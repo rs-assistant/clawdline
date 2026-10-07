@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 4715,
-  "riskKeys": 2059,
-  "nonRiskCount": 2656,
+  "englishContentKeys": 4730,
+  "riskKeys": 2069,
+  "nonRiskCount": 2661,
   "groups": [
     {
       "name": "bar / other",
@@ -1634,11 +1634,16 @@
     },
     {
       "name": "next / cloud",
-      "count": 67,
+      "count": 72,
       "sources": [
         "src/next-strings.ts"
       ],
       "keys": [
+        "next.cloudAccessCanOperate",
+        "next.cloudAccessCanView",
+        "next.cloudAccessOffline",
+        "next.cloudAccessOnline",
+        "next.cloudAccessSignedIn",
         "next.cloudChecking",
         "next.cloudConnRetry",
         "next.cloudConnecting",
@@ -1683,7 +1688,7 @@
         "next.cloudPairExpires",
         "next.cloudPairFromBrowserTitle",
         "next.cloudPairFromBrowserWhen",
-        "next.cloudPairFromMachineStep1",
+        "next.cloudPairFromMachineStep2",
         "next.cloudPairFromMachineTitle",
         "next.cloudPairFromMachineWhen",
         "next.cloudPairGenerate",

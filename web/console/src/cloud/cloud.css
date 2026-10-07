@@ -15,6 +15,7 @@
 .cloud-machine-name { font-size: 14px; font-weight: 600; }
 .cloud-machine-identity { font-size: 11px; color: var(--faint); font-family: var(--mono); }
 .cloud-machine-facts { font-size: 12px; color: var(--dim); }
+.cloud-machine-access { font-size: 12px; color: var(--dim); line-height: 1.4; }
 
 /* In the header, shaped like the connection light it replaces (`legacy/header.css` `.conn`)
    and carrying that light's dot before the machine's name. The list opens here

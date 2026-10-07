@@ -45,6 +45,8 @@ export interface CloudMachine {
   observedAt: number | null
   freshness: "current" | "stale" | "unknown"
   pairing: "paired" | "not_paired" | "unknown"
+  /** From this machine's encrypted descriptor, or null when not observed. */
+  operationAllowed?: boolean | null
   /** Absent when this browser has no readable session inventory for the machine. */
   sessions?: number
   selectable: boolean
@@ -74,7 +76,7 @@ export interface CloudClientHandle extends CloudReadClient {
    * null when this browser has opened none — which is every machine it is not
    * paired with (`cloud-client.js`).
    */
-  machineDescriptor?(machine: string): { machine?: { name?: string; platform?: string } } | null
+  machineDescriptor?(machine: string): { machine?: { name?: string; platform?: string; operation_allowed?: unknown } } | null
   /** Low-level encrypted command seam used by the original webhook binder. */
   _publishCommand(
     machine: string,

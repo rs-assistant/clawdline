@@ -154,11 +154,12 @@ const (
 // The names of the rows. Stable: they are keys on the wire and in the
 // CLAWDLINE_NEXT_CAPACITY override.
 const (
-	AuditSecurity   = "audit.security"
-	StoreDB         = "store.db"
-	BoardReceipts   = "board.receipts"
-	CloudRelayQueue = "cloud.relay_queue"
-	StoreReceipts   = "store.receipts"
+	AuditSecurity          = "audit.security"
+	StoreDB                = "store.db"
+	BoardReceipts          = "board.receipts"
+	CloudRelayQueue        = "cloud.relay_queue"
+	CloudReloadStopSeconds = "cloud.reload_stop_seconds"
+	StoreReceipts          = "store.receipts"
 	// C2: the things that had no limit at all (limits §3.3, §7.2 wave 2).
 	LogDaemon             = "log.daemon"
 	DevicesList           = "devices.list"
@@ -593,6 +594,14 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics, Notice, CloudStatus, Log, Sender},
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/transport/cloud.(*Relay).start:chan(r.depth())"},
+		},
+		{
+			// A replacement line waits for its old connection and schedule
+			// poller to stop. A timeout refuses the replacement to avoid overlap.
+			Name: CloudReloadStopSeconds, Class: Buffer, Unit: Seconds,
+			Limit: 15, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender, Log}, EvictedBy: Daemon,
+			Sources: []string{"cmd/clawdline.startCloudLine.maxCloudReloadStopSeconds"},
 		},
 		{
 			// CLAWDLINE_NEXT_DIR/logs/daemon.log (limits N29). At this size it

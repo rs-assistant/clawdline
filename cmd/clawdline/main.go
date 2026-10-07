@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -322,7 +323,7 @@ func stopTunnelOnSignal(srv *httptransport.Server) {
 // behind. Each of those is recorded where `/v1/cloud/status` can say it, which
 // is the difference between a quiet failure and a legible one.
 func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.Server) {
-	link, err := cloudtransport.Open(cloudtransport.LinkOptions{
+	opts := cloudtransport.LinkOptions{
 		Dir:         cfg.Dir,
 		ForeignDirs: foreignDirs(),
 		// The daemon's own routes, gate and all. A Cloud request is answered by
@@ -353,26 +354,62 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		SpoolBytes:        int(httptransport.CapacityLimit(capacity.CloudSpoolBytes)),
 		SpoolChannelBytes: int(httptransport.CapacityLimit(capacity.CloudSpoolChannelBytes)),
 		SpoolReceipts:     int(httptransport.CapacityLimit(capacity.CloudSpoolReceipts)),
-	})
-	if err != nil {
-		// A malformed cloud setting is loud and is not fatal. Falling back to
-		// the production relay because somebody mistyped a local one is the
-		// failure worth refusing.
-		log.Printf("cloud: the line is off: %v", err)
-		return
 	}
-	httptransport.SetCloudLine(cfg.Dir, link)
-	if !link.Enabled() {
-		return
-	}
-	if identity, webhooks, ok := link.ScheduleWebhooks(); ok {
-		srv.StartScheduleWebhooks(ctx, identity, webhooks, version)
-	}
-	go func() {
-		if err := link.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			log.Printf("cloud: the line stopped: %v", err)
+	var mu sync.Mutex
+	var stop context.CancelFunc
+	var done chan struct{}
+	var webhooksDone <-chan struct{}
+	const maxCloudReloadStopSeconds = 15
+	stopWait := time.Duration(min(int64(maxCloudReloadStopSeconds), httptransport.CapacityLimit(capacity.CloudReloadStopSeconds))) * time.Second
+	reload := func() error {
+		mu.Lock()
+		defer mu.Unlock()
+		if stop != nil {
+			stop()
+			select {
+			case <-done:
+			case <-time.After(stopWait):
+				return fmt.Errorf("the previous Cloud connection did not stop within %s", stopWait)
+			}
+			if webhooksDone != nil {
+				select {
+				case <-webhooksDone:
+				case <-time.After(stopWait):
+					return fmt.Errorf("the previous Cloud schedule poller did not stop within %s", stopWait)
+				}
+			}
+			stop, done = nil, nil
+			webhooksDone = nil
 		}
-	}()
+		link, err := cloudtransport.Open(opts)
+		if err != nil {
+			httptransport.SetCloudLine(cfg.Dir, nil)
+			return err
+		}
+		httptransport.SetCloudLine(cfg.Dir, link)
+		if !link.Enabled() {
+			return nil
+		}
+		lineCtx, cancel := context.WithCancel(ctx)
+		stop = cancel
+		done = make(chan struct{})
+		if identity, webhooks, ok := link.ScheduleWebhooks(); ok {
+			webhooksDone = srv.StartScheduleWebhooks(lineCtx, identity, webhooks, version)
+		}
+		finished := done
+		go func() {
+			defer close(finished)
+			if err := link.Run(lineCtx); err != nil && !errors.Is(err, context.Canceled) {
+				log.Printf("cloud: the line stopped: %v", err)
+			}
+		}()
+		return nil
+	}
+	srv.SetCloudReload(reload)
+	if err := reload(); err != nil {
+		// A malformed setting is loud, but never takes the local daemon down.
+		log.Printf("cloud: the line is off: %v", err)
+	}
 }
 
 func doctor() {

@@ -696,11 +696,12 @@ func (l *Link) wire() error {
 		Log:       opts.Log,
 	}
 	l.publisher = &Publisher{
-		MachineID:   identity.MachineID,
-		MachineName: machineName(identity, settings, HostName(), runtime.GOOS),
-		Platform:    runtime.GOOS,
-		Version:     opts.Version,
-		APILevel:    opts.APILevel,
+		MachineID:       identity.MachineID,
+		MachineName:     machineName(identity, settings, HostName(), runtime.GOOS),
+		Platform:        runtime.GOOS,
+		Version:         opts.Version,
+		APILevel:        opts.APILevel,
+		OperationAccess: l.operationAccess,
 		Router: Router{Handler: opts.Handler, Authorize: opts.Authorize,
 			AppOrigin: settings.AppOrigin},
 		Publish: l.relay.Publish,
@@ -1028,11 +1029,18 @@ func (l *Link) answer(ctx context.Context, service Service, request Inbound) {
 // startup would keep saying yes until the daemon restarted. A file that cannot
 // be read is a no — an unreadable switch is not an open one.
 func (l *Link) allowCommands() bool {
+	allowed, _ := l.operationAccess()
+	return allowed
+}
+
+// operationAccess retains the distinction between an explicit off and a
+// settings file that could not be checked, for the browser's status card.
+func (l *Link) operationAccess() (bool, bool) {
 	settings, err := adaptercloud.ReadSettings(l.file)
 	if err != nil {
-		return false
+		return false, false
 	}
-	return settings.Commands
+	return settings.Commands, true
 }
 
 // publicKeyFor is who this machine will verify an envelope against.

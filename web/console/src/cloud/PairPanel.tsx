@@ -152,7 +152,7 @@ export function PairPanel(props: {
                     <li>{nextWord("cloudPairFromMachineStep1")}</li>
                     <li>{nextWord("cloudPairFromMachineStep2")}</li>
                   </ol>
-                  <code>clawdline cloud pair</code>
+                  <p className="fine">{nextWord("cloudPairContainer")}</p>
                   <p className="cloud-pair-success">{nextWord("cloudPairFromMachineSuccess")}</p>
                 </article>
                 <article>

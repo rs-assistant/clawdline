@@ -102,6 +102,9 @@ type Publisher struct {
 	// answers, so a newer console can say a feature needs an update before it
 	// asks for it. Zero leaves the key out, as a daemon before it had none.
 	APILevel int
+	// OperationAccess is the current per-machine write switch. Its second
+	// return distinguishes a readable off from an unreadable setting.
+	OperationAccess func() (allowed bool, known bool)
 	// Router is this daemon's own routes — the same in-process dispatch a Cloud
 	// read goes through, so the rows a viewer sees are the rows the local
 	// console sees.
@@ -533,6 +536,11 @@ func (p *Publisher) publishDescriptor(ctx context.Context) {
 			"platform": p.platform(),
 			"commands": cloudops.Implemented(),
 		},
+	}
+	if p.OperationAccess != nil {
+		if allowed, known := p.OperationAccess(); known {
+			snapshot["machine"].(map[string]any)["operation_allowed"] = allowed
+		}
 	}
 	// A machine with no task a viewer can reach publishes the descriptor it
 	// always did. The hosted console replaces a machine's whole snapshot with
