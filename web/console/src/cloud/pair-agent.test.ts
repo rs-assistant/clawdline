@@ -75,26 +75,25 @@ test("the status line says sent, finished here, cancelled, or refused with the r
 })
 
 // The card itself is React and is read here as source, as unpaired-rows.test.ts
-// reads it: the hand-off is offered only for a named machine inside the Mac
-// app, above the copy box, which stays for every other browser.
-test("the waiting card offers the hand-off above the copy box, only where the shell can take it", () => {
-  // Inside the Mac app the hand-off is the primary button and the copy path
-  // folds under a disclosure that opens when the AI could not finish.
+// reads it: the direct copy-to-Settings path precedes the optional agent path.
+test("the waiting card keeps the agent hand-off behind the direct code path", () => {
   const here = dirname(fileURLToPath(import.meta.url))
   const panel = readFileSync(resolve(here, "PairPanel.tsx"), "utf8")
   assert.match(panel, /const handOff = offer && asked && pairAgentAvailable\(\) \? asked : null/)
   const button = panel.indexOf('id="cloud-pair-agent"')
-  // The copy box is built as `manual` and drawn where `{manual}` stands.
+  const codeCopy = panel.indexOf('id="cloud-pair-code-copy"')
+  // The agent instruction copy box is built as `manual` and drawn after
+  // the native hand-off inside the advanced disclosure.
   assert.match(panel, /const manual = \(\s*<>[\s\S]*id="cloud-pair-command"/)
-  const copyBox = panel.indexOf("{manual}")
-  assert.ok(button > 0 && copyBox > button, "the hand-off button is drawn before the copy box")
+  const copyBox = panel.lastIndexOf("{manual}")
+  assert.ok(codeCopy > 0 && button > codeCopy && copyBox > button, "the direct code precedes optional agent paths")
   assert.match(panel, /handPairToAgent\(\{ offer: state\.fragment, machineID: handOff\.id, machineName: handOff\.name \}\)/)
   assert.match(panel, /id="cloud-pair-copy"/)
   const agentButton = panel.slice(panel.lastIndexOf("<button", button), button)
   assert.match(agentButton, /className="go"/)
-  const manual = panel.indexOf('id="cloud-pair-manual"')
-  assert.ok(manual > button, "the disclosure is under the hand-off")
-  assert.match(panel, /\{handOff \? \(\s*<details/)
+  const manual = panel.indexOf('id="cloud-pair-agent-advanced"')
+  assert.ok(manual > codeCopy && manual < button, "the disclosure contains the hand-off")
+  assert.match(panel, /\{handOff && \(\s*<div className="cloud-pair-agent"/)
   assert.match(panel, /if \(next\.stage === "failed"\) setManualOpen\(true\)/)
 })
 

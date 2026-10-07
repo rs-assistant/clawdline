@@ -1054,6 +1054,8 @@ export function CloudGate({ declared }: { declared: string }) {
           // the authenticated handover. Closing reveals that updated list;
           // the fingerprint stays here until the person has compared it.
           onPaired: closePairing,
+          canScan: cloudOnboardingMode(window) === "pwa",
+          onScan: readInvitation,
         }
       : null
   // Once drawn, the console stays: the copied modules bind to the document
@@ -1164,7 +1166,8 @@ function GateCard(props: {
         className="door-card"
         role={question || nameQuestion ? "alertdialog" : "dialog"}
         aria-modal="true"
-        aria-label="clawdline"
+        aria-label={pairing ? undefined : "clawdline"}
+        aria-labelledby={pairing ? "cloud-pair-title" : undefined}
         aria-busy={forgetting || renaming ? "true" : undefined}
         aria-describedby={question ? "cloud-forget-say" : nameQuestion ? "cloud-rename-say" : undefined}
       >
