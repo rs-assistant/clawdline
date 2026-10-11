@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import type { SessionRow } from "@clawdline/contract"
 import App from "../App.js"
 import { BRAND_MARK } from "../brand-mark.js"
 import type { ConnectionLight } from "../connection-state.js"
@@ -63,7 +64,7 @@ import { carrierReading, type CarrierReading } from "./carrier-state.js"
 import { CloudSessionSheets, type PendingMachineAction } from "./CloudSessionSheets.js"
 import { PeerAccessPage } from "./PeerAccessPage.js"
 import { destinationAvailable, destinationFragment, destinationFromFragment, destinationKey,
-  supersedingDestination, type FleetDetailProblem, type SessionContent,
+  supersedingDestination, type FleetDetailProblem, type ProjectedSession, type SessionContent,
   type SessionDestination, type SessionListPresentation, type SessionProjectionSource } from "./all-machine-sessions.js"
 import { statusSource } from "./status-source.js"
 import { RelayWriter, writeRoute } from "./relay-writer.js"
@@ -279,13 +280,17 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const [readerMachine, setReaderMachine] = useState<string | null>(null)
   const fleetTargetRef = useRef<SessionDestination | null>(null)
   fleetTargetRef.current = fleetScope ? fleetTarget : null
-  const fleetPresentations = useRef(new Map<string, SessionListPresentation & { destination: SessionDestination }>())
+  const fleetPresentations = useRef(new Map<string, SessionListPresentation & {
+    destination: SessionDestination; projection?: ProjectedSession }>())
+  const [fleetPresentationRevision, refreshFleetPresentation] = useState(0)
   const noteFleetPresentations = useCallback((machineID: string,
-    rows: readonly (SessionListPresentation & { destination: SessionDestination })[]) => {
+    rows: readonly (SessionListPresentation & { destination: SessionDestination;
+      projection?: ProjectedSession })[]) => {
     for (const [key, row] of fleetPresentations.current) {
       if (row.destination.machineID === machineID) fleetPresentations.current.delete(key)
     }
     for (const row of rows) fleetPresentations.current.set(destinationKey(row.destination), row)
+    refreshFleetPresentation((revision) => revision + 1)
     const target = fleetTargetRef.current
     if (target?.machineID === machineID && reader.current?.machine === machineID && client.current)
       reader.current.attach(client.current)
@@ -1439,6 +1444,29 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // Once drawn, the console stays: the copied modules bind to the document
   // once, so a refusal after that (a revoked device, a line that gave up) is
   // drawn over it, as the door is over a local console (`door/Door.tsx`).
+  const fleetTargetRow = useMemo(() => {
+    if (!fleetScope || !fleetTarget) return null
+    const presentation = fleetPresentations.current.get(destinationKey(fleetTarget))
+    const status = presentation?.status
+    if (!presentation || !status || typeof status.work_state !== "string" ||
+      typeof status.state !== "string" || presentation.projection?.freshness !== "current" ||
+      presentation.projection.state !== status.state) return null
+    // The pinned list deliberately omits closeability and terminal internals.
+    // The fallback opens content only; an unknown closeability cannot authorize
+    // an end action while the rich stream is catching up.
+    const closeability: SessionRow["closeability"] = {
+      activity_generation: 0, attestation_id: null, mover: null,
+      obligation_generation: 0, observed_at: 0, provenance: [], reasons: [],
+      session_generation: 0, source: { freshness: "unknown", max_age_seconds: 0,
+        observed_at: 0, provenance: "pinned_list" }, state: "unknown", version: "",
+    }
+    return { ...status, id: fleetTarget.sessionID, session: fleetTarget.sessionID,
+      machine: fleetTarget.machineID, execution_generation: fleetTarget.executionGeneration,
+      label: presentation.title, cwd: presentation.cwd, icon: presentation.icon,
+      backend: presentation.projection.backend, assistant: presentation.projection.assistant,
+      isClaude: presentation.projection.assistant === "claude",
+      evidence: "none", closeability } as SessionRow
+  }, [fleetScope, fleetTarget && destinationKey(fleetTarget), fleetPresentationRevision])
   return (
     <>
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
@@ -1453,6 +1481,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             focusCloudSessions={fleetScope}
             onLeaveCloudSessions={leaveFleet}
             fleetTarget={fleetScope ? fleetTarget : null}
+            fleetTargetRow={fleetTargetRow}
             fleetDetailProblem={fleetScope && fleetTarget
               ? fleetDetailProblem?.key === destinationKey(fleetTarget)
                 ? { text: fleetDetailProblem.text, action: fleetDetailProblem.action }

@@ -9,7 +9,8 @@ import { SessionToolbar } from "../session/SessionToolbar.js"
 import { ScheduleSection, scheduleMachineReady } from "../pages/schedules.js"
 import { destinationKey, displayedPresentationStatus, presentationPass, projectionRefreshAt, settleProjection,
   type MachineSessionProjection, type ProjectionProblem, type SessionDestination,
-  type SessionListPresentation, type SessionProjectionSource, type FleetMachine } from "./all-machine-sessions.js"
+  type SessionListPresentation, type SessionProjectionSource, type FleetMachine,
+  type ProjectedSession } from "./all-machine-sessions.js"
 import { STATUS_FRESH_MS } from "./status-projection.js"
 import { STATUS_MARKER_RETRY_MS } from "./status-source.js"
 import { arrangeFleetRows, fleetWaitingKey } from "./fleet-order.js"
@@ -31,7 +32,8 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   filter: string
   onFilter: (value: string) => void
   onOpen: (target: SessionDestination) => void
-  onPresentations?: (machineID: string, rows: readonly (SessionListPresentation & { destination: SessionDestination })[]) => void
+  onPresentations?: (machineID: string, rows: readonly (SessionListPresentation & {
+    destination: SessionDestination; projection?: ProjectedSession })[]) => void
   onMachineAction?: (machineID: string, action: MachineToolbarAction) => void
   onCloseRequest: (target: SessionDestination, title: string) => void
 }) {
@@ -179,8 +181,11 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               status: row.status ?? previous?.status,
             })
           }
-          onPresentations?.(machineID, rows)
           const expected = readings[machineID]
+          const projected = new Map(expected?.phase === "settled" && expected.value.kind === "ready"
+            ? expected.value.rows.map((row) => [destinationKey(row.destination), row] as const) : [])
+          onPresentations?.(machineID, rows.map((row) => ({ ...row,
+            projection: projected.get(destinationKey(row.destination)) })))
           const missing = expected?.phase === "settled" && expected.value.kind === "ready" &&
             expected.value.rows.some((row) => row.freshness === "current" &&
               !presentations.current.has(destinationKey(row.destination)))
