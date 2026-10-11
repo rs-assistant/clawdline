@@ -324,7 +324,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
             </button></h2>
           {!collapsed[machine.id] && <>
           {machine.freshness !== "current" && reading?.phase === "settled" && reading.value.kind === "ready" &&
-            <p role="status">{machine.freshness === "stale" ? nextWord("cloudAllStaleSource") : nextWord("cloudAllUnknownSource")}</p>}
+            <p role="status">{machine.freshness === "stale" ? nextWord("cloudAllStaleSource") : nextWord("cloudAllCheckingConnection")}</p>}
           {!reading || reading.phase === "loading" ? <p role="status">{nextWord("cloudAllLoading")}</p> : <>
             {reading.value.kind === "unavailable" && <p role="status">{problemWord(reading.value.reason)}</p>}
             {presentationLoading && <p role="status">{nextWord("cloudAllLoading")}</p>}

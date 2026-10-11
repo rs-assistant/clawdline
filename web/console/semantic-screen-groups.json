@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5050,
+  "englishContentKeys": 5051,
   "riskKeys": 2214,
-  "nonRiskCount": 2836,
+  "nonRiskCount": 2837,
   "groups": [
     {
       "name": "bar / other",
@@ -1638,7 +1638,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 203,
+      "count": 204,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1671,6 +1671,7 @@
         "next.cloudAllAttention",
         "next.cloudAllAttentionNeeded",
         "next.cloudAllBack",
+        "next.cloudAllCheckingConnection",
         "next.cloudAllCloseBlocked",
         "next.cloudAllCloseGone",
         "next.cloudAllCollapseMachine",
