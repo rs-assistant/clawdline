@@ -1512,7 +1512,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     <>
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
-          <App aside={aside} hideSessionCounts={fleetScope}
+          <App key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
             cloudPeerAccess={(active) => <PeerAccessPage active={active}
               machines={(shown.phase === "ready" ? shown.machines : []).map((machine) => ({
               id: machine.id, name: machine.name || machine.label || machine.id,
