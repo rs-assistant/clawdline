@@ -565,7 +565,7 @@ export interface RelayReaderOptions {
   /** Display facts from the already authorized per-machine list read. */
   fleetPresentation?: (target: SessionDestination) => SessionListPresentation | null
   /** The same bounded, pinned machine list used by the fleet when rich rows are missing. */
-  listPresentations?: (machineID: string) => Promise<MachineListPresentation[] | null>
+  listPresentations?: (machineID: string, expectedCount: number) => Promise<MachineListPresentation[] | null>
   /** Resolve an exact execution through the verified status source if ss/ replay is missing. */
   resolveSession?: (machineID: string, sessionID: string) => Promise<SessionDestination | null>
   /** Recheck one visible fleet mutation against the latest ss/ pass. */
@@ -1436,7 +1436,7 @@ export class RelayReader {
     const now = this.now()
     const held = this.presentationRead
     if (held?.pass === pass && held.until > now) return held.promise
-    const promise = Promise.resolve().then(() => this.options.listPresentations?.(this.machine) ?? null)
+    const promise = Promise.resolve().then(() => this.options.listPresentations?.(this.machine, expectedCount) ?? null)
       .catch(() => null)
     const reading = { pass, until: now + 60_000, promise }
     this.presentationRead = reading

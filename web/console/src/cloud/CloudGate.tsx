@@ -64,8 +64,9 @@ import { carrierReading, type CarrierReading } from "./carrier-state.js"
 import { CloudSessionSheets, type PendingMachineAction } from "./CloudSessionSheets.js"
 import { PeerAccessPage } from "./PeerAccessPage.js"
 import { destinationAvailable, destinationFragment, destinationFromFragment, destinationKey,
-  supersedingDestination, type FleetDetailProblem, type ProjectedSession, type SessionContent,
-  type SessionDestination, type SessionListPresentation, type SessionProjectionSource } from "./all-machine-sessions.js"
+  supersedingDestination, type FleetDetailProblem, type MachineListPresentation,
+  type ProjectedSession, type SessionContent, type SessionDestination,
+  type SessionListPresentation, type SessionProjectionSource } from "./all-machine-sessions.js"
 import { statusSource } from "./status-source.js"
 import { RelayWriter, writeRoute } from "./relay-writer.js"
 import { installScheduleWebhookManagement } from "./schedule-webhooks.js"
@@ -495,8 +496,17 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       classicStatus: true,
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
-      listPresentations: (machineID) => liveSessionSource.readMachinePresentations?.(
-        machineID, new AbortController().signal) ?? Promise.resolve(null),
+      listPresentations: (machineID, expectedCount) => {
+        // A machine switch follows the fleet's authorized pinned read. Reuse
+        // that complete batch while the exact ss/ generation is checked by the
+        // reader, instead of making the same machine answer twice at once.
+        const held = [...fleetPresentations.current.values()]
+          .filter((row) => row.destination.machineID === machineID)
+        if (expectedCount > 0 && held.length >= expectedCount)
+          return Promise.resolve(held as MachineListPresentation[])
+        return liveSessionSource.readMachinePresentations?.(
+          machineID, new AbortController().signal) ?? Promise.resolve(null)
+      },
       resolveSession: async (machineID, sessionID) => {
         const reading = await liveSessionSource.readMachine(machineID, new AbortController().signal)
         return reading.kind === "ready"
