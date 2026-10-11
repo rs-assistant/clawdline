@@ -564,6 +564,8 @@ export interface RelayReaderOptions {
   fleetTarget?: () => SessionDestination | null
   /** Display facts from the already authorized per-machine list read. */
   fleetPresentation?: (target: SessionDestination) => SessionListPresentation | null
+  /** A newer, authenticated fleet batch keeps an older ss/ replay from shrinking the list. */
+  fleetPresentations?: (machineID: string) => MachineListPresentation[]
   /** The same bounded, pinned machine list used by the fleet when rich rows are missing. */
   listPresentations?: (machineID: string, expectedCount: number | null) => Promise<MachineListPresentation[] | null>
   /** Resolve an exact execution through the verified status source if ss/ replay is missing. */
@@ -1478,16 +1480,36 @@ export class RelayReader {
     const recovering = (all.scan.recovering ?? []).includes(this.machine)
     const failed = (all.scan.failures ?? []).some((f) => f.machine === this.machine)
     const statusMarker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
-      | { payload?: { complete?: unknown; snapshot_generation?: unknown;
+      | { payload?: { at?: unknown; complete?: unknown; snapshot_generation?: unknown;
         inventory?: { version?: unknown; sessions?: unknown } } } | undefined
     const statusIDs = statusMarker?.payload?.complete === true && statusMarker.payload.inventory?.version === 1 &&
       Array.isArray(statusMarker.payload.inventory.sessions)
       ? statusMarker.payload.inventory.sessions.filter((id): id is string => typeof id === "string" && !!id) : null
     const inventory = client.sessionInventoryByMachine?.get(this.machine)
-    let expected = this.options.classicStatus
+    const inventoryKeys = inventoryRowKeys(inventory)
+    let expected: Set<string> | null = this.options.classicStatus
       ? statusIDs === null ? null : new Set(statusIDs.map((id) => this.machine + "\u0000" + id))
-      : inventoryRowKeys(inventory)
+      : inventoryKeys ? new Set(inventoryKeys) : null
     const hasInventory = this.options.classicStatus ? expected !== null : inventory !== undefined
+    let newerFleetRows = false
+    const newerFleetExecutions = new Map<string, string>()
+    if (this.options.classicStatus && expected && typeof statusMarker?.payload?.at === "number" &&
+      Number.isFinite(statusMarker.payload.at)) {
+      const markerAt = Number(statusMarker!.payload!.at) * 1000
+      for (const row of this.options.fleetPresentations?.(this.machine) ?? []) {
+        const projection = row.projection
+        if (projection?.freshness !== "current" || projection.observedAt <= markerAt ||
+          projection.destination.machineID !== this.machine ||
+          projection.destination.sessionID !== row.destination.sessionID ||
+          projection.destination.executionGeneration !== row.destination.executionGeneration) continue
+        const key = this.machine + "\u0000" + row.destination.sessionID
+        newerFleetExecutions.set(row.destination.sessionID, row.destination.executionGeneration)
+        if (!expected.has(key)) {
+          expected.add(key)
+          newerFleetRows = true
+        }
+      }
+    }
     const machineRows = all.sessions.filter((row) => {
       if (row.machine !== this.machine) return false
       if (!this.options.classicStatus) return true
@@ -1498,6 +1520,15 @@ export class RelayReader {
       return typeof status?.payload?.execution_generation === "string" &&
         row.execution_generation === status.payload.execution_generation
     })
+    for (let index = machineRows.length - 1; index >= 0; index--) {
+      const row = machineRows[index]
+      const id = typeof row.session === "string" ? row.session : row.id
+      const newer = typeof id === "string" ? newerFleetExecutions.get(id) : undefined
+      if (newer && row.execution_generation !== newer) {
+        machineRows.splice(index, 1)
+        newerFleetRows = true
+      }
+    }
     let recoveredFromList = false
     if (this.options.classicStatus && this.options.listPresentations &&
       (!expected || machineRows.length < expected.size)) {
@@ -1574,7 +1605,7 @@ export class RelayReader {
       return this.machine + "\u0000" + id
     }))
     const hasEveryRow = expected === null ? !this.options.classicStatus : [...expected].every((key) => heldKeys.has(key))
-    const whole = hasInventory && hasEveryRow && !recovering && !failed
+    const whole = hasInventory && hasEveryRow && !newerFleetRows && !recovering && !failed
     const sessions = machineRows.filter((row) => {
       const id = typeof row.session === "string" ? row.session : typeof row.id === "string" ? row.id : ""
       const closedAt = this.closedAt.get(id)

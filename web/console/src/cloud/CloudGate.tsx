@@ -496,6 +496,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       classicStatus: true,
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
+      fleetPresentations: (machineID) => [...fleetPresentations.current.values()]
+        .filter((row) => row.destination.machineID === machineID),
       listPresentations: async (machineID, expectedCount) => {
         // A machine switch follows the fleet's authorized pinned read. Reuse
         // that batch while the exact ss/ generation is checked by the reader,

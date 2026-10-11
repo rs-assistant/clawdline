@@ -472,6 +472,36 @@ test("a verified pinned batch fills a single-machine list while one signed row i
   assert.equal(snapshot.scan.complete, true)
 })
 
+test("a newer fleet batch prevents an older signed marker from declaring a shorter list complete", async () => {
+  const client = new FakeClient()
+  const pass = "c".repeat(32), execution = "a".repeat(32)
+  client.statusSnapshots = markerOnly("mac-a", pass, 1, "s1")
+  ;(client.statusSnapshots as Map<string, unknown>).set(JSON.stringify(["mac-a", "s1"]),
+    statusRow(pass, execution, 1))
+  client.rows = [row("mac-a", "s1", { execution_generation: execution })]
+  const batch = ["s1", "s2", "s3"].map((session) => {
+    const destination = { machineID: "mac-a", sessionID: session, executionGeneration: execution }
+    return { destination, title: "Title " + session, status: { state: "idle" as const },
+      projection: { destination, state: "idle", freshness: "current" as const,
+        observedAt: 2000, snapshotGeneration: "direct:2000" } }
+  })
+  let reads = 0
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 2000,
+    fleetPresentations: () => batch,
+    listPresentations: async () => { reads++; return batch },
+  })
+  r.attach(client)
+  const pending = await r.snapshot()
+  assert.deepEqual(pending.sessions.map((session) => session.id), ["s1", "s2", "s3"])
+  assert.equal(pending.scan.complete, false)
+  assert.equal(reads, 1)
+
+  client.statusSnapshots = markerOnly("mac-a", "d".repeat(32), 3, "s1", "s2", "s3")
+  const settled = await r.snapshot()
+  assert.deepEqual(settled.sessions.map((session) => session.id), ["s1", "s2", "s3"])
+  assert.equal(settled.scan.complete, true)
+})
+
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {
   const client = new FakeClient()
   const pass = "c".repeat(32)
