@@ -170,6 +170,8 @@ test("a cold status gap uses one complete pinned machine list for rows and title
   const reading = await source.readMachine(machineID, new AbortController().signal)
   assert.equal(reading.kind, "ready")
   assert.equal(reading.rows?.[0]?.destination.executionGeneration, executionGeneration)
+  assert.equal(reading.rows?.[0]?.snapshotGeneration, reading.snapshotGeneration,
+    "a direct row carries the generation the single-machine reader verifies")
   const titles = await source.readMachinePresentations?.(machineID, new AbortController().signal)
   assert.deepEqual(titles?.map((row) => row.title), ["The real title"])
   assert.deepEqual(calls, ["sessions.list:" + machineID])

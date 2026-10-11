@@ -104,13 +104,14 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
   // the machine did name. Absence then proves nothing, including an empty list.
   const complete = body.complete === true || !!inventoryIDs && ids.length === inventoryIDs.length &&
     ids.every((id) => inventoryIDs.includes(id))
+  const snapshotGeneration = "direct:" + nowMs
   return { reply: body, projection: { kind: "ready", complete, observedAt: nowMs,
-    snapshotGeneration: "direct:" + nowMs,
+    snapshotGeneration,
     rows: sessions.map((row: Record<string, unknown> | null) => {
       const status = record(row!.status)!
       return { destination: { machineID, sessionID: String(row!.id),
         executionGeneration: String(row!.execution_generation) }, state: String(status.state),
-      freshness: "current" as const, observedAt: nowMs }
+      freshness: "current" as const, observedAt: nowMs, snapshotGeneration }
     }) } }
 }
 

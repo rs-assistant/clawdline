@@ -344,6 +344,24 @@ test("a single-machine page fills missing rich rows from one pinned list read", 
   assert.equal(reads, 1)
 })
 
+test("a signed marker accepts missing rows from the same pinned direct-list generation", async () => {
+  const client = new FakeClient()
+  const execution = "a".repeat(32), pass = "b".repeat(32)
+  client.statusSnapshots = markerOnly("mac-a", pass, 1, "s1", "s2", "s3")
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    listPresentations: async () => ["s1", "s2", "s3"].map((session) => ({
+      destination: { machineID: "mac-a", sessionID: session, executionGeneration: execution },
+      title: "Title " + session, status: { state: "idle" },
+      projection: { destination: { machineID: "mac-a", sessionID: session, executionGeneration: execution },
+        state: "idle", freshness: "current", observedAt: 1000, snapshotGeneration: "direct:1000" },
+    })),
+  })
+  r.attach(client)
+  const result = await r.snapshot()
+  assert.deepEqual(result.sessions.map((row) => row.id), ["s1", "s2", "s3"])
+  assert.equal(result.scan.complete, true)
+})
+
 test("a waiting single-machine list asks again after a failed pinned read without a new marker event", async () => {
   const client = new FakeClient()
   client.statusSnapshots = new Map()
