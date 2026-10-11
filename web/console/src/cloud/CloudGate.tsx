@@ -496,16 +496,28 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       classicStatus: true,
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
-      listPresentations: (machineID, expectedCount) => {
+      listPresentations: async (machineID, expectedCount) => {
         // A machine switch follows the fleet's authorized pinned read. Reuse
-        // that complete batch while the exact ss/ generation is checked by the
-        // reader, instead of making the same machine answer twice at once.
+        // that batch while the exact ss/ generation is checked by the reader,
+        // instead of making the same machine answer twice at once. Without a
+        // signed marker, compare exact executions with the fleet's current
+        // authenticated set before reusing it; a first handful of titles is
+        // still a partial batch and the reader keeps its bounded retry.
         const held = [...fleetPresentations.current.values()]
           .filter((row) => row.destination.machineID === machineID)
         if (expectedCount !== null && held.length >= expectedCount)
-          return Promise.resolve(held as MachineListPresentation[])
-        return liveSessionSource.readMachinePresentations?.(
-          machineID, new AbortController().signal) ?? Promise.resolve(null)
+          return held as MachineListPresentation[]
+        if (expectedCount === null && held.length) {
+          const reading = await liveSessionSource.readMachine(machineID, new AbortController().signal)
+          if (reading.kind === "ready") {
+            const current = new Set(reading.rows.filter((row) => row.freshness === "current")
+              .map((row) => destinationKey(row.destination)))
+            if (current.size === held.length && held.every((row) => current.has(destinationKey(row.destination))))
+              return held as MachineListPresentation[]
+          }
+        }
+        return await liveSessionSource.readMachinePresentations?.(
+          machineID, new AbortController().signal) ?? null
       },
       resolveSession: async (machineID, sessionID) => {
         const reading = await liveSessionSource.readMachine(machineID, new AbortController().signal)
