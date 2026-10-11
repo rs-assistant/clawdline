@@ -361,6 +361,34 @@ test("a waiting single-machine list asks again after a failed pinned read withou
   assert.equal(reads, 2)
 })
 
+test("a single-machine list with no marker does not cache its first partial batch as complete", async () => {
+  const client = new FakeClient()
+  client.statusSnapshots = new Map()
+  let now = 1000, reads = 0
+  const counts: (number | null)[] = []
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+    listPresentations: async (_machine, expectedCount) => {
+      counts.push(expectedCount)
+      reads++
+      return Array.from({ length: reads === 1 ? 3 : 11 }, (_, index) => ({
+        destination: { machineID: "mac-a", sessionID: "s" + index, executionGeneration: "a".repeat(32) },
+        title: "Session " + index, status: { state: "idle" },
+      }))
+    },
+  })
+  r.attach(client)
+  const first = await r.snapshot()
+  assert.equal(first.sessions.length, 3)
+  assert.equal(first.scan.complete, false)
+  assert.equal((await r.snapshot()).sessions.length, 3)
+  assert.equal(reads, 1, "a second render shares the bounded read")
+  now += 5_001
+  const refreshed = await r.snapshot()
+  assert.equal(refreshed.sessions.length, 11)
+  assert.equal(refreshed.scan.complete, false, "eleven rows without a signed marker still prove no absence")
+  assert.deepEqual(counts, [null, null])
+})
+
 test("a cross-machine conversation uses a verified list when its retained status marker is missing", async () => {
   const client = new FakeClient()
   const generation = "a".repeat(32)

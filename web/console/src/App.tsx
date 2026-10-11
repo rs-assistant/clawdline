@@ -854,6 +854,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         {!hideSessionCounts && <Counts
           reading={sessionCountState(fleet)}
           recovering={!!fleet.snapshot && scanRecovering(fleet.snapshot.scan)}
+          partialCloudList={fleet.snapshot?.scan.provenance === "cloud" && !fleet.snapshot.scan.complete &&
+            fleet.snapshot.sessions.length > 0}
           onOpen={() => setMachine(true)}
         />}
         {typeof aside === "function" ? aside(light) : (
@@ -1043,10 +1045,12 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
 function Counts({
   reading,
   recovering,
+  partialCloudList,
   onOpen,
 }: {
   reading: ReturnType<typeof sessionCountState>
   recovering: boolean
+  partialCloudList: boolean
   onOpen: () => void
 }) {
   const T = L.strings
@@ -1086,7 +1090,10 @@ function Counts({
   // The line is up — this band is drawn from a snapshot that arrived — so the
   // sentence is about the list, not about the app (`Sessions.tsx`'s empty
   // state, and `next-strings.ts` on why these are two words and not one).
-  if (recovering && reading.phase === "ready") bits.push({ cls: "part quiet", text: nextWord("sessionsListWaitTitle") })
+  if (partialCloudList && reading.phase === "ready")
+    bits.push({ cls: "part quiet", text: nextWord("sessionsListIncompleteTitle") })
+  else if (recovering && reading.phase === "ready")
+    bits.push({ cls: "part quiet", text: nextWord("sessionsListWaitTitle") })
   if (rows.length > 0 && !working && !waiting && !unknown && !shells && !recovering) {
     bits.push({ cls: "part quiet", text: catalogWord("literal", "1b40e6344265") })
   }

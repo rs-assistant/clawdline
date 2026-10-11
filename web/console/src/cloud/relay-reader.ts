@@ -565,7 +565,7 @@ export interface RelayReaderOptions {
   /** Display facts from the already authorized per-machine list read. */
   fleetPresentation?: (target: SessionDestination) => SessionListPresentation | null
   /** The same bounded, pinned machine list used by the fleet when rich rows are missing. */
-  listPresentations?: (machineID: string, expectedCount: number) => Promise<MachineListPresentation[] | null>
+  listPresentations?: (machineID: string, expectedCount: number | null) => Promise<MachineListPresentation[] | null>
   /** Resolve an exact execution through the verified status source if ss/ replay is missing. */
   resolveSession?: (machineID: string, sessionID: string) => Promise<SessionDestination | null>
   /** Recheck one visible fleet mutation against the latest ss/ pass. */
@@ -1434,7 +1434,7 @@ export class RelayReader {
     })
   }
 
-  private presentationsForPass(pass: string, expectedCount: number): Promise<MachineListPresentation[] | null> {
+  private presentationsForPass(pass: string, expectedCount: number | null): Promise<MachineListPresentation[] | null> {
     const now = this.now()
     const held = this.presentationRead
     if (held?.pass === pass && held.until > now) return held.promise
@@ -1443,7 +1443,11 @@ export class RelayReader {
     const reading = { pass, until: now + 60_000, promise }
     this.presentationRead = reading
     void promise.then((rows) => {
-      if (this.presentationRead === reading && (!rows || rows.length < expectedCount)) reading.until = this.now() + 5_000
+      // Without a signed marker there is no count to certify a partial read.
+      // Keep checking while the person is on this machine; one row is not the
+      // whole list merely because it was the first row to arrive.
+      if (this.presentationRead === reading && (!rows || expectedCount === null || rows.length < expectedCount))
+        reading.until = this.now() + 5_000
     })
     return promise
   }
@@ -1499,7 +1503,7 @@ export class RelayReader {
       (!expected || machineRows.length < expected.size)) {
       const pass = String(statusMarker?.payload?.snapshot_generation ?? "") + ":" +
         String((statusMarker?.payload as { presentation_generation?: unknown } | undefined)?.presentation_generation ?? "")
-      const presentations = await this.presentationsForPass(pass, expected?.size ?? 1)
+      const presentations = await this.presentationsForPass(pass, expected?.size ?? null)
       if (!expected && presentations?.length) {
         expected = new Set(presentations.map((row) => this.machine + "\u0000" + row.destination.sessionID))
       }
@@ -1609,7 +1613,7 @@ export class RelayReader {
     // marker remains the deletion barrier; a gap never claims an empty list.
     const settled = whole || failed || (this.options.classicStatus === true &&
       (hasInventory || recoveredFromList) && machineRows.length > 0)
-    if (settled) {
+    if (whole) {
       if (this.listRetryTimer) clearTimeout(this.listRetryTimer)
       this.listRetryTimer = null
       this.listRetryMs = 5_000

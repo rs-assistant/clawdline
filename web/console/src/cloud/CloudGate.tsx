@@ -502,7 +502,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         // reader, instead of making the same machine answer twice at once.
         const held = [...fleetPresentations.current.values()]
           .filter((row) => row.destination.machineID === machineID)
-        if (expectedCount > 0 && held.length >= expectedCount)
+        if (expectedCount !== null && held.length >= expectedCount)
           return Promise.resolve(held as MachineListPresentation[])
         return liveSessionSource.readMachinePresentations?.(
           machineID, new AbortController().signal) ?? Promise.resolve(null)
