@@ -109,7 +109,7 @@ export type MachineSessionProjection =
    * the list needs this to know a title or work note may have changed. Absent
    * against a machine that does not send it, and the key falls back.
    */
-  | { kind: "ready"; complete: true; observedAt: number; snapshotGeneration?: string; presentationGeneration?: string;
+  | { kind: "ready"; complete: boolean; observedAt: number; snapshotGeneration?: string; presentationGeneration?: string;
       rows: ProjectedSession[]; unknownTargets?: number }
   | { kind: "unavailable"; reason: ProjectionProblem; observedAt?: number; rows?: ProjectedSession[]; retryAt?: number;
       complete?: true; snapshotGeneration?: string; unknownTargets?: number }
@@ -185,7 +185,7 @@ export function checkedProjection(machineID: string, reply: MachineSessionProjec
   if (reply.kind === "unavailable" && !reply.rows) return reply
   const rows = reply.rows
   if (!rows) return { kind: "unavailable", reason: "bad_projection" }
-  if (reply.kind === "ready" && (reply.complete !== true || !Number.isFinite(reply.observedAt)))
+  if (reply.kind === "ready" && (typeof reply.complete !== "boolean" || !Number.isFinite(reply.observedAt)))
     return { kind: "unavailable", reason: "bad_projection" }
   if (reply.kind === "unavailable" && (!Number.isFinite(reply.observedAt) ||
     !["stale", "offline", "event_gap", "unknown", "unresponsive"].includes(reply.reason) ||
@@ -204,7 +204,7 @@ export function checkedProjection(machineID: string, reply: MachineSessionProjec
 export function destinationAvailable(destination: SessionDestination, projection: MachineSessionProjection | undefined): "ready" | "waiting" | "changed" | "stale" | "unknown" {
   if (!projection || projection.kind !== "ready") return "waiting"
   const row = projection.rows.find((item) => destinationKey(item.destination) === destinationKey(destination))
-  return row ? row.freshness === "current" ? "ready" : row.freshness : "changed"
+  return row ? row.freshness === "current" ? "ready" : row.freshness : projection.complete ? "changed" : "waiting"
 }
 
 /**

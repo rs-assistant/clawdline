@@ -327,12 +327,14 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
             <p role="status">{machine.freshness === "stale" ? nextWord("cloudAllStaleSource") : nextWord("cloudAllCheckingConnection")}</p>}
           {!reading || reading.phase === "loading" ? <p role="status">{nextWord("cloudAllLoading")}</p> : <>
             {reading.value.kind === "unavailable" && <p role="status">{problemWord(reading.value.reason)}</p>}
+            {reading.value.kind === "ready" && !reading.value.complete &&
+              <p role="status">{nextWord("cloudAllPartialMachine")}</p>}
             {presentationLoading && <p role="status">{nextWord("cloudAllLoading")}</p>}
             {presentationFailed && <p role="alert">{nextWord("cloudAllNameUnavailable")} <button type="button"
               onClick={() => { presentationPasses.current.delete(machine.id); presentationFailures.current.delete(machine.id)
                 refreshPresentation((revision) => revision + 1) }}>{nextWord("cloudAllTryAgain")}</button></p>}
             {presentationLoading || presentationFailed ? null : rows.length === 0 ? reading.value.unknownTargets ? null : reading.value.kind === "ready" ?
-              <p>{reading.value.rows.length === 0 ? nextWord("cloudAllEmptyMachine") : nextWord("cloudAllNoMatch")}</p> : null
+              <p>{reading.value.rows.length === 0 ? nextWord(reading.value.complete ? "cloudAllEmptyMachine" : "cloudAllPartialEmpty") : nextWord("cloudAllNoMatch")}</p> : null
               : <ul className="rows" role="listbox" aria-label={`${machine.name} ${nextWord("cloudSingleSessions")}`}>
                 {rows.map(({ row, depth, branchThrough, ancestorThrough }) => {
                   const presentation = presentations.current.get(destinationKey(row.destination))

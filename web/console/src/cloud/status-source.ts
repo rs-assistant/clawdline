@@ -99,11 +99,12 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
     !["working", "waiting", "idle", "unknown"].includes(String(record(row.status)?.state)))) return null
   const ids = sessions.map((row: Record<string, unknown> | null) => String(row!.id))
   if (new Set(ids).size !== ids.length) return null
-  // An incomplete local scan can still fill a gap in the signed ss/ set.
-  // A different or missing ID cannot silently become a complete list.
-  if (body.complete === false && (!inventoryIDs || ids.length !== inventoryIDs.length ||
-    ids.some((id) => !inventoryIDs.includes(id)))) return null
-  return { reply: body, projection: { kind: "ready", complete: true, observedAt: nowMs,
+  // The signed ss/ set can prove that an incomplete local scan nevertheless
+  // names every Session in that set. Without that proof, show only the rows
+  // the machine did name. Absence then proves nothing, including an empty list.
+  const complete = body.complete === true || !!inventoryIDs && ids.length === inventoryIDs.length &&
+    ids.every((id) => inventoryIDs.includes(id))
+  return { reply: body, projection: { kind: "ready", complete, observedAt: nowMs,
     snapshotGeneration: "direct:" + nowMs,
     rows: sessions.map((row: Record<string, unknown> | null) => {
       const status = record(row!.status)!

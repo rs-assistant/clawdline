@@ -3439,6 +3439,8 @@
   "next.cloudAllUnknown": "Unknown",
   "next.cloudAllUnknownSource": "The source of this Session cannot be confirmed.",
   "next.cloudAllCheckingConnection": "Session list loaded. Confirming this machine’s connection…",
+  "next.cloudAllPartialMachine": "Showing confirmed Sessions. This machine has not scanned every Session source.",
+  "next.cloudAllPartialEmpty": "No Sessions confirmed yet. This machine has not scanned every Session source.",
   "next.cloudAllChanged": "The assistant on {machine} restarted, so this is no longer the execution that is running.",
   "next.cloudAllLoading": "Loading this machine’s Sessions…",
   "next.cloudAllNameUnavailable": "Session names could not be loaded.",

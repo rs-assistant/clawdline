@@ -248,7 +248,7 @@ test("a stale retained status pass recovers from one pinned machine list without
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 })
 
-test("a stale marker does not certify an incomplete direct list", async () => {
+test("a stale marker cannot turn an incomplete direct list into a complete one", async () => {
   const { client, row } = clientFixture()
   row.projected_at -= 600
   const marker = client.statusSnapshots.get(JSON.stringify([machineID, inventory])) as {
@@ -259,14 +259,14 @@ test("a stale marker does not certify an incomplete direct list", async () => {
     sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
       status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] })
   const read = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
-  assert.equal(read.kind, "unavailable")
-  if (read.kind === "unavailable") {
-    assert.equal(read.reason, "stale")
-    assert.ok(read.retryAt! > Date.now() + STATUS_GAP_RETRY_MS - 1000)
+  assert.equal(read.kind, "ready")
+  if (read.kind === "ready") {
+    assert.equal(read.complete, false)
+    assert.equal(read.rows.length, 1)
   }
 })
 
-test("an incomplete machine scan fills a gap only with the signed inventory's exact Session set", async () => {
+test("an incomplete machine scan is complete only with the signed inventory's exact Session set", async () => {
   const { client, calls } = clientFixture()
   client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
   client.listPresentationsForMachine = async (machine: string) => {
@@ -276,7 +276,9 @@ test("an incomplete machine scan fills a gap only with the signed inventory's ex
         status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] }
   }
   const source = statusSource(() => client as never)
-  assert.equal((await source.readMachine(machineID, new AbortController().signal)).kind, "ready")
+  const certified = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(certified.kind, "ready")
+  if (certified.kind === "ready") assert.equal(certified.complete, true)
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 
   const other = clientFixture()
@@ -285,8 +287,12 @@ test("an incomplete machine scan fills a gap only with the signed inventory's ex
     sessions: [{ id: "different", execution_generation: executionGeneration, title: "Wrong set",
       status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] })
   other.client.recoverStatusRow = async () => false
-  assert.equal((await statusSource(() => other.client as never).readMachine(machineID, new AbortController().signal)).kind,
-    "unavailable")
+  const partial = await statusSource(() => other.client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(partial.kind, "ready")
+  if (partial.kind === "ready") {
+    assert.equal(partial.complete, false)
+    assert.equal(partial.rows[0].destination.sessionID, "different")
+  }
 })
 
 test("a refused pinned list falls back to exact retained-row recovery", async () => {
