@@ -339,7 +339,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
                   return <ProjectedRow key={destinationKey(row.destination)}
                     title={presentation?.title || row.destination.sessionID} icon={presentation?.icon} cwd={presentation?.cwd}
                     status={displayedPresentationStatus(row, presentation)}
-                    sessionID={row.destination.sessionID} machineName={machine.name} platform={machine.platform}
+                    sessionID={row.destination.sessionID} machineName={machine.name}
                     assistant={row.assistant} backend={row.backend} state={row.state} stateLabel={stateWord(row.state)}
                     freshness={row.freshness === "current" ? "" : nextWord(
                       row.freshness === "stale" ? "cloudAllStale" : "cloudAllUnknown")}

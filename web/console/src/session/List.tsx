@@ -22,9 +22,9 @@ export function SessionRowLayout({ children, className, ...props }: ComponentPro
 }
 
 /** Status-only rows keep the original list structure without inventing rich Session content. */
-export function ProjectedRow({ title, sessionID, machineName, platform, assistant, backend, state, stateLabel, icon, cwd,
+export function ProjectedRow({ title, sessionID, machineName, assistant, backend, state, stateLabel, icon, cwd,
   freshness, lastMovementAt, attention, open, selectionKey, depth, branchThrough, ancestorThrough, status, swiped = false, onOpen, onClose, consumePress }: {
-  title: string; sessionID: string; machineName: string; platform: string
+  title: string; sessionID: string; machineName: string
   assistant?: "claude" | "codex"; backend?: "tmux" | "iterm" | "ps"
   icon?: SessionRow["icon"]; cwd?: string
   state: string; stateLabel: string; freshness: string; lastMovementAt?: number; attention: boolean; open: boolean
@@ -51,7 +51,7 @@ export function ProjectedRow({ title, sessionID, machineName, platform, assistan
     <Mark icon={mark} cellPx={4} />
     <div className="title" style={{ color: L.accentTint(mark.accent) }}><span className="label">{title}</span>
       {assistant && <span className="who" dangerouslySetInnerHTML={{ __html: L.whoHTML(assistant) }} />}</div>
-    <div className="meta"><span className="path">{cwd ? `${machineName} · ${L.path(cwd)}` : `${machineName} · ${platform}`}</span>
+    <div className="meta"><span className="path">{cwd ? L.path(cwd) : ""}</span>
       <span className="tty">{backend || sessionID}</span>
       {lastMovementAt && <span className="session-activity">{sessionActivityWord({ activity: { known: true, at: lastMovementAt / 1000 } })}</span>}</div>
     {status ? <StateLine row={{ ...status, id: sessionID, state } as SessionRow}
