@@ -25,6 +25,7 @@ type StatusClient = CloudClientHandle & {
   recoverStatusMarker?(machineID: string): Promise<boolean>
   readTimeoutMs?: number
   cancelStatusRecoveries?(): void
+  viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown }
   /** The daemon must atomically compare the execution generation before reading content. */
   infoForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
   listPresentationsForMachine?(machineID: string, signal: AbortSignal): Promise<unknown>
@@ -32,6 +33,15 @@ type StatusClient = CloudClientHandle & {
   transcriptPageForGeneration?(destination: SessionDestination, before: number, signal: AbortSignal): Promise<unknown>
   skillsForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
   imageForGeneration?(destination: SessionDestination, id: string, signal: AbortSignal): Promise<unknown>
+}
+
+function reportListFailure(client: StatusClient, machineID: string, reason: string,
+  code: string, ms: number, failures: number): void {
+  try {
+    client.viewerEvents?.record?.("cloud.status_list.failed", { machine: machineID, reason, code, ms,
+      failures, support: pinnedReadSupport(client, machineID) },
+    ["cloud.status_list.failed", machineID, code].join("|"))
+  } catch { /* diagnostics cannot fail a Session read */ }
 }
 
 function channels(destination: SessionDestination): string[] {
@@ -188,11 +198,24 @@ export function statusSource(current: () => StatusClient | null): SessionProject
       const now = client.now?.() ?? Date.now()
       let cached = directLists.get(machineID)
       if (!cached || cached.client !== client || cached.until <= now) {
+        const started = now
+        const reason = projection.reason
+        const failures = cached?.client === client ? cached.failures : 0
         const promise = client.listPresentationsForMachine(machineID, new AbortController().signal)
-          .then((reply) => directList(machineID, reply, client.now?.() ?? Date.now(),
-            statusInventoryIDs(client, machineID, client.now?.() ?? Date.now())), () => null)
+          .then((reply) => {
+            const value = directList(machineID, reply, client.now?.() ?? Date.now(),
+              statusInventoryIDs(client, machineID, client.now?.() ?? Date.now()))
+            if (!value) reportListFailure(client, machineID, reason, "invalid_reply",
+              (client.now?.() ?? Date.now()) - started, failures + 1)
+            return value
+          }, (error: unknown) => {
+            const code = (error as { code?: unknown })?.code
+            reportListFailure(client, machineID, reason, typeof code === "string" ? code : "untyped",
+              (client.now?.() ?? Date.now()) - started, failures + 1)
+            return null
+          })
         cached = { client, until: now + STATUS_MARKER_RETRY_MS, value: null,
-          failures: cached?.client === client ? cached.failures : 0, promise }
+          failures, promise }
         directLists.set(machineID, cached)
         void promise.then((value) => { if (directLists.get(machineID) === cached) {
           cached!.value = value

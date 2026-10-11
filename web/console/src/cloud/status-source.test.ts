@@ -187,6 +187,9 @@ test("a cold browser asks once before the machine descriptor arrives", async () 
 
 test("a failed cold list retries after the short bound and recovers without a marker", async () => {
   const { client, calls } = clientFixture()
+  const diagnostics: { event: string; data: Record<string, unknown> }[] = []
+  ;(client as typeof client & { viewerEvents: { record: (event: string, data: Record<string, unknown>) => void } })
+    .viewerEvents = { record: (event, data) => { diagnostics.push({ event, data }) } }
   client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
   let now = Date.now()
   client.now = () => now
@@ -219,6 +222,10 @@ test("a failed cold list retries after the short bound and recovers without a ma
   assert.equal(recovered.kind, "ready")
   assert.equal(recovered.rows?.[0]?.destination.executionGeneration, executionGeneration)
   assert.equal(calls.length, 3)
+  assert.deepEqual(diagnostics.map((row) => [row.event, row.data.code, row.data.failures]), [
+    ["cloud.status_list.failed", "untyped", 1], ["cloud.status_list.failed", "untyped", 2],
+  ])
+  assert.equal(JSON.stringify(diagnostics).includes("carrier_closed"), false)
 })
 
 test("a stale retained status pass recovers from one pinned machine list without repeated reads", async () => {
