@@ -157,7 +157,7 @@ export function statusSource(current: () => StatusClient | null): SessionProject
     sessions: Map<string, { promise: Promise<boolean>; retryAt: number }> }>()
   const markerAttempts = new Map<string, { promise: Promise<boolean>; retryAt: number }>()
   const opened = new Map<string, StatusClient>()
-  const directLists = new Map<string, { client: StatusClient; until: number; value: DirectList | null;
+  const directLists = new Map<string, { client: StatusClient; until: number; value: DirectList | null; failures: number;
     promise?: Promise<DirectList | null> }>()
   const imageSignals = new Map<string, AbortController>()
   const visibleArtifacts = new Map<string, Set<string>>()
@@ -191,11 +191,17 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         const promise = client.listPresentationsForMachine(machineID, new AbortController().signal)
           .then((reply) => directList(machineID, reply, client.now?.() ?? Date.now(),
             statusInventoryIDs(client, machineID, client.now?.() ?? Date.now())), () => null)
-        cached = { client, until: now + STATUS_MARKER_RETRY_MS, value: null, promise }
+        cached = { client, until: now + STATUS_MARKER_RETRY_MS, value: null,
+          failures: cached?.client === client ? cached.failures : 0, promise }
         directLists.set(machineID, cached)
         void promise.then((value) => { if (directLists.get(machineID) === cached) {
           cached!.value = value
           cached!.promise = undefined
+          // The first carrier failure clears quickly, while continued silence
+          // backs off to the successful list's normal cache interval.
+          cached!.failures = value ? 0 : Math.min(5, cached!.failures + 1)
+          if (!value) cached!.until = (client.now?.() ?? Date.now()) +
+            Math.min(STATUS_MARKER_RETRY_MS, STATUS_GAP_RETRY_MS * 2 ** (cached!.failures - 1))
         } })
       }
       const direct = cached.promise ? await cached.promise : cached.value
@@ -223,8 +229,9 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         attempt.retryAt = (client.now?.() ?? Date.now()) + STATUS_MARKER_RETRY_MS
       projection = statusProjection(client, machineID)
       if (projection.kind === "unavailable" && projection.reason === "unknown")
-        return { ...projection, retryAt: markerAttempts.get(machineID)?.retryAt ??
-          (client.now?.() ?? Date.now()) + STATUS_MARKER_RETRY_MS }
+        return { ...projection, retryAt: Math.min(markerAttempts.get(machineID)?.retryAt ??
+          (client.now?.() ?? Date.now()) + STATUS_MARKER_RETRY_MS,
+        directLists.get(machineID)?.until ?? Number.POSITIVE_INFINITY) }
     }
     if (projection.kind === "unavailable" && projection.reason === "event_gap" &&
       !statusPassTransition(client, machineID) && client.recoverStatusRow) {
@@ -256,7 +263,13 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         }
       }
     }
-    if (projection.kind !== "ready" || signal.aborted) return projection
+    if (projection.kind !== "ready" || signal.aborted) {
+      if (projection.kind === "unavailable" && projection.reason === "unknown" && !projection.retryAt) {
+        const until = directLists.get(machineID)?.until
+        if (until) return { ...projection, retryAt: until }
+      }
+      return projection
+    }
     const answer = await client.machines()
     const machine = answer.machines.find((entry) => entry.id === machineID)
     if (!machine || machine.freshness === "unknown") return { kind: "unavailable", reason: "unknown" }

@@ -344,6 +344,23 @@ test("a single-machine page fills missing rich rows from one pinned list read", 
   assert.equal(reads, 1)
 })
 
+test("a waiting single-machine list asks again after a failed pinned read without a new marker event", async () => {
+  const client = new FakeClient()
+  client.statusSnapshots = new Map()
+  let reads = 0
+  const destination = { machineID: "mac-a", sessionID: "s1", executionGeneration: "a".repeat(32) }
+  const r = new RelayReader("mac-a", { classicStatus: true,
+    listPresentations: async () => ++reads === 1 ? null : [{ destination, title: "Recovered",
+      status: { state: "idle" } }],
+  })
+  r.attach(client)
+  const answer = await r.fetch("/v1/sessions", { signal: new AbortController().signal,
+    headers: { "X-Clawdline-Initial-Read": "1" } })
+  const snapshot = await answer.json() as SessionsSnapshot
+  assert.deepEqual(snapshot.sessions.map((row) => row.label), ["Recovered"])
+  assert.equal(reads, 2)
+})
+
 test("a cross-machine conversation uses a verified list when its retained status marker is missing", async () => {
   const client = new FakeClient()
   const generation = "a".repeat(32)

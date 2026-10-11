@@ -674,7 +674,8 @@ test("a cold browser replays one missing inventory marker and shares the pending
   client.readTimeoutMs = 60000
   client.now = () => 0
   client._trimSubscriptions = () => {}
-  client.setTimeout = () => 1
+  const delays = []
+  client.setTimeout = (_callback, ms) => { delays.push(ms); return 1 }
   client.clearTimeout = () => {}
   const frames = []
   client._sendSubscriptionFrame = (type, channels) => frames.push({ type, channels })
@@ -683,6 +684,7 @@ test("a cold browser replays one missing inventory marker and shares the pending
   const first = client.recoverStatusMarker("m")
   const second = client.recoverStatusMarker("m")
   assert.equal(first, second)
+  assert.deepEqual(delays, [5_000])
   assert.deepEqual(frames, [{ type: "subscribe", channels: ["ss/m/__clawdline_inventory_v1__"] }])
   client.statusSnapshots.set(JSON.stringify(["m", "__clawdline_inventory_v1__"]), { payload: { inventory: { version: 1 } } })
   listener({ type: "session_status", identity: { machine: "m", session: "__clawdline_inventory_v1__" } })
@@ -690,6 +692,14 @@ test("a cold browser replays one missing inventory marker and shares the pending
   assert.deepEqual(frames[1], { type: "unsubscribe", channels: ["ss/m/__clawdline_inventory_v1__"] })
   assert.equal(await client.recoverStatusMarker("m"), true)
   assert.equal(frames.length, 2)
+})
+
+test("a pinned machine list has a shorter timeout than an ordinary content read", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  let received
+  client._read = (...args) => { received = args; return Promise.resolve({ complete: true, sessions: [] }) }
+  await client.listPresentationsForMachine("m", new AbortController().signal)
+  assert.equal(received[4], 10_000)
 })
 
 test("a status row arriving before recovery is used without a timeout or subscription", async () => {

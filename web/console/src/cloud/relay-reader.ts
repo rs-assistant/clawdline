@@ -628,6 +628,8 @@ export class RelayReader {
   /** The opened destination this reader last asked the machine to restate, and when. */
   private rowAsked: { key: string; at: number } | null = null
   private presentationRead: { pass: string; until: number; promise: Promise<MachineListPresentation[] | null> } | null = null
+  private listRetryTimer: ReturnType<typeof setTimeout> | null = null
+  private listRetryMs = 5_000
   /** The one machine this reads. */
   readonly machine: string
 
@@ -1605,8 +1607,22 @@ export class RelayReader {
     }
     // The original page can show verified rich rows as they arrive. The ss/
     // marker remains the deletion barrier; a gap never claims an empty list.
-    return { snapshot, settled: whole || failed || (this.options.classicStatus === true &&
-      (hasInventory || recoveredFromList) && machineRows.length > 0) }
+    const settled = whole || failed || (this.options.classicStatus === true &&
+      (hasInventory || recoveredFromList) && machineRows.length > 0)
+    if (settled) {
+      if (this.listRetryTimer) clearTimeout(this.listRetryTimer)
+      this.listRetryTimer = null
+      this.listRetryMs = 5_000
+    } else if (this.options.classicStatus && !this.listRetryTimer && this.streams.size) {
+      // A missing ss/ marker emits no event. Retry the still-open page with
+      // backoff so a failed carrier does not leave it waiting forever.
+      this.listRetryTimer = setTimeout(() => {
+        this.listRetryTimer = null
+        this.listRetryMs = Math.min(this.listRetryMs * 2, 60_000)
+        for (const stream of this.streams) this.queueFrame(stream)
+      }, this.listRetryMs)
+    }
+    return { snapshot, settled }
   }
 
   /**

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 // @ts-expect-error -- node's type-stripping runner resolves the source .ts file.
-import { pinnedQuestion, statusSource, STATUS_GAP_RETRY_MS, STATUS_MARKER_RETRY_MS } from "./status-source.ts"
+import { pinnedQuestion, statusSource, STATUS_GAP_RETRY_MS } from "./status-source.ts"
 
 const machineID = "one"
 const sessionID = "same"
@@ -118,7 +118,7 @@ test("an unanswered marker is retried at most once per minute", async () => {
   const source = statusSource(() => client as never)
   const first = await source.readMachine(machineID, new AbortController().signal)
   assert.equal(first.kind, "unavailable")
-  if (first.kind === "unavailable") assert.ok(first.retryAt! > Date.now() + STATUS_MARKER_RETRY_MS - 1000)
+  if (first.kind === "unavailable") assert.ok(first.retryAt! > Date.now() + STATUS_GAP_RETRY_MS - 1000)
   await source.readMachine(machineID, new AbortController().signal)
   assert.equal(reads, 1)
 })
@@ -185,6 +185,42 @@ test("a cold browser asks once before the machine descriptor arrives", async () 
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 })
 
+test("a failed cold list retries after the short bound and recovers without a marker", async () => {
+  const { client, calls } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
+  let now = Date.now()
+  client.now = () => now
+  let fail = true
+  client.listPresentationsForMachine = async (machine: string) => {
+    calls.push("sessions.list:" + machine)
+    if (fail) throw new Error("carrier_closed")
+    return { at: Math.floor(now / 1000), complete: true,
+      sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "Recovered",
+        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] }
+  }
+  const source = statusSource(() => client as never)
+  const first = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(first.kind, "unavailable")
+  if (first.kind === "unavailable") assert.equal(first.retryAt, now + STATUS_GAP_RETRY_MS)
+  now += STATUS_GAP_RETRY_MS - 1
+  assert.equal((await source.readMachine(machineID, new AbortController().signal)).kind, "unavailable")
+  assert.equal(calls.length, 1)
+  now += 1
+  const second = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(second.kind, "unavailable")
+  if (second.kind === "unavailable") assert.equal(second.retryAt, now + STATUS_GAP_RETRY_MS * 2)
+  assert.equal(calls.length, 2)
+  fail = false
+  now += STATUS_GAP_RETRY_MS * 2 - 1
+  assert.equal((await source.readMachine(machineID, new AbortController().signal)).kind, "unavailable")
+  assert.equal(calls.length, 2)
+  now += 1
+  const recovered = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(recovered.kind, "ready")
+  assert.equal(recovered.rows?.[0]?.destination.executionGeneration, executionGeneration)
+  assert.equal(calls.length, 3)
+})
+
 test("a stale retained status pass recovers from one pinned machine list without repeated reads", async () => {
   const { client, calls, row } = clientFixture()
   row.projected_at -= 600
@@ -219,7 +255,7 @@ test("a stale marker does not certify an incomplete direct list", async () => {
   assert.equal(read.kind, "unavailable")
   if (read.kind === "unavailable") {
     assert.equal(read.reason, "stale")
-    assert.ok(read.retryAt! > Date.now() + STATUS_MARKER_RETRY_MS - 1000)
+    assert.ok(read.retryAt! > Date.now() + STATUS_GAP_RETRY_MS - 1000)
   }
 })
 
