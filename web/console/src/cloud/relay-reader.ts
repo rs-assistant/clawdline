@@ -566,6 +566,8 @@ export interface RelayReaderOptions {
   fleetPresentation?: (target: SessionDestination) => SessionListPresentation | null
   /** The same bounded, pinned machine list used by the fleet when rich rows are missing. */
   listPresentations?: (machineID: string) => Promise<MachineListPresentation[] | null>
+  /** Resolve an exact execution through the verified status source if ss/ replay is missing. */
+  resolveSession?: (machineID: string, sessionID: string) => Promise<SessionDestination | null>
   /** Recheck one visible fleet mutation against the latest ss/ pass. */
   admitFleetMutation?: (target: SessionDestination) => Promise<void>
 }
@@ -1476,9 +1478,10 @@ export class RelayReader {
       Array.isArray(statusMarker.payload.inventory.sessions)
       ? statusMarker.payload.inventory.sessions.filter((id): id is string => typeof id === "string" && !!id) : null
     const inventory = client.sessionInventoryByMachine?.get(this.machine)
-    const expected = this.options.classicStatus
+    let expected = this.options.classicStatus
       ? statusIDs === null ? null : new Set(statusIDs.map((id) => this.machine + "\u0000" + id))
       : inventoryRowKeys(inventory)
+    const hasInventory = this.options.classicStatus ? expected !== null : inventory !== undefined
     const machineRows = all.sessions.filter((row) => {
       if (row.machine !== this.machine) return false
       if (!this.options.classicStatus) return true
@@ -1489,30 +1492,36 @@ export class RelayReader {
       return typeof status?.payload?.execution_generation === "string" &&
         row.execution_generation === status.payload.execution_generation
     })
-    if (this.options.classicStatus && this.options.listPresentations && expected &&
-      machineRows.length < expected.size) {
+    let recoveredFromList = false
+    if (this.options.classicStatus && this.options.listPresentations &&
+      (!expected || machineRows.length < expected.size)) {
       const pass = String(statusMarker?.payload?.snapshot_generation ?? "") + ":" +
         String((statusMarker?.payload as { presentation_generation?: unknown } | undefined)?.presentation_generation ?? "")
-      const presentations = await this.presentationsForPass(pass, expected.size)
+      const presentations = await this.presentationsForPass(pass, expected?.size ?? 1)
+      if (!expected && presentations?.length) {
+        expected = new Set(presentations.map((row) => this.machine + "\u0000" + row.destination.sessionID))
+      }
+      recoveredFromList = !!presentations?.length
       const held = new Set(machineRows.map((row) => this.machine + "\u0000" + (row.session ?? row.id)))
       for (const presentation of presentations ?? []) {
         const target = presentation.destination
         const key = this.machine + "\u0000" + target.sessionID
-        if (target.machineID !== this.machine || !expected.has(key) || held.has(key)) continue
+        if (target.machineID !== this.machine || !expected?.has(key) || held.has(key)) continue
         const status = client.statusSnapshots?.get(JSON.stringify([this.machine, target.sessionID])) as
           | { payload?: { snapshot_generation?: unknown; execution_generation?: unknown;
             machine_id?: unknown; session_id?: unknown; state?: unknown; assistant?: unknown; backend?: unknown;
             source?: { freshness?: unknown; observed_at?: unknown } } } | undefined
         const data = status?.payload
-        if (data?.machine_id !== this.machine || data.session_id !== target.sessionID ||
+        if (hasInventory && (data?.machine_id !== this.machine || data.session_id !== target.sessionID ||
           data.execution_generation !== target.executionGeneration ||
           data.snapshot_generation !== statusMarker?.payload?.snapshot_generation ||
-          data.source?.freshness !== "current") continue
+          data.source?.freshness !== "current")) continue
         const { identity: _displayIdentity, ...displayStatus } = presentation.status ?? {}
         machineRows.push({ ...displayStatus, id: target.sessionID, session: target.sessionID,
           machine: this.machine, execution_generation: target.executionGeneration, label: presentation.title,
-          cwd: presentation.cwd, icon: presentation.icon, assistant: data.assistant, backend: data.backend,
-          state: data.state, source: data.source })
+          cwd: presentation.cwd, icon: presentation.icon, assistant: data?.assistant, backend: data?.backend,
+          state: data?.state ?? presentation.status?.state ?? "unknown",
+          source: data?.source ?? { freshness: "current", observed_at: this.now() / 1000 } })
         held.add(key)
       }
     }
@@ -1543,7 +1552,6 @@ export class RelayReader {
     this.askForOpenedRow(client, machineRows)
     // The marker can arrive before another retained channel. Its id set is the
     // receipt: a marker alone is not yet the whole list it describes.
-    const hasInventory = this.options.classicStatus ? expected !== null : inventory !== undefined
     const heldKeys = new Set(machineRows.map((row) => {
       const id = typeof row.session === "string" ? row.session : typeof row.id === "string" ? row.id : ""
       return this.machine + "\u0000" + id
@@ -1586,7 +1594,8 @@ export class RelayReader {
     }
     // The original page can show verified rich rows as they arrive. The ss/
     // marker remains the deletion barrier; a gap never claims an empty list.
-    return { snapshot, settled: whole || failed || (this.options.classicStatus === true && hasInventory && machineRows.length > 0) }
+    return { snapshot, settled: whole || failed || (this.options.classicStatus === true &&
+      (hasInventory || recoveredFromList) && machineRows.length > 0) }
   }
 
   /**
@@ -1877,9 +1886,18 @@ export class RelayReader {
       // refusal of the day: 23 of them, every one `no_row`.
       if (condition === "no_row") {
         if (await this.askForStatusRow(session, signal)) return this.pinnedSession(session)
+      }
+      if (condition !== "pass_mismatch") {
+        if (["no_marker", "no_row", "marker_stale", "row_stale", "observed_stale"].includes(String(condition))) {
+          const resolved = await this.options.resolveSession?.(this.machine, session)
+          if (resolved && !signal?.aborted) {
+            const intended = this.options.fleetTarget?.()
+            if (!intended || intended.machineID === resolved.machineID && intended.sessionID === resolved.sessionID &&
+              intended.executionGeneration === resolved.executionGeneration) return resolved
+          }
+        }
         throw error
       }
-      if (condition !== "pass_mismatch") throw error
     }
     const client = this.connected()
     await new Promise<void>((resolve) => {
@@ -1898,7 +1916,14 @@ export class RelayReader {
       }) as (() => void) | null
     })
     if (signal?.aborted) throw new AbandonedRead(word)
-    return this.pinnedSession(session)
+    try { return this.pinnedSession(session) }
+    catch (error) {
+      const resolved = await this.options.resolveSession?.(this.machine, session)
+      const intended = this.options.fleetTarget?.()
+      if (resolved && !signal?.aborted && (!intended || intended.machineID === resolved.machineID &&
+        intended.sessionID === resolved.sessionID && intended.executionGeneration === resolved.executionGeneration)) return resolved
+      throw error
+    }
   }
 
   /**

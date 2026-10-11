@@ -492,6 +492,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
       listPresentations: (machineID) => liveSessionSource.readMachinePresentations?.(
         machineID, new AbortController().signal) ?? Promise.resolve(null),
+      resolveSession: async (machineID, sessionID) => {
+        const reading = await liveSessionSource.readMachine(machineID, new AbortController().signal)
+        return reading.kind === "ready"
+          ? reading.rows.find((row) => row.destination.sessionID === sessionID && row.freshness === "current")?.destination ?? null
+          : null
+      },
       admitFleetMutation,
     })
     const writer = new RelayWriter(next.writeHost)

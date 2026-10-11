@@ -344,6 +344,39 @@ test("a single-machine page fills missing rich rows from one pinned list read", 
   assert.equal(reads, 1)
 })
 
+test("a cross-machine conversation uses a verified list when its retained status marker is missing", async () => {
+  const client = new FakeClient()
+  const generation = "a".repeat(32)
+  const target = { machineID: "mac-a", sessionID: "s1", executionGeneration: generation }
+  client.statusSnapshots = new Map()
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    fleetTarget: () => target,
+    listPresentations: async () => [{ destination: target, title: "Remote Session", status: { state: "idle" } }],
+    resolveSession: async () => target,
+  })
+  r.attach(client)
+  const snapshot = await r.snapshot()
+  assert.deepEqual(snapshot.sessions.map((session) => session.label), ["Remote Session"])
+  assert.equal(snapshot.scan.complete, false, "a display read is not a signed deletion barrier")
+  const transcript = await r.fetch("/v1/transcript?session=s1&limit=200")
+  assert.equal(transcript.status, 200)
+  assert.deepEqual(client.pinnedReads, [target])
+})
+
+test("a verified list cannot open a different execution under an old fleet target", async () => {
+  const client = new FakeClient()
+  const current = { machineID: "mac-a", sessionID: "s1", executionGeneration: "a".repeat(32) }
+  client.statusSnapshots = new Map()
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    fleetTarget: () => ({ ...current, executionGeneration: "b".repeat(32) }),
+    resolveSession: async () => current,
+  })
+  r.attach(client)
+  const transcript = await r.fetch("/v1/transcript?session=s1&limit=200")
+  assert.equal(transcript.status, 409)
+  assert.deepEqual(client.pinnedReads, [])
+})
+
 /** One machine's pass with the marker only: every row is still on its way. */
 function markerOnly(machine: string, pass: string, at: number, ...sessions: string[]) {
   return new Map<string, unknown>([
