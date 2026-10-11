@@ -536,6 +536,40 @@ test("a signed unverified Session stays visible with its honest source state", a
   assert.equal(snapshot.sessions[0].source?.freshness, "unverified")
 })
 
+test("the single-machine page uses the fleet projection before a blocked rich snapshot", async () => {
+  const client = new FakeClient()
+  client.sessions = async () => { throw new Error("the rich snapshot must not gate the list") }
+  const execution = "a".repeat(32)
+  const rows = ["s1", "s2", "s3"].map((sessionID) => ({
+    destination: { machineID: "mac-a", sessionID, executionGeneration: execution },
+    state: "idle", freshness: "current" as const, observedAt: 1000,
+  }))
+  let titles = 3, now = 1000
+  let presentationGeneration = "a"
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: now,
+      snapshotGeneration: "a".repeat(32), presentationGeneration, rows }),
+    listPresentations: async () => rows.slice(0, titles).map((row) => ({
+      destination: row.destination, title: "Title " + row.destination.sessionID,
+      status: { state: "idle" }, projection: row,
+    })),
+  })
+  r.attach(client)
+  const first = await r.snapshot()
+  assert.deepEqual(first.sessions.map((row) => row.label), ["Title s1", "Title s2", "Title s3"])
+  assert.equal(first.scan.complete, true)
+  titles = 1
+  presentationGeneration = "b"
+  const partial = await r.snapshot()
+  assert.deepEqual(partial.sessions.map((row) => row.id), ["s1", "s2", "s3"])
+  assert.equal(partial.scan.complete, false)
+  titles = 3
+  now += 5_001
+  const restored = await r.snapshot()
+  assert.deepEqual(restored.sessions.map((row) => row.label), ["Title s1", "Title s2", "Title s3"])
+  assert.equal(restored.scan.complete, true)
+})
+
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {
   const client = new FakeClient()
   const pass = "c".repeat(32)

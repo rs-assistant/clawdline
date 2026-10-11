@@ -515,6 +515,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
       fleetPresentations: heldFleetRows,
+      machineProjection: (machineID) => liveSessionSource.readMachine(machineID, new AbortController().signal),
       listPresentations: async (machineID) => {
         // Reuse the fleet's already verified rows, even if a newer
         // presentation pass has only delivered its first title. A partial
