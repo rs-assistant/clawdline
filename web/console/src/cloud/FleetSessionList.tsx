@@ -23,7 +23,7 @@ type Reading = { phase: "loading" } | { phase: "settled"; value: MachineSessionP
 
 /** Only the fleet list is new; the conversation and composer belong to SessionsPage. */
 export function FleetSessionList({ machines, source, target, filter, onFilter, onOpen,
-  carrierOf, onMachineAction, onCloseRequest, onPresentations }: {
+  carrierOf, onMachineAction, onCloseRequest, onPresentations, onProjection }: {
   machines: readonly FleetMachine[]
   source: SessionProjectionSource | null
   /** Which road this page's reads of that machine take, read as the row is drawn. */
@@ -34,10 +34,17 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   onOpen: (target: SessionDestination) => void
   onPresentations?: (machineID: string, rows: readonly (SessionListPresentation & {
     destination: SessionDestination; projection?: ProjectedSession })[]) => void
+  onProjection?: (machineID: string, reading: MachineSessionProjection) => void
   onMachineAction?: (machineID: string, action: MachineToolbarAction) => void
   onCloseRequest: (target: SessionDestination, title: string) => void
 }) {
   const [readings, setReadings] = useState<Record<string, Reading>>({})
+  useEffect(() => {
+    for (const machine of machines) {
+      const reading = readings[machine.id]
+      if (reading?.phase === "settled") onProjection?.(machine.id, reading.value)
+    }
+  }, [readings, machines, onProjection])
   const presentations = useRef(new Map<string, { machineID: string; sessionID: string; pass: string } & SessionListPresentation>())
   const presentationPasses = useRef(new Map<string, string>())
   const presentationFailures = useRef(new Map<string, string>())

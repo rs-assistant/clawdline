@@ -65,10 +65,10 @@ import { CloudSessionSheets, type PendingMachineAction } from "./CloudSessionShe
 import { PeerAccessPage } from "./PeerAccessPage.js"
 import { destinationAvailable, destinationFragment, destinationFromFragment, destinationKey,
   supersedingDestination, type FleetDetailProblem, type MachineListPresentation,
-  type ProjectedSession, type SessionContent, type SessionDestination,
+  type MachineSessionProjection, type ProjectedSession, type SessionContent, type SessionDestination,
   type SessionListPresentation, type SessionProjectionSource } from "./all-machine-sessions.js"
 import { statusSource } from "./status-source.js"
-import { STATUS_FRESH_MS } from "./status-projection.js"
+import { STATUS_FRESH_MS, statusProjection } from "./status-projection.js"
 import { RelayWriter, writeRoute } from "./relay-writer.js"
 import { installScheduleWebhookManagement } from "./schedule-webhooks.js"
 import { installCloudPush, type CloudPushClient } from "./cloud-push.js"
@@ -285,6 +285,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const fleetPresentations = useRef(new Map<string, SessionListPresentation & {
     destination: SessionDestination; projection?: ProjectedSession }>())
   const fleetPresentationReceivedAt = useRef(new Map<string, number>())
+  const fleetProjections = useRef(new Map<string, { reading: MachineSessionProjection; receivedAt: number }>())
+  const noteFleetProjection = useCallback((machineID: string, reading: MachineSessionProjection) => {
+    fleetProjections.current.set(machineID, { reading, receivedAt: Date.now() })
+  }, [])
   const [fleetPresentationRevision, refreshFleetPresentation] = useState(0)
   const noteFleetPresentations = useCallback((machineID: string,
     rows: readonly (SessionListPresentation & { destination: SessionDestination;
@@ -515,7 +519,16 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
       fleetPresentations: heldFleetRows,
-      machineProjection: (machineID) => liveSessionSource.readMachine(machineID, new AbortController().signal),
+      machineProjection: (machineID) => {
+        const held = fleetProjections.current.get(machineID)
+        if (held && Date.now() - held.receivedAt <= STATUS_FRESH_MS) {
+          const live = statusProjection(client.current, machineID)
+          if (live.kind === "ready" && live.observedAt > (held.reading.observedAt ?? 0))
+            return Promise.resolve(live)
+          return Promise.resolve(held.reading)
+        }
+        return liveSessionSource.readMachine(machineID, new AbortController().signal)
+      },
       listPresentations: async (machineID) => {
         // Reuse the fleet's already verified rows, even if a newer
         // presentation pass has only delivered its first title. A partial
@@ -1535,6 +1548,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             onOpen={openFleetSession}
             carrierOf={carrierOf}
             onPresentations={noteFleetPresentations}
+            onProjection={noteFleetProjection}
             onCloseRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title }) }}
             onMachineAction={runMachineTool}
           /> : undefined} />
