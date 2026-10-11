@@ -31,6 +31,8 @@ export interface SessionListPresentation {
 
 export interface MachineListPresentation extends SessionListPresentation {
   destination: SessionDestination
+  /** Current exact execution verified around the pinned list read. */
+  projection?: ProjectedSession
 }
 
 /** Keep a prior list reading for the same execution, unless fresh ss/ contradicts its state. */

@@ -1512,16 +1512,27 @@ export class RelayReader {
             machine_id?: unknown; session_id?: unknown; state?: unknown; assistant?: unknown; backend?: unknown;
             source?: { freshness?: unknown; observed_at?: unknown } } } | undefined
         const data = status?.payload
-        if (hasInventory && (data?.machine_id !== this.machine || data.session_id !== target.sessionID ||
-          data.execution_generation !== target.executionGeneration ||
-          data.snapshot_generation !== statusMarker?.payload?.snapshot_generation ||
-          data.source?.freshness !== "current")) continue
+        const signedRow = data?.machine_id === this.machine && data.session_id === target.sessionID &&
+          data.execution_generation === target.executionGeneration &&
+          data.snapshot_generation === statusMarker?.payload?.snapshot_generation &&
+          data.source?.freshness === "current"
+        const pinnedRow = presentation.projection?.freshness === "current" &&
+          presentation.projection.destination.machineID === this.machine &&
+          presentation.projection.destination.sessionID === target.sessionID &&
+          presentation.projection.destination.executionGeneration === target.executionGeneration &&
+          presentation.projection.state === presentation.status?.state &&
+          (presentation.projection.snapshotGeneration?.startsWith("direct:") ||
+            presentation.projection.snapshotGeneration === statusMarker?.payload?.snapshot_generation)
+        if (hasInventory && !signedRow && !pinnedRow) continue
         const { identity: _displayIdentity, ...displayStatus } = presentation.status ?? {}
         machineRows.push({ ...displayStatus, id: target.sessionID, session: target.sessionID,
           machine: this.machine, execution_generation: target.executionGeneration, label: presentation.title,
-          cwd: presentation.cwd, icon: presentation.icon, assistant: data?.assistant, backend: data?.backend,
-          state: data?.state ?? presentation.status?.state ?? "unknown",
-          source: data?.source ?? { freshness: "current", observed_at: this.now() / 1000 } })
+          cwd: presentation.cwd, icon: presentation.icon,
+          assistant: signedRow ? data?.assistant : presentation.projection?.assistant,
+          backend: signedRow ? data?.backend : presentation.projection?.backend,
+          state: signedRow ? data?.state : presentation.status?.state ?? "unknown",
+          source: signedRow ? data?.source : { freshness: "current",
+            observed_at: (presentation.projection?.observedAt ?? this.now()) / 1000 } })
         held.add(key)
       }
     }

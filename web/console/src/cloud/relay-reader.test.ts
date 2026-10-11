@@ -391,6 +391,24 @@ function statusRow(pass: string, generation: string, at: number) {
     source: { freshness: "current", observed_at: at } } }
 }
 
+test("a verified pinned batch fills a single-machine list while one signed row is missing", async () => {
+  const client = new FakeClient()
+  const pass = "c".repeat(32)
+  const generation = "a".repeat(32)
+  const destination = { machineID: "mac-a", sessionID: "s1", executionGeneration: generation }
+  client.statusSnapshots = markerOnly("mac-a", pass, 1, "s1")
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    listPresentations: async () => [{ destination, title: "Verified Session",
+      status: { state: "idle", work_state: "unknown" },
+      projection: { destination, state: "idle", freshness: "current", observedAt: 1000,
+        snapshotGeneration: "direct:1000" } }],
+  })
+  r.attach(client)
+  const snapshot = await r.snapshot()
+  assert.deepEqual(snapshot.sessions.map((row) => row.label), ["Verified Session"])
+  assert.equal(snapshot.scan.complete, true)
+})
+
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {
   const client = new FakeClient()
   const pass = "c".repeat(32)
