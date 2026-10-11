@@ -68,6 +68,7 @@ import { destinationAvailable, destinationFragment, destinationFromFragment, des
   type ProjectedSession, type SessionContent, type SessionDestination,
   type SessionListPresentation, type SessionProjectionSource } from "./all-machine-sessions.js"
 import { statusSource } from "./status-source.js"
+import { STATUS_FRESH_MS } from "./status-projection.js"
 import { RelayWriter, writeRoute } from "./relay-writer.js"
 import { installScheduleWebhookManagement } from "./schedule-webhooks.js"
 import { installCloudPush, type CloudPushClient } from "./cloud-push.js"
@@ -287,13 +288,20 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const noteFleetPresentations = useCallback((machineID: string,
     rows: readonly (SessionListPresentation & { destination: SessionDestination;
       projection?: ProjectedSession })[]) => {
-    for (const [key, row] of fleetPresentations.current) {
-      if (row.destination.machineID === machineID) fleetPresentations.current.delete(key)
+    // A presentation pass may answer only its first row while ss/ replays the
+    // rest. Keep the prior verified rows for a machine switch; the reader
+    // checks each row's exact execution and freshness against the marker.
+    for (const row of rows) {
+      for (const [key, held] of fleetPresentations.current) {
+        if (held.destination.machineID === machineID &&
+          held.destination.sessionID === row.destination.sessionID &&
+          held.destination.executionGeneration !== row.destination.executionGeneration)
+          fleetPresentations.current.delete(key)
+      }
+      fleetPresentations.current.set(destinationKey(row.destination), row)
     }
-    for (const row of rows) fleetPresentations.current.set(destinationKey(row.destination), row)
     refreshFleetPresentation((revision) => revision + 1)
-    const target = fleetTargetRef.current
-    if (target?.machineID === machineID && reader.current?.machine === machineID && client.current)
+    if (reader.current?.machine === machineID && client.current)
       reader.current.attach(client.current)
   }, [])
   /** A console is on screen, for a machine this browser can read. */
@@ -497,27 +505,16 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
       fleetPresentations: (machineID) => [...fleetPresentations.current.values()]
-        .filter((row) => row.destination.machineID === machineID),
-      listPresentations: async (machineID, expectedCount) => {
-        // A machine switch follows the fleet's authorized pinned read. Reuse
-        // that batch while the exact ss/ generation is checked by the reader,
-        // instead of making the same machine answer twice at once. Without a
-        // signed marker, compare exact executions with the fleet's current
-        // authenticated set before reusing it; a first handful of titles is
-        // still a partial batch and the reader keeps its bounded retry.
+        .filter((row) => row.destination.machineID === machineID && row.projection?.freshness === "current" &&
+          Math.abs(Date.now() - row.projection.observedAt) <= STATUS_FRESH_MS),
+      listPresentations: async (machineID) => {
+        // Reuse the fleet's already verified rows, even if a newer
+        // presentation pass has only delivered its first title. A partial
+        // batch remains visibly partial until the signed set catches up.
         const held = [...fleetPresentations.current.values()]
-          .filter((row) => row.destination.machineID === machineID)
-        if (expectedCount !== null && held.length >= expectedCount)
-          return held as MachineListPresentation[]
-        if (expectedCount === null && held.length) {
-          const reading = await liveSessionSource.readMachine(machineID, new AbortController().signal)
-          if (reading.kind === "ready") {
-            const current = new Set(reading.rows.filter((row) => row.freshness === "current")
-              .map((row) => destinationKey(row.destination)))
-            if (current.size === held.length && held.every((row) => current.has(destinationKey(row.destination))))
-              return held as MachineListPresentation[]
-          }
-        }
+          .filter((row) => row.destination.machineID === machineID && row.projection?.freshness === "current" &&
+            Math.abs(Date.now() - row.projection.observedAt) <= STATUS_FRESH_MS)
+        if (held.length) return held as MachineListPresentation[]
         return await liveSessionSource.readMachinePresentations?.(
           machineID, new AbortController().signal) ?? null
       },

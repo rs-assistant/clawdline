@@ -496,10 +496,25 @@ test("a newer fleet batch prevents an older signed marker from declaring a short
   assert.equal(pending.scan.complete, false)
   assert.equal(reads, 1)
 
-  client.statusSnapshots = markerOnly("mac-a", "d".repeat(32), 3, "s1", "s2", "s3")
+  client.statusSnapshots = markerOnly("mac-a", "d".repeat(32), 2, "s1", "s2", "s3")
   const settled = await r.snapshot()
   assert.deepEqual(settled.sessions.map((session) => session.id), ["s1", "s2", "s3"])
   assert.equal(settled.scan.complete, true)
+})
+
+test("an older retained direct row cannot satisfy a newer signed marker", async () => {
+  const client = new FakeClient()
+  const destination = { machineID: "mac-a", sessionID: "s1", executionGeneration: "a".repeat(32) }
+  client.statusSnapshots = markerOnly("mac-a", "c".repeat(32), 3, "s1")
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 3000,
+    listPresentations: async () => [{ destination, title: "Old title", status: { state: "idle" },
+      projection: { destination, state: "idle", freshness: "current", observedAt: 2000,
+        snapshotGeneration: "direct:2000" } }],
+  })
+  r.attach(client)
+  const snapshot = await r.snapshot()
+  assert.equal(snapshot.sessions.length, 0)
+  assert.equal(snapshot.scan.complete, false)
 })
 
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {

@@ -1558,7 +1558,9 @@ export class RelayReader {
           presentation.projection.destination.sessionID === target.sessionID &&
           presentation.projection.destination.executionGeneration === target.executionGeneration &&
           presentation.projection.state === presentation.status?.state &&
-          (presentation.projection.snapshotGeneration?.startsWith("direct:") ||
+          (presentation.projection.snapshotGeneration?.startsWith("direct:") &&
+            (typeof statusMarker?.payload?.at !== "number" ||
+              presentation.projection.observedAt >= statusMarker.payload.at * 1000) ||
             presentation.projection.snapshotGeneration === statusMarker?.payload?.snapshot_generation)
         if (hasInventory && !signedRow && !pinnedRow) continue
         const { identity: _displayIdentity, ...displayStatus } = presentation.status ?? {}
