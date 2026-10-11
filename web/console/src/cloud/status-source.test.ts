@@ -185,6 +185,44 @@ test("a cold browser asks once before the machine descriptor arrives", async () 
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 })
 
+test("a stale retained status pass recovers from one pinned machine list without repeated reads", async () => {
+  const { client, calls, row } = clientFixture()
+  row.projected_at -= 600
+  client.listPresentationsForMachine = async (machine: string) => {
+    calls.push("sessions.list:" + machine)
+    return { at: Math.floor(Date.now() / 1000), complete: false,
+      sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
+        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] }
+  }
+  const source = statusSource(() => client as never)
+  const first = await source.readMachine(machineID, new AbortController().signal)
+  const second = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(first.kind, "ready")
+  assert.equal(second.kind, "ready")
+  assert.deepEqual(calls, ["sessions.list:" + machineID])
+  assert.deepEqual((await source.readMachinePresentations?.(machineID, new AbortController().signal))?.map((row) => row.title),
+    ["The real title"])
+  assert.deepEqual(calls, ["sessions.list:" + machineID])
+})
+
+test("a stale marker does not certify an incomplete direct list", async () => {
+  const { client, row } = clientFixture()
+  row.projected_at -= 600
+  const marker = client.statusSnapshots.get(JSON.stringify([machineID, inventory])) as {
+    payload: { at: number }
+  }
+  marker.payload.at -= 600
+  client.listPresentationsForMachine = async () => ({ at: Math.floor(Date.now() / 1000), complete: false,
+    sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
+      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] })
+  const read = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(read.kind, "unavailable")
+  if (read.kind === "unavailable") {
+    assert.equal(read.reason, "stale")
+    assert.ok(read.retryAt! > Date.now() + STATUS_MARKER_RETRY_MS - 1000)
+  }
+})
+
 test("an incomplete machine scan fills a gap only with the signed inventory's exact Session set", async () => {
   const { client, calls } = clientFixture()
   client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))

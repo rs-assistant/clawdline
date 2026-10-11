@@ -490,6 +490,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       classicStatus: true,
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
+      listPresentations: (machineID) => liveSessionSource.readMachinePresentations?.(
+        machineID, new AbortController().signal) ?? Promise.resolve(null),
       admitFleetMutation,
     })
     const writer = new RelayWriter(next.writeHost)
@@ -512,7 +514,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     // was one machine's for its whole life. They are not any more.
     forgetPersonas()
     return next
-  }, [transport, admitFleetMutation])
+  }, [transport, admitFleetMutation, liveSessionSource])
 
   /**
    * Read `machine`, and — unless `remember` says otherwise — record it as the
