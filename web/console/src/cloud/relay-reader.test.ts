@@ -311,6 +311,39 @@ test("an authorized fleet presentation opens a conversation when rich replay is 
   assert.deepEqual((await r.snapshot()).sessions, [], "a later execution never inherits the opened row")
 })
 
+test("a single-machine page fills missing rich rows from one pinned list read", async () => {
+  const client = new FakeClient()
+  const generation = "a".repeat(32)
+  const pass = "b".repeat(32)
+  client.statusSnapshots = new Map([
+    [JSON.stringify(["mac-a", "__clawdline_inventory_v1__"]), { payload: {
+      complete: true, snapshot_generation: pass, inventory: { version: 1, sessions: ["s1", "s2"] },
+    } }],
+    ...["s1", "s2"].map((session) => [JSON.stringify(["mac-a", session]), { payload: {
+      machine_id: "mac-a", session_id: session, snapshot_generation: pass,
+      execution_generation: generation, state: "idle", assistant: "claude", backend: "tmux",
+      source: { freshness: "current", observed_at: 1 },
+    } }] as [string, unknown]),
+  ])
+  let reads = 0
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    listPresentations: async () => {
+      reads++
+      return ["s1", "s2"].map((session) => ({
+        destination: { machineID: "mac-a", sessionID: session, executionGeneration: generation },
+        title: "Title " + session,
+      }))
+    },
+  })
+  r.attach(client)
+  const first = await r.snapshot()
+  const second = await r.snapshot()
+  assert.deepEqual(first.sessions.map((session) => session.label), ["Title s1", "Title s2"])
+  assert.equal(first.scan.complete, true)
+  assert.deepEqual(second.sessions.map((session) => session.label), ["Title s1", "Title s2"])
+  assert.equal(reads, 1)
+})
+
 /** One machine's pass with the marker only: every row is still on its way. */
 function markerOnly(machine: string, pass: string, at: number, ...sessions: string[]) {
   return new Map<string, unknown>([

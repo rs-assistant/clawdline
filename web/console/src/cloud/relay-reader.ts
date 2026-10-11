@@ -26,7 +26,7 @@ import type { CarriedWord, CarryTable } from "./carry.js"
 import type { Health, SessionRow, SessionsSnapshot, TaskList, TaskRow, TranscriptPage } from "@clawdline/contract"
 import type { StreamHandle, StreamHandlers, StreamTransport } from "@clawdline/core"
 import type { CloudWriteClient, WriteHost, WriteRoute } from "./relay-writer.js"
-import type { SessionDestination, SessionListPresentation } from "./all-machine-sessions.js"
+import type { MachineListPresentation, SessionDestination, SessionListPresentation } from "./all-machine-sessions.js"
 import { authenticatedRefusalKey } from "./refusal-client.js"
 
 /** One machine and one of its sessions, as the relay's channels name them. */
@@ -564,6 +564,8 @@ export interface RelayReaderOptions {
   fleetTarget?: () => SessionDestination | null
   /** Display facts from the already authorized per-machine list read. */
   fleetPresentation?: (target: SessionDestination) => SessionListPresentation | null
+  /** The same bounded, pinned machine list used by the fleet when rich rows are missing. */
+  listPresentations?: (machineID: string) => Promise<MachineListPresentation[] | null>
   /** Recheck one visible fleet mutation against the latest ss/ pass. */
   admitFleetMutation?: (target: SessionDestination) => Promise<void>
 }
@@ -623,6 +625,7 @@ export class RelayReader {
   private saidDrift = false
   /** The opened destination this reader last asked the machine to restate, and when. */
   private rowAsked: { key: string; at: number } | null = null
+  private presentationRead: { pass: string; until: number; promise: Promise<MachineListPresentation[] | null> } | null = null
   /** The one machine this reads. */
   readonly machine: string
 
@@ -651,6 +654,7 @@ export class RelayReader {
    */
   attach(client: CloudReadClient): void {
     this.client = client
+    this.presentationRead = null
     for (const stream of this.streams) {
       this.bind(stream)
       if (client.ready !== false) stream.handlers.onOpen?.()
@@ -1426,6 +1430,20 @@ export class RelayReader {
     })
   }
 
+  private presentationsForPass(pass: string, expectedCount: number): Promise<MachineListPresentation[] | null> {
+    const now = this.now()
+    const held = this.presentationRead
+    if (held?.pass === pass && held.until > now) return held.promise
+    const promise = Promise.resolve().then(() => this.options.listPresentations?.(this.machine) ?? null)
+      .catch(() => null)
+    const reading = { pass, until: now + 60_000, promise }
+    this.presentationRead = reading
+    void promise.then((rows) => {
+      if (this.presentationRead === reading && (!rows || rows.length < expectedCount)) reading.until = this.now() + 5_000
+    })
+    return promise
+  }
+
   private async snapshotReading(): Promise<{ snapshot: SessionsSnapshot; settled: boolean }> {
     if (this.options.statusList) {
       const status = this.options.statusList()
@@ -1471,6 +1489,33 @@ export class RelayReader {
       return typeof status?.payload?.execution_generation === "string" &&
         row.execution_generation === status.payload.execution_generation
     })
+    if (this.options.classicStatus && this.options.listPresentations && expected &&
+      machineRows.length < expected.size) {
+      const pass = String(statusMarker?.payload?.snapshot_generation ?? "") + ":" +
+        String((statusMarker?.payload as { presentation_generation?: unknown } | undefined)?.presentation_generation ?? "")
+      const presentations = await this.presentationsForPass(pass, expected.size)
+      const held = new Set(machineRows.map((row) => this.machine + "\u0000" + (row.session ?? row.id)))
+      for (const presentation of presentations ?? []) {
+        const target = presentation.destination
+        const key = this.machine + "\u0000" + target.sessionID
+        if (target.machineID !== this.machine || !expected.has(key) || held.has(key)) continue
+        const status = client.statusSnapshots?.get(JSON.stringify([this.machine, target.sessionID])) as
+          | { payload?: { snapshot_generation?: unknown; execution_generation?: unknown;
+            machine_id?: unknown; session_id?: unknown; state?: unknown; assistant?: unknown; backend?: unknown;
+            source?: { freshness?: unknown; observed_at?: unknown } } } | undefined
+        const data = status?.payload
+        if (data?.machine_id !== this.machine || data.session_id !== target.sessionID ||
+          data.execution_generation !== target.executionGeneration ||
+          data.snapshot_generation !== statusMarker?.payload?.snapshot_generation ||
+          data.source?.freshness !== "current") continue
+        const { identity: _displayIdentity, ...displayStatus } = presentation.status ?? {}
+        machineRows.push({ ...displayStatus, id: target.sessionID, session: target.sessionID,
+          machine: this.machine, execution_generation: target.executionGeneration, label: presentation.title,
+          cwd: presentation.cwd, icon: presentation.icon, assistant: data.assistant, backend: data.backend,
+          state: data.state, source: data.source })
+        held.add(key)
+      }
+    }
     const target = this.options.classicStatus ? this.options.fleetTarget?.() : null
     if (target?.machineID === this.machine && expected?.has(this.machine + "\u0000" + target.sessionID) &&
       !machineRows.some((row) => (row.session ?? row.id) === target.sessionID &&

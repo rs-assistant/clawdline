@@ -259,7 +259,7 @@ export function settleProjection(machineID: string, before: MachineSessionProjec
 export function projectionRefreshAt(projection: MachineSessionProjection, freshnessMs: number,
   directRefreshMs = freshnessMs): number | null {
   if (projection.kind !== "ready") return (projection.reason === "offline" || projection.reason === "event_gap" ||
-    projection.reason === "unknown") && Number.isFinite(projection.retryAt)
+    projection.reason === "unknown" || projection.reason === "stale") && Number.isFinite(projection.retryAt)
     ? projection.retryAt! : null
   if (projection.snapshotGeneration?.startsWith("direct:")) return projection.observedAt + directRefreshMs + 1
   return Math.min(projection.observedAt, ...projection.rows.filter((row) => row.freshness === "current")

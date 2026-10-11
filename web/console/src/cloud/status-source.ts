@@ -182,7 +182,8 @@ export function statusSource(current: () => StatusClient | null): SessionProject
     // The roster can arrive before orch/ advertises the reader. One bounded
     // authenticated attempt is safe: an older machine refuses sessions.list,
     // while waiting for the descriptor can hold a cold browser for a minute.
-    if (projection.kind === "unavailable" && (projection.reason === "unknown" || projection.reason === "event_gap") &&
+    if (projection.kind === "unavailable" &&
+      (projection.reason === "unknown" || projection.reason === "event_gap" || projection.reason === "stale") &&
       client.listPresentationsForMachine && pinnedReadSupport(client, machineID) !== "no" && !signal.aborted) {
       const now = client.now?.() ?? Date.now()
       let cached = directLists.get(machineID)
@@ -204,6 +205,8 @@ export function statusSource(current: () => StatusClient | null): SessionProject
           return direct.projection
       }
       projection = statusProjection(client, machineID)
+      if (projection.kind === "unavailable" && projection.reason === "stale")
+        projection = { ...projection, retryAt: cached.until }
     }
     if (projection.kind === "unavailable" && projection.reason === "unknown" &&
       !client.statusSnapshots?.has(JSON.stringify([machineID, "__clawdline_inventory_v1__"])) &&
