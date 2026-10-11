@@ -1552,7 +1552,7 @@ export class RelayReader {
         const signedRow = data?.machine_id === this.machine && data.session_id === target.sessionID &&
           data.execution_generation === target.executionGeneration &&
           data.snapshot_generation === statusMarker?.payload?.snapshot_generation &&
-          data.source?.freshness === "current"
+          ["current", "unverified", "missing"].includes(String(data.source?.freshness))
         const pinnedRow = presentation.projection?.freshness === "current" &&
           presentation.projection.destination.machineID === this.machine &&
           presentation.projection.destination.sessionID === target.sessionID &&
@@ -1570,7 +1570,7 @@ export class RelayReader {
           assistant: signedRow ? data?.assistant : presentation.projection?.assistant,
           backend: signedRow ? data?.backend : presentation.projection?.backend,
           state: signedRow ? data?.state : presentation.status?.state ?? "unknown",
-          source: signedRow ? data?.source : { freshness: "current",
+          source: signedRow ? data?.source : { freshness: presentation.projection?.freshness === "current" ? "current" : "unverified",
             observed_at: (presentation.projection?.observedAt ?? this.now()) / 1000 } })
         held.add(key)
       }

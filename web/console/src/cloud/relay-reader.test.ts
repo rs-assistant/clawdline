@@ -517,6 +517,25 @@ test("an older retained direct row cannot satisfy a newer signed marker", async 
   assert.equal(snapshot.scan.complete, false)
 })
 
+test("a signed unverified Session stays visible with its honest source state", async () => {
+  const client = new FakeClient()
+  const pass = "c".repeat(32), execution = "a".repeat(32)
+  const destination = { machineID: "mac-a", sessionID: "s1", executionGeneration: execution }
+  client.statusSnapshots = markerOnly("mac-a", pass, 1, "s1")
+  ;(client.statusSnapshots as Map<string, unknown>).set(JSON.stringify(["mac-a", "s1"]),
+    { payload: { machine_id: "mac-a", session_id: "s1", execution_generation: execution,
+      snapshot_generation: pass, state: "idle", source: { freshness: "unverified", observed_at: 1 } } })
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    listPresentations: async () => [{ destination, title: "Retained Session", status: { state: "idle" },
+      projection: { destination, state: "idle", freshness: "stale", observedAt: 1000,
+        snapshotGeneration: pass } }],
+  })
+  r.attach(client)
+  const snapshot = await r.snapshot()
+  assert.deepEqual(snapshot.sessions.map((session) => session.label), ["Retained Session"])
+  assert.equal(snapshot.sessions[0].source?.freshness, "unverified")
+})
+
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {
   const client = new FakeClient()
   const pass = "c".repeat(32)

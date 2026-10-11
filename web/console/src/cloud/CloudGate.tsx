@@ -284,6 +284,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   fleetTargetRef.current = fleetScope ? fleetTarget : null
   const fleetPresentations = useRef(new Map<string, SessionListPresentation & {
     destination: SessionDestination; projection?: ProjectedSession }>())
+  const fleetPresentationReceivedAt = useRef(new Map<string, number>())
   const [fleetPresentationRevision, refreshFleetPresentation] = useState(0)
   const noteFleetPresentations = useCallback((machineID: string,
     rows: readonly (SessionListPresentation & { destination: SessionDestination;
@@ -295,10 +296,14 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       for (const [key, held] of fleetPresentations.current) {
         if (held.destination.machineID === machineID &&
           held.destination.sessionID === row.destination.sessionID &&
-          held.destination.executionGeneration !== row.destination.executionGeneration)
+          held.destination.executionGeneration !== row.destination.executionGeneration) {
           fleetPresentations.current.delete(key)
+          fleetPresentationReceivedAt.current.delete(key)
+        }
       }
-      fleetPresentations.current.set(destinationKey(row.destination), row)
+      const key = destinationKey(row.destination)
+      fleetPresentations.current.set(key, row)
+      fleetPresentationReceivedAt.current.set(key, Date.now())
     }
     refreshFleetPresentation((revision) => revision + 1)
     if (reader.current?.machine === machineID && client.current)
@@ -498,22 +503,23 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const pointAt = useCallback((machineID: string, current: CloudClientHandle): RelayReader => {
     if (reader.current?.machine === machineID) return reader.current
     const config = transport.kind === "cloud" ? transport.config : null
+    const heldFleetRows = (machineID: string) => [...fleetPresentations.current.entries()]
+      .filter(([key, row]) => row.destination.machineID === machineID &&
+        !!row.projection &&
+        Date.now() - (fleetPresentationReceivedAt.current.get(key) ?? 0) <= STATUS_FRESH_MS)
+      .map(([, row]) => row)
     const next = new RelayReader(machineID, {
       strings: () => (config ? catalog(config) : Promise.resolve({})),
       carry: CARRY_TABLE,
       classicStatus: true,
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
-      fleetPresentations: (machineID) => [...fleetPresentations.current.values()]
-        .filter((row) => row.destination.machineID === machineID && row.projection?.freshness === "current" &&
-          Math.abs(Date.now() - row.projection.observedAt) <= STATUS_FRESH_MS),
+      fleetPresentations: heldFleetRows,
       listPresentations: async (machineID) => {
         // Reuse the fleet's already verified rows, even if a newer
         // presentation pass has only delivered its first title. A partial
         // batch remains visibly partial until the signed set catches up.
-        const held = [...fleetPresentations.current.values()]
-          .filter((row) => row.destination.machineID === machineID && row.projection?.freshness === "current" &&
-            Math.abs(Date.now() - row.projection.observedAt) <= STATUS_FRESH_MS)
+        const held = heldFleetRows(machineID)
         if (held.length) return held as MachineListPresentation[]
         return await liveSessionSource.readMachinePresentations?.(
           machineID, new AbortController().signal) ?? null
