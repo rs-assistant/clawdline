@@ -318,9 +318,9 @@ merge keeps it whichever side it arrived on (`richer`). `SessionRow.persona` rep
 
 ## Console and Cloud
 
-The console calls a persona a "Role" (角色). It reads `GET /v1/personas` once per page
-(`web/console/src/personas.ts`); a console shows one machine for its whole life, so that is once
-per machine. A read that fails for any reason is an empty catalog, and an empty catalog draws no
+The console calls a persona a "Role" (角色). It reads `GET /v1/personas` once per machine
+(`web/console/src/personas.ts`), including machines shown in the Cloud fleet. A read that fails
+for any reason is an empty catalog, and an empty catalog draws no
 chips and no bots: an older daemon, or a machine on Cloud that cannot answer, shows the console it
 showed before this feature, never a sheet that breaks after a press.
 
@@ -342,8 +342,12 @@ showed before this feature, never a sheet that breaks after a press.
   `shownTeam`, `switchTeam`, `teamsOffered`, `personasOfTeam`).
 - **Session list.** A row whose `persona` the catalog names starts its third line, before the
   state words, with the bot at two pixels a cell and the role's full name in the console's
-  language (11.5 px, as the words beside it), with name and summary as its title. It is written
-  into the state line's markup, so it swipes with the line and adds no height; the name takes at
+  language (11.5 px, as the words beside it), with name and summary as its title. Both local and
+  Cloud fleet rows draw it. The fleet reads the role from the machine's pinned
+  Session list and resolves its name from that machine's catalog; a newly discovered role changes
+  the presentation generation so the viewer re-reads the list. The content-free `ss/` status
+  channel carries neither the role nor the catalog. The badge sits in the state line's markup,
+  so it swipes with the line and adds no height; the name takes at
   most 65 % of the line and does not shrink below its own width, so a long working sentence takes
   the ellipsis instead. The history, all from 2026-09-27: after the assistant's name in the title
   (a 390 px phone cut the name to one character); a line of its own under the state line with a

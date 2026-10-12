@@ -26,7 +26,7 @@ import (
 func TestMachineListUsesTheSingleMachineSnapshotAndItsRowStatus(t *testing.T) {
 	item := session.Session{ID: "%41", Backend: session.BackendTmux, Assistant: session.AssistantCodex,
 		State: session.StateWorking, Label: "Readable title", CWD: "/project",
-		Line: "private work detail", ConversationID: "conversation-41"}
+		Line: "private work detail", ConversationID: "conversation-41", Persona: "product-manager"}
 	s := paneServer(t, &pane{s: item})
 	s.cfg = config.Config{Dir: filepath.Join(t.TempDir(), "clawdline-next")}
 	rec := httptest.NewRecorder()
@@ -47,7 +47,7 @@ func TestMachineListUsesTheSingleMachineSnapshotAndItsRowStatus(t *testing.T) {
 		t.Fatalf("machine list leaked content or lost identity: %v", row)
 	}
 	if status == nil || status["line"] != "private work detail" || status["work_state"] == nil ||
-		status["sessionId"] != "conversation-41" {
+		status["sessionId"] != "conversation-41" || status["persona"] != "product-manager" {
 		t.Fatalf("machine list dropped the original status line: %v", row)
 	}
 }

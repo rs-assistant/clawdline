@@ -204,7 +204,7 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 			line = session.WithoutElapsed(line)
 		}
 		display := map[string]any{
-			"line": line, "work_state": row["work_state"],
+			"line": line, "persona": row["persona"], "work_state": row["work_state"],
 			"work_note": row["work_note"], "work_provenance": row["work_provenance"],
 			"work_moved_by": row["work_moved_by"], "work_person_needed": row["work_person_needed"],
 			"shells": row["shells"], "heavy_work": row["heavy_work"],

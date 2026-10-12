@@ -5,13 +5,15 @@ import { loadPersonas, onPersonas, personaById, personaName, personaTitle, perso
 import "./persona.css"
 
 /** The catalog, re-rendering once it arrives; empty until then and when it cannot be read. */
-export function usePersonas(): Persona[] {
-  const [list, setList] = useState<Persona[]>(() => personasNow() ?? [])
+export function usePersonas(machine: string | null = null): Persona[] {
+  const [list, setList] = useState<Persona[]>(() => personasNow(machine) ?? [])
   useEffect(() => {
-    const off = onPersonas(() => setList(personasNow() ?? []))
-    void loadPersonas().then((l) => setList(l))
-    return off
-  }, [])
+    let active = true
+    setList(personasNow(machine) ?? [])
+    const off = onPersonas(() => { if (active) setList(personasNow(machine) ?? []) })
+    void loadPersonas(undefined, machine).then((l) => { if (active) setList(l) })
+    return () => { active = false; off() }
+  }, [machine])
   return list
 }
 

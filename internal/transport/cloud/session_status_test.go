@@ -180,6 +180,31 @@ func TestStatusNotifiesOneMachineListReadWhenOnlyItsWorkLineChanges(t *testing.T
 	}
 }
 
+func TestStatusNotifiesOneMachineListReadWhenItsRoleAppears(t *testing.T) {
+	c := &collector{}
+	p := &Publisher{MachineID: "mac_a", published: map[string][32]byte{}, sent: map[string]time.Time{}, Publish: c.publish}
+	row := map[string]any{"id": "%19", "state": "idle"}
+	reading := sessionReading{sessions: []map[string]any{row}, at: json.RawMessage(`100`), complete: true}
+	p.publishStatuses(context.Background(), reading, []string{"%19"})
+	first := c.payload(t, "ss/mac_a/"+InventorySessionID)
+	row["persona"] = "product-manager"
+	p.publishStatuses(context.Background(), reading, []string{"%19"})
+	if got := c.channels(); len(got) != 3 || got[2] != "ss/mac_a/"+InventorySessionID {
+		t.Fatalf("a discovered role did not refresh only the machine list: %v", got)
+	}
+	next := c.payload(t, "ss/mac_a/"+InventorySessionID)
+	if next["presentation_generation"] == first["presentation_generation"] ||
+		next["snapshot_generation"] != first["snapshot_generation"] {
+		t.Fatalf("role changed the status set instead of its presentation: %v -> %v", first, next)
+	}
+	for _, channel := range c.channels() {
+		body, err := json.Marshal(c.payload(t, channel))
+		if err != nil || strings.Contains(string(body), "product-manager") {
+			t.Fatalf("status channel %s copied the role: %s (%v)", channel, body, err)
+		}
+	}
+}
+
 // What the pass id is for: a row the relay still retains for a Session that
 // has closed, or that is running a different execution, cannot satisfy the
 // newest marker. The id is derived from the set rather than drawn fresh every
