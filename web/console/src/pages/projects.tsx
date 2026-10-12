@@ -1,6 +1,7 @@
 import { catalogFormat, catalogWord, catalogWordLanguage, currentCatalogTag } from "../catalog.js"
 import { createPortal } from "react-dom"
 import { ProjectTools } from "./projects/ProjectTools.js"
+import { ProjectFolderPicker } from "./projects/ProjectFolderPicker.js"
 import type { ProjectSetupHandle } from "./projects/ProjectSetup.js"
 import { localizePinnedProjectStatus, projectOpenLabel } from "./projects/project-list.js"
 import { decoratePinnedWorktree } from "./projects/pinned-worktree-copy.js"
@@ -49,16 +50,26 @@ type BoundProjects = ProjectsPage & {
  * close first is open.
  */
 function ProjectsPageView({ shown }: { shown: boolean }) {
-  const [iconHost, setIconHost] = useState<HTMLElement | null>(null)
-  useLayoutEffect(() => { setIconHost(document.getElementById("project-icon-copy-host")) }, [])
+  const [toolsHost, setToolsHost] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => { setToolsHost(document.getElementById("project-tools-host")) }, [])
   const page = useRef<BoundProjects | null>(null)
   const setup = useRef<ProjectSetupHandle>(null)
   const was = useRef(false)
   const painted = useRef(false)
   const [removeTarget, setRemoveTarget] = useState<ProjectTarget | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
   const [removeBusy, setRemoveBusy] = useState(false)
   const [removeError, setRemoveError] = useState("")
   const removeDialog = useRef<HTMLDialogElement>(null)
+
+  useLayoutEffect(() => {
+    const button = document.getElementById("projects-add")
+    if (!button) return
+    button.textContent = catalogWord("projects", "addButton")
+    const open = () => setAddOpen(true)
+    button.addEventListener("click", open)
+    return () => button.removeEventListener("click", open)
+  }, [])
 
   useLayoutEffect(() => {
     const dialog = removeDialog.current
@@ -271,6 +282,8 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
         painted.current = true
         paintNextWords(document.getElementById("projects"))
       }
+      const add = document.getElementById("projects-add")
+      if (add) add.textContent = catalogWord("projects", "addButton")
       void page.current?.enter()
       document.getElementById("projects-title")?.focus({ preventScroll: true })
     }
@@ -314,9 +327,10 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       hidden={!shown}
       dangerouslySetInnerHTML={{ __html: sectionMarkup }}
     />
-    {iconHost && createPortal(<>
+    {toolsHost && createPortal(<>
       <ProjectTools shown={shown} changed={() => { void page.current?.enter() }} setupRef={setup} />
-    </>, iconHost)}
+    </>, toolsHost)}
+    <ProjectFolderPicker open={addOpen} onClose={() => setAddOpen(false)} onAdded={() => { void page.current?.enter() }} />
     <dialog className="project-remove-dialog" ref={removeDialog}
       onCancel={(event) => { if (removeBusy) event.preventDefault() }}
       onClose={() => { if (!removeBusy) setRemoveTarget(null) }}>

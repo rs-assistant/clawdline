@@ -97,8 +97,8 @@ on me and it cannot wait, send it with `clawdline notify` rather than only writi
 
 Open **專案** (Projects) on the new machine — through its own console, or by selecting it in the
 hosted console. Each project appears with the name and icon the source machine draws, and a
-mirrored skill is a real file in that checkout's `.claude/skills/`. Changing a mirrored project's
-icon there is refused (`project_mirrored`): the machine you already use owns those settings.
+mirrored skill is a real file in that checkout's `.claude/skills/`. The machine
+you already use owns later changes to those settings.
 
 ## What this does not do
 

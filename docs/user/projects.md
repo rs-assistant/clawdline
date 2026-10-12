@@ -21,9 +21,10 @@ The first command asks the running daemon to add the directory to its durable Pr
 second reads the explicit registrations from that same daemon. Run `./bin/clawdline`
 instead if you built Clawdline from source and did not install its CLI. The directory must already
 exist. `clawdline project add .`, `clawdline project add ../my-app`, and an absolute path also work.
-There is no Add Project
-button in the console, including the hosted Cloud console. If you have Cloud terminal access to
-that machine, you can run the same CLI command in its terminal.
+In the console, press **+ Add Project** on the Projects page or in the new Session
+sheet, browse folders on the selected machine, then add the current folder.
+You can enter an absolute path on that machine when a folder is not listed.
+The new Session sheet also has **Edit projects** to remove entries from its list.
 
 **Check:** refresh **Projects** on the same machine in the local console, or select that machine in
 the paired Cloud console and refresh **Projects** there. The directory is also offered when you
@@ -32,8 +33,9 @@ start a session ([sessions.md](sessions.md)); an already open start sheet refres
 the console without it.
 
 To remove the Project from both **Projects** and the session start list, use its row's
-**Remove from list** action and confirm, or run `clawdline project remove /absolute/path/to/my-app`.
-The directory and sessions remain on the machine. Assistant history and live Sessions cannot
+**Remove from list** action, use **Edit projects** in the new Session sheet, or run
+`clawdline project remove /absolute/path/to/my-app`.
+The directory, sessions and project settings remain on the machine. Assistant history and live Sessions cannot
 restore a removed Project. **Projects** refreshes when removal succeeds, and an open
 session start sheet refreshes automatically; `clawdline project add` from its directory restores it.
 
@@ -136,8 +138,7 @@ already mirrors here.
 ### Check
 
 On the receiving machine, **專案** shows each project with the source's name and icon, and a
-mirrored skill is in that checkout's `.claude/skills/`. Changing the icon there is refused
-(`project_mirrored`): the source owns it.
+mirrored skill is in that checkout's `.claude/skills/`. The source owns its icon.
 
 ### What is never copied
 
@@ -151,7 +152,6 @@ and build caches inside those directories, and your personal `~/.claude/skills`.
 | `project add` cannot connect or authenticate | Start or update the daemon on the machine that holds the directory. Run `clawdline doctor` to check the CLI's port and state directory against that daemon, then retry. The command leaves the Project list unchanged when it cannot reach the daemon. |
 | `project add` succeeded, but the Project is absent from Cloud | Select the machine that holds the directory; the open start sheet refreshes automatically, while **Projects** refreshes when reopened. If it is still absent, report a product defect with the command response and selected machine; success means the serving daemon accepted the registration. |
 | `mirror_source_mismatch` | Another machine already owns that project's settings here. Choose that one as the source, or import with `--replace-source` |
-| `project_mirrored` | Change it on the source, or press **改回本機設定** first |
 | `clone_failed` | The receiving machine could not reach the remote with its own credentials. Clone it by hand into the named directory, then sync again |
 
 ## Deeper

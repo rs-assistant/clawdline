@@ -690,9 +690,13 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		path:  "/v1/work/v2/human-interventions/conversation%3A10000000-0000-4000-8000-000000000002/10000000-0000-4000-8000-000000000003/read",
 		body2: `{"expected_version":1}`,
 	}, {
-		word:    "project-icon-copy",
-		body:    map[string]any{"type": "project-icon-copy", "session": machine, "request": "req-icon", "id": "p1", "item": map[string]any{}},
-		session: machine, name: "action:req-icon", method: "PUT", path: "/v1/projects/p1/icon", body2: `{}`,
+		word:    "project-folders",
+		body:    map[string]any{"type": "project-folders", "session": machine, "request": "req-folders", "path": "/projects"},
+		session: machine, name: "read:req-folders", method: "GET", path: "/v1/project-folders", query: map[string]string{"path": "/projects"},
+	}, {
+		word:    "project-add",
+		body:    map[string]any{"type": "project-add", "session": machine, "request": "req-add", "path": "/projects/example"},
+		session: machine, name: "action:req-add", method: "POST", path: "/v1/places", body2: `{"paths":["/projects/example"]}`,
 	}, {
 		word:    "project-manifest",
 		body:    map[string]any{"type": "project-manifest", "session": machine, "request": "req-manifest"},

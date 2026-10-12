@@ -235,8 +235,8 @@ export interface WriteHost {
 export type WriteRoute =
  | { op: "squad-write"; word: Carried<"squad.settings.update" | "squad.motion.update" | "squad.catalog.update"> }
   | { op: "squad-package"; word: Carried<"squad.packages.preview" | "squad.packages.adopt" | "squad.packages.export"> }
- | { op: "project-icon-copy"; word: Carried<"project-icon-copy">; id: string }
   | { op: "project-hide"; word: Carried<"project-hide"> }
+  | { op: "project-add"; word: Carried<"project-add"> }
   | { op: "project-file-save"; word: Carried<"project-file-save">; project: string; file: string }
   | { op: "project-unify-apply"; word: Carried<"project-unify-apply">; project: string }
   | { op: "project-mirror-apply"; word: Carried<"project-mirror-apply"> }
@@ -594,8 +594,8 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   if (head === "work" && a === "v2" && b === "items" && c && segments.length === 4 && method === "PATCH") {
     return { op: "work-v2-edit", word: "work.v2.edit", id: c }
   }
-  if (head === "projects" && a && b === "icon" && segments.length === 3 && method === "PUT") return { op: "project-icon-copy", word: "project-icon-copy", id: a }
   if (head === "places" && segments.length === 1 && method === "DELETE") return { op: "project-hide", word: "project-hide" }
+  if (head === "places" && segments.length === 1 && method === "POST") return { op: "project-add", word: "project-add" }
   if (head === "projects" && a && b === "files" && c && segments.length === 4 && method === "PUT" && /^[0-9a-f]{32}$/.test(c)) {
     return { op: "project-file-save", word: "project-file-save", project: a, file: c }
   }
@@ -852,8 +852,8 @@ function spellingOf(route: WriteRoute): Spelling {
     case "squad-write":
     case "squad-package":
     case "board-command":
-    case "project-icon-copy":
     case "project-hide":
+    case "project-add":
     case "project-file-save":
     case "project-unify-apply":
     case "project-mirror-apply":
@@ -1637,25 +1637,28 @@ export class RelayWriter {
         if (!request) throw failure("bad_request", "a Board command needs a requestId", 400)
         return this.machineWorkV2(client, route.word, { command }, request)
       }
-      case "project-icon-copy": {
-        if (typeof client._place !== "function") throw failure("cloud_not_carried", route.word, 501)
-        const place = client._place(route.id)
-        if (place.machine !== this.host.machine) throw failure("cloud_project_machine_mismatch", "this Project belongs to another machine", 409)
-        return this.machineWorkV2(client, route.word, { id: place.id, item: await bodyOf(init) }, headerOf(init, "idempotency-key"))
-      }
       case "project-hide": {
         if (typeof client._place !== "function") throw failure("cloud_not_carried", route.word, 501)
         const body = await bodyOf(init)
         const id = typeof body.place === "string" ? body.place : ""
         if (!id) throw failure("bad_request", "a Project must be selected", 400)
         const place = client._place(id)
-        if (place.machine !== this.host.machine) throw failure("cloud_project_machine_mismatch", "this Project belongs to another machine", 409)
         if (!Array.isArray(body.paths) || body.paths.length !== 1 || body.paths[0] !== place.path) {
           throw failure("bad_request", "the Project path changed", 400)
         }
         const request = headerOf(init, "idempotency-key")
         if (!request) throw failure("idempotency_key_required", "Removing a Project needs an Idempotency-Key.", 400)
-        return this.machineWorkV2(client, route.word, { path: place.path }, request)
+        return this.machineWorkV2(client, route.word, { path: place.path }, request, place.machine)
+      }
+      case "project-add": {
+        for (const [key] of url.searchParams) if (key !== "machine") throw failure("bad_request", "Only machine is accepted.", 400)
+        const body = await bodyOf(init)
+        if (!Array.isArray(body.paths) || body.paths.length !== 1 || typeof body.paths[0] !== "string" || !body.paths[0]) {
+          throw failure("bad_request", "Choose one absolute directory on the selected machine.", 400)
+        }
+        const request = headerOf(init, "idempotency-key")
+        if (!request) throw failure("idempotency_key_required", "Adding a Project needs an Idempotency-Key.", 400)
+        return this.machineWorkV2(client, route.word, { path: body.paths[0] }, request, url.searchParams.get("machine") || this.host.machine)
       }
       case "project-file-save": {
         if (typeof client._place !== "function" || typeof client._machineRequestAs !== "function") throw failure("cloud_not_carried", route.word, 501)
@@ -1753,14 +1756,14 @@ export class RelayWriter {
     }
   }
 
-  private machineWorkV2(client: CloudWriteClient, word: CarriedWord, body: Record<string, unknown>, request: string): Promise<unknown> {
+  private machineWorkV2(client: CloudWriteClient, word: CarriedWord, body: Record<string, unknown>, request: string, machine = this.host.machine): Promise<unknown> {
     if (request && typeof client._machineRequestAs === "function") {
-      return client._machineRequestAs(request, this.host.machine, word, body, "action")
+      return client._machineRequestAs(request, machine, word, body, "action")
     }
     if (typeof client._machineRequest !== "function") {
       return Promise.reject(failure("cloud_not_carried", word, 501))
     }
-    return client._machineRequest(this.host.machine, word, body, "action")
+    return client._machineRequest(machine, word, body, "action")
   }
 
   /**

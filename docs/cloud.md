@@ -118,10 +118,11 @@ Two things follow, and both were wrong before:
 
 The hosted and daemon consoles share source but require different builds. The hosted build must set `VITE_HOSTED_CONSOLE` so its entry point selects `CloudGate`; an ordinary local build selects `DoorGate`. [Deploying the hosted console](hosted-console.md) documents the build, production ancestry check, `BUILD.json` stamp, served-bundle `CloudGate` check and rollback procedure. A build stamp alone does not show that the served bundle is the Cloud one. This page makes no claim that the currently deployed bundle or private service matches this checkout.
 
-The Cloud console shows the selected machine's Projects, but does not register a local directory.
-For a missing existing directory, run `clawdline project add` from that directory on the
-machine that holds it while its daemon is running. The session start sheet refreshes automatically
-while open; reopen **Projects** to refresh that page. The command reports success only when the serving daemon
+The Cloud console shows the selected machine's Projects and can register an
+existing directory on that machine. Press **+ Add Project** in Projects or the
+new Session sheet, browse folders on the selected machine, and add one. The
+session start sheet refreshes automatically while open; reopen **Projects** to
+refresh that page. The CLI command `clawdline project add` also reports success only when the serving daemon
 registered it; `clawdline project list` reads that same explicit list. If the daemon cannot be
 reached or authenticated, the command fails without writing another list. [Adding a project](user/projects.md#add-a-project)
 gives the full steps.

@@ -8,15 +8,14 @@ import (
 	"testing"
 
 	"github.com/sainteye/clawdline/internal/app/cloudops"
-	"github.com/sainteye/clawdline/internal/domain/icon"
 	domain "github.com/sainteye/clawdline/internal/domain/projectsync"
 )
 
-// syncStandIn is iconCloudStandIn whose one project is a git checkout with
+// syncStandIn is projectCloudStandIn whose one project is a git checkout with
 // the given origin and an untracked project skill.
 func syncStandIn(t *testing.T, origin, skill string) (*standIn, string) {
 	t.Helper()
-	s := iconCloudStandIn(t)
+	s := projectCloudStandIn(t)
 	project, ok := s.server.workV2Project(t.Context(), s.place)
 	if !ok {
 		t.Fatal("missing fixture place")
@@ -84,33 +83,21 @@ func TestCloudCarriesProjectSettingsFromASourceToAMirror(t *testing.T) {
 		t.Fatalf("the mirror's label is %q", got)
 	}
 
-	// The mirror's icon is the source's, and cannot be changed here.
+	// The mirror's icon is the source's.
 	current := dst.server.icons.For(there)
-	c := "#FEDCBA"
-	other := icon.Grid{Accent: c, Cells: [][]*string{{&c}}}
-	a, _ = dst.ask(t, 5, map[string]any{"type": "project-icon-copy", "session": machine, "request": "icon",
-		"id": dst.place, "item": map[string]any{"icon": other, "expected": current}})
-	if a.Status != 409 {
-		t.Fatalf("an icon write on a mirrored project answered %d %s", a.Status, a.Payload)
-	}
-	a, _ = dst.ask(t, 6, map[string]any{"type": "project-mirror", "session": machine, "request": "state"})
+	a, _ = dst.ask(t, 5, map[string]any{"type": "project-mirror", "session": machine, "request": "state"})
 	var state struct {
 		Projects []domain.Record `json:"projects"`
 	}
 	if !a.OK() || unwrap(a.Payload, &state) != nil || len(state.Projects) != 1 || state.Projects[0].Source.Name != "Studio" {
 		t.Fatalf("mirror state: %d %s", a.Status, a.Payload)
 	}
-	a, _ = dst.ask(t, 7, map[string]any{"type": "project-mirror-detach", "session": machine, "request": "detach", "repo": "github.com/acme/shop"})
+	a, _ = dst.ask(t, 6, map[string]any{"type": "project-mirror-detach", "session": machine, "request": "detach", "repo": "github.com/acme/shop"})
 	if !a.OK() {
 		t.Fatalf("detach: %d %s", a.Status, a.Payload)
 	}
 	if own := dst.server.icons.For(there); own.Accent == current.Accent {
 		t.Fatal("a detached project still draws the mirrored mark")
-	}
-	a, _ = dst.ask(t, 8, map[string]any{"type": "project-icon-copy", "session": machine, "request": "icon2",
-		"id": dst.place, "item": map[string]any{"icon": other, "expected": dst.server.icons.For(there)}})
-	if !a.OK() {
-		t.Fatalf("a detached project's icon is its own again: %d %s", a.Status, a.Payload)
 	}
 }
 

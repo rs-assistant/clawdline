@@ -10,8 +10,7 @@ This page is how one machine owns those settings and others read them.
 ## The shape
 
 - **One side owns, the other reads.** A *source* offers its projects; a *mirror* applies them and
-  keeps a record of what it applied. A mirrored project's icon cannot be changed on the mirror
-  (`409 project_mirrored`), and a mirror never offers what it mirrors, so settings travel in one
+  keeps a record of what it applied. A mirror never offers what it mirrors, so settings travel in one
   direction and two machines cannot echo each other.
 - **The identity is the repository, not the folder.** Projects are matched by their `origin`
   remote spelled as `host/owner/name` (`git@github.com:Acme/Shop.git` and

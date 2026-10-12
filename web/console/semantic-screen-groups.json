@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5050,
-  "riskKeys": 2214,
-  "nonRiskCount": 2836,
+  "englishContentKeys": 5066,
+  "riskKeys": 2221,
+  "nonRiskCount": 2845,
   "groups": [
     {
       "name": "bar / other",
@@ -2301,7 +2301,7 @@
     },
     {
       "name": "projects / other",
-      "count": 15,
+      "count": 24,
       "sources": [
         "src/pages/projects/project-list.ts"
       ],
@@ -2309,7 +2309,16 @@
         "projects.activityInProgress",
         "projects.activityLastKnown",
         "projects.activityPartial",
+        "projects.addButton",
         "projects.boardLede",
+        "projects.editList",
+        "projects.folderAdd",
+        "projects.folderCancel",
+        "projects.folderHint",
+        "projects.folderList",
+        "projects.folderParent",
+        "projects.folderPath",
+        "projects.folderTitle",
         "projects.setupProjectRoot",
         "projects.setupUnifyDrift",
         "projects.setupUnifyDriftCount",

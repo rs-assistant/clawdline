@@ -1224,6 +1224,10 @@ export class RelayReader {
           this.only(url, path)
           return await this.machineRead(init?.signal, method, path, "projects", {})
         }
+        case "/v1/project-folders": {
+          const q = this.only(url, path, "path", "machine")
+          return await this.machineRead(init?.signal, method, path, "project-folders", { path: q.path ?? "" }, q.machine || undefined)
+        }
         case "/v1/personas": {
           // The built-in personas a start may name (docs/personas.md). A
           // machine whose descriptor does not list the word is a daemon from

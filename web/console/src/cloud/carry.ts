@@ -85,6 +85,8 @@ export const CARRIED = {
   intents: "POST /v1/intents",
   "past-sessions": "GET /v1/places/{id}/sessions[/{assistant}]",
   places: "GET /v1/places",
+  "project-folders": "GET /v1/project-folders?path=&machine=",
+  "project-add": "POST /v1/places?machine=",
   "project-hide": "DELETE /v1/places",
   // The built-in personas a start may name (docs/personas.md): a machine read
   // with no parameter. A machine that does not list it is refused by the copied
@@ -117,7 +119,6 @@ export const CARRIED = {
   "project-unify-apply": "POST /v1/projects/{project}/unify",
   "project-tree-list": "GET /v1/projects/{project}/tree?directory=",
   "project-tree-read": "GET /v1/projects/{project}/tree/file?path=",
-  "project-icon-copy": "PUT /v1/projects/{id}/icon",
   // Project settings sync (docs/project-sync.md). The two source reads are
   // also asked of *another* paired machine by `cloud/project-sync.ts`, which
   // is how a mirror reads its source without either machine reaching the other.

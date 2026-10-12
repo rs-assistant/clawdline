@@ -419,6 +419,42 @@ func init() {
 
 		// The Projects page's catalog and worktree lifecycle. `places` above is
 		// carried separately.
+		op{name: "project-folders", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.hasOneOf([]string{"type", "session", "request"}, []string{"type", "session", "request", "path"}) {
+					return plan{}, false
+				}
+				p, ok := machinePlan(b)
+				if !ok {
+					return plan{}, false
+				}
+				path, ok := b.str("path")
+				if _, present := b["path"]; present && (!ok || len(path) > 4096) {
+					return plan{}, false
+				}
+				p.path = path
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "GET", Path: "/v1/project-folders", Query: map[string]string{"path": p.path}}
+			}},
+		op{name: "project-add",
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "path") {
+					return plan{}, false
+				}
+				p, ok := actionPlan(b, false)
+				path, valid := b.nonEmpty("path")
+				if !ok || !valid || !printable(path) || len(path) > 4096 || !filepath.IsAbs(path) {
+					return plan{}, false
+				}
+				p.path = path
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				payload, _ := json.Marshal(map[string][]string{"paths": {p.path}})
+				return LocalRequest{Method: "POST", Path: "/v1/places", Body: payload, Header: asDevice()}
+			}},
 		op{name: "project-hide",
 			decode: func(b body) (plan, bool) {
 				if !b.has("type", "session", "request", "path") {
@@ -436,12 +472,6 @@ func init() {
 				payload, _ := json.Marshal(map[string][]string{"paths": {p.path}})
 				return LocalRequest{Method: "DELETE", Path: "/v1/places", Body: payload, Header: asDevice()}
 			}},
-		op{name: "project-icon-copy",
-			decode: decodeWorkV2NamedDocument("id", "item"),
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "PUT", Path: "/v1/projects/" + segment(p.id) + "/icon", Body: p.document, Header: asDevice()}
-			},
-		},
 		op{name: "projects", read: true,
 			decode: func(b body) (plan, bool) {
 				if !b.has("type", "session", "request") {

@@ -1494,16 +1494,15 @@ test("a client that cannot write snippets is refused by name", async () => {
   assert.deepEqual(client.calls, [], "nothing was asked of the machine")
 })
 
-test("project icon copy resolves the receiving place and carries only the mark", async () => {
+test("adding a Project on the selected machine carries its folder", async () => {
   const client = new FakeClient()
   const { reader } = seam(client)
-  const item = { icon: { accent: "#123456", cells: [["#123456", null]] }, expected: { accent: "#FFFFFF", cells: [[null]] } }
-  const response = await reader.fetch("/v1/projects/cloud-p1/icon", { ...post(item), method: "PUT" })
-  assert.equal(response.status, 200)
-  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "project-icon-copy", { id: "p1", item }, "action"])
-  client._place = () => ({ machine: "different-machine", id: "p1", path: "/fixture" })
-  const refused = await reader.fetch("/v1/projects/cloud-p1/icon", { ...post(item), method: "PUT" })
-  assert.equal(refused.status, 409)
+  const folders = await reader.fetch("/v1/project-folders?machine=linux-b&path=%2Fprojects")
+  assert.equal(folders.status, 200, await folders.text())
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "linux-b", "project-folders", { path: "/projects" }, "read"])
+  const response = await reader.fetch("/v1/places?machine=linux-b", post({ paths: ["/projects/example"] }, { "Idempotency-Key": "add-1" }))
+  assert.equal(response.status, 200, await response.text())
+  assert.deepEqual(client.calls.pop(), ["_machineRequestAs", "add-1", "linux-b", "project-add", { path: "/projects/example" }, "action"])
 })
 
 test("removing a Project uses its selected machine and rejects a changed path", async () => {
@@ -1517,7 +1516,8 @@ test("removing a Project uses its selected machine and rejects a changed path", 
   assert.equal(stale.status, 400)
   client._place = () => ({ machine: "different-machine", id: "p1", path: "/repo" })
   const foreign = await reader.fetch("/v1/places", init)
-  assert.equal(foreign.status, 409)
+  assert.equal(foreign.status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequestAs", "hide-1", "different-machine", "project-hide", { path: "/repo" }, "action"])
 })
 
 test("a Project file save keeps its key, Project machine and exact file id", async () => {

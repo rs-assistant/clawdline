@@ -2236,6 +2236,11 @@ func Register() []Entry {
 			Sources: []string{"internal/domain/projectsync.MaxProjectFiles"},
 		},
 		{
+			Name: "projects.folder_rows", Class: Buffer, Unit: Rows,
+			Limit: 128, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.maxProjectFolderRows"},
+		},
+		{
 			Name: "projectfiles.list", Class: Buffer, Unit: Rows,
 			Limit: 128, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/adapters/projectfiles.MaxFiles"},

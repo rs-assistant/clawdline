@@ -16,7 +16,7 @@ import (
 // forgets; each refusal has its own code; a retry of the same add is
 // `unchanged`; nothing reaches the store without a credential.
 func TestProjectMemoryRoutesKeepOneStorePerProject(t *testing.T) {
-	s := iconCloudStandIn(t)
+	s := projectCloudStandIn(t)
 	request := func(method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
 		t.Helper()
 		req := httptest.NewRequest(method, "http://127.0.0.1:7757"+path, strings.NewReader(body))
@@ -105,7 +105,7 @@ func TestProjectMemoryRoutesKeepOneStorePerProject(t *testing.T) {
 // A store that cannot be read is 500 memory_unreadable, never an empty list:
 // unknown is not zero.
 func TestProjectMemoryThatCannotBeReadIsNotAnEmptyList(t *testing.T) {
-	s := iconCloudStandIn(t)
+	s := projectCloudStandIn(t)
 	project, _ := s.server.workV2Project(t.Context(), s.place)
 	key, _ := memory.KeyFor(project.Path)
 	dir := filepath.Join(s.server.cfg.Dir, "memory", key)
@@ -133,7 +133,7 @@ func TestProjectMemoryThatCannotBeReadIsNotAnEmptyList(t *testing.T) {
 // nobody set is refused with its own code; the list carries every group with
 // its count and an index line for it.
 func TestProjectMemoryGroupsAreSetThenNamedByEntries(t *testing.T) {
-	s := iconCloudStandIn(t)
+	s := projectCloudStandIn(t)
 	request := func(method, path, body string, headers map[string]string) *httptest.ResponseRecorder {
 		t.Helper()
 		req := httptest.NewRequest(method, "http://127.0.0.1:7757"+path, strings.NewReader(body))

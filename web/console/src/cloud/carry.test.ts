@@ -200,7 +200,6 @@ test("one word, one list, and every route names a word the table carries", () =>
     ["DELETE", "/v1/snippets/sn-1"],
     ["POST", "/v1/snippets/order"],
     ["POST", "/v1/projects/%2Frepo/worktrees/refresh"],
-    ["PUT", "/v1/projects/p1/icon"],
     ["PUT", "/v1/projects/p1/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
     ["POST", "/v1/project-sync/mirror"],
     ["DELETE", "/v1/project-sync/mirror"],
@@ -310,7 +309,7 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok(!("project-unify-apply" in DEFERRED))
   // The fleet list's one machine-level title read (5ff7f4ee).
   assert.ok("sessions.list" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 150)
+  assert.equal(Object.keys(CARRIED).length, 151)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {
