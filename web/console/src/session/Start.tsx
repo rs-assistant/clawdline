@@ -438,7 +438,11 @@ function draw(): void {
   const machineAction = el<HTMLButtonElement>("start-machine-action")
   const projectActions = el("start-project-actions")
   projectActions.hidden = machineOnly || mode !== "session" || !!at || !write
-  el("start-edit-projects").textContent = catalogWord("projects", editingProjects ? "editDone" : "editList")
+  const editProjects = el<HTMLButtonElement>("start-edit-projects")
+  const editLabel = catalogWord("projects", editingProjects ? "editDone" : "editList")
+  editProjects.setAttribute("aria-label", editLabel)
+  editProjects.title = editLabel
+  editProjects.setAttribute("aria-pressed", editingProjects ? "true" : "false")
   el("start-title").textContent = machineOnly ? "Clawdfather" : mode === "terminal" ? nextWord("terminalStartTitle") : T().webStart
   machineAction.hidden = !machineOnly
   machineAction.disabled = !!pressing || !!wait || !with_ || !write
@@ -1107,31 +1111,42 @@ export function StartSheet() {
           <div className="row" id="start-with" hidden></div>
           <div className="row persona-row" id="start-persona" role="group" aria-label={nextWord("personaPicker")} hidden></div>
           <div className="row" id="start-resume" hidden></div>
-          <div className="start-project-actions" id="start-project-actions" hidden>
-            <button id="start-add-project" type="button">{catalogWord("projects", "addButton")}</button>
-            <button id="start-edit-projects" type="button">{catalogWord("projects", "editList")}</button>
-          </div>
           <button className="chip machine-start" id="start-machine-action" type="button" hidden>
             <span className="clawdfather-crown" aria-hidden="true" />
             <span className="label">{nextWord("machineSessionStart")}</span>
           </button>
-          <input
-            className="find"
-            id="start-filter"
-            type="search"
-            name="p2k"
-            placeholder={T.webStartFilter}
-            hidden
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            data-1p-ignore=""
-            data-lpignore="true"
-            data-bwignore=""
-            data-form-type="other"
-            aria-label={T.webStartFilter}
-          />
+          <div className="start-project-filter-row">
+            <input
+              className="find"
+              id="start-filter"
+              type="search"
+              name="p2k"
+              placeholder={T.webStartFilter}
+              hidden
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              data-1p-ignore=""
+              data-lpignore="true"
+              data-bwignore=""
+              data-form-type="other"
+              aria-label={T.webStartFilter}
+            />
+            <div className="start-project-actions" id="start-project-actions" hidden>
+              <button id="start-add-project" type="button" aria-label={catalogWord("projects", "addButton")}
+                title={catalogWord("projects", "addButton")}>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" /></svg>
+              </button>
+              <button id="start-edit-projects" type="button" aria-label={catalogWord("projects", "editList")}
+                title={catalogWord("projects", "editList")} aria-pressed="false">
+                <svg className="start-edit-pencil" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z" /><path d="m14 7 3 3" />
+                </svg>
+                <svg className="start-edit-done" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6" /></svg>
+              </button>
+            </div>
+          </div>
           <ul className="places" id="start-list"></ul>
           <p className="said" id="start-said" role="status" aria-live="polite"></p>
         </div>

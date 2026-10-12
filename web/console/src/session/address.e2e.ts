@@ -90,6 +90,7 @@ let intentRequests = 0
 let placeRequests = 0
 let projectPickerEmpty = false
 let projectPickerNew = false
+let projectPickerMany = false
 let projectAdds = 0
 let projectRemoves = 0
 let projectFileText = "first instruction"
@@ -306,7 +307,10 @@ function daemon(): Server {
     if (path === "/v1/project-folders" && req.method === "GET") {
       const folder = url.searchParams.get("path") || "/tmp"
       return json(res, 200, { path: folder, parent: folder === "/tmp" ? "/" : "/tmp",
-        folders: folder === "/tmp" ? [{ name: "fixture-new", path: "/tmp/fixture-new" }] : [], truncated: false })
+        folders: folder === "/tmp" ? [
+          { name: "fixture-" + "very-long-folder-name-".repeat(12), path: "/tmp/fixture-long" },
+          { name: "fixture-new", path: "/tmp/fixture-new" },
+        ] : [], truncated: false })
     }
     if (path === "/v1/places") {
       if (req.method === "POST") { projectAdds++; projectPickerEmpty = false; projectPickerNew = true; return json(res, 200, { registered: true, places: [] }) }
@@ -319,11 +323,14 @@ function daemon(): Server {
       return json(res, 200, {
         at: Date.now(),
         assistants: [{ id: "claude", label: "Claude Code", availability: "unknown" }],
-        places: projectPickerEmpty ? [] : [{
+        places: projectPickerEmpty ? [] : (projectPickerMany ? Array.from({ length: 9 }, (_, index) => ({
+          id: "fixture-place-" + index, label: "Example project " + index, path: "/tmp/fixture-" + index,
+          at: Date.now(), icon: PROJECT_ICON,
+        })) : [{
           id: "fixture-place", label: "Example project", path: projectPickerNew ? "/tmp/fixture-new" : "/tmp/fixture", at: Date.now(), icon: PROJECT_ICON,
           repo: "github.com/example/project",
           setup: { icon: "generated", deploy: "ready", deploy_activity: "running", servers: "missing", server_count: 0, sync: "ready" },
-        }],
+        }]),
       })
     }
     if (path === "/v1/projects/fixture-place/tree" && req.method === "GET") {
@@ -2281,10 +2288,18 @@ test("phone: Projects offers a folder picker that can be cancelled", () =>
           if (!pressed) { add.click(); pressed = true }
           const dialog = document.querySelector(".project-folder-picker[open]")
           if (dialog) {
+            const folder = dialog.querySelector(".project-folder-list button:nth-child(2)")
+            if (!folder) return setTimeout(wait, 25)
+            const dialogRect = dialog.getBoundingClientRect()
+            const folderRect = folder.getBoundingClientRect()
+            const fits = dialogRect.left >= 0 && dialogRect.right <= innerWidth &&
+              folderRect.left >= dialogRect.left && folderRect.right <= dialogRect.right &&
+              folder.scrollWidth <= folder.clientWidth + 1 &&
+              folder.scrollHeight > 38
             const cancel = dialog.querySelector(".project-folder-actions button:first-child")
             cancel.click()
             const closed = () => {
-              if (!dialog.open) return resolve({ shown: !document.getElementById("projects").hidden, cancelled: true })
+              if (!dialog.open) return resolve({ shown: !document.getElementById("projects").hidden, cancelled: true, fits })
               if (Date.now() > deadline) return reject(new Error("Project picker did not close"))
               setTimeout(closed, 25)
             }
@@ -2296,8 +2311,44 @@ test("phone: Projects offers a folder picker that can be cancelled", () =>
       }
       wait()
     })`)
-    assert.deepEqual(state, { shown: true, cancelled: true })
+    assert.deepEqual(state, { shown: true, cancelled: true, fits: true })
     assert.equal(projectAdds, before)
+  }))
+
+test("phone: Session Project controls fit beside the search field", () =>
+  inTab(PHONE, async (tab) => {
+    projectPickerMany = true
+    try {
+      await tab.go("/")
+      await tab.until("the list arrives", (s) => s.rows === ROWS.length)
+      const layout = await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        document.getElementById("start-go").click()
+        const wait = () => {
+          const filter = document.getElementById("start-filter")
+          const add = document.getElementById("start-add-project")
+          const edit = document.getElementById("start-edit-projects")
+          if (filter && add && edit && !filter.hidden && !add.closest("[hidden]") &&
+            document.querySelectorAll("#start-list .place").length === 9) {
+            const search = filter.getBoundingClientRect()
+            const plus = add.getBoundingClientRect()
+            const pencil = edit.getBoundingClientRect()
+            return resolve({
+              sameRow: Math.abs(search.top - plus.top) <= 1 && Math.abs(search.top - pencil.top) <= 1,
+              order: search.right < plus.left && plus.right < pencil.left && pencil.right <= innerWidth,
+              compact: add.textContent.trim() === "" && edit.textContent.trim() === "",
+              accessible: !!add.getAttribute("aria-label") && !!edit.getAttribute("aria-label"),
+            })
+          }
+          if (Date.now() > deadline) return reject(new Error("Session Project search did not appear"))
+          setTimeout(wait, 25)
+        }
+        wait()
+      })`)
+      assert.deepEqual(layout, { sameRow: true, order: true, compact: true, accessible: true })
+    } finally {
+      projectPickerMany = false
+    }
   }))
 
 test("phone: an empty Session picker adds and removes a Project in edit mode", () =>
