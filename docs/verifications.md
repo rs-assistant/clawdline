@@ -71,6 +71,10 @@ otherwise), is signed `task:<task id>`, and a task that no schedule started is `
 task never needs the orchestrator token for it. The skill guide's "Schedule future work" section has
 the call.
 
+The person decides from these notes, so the guide asks every writer — a scheduled task, a session's
+note, a closing reason — to open with the answer in one plain sentence, give one line per criterion
+with its suggested state and the numbers that decide it, and leave out tables and statistics.
+
 ## The CLI
 
 ```

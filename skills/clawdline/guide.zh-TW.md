@@ -909,6 +909,19 @@ curl -sS -X POST "http://127.0.0.1:$PORT/v1/orchestrator/tasks/$TASK_ID/verifica
 只寫得進 `schedule_id` 正是啟動這個 task 的排程的那筆紀錄（否則回 `schedule_mismatch`），署名為
 `task:<task id>`；不是排程啟動的 task 會被拒絕為 `not_scheduled`。紀錄 id 用 `clawdline verify list` 查。
 
+**驗收紀錄上的讀數、紀錄與結案理由，是寫給使用者看的，不是寫給另一個 agent。** 不管是排程 task、用
+`clawdline verify note` 的 session，還是用 `clawdline verify done` 結案的 session，使用者都是在手機上讀
+它、靠它做決定：
+
+- 第一句用白話講答案：這個改動站不站得住，你建議怎麼做（接受、不接受、還看不出來）。
+- 接著每條條件一行，照原本的順序：建議狀態（通過、未通過、無法判定），加上決定它的一兩個數字，寫成
+  「之前 → 之後」。
+- 但書用日常的話講（「降幅大半是因為 task 本身變小」），不要寫成統計。除非使用者要，不放表格、百分位數、
+  檢定值或一串 task id；但書最多三條。
+- 結案理由一句話。
+
+一句話要懂這個程式碼的內部才看得懂，就改寫。
+
 ## 7. 回報你自己完成的 turn
 
 這一輪真的做完了——工作做完、驗證過、該 commit 的也 commit 了——就在最後回答之前，把這一步當成最後一個
