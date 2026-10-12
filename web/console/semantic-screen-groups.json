@@ -1,8 +1,8 @@
 {
   "version": 1,
   "englishContentKeys": 5070,
-  "riskKeys": 2224,
-  "nonRiskCount": 2846,
+  "riskKeys": 2221,
+  "nonRiskCount": 2849,
   "groups": [
     {
       "name": "bar / other",
@@ -1215,7 +1215,7 @@
     },
     {
       "name": "legacy / other",
-      "count": 155,
+      "count": 157,
       "sources": [
         "src/legacy/js/core/i18n.js"
       ],
@@ -1281,6 +1281,8 @@
         "legacy.webDevicesLede",
         "legacy.webEmptyFilterHint",
         "legacy.webEmptyNoneHint",
+        "legacy.webEmptyWaitHint",
+        "legacy.webEmptyWaitTitle",
         "legacy.webEndSession",
         "legacy.webFilterLabel",
         "legacy.webFilterPlaceholder",
@@ -1917,7 +1919,7 @@
     },
     {
       "name": "next / other",
-      "count": 105,
+      "count": 106,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1976,6 +1978,7 @@
         "next.sessionStop",
         "next.sessionTrySendingAgain",
         "next.sessionWriteDisabled",
+        "next.sessionsListWaitTitle",
         "next.smartTitleAction",
         "next.smartTitleButton",
         "next.smartTitleConfirmTitle",
