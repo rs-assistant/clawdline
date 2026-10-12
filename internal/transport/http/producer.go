@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/contract"
 )
 
@@ -74,7 +75,20 @@ func (l *latest[T]) peek() (T, bool) {
 
 // refresh builds now, or waits for the build that is already running.
 func (l *latest[T]) refresh() (T, error) {
+	return l.refreshFrom(context.Background(), false)
+}
+
+// refreshFrom is refresh with base's values, never its cancellation, on the
+// build's context: how `since` tells the build which scan it may read. `own`
+// waits out a build in flight and then builds, instead of taking its answer.
+func (l *latest[T]) refreshFrom(base context.Context, own bool) (T, error) {
 	l.mu.Lock()
+	for own && l.flight != nil {
+		flight := l.flight
+		l.mu.Unlock()
+		<-flight
+		l.mu.Lock()
+	}
 	if flight := l.flight; flight != nil {
 		l.mu.Unlock()
 		<-flight
@@ -91,7 +105,7 @@ func (l *latest[T]) refresh() (T, error) {
 	// The build has a clock of its own and not a reader's: a tab that closes
 	// while the build runs must not cancel it for every other reader waiting
 	// on it.
-	ctx, cancel := context.WithTimeout(context.Background(), productBuildSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(base), productBuildSeconds*time.Second)
 	value, err := l.build(ctx)
 	cancel()
 	l.builds.Add(1)
@@ -115,30 +129,18 @@ func (l *latest[T]) refresh() (T, error) {
 	return value, nil
 }
 
-// since answers a value whose build began at or after `t`. A build already in
-// flight that began before it is waited out, not joined: it read the machine
-// before `t`.
+// since answers a value from a build of its own, begun at or after `t`, whose
+// readings come from scans begun at or after `t` too (app.WithReadingSince). A
+// build in flight is waited out, never joined: it was not asked for `t`, and
+// its readings may be the held scan from before it.
 //
 // Measured on 2026-10-12: the Cloud publisher's looks 246 ms and 1242 ms after a
 // press both asked for a build now, both joined a build that had begun before
 // the press, and the pressed Session's row went out six seconds later on the
-// next ordinary pass.
+// next ordinary pass. With the build taken fresh the looks still sent another
+// Session's row: the build read the inventory's held scan, which was older.
 func (l *latest[T]) since(t time.Time) (T, error) {
-	for {
-		l.mu.Lock()
-		if l.ok && !l.valueStarted.Before(t) {
-			value := l.value
-			l.mu.Unlock()
-			return value, nil
-		}
-		if flight := l.flight; flight != nil && l.flightStarted.Before(t) {
-			l.mu.Unlock()
-			<-flight
-			continue
-		}
-		l.mu.Unlock()
-		return l.refresh()
-	}
+	return l.refreshFrom(app.WithReadingSince(context.Background(), t), true)
 }
 
 // listProducer is the one clock behind every session-list and task-list reader.
