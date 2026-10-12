@@ -442,8 +442,13 @@ export const ROW_RESTATE_MS = 5_000
 /** How old a rich row's question may be and still be drawn: the status freshness window (`status-projection.ts`). */
 const RICH_MENU_FRESH_MS = 300_000
 
-/** How often an opened waiting Session with no question in hand asks the machine to restate its rows. */
-const QUESTION_RESTATE_MS = 30_000
+/**
+ * How often an opened waiting Session with no question in hand asks the machine
+ * to restate its rows: a little over the machine's own pass (five seconds), so
+ * a restatement that arrived before the detail was open is asked for again
+ * at the next one rather than half a minute later.
+ */
+const QUESTION_RESTATE_MS = 6_000
 
 /**
  * How long, after this page did something to a session, every poll asks the
@@ -2221,7 +2226,13 @@ export class RelayReader {
     const now = this.now()
     if (this.questionAsked?.key === key && now - this.questionAsked.at < QUESTION_RESTATE_MS) return false
     this.questionAsked = { key, at: now }
-    void this.machineRead(null, "GET", "/v1/sessions", "sessions.snapshot", {}).catch(() => undefined)
+    // `.initial` is stated at once rather than at the machine's next pass, once
+    // per viewer per pass (publish.go SnapshotFrom); a machine that does not
+    // list the word is asked the plain way.
+    const initial = (this.client as { _machineImplements?(machine: string, word: string): string } | null)
+      ?._machineImplements?.(this.machine, "sessions.snapshot.initial") === "yes"
+    void this.machineRead(null, "GET", "/v1/sessions", initial ? "sessions.snapshot.initial" : "sessions.snapshot", {})
+      .catch(() => undefined)
     return true
   }
 

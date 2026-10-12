@@ -640,9 +640,15 @@ test("an opened waiting Session with no question in hand asks the machine to res
   assert.equal(asked(), 1, "asked once, not on every redraw")
   assert.deepEqual(recorded.map((row) => [row.event, row.data.session, row.data.rich]),
     [["cloud.opened_question.missing", "s1", false]], "the machine's log hears what the page held, once per ask")
-  now += 30_001
+  now += 6_001
   await r.snapshot()
   assert.equal(asked(), 2, "asked again once the window passed")
+  ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements =
+    (_machine, word) => word === "sessions.snapshot.initial" ? "yes" : "unknown"
+  now += 6_001
+  await r.snapshot()
+  assert.equal(client.reads.at(-1)?.word, "sessions.snapshot.initial",
+    "a machine that lists the immediate word is asked with it, not left to its next pass")
 })
 
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {
