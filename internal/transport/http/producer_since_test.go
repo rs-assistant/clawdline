@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/sainteye/clawdline/internal/app"
 )
 
 // A look right after a press must read the machine after the press. A build
@@ -37,7 +39,25 @@ func TestAFreshListIsNeverABuildThatBeganBeforeTheMoment(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("the look after the press never came back")
 	}
-	if v, _ := l.since(pressed); v != 2 {
-		t.Fatalf("a build begun after the moment is reused: got %d", v)
+}
+
+// The build a look asks for reads its scan from after the moment too: the
+// moment rides the build's context to the inventory (app.WithReadingSince).
+func TestAFreshListAsksItsReadingsForTheMoment(t *testing.T) {
+	var asked time.Time
+	l := latest[int]{build: func(ctx context.Context) (int, error) {
+		asked, _ = app.ReadingSince(ctx)
+		return 1, nil
+	}}
+	pressed := time.Now()
+	if _, err := l.since(pressed); err != nil {
+		t.Fatal(err)
+	}
+	if !asked.Equal(pressed) {
+		t.Fatalf("the build was asked for readings since %v; want %v", asked, pressed)
+	}
+	asked = time.Time{}
+	if _, err := l.refresh(); err != nil || !asked.IsZero() {
+		t.Fatalf("an ordinary build was asked for a moment: %v %v", asked, err)
 	}
 }

@@ -372,6 +372,9 @@ func (s *Server) reading(ctx context.Context) session.Inventory {
 	if s.readings == nil {
 		return s.inventory.Read(ctx)
 	}
+	if t, ok := app.ReadingSince(ctx); ok {
+		return s.readings.Since(ctx, t)
+	}
 	return s.readings.Fast(ctx)
 }
 
