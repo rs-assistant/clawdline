@@ -458,8 +458,13 @@ export function sessionWorkStateHTML(s) {
         // even when nobody reported whether the work was delivered. Say both
         // facts instead of making the whole row sound unreadable. An unknown
         // terminal reading still keeps the honest unknown label.
-        var unknownCopy = s && s.state === "idle" && !projected.failedClosed
-            ? T.sessionWorkIdleUnreported : T.sessionWorkUnknown;
+        var unknownCopy = T.sessionWorkUnknown;
+        if (s && s.state === "idle" && !projected.failedClosed) {
+            // A conversation record plus the observed idle terminal says a
+            // turn has ended. Neither fact alone proves a delivered result.
+            unknownCopy = s.activity && s.activity.known
+                ? T.sessionTurnEndedUnreported : T.sessionWorkIdleUnreported;
+        }
         said = '<span class="session-work-copy" data-work-state="unknown" title="' +
             attr(unknownCopy) + '">' + attr(unknownCopy) + "</span>";
     }

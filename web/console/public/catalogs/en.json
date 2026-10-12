@@ -1733,6 +1733,7 @@
   "legacy.sessionWorkSelfStated": "self-reported",
   "legacy.sessionWorkUnknown": "status unknown",
   "legacy.sessionWorkIdleUnreported": "idle · delivery not reported",
+  "legacy.sessionTurnEndedUnreported": "turn ended · delivery not reported",
   "legacy.webAgentDone": "done",
   "legacy.webAgentFailed": "failed",
   "legacy.webAgentOpen": "See what this agent did",

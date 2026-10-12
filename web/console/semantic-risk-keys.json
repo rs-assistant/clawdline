@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5093,
+  "englishKeys": 5094,
   "counts": {
-    "negation": 1466,
+    "negation": 1467,
     "state": 700,
     "permission": 299,
     "deletion": 98,
     "uncertainty": 148
   },
-  "unionCount": 2231,
+  "unionCount": 2232,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -604,6 +604,7 @@
       "legacy.noOutput",
       "legacy.noSession",
       "legacy.sendFailed",
+      "legacy.sessionTurnEndedUnreported",
       "legacy.sessionWorkAcceptanceUnknown",
       "legacy.sessionWorkIdleUnreported",
       "legacy.webClawdfatherRegisterAsk",
@@ -3503,6 +3504,7 @@
     "legacy.sendFailed",
     "legacy.sessionShellMany",
     "legacy.sessionShellOne",
+    "legacy.sessionTurnEndedUnreported",
     "legacy.sessionWaitedOnByMany",
     "legacy.sessionWaitedOnByOne",
     "legacy.sessionWaiting",

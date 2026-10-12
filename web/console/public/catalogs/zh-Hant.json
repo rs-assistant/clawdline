@@ -1733,6 +1733,7 @@
   "legacy.sessionWorkSelfStated": "自述",
   "legacy.sessionWorkUnknown": "狀態未知",
   "legacy.sessionWorkIdleUnreported": "目前閒置 · 交付尚未回報",
+  "legacy.sessionTurnEndedUnreported": "本輪已結束 · 交付尚未回報",
   "legacy.webAgentDone": "完成",
   "legacy.webAgentFailed": "失敗",
   "legacy.webAgentOpen": "看這個 agent 做了什麼",

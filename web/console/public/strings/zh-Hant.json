@@ -782,5 +782,6 @@
   "webWhoYou": "你",
   "webWriteOff": "*現在不能送*——伺服器回報 `write: false`。這個框是接好的，那邊一改它就自己開。",
   "webWriteOpen": "先打開一個 session 才能寫進去。",
-  "sessionWorkIdleUnreported": "目前閒置 · 交付尚未回報"
+  "sessionWorkIdleUnreported": "目前閒置 · 交付尚未回報",
+  "sessionTurnEndedUnreported": "本輪已結束 · 交付尚未回報"
 }
