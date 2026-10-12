@@ -612,6 +612,34 @@ test("the opened waiting Session draws the question its current rich row carries
   assert.equal(row(await r.snapshot(), "s2")?.menu?.question, "Tea or coffee?")
 })
 
+// The machine sends a rich row only when the row changes, and a Session
+// stopped on a question does not: on 2026-10-12 a page that opened it later
+// waited twenty minutes for a row the machine never sent again.
+test("an opened waiting Session with no question in hand asks the machine to restate, once per window", async () => {
+  const client = new FakeClient()
+  client.sessions = async () => { throw new Error("the rich snapshot must not gate the list") }
+  const execution = "a".repeat(32)
+  let now = 1_000_000
+  const rows = [{ destination: { machineID: "mac-a", sessionID: "s1", executionGeneration: execution },
+    state: "waiting", freshness: "current" as const, observedAt: now }]
+  ;(client as unknown as { detailSnapshots: Map<string, unknown> }).detailSnapshots = new Map()
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+    fleetTarget: () => rows[0].destination,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: now,
+      snapshotGeneration: "a".repeat(32), presentationGeneration: "a", rows }),
+    listPresentations: async () => rows.map((row) => ({
+      destination: row.destination, title: "Title", status: { state: "waiting" }, projection: row })),
+  })
+  r.attach(client)
+  await r.snapshot()
+  await r.snapshot()
+  const asked = () => client.reads.filter((read) => read.word === "sessions.snapshot").length
+  assert.equal(asked(), 1, "asked once, not on every redraw")
+  now += 30_001
+  await r.snapshot()
+  assert.equal(asked(), 2, "asked again once the window passed")
+})
+
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {
   const client = new FakeClient()
   const pass = "c".repeat(32)
