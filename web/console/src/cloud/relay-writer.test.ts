@@ -42,6 +42,8 @@ class FakeClient implements CloudWriteClient {
   allowWrites = true
   macCapabilities = new Set<string>()
   descriptors = new Map<string, { machine: { commands?: string[] } }>([["mac-a", GO_DAEMON]])
+  machineDescriptors = new Map<string, unknown>()
+  orchestratorSnapshots = new Map<string, unknown>()
   sessionInventoryByMachine = new Map<string, unknown>()
   rows: CloudRow[] = []
   calls: Call[] = []
@@ -190,8 +192,9 @@ function row(session: string, extra: Record<string, unknown> = {}): CloudRow {
   return { id: session, machine: "mac-a", session, identity: { machine: "mac-a", session }, execution_generation: EXECUTION, state: "idle", ...extra }
 }
 
-function seam(client: FakeClient, clock = { t: 1_000 }, fleet = false) {
+function seam(client: FakeClient, clock = { t: 1_000 }, fleet = false, featureWaitMs = 5_000) {
   const reader = new RelayReader("mac-a", { now: () => clock.t,
+    featureWaitMs,
     ...(fleet ? { fleetTarget: () => ({ machineID: "mac-a", sessionID: "s1", executionGeneration: EXECUTION }),
       admitFleetMutation: async () => {} } : {}) })
   const writer = new RelayWriter(reader.writeHost, { now: () => clock.t, requestID: () => "req-1" })
@@ -1041,6 +1044,45 @@ test("an older machine without durable receipt capability never receives a sessi
   assert.equal(res.status, 501)
   assert.equal((await json<{ error: string }>(res)).error, "cloud_machine_unsupported")
   assert.deepEqual(client.calls, [])
+})
+
+test("a live descriptor restores durable note replies missing from the saved 64-word prefix", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  client.descriptors.set("mac-a", { machine: { commands: ["send", ...Array.from({ length: 63 }, (_, i) => `earlier-${i}`)] } })
+  client.orchestratorSnapshots.set("mac-a", GO_DAEMON)
+  const { reader } = seam(client)
+
+  const sent = await reader.fetch("/v1/sessions/s1/send", post({ text: "suggested reply" }, { "Idempotency-Key": "note-1" }))
+  assert.equal(sent.status, 200)
+  assert.deepEqual(client.calls[0]?.slice(0, 3), ["_read", { machine: "mac-a", session: "s1" }, "send"])
+
+  const receipt = await reader.fetch(`/v1/sessions/s1/cloud-receipts/note-1?action=send&execution_generation=${EXECUTION}`)
+  assert.equal(receipt.status, 200)
+  assert.equal(client.calls[1]?.[2], "session-receipt")
+})
+
+test("a cut cache without a live descriptor cannot reject or send a note reply as unsupported", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  const saved = ["send", ...Array.from({ length: 63 }, (_, i) => `earlier-${i}`)]
+  client.descriptors.set("mac-a", { machine: { commands: saved } })
+  client.machineDescriptors.set("mac-a", { machine: { commands: saved } })
+  const { reader } = seam(client, { t: 1_000 }, false, 1)
+  const sent = await reader.fetch("/v1/sessions/s1/send", post({ text: "suggested reply" }, { "Idempotency-Key": "note-3" }))
+  assert.equal(sent.status, 503)
+  assert.equal((await json<{ error: string }>(sent)).error, "cloud_reconnecting")
+  assert.deepEqual(client.calls, [], "the uncertain cached prefix cannot authorize a write")
+})
+
+test("a live descriptor that lacks durable receipts still refuses a note reply", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  client.orchestratorSnapshots.set("mac-a", { machine: { commands: ["send"] } })
+  const { reader } = seam(client)
+  const sent = await reader.fetch("/v1/sessions/s1/send", post({ text: "suggested reply" }, { "Idempotency-Key": "note-2" }))
+  assert.equal(sent.status, 501)
+  assert.deepEqual(client.calls, [], "an unsupported machine receives no write")
 })
 
 test("F1: a press names the question it answers, under the press's own request", async () => {
