@@ -268,6 +268,14 @@ func TestCodexPickerIsStillRead(t *testing.T) {
 	}
 }
 
+func TestCodexModelPickerNamesItsQuestion(t *testing.T) {
+	screen := "  Select Model and Effort\n\n\n  1. GPT-6.1-Sol (default)\n› 2. GPT-6-Sol (current)\n  3. GPT-6-Luna\n\n  enter select · esc back\n"
+	m, ok := ReadMenu(screen, AssistantCodex, false)
+	if !ok || m.Question != "Select Model and Effort" || len(m.Options) != 3 {
+		t.Fatalf("model picker = %+v, found %v", m, ok)
+	}
+}
+
 // Codex's update picker on an 80-column pane wraps its first row, the one
 // that spells out the install command, onto a second line indented under the
 // label (2026-09-28, codex-cli 0.154.0). The wrapped line is part of that row,
