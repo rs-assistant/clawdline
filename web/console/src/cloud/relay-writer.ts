@@ -1846,7 +1846,7 @@ export class RelayWriter {
    */
   private async identity(client: CloudWriteClient, session: string): Promise<CloudIdentity> {
     const row = await this.row(client, session)
-    if (!row) throw failure("session_not_found", "this page holds no row for that session", 404)
+    if (!row) throw failure("session_unknown", "This page cannot verify that Session yet.", 409)
     this.requireFleetRow(row, session)
     const identity = row.identity
     if (identity && typeof identity.machine === "string" && typeof identity.session === "string") return identity
@@ -1854,19 +1854,27 @@ export class RelayWriter {
   }
 
   private async mutationTarget(client: CloudWriteClient, session: string, word: string): Promise<{ identity: CloudIdentity; generation: string }> {
-    const row = await this.row(client, session)
-    if (!row) throw failure("session_not_found", "This page holds no row for that session.", 404)
-    const generation = (row as CloudRow & { execution_generation?: unknown }).execution_generation
-    const identity = row.identity && typeof row.identity.machine === "string" && typeof row.identity.session === "string"
-      ? row.identity : { machine: this.host.machine, session: typeof row.session === "string" ? row.session : session }
-    if (identity.machine !== this.host.machine || identity.session !== session || !/^[0-9a-f]{32}$/.test(String(generation ?? ""))) {
-      throw failure("execution_generation_required", "This session's current execution generation is unavailable.", 409)
-    }
-    this.requireFleetRow(row, session)
     const exact = this.fleetTarget(session)
+    // The opened fleet detail is pinned to an exact execution. Its current
+    // status projection is checked below. The legacy rich-row replay is a
+    // separate stream and can temporarily omit that Session during recovery;
+    // its absence is not evidence that the execution has gone away.
+    let identity: CloudIdentity
+    let generation: string
     if (exact) {
       if (!this.host.admitExactTarget) throw failure("execution_check_unavailable", "The selected Session cannot be checked now.", 503)
       await this.host.admitExactTarget(exact)
+      identity = { machine: exact.machineID, session: exact.sessionID }
+      generation = exact.executionGeneration
+    } else {
+      const row = await this.row(client, session)
+      if (!row) throw failure("session_unknown", "This page cannot verify that Session yet.", 409)
+      generation = String(row.execution_generation ?? "")
+      identity = row.identity && typeof row.identity.machine === "string" && typeof row.identity.session === "string"
+        ? row.identity : { machine: this.host.machine, session: typeof row.session === "string" ? row.session : session }
+      if (identity.machine !== this.host.machine || identity.session !== session || !/^[0-9a-f]{32}$/.test(generation)) {
+        throw failure("execution_generation_required", "This session's current execution generation is unavailable.", 409)
+      }
     }
     await this.host.settledWords?.(word, identity.machine)
     await this.host.settledWords?.("session-receipt", identity.machine)
@@ -1877,7 +1885,7 @@ export class RelayWriter {
     if (!commands?.includes(word) || !commands.includes("session-receipt") || typeof client._read !== "function") {
       throw failure("cloud_machine_unsupported", "This machine cannot provide durable session receipts.", 501)
     }
-    return { identity, generation: generation as string }
+    return { identity, generation }
   }
 
   private fleetTarget(session: string): { machineID: string; sessionID: string; executionGeneration: string } | null {

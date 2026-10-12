@@ -344,6 +344,31 @@ test("a send goes as the machine's `send` under the row's own identity, and answ
   assert.equal(typeof last.ms, "number")
 })
 
+test("an opened exact Session sends while the legacy rich-row replay is missing", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client, { t: 1_000 }, true)
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-pinned" }))
+  assert.equal(res.status, 200)
+  assert.deepEqual(client.calls, [["_read", { machine: "mac-a", session: "s1" }, "send",
+    { request: "send-pinned", execution_generation: EXECUTION, text: "hello", images: [] },
+    "action:send-pinned", undefined, undefined]])
+})
+
+test("an opened exact Session is not sent after its execution changes", async () => {
+  const client = new FakeClient()
+  const reader = new RelayReader("mac-a", {
+    fleetTarget: () => ({ machineID: "mac-a", sessionID: "s1", executionGeneration: EXECUTION }),
+    admitFleetMutation: async () => { throw refusal("execution_generation_changed", { status: 409 }) },
+  })
+  const writer = new RelayWriter(reader.writeHost)
+  reader.carryWrites({ route: writeRoute, answer: (route, method, url, init) => writer.answer(route, method, url, init) })
+  reader.attach(client)
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-changed" }))
+  assert.equal(res.status, 409)
+  assert.equal((await json(res)).error, "execution_generation_changed")
+  assert.deepEqual(client.calls, [])
+})
+
 test("a session mutation without a key or current generation never leaves the browser", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
@@ -1170,14 +1195,14 @@ test("F3: a write is `not_done` only when this page can prove it never reached t
   }
 })
 
-test("F5: a write for a session this page has no row for is refused here, not sent to the raw id", async () => {
+test("F5: a write with neither an exact target nor a rich row is refused as unverified", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
   const { reader } = seam(client)
   const res = await reader.fetch("/v1/sessions/gone/send", post({ text: "hi" }, { "Idempotency-Key": "card-1" }))
-  assert.equal(res.status, 404)
+  assert.equal(res.status, 409)
   const body = await json(res)
-  assert.equal(body.error, "session_not_found")
+  assert.equal(body.error, "session_unknown")
   assert.equal(body.outcome, "not_done")
   assert.deepEqual(client.calls, [])
 })
