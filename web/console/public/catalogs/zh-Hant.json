@@ -3808,6 +3808,7 @@
   "next.sessionsListWaitTitle": "正在載入這台機器的 Session",
   "next.sessionStateUnrecognizedDetail": "Clawdline 已讀到畫面，但無法辨認狀態。決定下一步前，請查看下方對話。",
   "next.sessionStateUnrecognizedList": "無法辨認狀態",
+  "next.sessionWaitingOnSession": "等待其他 Session",
   "next.sessionStop": "停止目前的工作（Esc）",
   "next.sessionStopSent": "已送出 Esc，session 讀到後會停下目前這一輪。",
   "next.signedInCancel": "取消",

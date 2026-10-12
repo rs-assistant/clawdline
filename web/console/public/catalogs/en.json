@@ -3808,6 +3808,7 @@
   "next.sessionsListWaitTitle": "Loading this machine’s Sessions",
   "next.sessionStateUnrecognizedDetail": "Clawdline read the screen but could not identify its state. Inspect the conversation below before deciding what to do.",
   "next.sessionStateUnrecognizedList": "State unknown",
+  "next.sessionWaitingOnSession": "Waiting for another Session",
   "next.sessionStop": "Stop current work (Esc)",
   "next.sessionStopSent": "Esc sent. The session stops its current turn once it reads it.",
   "next.signedInCancel": "Cancel",
