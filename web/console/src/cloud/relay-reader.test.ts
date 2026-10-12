@@ -630,11 +630,16 @@ test("an opened waiting Session with no question in hand asks the machine to res
     listPresentations: async () => rows.map((row) => ({
       destination: row.destination, title: "Title", status: { state: "waiting" }, projection: row })),
   })
+  const recorded: { event: string; data: Record<string, unknown> }[] = []
+  ;(client as unknown as { viewerEvents: unknown }).viewerEvents = {
+    record: (event: string, data: Record<string, unknown>) => { recorded.push({ event, data }) } }
   r.attach(client)
   await r.snapshot()
   await r.snapshot()
   const asked = () => client.reads.filter((read) => read.word === "sessions.snapshot").length
   assert.equal(asked(), 1, "asked once, not on every redraw")
+  assert.deepEqual(recorded.map((row) => [row.event, row.data.session, row.data.rich]),
+    [["cloud.opened_question.missing", "s1", false]], "the machine's log hears what the page held, once per ask")
   now += 30_001
   await r.snapshot()
   assert.equal(asked(), 2, "asked again once the window passed")
