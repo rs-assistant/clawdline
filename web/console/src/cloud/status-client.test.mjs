@@ -9,6 +9,22 @@ const envelope = (ch) => ({ v: 1, ch, seq: 1, ts: 1, class: "stream", key_id: "k
 const genA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 const genB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
+test("fleet diagnostics choose a paired Mac even when a Linux test machine sorts first", () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  client.viewerVerified = new Map([
+    ["linux-a", { sender: "agent-a" }], ["mac-z", { sender: "agent-z" }],
+  ])
+  client._machineImplements = () => "yes"
+  client._evidentMac = (machine) => machine === "mac-z"
+  const remembered = []
+  client.viewerEvents = { rememberTarget: (target) => remembered.push(target) }
+  assert.equal(client._viewerEventTarget(true).machine, "mac-z")
+  assert.equal(remembered[0].machine, "mac-z")
+  client.viewerVerified.delete("mac-z")
+  assert.equal(client._viewerEventTarget(false).machine, "linux-a",
+    "a Linux-only account still delivers its diagnostics")
+})
+
 test("one schedule machine paints without waiting for another machine", async () => {
   const client = Object.create(StatusCloudClient.prototype)
   client.retired = false

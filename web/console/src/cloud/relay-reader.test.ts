@@ -62,6 +62,7 @@ test("Session header trail distinguishes started, observed, canceled, unavailabl
 
 class FakeClient implements CloudReadClient {
   ready = true
+  viewerEvents?: { record(event: string, data: Record<string, unknown>, key?: string): void }
   statusSnapshots?: ReadonlyMap<string, unknown>
   sessionInventoryByMachine = new Map<string, unknown>()
   machineRows: { id: string; freshness: "current" | "stale" | "unknown" }[] = [
@@ -409,6 +410,8 @@ test("a single-machine list with no marker does not cache its first partial batc
 
 test("a cross-machine conversation uses a verified list when its retained status marker is missing", async () => {
   const client = new FakeClient()
+  const timings: { event: string; data: Record<string, unknown> }[] = []
+  client.viewerEvents = { record: (event, data) => { timings.push({ event, data }) } }
   const generation = "a".repeat(32)
   const target = { machineID: "mac-a", sessionID: "s1", executionGeneration: generation }
   client.statusSnapshots = new Map()
@@ -424,6 +427,15 @@ test("a cross-machine conversation uses a verified list when its retained status
   const transcript = await r.fetch("/v1/transcript?session=s1&limit=200")
   assert.equal(transcript.status, 200)
   assert.deepEqual(client.pinnedReads, [target])
+  assert.equal(timings.length, 1)
+  assert.equal(timings[0].event, "cloud.transcript.first_read")
+  assert.equal(timings[0].data.outcome, "ready")
+  for (const field of ["total_ms", "sessions_ms", "words_ms", "pin_ms", "wire_ms"]) {
+    assert.equal(typeof timings[0].data[field], "number", field)
+  }
+  assert.equal(JSON.stringify(timings).includes("Remote Session"), false)
+  await r.fetch("/v1/transcript?session=s1&limit=200")
+  assert.equal(timings.length, 1, "cached rereads do not spend another diagnostic event")
 })
 
 test("a verified list cannot open a different execution under an old fleet target", async () => {

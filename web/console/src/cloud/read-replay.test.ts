@@ -244,5 +244,6 @@ test("a pass whose marker never arrives is still refused, after waiting for it",
   assert.equal(answer.status, 409)
   assert.ok(Date.now() - started >= 1_900, "the page refused before the rest of the pass could arrive")
   assert.equal(client.pinned, 0, "nothing was sent for an incoherent pass")
-  assert.deepEqual(client.recorded.map((row) => row.data.cond), ["pass_mismatch"])
+  assert.deepEqual(client.recorded.filter((row) => row.event === "cloud.read.failed")
+    .map((row) => row.data.cond), ["pass_mismatch"])
 })
