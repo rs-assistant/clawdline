@@ -3613,6 +3613,7 @@
   "next.machineUpdateAvailable": "這台機器執行的是 {running}，最新版本是 {latest}。在這台機器上執行 clawdline update --apply 即可更新到最新。",
   "next.machineUpdateDiffers": "這台機器執行的是 {running}，與最新版本 {latest} 不同。在這台機器上執行 clawdline update --apply 即可更新到最新。",
   "next.machineWorkspaceInvalid": "Clawdline 無法準備私有機器工作區；請先檢查這台機器的狀態資料夾。",
+  "next.menuArrivingSay": "Claude Code 正在那台機器上顯示一個選單，它的選項還沒傳到這個頁面。",
   "next.menuCancel": "取消這個選單（Esc）",
   "next.menuCancelSent": "已送出 Esc。選單關掉後，用輸入框說你的答案。",
   "next.menuChooseAgain": "重新選擇",

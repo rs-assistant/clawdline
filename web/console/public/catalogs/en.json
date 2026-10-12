@@ -3613,6 +3613,7 @@
   "next.machineUpdateAvailable": "This machine runs {running}; the latest build is {latest}. Run clawdline update --apply on this machine to bring it up to date.",
   "next.machineUpdateDiffers": "This machine runs {running}, which differs from the latest build {latest}. Run clawdline update --apply on this machine to bring it up to date.",
   "next.machineWorkspaceInvalid": "Clawdline could not prepare its private machine workspace. Check the machine's state directory before trying again.",
+  "next.menuArrivingSay": "Claude Code is showing a menu on that machine. Its choices have not reached this page yet.",
   "next.menuCancel": "Cancel this menu (Esc)",
   "next.menuCancelSent": "Esc sent. Once the menu has closed, say your answer in the message box.",
   "next.menuChooseAgain": "Choose again",
