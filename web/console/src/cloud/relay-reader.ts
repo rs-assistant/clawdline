@@ -2192,7 +2192,16 @@ export class RelayReader {
     const id = typeof row.session === "string" ? row.session : row.id
     if (!target || target.machineID !== this.machine || id !== target.sessionID ||
       row.execution_generation !== target.executionGeneration || row.state !== "waiting") return row
-    const rich = client.detailSnapshots?.get(this.machine + "\u0000" + target.sessionID) as
+    // The detail's own copy is emptied each time the detail is opened and
+    // filled only by a row that arrives afterwards; a Session stopped on a
+    // question sends none, so the row this client already holds stands in.
+    // On 2026-10-12 the page's report read `rich=false snapshot=true
+    // snapshot_options=5` while the options came and went with the moment the
+    // detail was opened. Either way the machine checks the question's
+    // fingerprint before a press is typed (`menuFingerprint`).
+    const key = this.machine + "\u0000" + target.sessionID
+    const rich = (client.detailSnapshots?.get(key) ??
+      (client as { sessionSnapshots?: ReadonlyMap<string, unknown> }).sessionSnapshots?.get(key)) as
       | { machine?: unknown; session?: unknown; execution_generation?: unknown; state?: unknown;
         menu?: { options?: unknown }; screen_reading?: unknown;
         source?: { freshness?: unknown; observed_at?: unknown } } | undefined
