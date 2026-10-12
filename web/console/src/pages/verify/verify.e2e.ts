@@ -316,8 +316,11 @@ test("phone: the list and a record fit 390px, the table scrolls inside itself, a
       const box = (el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right } }
       const back = document.querySelector(".verify-back"), refresh = document.getElementById("verify-refresh")
       return { back: box(back), refresh: box(refresh), page: box(document.getElementById("verify")),
+        bar: box(back.closest(".page-bar")),
         icon: !!refresh.querySelector("svg"), name: refresh.getAttribute("aria-label"), text: refresh.textContent.trim() }
     })()`)
+    // Flush with the header: no strip of the record between the two.
+    assert.ok(Math.abs(bar.bar.top - bar.page.top) < 1, "the bar does not touch the top of the page: " + JSON.stringify(bar))
     assert.ok(bar.back.top >= bar.page.top - 0.5 && bar.back.bottom <= bar.page.top + 80, "the way back scrolled away: " + JSON.stringify(bar))
     assert.ok(bar.refresh.top >= bar.page.top - 0.5 && bar.refresh.bottom <= bar.page.top + 80, "Read again scrolled away: " + JSON.stringify(bar))
     assert.ok(bar.refresh.left > 390 / 2, "Read again is not on the right: " + JSON.stringify(bar))

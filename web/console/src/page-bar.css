@@ -5,10 +5,24 @@
    window), so the way back and Read again stay on screen however far down the
    page is read. Its background reaches past the page's side padding with a
    spread shadow clipped to the bar's height, so text scrolling under it never
-   shows through at the sides, whatever padding the page has. */
+   shows through at the sides, whatever padding the page has.
+
+   A sticky box stops at its scroller's padding edge, not at the scroller's
+   top: on a phone the 驗收 page's 16px top padding left a strip under the
+   header where the record showed through above the bar. Each page that
+   carries a bar says its own top padding here as --page-bar-lift, beside the
+   rule that sets it, and the bar sticks that much higher: flush with the
+   header. verify.e2e.ts holds the bar's top to the page's top. */
+
+.board-page { --page-bar-lift: 24px; }
+.projects { --page-bar-lift: clamp(16px, 3vw, 34px); }
+.documents-page { --page-bar-lift: 22px; }
+.timeline-page { --page-bar-lift: max(1rem, env(safe-area-inset-top)); }
+@media (max-width: 640px) { .board-page { --page-bar-lift: 16px; } }
+@media (max-width: 560px) { .documents-page { --page-bar-lift: 12px; } }
 
 .page-bar {
-    position: sticky; top: 0; z-index: 4;
+    position: sticky; top: calc(-1 * var(--page-bar-lift, 0px)); z-index: 4;
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     min-height: 44px; padding-block: 8px; margin-bottom: 16px;
     background: var(--bg);

@@ -79,6 +79,11 @@
 }
 .cloud-switch[aria-expanded="true"] { color: var(--ink); background: var(--card-hi); border-color: var(--accent-ed); }
 .cloud-switch[aria-expanded="true"] .cloud-switch-chevron { transform: rotate(180deg); }
+/* The header carries the machine menu, so it stacks above the pages under it
+   (`.page` is z-index 35): at 20 the menu opened behind every page but
+   Sessions and the switch looked dead. Below the phone's full-screen Session
+   (40), the drawer (45) and the sheets (60). */
+.top:has(.cloud-switcher) { z-index: 36; }
 .cloud-switch-menu {
     position: absolute; top: calc(100% + 10px); right: 0; z-index: 30;
     box-sizing: border-box; width: min(300px, calc(100vw - 24px)); padding: 8px;
