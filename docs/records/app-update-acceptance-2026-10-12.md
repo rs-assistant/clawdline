@@ -41,7 +41,7 @@ only on Linux, prints manual bundle instructions on macOS, and refuses other ope
 | Platform | Release version, entry, post-update | Source version, entry, post-update |
 | --- | --- | --- |
 | macOS | v0.10.0 release install, signature check, daemon start, console HTTP 200 and clean uninstall passed in an isolated root; version transition and App bundle still untested | Not yet exercised on an isolated installation |
-| Linux | Not yet exercised in a Linux runtime | Not yet exercised in a Linux runtime |
+| Linux | v0.10.0 arm64 release archive checksum, extracted binary, daemon start, console HTTP 200 and matching BUILD stamp passed in an Ubuntu 24.04 container; systemd installation and version transition untested | Not yet exercised in a Linux runtime |
 | Windows | No release artifact or installer exists; cannot exercise this path | No supported source update entry; cannot exercise this path |
 
 No matrix cell is counted complete. Compilation or a unit fixture is not an installation result.
@@ -58,3 +58,11 @@ designed to refuse the running version even with `--force`. That attempt does no
 post-update state. The test service and LaunchAgent were removed by `setup --uninstall`. The
 previous public tag v0.8.0 has only the retired Swift App archive, so it cannot provide an older
 Go daemon installation for this release-to-release transition.
+
+The Linux aarch64 run downloaded the public `clawdline_v0.10.0_linux_arm64.tar.gz` and
+`SHA256SUMS`; the archive's listed SHA256 passed. In an isolated Ubuntu 24.04 container, the
+archive's `clawdline serve --port 7727` answered HTTP 200 on loopback. Both `clawdline version
+--json` and the served distribution's `BUILD.json` named v0.10.0 and commit
+`bc644851fcdbe0a46741a7f4777a1c1247a2a81f`. The container was stopped after the check.
+This uses the release archive directly; it is not a `systemd --user` install, does not exercise
+`install.sh` there, and has no before/after version transition.
