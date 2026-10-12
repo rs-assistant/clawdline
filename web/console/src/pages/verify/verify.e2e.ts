@@ -88,7 +88,10 @@ function document(): string {
   const words = JSON.parse(readFileSync(join(dist, "strings", "zh-Hant.json"), "utf8"))
   words.lang = "zh-Hant"
   words.dir = "ltr"
-  const slot = "<script>window.__strings=" + JSON.stringify(words).replaceAll("</", "<\\/") + "</script>"
+  // The console's language is the person's choice (`ui_language`), not the
+  // strings the page was served with; the fixture chooses 繁體中文 as
+  // session/human-interventions.e2e.ts does.
+  const slot = "<script>localStorage.setItem('ui_language','zh-Hant');window.__strings=" + JSON.stringify(words).replaceAll("</", "<\\/") + "</script>"
   return html.replace("<!-- clawdline:strings -->", slot).replace("<!-- clawdline:cloud -->", "")
 }
 
@@ -127,6 +130,10 @@ function daemon(): Server {
     if (path === `/v1/verifications/${ID}` && req.method === "DELETE") {
       res.writeHead(204)
       return res.end()
+    }
+    if (path === "/v1/strings") {
+      const file = join(dist, "catalogs", `${url.searchParams.get("lang") || "en"}.json`)
+      return existsSync(file) ? json(res, 200, JSON.parse(readFileSync(file, "utf8"))) : json(res, 404, { error: "not_found" })
     }
     if (path.startsWith("/v1/")) return json(res, 404, { error: "not_found", message: path })
     if (path === "/") {
@@ -299,6 +306,31 @@ test("phone: the list and a record fit 390px, the table scrolls inside itself, a
     assert.equal(await run(`document.querySelectorAll(".verify-table tbody tr").length`), 2)
     assert.equal(await run(`document.querySelector(".verify-table tbody th").textContent`), "before-setting")
 
+    // The record has an address, and the way back and Read again stay on
+    // screen at the bottom of the record: Read again on the right, as an icon.
+    assert.equal(await run(`location.hash`), `#page=verify&id=${ID}`)
+    await run(`(() => { const p = document.getElementById("verify"); p.scrollTop = p.scrollHeight })()`)
+    await new Promise((r) => setTimeout(r, 100))
+    assert.ok(await run(`document.getElementById("verify").scrollTop`) > 200, "the record is not long enough to scroll")
+    const bar = await run(`(() => {
+      const box = (el) => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right } }
+      const back = document.querySelector(".verify-back"), refresh = document.getElementById("verify-refresh")
+      return { back: box(back), refresh: box(refresh), page: box(document.getElementById("verify")),
+        icon: !!refresh.querySelector("svg"), name: refresh.getAttribute("aria-label"), text: refresh.textContent.trim() }
+    })()`)
+    assert.ok(bar.back.top >= bar.page.top - 0.5 && bar.back.bottom <= bar.page.top + 80, "the way back scrolled away: " + JSON.stringify(bar))
+    assert.ok(bar.refresh.top >= bar.page.top - 0.5 && bar.refresh.bottom <= bar.page.top + 80, "Read again scrolled away: " + JSON.stringify(bar))
+    assert.ok(bar.refresh.left > 390 / 2, "Read again is not on the right: " + JSON.stringify(bar))
+    assert.ok(bar.icon && bar.text === "" && bar.name === "重新讀取", "Read again is not an icon with its name: " + JSON.stringify(bar))
+    await shot("verify-detail-scrolled-390")
+
+    // The browser's Back closes the record and stays on the page.
+    await run(`history.back()`)
+    await until("Back returns to the list", `!document.getElementById("verify-detail") && !!document.querySelector("#verify-open .verify-row")`)
+    assert.equal(await run(`location.hash`), "#page=verify")
+    await run(`document.querySelector("#verify-open .verify-row").click()`)
+    await until("the record opens again", `!!document.querySelector("#verify-detail .verify-table table")`)
+
     // A criterion is marked with one press, on its own index.
     sent = []
     await run(`document.querySelector(".verify-criteria > li:nth-child(1) .verify-actions button").click()`)
@@ -326,6 +358,7 @@ test("phone: the list and a record fit 390px, the table scrolls inside itself, a
     assert.equal(asked.filter((a) => a.startsWith("DELETE")).length, 0, "nothing is deleted before the second press")
     await run(`document.querySelector("#verify-remove-ask + .verify-actions button").click()`)
     await until("the page goes back to the list", `!document.getElementById("verify-detail")`)
+    assert.equal(await run(`location.hash`), "#page=verify")
     assert.deepEqual(asked.filter((a) => a.startsWith("DELETE")), [`DELETE /v1/verifications/${ID}?force=1`])
   } finally {
     await browser.send("Target.closeTarget", { targetId }).catch(() => undefined)

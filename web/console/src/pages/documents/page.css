@@ -1,0 +1,8 @@
+/* The Documents page's own additions over the pinned copy (legacy/documents.css).
+
+   The head is the shared page bar (page-bar.css): the two ways back on the left
+   and Read again on the right stay on screen while a long document is read. The
+   title moved out of the head so the bar that sticks is one row, and takes the
+   size the pinned rule gave it inside the head. */
+.documents-page .documents-head.page-bar { gap: 8px; }
+.documents-page .documents-title { margin: 4px 0 0; font-size: clamp(24px, 5vw, 34px); }

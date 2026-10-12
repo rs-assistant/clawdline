@@ -4,7 +4,15 @@ import type { PageModule } from "./types.js"
 import { bindTimeline, requestedTimeline, timelineReturn, type TimelinePage } from "../legacy/timeline-bridge.js"
 import { machineWording } from "../legacy/machine-copy.js"
 import { ActionConfirm, Info, shown as overlayShown } from "../overlays/index.js"
+import { arriveAtDetail, detailInHash, enterDetail, leaveDetail } from "../page-detail.js"
 import sectionMarkup from "./timeline/section.html?raw"
+import "../page-bar.css"
+
+/** True when the history step under the reader is this page's open entry. */
+function ownEntryStep(): boolean {
+  const state = history.state as { view?: unknown; page?: unknown } | null
+  return state?.view === "page-detail" && state.page === "timeline"
+}
 
 /**
  * The Project Timeline: `section#timeline` in the Swift app's `index.html`,
@@ -60,6 +68,73 @@ function TimelinePageView({ shown }: { shown: boolean }) {
     return () => observer?.disconnect()
   }, [])
 
+  // An open entry is a history step (`#page=timeline&id=<entry>`, page-detail.ts):
+  // a card opens it, and both ways back — the module's own two buttons and the
+  // browser's Back — go back over that step, so they agree. The page's Read
+  // again is an icon on the right; it presses the module's own hidden button,
+  // whose word it carries as its name.
+  const listScroll = useRef(0)
+  useLayoutEffect(() => {
+    const root = document.getElementById("timeline")
+    const reload = document.getElementById("timeline-reload")
+    const moduleRefresh = document.getElementById("timeline-refresh")
+    if (!root || !reload || !moduleRefresh) return
+    const name = () => {
+      const word = moduleRefresh.textContent?.trim() || "Refresh"
+      reload.setAttribute("aria-label", word)
+      reload.title = word
+    }
+    name()
+    const words = new MutationObserver(name)
+    words.observe(moduleRefresh, { childList: true, characterData: true, subtree: true })
+    const onReload = () => moduleRefresh.click()
+    const restoreList = () => requestAnimationFrame(() => { root.scrollTop = listScroll.current })
+    const onClick = (ev: MouseEvent) => {
+      const target = ev.target as Element | null
+      const card = target?.closest?.<HTMLElement>(".timeline-card")
+      if (card?.dataset.timelineEntry) {
+        listScroll.current = root.scrollTop
+        root.scrollTop = 0
+        enterDetail("timeline", card.dataset.timelineEntry)
+        return
+      }
+      const back = target?.closest?.(".timeline-detail-back, #timeline-back")
+      if (!back || !page.current?.state.entryId) return
+      if (ownEntryStep()) {
+        // Back over the step; popstate closes the entry.
+        ev.stopImmediatePropagation()
+        ev.preventDefault()
+        history.back()
+        return
+      }
+      leaveDetail("timeline")
+      restoreList()
+    }
+    const onPop = () => {
+      if (root.hidden) return
+      const bound = page.current
+      if (!bound) return
+      const wanted = detailInHash("timeline", location.hash) || null
+      if (wanted === bound.state.entryId) return
+      if (wanted) {
+        bound.state.entryId = wanted
+        void bound.refresh()
+      } else {
+        bound.leave()
+        restoreList()
+      }
+    }
+    root.addEventListener("click", onClick, true)
+    reload.addEventListener("click", onReload)
+    window.addEventListener("popstate", onPop)
+    return () => {
+      words.disconnect()
+      root.removeEventListener("click", onClick, true)
+      reload.removeEventListener("click", onReload)
+      window.removeEventListener("popstate", onPop)
+    }
+  }, [])
+
   useLayoutEffect(() => {
     if (shown === was.current) return
     was.current = shown
@@ -76,6 +151,13 @@ function TimelinePageView({ shown }: { shown: boolean }) {
       if (!project) {
         navigate(timelineReturn())
         return
+      }
+      // An address naming an entry opens it with the Project (a reload keeps
+      // the address but not the Project, so that one is sent back above).
+      const entry = detailInHash("timeline", location.hash)
+      if (entry && page.current) {
+        page.current.state.entryId = entry
+        arriveAtDetail("timeline", entry)
       }
       void page.current?.enter(project)
       document.getElementById("timeline-title")?.focus({ preventScroll: true })
@@ -103,7 +185,11 @@ function TimelinePageView({ shown }: { shown: boolean }) {
       if (document.querySelector("dialog[open]")) return
       ev.preventDefault()
       ev.stopImmediatePropagation()
-      page.current?.escape()
+      if (page.current?.state.entryId && ownEntryStep()) history.back()
+      else {
+        if (page.current?.state.entryId) leaveDetail("timeline")
+        page.current?.escape()
+      }
     }
     window.addEventListener("keydown", onKey, true)
     return () => window.removeEventListener("keydown", onKey, true)

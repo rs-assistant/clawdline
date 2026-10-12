@@ -31,7 +31,7 @@
 .verify-closed { margin-top: 24px; }
 
 .verify-detail { display: grid; gap: 16px; min-width: 0; }
-.verify-back { justify-self: start; }
+
 .verify-detail-head { display: grid; gap: 8px; }
 .verify-status { color: var(--ink); font-weight: 600; }
 .verify-detail[data-status="accepted"] .verify-status { color: var(--ok); }

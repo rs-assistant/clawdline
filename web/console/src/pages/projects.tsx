@@ -17,6 +17,14 @@ import { openTerminalPage } from "./terminal/navigate.js"
 import { showProjectRefusalDetail } from "./projects/refusal-detail.js"
 import { removeProjectPlace } from "./work/api.js"
 import { failureSentence } from "../legacy/bridge.js"
+import { arriveAtDetail, detailInHash, enterDetail, leaveDetail } from "../page-detail.js"
+import "../page-bar.css"
+
+/** An opened Project is `#page=projects&id=<place id>` (page-detail.ts). */
+const PROJECTS_ADDRESS = {
+  enter: (id: string) => enterDetail("projects", id),
+  leave: () => leaveDetail("projects"),
+}
 
 type ProjectTarget = {
   id: string
@@ -113,7 +121,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   }, [])
 
   useLayoutEffect(() => {
-    const bound = page.current ?? (bindProjects(document, navigate) as BoundProjects)
+    const bound = page.current ?? (bindProjects(document, navigate, PROJECTS_ADDRESS) as BoundProjects)
     page.current = bound
     const openWork = (project: ProjectTarget) => {
       const path = typeof project.path === "string" ? project.path.trim() : ""
@@ -284,7 +292,11 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       }
       const add = document.getElementById("projects-add")
       if (add) add.textContent = catalogWord("projects", "addButton")
-      void page.current?.enter()
+      // An address that names a Project (a reload, a link) opens it once the
+      // list is read, with the list put under it as one Back step.
+      const wanted = detailInHash("projects", location.hash)
+      if (wanted) arriveAtDetail("projects", wanted)
+      void page.current?.enter(wanted)
       document.getElementById("projects-title")?.focus({ preventScroll: true })
     }
     const root = document.documentElement
@@ -299,6 +311,22 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
     })
     watch.observe(root, { attributes: true, attributeFilter: ["class"] })
     return () => watch.disconnect()
+  }, [shown])
+
+  // Back, Forward and a typed address move the open Project the way the
+  // page's own back control does.
+  useLayoutEffect(() => {
+    if (!shown) return
+    const follow = () => {
+      if (!/(?:^|[#&])page=projects(?:&|$)/.test(location.hash)) return
+      void page.current?.follow(detailInHash("projects", location.hash))
+    }
+    window.addEventListener("popstate", follow)
+    window.addEventListener("hashchange", follow)
+    return () => {
+      window.removeEventListener("popstate", follow)
+      window.removeEventListener("hashchange", follow)
+    }
   }, [shown])
 
   useLayoutEffect(() => {
