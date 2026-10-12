@@ -370,14 +370,26 @@ test("Relay-confirmed offline applies to one machine only and expires to unknown
 
 test("opening and leaving an exact detail subscribes, reads pinned content, and releases both channels", async () => {
   const { client, calls } = clientFixture()
+  const timings: { event: string; data: Record<string, unknown> }[] = []
+  ;(client as typeof client & { viewerEvents: { record: (event: string, data: Record<string, unknown>) => void } })
+    .viewerEvents = { record: (event, data) => { timings.push({ event, data }) } }
   const source = statusSource(() => client as never)
   const destination = { machineID, sessionID, executionGeneration }
   const detail = await source.readDetail(destination, new AbortController().signal)
   assert.equal(detail.kind, "ready")
   assert.equal(detail.kind === "ready" && detail.info.title, "Pinned")
   assert.equal(detail.kind === "ready" && detail.nextBefore, 123)
+  assert.equal(timings.length, 1)
+  assert.equal(timings[0].event, "cloud.detail.first_read")
+  assert.equal(timings[0].data.outcome, "ready")
+  assert.equal(typeof timings[0].data.info_ms, "number")
+  assert.equal(typeof timings[0].data.transcript_ms, "number")
+  assert.equal(JSON.stringify(timings).includes("Pinned"), false)
+  await source.readDetail(destination, new AbortController().signal)
+  assert.equal(timings.length, 1, "an open detail's routine reread does not create another diagnostic")
   source.closeDetail?.(destination)
   assert.deepEqual(calls, ["subscribe:s/one/same,t/one/same", "info:" + executionGeneration,
+    "transcript:" + executionGeneration, "info:" + executionGeneration,
     "transcript:" + executionGeneration, "unsubscribe:s/one/same,t/one/same"])
 })
 
