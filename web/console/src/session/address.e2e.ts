@@ -2365,9 +2365,14 @@ test("phone: Session Project controls fit beside the search field", () =>
         const list = document.getElementById("start-list").getBoundingClientRect()
         const rect = remove?.getBoundingClientRect()
         return { pressed: button.getAttribute("aria-pressed"), count: document.querySelectorAll("#start-list .start-project-remove").length,
-          removeVisible: !!rect && rect.left >= list.left && rect.right <= list.right }
+          removeVisible: !!rect && rect.left >= list.left && rect.right <= list.right,
+          iconOnly: !!remove?.querySelector("svg") && remove.textContent.trim() === "",
+          compact: !!rect && rect.width <= 44,
+          unboxed: !!remove && getComputedStyle(remove).borderTopWidth === "0px" &&
+            getComputedStyle(remove).backgroundColor === "rgba(0, 0, 0, 0)" }
       })()`)
-      assert.deepEqual(editing, { pressed: "true", count: 9, removeVisible: true })
+      assert.deepEqual(editing, { pressed: "true", count: 9, removeVisible: true,
+        iconOnly: true, compact: true, unboxed: true })
     } finally {
       projectPickerMany = false
     }
