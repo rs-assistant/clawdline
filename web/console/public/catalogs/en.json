@@ -3551,6 +3551,7 @@
   "next.imageMarkupZoomIn": "Zoom in",
   "next.imageMarkupZoomOut": "Zoom out",
   "next.infoContext": "Context",
+  "next.infoOpenModelPicker": "Open Codex model menu",
   "next.infoContextUsed": "{used} of {window} tokens in the context",
   "next.infoResetsInMinutes": "in {n} min",
   "next.linksDeployBecause": "Its reason: {reason}.",

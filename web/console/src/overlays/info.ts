@@ -291,6 +291,13 @@ function modelsHTML(models: SessionModel[], current: string): string {
   return '<div class="models">' + chips + other + "</div>" + (can ? "" : note(T.webInfoModelBusy))
 }
 
+function codexModelHTML(): string {
+  const can = canSwitch()
+  return '<div class="models"><button type="button" class="m" data-model-picker="1"' +
+    (can ? "" : " disabled") + '>' + esc(nextWord("infoOpenModelPicker")) + '</button></div>' +
+    (can ? "" : note(T.webInfoModelBusy))
+}
+
 /**
  * The list's one-line statuses, unabridged: each is a native `details` whose
  * summary is the status and whose body says what it means.
@@ -507,7 +514,9 @@ function html(d: Facts): string {
   const role = roleHTML(session())
   if (role) out += sec(++i, nextWord("personaPicker"), "", role)
   // Read-only pairings get no buttons rather than dead ones.
-  if (models.length && host.writable()) out += sec(++i, T.webInfoSwitchModel, "", modelsHTML(models, current))
+  if (host.writable() && (models.length || s.assistant === "codex")) {
+    out += sec(++i, T.webInfoSwitchModel, "", s.assistant === "codex" ? codexModelHTML() : modelsHTML(models, current))
+  }
   out += sec(++i, nextWord("infoContext"), "", contextHTML(d.context))
   out += sec(++i, T.webInfoUsage, "", usageHTML(u))
   if (d.limits) {
@@ -728,6 +737,25 @@ export const Info = {
     )
   },
 
+  openModelPicker(): void {
+    const id = forId
+    if (!id || data?.session?.assistant !== "codex" || !canSwitch()) return
+    busy = true
+    said("")
+    draw()
+    client.send(id, "/model", pressKey("model-picker")).then(
+      () => {
+        if (forId === id) Info.close()
+      },
+      (e) => {
+        if (forId !== id) return
+        busy = false
+        said(why(e), false)
+        draw()
+      },
+    )
+  },
+
   editTitle(): void {
     if (!host.writable() || busy || !data?.session) return
     editingTitle = true
@@ -846,6 +874,11 @@ export function bindInfo(): () => void {
   const onBody = (ev: MouseEvent) => {
     const t = ev.target as Element | null
     if (!t || !t.closest) return
+    const picker = t.closest<HTMLButtonElement>("button[data-model-picker]")
+    if (picker) {
+      if (!picker.disabled) Info.openModelPicker()
+      return
+    }
     const chip = t.closest<HTMLButtonElement>("button[data-model]")
     if (chip) {
       if (!chip.disabled) Info.switchTo(chip.dataset.model || "", chip.dataset.name || "")

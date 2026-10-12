@@ -29,6 +29,20 @@ test("a card goes when its turn is read back, and not before", () => {
   assert.deepEqual(states(p), [])
 })
 
+test("a Codex model menu settles only its accepted bare /model card", () => {
+  const p = new PendingSends()
+  const opened = p.add("s", "/model", [], T0)
+  const refused = p.add("s", "/model", [], T0 + 1)
+  p.failed(refused.token, "session_not_found")
+  p.add("other", "/model", [], T0 + 2)
+  p.accepted(opened.token, T0 + 3)
+  p.settleModelPicker("s", "Do you trust this directory?")
+  assert.equal(p.of("s").length, 2)
+  p.settleModelPicker("s", "Select Model and Effort")
+  assert.deepEqual(p.of("s").map((card) => card.token), [refused.token])
+  assert.equal(p.of("other").length, 1)
+})
+
 test("the same words already in the transcript when it was sent are not its turn", () => {
   const p = new PendingSends()
   const before = [user("ok", T0 - 20_000)]

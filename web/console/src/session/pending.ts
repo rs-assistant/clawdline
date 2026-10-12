@@ -392,6 +392,15 @@ export class PendingSends {
     if (this.cards.length !== before) this.changed()
   }
 
+  /** Codex's /model opens a picker instead of leaving a user transcript turn. */
+  settleModelPicker(session: string, question: string): void {
+    if (question !== "Select Model and Effort") return
+    const before = this.cards.length
+    this.cards = this.cards.filter((card) =>
+      !(card.session === session && card.text.trim() === "/model" && card.pictures.length === 0 && card.state === "accepted"))
+    if (this.cards.length !== before) this.changed()
+  }
+
   /**
    * A fresh read of one session's transcript: the cards it confirms go, and
    * so does an accepted card older than its lifetime.

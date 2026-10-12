@@ -120,6 +120,12 @@ The same setting is available without a browser as
 `claude_default_model claude-opus-5-5`); use `default` as the value to hand the choice back to the
 assistant.
 
+To change the model of an existing Codex session, open its info card and press **Open Codex model
+menu**, or send `/model` alone in its composer. Choose a model from the menu Codex draws above the
+composer. Codex does not switch models through `/model <name>`; the info card therefore opens the
+native picker instead of sending one of its cached model names. Claude Code's info card continues
+to send its model choice directly.
+
 ## Stop the current turn
 
 **⋯** → **停止目前的工作（Esc）** sends Esc to the session's terminal. The session stops the turn it
