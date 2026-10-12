@@ -446,6 +446,7 @@ func (s *Server) routeTable() []route {
 		// Whether this machine trails the cloud's latest build (update.go). Any
 		// paired device, as /v1/capacity.
 		{Route{"*", "/v1/update"}, s.updateRoute},
+		{Route{"*", "/v1/update/fresh"}, s.updateRoute},
 		// Installing a newer release on a release install (update.go). This
 		// machine's token, or a device that may send.
 		{Route{"*", "/v1/update/apply"}, s.updateApplyRoute},

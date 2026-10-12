@@ -13,8 +13,8 @@ import { classifyApplyAnswer, classifyUpdateRead, createUpdateReadStore, type An
  * answer comes back sorted (`update-model.ts`), and the panel says what that
  * means rather than 「讀取失敗」.
  */
-export function readUpdate(): Promise<UpdateRead> {
-  return call("GET", "/v1/update").then(classifyUpdateRead)
+export function readUpdate(fresh = false): Promise<UpdateRead> {
+  return call("GET", fresh ? "/v1/update/fresh" : "/v1/update").then(classifyUpdateRead)
 }
 
 /**

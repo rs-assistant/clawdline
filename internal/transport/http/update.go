@@ -38,7 +38,39 @@ func (s *Server) updateRoute(w http.ResponseWriter, r *http.Request) {
 		writeAuthRefusal(w, http.StatusMethodNotAllowed, "bad_request", "Whether this machine is up to date is read with GET.")
 		return
 	}
+	if r.URL.Path == "/v1/update/fresh" {
+		writeJSON(w, s.freshUpdateStatus(r.Context()))
+		return
+	}
 	writeJSON(w, s.updateStatus())
+}
+
+// A foreground return asks the source once rather than reusing a manifest
+// that may name a release withdrawn since the daemon's background check.
+// A failed fresh read cannot justify showing the previously cached release.
+func (s *Server) freshUpdateStatus(request context.Context) contract.UpdateStatus {
+	ctx, cancel := context.WithTimeout(request, updatecheck.FetchTimeoutSecondsLimit*time.Second)
+	defer cancel()
+	s.updateChecker()
+	if s.releaseUpdate != nil {
+		check := s.releaseUpdate.Checker.Refresh(ctx)
+		status := s.releaseUpdate.Status()
+		if check.Err != nil {
+			status.State = contract.UpdateStateUnknown
+			status.Latest = contract.BuildStamp{}
+			if status.Reason != updater.CodeNoReleasePublished {
+				status.Reason = "the release manifest could not be read: " + check.Err.Error()
+			}
+		}
+		return status
+	}
+	s.update.Refresh(ctx)
+	status := s.updateStatus()
+	if status.Error != "" {
+		status.State = contract.UpdateStateUnknown
+		status.Latest = contract.BuildStamp{}
+	}
+	return status
 }
 
 func (s *Server) updateStatus() contract.UpdateStatus {

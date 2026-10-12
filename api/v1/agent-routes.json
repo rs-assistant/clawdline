@@ -523,6 +523,11 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/update/fresh",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/update/apply",
       "guide": "connect"
     },

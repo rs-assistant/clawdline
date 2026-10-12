@@ -799,6 +799,18 @@ func init() {
 			route: func(p plan) LocalRequest {
 				return LocalRequest{Method: "GET", Path: "/v1/update"}
 			}},
+		// A foreground return requires a fresh signed manifest. A distinct word
+		// keeps older machines' update read wire shape unchanged.
+		op{name: "update-fresh", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request") {
+					return plan{}, false
+				}
+				return machinePlan(b)
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "GET", Path: "/v1/update/fresh"}
+			}},
 
 		// The Settings page's 「立即更新」 (docs/updates.md): install the newest
 		// release of this machine's channel. A command, so it needs the

@@ -2050,6 +2050,10 @@ test("the update read crosses as its machine word, with no field of its own", as
   assert.equal(read.status, 200)
   assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "update", {}, "read"])
 
+  const fresh = await reader.fetch("/v1/update/fresh")
+  assert.equal(fresh.status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "update-fresh", {}, "read"])
+
   assert.equal(writeRoute("GET", "/v1/update/1"), null)
   assert.equal(writeRoute("POST", "/v1/update"), null)
   assert.equal(writeRoute("GET", "/v1/update/apply"), null)
@@ -2269,6 +2273,7 @@ test("every read the writer carries is one it waits for, and no write is", () =>
     ["/v1/sessions/archived", "archived"],
     ["/v1/machine/usage", "machine-usage"],
     ["/v1/update", "update"],
+    ["/v1/update/fresh", "update-fresh"],
     ["/v1/verifications", "verification-read"],
     ["/v1/verifications/v1", "verification-read"],
     ["/v1/places", "places"],

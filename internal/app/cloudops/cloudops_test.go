@@ -832,6 +832,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: machine, name: "read:req-update",
 		method: "GET", path: "/v1/update",
 	}, {
+		word:    "update-fresh",
+		body:    map[string]any{"type": "update-fresh", "session": machine, "request": "req-update-fresh"},
+		session: machine, name: "read:req-update-fresh",
+		method: "GET", path: "/v1/update/fresh",
+	}, {
 		// The Settings page's 「立即更新」: a machine command with no parameter.
 		word:    "update-apply",
 		body:    map[string]any{"type": "update-apply", "session": machine, "request": "req-apply"},

@@ -70,6 +70,7 @@ export const CARRIED = {
   // The Settings page's update panel and the list's banner (`machine/update.ts`):
   // whether this machine trails the latest build, a machine read with no parameter.
   update: "GET /v1/update",
+  "update-fresh": "GET /v1/update/fresh",
   // The Settings page's 「立即更新」 (`machine/UpdatePanel.tsx`): install the
   // newest release of the machine's channel, a machine command with no body.
   "update-apply": "POST /v1/update/apply",

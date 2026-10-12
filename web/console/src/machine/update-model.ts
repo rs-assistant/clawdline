@@ -28,7 +28,7 @@ export interface UpdateReadEnvironment {
 }
 
 /** One reading for all mounted update views, including their resume checks. */
-export function createUpdateReadStore(read: () => Promise<UpdateRead>, env: UpdateReadEnvironment) {
+export function createUpdateReadStore(read: (fresh: boolean) => Promise<UpdateRead>, env: UpdateReadEnvironment) {
   let reading: UpdateRead | null = null
   let readAt: number | null = null
   let inFlight: Promise<UpdateRead> | null = null
@@ -45,10 +45,10 @@ export function createUpdateReadStore(read: () => Promise<UpdateRead>, env: Upda
     for (const listener of listeners) listener()
   }
 
-  const readNow = (): Promise<UpdateRead> => {
+  const readNow = (fresh = false): Promise<UpdateRead> => {
     if (inFlight) return inFlight
     const requested = generation
-    inFlight = read().then((next) => {
+    inFlight = read(fresh).then((next) => {
       if (requested === generation) publish(next)
       return next
     }).finally(() => { if (requested === generation) inFlight = null })
@@ -62,7 +62,7 @@ export function createUpdateReadStore(read: () => Promise<UpdateRead>, env: Upda
     lostFocus = false
     inFlight = null
     publish({ kind: "checking" })
-    void readNow()
+    void readNow(true)
   }
 
   // The Settings panel also has a timer while an update moves. A browser
@@ -71,7 +71,7 @@ export function createUpdateReadStore(read: () => Promise<UpdateRead>, env: Upda
 
   const stale = () => readAt === null || env.now() < readAt || env.now() - readAt >= UPDATE_READ_EVERY_MS
   const refreshIfStale = () => {
-    if (env.visible() && stale()) void readNow()
+    if (env.visible() && stale()) void readNow(true)
   }
   const stopTimer = () => {
     if (timer !== null) env.clearInterval(timer)

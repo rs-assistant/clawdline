@@ -169,10 +169,12 @@ at the next check hours later.
 ## The console's update panel
 
 The Settings page's **Clawdline 版本** panel (`web/console/src/machine/UpdatePanel.tsx`, its logic
-in `update-model.ts`) shares one `/v1/update` reading with the session list's banner. While the
-console is visible, it reads when first opened and every ten minutes. A hidden console stops its
+in `update-model.ts`) shares one update reading with the session list's banner. While the
+console is visible, it reads when first opened and every ten minutes. These reads ask
+`GET /v1/update/fresh`, which contacts the update source within a ten-second request bound;
+ordinary progress polling keeps using the cached `GET /v1/update`. A hidden console stops its
 periodic reads. Returning from hidden to visible, or from a blurred window to focus, immediately
-reads `/v1/update` even if the previous answer is under ten minutes old. Visibility and focus
+reads `/v1/update/fresh` even if the previous answer is under ten minutes old. Visibility and focus
 events from the same return share one request; repeated focus events without a preceding blur
 keep the ten-minute freshness rule. A page restored from the browser's back-forward cache also
 reads immediately. During a return check the previous update prompt and install action are hidden;
@@ -199,10 +201,12 @@ The panel shows the running and latest version (a short commit for a source buil
 On a release install with `update_available`, the session list also shows a banner linking to
 Settings, dismissed per version in the browser's storage.
 
-The resume read reports the daemon's last signed-manifest check; it does not make the daemon
-contact the release host. The daemon's six-hour check interval therefore limits how quickly a
-withdrawn release can disappear from an already running machine. The browser hides its old prompt
-while rereading, but a fresh browser request alone cannot prove a release was withdrawn at the host.
+On a release install, the fresh route rereads the signed manifest. A 404 clears a withdrawn release;
+an unreachable or invalid source produces `unknown` instead of showing a cached version as
+available. Concurrent background and foreground checks are serialized, so an older result cannot
+overwrite the new one. Over Cloud this route uses the distinct `update-fresh` word; a daemon
+predating that word refuses it and the console suppresses the prompt. The request depends on the
+release host answering; an unreachable host cannot establish whether a release was withdrawn.
 The remaining cross-platform acceptance evidence is tracked in
 [the update acceptance record](records/app-update-acceptance-2026-10-12.md).
 

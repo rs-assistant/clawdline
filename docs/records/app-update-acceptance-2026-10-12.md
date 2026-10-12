@@ -14,11 +14,12 @@ version in the next daemon answer, a rollback, dismissal per version, and a pre-
 arriving after the return. The Settings install action and list banner are hidden while that return
 check is pending.
 
-This establishes browser behavior **given a correct daemon answer**. It does not establish an
-immediate withdrawal at the release host: `GET /v1/update` reads the daemon's cached signed
-manifest, which the daemon refreshes every six hours plus jitter. A browser reopening between
-daemon checks can still receive an outdated `update_available` answer. The acceptance criterion
-for a withdrawn release remains open.
+The foreground path now asks `GET /v1/update/fresh` (the separate `update-fresh` Cloud word), while
+progress polling uses cached `GET /v1/update`. A controlled release-host test first returned a
+signed v0.11.0 manifest to a v0.10.0 daemon, then returned 404: the cached route still reported
+`update_available`, while the fresh route returned `unknown`, no latest version, and
+`no_release_published`. This is a daemon-and-browser contract check, not a phone run against a
+published withdrawal. That end-to-end acceptance observation remains open.
 
 ## Old daemon with current Cloud
 

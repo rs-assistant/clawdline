@@ -226,6 +226,7 @@ test("one word, one list, and every route names a word the table carries", () =>
     ["POST", "/v1/settings/work-gates"],
     ["GET", "/v1/machine/usage"],
     ["GET", "/v1/update"],
+    ["GET", "/v1/update/fresh"],
     ["POST", "/v1/update/apply"],
     ["GET", "/v1/verifications"],
     ["GET", "/v1/verifications/v1"],
@@ -311,7 +312,7 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("sessions.list" in CARRIED)
   // An opened waiting Session's one row, asked when its question has not come.
   assert.ok("sessions.row" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 153)
+  assert.equal(Object.keys(CARRIED).length, 154)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {

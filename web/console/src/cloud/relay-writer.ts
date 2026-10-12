@@ -281,6 +281,7 @@ export type WriteRoute =
   | { op: "board-command"; word: Carried<"board-command"> }
   | { op: "machine-usage"; word: Carried<"machine-usage"> }
   | { op: "update"; word: Carried<"update"> }
+  | { op: "update-fresh"; word: Carried<"update-fresh"> }
   | { op: "update-apply"; word: Carried<"update-apply"> }
   // The sessions a reboot took away: one machine read and two machine
   // commands, none of them a session's — the rows are conversations the
@@ -452,6 +453,7 @@ export const CARRIED_READS: ReadonlySet<WriteRoute["op"]> = new Set<WriteRoute["
   "archived",
   "machine-usage",
   "update",
+  "update-fresh",
   "verification-read",
   "places",
   "past",
@@ -529,6 +531,9 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
     // on the machine's one reply channel.
     if (head === "update" && segments.length === 1) {
       return { op: "update", word: "update" }
+    }
+    if (head === "update" && a === "fresh" && segments.length === 2) {
+      return { op: "update-fresh", word: "update-fresh" }
     }
     if (head === "verifications" && segments.length === 1) {
       return { op: "verification-read", word: "verification.list", id: "" }
@@ -1316,7 +1321,8 @@ export class RelayWriter {
       case "default-models":
       case "work-gate-settings":
       case "machine-usage":
-      case "update": {
+      case "update":
+      case "update-fresh": {
         if (typeof client._machineRequest !== "function") {
           throw failure("cloud_not_carried", route.word, 501)
         }

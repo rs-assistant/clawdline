@@ -57,7 +57,8 @@ const bannerVersion = (read: UpdateRead | null) => updateBannerVersion(read?.kin
 test("a hidden page makes no periodic reads and checks immediately after a stale return", async () => {
   const time = environment()
   let reads = 0
-  const store = createUpdateReadStore(async () => { reads++; return status("update_available") }, time.env)
+  const fresh: boolean[] = []
+  const store = createUpdateReadStore(async (mustRefresh) => { reads++; fresh.push(mustRefresh); return status("update_available") }, time.env)
   const stop = store.subscribe(() => {})
   await settle()
   assert.equal(reads, 1)
@@ -73,6 +74,7 @@ test("a hidden page makes no periodic reads and checks immediately after a stale
   assert.equal(store.current()?.kind, "checking", "an old banner is hidden while the new answer is pending")
   await settle()
   assert.equal(reads, 2)
+  assert.deepEqual(fresh, [true, true], "opening and returning both ask the release host")
   assert.equal(time.timers(), 1)
   stop()
   assert.equal(time.listeners(), 0)
