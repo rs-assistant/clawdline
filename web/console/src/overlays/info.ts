@@ -191,6 +191,11 @@ function canSwitch(): boolean {
   const s = session()
   return !!(s && host.writable() && s.state === "idle" && !busy)
 }
+/** A Codex row may be unknown while its terminal remains writable. A deliberate press can open its picker. */
+function canOpenCodexPicker(): boolean {
+  const s = session()
+  return !!(s && host.writable() && (s.state === "idle" || s.state === "unknown") && !busy)
+}
 /** A dated model finds its versioned row without selecting a shorter version. */
 function onModel(current: string, m: SessionModel): boolean {
   return !!current && (current === m.id ||
@@ -291,10 +296,16 @@ function modelsHTML(models: SessionModel[], current: string): string {
   return '<div class="models">' + chips + other + "</div>" + (can ? "" : note(T.webInfoModelBusy))
 }
 
-function codexModelHTML(): string {
-  const can = canSwitch()
-  return '<div class="models"><button type="button" class="m" data-model-picker="1"' +
-    (can ? "" : " disabled") + '>' + esc(nextWord("infoOpenModelPicker")) + '</button></div>' +
+function codexModelHTML(models: SessionModel[], current: string): string {
+  const can = canOpenCodexPicker()
+  const chips = models.map((model) => {
+    const on = onModel(current, model)
+    return '<button type="button" class="m" data-model-picker="1" title="' + esc(nextWord("infoOpenModelPicker")) + '"' +
+      (on ? ' data-on="1" aria-current="true"' : "") + (can && !on ? "" : " disabled") + '>' + esc(model.name) + '</button>'
+  }).join("")
+  const other = '<button type="button" class="m" data-model-picker="1"' +
+    (can ? "" : " disabled") + '>' + esc(T.webInfoModelOther) + '</button>'
+  return '<div class="models">' + chips + other + '</div>' +
     (can ? "" : note(T.webInfoModelBusy))
 }
 
@@ -515,7 +526,7 @@ function html(d: Facts): string {
   if (role) out += sec(++i, nextWord("personaPicker"), "", role)
   // Read-only pairings get no buttons rather than dead ones.
   if (host.writable() && (models.length || s.assistant === "codex")) {
-    out += sec(++i, T.webInfoSwitchModel, "", s.assistant === "codex" ? codexModelHTML() : modelsHTML(models, current))
+    out += sec(++i, T.webInfoSwitchModel, "", s.assistant === "codex" ? codexModelHTML(models, current) : modelsHTML(models, current))
   }
   out += sec(++i, nextWord("infoContext"), "", contextHTML(d.context))
   out += sec(++i, T.webInfoUsage, "", usageHTML(u))
@@ -739,21 +750,9 @@ export const Info = {
 
   openModelPicker(): void {
     const id = forId
-    if (!id || data?.session?.assistant !== "codex" || !canSwitch()) return
-    busy = true
-    said("")
-    draw()
-    client.send(id, "/model", pressKey("model-picker")).then(
-      () => {
-        if (forId === id) Info.close()
-      },
-      (e) => {
-        if (forId !== id) return
-        busy = false
-        said(why(e), false)
-        draw()
-      },
-    )
+    if (!id || data?.session?.assistant !== "codex" || !canOpenCodexPicker()) return
+    Info.close()
+    client.send(id, "/model", pressKey("model-picker")).catch((e) => toast(why(e)))
   },
 
   editTitle(): void {
