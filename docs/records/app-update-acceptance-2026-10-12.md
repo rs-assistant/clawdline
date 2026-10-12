@@ -39,10 +39,21 @@ only on Linux, prints manual bundle instructions on macOS, and refuses other ope
 
 | Platform | Release version, entry, post-update | Source version, entry, post-update |
 | --- | --- | --- |
-| macOS | Not yet exercised on an isolated installation | Not yet exercised on an isolated installation |
+| macOS | v0.10.0 release install, signature check, daemon start, console HTTP 200 and clean uninstall passed in an isolated root; version transition and App bundle still untested | Not yet exercised on an isolated installation |
 | Linux | Not yet exercised in a Linux runtime | Not yet exercised in a Linux runtime |
 | Windows | No release artifact or installer exists; cannot exercise this path | No supported source update entry; cannot exercise this path |
 
 No matrix cell is counted complete. Compilation or a unit fixture is not an installation result.
 An isolated runtime check must record the version before and after, the exact download or install
 entry, and the post-update console and daemon state for each cell.
+
+The macOS arm64 run used `sh install.sh --version v0.10.0 --headless --no-app
+--no-autostart --no-session-check --port 63578 --verbose` with separate install, binary, state,
+and App paths under `/private/tmp`. Its signed archive identified commit `bc644851fcdbe0a46741a7f4777a1c1247a2a81f`;
+the installed console answered HTTP 200 and its `BUILD.json` named the same commit. The daemon
+reported v0.10.0 after installation. The attempt to use `clawdline update --apply --version
+v0.10.0 --force` as a transition test was refused with `already_current`, as the updater is
+designed to refuse the running version even with `--force`. That attempt does not establish a
+post-update state. The test service and LaunchAgent were removed by `setup --uninstall`. The
+previous public tag v0.8.0 has only the retired Swift App archive, so it cannot provide an older
+Go daemon installation for this release-to-release transition.
