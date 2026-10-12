@@ -184,6 +184,9 @@ export const CARRIED = {
   // a failed carried read is one (`cloud.read.failed`, `relay-reader.ts`).
   "diagnostics.events": "cloud-client.js _deliverViewerEvents (after a recorded failure)",
   "sessions.snapshot.initial": "cloud-client.js first _recoverSessions attempt (when advertised)",
+  // An opened waiting Session whose question has not come asks for its one row
+  // (`relay-reader.ts` askForOpenedQuestion), when the machine advertises it.
+  "sessions.row": "relay-reader.ts askForOpenedQuestion (when advertised)",
   "smart-title": "POST /v1/sessions/{id}/smart-title",
   "snippet-create": "POST /v1/snippets",
   "snippet-delete": "DELETE /v1/snippets/{id}",

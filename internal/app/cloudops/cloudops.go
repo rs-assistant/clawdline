@@ -220,6 +220,11 @@ type Bridge struct {
 	// SessionsFor carries the authenticated sender and first-attempt bit to
 	// the publisher. Sessions remains for callers using the older bridge seam.
 	SessionsFor func(ctx context.Context, sender string, first bool) (SessionsStated, *Refusal)
+	// SessionRow puts one Session's row back on its channel now
+	// (`sessions.row`): what a page that has a Session open and waiting asks
+	// for when its question has not come, instead of a whole restatement that
+	// waits for the machine's next pass. Nil answers that word `unknown_command`.
+	SessionRow func(ctx context.Context, sender, session string) (SessionsStated, *Refusal)
 	// ViewerEvents writes the failures a hosted page reports about itself
 	// (`diagnostics.events`) to this daemon's log. Nil answers that word
 	// `unknown_command`, which the page holds its rows on and does not retry.
@@ -231,7 +236,7 @@ type Bridge struct {
 // waits for a publication pass. A body too malformed to say is not one; the
 // bridge refuses it like any other.
 func AsksForSessions(plaintext []byte) bool {
-	if !bytes.Contains(plaintext, []byte(sessionsSnapshotWord)) {
+	if !bytes.Contains(plaintext, []byte(sessionsSnapshotWord)) && !bytes.Contains(plaintext, []byte(sessionsRowWord)) {
 		return false
 	}
 	parsed, err := decodeBody(plaintext)
@@ -239,12 +244,13 @@ func AsksForSessions(plaintext []byte) bool {
 		return false
 	}
 	word, _ := parsed.str("type")
-	return word == sessionsSnapshotWord || word == sessionsSnapshotInitialWord
+	return word == sessionsSnapshotWord || word == sessionsSnapshotInitialWord || word == sessionsRowWord
 }
 
 const (
 	sessionsSnapshotWord        = "sessions.snapshot"
 	sessionsSnapshotInitialWord = "sessions.snapshot.initial"
+	sessionsRowWord             = "sessions.row"
 )
 
 // IsRead reports whether this plaintext asks for an effect-free word, for a
@@ -487,6 +493,18 @@ func (b Bridge) stateSessions(ctx context.Context, cmd Command, parsed body, p p
 			Message: "This machine does not know that Cloud command.", fixedCopy: true}, nil)
 	}
 	word, _ := parsed.str("type")
+	if word == sessionsRowWord {
+		row, _ := parsed.str("row")
+		if b.SessionRow == nil {
+			return b.publish(cmd, p, Refusal{Status: 400, Code: "unknown_command",
+				Message: "This machine does not know that Cloud command.", fixedCopy: true}, nil)
+		}
+		stated, refusal := b.SessionRow(ctx, cmd.Sender, row)
+		if refusal != nil {
+			return b.publish(cmd, p, *refusal, nil)
+		}
+		return b.statedAnswer(cmd, p, stated)
+	}
 	first := word == sessionsSnapshotInitialWord
 	if word == sessionsSnapshotWord {
 		first = true // An older viewer sends no attempt bit.
@@ -504,6 +522,11 @@ func (b Bridge) stateSessions(ctx context.Context, cmd Command, parsed body, p p
 	if refusal != nil {
 		return b.publish(cmd, p, *refusal, nil)
 	}
+	return b.statedAnswer(cmd, p, stated)
+}
+
+// statedAnswer is `{"sessions":[ids],"complete":bool}`, after the rows went out.
+func (b Bridge) statedAnswer(cmd Command, p plan, stated SessionsStated) Answer {
 	ids := stated.IDs
 	if ids == nil {
 		ids = []string{}

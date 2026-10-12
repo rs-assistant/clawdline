@@ -649,6 +649,14 @@ test("an opened waiting Session with no question in hand asks the machine to res
   await r.snapshot()
   assert.equal(client.reads.at(-1)?.word, "sessions.snapshot.initial",
     "a machine that lists the immediate word is asked with it, not left to its next pass")
+  ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements =
+    (_machine, word) => word === "sessions.row" || word === "sessions.snapshot.initial" ? "yes" : "unknown"
+  now += 6_001
+  const asking = await r.snapshot()
+  assert.deepEqual(client.reads.at(-1), { machine: "mac-a", word: "sessions.row", body: { row: "s1" } },
+    "a machine that can state one row is asked for just that row")
+  assert.equal((asking.sessions[0] as { menu_arriving?: boolean }).menu_arriving, true,
+    "the card says the question is on its way while it is asked for")
 })
 
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {

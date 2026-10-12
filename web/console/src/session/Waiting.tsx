@@ -133,7 +133,8 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
             screenOff: !current.current.onScreen,
             cancel: current.current.write,
             screen: open.screen_reading ?? null,
-            arriving: open.closeability?.source?.provenance === "pinned_list",
+            arriving: open.closeability?.source?.provenance === "pinned_list" ||
+              (open as { menu_arriving?: unknown }).menu_arriving === true,
             inferred: !sent && menu?.source === "transcript",
           })
     if (want === st.drawn) return

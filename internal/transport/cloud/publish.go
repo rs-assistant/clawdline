@@ -64,7 +64,7 @@ const SnapshotInterval = 5 * time.Second
 // FeatureWords is `CloudAppBridge.swift:1436`'s `cloudFeatures`: the words a
 // newer machine answers that an older one does not. A page sends such a word only
 // to a machine that listed it.
-var FeatureWords = []string{"sessions.snapshot", "sessions.snapshot.initial", "board.items"}
+var FeatureWords = []string{"sessions.snapshot", "sessions.snapshot.initial", "sessions.row", "board.items"}
 
 // Features is the subset of those this daemon can actually answer.
 //
@@ -242,6 +242,16 @@ type Publisher struct {
 	// pass, so readProduct builds the list now.
 	settle chan struct{}
 	fresh  bool
+	// rows carries StateRow's asks to Run, which owns the skip memory;
+	// rowAsked is when each sender last asked for each row (StateRow).
+	rows     chan rowAsk
+	rowAsked map[string]time.Time
+}
+
+// rowAsk is one StateRow waiting for Run.
+type rowAsk struct {
+	id     string
+	answer chan snapshotResult
 }
 
 // heldRow is one published row: the identity it was compared by and the bytes
@@ -319,7 +329,7 @@ func (p *Publisher) Run(ctx context.Context) error {
 	wake := p.open()
 	defer p.close()
 	p.mu.Lock()
-	settle := p.settle
+	settle, rows := p.settle, p.rows
 	p.mu.Unlock()
 	// Settle's passes: each press restarts the sequence, so a burst of presses
 	// is one sequence after the last of them.
@@ -371,6 +381,8 @@ func (p *Publisher) Run(ctx context.Context) error {
 			p.fresh = true
 			p.pass(ctx)
 			p.fresh = false
+		case ask := <-rows:
+			p.stateRow(ctx, ask)
 		case <-wake:
 			if !p.asked() {
 				continue
@@ -502,6 +514,8 @@ func (p *Publisher) open() <-chan struct{} {
 	defer p.mu.Unlock()
 	p.wake = make(chan struct{}, 1)
 	p.settle = make(chan struct{}, 1)
+	p.rows = make(chan rowAsk, SessionRowAsksLimit)
+	p.rowAsked = map[string]time.Time{}
 	p.running = true
 	p.stated = time.Time{}
 	p.firstBySender = map[string]time.Time{}
@@ -545,6 +559,88 @@ func (p *Publisher) Settle() {
 	case settle <- struct{}{}:
 	default:
 	}
+}
+
+// SessionRowAsksLimit is how many `sessions.row` asks may wait for Run. Past
+// it the sender is answered 429 cloud_read_busy; each ask is one fresh pass,
+// answered in order, so the lane drains as fast as the machine can read.
+const SessionRowAsksLimit = 64
+
+// SessionRowEvery is how often one viewer may ask for one row (StateRow).
+// A page asks once per six seconds while it waits (`relay-reader.ts`
+// QUESTION_RESTATE_MS); this only stops a page that misbehaves from buying a
+// fresh session build on every envelope.
+const SessionRowEvery = time.Second
+
+// StateRow is `sessions.row`: one Session's row back on its channel now, built
+// fresh, whether or not it changed. A page with a Session open and waiting asks
+// it when the question has not come, because the machine sends a row only when
+// it changes and a Session stopped on a question does not change — and the
+// whole restatement it asked before waited for this machine's next pass, five
+// seconds at worst, measured on 2026-10-12 as four seconds of "could not read
+// the choices" between opening the Session and its options.
+func (p *Publisher) StateRow(ctx context.Context, sender, id string) (cloudops.SessionsStated, *cloudops.Refusal) {
+	answer := make(chan snapshotResult, 1)
+	p.mu.Lock()
+	if !p.running {
+		p.mu.Unlock()
+		return cloudops.SessionsStated{}, &cloudops.Refusal{Status: 503, Code: "cloud_starting",
+			Message: "This machine has not started publishing its Sessions yet; try again shortly."}
+	}
+	key := sender + "\x00" + id
+	if last, ok := p.rowAsked[key]; ok && p.now().Sub(last) < SessionRowEvery {
+		p.mu.Unlock()
+		return cloudops.SessionsStated{}, &cloudops.Refusal{Status: 429, Code: "cloud_read_busy",
+			Message: "This Session's row was asked for a moment ago; try again shortly.",
+			Detail:  map[string]any{"retry_after": 1}}
+	}
+	for asked, last := range p.rowAsked {
+		if p.now().Sub(last) >= SessionRowEvery {
+			delete(p.rowAsked, asked)
+		}
+	}
+	p.rowAsked[key] = p.now()
+	rows := p.rows
+	p.mu.Unlock()
+	select {
+	case rows <- rowAsk{id: id, answer: answer}:
+	default:
+		return cloudops.SessionsStated{}, &cloudops.Refusal{Status: 429, Code: "cloud_read_busy",
+			Message: "This machine is already stating its Sessions to many viewers; try again shortly.",
+			Detail:  map[string]any{"limit": SessionRowAsksLimit, "retry_after": 1}}
+	}
+	select {
+	case result := <-answer:
+		return result.stated, result.refusal
+	case <-ctx.Done():
+		return cloudops.SessionsStated{}, &cloudops.Refusal{Status: 503, Code: "cloud_reconnecting",
+			Message: "This machine's Cloud line went down before the Session was stated."}
+	}
+}
+
+// stateRow forgets that one row was sent, so the fresh pass sends it again,
+// and answers with it named only if the reading had it.
+func (p *Publisher) stateRow(ctx context.Context, ask rowAsk) {
+	delete(p.published, ask.id)
+	delete(p.sent, ask.id)
+	delete(p.steady, ask.id)
+	p.unsent = 0
+	p.fresh = true
+	_, reading, ok := p.pass(ctx)
+	p.fresh = false
+	if !ok {
+		ask.answer <- snapshotResult{refusal: &cloudops.Refusal{Status: 503, Code: "reading_busy",
+			Message: "This machine could not read its own Session list; try again shortly."}}
+		return
+	}
+	stated := cloudops.SessionsStated{IDs: []string{}, Complete: true}
+	for _, id := range reading.ids {
+		if id == ask.id {
+			stated.IDs = []string{id}
+			break
+		}
+	}
+	ask.answer <- snapshotResult{stated: stated}
 }
 
 // nudge wakes Run without waiting for it.

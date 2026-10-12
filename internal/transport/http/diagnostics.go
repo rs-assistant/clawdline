@@ -1076,6 +1076,12 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		capacity.CloudViewerEventsLine: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-row log line guard; no retained buffer"}
 		},
+		capacity.CloudSessionRowID: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-read guard on the id a sessions.row names; no retained buffer"}
+		},
+		capacity.CloudSessionRowAsks: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "asks live in the Cloud link's publisher and drain each pass; not measured here"}
+		},
 		capacity.CloudViewerEventsSeen: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "batch ids live in the Cloud link and reset with it; not measured here"}
 		},
