@@ -457,9 +457,14 @@ export function statusSource(current: () => StatusClient | null): SessionProject
       }
       const pinned = channels(destination)
       const key = destinationKey(destination)
+      const firstOpen = opened.get(key) !== client
+      const started = Date.now()
+      let infoMs: number | null = null
+      let transcriptMs: number | null = null
+      let outcome = "unknown"
       // Rich-row changes reread the already opened destination. Keep its exact
       // subscription in place so a retained s/ replay cannot trigger a loop.
-      if (opened.get(key) !== client) {
+      if (firstOpen) {
         client.openDetail(destination)
         client.subscribe(pinned)
         opened.set(key, client)
@@ -469,13 +474,17 @@ export function statusSource(current: () => StatusClient | null): SessionProject
       }
       if (signal.aborted) return { kind: "unavailable", reason: "unknown" }
       try {
+        const infoStarted = Date.now()
         const infoReply = record(await client.infoForGeneration(destination, signal))
+        infoMs = Date.now() - infoStarted
         if (!infoReply || signal.aborted) return { kind: "unavailable", reason: "unknown" }
         const afterInfoReading = await readMachine(destination.machineID, signal)
         if (afterInfoReading.kind === "unavailable") return { kind: "unavailable", reason: detailProblem(afterInfoReading.reason) }
         const afterInfo = destinationAvailable(destination, afterInfoReading)
         if (afterInfo !== "ready") return { kind: "unavailable", reason: afterInfo === "waiting" ? "unknown" : afterInfo }
+        const transcriptStarted = Date.now()
         const reply = record(await client.transcriptForGeneration(destination, signal))
+        transcriptMs = Date.now() - transcriptStarted
         if (signal.aborted) return { kind: "unavailable", reason: "unknown" }
         const afterTranscriptReading = await readMachine(destination.machineID, signal)
         if (afterTranscriptReading.kind === "unavailable") return { kind: "unavailable", reason: detailProblem(afterTranscriptReading.reason) }
@@ -485,6 +494,7 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         if (!page) return { kind: "unavailable", reason: "unknown" }
         visibleArtifacts.set(key, new Set(page.entries.flatMap((entry) => entry.artifacts?.map((artifact) => artifact.id) ?? [])))
         const session = record(record(infoReply.info)?.session)
+        outcome = "ready"
         return { kind: "ready", destination, observedAt: Date.now(),
           info: { title: typeof session?.title === "string" ? session.title : undefined,
             assistant: typeof session?.assistant === "string" ? session.assistant : undefined,
@@ -492,7 +502,19 @@ export function statusSource(current: () => StatusClient | null): SessionProject
           entries: page.entries, nextBefore: page.nextBefore,
           question: pinnedQuestion(client, destination) }
       } catch (error) {
+        outcome = typeof (error as { code?: unknown } | null)?.code === "string"
+          ? String((error as { code: string }).code) : "failed"
         return { kind: "unavailable", reason: contentFailure(error) }
+      } finally {
+        // One content-free timing row per opened detail distinguishes waiting
+        // for info from waiting for the transcript on a real phone. Subsequent
+        // status-driven rereads do not consume the viewer's diagnostics budget.
+        if (firstOpen && !signal.aborted) {
+          try { client.viewerEvents?.record?.("cloud.detail.first_read", {
+            machine: destination.machineID, outcome,
+            total_ms: Date.now() - started, info_ms: infoMs, transcript_ms: transcriptMs,
+          }, "cloud.detail.first_read|" + destination.machineID) } catch { /* diagnostics cannot fail a read */ }
+        }
       }
     },
     async readOlder(destination, before, signal): Promise<SessionOlderPage> {

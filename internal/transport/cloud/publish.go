@@ -242,6 +242,10 @@ type Publisher struct {
 	// pass, so readProduct builds the list now.
 	settle chan struct{}
 	fresh  bool
+	// pressedAt is when the last Settle came, and rowsSent counts Session
+	// rows handed over, for the line each of Settle's passes leaves.
+	pressedAt time.Time
+	rowsSent  int
 	// rows carries StateRow's asks to Run, which owns the skip memory;
 	// rowAsked is when each sender last asked for each row (StateRow).
 	rows     chan rowAsk
@@ -368,6 +372,7 @@ func (p *Publisher) Run(ctx context.Context) error {
 			}
 			p.pass(ctx)
 		case <-settle:
+			p.pressedAt = p.now()
 			stopSettling()
 			for _, d := range SettleDelays {
 				settling = append(settling, time.AfterFunc(d, func() {
@@ -378,9 +383,15 @@ func (p *Publisher) Run(ctx context.Context) error {
 				}))
 			}
 		case <-due:
+			// One line per look, because the whole point of these passes is a
+			// time, and on 2026-10-12 a press still waited nine seconds to be
+			// seen with nothing on this machine saying whether a look ran.
+			sent := p.rowsSent
 			p.fresh = true
 			p.pass(ctx)
 			p.fresh = false
+			p.logf("cloud: looked again %dms after a press: %d Session row(s) sent",
+				p.now().Sub(p.pressedAt).Milliseconds(), p.rowsSent-sent)
 		case ask := <-rows:
 			p.stateRow(ctx, ask)
 		case <-wake:
@@ -1271,6 +1282,9 @@ func (p *Publisher) send(ctx context.Context, key, channel string, body []byte, 
 		return
 	}
 	out := Outbound{Channel: channel, Class: string(domaincloud.ClassStream), Payload: body}
+	if strings.HasPrefix(channel, "s/") && key != InventorySessionID {
+		p.rowsSent++
+	}
 	if err := p.Publish(ctx, out); err != nil {
 		p.logf("cloud: the %s snapshot was not published: %v", what, err)
 		// `changed` recorded it as sent before it was handed over. Forget
