@@ -333,6 +333,10 @@ func statusParents(rows map[string]map[string]any, tasks []map[string]any) map[s
 		root, _ := task["root"].(map[string]any)
 		kid, _ := child["terminalId"].(string)
 		owner, _ := root["terminalId"].(string)
+		if owner == "" {
+			conversation, _ := root["sessionId"].(string)
+			owner = conversations[conversation]
+		}
 		if kid != "" && owner != "" && kid != owner && rows[kid] != nil && rows[owner] != nil && rows[kid]["machine_scope"] != true {
 			parents[kid] = owner
 		}
