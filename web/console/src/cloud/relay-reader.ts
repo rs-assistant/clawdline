@@ -173,6 +173,12 @@ export interface CloudReadClient {
    * is a machine that has itself said no, which is never waited for.
    */
   readonly machineLacks?: Map<string, unknown>
+  /**
+   * machine + NUL + session → the rich s/ row received while that detail is
+   * open (`status-client.js` `openDetail`), the only row here that carries a
+   * waiting question's options (`withOpenedMenu`).
+   */
+  readonly detailSnapshots?: ReadonlyMap<string, unknown>
   events(listener: (event: CloudEvent) => void): () => void
   /** The current account rows, used here only to answer health for the chosen machine. */
   machines?(): Promise<{
@@ -431,6 +437,9 @@ export const PASS_SETTLE_MS = 2_000
  * Asking the machine for its list instead put the row back in one second.
  */
 export const ROW_RESTATE_MS = 5_000
+
+/** How old a rich row's question may be and still be drawn: the status freshness window (`status-projection.ts`). */
+const RICH_MENU_FRESH_MS = 300_000
 
 /**
  * How long, after this page did something to a session, every poll asks the
@@ -1461,7 +1470,7 @@ export class RelayReader {
     return promise
   }
 
-  private async projectedReading(): Promise<{ snapshot: SessionsSnapshot; settled: boolean } | null> {
+  private async projectedReading(client: CloudReadClient): Promise<{ snapshot: SessionsSnapshot; settled: boolean } | null> {
     if (!this.options.classicStatus || !this.options.machineProjection) return null
     let projection: MachineSessionProjection
     try { projection = await this.options.machineProjection(this.machine) } catch { return null }
@@ -1498,7 +1507,7 @@ export class RelayReader {
         return true
       }
       return false
-    }).map(consoleRow)
+    }).map((row) => consoleRow(this.withOpenedMenu(client, row)))
     if (whole) {
       const present = new Set(machineRows.map((row) => String(row.session ?? row.id ?? "")))
       for (const id of this.closedAt.keys()) if (!present.has(id)) this.closedAt.delete(id)
@@ -1545,7 +1554,7 @@ export class RelayReader {
       }
     }
     const client = this.connected()
-    const projected = await this.projectedReading()
+    const projected = await this.projectedReading(client)
     if (projected) return projected
     const all = await client.sessions()
     this.sayDrift()
@@ -1694,7 +1703,7 @@ export class RelayReader {
         return true
       }
       return false
-    }).map(consoleRow)
+    }).map((row) => consoleRow(this.withOpenedMenu(client, row)))
     if (whole) {
       const present = new Set(machineRows.map((row) => typeof row.session === "string" ? row.session : row.id))
       for (const id of this.closedAt.keys()) {
@@ -2153,6 +2162,36 @@ export class RelayReader {
       })
     }
     return target
+  }
+
+  /**
+   * The opened Session's row, with the question its rich row carries.
+   *
+   * Every row here is put together from the content-free status and the
+   * authorized display list, and neither carries a question's words. On
+   * 2026-10-12 a Session stopped on a menu its machine had read whole was open
+   * on app.clawdline.com, its rich s/ row arriving (`ch=s/<machine>/<session>
+   * fanout=1`), and the waiting card said Clawdline "could not read its
+   * choices from the screen": the row it drew had no `menu`, because the rich
+   * row went only to `detailSnapshots`. Only that open, exact execution's
+   * row, and only while its rich row is current and names the same state.
+   */
+  private withOpenedMenu(client: CloudReadClient, row: CloudRow): CloudRow {
+    const target = this.options.fleetTarget?.()
+    const id = typeof row.session === "string" ? row.session : row.id
+    if (!target || target.machineID !== this.machine || id !== target.sessionID ||
+      row.execution_generation !== target.executionGeneration || row.state !== "waiting") return row
+    const rich = client.detailSnapshots?.get(this.machine + "\u0000" + target.sessionID) as
+      | { machine?: unknown; session?: unknown; execution_generation?: unknown; state?: unknown;
+        menu?: { options?: unknown }; screen_reading?: unknown;
+        source?: { freshness?: unknown; observed_at?: unknown } } | undefined
+    const observedAt = Number(rich?.source?.observed_at) * 1000
+    if (!rich || rich.machine !== this.machine || rich.session !== target.sessionID ||
+      rich.execution_generation !== target.executionGeneration || rich.state !== "waiting" ||
+      rich.source?.freshness !== "current" || !Number.isFinite(observedAt) ||
+      Math.abs(this.now() - observedAt) > RICH_MENU_FRESH_MS ||
+      !Array.isArray(rich.menu?.options) || !rich.menu.options.length) return row
+    return { ...row, menu: rich.menu, ...(typeof rich.screen_reading === "string" ? { screen_reading: rich.screen_reading } : {}) }
   }
 
   /**
