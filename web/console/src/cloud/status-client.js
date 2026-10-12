@@ -610,17 +610,25 @@ export class StatusCloudClient extends CatalogCloudClient {
     const previous = this.allowWrites
     this.allowWrites = true
     try {
-      // The carrier is taken only when it is already open. Negotiating one takes a
-      // round trip to a STUN server and a publish, and a transcript must not wait
-      // for that: the first read of a machine goes over the relay while the carrier
-      // opens behind it, and the reads after it take the short path.
+      // The carrier is taken only when it is already open. A cold foreground
+      // read goes over the relay before this page negotiates another path: a
+      // failed STUN/data-channel attempt on a small executor must not contend
+      // with the first conversation the person is waiting to see.
       const carrier = this._carrierFor(extra.machine_id)
       const direct = carrier?.open ? carrier : null
-      if (carrier && !direct) carrier.ensure().catch(() => {})
       const promise = direct
         ? this._readOnCarrier({ machine: extra.machine_id, session: value.session },
           direct, type, extra, answer, timeoutMs, readOptions)
         : super._read(value, type, extra, answer, timeoutMs, readOptions)
+      if (carrier && !direct) {
+        // Only a successful read warms the optional path. The timer yields to
+        // the caller's promise continuation, so the transcript can be drawn
+        // before WebRTC work begins. DirectCarrier.ensure coalesces any other
+        // reads that completed in the same turn and applies its retry bound.
+        void promise.then(() => {
+          setTimeout(() => { void carrier.ensure().catch(() => {}) }, 0)
+        }, () => {})
+      }
       proof.waiters = this.readWaiters.get(key) || null
       if (!proof.waiters) this.pinnedReadProofs.delete(key)
       return promise
