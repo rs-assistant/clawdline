@@ -147,6 +147,38 @@ test("a cut remembered Linux command list cannot refuse a named transcript read"
   assert.equal(client._machineImplements("m", "transcript"), "no")
 })
 
+test("a paired Mac remains the voice host while its cached command list is incomplete", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  const cached = Array.from({ length: 64 }, (_, i) => `word-${i}`)
+  client._machineRows = () => [
+    { id: "mac", pairing: "paired", freshness: "current" },
+    { id: "linux", pairing: "paired", freshness: "current" },
+  ]
+  client.orchestratorSnapshots = new Map()
+  client.machineDescriptors = new Map([
+    ["mac", { machine: { platform: "darwin", commands: cached } }],
+    ["linux", { machine: { platform: "linux", commands: ["send"] } }],
+  ])
+  client.machineLacks = new Map()
+  client.macCapabilities = new Map()
+  client.account = "account"
+  client.voiceHostStorage = null
+  client.voiceHostChoice = null
+  const host = await client.voiceHost()
+  assert.equal(host.machine, "mac")
+  const asked = []
+  client._machineRequest = async (machine, word) => {
+    asked.push([machine, word])
+    return { text: "heard" }
+  }
+  assert.deepEqual(await client.voice("audio", 16000), { text: "heard" })
+  assert.deepEqual(asked, [["mac", "voice"]])
+
+  // A complete live descriptor that omits voice is an actual refusal.
+  client.orchestratorSnapshots.set("mac", { machine: { platform: "darwin", commands: ["send"] } })
+  await assert.rejects(client.voiceHost(), { code: "cloud_voice_host_unavailable" })
+})
+
 test("status recovery frees idle relay channels before declaring an event gap", async () => {
   const client = Object.create(StatusCloudClient.prototype)
   client.ready = true

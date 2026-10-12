@@ -339,6 +339,19 @@ export class StatusCloudClient extends CatalogCloudClient {
     return super._machineImplements(machine, type, options)
   }
 
+  _machinesFor(type) {
+    const found = super._machinesFor(type)
+    if (type !== "voice" || found.capable.length || !found.evidentMac) return found
+    // The archived picker drops every unknown route as soon as it sees a Mac.
+    // Its 64-word descriptor cache makes voice unknown on that very Mac while
+    // its live descriptor is between snapshots. Keep only paired, evident Macs
+    // as candidates; a named request gets the machine's authoritative answer.
+    const possible = found.unconfirmed.filter((row) => this._evidentMac(row.id))
+    if (!possible.length) return found
+    return { ...found, capable: possible,
+      unconfirmed: found.unconfirmed.filter((row) => !possible.includes(row)) }
+  }
+
   /**
    * Publishes one `carrier_offer` and resolves with the machine's answer.
    *
