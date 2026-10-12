@@ -610,6 +610,13 @@ test("the opened waiting Session draws the question its current rich row carries
   assert.equal(row(await r.snapshot(), "s1")?.menu, undefined, "a stale rich row is not drawn as the question now")
   target = { machineID: "mac-a", sessionID: "s2", executionGeneration: execution }
   assert.equal(row(await r.snapshot(), "s2")?.menu?.question, "Tea or coffee?")
+  // Opening a detail empties its own copy, and a Session waiting on a question
+  // sends no new row: the row the client already holds is the question.
+  details.delete("mac-a\u0000s2")
+  ;(client as unknown as { sessionSnapshots: Map<string, unknown> }).sessionSnapshots =
+    new Map([["mac-a\u0000s2", rich({ session: "s2" })]])
+  assert.equal(row(await r.snapshot(), "s2")?.menu?.question, "Tea or coffee?",
+    "the held row stands in for a detail copy that was emptied on open")
 })
 
 // The machine sends a rich row only when the row changes, and a Session
