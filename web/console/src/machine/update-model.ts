@@ -18,6 +18,8 @@ export interface UpdateReadEnvironment {
   visible(): boolean
   onVisibilityChange(listener: () => void): () => void
   onFocus(listener: () => void): () => void
+  /** A restored page may skip visibilitychange and focus (back-forward cache). */
+  onPageShow?(listener: () => void): () => void
   /** Optional for adapters that cannot report a window leaving focus. */
   onBlur?(listener: () => void): () => void
   onOnline(listener: () => void): () => void
@@ -30,6 +32,7 @@ export function createUpdateReadStore(read: () => Promise<UpdateRead>, env: Upda
   let reading: UpdateRead | null = null
   let readAt: number | null = null
   let inFlight: Promise<UpdateRead> | null = null
+  let generation = 0
   let timer: ReturnType<typeof setInterval> | null = null
   let wasVisible = env.visible()
   let lostFocus = false
@@ -44,11 +47,22 @@ export function createUpdateReadStore(read: () => Promise<UpdateRead>, env: Upda
 
   const readNow = (): Promise<UpdateRead> => {
     if (inFlight) return inFlight
+    const requested = generation
     inFlight = read().then((next) => {
-      publish(next)
+      if (requested === generation) publish(next)
       return next
-    }).finally(() => { inFlight = null })
+    }).finally(() => { if (requested === generation) inFlight = null })
     return inFlight
+  }
+
+  const recheck = () => {
+    // A request started before the page slept cannot prove the current
+    // version. It may finish after this one, so ignore its late answer.
+    generation++
+    lostFocus = false
+    inFlight = null
+    publish({ kind: "checking" })
+    void readNow()
   }
 
   // The Settings panel also has a timer while an update moves. A browser
@@ -67,6 +81,8 @@ export function createUpdateReadStore(read: () => Promise<UpdateRead>, env: Upda
     if (!env.visible()) {
       wasVisible = false
       lostFocus = false
+      generation++
+      inFlight = null
       stopTimer()
       return
     }
@@ -74,7 +90,7 @@ export function createUpdateReadStore(read: () => Promise<UpdateRead>, env: Upda
     wasVisible = true
     lostFocus = false
     if (timer === null) timer = env.setInterval(refreshIfStale, UPDATE_READ_EVERY_MS)
-    if (resumed) void readNow()
+    if (resumed) recheck()
     else refreshIfStale()
   }
   const focused = () => {
@@ -84,7 +100,7 @@ export function createUpdateReadStore(read: () => Promise<UpdateRead>, env: Upda
     if (!wasVisible) { visibilityChanged(); return }
     if (lostFocus) {
       lostFocus = false
-      void readNow()
+      recheck()
     } else refreshIfStale()
   }
   const online = () => {
@@ -103,6 +119,11 @@ export function createUpdateReadStore(read: () => Promise<UpdateRead>, env: Upda
       unlisten = [
         env.onVisibilityChange(visibilityChanged),
         env.onFocus(focused),
+        ...(env.onPageShow ? [env.onPageShow(() => {
+          if (!env.visible()) return
+          if (!wasVisible) visibilityChanged()
+          else if (reading?.kind !== "checking") recheck()
+        })] : []),
         ...(env.onBlur ? [env.onBlur(() => { if (env.visible()) lostFocus = true })] : []),
         env.onOnline(online),
       ]
@@ -146,6 +167,7 @@ const OLDER_CODES = new Set(["not_implemented", "not_found", "unknown_command"])
  */
 export type UpdateRead =
   | { kind: "status"; status: UpdateStatus }
+  | { kind: "checking" }
   | { kind: "older" }
   | { kind: "unreachable" }
   | { kind: "refused" }
@@ -403,7 +425,7 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
     restarting: false,
   }
   const read = input.read
-  const status = read?.kind === "status" ? read.status : input.last
+  const status = read?.kind === "status" ? read.status : read?.kind === "checking" ? null : input.last
   const silent = read?.kind === "unreachable"
   // The restart: the page was following an update, or the last status said one
   // was moving, and now nothing answers. That is the update, not a failure.
