@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5071,
-  "riskKeys": 2227,
-  "nonRiskCount": 2844,
+  "englishContentKeys": 5091,
+  "riskKeys": 2229,
+  "nonRiskCount": 2862,
   "groups": [
     {
       "name": "bar / other",
@@ -1914,7 +1914,7 @@
     },
     {
       "name": "next / other",
-      "count": 106,
+      "count": 123,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1961,6 +1961,23 @@
         "next.proposalResolveSubmit",
         "next.providerWork",
         "next.pushCloudReached",
+        "next.roleCreateAI",
+        "next.roleCreateClose",
+        "next.roleCreateDefinition",
+        "next.roleCreateDescribe",
+        "next.roleCreateDrafting",
+        "next.roleCreateGenerate",
+        "next.roleCreateID",
+        "next.roleCreateIDHint",
+        "next.roleCreateName",
+        "next.roleCreateOpen",
+        "next.roleCreateRequired",
+        "next.roleCreateReview",
+        "next.roleCreateSave",
+        "next.roleCreateSaving",
+        "next.roleCreateSummary",
+        "next.roleCreateTitle",
+        "next.roleCreateUsage",
         "next.schedulesHeading",
         "next.schedulesListLabel",
         "next.schedulesLoading",
@@ -2029,7 +2046,7 @@
     },
     {
       "name": "next / persona",
-      "count": 23,
+      "count": 24,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2050,6 +2067,7 @@
         "next.personaSource",
         "next.personaSuggestedKinds",
         "next.personaTeamBusiness",
+        "next.personaTeamCustom",
         "next.personaTeamDesign",
         "next.personaTeamEngineering",
         "next.personaTeamMarketing",

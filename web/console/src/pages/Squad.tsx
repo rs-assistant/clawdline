@@ -8,6 +8,8 @@ import type { PageModule } from "./types.js"
 import { squadApi, type PackPreview, type SkillSourceRow, type SquadAPI } from "./squad/api.js"
 import { ReceiptGate, sourceLabel, visiblePersonas, type SquadDraft, type SquadPersona, type SquadReadState, type SquadSkill, type SquadView } from "./squad/model.js"
 import { ACTIVE_SKILL_BYTES, activeSkillBytes, makeSkill, sameSkill, skillInputError, type SkillTransaction } from "./squad/skill-create.js"
+import { PersonaCreator } from "./squad/PersonaCreator.js"
+import { forgetPersonas } from "../personas.js"
 import "./squad/squad.css"
 import "../page-bar.css"
 import { arriveAtDetail, detailInHash, enterDetail, leaveDetail } from "../page-detail.js"
@@ -626,7 +628,7 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
     if (!packPreview) return
     if (importPrivateScopes.length && !importPrivateConfirm) { setPackError(catalogWord("literal", "9d1b0d17990f")); return }
     setBusy("adopt"); setPackError("")
-    try { await api.adopt(packPreview, packChoices, importPrivateScopes); closePack(); await load(scope); setNotice({ text: catalogWord("literal", "9a9a62474225") }) }
+    try { await api.adopt(packPreview, packChoices, importPrivateScopes); forgetPersonas(); closePack(); await load(scope); setNotice({ text: catalogWord("literal", "9a9a62474225") }) }
     catch (error) {
       if (["version_conflict", "settings_changed", "preview_expired", "preview_invalid"].includes(errorCode(error))) setPackError(catalogWord("literal", "be71ec45cc65"))
       else setPackError(catalogFormat("template", "4cc0e44397c7", [errorDetail(error)]))
@@ -724,6 +726,7 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
             <button type="button" onClick={(event) => openPack("import", event.currentTarget)}>{catalogWord("inline", "3d94747fe80d")}</button>
             <button type="button" onClick={(event) => openPack("export", event.currentTarget)}>{catalogWord("inline", "21ef789fd56d")}</button></div></aside>
         <div className="squad-roster" aria-labelledby="squad-roster-title"><div className="squad-panel-head"><div><h2 id="squad-roster-title">{catalogWord("inline", "9d19a6eff5a7")}</h2><p>{catalogWord("inline", "7f40e97b7bdb")}</p></div><span>{catalogFormat("count", "squadRoles", [shownPersonas.length])}</span></div>
+          <div className="squad-create-actions"><PersonaCreator api={api} canWrite={canWrite} catalogVersion={data.catalogVersion} onSaved={async (id) => { forgetPersonas(); setTeam("clawdline.team.custom"); setSearch(""); await load(scope); setSelected(id); if (phoneLayout()) setMobileView("detail") }} /></div>
           <label className="squad-search">{catalogWord("inline", "b5ddf97c42d3")}<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={catalogWord("inline", "1fa038b1af83")} /></label>
           {shownPersonas.length ? <div className="squad-cards">{shownPersonas.map((row) => <div key={row.id} ref={(node) => { if (node) cardRefs.current.set(row.id, node); else cardRefs.current.delete(row.id) }}>
             <PersonaCard persona={row} selected={selected === row.id} animated={using?.persona === row.id && data.motion.value && !motionReduced} onPick={() => choosePersona(row.id)} />

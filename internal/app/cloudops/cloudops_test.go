@@ -280,6 +280,12 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: machine, name: "action:req-squad-catalog-write",
 		method: "POST", path: "/v1/squad/catalog", body2: `{"expected_version":0}`,
 	}, {
+		word: "squad.role-draft",
+		body: map[string]any{"type": "squad.role-draft", "session": machine,
+			"request": "req-squad-role-draft", "changes": map[string]any{"description": "Review release notes"}},
+		session: machine, name: "action:req-squad-role-draft",
+		method: "POST", path: "/v1/squad/role-draft", body2: `{"description":"Review release notes"}`,
+	}, {
 		word: "squad.settings.update",
 		body: map[string]any{"type": "squad.settings.update", "session": machine,
 			"request": "req-squad-settings-write", "changes": map[string]any{"expected_version": 0}},

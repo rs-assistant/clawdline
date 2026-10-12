@@ -23,6 +23,7 @@ const TEAM_WORDS = {
   operations: "personaTeamOperations",
   design: "personaTeamDesign",
   business: "personaTeamBusiness",
+  custom: "personaTeamCustom",
 } as const satisfies Record<PersonaTeam, string>
 
 /** What one role row draws and what it answers to. */

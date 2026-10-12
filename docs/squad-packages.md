@@ -6,6 +6,14 @@ candidate by itself. Preview and human adoption are separate operations.
 
 ## Make an example
 
+The two original roles shown under Custom in the Squad page are maintained in
+[`internal/domain/persona/catalog/`](../internal/domain/persona/catalog/). Their Markdown
+frontmatter and body show how to write a role; the catalog files are public examples, while
+roles created in the Console live in the machine's private versioned squad catalog. The
+Console's **Create a role** action can draft one with the configured AI provider, but the
+person edits and saves the result. To share a saved role, export a package from Squad and
+inspect the ZIP before committing it to a repository.
+
 [`examples/ai-squad/`](../examples/ai-squad/) contains two teams, two personas and two
 skills. Each team's `personas` and each persona's `skills` array is ordered. Both teams reuse
 the same personas, and both personas reuse the same skills in a different order. The committed
