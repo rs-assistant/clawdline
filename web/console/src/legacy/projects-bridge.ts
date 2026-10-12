@@ -21,6 +21,7 @@ import { drawIcon } from "./js/core/pixels.js"
 import { tint } from "./js/core/util.js"
 import { makeJSONFetch } from "@clawdline/core/refusal"
 import { bindProjectsPage as bindProjectsPageOriginal } from "./js/view/projects.js"
+import { lifecyclePlace } from "./lifecycle-place"
 
 let projectReadRefusal: unknown = null
 let projectReadAttempt = 0
@@ -160,7 +161,8 @@ export function bindProjects(doc: Document, navigate: (name: string) => void, ad
         const attempt = ++projectReadAttempt
         projectReadRefusal = null
         try {
-          return await transport.places()
+          const answer = await transport.places()
+          return { ...answer, places: (answer.places as Place[]).map(lifecyclePlace) }
         } catch (error) {
           if (attempt === projectReadAttempt) projectReadRefusal = error
           throw error
