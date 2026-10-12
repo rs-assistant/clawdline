@@ -747,6 +747,7 @@ export var T = {
     sessionWaiting: "waiting for you",
     sessionWorkReady: "can take new work",
     sessionWorkUnknown: "status unknown",
+    sessionWorkIdleUnreported: "idle · delivery not reported",
     sessionWorkHolding: "moving on its own",
     sessionWorkOwed: "a decision is owed",
     sessionWorkSelfStated: "self-reported",
