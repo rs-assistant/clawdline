@@ -30,8 +30,16 @@
     margin-top: calc(-1 * var(--page-bar-lift, 0px));
     background: var(--bg);
     box-shadow: 0 0 0 100vmax var(--bg);
-    clip-path: inset(0 -100vmax);
+    clip-path: inset(-100vmax -100vmax 0);
 }
+
+/* iOS rubber-bands a scroller pulled past its top, and the sticky bar moves
+   down with it, opening a gap under the header (seen on a phone, 2026-10-12,
+   the scroll indicator still showing). A page that carries a bar does not
+   bounce; where a browser bounces anyway, the bar's colour reaches up (the
+   clip above lets its spread shadow out on top, under the header), so what
+   opens is more bar, not the page behind it. */
+.page:has(.page-bar) { overscroll-behavior-y: none; }
 .page-bar-start, .page-bar-end { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .page-bar-end { margin-left: auto; }
 
