@@ -2227,10 +2227,17 @@ export class RelayReader {
    * row, and only while its rich row is current and names the same state.
    */
   private withOpenedMenu(client: CloudReadClient, row: CloudRow): CloudRow {
-    const target = this.options.fleetTarget?.()
     const id = typeof row.session === "string" ? row.session : row.id
-    if (!target || target.machineID !== this.machine || id !== target.sessionID ||
-      row.execution_generation !== target.executionGeneration || row.state !== "waiting") return row
+    if (typeof id !== "string" || !id || row.state !== "waiting" ||
+      typeof row.execution_generation !== "string") return row
+    // Every waiting row takes the question its held rich row carries, not only
+    // the opened one: the one-machine page has no fleet target at all, and on
+    // 2026-10-12 a phone on it drew "could not read its choices" for a Session
+    // whose rich row it held. Asking the machine, and reporting a question that
+    // did not come, stay with the opened Session.
+    const target = this.options.fleetTarget?.()
+    const opened = !!target && target.machineID === this.machine && id === target.sessionID &&
+      row.execution_generation === target.executionGeneration ? target : null
     // The detail's own copy is emptied each time the detail is opened and
     // filled only by a row that arrives afterwards; a Session stopped on a
     // question sends none, so the row this client already holds stands in.
@@ -2238,19 +2245,20 @@ export class RelayReader {
     // snapshot_options=5` while the options came and went with the moment the
     // detail was opened. Either way the machine checks the question's
     // fingerprint before a press is typed (`menuFingerprint`).
-    const key = this.machine + "\u0000" + target.sessionID
-    const rich = (client.detailSnapshots?.get(key) ??
+    const key = this.machine + "\u0000" + id
+    const rich = ((opened ? client.detailSnapshots?.get(key) : undefined) ??
       (client as { sessionSnapshots?: ReadonlyMap<string, unknown> }).sessionSnapshots?.get(key)) as
       | { machine?: unknown; session?: unknown; execution_generation?: unknown; state?: unknown;
         menu?: { options?: unknown }; screen_reading?: unknown;
         source?: { freshness?: unknown; observed_at?: unknown } } | undefined
     const observedAt = Number(rich?.source?.observed_at) * 1000
-    if (!rich || rich.machine !== this.machine || rich.session !== target.sessionID ||
-      rich.execution_generation !== target.executionGeneration || rich.state !== "waiting" ||
+    if (!rich || rich.machine !== this.machine || rich.session !== id ||
+      rich.execution_generation !== row.execution_generation || rich.state !== "waiting" ||
       rich.source?.freshness !== "current" || !Number.isFinite(observedAt) ||
       Math.abs(this.now() - observedAt) > RICH_MENU_FRESH_MS ||
       !Array.isArray(rich.menu?.options) || !rich.menu.options.length) {
-      if (this.askForOpenedQuestion(target)) this.reportMissingQuestion(client, target, rich, observedAt)
+      if (!opened) return row
+      if (this.askForOpenedQuestion(opened)) this.reportMissingQuestion(client, opened, rich, observedAt)
       // Asked for and on its way: the card says so rather than that the
       // machine could not read a question it has not been asked to send yet.
       return { ...row, menu_arriving: true }
