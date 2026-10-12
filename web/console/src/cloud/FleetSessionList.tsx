@@ -330,8 +330,10 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
             </button></h2>
           {!collapsed[machine.id] && <>
-          {machine.freshness !== "current" && reading?.phase === "settled" && reading.value.kind === "ready" &&
-            <p role="status">{machine.freshness === "stale" ? nextWord("cloudAllStaleSource") : nextWord("cloudAllCheckingConnection")}</p>}
+          {/* A verified Session reading can settle before the roster's machine
+              freshness changes. Its own completeness and row freshness are the
+              authority here; an unrelated roster state must not leave a
+              permanent "checking connection" banner above settled results. */}
           {!reading || reading.phase === "loading" ? <p role="status">{nextWord("cloudAllLoading")}</p> : <>
             {reading.value.kind === "unavailable" && <p role="status">{problemWord(reading.value.reason)}</p>}
             {reading.value.kind === "ready" && !reading.value.complete &&
