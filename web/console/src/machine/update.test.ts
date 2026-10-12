@@ -31,6 +31,7 @@ function environment() {
     visible: () => visible,
     onVisibilityChange: (listener) => on("visibilitychange", listener),
     onFocus: (listener) => on("focus", listener),
+    onPageShow: (listener) => on("pageshow", listener),
     onOnline: (listener) => on("online", listener),
     setInterval: (listener, ms) => {
       assert.equal(ms, UPDATE_READ_EVERY_MS)
@@ -69,6 +70,7 @@ test("a hidden page makes no periodic reads and checks immediately after a stale
   assert.deepEqual(await store.refresh(), store.current(), "the Settings timer cannot poll in background")
   assert.equal(reads, 1)
   time.show(true)
+  assert.equal(store.current()?.kind, "checking", "an old banner is hidden while the new answer is pending")
   await settle()
   assert.equal(reads, 2)
   assert.equal(time.timers(), 1)
@@ -134,5 +136,36 @@ test("a remounted view rechecks an aged shared reading", async () => {
   const stop = store.subscribe(() => {})
   await settle()
   assert.equal(reads, 2)
+  stop()
+})
+
+test("a restored phone page discards a late pre-background answer", async () => {
+  const time = environment()
+  const pending: Array<(read: UpdateRead) => void> = []
+  const store = createUpdateReadStore(() => new Promise((resolve) => { pending.push(resolve) }), time.env)
+  const stop = store.subscribe(() => {})
+  pending.shift()!(status("update_available"))
+  await settle()
+  assert.equal(bannerVersion(store.current()), "v2")
+
+  time.advance(UPDATE_READ_EVERY_MS)
+  time.tick()
+  const beforeSleep = pending.shift()!
+  time.show(false)
+  time.show(true)
+  assert.equal(store.current()?.kind, "checking")
+  assert.equal(bannerVersion(store.current()), null)
+  const afterWake = pending.shift()!
+  beforeSleep(status("update_available"))
+  await settle()
+  assert.equal(store.current()?.kind, "checking", "the old response cannot restore a withdrawn banner")
+  afterWake(status("current"))
+  await settle()
+  assert.equal(bannerVersion(store.current()), null)
+
+  time.fire("pageshow")
+  assert.equal(store.current()?.kind, "checking", "back-forward restoration checks immediately")
+  pending.shift()!(status("current"))
+  await settle()
   stop()
 })

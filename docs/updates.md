@@ -174,8 +174,10 @@ console is visible, it reads when first opened and every ten minutes. A hidden c
 periodic reads. Returning from hidden to visible, or from a blurred window to focus, immediately
 reads `/v1/update` even if the previous answer is under ten minutes old. Visibility and focus
 events from the same return share one request; repeated focus events without a preceding blur
-keep the ten-minute freshness rule. A network return checks a stale reading and retries a recent
-failed reading. The banner disappears when a fresh answer says the
+keep the ten-minute freshness rule. A page restored from the browser's back-forward cache also
+reads immediately. During a return check the previous update prompt and install action are hidden;
+a response from before the page was backgrounded cannot restore them. A network return checks a
+stale reading and retries a recent failed reading. The banner disappears when a fresh answer says the
 release is current, unknown, or otherwise no longer available, and when the read fails.
 The panel shows the running and latest version (a short commit for a source build), a **版本說明** link to
 `latest.notes_url`, when the last check ran, and the channel.
@@ -196,6 +198,13 @@ The panel shows the running and latest version (a short commit for a source buil
 
 On a release install with `update_available`, the session list also shows a banner linking to
 Settings, dismissed per version in the browser's storage.
+
+The resume read reports the daemon's last signed-manifest check; it does not make the daemon
+contact the release host. The daemon's six-hour check interval therefore limits how quickly a
+withdrawn release can disappear from an already running machine. The browser hides its old prompt
+while rereading, but a fresh browser request alone cannot prove a release was withdrawn at the host.
+The remaining cross-platform acceptance evidence is tracked in
+[the update acceptance record](records/app-update-acceptance-2026-10-12.md).
 
 ## The CLI
 

@@ -213,7 +213,7 @@ test("a visible window rereads on blur and focus, while ordinary focus obeys fre
   unsubscribe()
 })
 
-test("a return shares a read already on the wire", async () => {
+test("a return supersedes a read started before the page slept", async () => {
   const h = updateStoreHarness()
   const unsubscribe = h.store.subscribe(() => {})
   h.setVisible(false)
@@ -221,7 +221,9 @@ test("a return shares a read already on the wire", async () => {
   h.setVisible(true)
   h.emit("visibility")
   h.emit("focus")
-  assert.equal(h.requests(), 1)
+  assert.equal(h.requests(), 2)
+  await h.settle(answered(release("update_available")))
+  assert.equal(h.store.current()?.kind, "checking")
   await h.settle(answered(release("current")))
   assert.equal(h.store.current()?.kind, "status")
   unsubscribe()
@@ -484,6 +486,13 @@ test("the banner names a newer release until that version is dismissed", () => {
   assert.equal(updateBannerVersion(release("update_available", { state: "downloading" }), null), null)
   assert.equal(updateBannerVersion(release("update_available", undefined, { install_kind: "source_deploy" }), null), null)
   assert.equal(updateBannerVersion(null, null), null)
+})
+
+test("a resumed phone does not offer an old release while checking", () => {
+  const view = panel({ read: { kind: "checking" }, last: release("update_available") })
+  assert.equal(view.press.shown, false)
+  assert.equal(view.stateLine, null)
+  assert.equal(view.kind, "nothing")
 })
 
 test("a rolled-back release stops nagging in the session list while a newer one can appear", () => {
