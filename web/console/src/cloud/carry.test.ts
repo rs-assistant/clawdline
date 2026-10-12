@@ -607,11 +607,11 @@ test("the Git panel's read reaches the machine, and its refusals keep their name
   assert.equal(refused.status, 404)
   assert.equal(((await refused.json()) as { error: string }).error, "not_a_repo")
 
-  // And a session this page holds no row for is refused rather than addressed
-  // by the raw id (F5), as every other session read is.
+  // A missing row cannot prove the machine has removed the Session. The page
+  // refuses the unverified target without addressing the raw id (F5).
   const gone = await reader.fetch("/v1/sessions/s9/git")
-  assert.equal(gone.status, 404)
-  assert.equal(((await gone.json()) as { error: string }).error, "session_not_found")
+  assert.equal(gone.status, 409)
+  assert.equal(((await gone.json()) as { error: string }).error, "session_unknown")
 })
 
 test("the live screen is a machine read of `screen` for the session, and its answer crosses as sent", async () => {
@@ -641,11 +641,10 @@ test("the live screen is a machine read of `screen` for the session, and its ans
   assert.equal(refused.status, 404)
   assert.equal(((await refused.json()) as { error: string }).error, "session_not_found")
 
-  // And a session this page holds no row for is refused rather than addressed
-  // by the raw id (F5).
+  // A missing row is unverified rather than proved absent (F5).
   const gone = await reader.fetch("/v1/sessions/s9/screen")
-  assert.equal(gone.status, 404)
-  assert.equal(((await gone.json()) as { error: string }).error, "session_not_found")
+  assert.equal(gone.status, 409)
+  assert.equal(((await gone.json()) as { error: string }).error, "session_unknown")
 })
 
 test("the status line's read reaches the machine, and its context cell draws", async () => {
