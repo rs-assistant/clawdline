@@ -3551,6 +3551,7 @@
   "next.imageMarkupZoomIn": "放大",
   "next.imageMarkupZoomOut": "縮小",
   "next.infoContext": "Context",
+  "next.infoOpenModelPicker": "開啟 Codex 模型選單",
   "next.infoContextUsed": "context 裡有 {used} / {window} tokens",
   "next.infoResetsInMinutes": "{n} 分鐘後",
   "next.linksDeployBecause": "它給的理由是：{reason}。",
