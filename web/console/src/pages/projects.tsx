@@ -30,6 +30,7 @@ type ProjectTarget = {
   id: string
   label?: string
   path?: string
+  activeItemCount?: number
 }
 type BoundProjects = ProjectsPage & {
   state: ProjectsPage["state"] & { places?: ProjectTarget[] | null; place?: ProjectTarget | null }
@@ -181,6 +182,9 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       for (const button of rows.querySelectorAll<HTMLButtonElement>("button.project-row[data-place-id]")) {
         const place = page.current?.state.places?.find((candidate) => candidate.id === button.dataset.placeId)
         if (!place) continue
+        if (!Number.isSafeInteger(place.activeItemCount) || (place.activeItemCount ?? -1) < 0) {
+          button.querySelector(".project-row-activity")?.remove()
+        }
         const name = place.label || place.path || ""
         const label = projectOpenLabel(name, null, false)
         if (button.getAttribute("aria-label") !== label) button.setAttribute("aria-label", label)
