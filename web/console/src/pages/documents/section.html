@@ -1,10 +1,15 @@
 
     <div class="documents-shell">
-        <header class="documents-head">
-            <button id="documents-back" class="documents-back" type="button">‹ Sessions</button>
-            <button id="document-list-back" class="documents-back" type="button" hidden>‹ Documents</button>
-            <h1 id="documents-title" tabindex="-1">Documents</h1>
+        <header class="documents-head page-bar">
+            <div class="page-bar-start">
+                <button id="documents-back" class="documents-back" type="button">‹ Sessions</button>
+                <button id="document-list-back" class="documents-back" type="button" hidden>‹ Documents</button>
+            </div>
+            <div class="page-bar-end">
+                <button id="documents-refresh" class="page-bar-refresh" type="button"><svg class="page-bar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12a7 7 0 1 1-2.05-4.95" /><path d="M19 4.5V9h-4.5" /></svg></button>
+            </div>
         </header>
+        <h1 id="documents-title" class="documents-title" tabindex="-1">Documents</h1>
         <p id="documents-status" class="documents-status" role="status" aria-live="polite"></p>
         <div id="documents-list-view">
             <ol id="documents-rows" class="documents-rows"></ol>

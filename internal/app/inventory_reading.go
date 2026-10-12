@@ -519,6 +519,41 @@ func (r *InventoryReading) Fresh(ctx context.Context) session.Inventory {
 	return r.take(ctx, true)
 }
 
+// Since is a reading from a scan that began at or after t. A scan in flight
+// that began earlier is waited out, not joined: it read the terminals before t.
+// It is the session list built right after a press (WithReadingSince), and it
+// answers the display reading Fast would, only never one from before t.
+func (r *InventoryReading) Since(ctx context.Context, t time.Time) session.Inventory {
+	for {
+		r.mu.Lock()
+		flight := r.flight
+		if flight == nil || !flight.started.Before(t) {
+			r.mu.Unlock()
+			return r.take(ctx, false)
+		}
+		r.mu.Unlock()
+		select {
+		case <-flight.done:
+		case <-ctx.Done():
+			return r.Fast(ctx)
+		}
+	}
+}
+
+type readingSinceKey struct{}
+
+// WithReadingSince asks every reading taken under ctx to come from a scan
+// begun at or after t (Since). Nothing else reads it.
+func WithReadingSince(ctx context.Context, t time.Time) context.Context {
+	return context.WithValue(ctx, readingSinceKey{}, t)
+}
+
+// ReadingSince is the moment WithReadingSince put on ctx, if any.
+func ReadingSince(ctx context.Context) (time.Time, bool) {
+	t, ok := ctx.Value(readingSinceKey{}).(time.Time)
+	return t, ok
+}
+
 // takenReading is a Fresh reading one request has already taken, for the
 // first action under that request to use instead of scanning again.
 type takenReading struct {

@@ -53,6 +53,10 @@
 .squad-card-foot span:first-child { color: var(--ink); }
 .squad-detail { overflow: hidden; }
 .squad-back { display: none; }
+/* On a phone the way back to the roster is the shared page bar (page-bar.css),
+   held at the top of the page while a long persona is read; side by side there
+   is no way back to show. */
+.squad-page .squad-back-bar { display: none; }
 .squad-profile { display: flex; gap: 14px; align-items: center; min-width: 0; padding: 20px; background: linear-gradient(110deg, var(--card-hi), rgba(217,119,87,.13)); }
 .squad-profile p { margin: 0 0 4px; color: var(--dim); font: 10px/1.4 var(--mono); }
 .squad-profile h2 { margin: 0; font-size: 24px; line-height: 1.2; }
@@ -183,7 +187,11 @@
   .squad-roster { margin-bottom: 18px; }
   .squad-detail { width: 100%; }
   .squad-skill-jump { display: inline-flex; margin: 0 20px 14px; padding: 8px 12px; font-size: 12px; }
-  .squad-back { display: inline-flex; align-items: center; margin: 12px 0 0 12px; padding: 7px 11px; font-size: 12px !important; }
+  .squad-back { display: inline-flex; align-items: center; margin: 0 0 0 12px; padding: 7px 11px; font-size: 12px !important; }
+  .squad-page .squad-back-bar { display: flex; margin-bottom: 4px; background: var(--card); box-shadow: none; clip-path: none; }
+  /* clip, not hidden: a hidden overflow is a scroller of its own, and the bar
+     inside it would stick to it rather than to the page. */
+  .squad-detail { overflow: clip; }
   .squad-layout[data-mobile-view="detail"] .squad-rail, .squad-layout[data-mobile-view="detail"] .squad-roster { display: none; }
   .squad-layout[data-mobile-view="roster"] .squad-detail { display: none; }
   .squad-loading { display: block; }

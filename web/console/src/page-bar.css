@@ -1,0 +1,41 @@
+/* The bar at the top of a sidebar page (PageBar.tsx, and the legacy pages
+   that carry the same classes in their section.html).
+
+   It sticks to the top of the page's own scroller (`.page` scrolls, not the
+   window), so the way back and Read again stay on screen however far down the
+   page is read. Its background reaches past the page's side padding with a
+   spread shadow clipped to the bar's height, so text scrolling under it never
+   shows through at the sides, whatever padding the page has. */
+
+.page-bar {
+    position: sticky; top: 0; z-index: 4;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    min-height: 44px; padding-block: 8px; margin-bottom: 16px;
+    background: var(--bg);
+    box-shadow: 0 0 0 100vmax var(--bg);
+    clip-path: inset(0 -100vmax);
+}
+.page-bar-start, .page-bar-end { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.page-bar-end { margin-left: auto; }
+
+.page-bar-icon {
+    width: 18px; height: 18px; flex: none;
+    fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.page-bar-refresh, .page-bar-back {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 40px; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--card); color: var(--dim); font: inherit; font-size: 14px; cursor: pointer;
+}
+.page-bar-refresh { width: 40px; padding: 0; }
+.page-bar-back { padding: 0 14px 0 10px; min-width: 0; }
+.page-bar-back span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-bar-refresh:hover:not(:disabled), .page-bar-back:hover { color: var(--ink); border-color: var(--accent-ed, var(--line)); }
+.page-bar-refresh:focus-visible, .page-bar-back:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.page-bar-refresh:disabled { cursor: default; }
+.page-bar-refresh[data-busy] .page-bar-icon { animation: page-bar-turn .9s linear infinite; }
+@keyframes page-bar-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    .page-bar-refresh[data-busy] .page-bar-icon { animation: none; opacity: .5; }
+}

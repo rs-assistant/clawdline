@@ -46,9 +46,12 @@ const LOCAL_MACHINE = "this-mac"
 
 /** What `bindProjectsPage` hands back. */
 export interface ProjectsPage {
-  enter(): Promise<void>
+  /** The list; with `wanted`, then the Project of that place id once the list holds it. */
+  enter(wanted?: string): Promise<void>
   leave(): void
   escape(): void
+  /** The address now names this Project ("" for the list): open or close to match it. */
+  follow(id: string): Promise<void>
   state: { view: "list" | "detail" }
 }
 
@@ -139,7 +142,14 @@ const transport = {
  * Bind the page once its markup is in the document, with `main.js`'s
  * environment less the two surfaces this console does not have.
  */
-export function bindProjects(doc: Document, navigate: (name: string) => void): ProjectsPage {
+/** How an opened Project moves the history (`page-detail.ts`). */
+export interface ProjectsAddress {
+  enter(id: string): void
+  /** True when it went Back, which is heard as the address changing. */
+  leave(): boolean
+}
+
+export function bindProjects(doc: Document, navigate: (name: string) => void, address?: ProjectsAddress): ProjectsPage {
   const elements: Record<string, HTMLElement | null> = {}
   for (const id of PROJECTS_ELEMENT_IDS) elements[id] = doc.getElementById(id)
   return (bindProjectsPageOriginal as (elements: Record<string, HTMLElement | null>, environment: Record<string, unknown>) => ProjectsPage)(
@@ -164,6 +174,7 @@ export function bindProjects(doc: Document, navigate: (name: string) => void): P
       drawIcon,
       tint,
       navigate,
+      address,
     },
   )
 }
