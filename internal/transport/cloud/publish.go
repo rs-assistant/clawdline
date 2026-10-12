@@ -122,6 +122,11 @@ type Publisher struct {
 	// (internal/transport/http producer.go), so this publisher no longer builds
 	// a list of its own. Nil, or false, reads the route through Router.
 	Sessions func(context.Context) ([]byte, bool)
+	// Fresh is the same list built now rather than taken from the shared
+	// product, which may be a tick old (producer.go). Settle's passes read it,
+	// because they run right after a press changed a screen and a tick-old list
+	// is the screen before the press. Nil reads Sessions.
+	Fresh func(context.Context) ([]byte, bool)
 	// TaskListMoved answers whether this machine has written a task row since
 	// it was last asked, and clears the fact (link.go, takeTaskListMoved).
 	// Nil answers no, which leaves the list to be read on the first pass, on
@@ -233,6 +238,10 @@ type Publisher struct {
 	urgent        bool
 	stating       bool
 	firstBySender map[string]time.Time
+	// settle wakes Run for Settle's passes; fresh is set by Run, around such a
+	// pass, so readProduct builds the list now.
+	settle chan struct{}
+	fresh  bool
 }
 
 // heldRow is one published row: the identity it was compared by and the bytes
@@ -309,6 +318,20 @@ func (p *Publisher) Run(ctx context.Context) error {
 	p.held = map[string]heldRow{}
 	wake := p.open()
 	defer p.close()
+	p.mu.Lock()
+	settle := p.settle
+	p.mu.Unlock()
+	// Settle's passes: each press restarts the sequence, so a burst of presses
+	// is one sequence after the last of them.
+	due := make(chan struct{}, 1)
+	var settling []*time.Timer
+	stopSettling := func() {
+		for _, t := range settling {
+			t.Stop()
+		}
+		settling = nil
+	}
+	defer stopSettling()
 	// A new socket is a new audience. Nothing this publisher said on the last
 	// one was heard on this one — the relay holds each connection's realign
 	// snapshots, not this machine's — so the first pass below states
@@ -334,6 +357,20 @@ func (p *Publisher) Run(ctx context.Context) error {
 				continue
 			}
 			p.pass(ctx)
+		case <-settle:
+			stopSettling()
+			for _, d := range SettleDelays {
+				settling = append(settling, time.AfterFunc(d, func() {
+					select {
+					case due <- struct{}{}:
+					default:
+					}
+				}))
+			}
+		case <-due:
+			p.fresh = true
+			p.pass(ctx)
+			p.fresh = false
 		case <-wake:
 			if !p.asked() {
 				continue
@@ -464,6 +501,7 @@ func (p *Publisher) open() <-chan struct{} {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.wake = make(chan struct{}, 1)
+	p.settle = make(chan struct{}, 1)
 	p.running = true
 	p.stated = time.Time{}
 	p.firstBySender = map[string]time.Time{}
@@ -481,6 +519,31 @@ func (p *Publisher) close() {
 	for _, answer := range asks {
 		answer <- snapshotResult{refusal: &cloudops.Refusal{Status: 503, Code: "cloud_reconnecting",
 			Message: "This machine's Cloud line went down before its Sessions were stated."}}
+	}
+}
+
+// SettleDelays are when, after a person acted on a Session from a page, the
+// publisher looks again instead of waiting for its next pass. The first catches
+// the screen the press left; the second the one the session drew after it — an
+// answered question's next question, a ticked box. Measured on 2026-10-12: a
+// press was answered on the machine in well under a second, and the row that
+// showed its effect then waited up to SnapshotInterval (five seconds) for the
+// next pass, which is the wait a phone saw after every tap.
+var SettleDelays = []time.Duration{200 * time.Millisecond, 1200 * time.Millisecond}
+
+// Settle asks for SettleDelays' passes, with the session list built fresh for
+// each. It never waits, and presses that come while a sequence is pending start
+// it again rather than adding passes.
+func (p *Publisher) Settle() {
+	p.mu.Lock()
+	settle := p.settle
+	p.mu.Unlock()
+	if settle == nil {
+		return
+	}
+	select {
+	case settle <- struct{}{}:
+	default:
 	}
 }
 
@@ -731,6 +794,9 @@ func (p *Publisher) readSessions(ctx context.Context) (sessionReading, bool) {
 
 // readProduct is the shared session list, when this publisher was given one.
 func (p *Publisher) readProduct(ctx context.Context) ([]byte, bool) {
+	if p.fresh && p.Fresh != nil {
+		return p.Fresh(ctx)
+	}
 	if p.Sessions == nil {
 		return nil, false
 	}

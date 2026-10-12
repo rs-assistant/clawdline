@@ -204,6 +204,24 @@ func (p *listProducer) taskList() (contract.TaskList, error) {
 	return p.tasks.get(p.every)
 }
 
+// CloudSessionsFresh is CloudSessions built now: the publisher's look right
+// after a press from a page (cloud.Publisher.Fresh), when the shared product
+// may still be the screen from before the press.
+func (s *Server) CloudSessionsFresh(context.Context) ([]byte, bool) {
+	if !s.ownsSessions() {
+		return nil, false
+	}
+	value, err := s.lists().sessions.refresh()
+	if err != nil {
+		return nil, false
+	}
+	body, err := json.Marshal(value)
+	if err != nil {
+		return nil, false
+	}
+	return body, true
+}
+
 // CloudSessions is the session list as the Cloud publisher reads it: the
 // product every stream reads, encoded as `GET /v1/sessions` answers it, so the
 // publisher no longer builds one of its own through the route.
