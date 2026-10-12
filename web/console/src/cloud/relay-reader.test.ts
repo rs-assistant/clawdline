@@ -570,6 +570,48 @@ test("the single-machine page uses the fleet projection before a blocked rich sn
   assert.equal(restored.scan.complete, true)
 })
 
+// On 2026-10-12 a Session stopped on a menu was open on app.clawdline.com and
+// its rich s/ row was arriving, yet the waiting card said Clawdline could not
+// read the choices: the row drawn was put together from the status and the
+// display list, and neither carries the question.
+test("the opened waiting Session draws the question its current rich row carries", async () => {
+  const client = new FakeClient()
+  client.sessions = async () => { throw new Error("the rich snapshot must not gate the list") }
+  const execution = "a".repeat(32)
+  const now = 1_000_000
+  const rows = ["s1", "s2"].map((sessionID) => ({
+    destination: { machineID: "mac-a", sessionID, executionGeneration: execution },
+    state: "waiting", freshness: "current" as const, observedAt: now,
+  }))
+  const menu = { question: "Tea or coffee?", options: [{ n: 1, label: "Tea", can: true }, { n: 2, label: "Coffee", can: true }] }
+  const rich = (over: Record<string, unknown> = {}) => ({ machine: "mac-a", session: "s1", execution_generation: execution,
+    state: "waiting", menu, screen_reading: "read", source: { freshness: "current", observed_at: now / 1000 }, ...over })
+  const details = new Map<string, unknown>([["mac-a\u0000s1", rich()], ["mac-a\u0000s2", rich({ session: "s2" })]])
+  ;(client as unknown as { detailSnapshots: Map<string, unknown> }).detailSnapshots = details
+  let target = { machineID: "mac-a", sessionID: "s1", executionGeneration: execution }
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now, fleetTarget: () => target,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: now,
+      snapshotGeneration: "a".repeat(32), presentationGeneration: "a", rows }),
+    listPresentations: async () => rows.map((row) => ({
+      destination: row.destination, title: "Title " + row.destination.sessionID,
+      status: { state: "waiting" }, projection: row,
+    })),
+  })
+  r.attach(client)
+  const opened = await r.snapshot()
+  const row = (snapshot: SessionsSnapshot, id: string) => snapshot.sessions.find((s) => s.id === id) as
+    { menu?: { question?: string }; screen_reading?: string } | undefined
+  assert.equal(row(opened, "s1")?.menu?.question, "Tea or coffee?")
+  assert.equal(row(opened, "s1")?.screen_reading, "read")
+  assert.equal(row(opened, "s2")?.menu, undefined, "only the opened Session's row is given a question")
+  details.set("mac-a\u0000s1", rich({ execution_generation: "b".repeat(32) }))
+  assert.equal(row(await r.snapshot(), "s1")?.menu, undefined, "a rich row of another execution is not this question")
+  details.set("mac-a\u0000s1", rich({ source: { freshness: "current", observed_at: (now - 600_000) / 1000 } }))
+  assert.equal(row(await r.snapshot(), "s1")?.menu, undefined, "a stale rich row is not drawn as the question now")
+  target = { machineID: "mac-a", sessionID: "s2", executionGeneration: execution }
+  assert.equal(row(await r.snapshot(), "s2")?.menu?.question, "Tea or coffee?")
+})
+
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {
   const client = new FakeClient()
   const pass = "c".repeat(32)
