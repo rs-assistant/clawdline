@@ -11,8 +11,10 @@
    top: on a phone the 驗收 page's 16px top padding left a strip under the
    header where the record showed through above the bar. Each page that
    carries a bar says its own top padding here as --page-bar-lift, beside the
-   rule that sets it, and the bar sticks that much higher: flush with the
-   header. verify.e2e.ts holds the bar's top to the page's top. */
+   rule that sets it, and the bar sits and sticks that much higher: flush
+   with the header from the first paint, not only once the page scrolls.
+   verify.e2e.ts holds the bar's top to the page's top, unscrolled and
+   scrolled. */
 
 .board-page { --page-bar-lift: 24px; }
 .projects { --page-bar-lift: clamp(16px, 3vw, 34px); }
@@ -25,6 +27,7 @@
     position: sticky; top: calc(-1 * var(--page-bar-lift, 0px)); z-index: 4;
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     min-height: 44px; padding-block: 8px; margin-bottom: 16px;
+    margin-top: calc(-1 * var(--page-bar-lift, 0px));
     background: var(--bg);
     box-shadow: 0 0 0 100vmax var(--bg);
     clip-path: inset(0 -100vmax);
