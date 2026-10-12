@@ -2223,6 +2223,38 @@ test("a write during the gap is refused at once and is never carried after the r
   assert.equal(renewed.calls.filter(([name]) => name === "_read").length, 1, "exactly the second press, once")
 })
 
+test("a send whose capability wait crosses a client renewal uses the successor's descriptor", async () => {
+  const old = new FakeClient()
+  const cut = { machine: { commands: Array.from({ length: 64 }, (_, n) => `saved-${n}`) } }
+  old.descriptors.set("mac-a", cut)
+  old.machineDescriptors.set("mac-a", cut)
+  const { reader } = seam(old, { t: 1_000 }, true, 20)
+  const asked = reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-after-renewal" }))
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  const renewed = new FakeClient()
+  reader.attach(renewed)
+  const answer = await asked
+  assert.equal(answer.status, 200)
+  assert.equal(old.calls.length, 0)
+  assert.equal(renewed.calls.filter(([name]) => name === "_read").length, 1)
+})
+
+test("a rejected send reports which browser gate stopped it without its contents", async () => {
+  const old = new FakeClient()
+  const cut = { machine: { commands: Array.from({ length: 64 }, (_, n) => `saved-${n}`) } }
+  old.descriptors.set("mac-a", cut)
+  old.machineDescriptors.set("mac-a", cut)
+  const recorded: Array<{ event: string; data: Record<string, unknown> }> = []
+  Object.assign(old, { viewerEvents: { record: (event: string, data: Record<string, unknown>) => recorded.push({ event, data }) } })
+  const { reader } = seam(old, { t: 1_000 }, true, 10)
+  const answer = await reader.fetch("/v1/sessions/s1/send", post({ text: "private words" }, { "Idempotency-Key": "send-incomplete" }))
+  assert.equal(answer.status, 503)
+  assert.deepEqual(recorded.map(({ event, data }) => [event, data.word, data.code, data.stage]),
+    [["cloud.write.failed", "send", "cloud_reconnecting", "command_list_incomplete"]])
+  assert.equal(JSON.stringify(recorded).includes("private words"), false)
+  assert.equal(old.calls.length, 0)
+})
+
 test("every read the writer carries is one it waits for, and no write is", () => {
   const reads: [string, string][] = [
     ["/v1/work/v2/images/a1", "work-v2-image"],

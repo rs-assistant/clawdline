@@ -121,6 +121,22 @@ class OpeningClient implements CloudReadClient {
   }
 }
 
+test("a descriptor wait follows a renewed client instead of keeping the old five-second timer", async () => {
+  const old = new OpeningClient(REMEMBERED)
+  const reader = new RelayReader(MACHINE, { featureWaitMs: FEATURE_WAIT_MS })
+  reader.attach(old)
+  const waiting = reader.writeHost.settledWords?.("transcript", MACHINE)
+  assert.ok(waiting)
+  const next = new OpeningClient(REMEMBERED)
+  reader.attach(next)
+  next.arrive()
+  const answer = await Promise.race([
+    waiting.then(() => "ready"),
+    new Promise<string>((resolve) => setTimeout(() => resolve("old_timer"), 500)),
+  ])
+  assert.equal(answer, "ready", "a retired client's descriptor timer held the new connection")
+})
+
 interface Counts {
   scenario: string
   /** The reads the page fired the moment it opened. */

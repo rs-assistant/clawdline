@@ -645,6 +645,8 @@ export class RelayReader {
   private writer: WriteSeam | null = null
   /** Machine reads waiting for a connected client (`connectedFor`). */
   private readonly awaitingClient = new Set<() => void>()
+  /** Descriptor waits that must follow a replacement Cloud client. */
+  private readonly awaitingWords = new Set<() => void>()
   /** Whether this page has already said what it and the machine disagree about (`drift`). */
   private saidDrift = false
   /** The opened destination this reader last asked the machine to restate, and when. */
@@ -683,6 +685,7 @@ export class RelayReader {
   attach(client: CloudReadClient): void {
     this.client = client
     this.presentationRead = null
+    for (const wake of [...this.awaitingWords]) wake()
     for (const stream of this.streams) {
       this.bind(stream)
       if (client.ready !== false) stream.handlers.onOpen?.()
@@ -710,6 +713,14 @@ export class RelayReader {
       wrote: (session, outcome) => this.wrote(session, outcome),
       closed: (session) => this.closed(session),
       note: (row) => this.note(row.method, row.path, row.answer, row.code, row),
+      reportWriteFailure: (row) => {
+        try {
+          const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } } | null)?.viewerEvents
+          log?.record?.("cloud.write.failed", { ...row, machine: this.machine,
+            connection: !this.client ? "none" : this.client.ready === false ? "not_ready" : "ready" },
+          ["cloud.write.failed", row.word, row.stage, row.code].join("|"))
+        } catch { /* diagnostics cannot fail the person's action */ }
+      },
     }
   }
 
@@ -2133,27 +2144,35 @@ export class RelayReader {
    * authoritative. The stored 64-word prefix is not.
    */
   private async settledWords(word: string, signal?: AbortSignal | null, machine: string = this.machine): Promise<void> {
-    const client = this.client
-    if (!client || signal?.aborted) return
-    if (!machineWordPending(client, machine, word)) return
+    if (!this.client || signal?.aborted || !machineWordPending(this.client, machine, word)) return
     const bound = this.options.featureWaitMs ?? FEATURE_WAIT_MS
     await new Promise<void>((resolve) => {
       let off: (() => void) | null = null
+      let listening: CloudReadClient | null = null
       const done = () => {
         clearTimeout(timer)
         off?.()
+        this.awaitingWords.delete(check)
         signal?.removeEventListener("abort", done)
         resolve()
       }
       const timer = setTimeout(done, bound)
       signal?.addEventListener("abort", done)
-      // A status-only `orch/` notice carries no descriptor and sets no
-      // snapshot (`_applySnapshot`), so the condition is asked again rather
-      // than the first envelope being taken for the answer.
-      off = client.events((event) => {
-        if (event.type === "orchestrator" && event.machine === machine &&
-          !machineWordPending(client, machine, word)) done()
-      }) as (() => void) | null
+      const check = () => {
+        const current = this.client
+        if (!current || !machineWordPending(current, machine, word)) { done(); return }
+        if (current === listening) return
+        off?.()
+        listening = current
+        // A status-only notice has no descriptor. A replacement client must
+        // get its own listener, so the retired one's five-second wait cannot
+        // hold a read or send after the new descriptor has arrived.
+        off = current.events((event) => {
+          if (event.type === "orchestrator" && event.machine === machine) check()
+        }) as (() => void) | null
+      }
+      this.awaitingWords.add(check)
+      check()
     })
   }
 

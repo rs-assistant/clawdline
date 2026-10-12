@@ -72,6 +72,8 @@ Every signed-in viewer paired with the target machine may send. The machine veri
 
 The connection backs off and reconnects. An outbound spool owns publish order and capacity, while inbound queues and per-channel answer reserves produce typed busy or refusal answers where possible. An accepted relay write is not the same as an executed command or an observed answer. Logs and status counters separate published, acknowledged, answered, refused and undeliverable work. Protocol and capacity details are in [cloud-wire.md](cloud-wire.md), [limits.md](limits.md), and the transport code; this overview does not promise delivery after every network or process failure.
 
+The hosted console also records a content-free `cloud.write.failed` viewer event for a refused write. Its word, code, layer, outcome, connection state and stage distinguish a refusal before publication from one whose envelope may have reached the relay or machine. The event carries no message text or request body and is delivered through `diagnostics.events` to the paired machine's daemon log. A read or mutation waiting for a complete command descriptor follows a replacement Cloud client instead of spending the remaining five-second wait on a retired one. A mutation checks that current client's descriptor again before publishing.
+
 ## Which machine the hosted console is on
 
 An account with more than one readable machine opens on **all of them**: the fleet list is the
