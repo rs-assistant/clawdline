@@ -146,7 +146,10 @@ function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape
     ? `<span class="coordination-wait" title="${L.escapeHTML(peerTitle)}">${L.glyphHTML("⏳", peerText)}</span>`
     : ""
 
-  const work = L.workState(row)
+  // The pinned fleet list has the daemon's work state but does not load the
+  // local task collection used by projectSessionWorkState to prove a peer wait.
+  const work = !useLocalTasks && row.state === "idle" && row.work_state === "waiting_session"
+    ? { state: "waiting_session" } : L.workState(row)
   if (work.state === "waiting_session" && !peerSaid) {
     if (row.work_provenance === "self" && row.work_note && row.work_moved_by && row.work_person_needed === false) {
       const declaredTitle = row.work_moved_by + " · " + row.work_note
@@ -157,6 +160,10 @@ function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape
         const childWait = T.webTaskTasks + ": " + liveRoots.map((task) => task.title || task.id).join(" · ")
         peerSaid = `<span class="coordination-wait" title="${L.escapeHTML(childWait)}">${L.glyphHTML("⏳", childWait)}</span>`
       }
+    }
+    if (!peerSaid && !useLocalTasks) {
+      const waiting = nextWord("sessionWaitingOnSession")
+      peerSaid = `<span class="coordination-wait">${L.glyphHTML("⏳", waiting)}</span>`
     }
   }
 

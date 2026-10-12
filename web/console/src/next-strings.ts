@@ -131,6 +131,7 @@ const words = {
     sessionCallbackUnverified: "Heavy work status unverified",
     sessionStateUnrecognizedList:
       "State unknown",
+    sessionWaitingOnSession: "Waiting for another Session",
     proposalNeedsYourDecision:
       "The system has no to-do it can reassess. Finishing work will not withdraw this proposal; answer it, or it will wait until expiry.",
     proposalNotNow: "Not now",
@@ -1376,6 +1377,7 @@ const words = {
     sessionCallbacksActive: "重工作業進行中 · {count} 項",
     sessionCallbackUnverified: "重工作業狀態待確認",
     sessionStateUnrecognizedList: "無法辨認狀態",
+    sessionWaitingOnSession: "等待其他 Session",
     sessionStateUnrecognizedDetail: "Clawdline 已讀到畫面，但無法辨認狀態。決定下一步前，請查看下方對話。",
     sessionCountNotStarted: "{n} 個還沒開始對話",
     transcriptTechnicalDetails: "技術細節",
