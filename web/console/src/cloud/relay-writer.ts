@@ -33,6 +33,8 @@
 import type { CarriedWord } from "./carry.js"
 import type { CloudIdentity, CloudReadClient, CloudRow, SeamRow } from "./relay-reader.js"
 import { authenticatedRefusalKey } from "./refusal-client.js"
+// @ts-expect-error -- Node's strip-types runner loads this source in its test suite.
+import { machineCommands } from "./machine-commands.ts"
 
 // One admitted request may wait behind one turn, and each turn may try two
 // 30-second CLIs. Ten seconds leaves the relay enough room to deliver either
@@ -218,6 +220,8 @@ export interface WriteHost {
    * fires first, so the caller's own deadline still ends the wait.
    */
   connectedFor(signal: AbortSignal | null | undefined, word: string): Promise<CloudWriteClient | null>
+  /** Wait for the full live descriptor when the saved 64-word prefix cannot decide a write. */
+  settledWords?(word: string, machine: string): Promise<void>
   /** Something was just done to this session: its transcript is about to change. */
   wrote(session: string, outcome: "done" | "unknown" | "refused"): void
   /** The machine's terminal backend confirmed that this session was closed. */
@@ -1121,7 +1125,11 @@ export class RelayWriter {
         if (!new Set(["send", "answer", "key", "interrupt", "end", "archive-session"]).has(action) || !/^[0-9a-f]{32}$/.test(generation)) {
           throw failure("bad_request", "A receipt lookup needs its action and execution generation.", 400)
         }
-        if (!declaredCommands(client, this.host.machine)?.includes("session-receipt") || typeof client._read !== "function") {
+        await this.host.settledWords?.("session-receipt", this.host.machine)
+        if (machineCommands(client, this.host.machine).incomplete) {
+          throw failure("cloud_reconnecting", "The machine's complete command list has not arrived yet.", 503)
+        }
+        if (!machineCommands(client, this.host.machine).commands?.includes("session-receipt") || typeof client._read !== "function") {
           throw failure("cloud_machine_unsupported", "This machine cannot look up session receipts.", 501)
         }
         const query = this.requestID()
@@ -1860,6 +1868,11 @@ export class RelayWriter {
       if (!this.host.admitExactTarget) throw failure("execution_check_unavailable", "The selected Session cannot be checked now.", 503)
       await this.host.admitExactTarget(exact)
     }
+    await this.host.settledWords?.(word, identity.machine)
+    await this.host.settledWords?.("session-receipt", identity.machine)
+    if (machineCommands(client, identity.machine).incomplete) {
+      throw failure("cloud_reconnecting", "The machine's complete command list has not arrived yet.", 503)
+    }
     const commands = declaredCommands(client, identity.machine)
     if (!commands?.includes(word) || !commands.includes("session-receipt") || typeof client._read !== "function") {
       throw failure("cloud_machine_unsupported", "This machine cannot provide durable session receipts.", 501)
@@ -1986,8 +1999,7 @@ export class RelayWriter {
 
 /** The words the machine's descriptor lists, or null when it lists none. */
 function declaredCommands(client: CloudWriteClient, machine: string): string[] | null {
-  const commands = client.machineDescriptor?.(machine)?.machine?.commands
-  return Array.isArray(commands) ? commands.filter((x): x is string => typeof x === "string") : null
+  return machineCommands(client, machine).commands
 }
 
 function sessionOf(route: WriteRoute): string | null {

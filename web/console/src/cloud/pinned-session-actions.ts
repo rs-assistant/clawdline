@@ -1,4 +1,6 @@
 /** Cross-machine writes never infer a destination from the selected console machine. */
+// @ts-expect-error -- Node's strip-types runner loads this source in its test suite.
+import { machineCommands } from "./machine-commands.ts"
 export interface ActionDestination {
   machineID: string
   sessionID: string
@@ -69,6 +71,7 @@ export interface PinnedClient {
   machines(): Promise<{ machines: readonly { id: string; freshness: "current" | "stale" | "unknown";
     pairing: string; observedAt?: number | null }[] }>
   machineDescriptor?(machine: string): { machine?: { commands?: string[] } } | null
+  readonly orchestratorSnapshots?: ReadonlyMap<string, unknown>
   _read?(identity: { machine: string; session: string }, type: string, body: Record<string, unknown>,
     answer: string, timeoutMs?: number, options?: { retireUncertain?: boolean }): Promise<unknown>
 }
@@ -220,8 +223,10 @@ export class PinnedSessionActions {
     if (machine.pairing !== "paired") return "revoked"
     if (machine.freshness === "stale") return "stale"
     if (machine.freshness === "unknown") return "unknown"
-    const commands = client.machineDescriptor?.(target.machineID)?.machine?.commands
-    if (!Array.isArray(commands) || !commands.includes(action) || !commands.includes("session-receipt")) return "unsupported"
+    const capability = machineCommands(client, target.machineID)
+    if (capability.incomplete) return "unknown"
+    const commands = capability.commands
+    if (!commands || !commands.includes(action) || !commands.includes("session-receipt")) return "unsupported"
     if (action === "answer") {
       if (context.content?.kind === "unavailable") {
         const reason = context.content.reason
@@ -300,8 +305,9 @@ export class PinnedSessionActions {
     const machine = machines?.machines.find((entry) => entry.id === record.destination.machineID)
     if (!machine || machine.pairing !== "paired") return { ...record, problem: machine ? "revoked" : "unknown" }
     if (!client.allowWrites) return { ...record, problem: "operation_permission" }
-    const commands = client.machineDescriptor?.(record.destination.machineID)?.machine?.commands
-    if (!client._read || !commands?.includes("session-receipt")) return { ...record, problem: "unsupported" }
+    const capability = machineCommands(client, record.destination.machineID)
+    if (capability.incomplete) return { ...record, problem: "unknown" }
+    if (!client._read || !capability.commands?.includes("session-receipt")) return { ...record, problem: "unsupported" }
     const query = this.requestID()
     try {
       const answer = await client._read({ machine: record.destination.machineID, session: record.destination.sessionID },
