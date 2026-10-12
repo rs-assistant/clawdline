@@ -692,24 +692,25 @@ func codexMenu(tail []tailLine, lines []string) (Menu, bool) {
 	// Current Codex leaves two blank rows between this title and its model
 	// options. The usual askedOver rule stays strict for a typed numbered list
 	// in the composer, while this exact title can bridge that gap.
-	modelPicker := false
+	pickerQuestion := ""
 	for i := tail[first].offset - 1; i >= 0 && i >= tail[first].offset-6; i-- {
-		if trimSpaces(lines[i]) == "Select Model and Effort" {
-			modelPicker = true
+		title := trimSpaces(lines[i])
+		if title == "Select Model and Effort" || strings.HasPrefix(title, "Select Reasoning Level for ") {
+			pickerQuestion = title
 			break
 		}
 		if isTurnMarker(lines[i]) || hasCaret(lines[i]) {
 			break
 		}
 	}
-	if len(options) < 2 || (!askedOver(lines, tail[first].offset) && !modelPicker) {
+	if len(options) < 2 || (!askedOver(lines, tail[first].offset) && pickerQuestion == "") {
 		return Menu{}, false
 	}
 	menu := Menu{Options: options, Selected: firstSelected(options), Numbered: true}
 	// The title is also the receipt for a bare /model command: Codex opens a
 	// picker without writing that command as a conversation turn.
-	if modelPicker {
-		menu.Question = "Select Model and Effort"
+	if pickerQuestion != "" {
+		menu.Question = pickerQuestion
 	}
 	return menu, true
 }

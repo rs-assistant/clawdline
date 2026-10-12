@@ -125,6 +125,8 @@ send `/model` alone in its composer. Pressing a model closes the info card and o
 draws above the composer; choose the model there. Codex does not switch models through
 `/model <name>`, so the info card sends `/model` for every Codex model press. Claude Code's info
 card continues to send its model choice directly.
+After choosing a Codex model, its reasoning-level menu is also shown as choices in the console.
+Choose the reasoning level there; a model change is not finished merely by opening its first menu.
 
 ## Stop the current turn
 
