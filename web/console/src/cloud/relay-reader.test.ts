@@ -452,6 +452,40 @@ test("a verified list cannot open a different execution under an old fleet targe
   assert.deepEqual(client.pinnedReads, [])
 })
 
+test("a selected verified fleet row reads without waiting for a cut word list or missing status replay", async () => {
+  const client = new FakeClient()
+  const target = { machineID: "mac-a", sessionID: "s1", executionGeneration: "a".repeat(32) }
+  client.statusSnapshots = new Map()
+  ;(client as FakeClient & { machineDescriptors: Map<string, unknown> }).machineDescriptors = new Map([
+    ["mac-a", { machine: { commands: Array.from({ length: 64 }, (_, n) => `other.${n}`) } }],
+  ])
+  ;(client as FakeClient & { orchestratorSnapshots: Map<string, unknown> }).orchestratorSnapshots = new Map()
+  ;(client as FakeClient & { machineLacks: Map<string, Set<string>> }).machineLacks = new Map()
+  client.events = () => { throw new Error("a pinned read must not wait for a descriptor or retained marker") }
+  let resolved = 0
+  const r = new RelayReader("mac-a", { classicStatus: true,
+    fleetTarget: () => target,
+    fleetPresentation: () => ({ title: "Verified Session" }),
+    resolveSession: async () => { resolved++; return null },
+  })
+  r.attach(client)
+  assert.equal((await r.fetch("/v1/transcript?session=s1&limit=200")).status, 200)
+  assert.deepEqual(client.pinnedReads, [target])
+  assert.equal(resolved, 0, "the exact selected row already supplies the pinned target")
+
+  const changed = new FakeClient()
+  changed.statusSnapshots = new Map([[JSON.stringify(["mac-a", "s1"]),
+    { payload: { execution_generation: "b".repeat(32) } }]])
+  const refused = new RelayReader("mac-a", { classicStatus: true,
+    fleetTarget: () => target,
+    fleetPresentation: () => ({ title: "Old Session" }),
+    resolveSession: async () => null,
+  })
+  refused.attach(changed)
+  assert.equal((await refused.fetch("/v1/transcript?session=s1&limit=200")).status, 409)
+  assert.deepEqual(changed.pinnedReads, [], "newer status cannot be bypassed by an old card")
+})
+
 /** One machine's pass with the marker only: every row is still on its way. */
 function markerOnly(machine: string, pass: string, at: number, ...sessions: string[]) {
   return new Map<string, unknown>([
