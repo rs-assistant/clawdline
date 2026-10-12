@@ -78,6 +78,11 @@ const store = createUpdateReadStore(readUpdate, {
     window.addEventListener("focus", listener)
     return () => window.removeEventListener("focus", listener)
   },
+  onPageShow: (listener) => {
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) listener() }
+    window.addEventListener("pageshow", restored)
+    return () => window.removeEventListener("pageshow", restored)
+  },
   onBlur: (listener) => {
     window.addEventListener("blur", listener)
     return () => window.removeEventListener("blur", listener)

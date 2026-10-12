@@ -308,6 +308,24 @@ func TestStatusCarriesOnlyExistingTaskAndEpicAncestry(t *testing.T) {
 	}
 }
 
+func TestStatusResolvesTaskRootFromConversationWhenScreenLinkIsMissing(t *testing.T) {
+	rows := map[string]map[string]any{
+		"root":  {"sessionId": "root-conversation"},
+		"child": {},
+	}
+	tasks := []map[string]any{{
+		"child": map[string]any{"terminalId": "child"},
+		"root":  map[string]any{"sessionId": "root-conversation", "terminalId": ""},
+	}}
+	if got := statusParents(rows, tasks)["child"]; got != "root" {
+		t.Fatalf("task root with a missing screen link: got %q, want root", got)
+	}
+	rows["other"] = map[string]any{"sessionId": "root-conversation"}
+	if got := statusParents(rows, tasks)["child"]; got != "" {
+		t.Fatalf("ambiguous conversation invented a parent: %q", got)
+	}
+}
+
 func TestStatusInventoryPublishesAnEmptySet(t *testing.T) {
 	c := &collector{}
 	p := &Publisher{MachineID: "mac_a", published: map[string][32]byte{}, sent: map[string]time.Time{}, Publish: c.publish}
