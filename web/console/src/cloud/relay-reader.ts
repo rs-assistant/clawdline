@@ -28,6 +28,7 @@ import type { StreamHandle, StreamHandlers, StreamTransport } from "@clawdline/c
 import type { CloudWriteClient, WriteHost, WriteRoute } from "./relay-writer.js"
 import type { MachineListPresentation, MachineSessionProjection, SessionDestination, SessionListPresentation } from "./all-machine-sessions.js"
 import { authenticatedRefusalKey } from "./refusal-client.js"
+import { channelSegment } from "../legacy/js/net/client.js"
 
 /** One machine and one of its sessions, as the relay's channels name them. */
 export interface CloudIdentity {
@@ -2196,7 +2197,7 @@ export class RelayReader {
       rich.source?.freshness !== "current" || !Number.isFinite(observedAt) ||
       Math.abs(this.now() - observedAt) > RICH_MENU_FRESH_MS ||
       !Array.isArray(rich.menu?.options) || !rich.menu.options.length) {
-      this.askForOpenedQuestion(target)
+      if (this.askForOpenedQuestion(target)) this.reportMissingQuestion(client, target, rich, observedAt)
       return row
     }
     return { ...row, menu: rich.menu, ...(typeof rich.screen_reading === "string" ? { screen_reading: rich.screen_reading } : {}) }
@@ -2215,12 +2216,56 @@ export class RelayReader {
    * `QUESTION_RESTATE_MS`, so a machine that answers with no question is not
    * asked in a loop.
    */
-  private askForOpenedQuestion(target: SessionDestination): void {
+  private askForOpenedQuestion(target: SessionDestination): boolean {
     const key = target.sessionID + "\u0000" + target.executionGeneration
     const now = this.now()
-    if (this.questionAsked?.key === key && now - this.questionAsked.at < QUESTION_RESTATE_MS) return
+    if (this.questionAsked?.key === key && now - this.questionAsked.at < QUESTION_RESTATE_MS) return false
     this.questionAsked = { key, at: now }
     void this.machineRead(null, "GET", "/v1/sessions", "sessions.snapshot", {}).catch(() => undefined)
+    return true
+  }
+
+  /**
+   * What this page held when it drew the opened waiting Session without its
+   * question, sent to the machine's log as `cloud.opened_question.missing`.
+   *
+   * On 2026-10-12 the same deploy drew the question in a desktop browser and
+   * not on a phone, and the machine's log could not say which step the phone
+   * stopped at: the rich row may reach a page on the direct carrier, which the
+   * relay's fanout does not count. Each field is one step of the way: the
+   * detail opened and its channel subscribed and held, a rich row in hand, and
+   * whether that row names this execution, is waiting, is current and carries
+   * options. No question words are sent. Once per ask (`askForOpenedQuestion`).
+   */
+  private reportMissingQuestion(client: CloudReadClient, target: SessionDestination,
+    rich: { execution_generation?: unknown; state?: unknown; menu?: { options?: unknown };
+      source?: { freshness?: unknown } } | undefined, observedAt: number): void {
+    try {
+      const log = (client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } }).viewerEvents
+      if (typeof log?.record !== "function") return
+      const inner = client as unknown as { openedDetails?: Set<string>; socketSubscriptions?: Map<string, unknown>;
+        subscriptionHolds?: Map<string, unknown>; sessionSnapshots?: Map<string, unknown>; carrierMachines?: Set<string> }
+      const channel = "s/" + channelSegment(this.machine) + "/" + channelSegment(target.sessionID)
+      const held = inner.sessionSnapshots?.get(this.machine + "\u0000" + target.sessionID) as
+        | { execution_generation?: unknown; state?: unknown; menu?: { options?: unknown } } | undefined
+      log.record("cloud.opened_question.missing", {
+        machine: this.machine, session: target.sessionID,
+        opened: inner.openedDetails ? inner.openedDetails.has(channel) : null,
+        subscribed: inner.socketSubscriptions ? inner.socketSubscriptions.has(channel) : null,
+        held: inner.subscriptionHolds ? inner.subscriptionHolds.has(channel) : null,
+        carrier: inner.carrierMachines ? inner.carrierMachines.has(this.machine) : null,
+        rich: !!rich,
+        rich_same_execution: rich ? rich.execution_generation === target.executionGeneration : null,
+        rich_state: rich && typeof rich.state === "string" ? rich.state : null,
+        rich_freshness: rich && typeof rich.source?.freshness === "string" ? rich.source.freshness : null,
+        rich_age_s: rich && Number.isFinite(observedAt) ? Math.round((this.now() - observedAt) / 1000) : null,
+        rich_options: rich ? Array.isArray(rich.menu?.options) ? rich.menu.options.length : 0 : null,
+        snapshot: !!held,
+        snapshot_same_execution: held ? held.execution_generation === target.executionGeneration : null,
+        snapshot_state: held && typeof held.state === "string" ? held.state : null,
+        snapshot_options: held ? Array.isArray(held.menu?.options) ? held.menu.options.length : 0 : null,
+      }, "cloud.opened_question.missing|" + target.sessionID + "|" + target.executionGeneration)
+    } catch { /* diagnostics cannot fail a Session read */ }
   }
 
   /**
