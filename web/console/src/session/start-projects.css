@@ -1,15 +1,16 @@
-.start-project-filter-row { display: flex; justify-content: flex-end; align-items: stretch; gap: 8px; min-width: 0; margin: 8px 0; }
+.start-project-filter-row { display: flex; justify-content: flex-end; align-items: stretch; gap: 4px; min-width: 0; margin: 8px 0; }
 .start-project-filter-row:has(> .find[hidden]):has(> .start-project-actions[hidden]) { display: none; }
 .sheet .start-project-filter-row .find { flex: 1 1 auto; width: auto; min-width: 0; margin: 0; }
-.start-project-actions { display: flex; flex: none; gap: 6px; }
+.start-project-actions { display: flex; flex: none; gap: 2px; }
 .start-project-actions[hidden] { display: none; }
-.start-project-actions button { display: grid; place-items: center; width: 42px; min-height: 42px; border: 1px solid var(--line); border-radius: 8px; background: var(--card-hi); color: var(--ink); padding: 0; cursor: pointer; }
-.start-project-actions button:first-child { border-color: var(--accent); }
-.start-project-actions svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.start-project-actions button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.start-project-actions button { display: grid; place-items: center; width: 38px; min-height: 42px; border: 0; border-radius: 8px; background: transparent; color: var(--dim); padding: 0; cursor: pointer; }
+@media (hover: hover) { .start-project-actions button:hover { color: var(--ink); background: var(--card-hi); } }
+.start-project-actions svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.start-project-actions button[aria-pressed="true"] { color: var(--accent); }
 .start-project-actions button[aria-pressed="true"] .start-edit-pencil,
 .start-project-actions button[aria-pressed="false"] .start-edit-done { display: none; }
 .start-project-actions button:focus-visible, .start-project-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#start-say:empty { display: none; }
 #start-list[data-editing="1"] li { display: flex; align-items: center; }
 #start-list[data-editing="1"] .place { opacity: 1; }
 .start-project-remove { flex: none; border: 1px solid var(--line); border-radius: 8px; background: var(--card-hi); color: var(--ink); min-height: 38px; padding: 6px 10px; cursor: pointer; }

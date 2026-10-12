@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
-import { Start, StartSheet } from "../session/Start.js"
-import { Command, CommandSheet } from "../session/Command.js"
+import { Start } from "../session/Start.js"
+import { Command } from "../session/Command.js"
 import { openNewWorkItem } from "../pages/work/new-item.js"
 import type { SessionDestination, SessionProjectionSource } from "./all-machine-sessions.js"
 import { toolPlan } from "./machine-tool.js"
@@ -14,7 +14,7 @@ export interface PendingMachineAction {
   at: number
 }
 
-/** Mount the original start and voice command sheets for the Cloud Session page. */
+/** Connect Cloud actions to the sheets already mounted by App's SessionsPage. */
 export function CloudSessionSheets({ machineID, machines, source, pending, onConsumed, onOpened }: {
   machineID: string
   /**
@@ -96,5 +96,5 @@ export function CloudSessionSheets({ machineID, machines, source, pending, onCon
     return () => cancelAnimationFrame(frame)
   }, [machineID, pending, onConsumed])
 
-  return <><StartSheet /><CommandSheet /></>
+  return null
 }

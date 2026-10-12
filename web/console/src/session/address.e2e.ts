@@ -627,6 +627,11 @@ class Tab {
     await this.b.send("Input.dispatchKeyEvent", { type: "keyUp", ...event }, this.session)
   }
 
+  async touch(x: number, y: number): Promise<void> {
+    await this.b.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] }, this.session)
+    await this.b.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }, this.session)
+  }
+
   async screenshot(path: string): Promise<void> {
     const { data } = await this.b.send("Page.captureScreenshot", { format: "png", fromSurface: true }, this.session)
     writeFileSync(path, Buffer.from(data, "base64"))
@@ -2338,6 +2343,11 @@ test("phone: Session Project controls fit beside the search field", () =>
               order: search.right < plus.left && plus.right < pencil.left && pencil.right <= innerWidth,
               compact: add.textContent.trim() === "" && edit.textContent.trim() === "",
               accessible: !!add.getAttribute("aria-label") && !!edit.getAttribute("aria-label"),
+              quiet: document.getElementById("start-say").textContent === "" &&
+                getComputedStyle(add).borderTopWidth === "0px" && getComputedStyle(edit).borderTopWidth === "0px" &&
+                add.querySelector("svg").getBoundingClientRect().width <= 18,
+              editX: pencil.left + pencil.width / 2,
+              editY: pencil.top + pencil.height / 2,
             })
           }
           if (Date.now() > deadline) return reject(new Error("Session Project search did not appear"))
@@ -2345,7 +2355,19 @@ test("phone: Session Project controls fit beside the search field", () =>
         }
         wait()
       })`)
-      assert.deepEqual(layout, { sameRow: true, order: true, compact: true, accessible: true })
+      assert.deepEqual({ sameRow: layout.sameRow, order: layout.order, compact: layout.compact,
+        accessible: layout.accessible, quiet: layout.quiet },
+      { sameRow: true, order: true, compact: true, accessible: true, quiet: true })
+      await tab.touch(layout.editX, layout.editY)
+      const editing = await tab.run(`(() => {
+        const button = document.getElementById("start-edit-projects")
+        const remove = document.querySelector("#start-list .start-project-remove")
+        const list = document.getElementById("start-list").getBoundingClientRect()
+        const rect = remove?.getBoundingClientRect()
+        return { pressed: button.getAttribute("aria-pressed"), count: document.querySelectorAll("#start-list .start-project-remove").length,
+          removeVisible: !!rect && rect.left >= list.left && rect.right <= list.right }
+      })()`)
+      assert.deepEqual(editing, { pressed: "true", count: 9, removeVisible: true })
     } finally {
       projectPickerMany = false
     }
@@ -2383,6 +2405,13 @@ test("phone: an empty Session picker adds and removes a Project in edit mode", (
             wait(() => document.querySelectorAll("#start-list .place").length === 1, () => {
               document.getElementById("start-edit-projects").click()
               const remove = document.querySelector("#start-list .start-project-remove")
+              const rect = remove.getBoundingClientRect()
+              const listRect = document.getElementById("start-list").getBoundingClientRect()
+              const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+              if (rect.left < listRect.left || rect.right > listRect.right || !remove.contains(hit)) {
+                return reject(new Error("Project remove control is outside the visible list: " +
+                  JSON.stringify({ rect: rect.toJSON(), list: listRect.toJSON(), hit: hit?.tagName })))
+              }
               remove.click()
               stage = "confirm"
               wait(() => document.querySelector(".project-remove-dialog[open]"), () => {

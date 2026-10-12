@@ -508,7 +508,7 @@ function draw(): void {
         ? T().webLoading
         : places && !places.length
           ? catalogWord("projects", "emptyAdd")
-          : T().webStartPick,
+          : "",
   )
 
   box.hidden = terminalAccess.state !== "ready" && mode === "terminal" || !(places && places.length > MANY)
