@@ -31,6 +31,10 @@ receipts together. That acceptance criterion remains open.
 
 ## Installation matrix
 
+The item's revised acceptance covers macOS and Linux release and source installation paths. The
+person moved Windows release and source updates to separate work on 2026-10-12. The Windows facts
+below remain context, not a cell required to complete this item.
+
 The host used for this record is macOS arm64. `docker info --format
 '{{.OSType}}/{{.Architecture}}'` answered `linux/aarch64`; `wine --version` answered `wine-10.0`.
 Neither command performs an installation. The release builder's target loop in
@@ -42,7 +46,9 @@ only on Linux, prints manual bundle instructions on macOS, and refuses other ope
 | --- | --- | --- |
 | macOS | v0.10.0 release install, signature check, daemon start, console HTTP 200 and clean uninstall passed in an isolated root; version transition and App bundle still untested | Not yet exercised on an isolated installation |
 | Linux | v0.10.0 arm64 release archive checksum, extracted binary, daemon start, console HTTP 200 and matching BUILD stamp passed in an Ubuntu 24.04 container; systemd installation and version transition untested | Not yet exercised in a Linux runtime |
-| Windows | No release artifact or installer exists; cannot exercise this path | No supported source update entry; cannot exercise this path |
+
+Windows currently has no release artifact, installer, or supported source update entry. These
+paths are outside this item's revised acceptance and require separate work.
 
 No matrix cell is counted complete. Compilation or a unit fixture is not an installation result.
 An isolated runtime check must record the version before and after, the exact download or install
