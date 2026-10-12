@@ -507,3 +507,40 @@ func TestARowAtTheEndOfTheListIsRefreshedToo(t *testing.T) {
 		t.Fatalf("after %d passes the last row still holds %q", len(rows), text)
 	}
 }
+
+// A box ticked from a page was on the pane at once and in the session list
+// five seconds later: the list read a held screen and refreshed it only behind
+// the read. After a press the pane is read live, so the next list shows it.
+func TestAScreenIsReadLiveRightAfterAPress(t *testing.T) {
+	var screen atomic.Value
+	screen.Store("[ ] Red")
+	host := &slowTerminal{answer: func() (string, bool) { return screen.Load().(string), true }}
+	held := NewHeldScreens(host)
+	at := time.Unix(1_700_000_000, 0)
+	held.now = func() time.Time { return at }
+	row := session.Session{ID: "%7", Backend: session.BackendTmux}
+	held.Capture(context.Background(), row)
+	for deadline := time.Now().Add(2 * time.Second); ; {
+		if text, ok := held.Capture(context.Background(), row); ok && text == "[ ] Red" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the first capture never came back")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	screen.Store("[✔] Red")
+	if text, _ := held.Capture(context.Background(), row); text != "[ ] Red" {
+		t.Fatalf("control: before a press the held screen is served; got %q", text)
+	}
+	held.Pressed(row.ID)
+	if text, ok := held.Capture(context.Background(), row); !ok || text != "[✔] Red" {
+		t.Fatalf("right after a press the list read %q, not the pane", text)
+	}
+	at = at.Add(ScreenLiveAfterPress)
+	screen.Store("[✔] Red [✔] Green")
+	if text, _ := held.Capture(context.Background(), row); text != "[✔] Red" {
+		t.Fatalf("after the window the held screen is served again; got %q", text)
+	}
+}

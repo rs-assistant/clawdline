@@ -277,6 +277,9 @@ func (a Actions) send(ctx context.Context, s session.Session, text string) (sess
 		return s, err
 	}
 	defer release()
+	// Whatever the message did to the screen is read live for a moment
+	// (HeldScreens.Pressed), as after a key.
+	defer a.Inventory.Held.Pressed(s.ID)
 	if err := h.Send(ctx, s, text); err != nil {
 		return s, sendRefusal(s, err)
 	}
