@@ -441,6 +441,9 @@ export const ROW_RESTATE_MS = 5_000
 /** How old a rich row's question may be and still be drawn: the status freshness window (`status-projection.ts`). */
 const RICH_MENU_FRESH_MS = 300_000
 
+/** How often an opened waiting Session with no question in hand asks the machine to restate its rows. */
+const QUESTION_RESTATE_MS = 30_000
+
 /**
  * How long, after this page did something to a session, every poll asks the
  * machine again until the transcript it answers has changed. A message just
@@ -640,6 +643,8 @@ export class RelayReader {
   private saidDrift = false
   /** The opened destination this reader last asked the machine to restate, and when. */
   private rowAsked: { key: string; at: number } | null = null
+  /** The opened waiting Session whose question was last asked for (`withOpenedMenu`). */
+  private questionAsked: { key: string; at: number } | null = null
   private presentationRead: { pass: string; until: number; promise: Promise<MachineListPresentation[] | null> } | null = null
   private listRetryTimer: ReturnType<typeof setTimeout> | null = null
   private listRetryMs = 5_000
@@ -2190,8 +2195,32 @@ export class RelayReader {
       rich.execution_generation !== target.executionGeneration || rich.state !== "waiting" ||
       rich.source?.freshness !== "current" || !Number.isFinite(observedAt) ||
       Math.abs(this.now() - observedAt) > RICH_MENU_FRESH_MS ||
-      !Array.isArray(rich.menu?.options) || !rich.menu.options.length) return row
+      !Array.isArray(rich.menu?.options) || !rich.menu.options.length) {
+      this.askForOpenedQuestion(target)
+      return row
+    }
     return { ...row, menu: rich.menu, ...(typeof rich.screen_reading === "string" ? { screen_reading: rich.screen_reading } : {}) }
+  }
+
+  /**
+   * Ask the machine to state its rows again when the opened Session is
+   * waiting and no current question has come with it.
+   *
+   * The machine sends a rich row when the row changes, and a Session stopped
+   * on a question does not change: a page that opened it afterwards waited for
+   * a row that was never coming (the 2026-10-12 log for that Session shows one
+   * rich row in twenty minutes, delivered to nobody). `sessions.snapshot`
+   * restates every row on its own channel, which the opened detail holds
+   * (`status-client.js` `openDetail`). Once per execution per
+   * `QUESTION_RESTATE_MS`, so a machine that answers with no question is not
+   * asked in a loop.
+   */
+  private askForOpenedQuestion(target: SessionDestination): void {
+    const key = target.sessionID + "\u0000" + target.executionGeneration
+    const now = this.now()
+    if (this.questionAsked?.key === key && now - this.questionAsked.at < QUESTION_RESTATE_MS) return
+    this.questionAsked = { key, at: now }
+    void this.machineRead(null, "GET", "/v1/sessions", "sessions.snapshot", {}).catch(() => undefined)
   }
 
   /**
