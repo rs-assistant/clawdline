@@ -45,6 +45,10 @@ type latest[T any] struct {
 	ok     bool
 	flight chan struct{}
 	err    error
+	// flightStarted is when the build in flight began, and valueStarted when
+	// the build behind value did: what `since` compares a moment against.
+	flightStarted time.Time
+	valueStarted  time.Time
 	// builds counts the builds that ran, for the tests that prove sharing.
 	builds atomic.Int64
 }
@@ -80,6 +84,8 @@ func (l *latest[T]) refresh() (T, error) {
 	}
 	flight := make(chan struct{})
 	l.flight = flight
+	started := time.Now()
+	l.flightStarted = started
 	l.mu.Unlock()
 
 	// The build has a clock of its own and not a reader's: a tab that closes
@@ -94,7 +100,7 @@ func (l *latest[T]) refresh() (T, error) {
 	defer l.mu.Unlock()
 	l.err = err
 	if err == nil {
-		l.value, l.at, l.ok = value, time.Now(), true
+		l.value, l.at, l.ok, l.valueStarted = value, time.Now(), true, started
 	} else if l.ok {
 		// A failed build leaves the last good value where peek finds it, and
 		// get will try again rather than serve it as fresh.
@@ -107,6 +113,32 @@ func (l *latest[T]) refresh() (T, error) {
 		return zero, err
 	}
 	return value, nil
+}
+
+// since answers a value whose build began at or after `t`. A build already in
+// flight that began before it is waited out, not joined: it read the machine
+// before `t`.
+//
+// Measured on 2026-10-12: the Cloud publisher's looks 246 ms and 1242 ms after a
+// press both asked for a build now, both joined a build that had begun before
+// the press, and the pressed Session's row went out six seconds later on the
+// next ordinary pass.
+func (l *latest[T]) since(t time.Time) (T, error) {
+	for {
+		l.mu.Lock()
+		if l.ok && !l.valueStarted.Before(t) {
+			value := l.value
+			l.mu.Unlock()
+			return value, nil
+		}
+		if flight := l.flight; flight != nil && l.flightStarted.Before(t) {
+			l.mu.Unlock()
+			<-flight
+			continue
+		}
+		l.mu.Unlock()
+		return l.refresh()
+	}
 }
 
 // listProducer is the one clock behind every session-list and task-list reader.
@@ -211,7 +243,7 @@ func (s *Server) CloudSessionsFresh(context.Context) ([]byte, bool) {
 	if !s.ownsSessions() {
 		return nil, false
 	}
-	value, err := s.lists().sessions.refresh()
+	value, err := s.lists().sessions.since(time.Now())
 	if err != nil {
 		return nil, false
 	}
