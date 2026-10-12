@@ -182,6 +182,7 @@ type Server struct {
 	// suggestPersona is the paid model seam behind the explicit Board button.
 	// Tests replace it, so verification never consumes an assistant account.
 	suggestPersona      func(context.Context, planner.PersonaRequest, string) (planner.PersonaSuggestion, error)
+	draftRole           func(context.Context, string, string) (planner.RoleDraft, error)
 	firstSessionRequest func(session.Session) (string, error)
 	sessionTailRead     func(session.Session) (transcript.Page, error)
 	intentContext       func(context.Context) ([]planner.Place, []string)
@@ -281,6 +282,7 @@ func New(cfg config.Config) (*Server, error) {
 	localPlanner.Timeout = time.Duration(CapacityLimit(capacity.IntentPlannerSeconds)) * time.Second
 	srv.planIntent = localPlanner.Draft
 	srv.nameSession = localPlanner.Name
+	srv.draftRole = localPlanner.DraftRole
 	// One producer in front of it, so three loops are one scan.
 	srv.readings = app.NewInventoryReading(srv.inventory.Read, 0)
 	srv.readings.SetRetentionAge(CapacityLimit(capacity.CacheSessionInventory))

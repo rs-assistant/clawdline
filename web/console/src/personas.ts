@@ -9,8 +9,8 @@ import type { Persona, PersonaCatalog } from "@clawdline/contract"
  * (`cloud/CloudGate.tsx` `pointAt`), and a start sheet opened for another
  * machine offers that machine's roles. So the catalog is held per machine, and
  * `forgetPersonas` drops every one of them when the account behind them
- * changes. The catalog is compiled into the daemon and does not change while
- * it runs, so nothing else expires it.
+ * changes. Creating a role or adopting a package also drops the cached reads:
+ * the catalog can now change while the daemon runs.
  *
  * A read that fails for any reason — an older daemon without the route, a
  * machine on Clawdline Cloud that does not list `personas` among its commands,
@@ -184,7 +184,7 @@ export function rememberPersona(id: string): void {
  * order the role row's switcher lists them. The console names them
  * (`personaTeam*` in next-strings.ts); the catalog only says which.
  */
-export const PERSONA_TEAMS = ["engineering", "marketing", "product", "quality", "operations", "design", "business"] as const
+export const PERSONA_TEAMS = ["engineering", "marketing", "product", "quality", "operations", "design", "business", "custom"] as const
 export type PersonaTeam = (typeof PERSONA_TEAMS)[number]
 
 function knownTeam(team: unknown): team is PersonaTeam {

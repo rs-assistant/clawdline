@@ -18,14 +18,13 @@ import (
 // The catalog route lists every persona in the picker's order, with its bot,
 // and never the text a session is launched with.
 func TestThePersonaCatalogIsListedWithoutItsTexts(t *testing.T) {
-	s := &Server{}
-	w := httptest.NewRecorder()
-	s.personasRoute(w, httptest.NewRequest(http.MethodGet, "/v1/personas", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GET: %d %s", w.Code, w.Body)
+	f := newSquadFixture(t)
+	status, raw := f.ask(http.MethodGet, "/v1/personas", f.reader, "", "")
+	if status != http.StatusOK {
+		t.Fatalf("GET: %d %s", status, raw)
 	}
 	var got contract.PersonaCatalog
-	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+	if err := json.Unmarshal([]byte(raw), &got); err != nil {
 		t.Fatal(err)
 	}
 	if len(got.Personas) != len(persona.IDs()) || len(got.Personas) < 16 || got.License != "MIT" {
@@ -40,20 +39,19 @@ func TestThePersonaCatalogIsListedWithoutItsTexts(t *testing.T) {
 			t.Errorf("%d: %+v", i, p)
 		}
 	}
-	if strings.Contains(w.Body.String(), "Clawdline persona") || strings.Contains(w.Body.String(), "never overrides") {
+	if strings.Contains(raw, "Clawdline persona") || strings.Contains(raw, "never overrides") {
 		t.Fatal("the injected text is on the wire")
 	}
 	var wire map[string]any
-	_ = json.Unmarshal(w.Body.Bytes(), &wire)
+	_ = json.Unmarshal([]byte(raw), &wire)
 	first := wire["personas"].([]any)[0].(map[string]any)
 	if _, ok := first["name"].(map[string]any)["zh-Hant"]; !ok {
 		t.Fatalf("the names are not keyed by language: %v", first["name"])
 	}
 
-	w = httptest.NewRecorder()
-	s.personasRoute(w, httptest.NewRequest(http.MethodPost, "/v1/personas", nil))
-	if w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("POST: %d", w.Code)
+	status, _ = f.ask(http.MethodPost, "/v1/personas", f.reader, "{}", "")
+	if status != http.StatusMethodNotAllowed {
+		t.Fatalf("POST: %d", status)
 	}
 }
 

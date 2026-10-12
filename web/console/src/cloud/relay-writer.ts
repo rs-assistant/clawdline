@@ -237,7 +237,7 @@ export interface WriteHost {
  * report name.
  */
 export type WriteRoute =
- | { op: "squad-write"; word: Carried<"squad.settings.update" | "squad.motion.update" | "squad.catalog.update"> }
+ | { op: "squad-write"; word: Carried<"squad.settings.update" | "squad.motion.update" | "squad.catalog.update" | "squad.role-draft"> }
   | { op: "squad-package"; word: Carried<"squad.packages.preview" | "squad.packages.adopt" | "squad.packages.export"> }
   | { op: "project-hide"; word: Carried<"project-hide"> }
   | { op: "project-add"; word: Carried<"project-add"> }
@@ -619,6 +619,7 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   }
   if (method !== "POST") return null
   if (head === "squad" && a === "catalog" && segments.length === 2) return { op: "squad-write", word: "squad.catalog.update" }
+  if (head === "squad" && a === "role-draft" && segments.length === 2) return { op: "squad-write", word: "squad.role-draft" }
   if (head === "squad-packages" && segments.length === 2) {
     if (a === "preview") return { op: "squad-package", word: "squad.packages.preview" }
     if (a === "adopt") return { op: "squad-package", word: "squad.packages.adopt" }

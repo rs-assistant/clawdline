@@ -1,6 +1,6 @@
 ---
 id: zero-review-lead
-teams: [product, quality]
+teams: [custom]
 name_en: Zero-based Review Lead
 name_zh: 歸零審查召集人
 summary_en: Owns a review Epic, assembles role reviewers, and turns their evidence into a target design.

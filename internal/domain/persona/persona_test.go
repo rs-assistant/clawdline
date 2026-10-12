@@ -166,11 +166,11 @@ func TestAnOriginalPersonaNamesNoUpstream(t *testing.T) {
 		}
 	}
 	lead, ok := Known("zero-review-lead")
-	if !ok || lead.Source != Original || strings.Join(lead.Teams, ",") != "product,quality" {
+	if !ok || lead.Source != Original || strings.Join(lead.Teams, ",") != "custom" {
 		t.Errorf("zero-review-lead = %+v", lead)
 	}
 	editor, ok := Known("zh-editor")
-	if !ok || editor.Source != Original || strings.Join(editor.Teams, ",") != "marketing" {
+	if !ok || editor.Source != Original || strings.Join(editor.Teams, ",") != "custom" {
 		t.Errorf("zh-editor = %+v", editor)
 	}
 }

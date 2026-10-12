@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/persona"
@@ -17,7 +18,33 @@ func (s *Server) personasRoute(w http.ResponseWriter, r *http.Request) {
 		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "Personas are read with GET.")
 		return
 	}
-	writeJSON(w, personaCatalog())
+	out := personaCatalog()
+	catalog, err := s.squadCatalog(r.Context())
+	if err != nil {
+		squadFailure(w, err, true)
+		return
+	}
+	for _, d := range catalog.Definitions {
+		if d.Builtin {
+			continue
+		}
+		teams := make([]string, 0, len(d.Teams))
+		for _, ref := range d.Teams {
+			if strings.HasPrefix(ref.ID, "clawdline.team.") {
+				teams = append(teams, strings.TrimPrefix(ref.ID, "clawdline.team."))
+			}
+		}
+		if len(teams) == 0 {
+			teams = []string{"custom"}
+		}
+		out.Personas = append(out.Personas, contract.Persona{
+			ID: d.DefinitionID, Teams: teams,
+			Name:           contract.PersonaNames{En: d.Name.En, ZhHant: d.Name.ZhHant},
+			Summary:        contract.PersonaNames{En: d.Summary.En, ZhHant: d.Summary.ZhHant},
+			SuggestedKinds: []string{}, Icon: contract.Icon{Accent: d.Icon.Accent, Cells: d.Icon.Cells}, Source: d.Source,
+		})
+	}
+	writeJSON(w, out)
 }
 
 func personaCatalog() contract.PersonaCatalog {

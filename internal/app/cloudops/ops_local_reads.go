@@ -424,6 +424,12 @@ func init() {
 				return LocalRequest{Method: "POST", Path: "/v1/squad/catalog",
 					Body: p.document, Header: asDevice()}
 			}},
+		op{name: "squad.role-draft",
+			decode: squadCloudWritePlan("changes"),
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "POST", Path: "/v1/squad/role-draft",
+					Body: p.document, Header: asDevice()}
+			}},
 
 		op{name: "squad-session-bindings", read: true,
 			decode: func(b body) (plan, bool) {

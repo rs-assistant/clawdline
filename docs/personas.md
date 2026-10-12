@@ -15,7 +15,7 @@ each built-in persona. They are research records, not installed or adopted skill
 
 ## The catalog
 
-The catalog is closed and compiled into the daemon (`internal/domain/persona`). Each persona is
+The built-in catalog is closed and compiled into the daemon (`internal/domain/persona`). Each built-in persona is
 one Markdown file under `internal/domain/persona/catalog/`, with a frontmatter of exactly eight
 keys (`id`, `teams`, `name_en`, `name_zh`, `summary_en`, `summary_zh`, `suggested_kinds`, `source`) and a
 body. The files are parsed when the package loads. `TestTheCatalogLoads` turns a malformed file, a
@@ -24,9 +24,9 @@ never finds one at run time.
 
 Every persona belongs to one or more **teams** (`teams: [engineering, quality]` in the frontmatter,
 the same list syntax as `suggested_kinds`; `teams` on the wire). The set is closed, in this order:
-`engineering`, `marketing`, `product`, `quality`, `operations`, `design`, `business`. `parse`
+`engineering`, `marketing`, `product`, `quality`, `operations`, `design`, `business`, `custom`. `parse`
 refuses an empty list, a name outside the set and a name listed twice. The console names the teams
-(工程團隊, 行銷團隊, 產品團隊, 品質團隊, 維運團隊, 設計團隊, 商業營運團隊); the catalog only says which.
+(工程團隊, 行銷團隊, 產品團隊, 品質團隊, 維運團隊, 設計團隊, 商業營運團隊, 客製化); the catalog only says which.
 
 **The same role may appear in several teams, and that is wanted**: a code reviewer is as much at
 home in a quality team as in an engineering one. A persona in two teams is still one persona —
@@ -48,9 +48,8 @@ The engineering team; the last column is every team the persona is in:
 The marketing team, for a session working in a blog, a site or a docs repository. Eight were
 adapted, not copied: upstream emoji, hype, invented metrics and tool-specific pipelines were
 dropped, and every one edits files in the repository, never posts or sends anything itself, and
-writes in the site's own language and locale (Taiwan usage for zh-TW). `zh-editor` was written
-for Clawdline to work from reader, point and structure through a whole Chinese article. None is
-suggested for a Board kind. The nine below are in the marketing team only; `technical-writer` is in it too.
+writes in the site's own language and locale (Taiwan usage for zh-TW). None is
+suggested for a Board kind. The eight below are in the marketing team only; `technical-writer` is in it too.
 
 | id | Name | 中文 | Source |
 | --- | --- | --- | --- |
@@ -62,7 +61,6 @@ suggested for a Board kind. The nine below are in the marketing team only; `tech
 | `email` | Email Strategist | 電子報策略師 | [`marketing-email-strategist.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/marketing/marketing-email-strategist.md) |
 | `growth` | Growth Hacker | 成長駭客 | [`marketing-growth-hacker.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/marketing/marketing-growth-hacker.md) |
 | `pr` | PR & Communications | 公關傳播 | [`marketing-pr-communications-manager.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/marketing/marketing-pr-communications-manager.md) |
-| `zh-editor` | Chinese Editor | 中文主編 | original |
 
 The product, quality and operations teams, adapted the same way: upstream emoji, hype, invented
 metrics and vendor-specific pipelines were dropped, and each works inside the repository and the
@@ -119,8 +117,8 @@ says it is not legal advice. None is suggested for a Board kind.
 | `devrel` | Developer Advocate | 開發者推廣 | business, marketing | [`specialized-developer-advocate.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/specialized/specialized-developer-advocate.md) |
 | `privacy` | Privacy & Compliance Officer | 隱私法遵官 | business, operations | [`data-privacy-officer.md`](https://github.com/msitarzewski/agency-agents/blob/053ddbbf392a1688fc7043d81529f47ef2cf86c8/specialized/data-privacy-officer.md) and `support-legal-compliance-checker.md` |
 
-Two personas were written for Clawdline rather than adapted. `zh-editor` is listed with the
-marketing team above. `zero-review-lead` owns a review Epic
+Two personas were written for Clawdline rather than adapted. Both now appear in the Custom team
+as source examples. `zero-review-lead` owns a review Epic
 that re-examines an existing feature or process from zero: it plans the role lenses, gives every
 read-only reviewer child the same fact pack, and turns their evidence into a target design and
 work items. Its source is `original` (`persona.Original`), so its text ends with
@@ -134,7 +132,21 @@ every Epic.
 
 | id | Name | 中文 | Teams | Source |
 | --- | --- | --- | --- | --- |
-| `zero-review-lead` | Zero-based Review Lead | 歸零審查召集人 | product, quality | original |
+| `zero-review-lead` | Zero-based Review Lead | 歸零審查召集人 | custom | original |
+| `zh-editor` | Chinese Editor | 中文主編 | custom | original |
+
+The two example definitions are versioned at
+[`internal/domain/persona/catalog/zero-review-lead.md`](../internal/domain/persona/catalog/zero-review-lead.md)
+and [`internal/domain/persona/catalog/zh-editor.md`](../internal/domain/persona/catalog/zh-editor.md).
+Their source files remain built in for existing Session IDs; moving them to the Custom team changes
+where a person finds them, not the identity of a Session already launched with one.
+
+The Squad page also lets a write-capable person create a role in the Custom team. Its generated
+namespaced ID and full definition are stored in the machine's versioned squad catalog. A person
+can write the definition directly or explicitly ask the configured AI provider for one editable
+draft, review it, then save it as a separate action. The AI draft is never installed on its own.
+These personal definitions are not committed to this public repository. A person who wants to
+share one can export a squad package and review its contents and license before publishing it.
 
 `suggested_kinds` tells a picker which persona is the safe fallback for a Board item's kind when
 exactly one catalog entry names it. It only suggests a choice: no kind gives a persona to
