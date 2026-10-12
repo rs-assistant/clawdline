@@ -151,7 +151,12 @@ export class StatusCloudClient extends CatalogCloudClient {
         }
       })
       candidates.sort((a, b) => a.machine < b.machine ? -1 : a.machine > b.machine ? 1 : 0)
-      const chosen = candidates.find((candidate) => candidate.machine === this.classicSessionMachine) ?? candidates[0]
+      // A fleet page has no single classicSessionMachine. Prefer the paired
+      // Mac's durable diagnostic log over an incidental Linux test machine
+      // whose id sorts first; a Linux-only account still has a recipient.
+      const chosen = candidates.find((candidate) => this._evidentMac(candidate.machine))
+        ?? candidates.find((candidate) => candidate.machine === this.classicSessionMachine)
+        ?? candidates[0]
       if (!chosen) throw error
       if (remember) this.viewerEvents.rememberTarget(chosen)
       return chosen

@@ -1770,8 +1770,10 @@ export class RelayReader {
    * a `fresh` caller is never handed an answer asked before it.
    */
   async transcript(session: string, fresh = false): Promise<{ page: TranscriptPage; reused: boolean }> {
+    const started = Date.now()
     const client = this.connected()
     const all = await client.sessions()
+    const sessionsMs = Date.now() - started
     const row = all.sessions.find((r) => r.machine === this.machine && (r.session ?? r.id) === session)
     const rowKey = row ? keyOf(row) : ""
     const line = row && typeof row.line === "string" ? row.line : ""
@@ -1806,32 +1808,69 @@ export class RelayReader {
       }
     }
     const entry: HeldTranscript = held ?? this.hold(session)
+    const firstRead = !held?.answer
+    let wordsMs: number | null = null
+    let pinMs: number | null = null
+    let wireMs: number | null = null
+    let outcome = "unknown"
+    const report = () => {
+      if (!firstRead) return
+      try {
+        const log = (client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } }).viewerEvents
+        log?.record?.("cloud.transcript.first_read", {
+          machine: this.machine, outcome, total_ms: Date.now() - started,
+          sessions_ms: sessionsMs, words_ms: wordsMs, pin_ms: pinMs, wire_ms: wireMs,
+        }, "cloud.transcript.first_read|" + this.machine)
+      } catch { /* diagnostics cannot fail a read */ }
+    }
     // `transcript` is past the remembered descriptor's cut too, and this read
     // does not go through `machineRead` (`client.transcript`).
-    await this.settledWords("transcript")
-    if (this.options.classicStatus && !client.transcriptForGeneration) {
-      throw Object.assign(new Error("Pinned Session reading is unavailable"), { code: "cloud_not_carried" })
-    }
-    const asked = (this.options.classicStatus
-      ? this.coherentSession(session).then((target) => client.transcriptForGeneration!(target))
-      : client.transcript({ machine: this.machine, session }, undefined, { foreground: true }))
-      .then((body) => transcriptPage(body, session))
-    entry.inflight = asked
-    this.transcripts.set(session, entry)
     try {
-      const page = await asked
-      entry.answer = page
-      entry.at = this.now()
-      entry.rowKey = rowKey
-      entry.line = line
-      entry.stale = false
-      // The awaited change has arrived; from here the ordinary rules apply.
-      if (entry.expectUntil && page.signature !== entry.expectFrom) entry.expectUntil = 0
-      return { page, reused: false }
+      const wordsStarted = Date.now()
+      await this.settledWords("transcript")
+      wordsMs = Date.now() - wordsStarted
+      if (this.options.classicStatus && !client.transcriptForGeneration) {
+        throw Object.assign(new Error("Pinned Session reading is unavailable"), { code: "cloud_not_carried" })
+      }
+      const asked = (async () => {
+        let body: unknown
+        if (this.options.classicStatus) {
+          const pinStarted = Date.now()
+          const target = await this.coherentSession(session)
+          pinMs = Date.now() - pinStarted
+          const wireStarted = Date.now()
+          body = await client.transcriptForGeneration!(target)
+          wireMs = Date.now() - wireStarted
+        } else {
+          const wireStarted = Date.now()
+          body = await client.transcript({ machine: this.machine, session }, undefined, { foreground: true })
+          wireMs = Date.now() - wireStarted
+        }
+        return transcriptPage(body, session)
+      })()
+      entry.inflight = asked
+      this.transcripts.set(session, entry)
+      try {
+        const page = await asked
+        entry.answer = page
+        entry.at = this.now()
+        entry.rowKey = rowKey
+        entry.line = line
+        entry.stale = false
+        // The awaited change has arrived; from here the ordinary rules apply.
+        if (entry.expectUntil && page.signature !== entry.expectFrom) entry.expectUntil = 0
+        outcome = "ready"
+        return { page, reused: false }
+      } finally {
+        // A failed ask keeps the last good answer and its age, so the next poll
+        // asks again rather than reusing it as though nothing had happened.
+        entry.inflight = null
+      }
+    } catch (error) {
+      outcome = failureCode(error)
+      throw error
     } finally {
-      // A failed ask keeps the last good answer and its age, so the next poll
-      // asks again rather than reusing it as though nothing had happened.
-      entry.inflight = null
+      report()
     }
   }
 
