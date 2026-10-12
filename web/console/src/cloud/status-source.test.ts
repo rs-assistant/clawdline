@@ -165,6 +165,12 @@ test("status-only list never subscribes to or reads rich content", async () => {
 
 test("a cold status gap uses one complete pinned machine list for rows and titles", async () => {
   const { client, calls } = clientFixture()
+  const list = client.listPresentationsForMachine
+  client.listPresentationsForMachine = async (machine) => {
+    const reply = await list(machine)
+    return { ...reply, sessions: reply.sessions.map((row) => ({ ...row,
+      status: { ...row.status, sessionId: "conversation-41" } })) }
+  }
   client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
   const source = statusSource(() => client as never)
   const reading = await source.readMachine(machineID, new AbortController().signal)
@@ -174,6 +180,8 @@ test("a cold status gap uses one complete pinned machine list for rows and title
     "a direct row carries the generation the single-machine reader verifies")
   const titles = await source.readMachinePresentations?.(machineID, new AbortController().signal)
   assert.deepEqual(titles?.map((row) => row.title), ["The real title"])
+  assert.equal(titles?.[0]?.status?.sessionId, "conversation-41",
+    "the pinned Cloud row retains the conversation that owns its attention notes")
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 })
 
