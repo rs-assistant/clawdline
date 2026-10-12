@@ -754,15 +754,32 @@ export class StatusCloudClient extends CatalogCloudClient {
     this.carrierMachines.clear()
   }
 
+  /**
+   * An opened detail holds its rich row's channel for as long as it is open.
+   *
+   * Unheld, the channel was trimmed as idle by the next read: on 2026-10-12 the
+   * machine's log recorded `ch=t/<machine>/<session> fanout=1` every minute and
+   * `ch=s/<machine>/<session> fanout=0` throughout, for a Session the page had
+   * open. A Session stopped on a question is exactly the one whose row stops
+   * moving, so the row carrying the question never arrived, and the card said
+   * the machine could not read a menu it had read whole.
+   */
   openDetail(destination) {
     const channel = "s/" + channelSegment(destination.machineID) + "/" + channelSegment(destination.sessionID)
+    if (!this.openedDetails.has(channel) && this.subscriptionHolds) {
+      this.subscriptionHolds.set(channel, (this.subscriptionHolds.get(channel) || 0) + 1)
+    }
     this.openedDetails.add(channel)
     this.detailSnapshots.delete(destination.machineID + "\u0000" + destination.sessionID)
   }
 
   closeDetail(destination) {
     const channel = "s/" + channelSegment(destination.machineID) + "/" + channelSegment(destination.sessionID)
-    this.openedDetails.delete(channel)
+    if (this.openedDetails.delete(channel) && this.subscriptionHolds) {
+      const holds = (this.subscriptionHolds.get(channel) || 0) - 1
+      if (holds > 0) this.subscriptionHolds.set(channel, holds)
+      else this.subscriptionHolds.delete(channel)
+    }
     this.detailSnapshots.delete(destination.machineID + "\u0000" + destination.sessionID)
   }
 

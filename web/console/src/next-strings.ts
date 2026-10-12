@@ -614,6 +614,7 @@ const words = {
       "Claude Code is showing a menu on that machine, and Clawdline could not read its choices from the screen.",
     menuNoScreenSay:
       "Claude Code is showing a menu on that machine, but its terminal is not answering right now, so Clawdline cannot see the screen.",
+    menuArrivingSay: "Claude Code is showing a menu on that machine. Its choices have not reached this page yet.",
     menuFromTranscript:
       "The terminal is not answering right now, so these choices are taken from the conversation record rather than read from the screen. The screen is checked before anything is typed, and nothing is typed if it cannot be seen.",
     menuUnreadHow:
@@ -1736,6 +1737,7 @@ const words = {
     menuChooseAgain: "重新選擇",
     menuUnreadSay: "Claude Code 正在那台機器上顯示一個選單，Clawdline 沒能從畫面讀出它的選項。",
     menuNoScreenSay: "Claude Code 正在那台機器上顯示一個選單，但那個終端機現在沒有回應，Clawdline 看不到畫面。",
+    menuArrivingSay: "Claude Code 正在那台機器上顯示一個選單，它的選項還沒傳到這個頁面。",
     menuFromTranscript:
       "終端機現在沒有回應，這些選項是照對話紀錄排出來的，不是從畫面讀到的。按下去之前會先對一次畫面，看不到畫面就不會打字。",
     menuUnreadHow:
