@@ -22,9 +22,9 @@ export function SessionRowLayout({ children, className, ...props }: ComponentPro
 }
 
 /** Status-only rows keep the original list structure without inventing rich Session content. */
-export function ProjectedRow({ title, sessionID, machineName, assistant, backend, state, stateLabel, icon, cwd,
+export function ProjectedRow({ title, sessionID, machineID, machineName, assistant, backend, state, stateLabel, icon, cwd,
   freshness, lastMovementAt, attention, open, selectionKey, depth, branchThrough, ancestorThrough, status, swiped = false, onOpen, onClose, consumePress }: {
-  title: string; sessionID: string; machineName: string
+  title: string; sessionID: string; machineID: string; machineName: string
   assistant?: "claude" | "codex"; backend?: "tmux" | "iterm" | "ps"
   icon?: SessionRow["icon"]; cwd?: string
   state: string; stateLabel: string; freshness: string; lastMovementAt?: number; attention: boolean; open: boolean
@@ -35,6 +35,7 @@ export function ProjectedRow({ title, sessionID, machineName, assistant, backend
 }) {
   const ref = useRef<HTMLLIElement>(null)
   const mark = icon ?? BRAND_MARK
+  const role = rowPersonaLine(usePersonas(machineID), status?.persona)
   useLayoutEffect(() => { if (state === "working") L.paintSpinner(ref.current?.querySelector<HTMLCanvasElement>("canvas.spin") ?? null) }, [state])
   useLayoutEffect(() => { if (ref.current) paintSwipe(ref.current, swiped ? "open" : "", swiped ? ACTION_WIDTH : 0) }, [swiped, selectionKey])
   const activate = () => { if (!consumePress?.() && ref.current) onOpen(ref.current) }
@@ -55,7 +56,7 @@ export function ProjectedRow({ title, sessionID, machineName, assistant, backend
       <span className="tty">{backend || sessionID}</span>
       {lastMovementAt && <span className="session-activity">{sessionActivityWord({ activity: { known: true, at: lastMovementAt / 1000 } })}</span>}</div>
     {status ? <StateLine row={{ ...status, id: sessionID, state } as SessionRow}
-      role={null} useLocalTasks={false} suffix={freshness} />
+      role={role} useLocalTasks={false} suffix={freshness} />
       : <div className="state">{state === "working" && <canvas className="spin" aria-hidden="true" />}
         <span>{stateLabel}</span>{freshness && <span className="session-activity">{freshness}</span>}
         {attention && <span className="session-attention"><span className="session-attention-dot" /></span>}</div>}

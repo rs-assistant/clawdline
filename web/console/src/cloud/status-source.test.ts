@@ -48,7 +48,8 @@ function clientFixture() {
     async listPresentationsForMachine(machine: string) {
       calls.push("sessions.list:" + machine)
       return { at, complete: true, sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
-        status: { state: "idle", work_state: "ready", work_note: "Queued heavy command finished", work_provenance: "self" } }] }
+        status: { state: "idle", work_state: "ready", work_note: "Queued heavy command finished", work_provenance: "self",
+          persona: "product-manager" } }] }
     },
     async infoForGeneration(destination: { executionGeneration: string }) {
       calls.push("info:" + destination.executionGeneration)
@@ -209,7 +210,7 @@ test("a failed cold list retries after the short bound and recovers without a ma
     if (fail) throw new Error("carrier_closed")
     return { at: Math.floor(now / 1000), complete: true,
       sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "Recovered",
-        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] }
+        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] }
   }
   const source = statusSource(() => client as never)
   const first = await source.readMachine(machineID, new AbortController().signal)
@@ -245,7 +246,7 @@ test("a stale retained status pass recovers from one pinned machine list without
     calls.push("sessions.list:" + machine)
     return { at: Math.floor(Date.now() / 1000), complete: false,
       sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
-        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] }
+        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] }
   }
   const source = statusSource(() => client as never)
   const first = await source.readMachine(machineID, new AbortController().signal)
@@ -267,7 +268,7 @@ test("a stale marker cannot turn an incomplete direct list into a complete one",
   marker.payload.at -= 600
   client.listPresentationsForMachine = async () => ({ at: Math.floor(Date.now() / 1000), complete: false,
     sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
-      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] })
+      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] })
   const read = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
   assert.equal(read.kind, "ready")
   if (read.kind === "ready") {
@@ -283,7 +284,7 @@ test("an incomplete machine scan is complete only with the signed inventory's ex
     calls.push("sessions.list:" + machine)
     return { at: Math.floor(Date.now() / 1000), complete: false,
       sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
-        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] }
+        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] }
   }
   const source = statusSource(() => client as never)
   const certified = await source.readMachine(machineID, new AbortController().signal)
@@ -295,7 +296,7 @@ test("an incomplete machine scan is complete only with the signed inventory's ex
   other.client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
   other.client.listPresentationsForMachine = async () => ({ at: Math.floor(Date.now() / 1000), complete: false,
     sessions: [{ id: "different", execution_generation: executionGeneration, title: "Wrong set",
-      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] })
+      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] })
   other.client.recoverStatusRow = async () => false
   const partial = await statusSource(() => other.client as never).readMachine(machineID, new AbortController().signal)
   assert.equal(partial.kind, "ready")
@@ -324,6 +325,7 @@ test("one machine list read joins only the current Session execution", async () 
   const rows = await source.readMachinePresentations?.(machineID, new AbortController().signal)
   assert.deepEqual(rows?.map((item) => item.title), ["The real title"])
   assert.equal(rows?.[0]?.status?.work_note, "Queued heavy command finished")
+  assert.equal(rows?.[0]?.status?.persona, "product-manager")
   assert.deepEqual(calls, ["sessions.list:" + machineID])
   row.execution_generation = "ffffffffffffffffffffffffffffffff"
   assert.deepEqual(await source.readMachinePresentations?.(machineID, new AbortController().signal), [])
