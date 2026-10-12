@@ -63,6 +63,21 @@ func init() {
 				return machinePlan(b)
 			}},
 
+		// One Session's row, now (`Bridge.SessionRow`). `row` names it; the
+		// envelope's own `session` is the machine's, as for the two words above.
+		// Only a machine advertising this word is asked it.
+		op{name: sessionsRowWord, read: true, sessions: true,
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "row") {
+					return plan{}, false
+				}
+				row, ok := b.str("row")
+				if !ok || row == "" || len(row) > SessionRowIDBytesLimit {
+					return plan{}, false
+				}
+				return machinePlan(b)
+			}},
+
 		op{name: "board.items", read: true,
 			decode: func(b body) (plan, bool) {
 				if !b.has("type", "session", "request", "project", "audience", "cursor", "limit") {
@@ -384,3 +399,8 @@ func init() {
 			}},
 	)
 }
+
+// SessionRowIDBytesLimit is the longest Session id a `sessions.row` read may
+// name. A tmux pane id or an iTerm2 GUID is a few dozen bytes; anything past
+// this is not an id this machine issued, and is refused before it is looked up.
+const SessionRowIDBytesLimit = 256

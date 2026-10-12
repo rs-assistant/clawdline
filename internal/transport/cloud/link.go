@@ -771,6 +771,7 @@ func (l *Link) wire() error {
 	// thing that can put the rows back on their channels.
 	l.service.Bridge.Sessions = l.publisher.Snapshot
 	l.service.Bridge.SessionsFor = l.publisher.SnapshotFrom
+	l.service.Bridge.SessionRow = l.publisher.StateRow
 	// A press from a page is shown landing at the next look, not the next pass.
 	l.service.Acted = l.publisher.Settle
 	return nil

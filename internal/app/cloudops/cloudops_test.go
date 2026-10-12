@@ -1099,6 +1099,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 			"request": "req-initial-rows"},
 		session: machine, name: "read:req-initial-rows", code: "unknown_command", status: 400,
 	}, {
+		word: "sessions.row",
+		body: map[string]any{"type": "sessions.row", "session": machine,
+			"request": "req-one-row", "row": "%7"},
+		session: machine, name: "read:req-one-row", code: "unknown_command", status: 400,
+	}, {
 		word: "schedule",
 		body: map[string]any{"type": "schedule", "session": machine, "request": "req-schedule",
 			"id": scheduleID},

@@ -54,3 +54,45 @@ func TestAPressIsShownLandingWithoutWaitingForTheNextPass(t *testing.T) {
 	cancel()
 	<-done
 }
+
+// A page with a Session open and waiting asks for that one row when its
+// question has not come. The row has not changed, so no pass would send it
+// again; the whole restatement it used to ask waited for the next pass.
+func TestOneSessionRowIsStatedNowEvenUnchanged(t *testing.T) {
+	out := &collector{}
+	body := scanBody(t, true, map[string]bool{"ps": true, "tmux": true, "iterm": true},
+		scanRow{id: "%19", tty: "ttys001", backend: "tmux"},
+		scanRow{id: "%20", tty: "ttys002", backend: "tmux"})
+	publisher := newPublisher(&fixedRouter{body: body}, out)
+	publisher.Every = time.Hour
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { _ = publisher.Run(ctx); close(done) }()
+	waitFor(t, "the first pass", func() bool { return len(legacyChannels(out.channels())) >= 4 })
+	out.reset()
+
+	started := time.Now()
+	stated, refusal := publisher.StateRow(ctx, "viewer-01", "%19")
+	if refusal != nil {
+		t.Fatalf("refused: %+v", *refusal)
+	}
+	if took := time.Since(started); took > time.Second {
+		t.Fatalf("the row was stated %v after it was asked", took)
+	}
+	if strings.Join(stated.IDs, ",") != "%19" {
+		t.Fatalf("answered %+v", stated)
+	}
+	channels := strings.Join(out.channels(), " ")
+	if !strings.Contains(channels, "s/mac-01/%2519") || strings.Contains(channels, "s/mac-01/%2520") {
+		t.Fatalf("published %v; want the one row asked for", channels)
+	}
+	if _, refusal := publisher.StateRow(ctx, "viewer-01", "%19"); refusal == nil || refusal.Code != "cloud_read_busy" {
+		t.Fatalf("the same viewer asking again at once was answered %+v", refusal)
+	}
+	if stated, refusal := publisher.StateRow(ctx, "viewer-01", "%99"); refusal != nil || len(stated.IDs) != 0 {
+		t.Fatalf("a row the machine does not have was answered %+v %+v", stated, refusal)
+	}
+	cancel()
+	<-done
+}

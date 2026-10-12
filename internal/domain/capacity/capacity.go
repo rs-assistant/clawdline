@@ -180,6 +180,8 @@ const (
 	CloudViewerEventsBatch = "cloud.viewer_events_batch_bytes"
 	CloudViewerEventsRows  = "cloud.viewer_events_logged_rows"
 	CloudViewerEventsLine  = "cloud.viewer_events_line_bytes"
+	CloudSessionRowID      = "cloud.session_row_id_bytes"
+	CloudSessionRowAsks    = "cloud.session_row_asks"
 	CloudViewerEventsSeen  = "cloud.viewer_events_seen_batches"
 	// C2: the things that had no limit at all (limits §3.3, §7.2 wave 2).
 	LogDaemon             = "log.daemon"
@@ -753,6 +755,25 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics, Log},
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/app/cloudops.ViewerEventsLoggedRowsLimit"},
+		},
+		{
+			// The Session id a `sessions.row` read names. Longer is refused
+			// `malformed_read`; no id this machine issues comes near it.
+			Name: CloudSessionRowID, Class: Buffer, Unit: Bytes,
+			Limit: 256, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Sender},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/app/cloudops.SessionRowIDBytesLimit"},
+		},
+		{
+			// `sessions.row` asks waiting for the publisher's loop. Past it
+			// the sender is answered 429 cloud_read_busy and asks again.
+			Name: CloudSessionRowAsks, Class: Buffer, Unit: Rows,
+			Limit: 64, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Sender},
+			EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.SessionRowAsksLimit",
+				"internal/transport/cloud.(*Publisher).open:chan(SessionRowAsksLimit)"},
 		},
 		{
 			// One reported row's log line; a longer one is cut and says so.

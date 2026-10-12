@@ -2203,7 +2203,9 @@ export class RelayReader {
       Math.abs(this.now() - observedAt) > RICH_MENU_FRESH_MS ||
       !Array.isArray(rich.menu?.options) || !rich.menu.options.length) {
       if (this.askForOpenedQuestion(target)) this.reportMissingQuestion(client, target, rich, observedAt)
-      return row
+      // Asked for and on its way: the card says so rather than that the
+      // machine could not read a question it has not been asked to send yet.
+      return { ...row, menu_arriving: true }
     }
     return { ...row, menu: rich.menu, ...(typeof rich.screen_reading === "string" ? { screen_reading: rich.screen_reading } : {}) }
   }
@@ -2229,10 +2231,15 @@ export class RelayReader {
     // `.initial` is stated at once rather than at the machine's next pass, once
     // per viewer per pass (publish.go SnapshotFrom); a machine that does not
     // list the word is asked the plain way.
-    const initial = (this.client as { _machineImplements?(machine: string, word: string): string } | null)
-      ?._machineImplements?.(this.machine, "sessions.snapshot.initial") === "yes"
-    void this.machineRead(null, "GET", "/v1/sessions", initial ? "sessions.snapshot.initial" : "sessions.snapshot", {})
-      .catch(() => undefined)
+    const implements_ = (word: string) => (this.client as { _machineImplements?(machine: string, word: string): string } | null)
+      ?._machineImplements?.(this.machine, word) === "yes"
+    // `sessions.row` states just this row, now (publish.go StateRow); the
+    // whole restatement is for a machine from before that word.
+    const ask = implements_("sessions.row")
+      ? this.machineRead(null, "GET", "/v1/sessions", "sessions.row", { row: target.sessionID })
+      : this.machineRead(null, "GET", "/v1/sessions",
+        implements_("sessions.snapshot.initial") ? "sessions.snapshot.initial" : "sessions.snapshot", {})
+    void ask.catch(() => undefined)
     return true
   }
 
