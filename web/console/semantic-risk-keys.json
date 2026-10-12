@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5066,
+  "englishKeys": 5069,
   "counts": {
-    "negation": 1465,
+    "negation": 1467,
     "state": 699,
     "permission": 298,
     "deletion": 90,
     "uncertainty": 147
   },
-  "unionCount": 2221,
+  "unionCount": 2223,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1013,6 +1013,8 @@
       "next.cloudAllNoRow",
       "next.cloudAllOldVersion",
       "next.cloudAllOlderOldVersion",
+      "next.cloudAllPartialEmpty",
+      "next.cloudAllPartialMachine",
       "next.cloudAllUnconfirmed",
       "next.cloudAllUnknownSource",
       "next.cloudAllUnknownTargets",
@@ -4155,6 +4157,8 @@
     "next.cloudAllOlderOldVersion",
     "next.cloudAllOpenCurrent",
     "next.cloudAllPairing",
+    "next.cloudAllPartialEmpty",
+    "next.cloudAllPartialMachine",
     "next.cloudAllStateWaiting",
     "next.cloudAllUnconfirmed",
     "next.cloudAllUnknown",

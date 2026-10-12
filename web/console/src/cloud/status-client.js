@@ -23,6 +23,10 @@ const CARRIER_SESSION = "__clawdline_machine__"
 const INVENTORY_SESSION = "__clawdline_inventory_v1__"
 /** A carrier either negotiates in a few seconds or is not available on this network. */
 const CARRIER_TIMEOUT_MS = 15_000
+/** A cold list must yield promptly when the relay or direct carrier stops answering. */
+const PINNED_LIST_READ_TIMEOUT_MS = 10_000
+/** A retained marker normally replays at once; silence must not block the direct-list fallback. */
+const STATUS_MARKER_RECOVERY_TIMEOUT_MS = 5_000
 
 function refused(code, message) {
   return Object.assign(new Error(message), { code })
@@ -952,7 +956,7 @@ export class StatusCloudClient extends CatalogCloudClient {
         this.pendingSubscriptions.add(channel)
         this._sendSubscriptionFrame("subscribe", [channel])
         this.socketSubscriptions.set(channel, this.now())
-        timer = this.setTimeout(() => finish(false), this.readTimeoutMs)
+        timer = this.setTimeout(() => finish(false), STATUS_MARKER_RECOVERY_TIMEOUT_MS)
       }
     } catch { finish(false) }
     return promise
@@ -977,7 +981,7 @@ export class StatusCloudClient extends CatalogCloudClient {
     const request = crypto.randomUUID()
     return this._read({ machine: machineID, session: "__clawdline_machine__" }, "sessions.list", {
       machine_id: machineID, request,
-    }, "read:" + request, undefined, { signal })
+    }, "read:" + request, PINNED_LIST_READ_TIMEOUT_MS, { signal })
   }
 
   /** Let each schedule machine answer independently of its slower peers. */

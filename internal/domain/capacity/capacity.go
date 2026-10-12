@@ -450,6 +450,8 @@ const (
 	ConsoleRelayFeatureWait           = "console.relay_feature_wait_seconds"
 	ConsoleStatusGapRetry             = "console.status_gap_retry_seconds"
 	ConsoleStatusMarkerRetry          = "console.status_marker_retry_seconds"
+	ConsolePinnedListReadTimeout      = "console.pinned_list_read_timeout_seconds"
+	ConsoleStatusMarkerRecoveryWait   = "console.status_marker_recovery_wait_seconds"
 	ConsoleTranscriptFollowFast       = "console.transcript_follow_fast_seconds"
 	ConsoleTranscriptFollowLater      = "console.transcript_follow_later_seconds"
 	ConsoleHealthLive                 = "console.health_live_seconds"
@@ -2587,10 +2589,25 @@ func Register() []Entry {
 		{
 			// A cold browser replays one missing ss/ inventory marker, then
 			// waits before asking again while default status pushes may arrive.
-			// The same interval revalidates a complete pinned machine list used
-			// while a cold browser still has an ss/ row gap.
+			// The same interval revalidates a successful pinned machine list used
+			// while a cold browser still has an ss/ row gap. A failed list starts
+			// at ConsoleStatusGapRetry and backs off to this bound.
 			Name: ConsoleStatusMarkerRetry, Class: Cache, Unit: Seconds,
 			Limit: 60, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// One pinned machine list read yields after ten seconds of
+			// silence (PINNED_LIST_READ_TIMEOUT_MS, status-client.js).
+			Name: ConsolePinnedListReadTimeout, Class: Cache, Unit: Seconds,
+			Limit: 10, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// One retained marker replay yields after five seconds of
+			// silence (STATUS_MARKER_RECOVERY_TIMEOUT_MS, status-client.js).
+			Name: ConsoleStatusMarkerRecoveryWait, Class: Cache, Unit: Seconds,
+			Limit: 5, AtLimit: Expire,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
 		{

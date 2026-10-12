@@ -108,10 +108,34 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 			At       int64          `json:"at"`
 			Complete bool           `json:"complete"`
 			Sessions []presentation `json:"sessions"`
-		}{At: snapshot.At, Complete: snapshot.Scan.Complete, Sessions: rows})
+		}{At: snapshot.At, Complete: cloudListComplete(snapshot.Scan), Sessions: rows})
 		return
 	}
 	_ = json.NewEncoder(w).Encode(snapshot)
+}
+
+// The compact Cloud list covers the sources this person enabled. The merged
+// local scan remains partial while a source is deliberately turned off, but
+// that source is outside the Cloud list's promised set. A failed enabled
+// source still makes the list partial. This matches the signed ss/ publisher.
+func cloudListComplete(scan contract.Scan) bool {
+	if scan.Complete || scan.EmptyAuthoritative {
+		return true
+	}
+	if len(scan.Sources) == 0 {
+		return false
+	}
+	disabled := false
+	for _, source := range scan.Sources {
+		if source.Complete {
+			continue
+		}
+		if source.Disabled == "" {
+			return false
+		}
+		disabled = true
+	}
+	return disabled
 }
 
 // sessionRowWire is a row as it is sent. It exists for one key the contract

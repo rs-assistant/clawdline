@@ -25,6 +25,7 @@ type StatusClient = CloudClientHandle & {
   recoverStatusMarker?(machineID: string): Promise<boolean>
   readTimeoutMs?: number
   cancelStatusRecoveries?(): void
+  viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown }
   /** The daemon must atomically compare the execution generation before reading content. */
   infoForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
   listPresentationsForMachine?(machineID: string, signal: AbortSignal): Promise<unknown>
@@ -32,6 +33,15 @@ type StatusClient = CloudClientHandle & {
   transcriptPageForGeneration?(destination: SessionDestination, before: number, signal: AbortSignal): Promise<unknown>
   skillsForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
   imageForGeneration?(destination: SessionDestination, id: string, signal: AbortSignal): Promise<unknown>
+}
+
+function reportListFailure(client: StatusClient, machineID: string, reason: string,
+  code: string, ms: number, failures: number): void {
+  try {
+    client.viewerEvents?.record?.("cloud.status_list.failed", { machine: machineID, reason, code, ms,
+      failures, support: pinnedReadSupport(client, machineID) },
+    ["cloud.status_list.failed", machineID, code].join("|"))
+  } catch { /* diagnostics cannot fail a Session read */ }
 }
 
 function channels(destination: SessionDestination): string[] {
@@ -89,17 +99,19 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
     !["working", "waiting", "idle", "unknown"].includes(String(record(row.status)?.state)))) return null
   const ids = sessions.map((row: Record<string, unknown> | null) => String(row!.id))
   if (new Set(ids).size !== ids.length) return null
-  // An incomplete local scan can still fill a gap in the signed ss/ set.
-  // A different or missing ID cannot silently become a complete list.
-  if (body.complete === false && (!inventoryIDs || ids.length !== inventoryIDs.length ||
-    ids.some((id) => !inventoryIDs.includes(id)))) return null
-  return { reply: body, projection: { kind: "ready", complete: true, observedAt: nowMs,
-    snapshotGeneration: "direct:" + nowMs,
+  // The signed ss/ set can prove that an incomplete local scan nevertheless
+  // names every Session in that set. Without that proof, show only the rows
+  // the machine did name. Absence then proves nothing, including an empty list.
+  const complete = body.complete === true || !!inventoryIDs && ids.length === inventoryIDs.length &&
+    ids.every((id) => inventoryIDs.includes(id))
+  const snapshotGeneration = "direct:" + nowMs
+  return { reply: body, projection: { kind: "ready", complete, observedAt: nowMs,
+    snapshotGeneration,
     rows: sessions.map((row: Record<string, unknown> | null) => {
       const status = record(row!.status)!
       return { destination: { machineID, sessionID: String(row!.id),
         executionGeneration: String(row!.execution_generation) }, state: String(status.state),
-      freshness: "current" as const, observedAt: nowMs }
+      freshness: "current" as const, observedAt: nowMs, snapshotGeneration }
     }) } }
 }
 
@@ -157,7 +169,7 @@ export function statusSource(current: () => StatusClient | null): SessionProject
     sessions: Map<string, { promise: Promise<boolean>; retryAt: number }> }>()
   const markerAttempts = new Map<string, { promise: Promise<boolean>; retryAt: number }>()
   const opened = new Map<string, StatusClient>()
-  const directLists = new Map<string, { client: StatusClient; until: number; value: DirectList | null;
+  const directLists = new Map<string, { client: StatusClient; until: number; value: DirectList | null; failures: number;
     promise?: Promise<DirectList | null> }>()
   const imageSignals = new Map<string, AbortController>()
   const visibleArtifacts = new Map<string, Set<string>>()
@@ -188,14 +200,33 @@ export function statusSource(current: () => StatusClient | null): SessionProject
       const now = client.now?.() ?? Date.now()
       let cached = directLists.get(machineID)
       if (!cached || cached.client !== client || cached.until <= now) {
+        const started = now
+        const reason = projection.reason
+        const failures = cached?.client === client ? cached.failures : 0
         const promise = client.listPresentationsForMachine(machineID, new AbortController().signal)
-          .then((reply) => directList(machineID, reply, client.now?.() ?? Date.now(),
-            statusInventoryIDs(client, machineID, client.now?.() ?? Date.now())), () => null)
-        cached = { client, until: now + STATUS_MARKER_RETRY_MS, value: null, promise }
+          .then((reply) => {
+            const value = directList(machineID, reply, client.now?.() ?? Date.now(),
+              statusInventoryIDs(client, machineID, client.now?.() ?? Date.now()))
+            if (!value) reportListFailure(client, machineID, reason, "invalid_reply",
+              (client.now?.() ?? Date.now()) - started, failures + 1)
+            return value
+          }, (error: unknown) => {
+            const code = (error as { code?: unknown })?.code
+            reportListFailure(client, machineID, reason, typeof code === "string" ? code : "untyped",
+              (client.now?.() ?? Date.now()) - started, failures + 1)
+            return null
+          })
+        cached = { client, until: now + STATUS_MARKER_RETRY_MS, value: null,
+          failures, promise }
         directLists.set(machineID, cached)
         void promise.then((value) => { if (directLists.get(machineID) === cached) {
           cached!.value = value
           cached!.promise = undefined
+          // The first carrier failure clears quickly, while continued silence
+          // backs off to the successful list's normal cache interval.
+          cached!.failures = value ? 0 : Math.min(5, cached!.failures + 1)
+          if (!value) cached!.until = (client.now?.() ?? Date.now()) +
+            Math.min(STATUS_MARKER_RETRY_MS, STATUS_GAP_RETRY_MS * 2 ** (cached!.failures - 1))
         } })
       }
       const direct = cached.promise ? await cached.promise : cached.value
@@ -223,8 +254,9 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         attempt.retryAt = (client.now?.() ?? Date.now()) + STATUS_MARKER_RETRY_MS
       projection = statusProjection(client, machineID)
       if (projection.kind === "unavailable" && projection.reason === "unknown")
-        return { ...projection, retryAt: markerAttempts.get(machineID)?.retryAt ??
-          (client.now?.() ?? Date.now()) + STATUS_MARKER_RETRY_MS }
+        return { ...projection, retryAt: Math.min(markerAttempts.get(machineID)?.retryAt ??
+          (client.now?.() ?? Date.now()) + STATUS_MARKER_RETRY_MS,
+        directLists.get(machineID)?.until ?? Number.POSITIVE_INFINITY) }
     }
     if (projection.kind === "unavailable" && projection.reason === "event_gap" &&
       !statusPassTransition(client, machineID) && client.recoverStatusRow) {
@@ -256,7 +288,13 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         }
       }
     }
-    if (projection.kind !== "ready" || signal.aborted) return projection
+    if (projection.kind !== "ready" || signal.aborted) {
+      if (projection.kind === "unavailable" && projection.reason === "unknown" && !projection.retryAt) {
+        const until = directLists.get(machineID)?.until
+        if (until) return { ...projection, retryAt: until }
+      }
+      return projection
+    }
     const answer = await client.machines()
     const machine = answer.machines.find((entry) => entry.id === machineID)
     if (!machine || machine.freshness === "unknown") return { kind: "unavailable", reason: "unknown" }

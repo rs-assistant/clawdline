@@ -40,6 +40,20 @@ test("a reused Session id with a new execution generation cannot open or reuse o
   assert.equal(cache.get(old.destination), undefined)
 })
 
+test("a partial authenticated list opens named executions but proves no Session absent", () => {
+  const known = row("machine/a", "known", "7")
+  const missing = row("machine/a", "unscanned", "8")
+  const partial = checkedProjection("machine/a", { kind: "ready", complete: false,
+    observedAt: 1000, rows: [known] })
+  assert.equal(partial.kind, "ready")
+  assert.equal(destinationAvailable(known.destination, partial), "ready")
+  assert.equal(destinationAvailable(missing.destination, partial), "waiting")
+  assert.equal(supersedingDestination(missing.destination, partial), null)
+  assert.equal(destinationAvailable(missing.destination, checkedProjection("machine/a", {
+    kind: "ready", complete: false, observedAt: 1000, rows: [],
+  })), "waiting")
+})
+
 test("slow or offline machines do not make the fast machine's projection empty", () => {
   const fast = ready("fast", [row("fast", "s1", "1")])
   const slow: MachineSessionProjection = { kind: "unavailable", reason: "offline" }

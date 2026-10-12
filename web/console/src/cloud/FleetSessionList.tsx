@@ -23,7 +23,7 @@ type Reading = { phase: "loading" } | { phase: "settled"; value: MachineSessionP
 
 /** Only the fleet list is new; the conversation and composer belong to SessionsPage. */
 export function FleetSessionList({ machines, source, target, filter, onFilter, onOpen,
-  carrierOf, onMachineAction, onCloseRequest, onPresentations }: {
+  carrierOf, onMachineAction, onCloseRequest, onPresentations, onProjection }: {
   machines: readonly FleetMachine[]
   source: SessionProjectionSource | null
   /** Which road this page's reads of that machine take, read as the row is drawn. */
@@ -34,10 +34,17 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   onOpen: (target: SessionDestination) => void
   onPresentations?: (machineID: string, rows: readonly (SessionListPresentation & {
     destination: SessionDestination; projection?: ProjectedSession })[]) => void
+  onProjection?: (machineID: string, reading: MachineSessionProjection) => void
   onMachineAction?: (machineID: string, action: MachineToolbarAction) => void
   onCloseRequest: (target: SessionDestination, title: string) => void
 }) {
   const [readings, setReadings] = useState<Record<string, Reading>>({})
+  useEffect(() => {
+    for (const machine of machines) {
+      const reading = readings[machine.id]
+      if (reading?.phase === "settled") onProjection?.(machine.id, reading.value)
+    }
+  }, [readings, machines, onProjection])
   const presentations = useRef(new Map<string, { machineID: string; sessionID: string; pass: string } & SessionListPresentation>())
   const presentationPasses = useRef(new Map<string, string>())
   const presentationFailures = useRef(new Map<string, string>())
@@ -323,16 +330,20 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
             </button></h2>
           {!collapsed[machine.id] && <>
-          {machine.freshness !== "current" && reading?.phase === "settled" && reading.value.kind === "ready" &&
-            <p role="status">{machine.freshness === "stale" ? nextWord("cloudAllStaleSource") : nextWord("cloudAllUnknownSource")}</p>}
+          {/* A verified Session reading can settle before the roster's machine
+              freshness changes. Its own completeness and row freshness are the
+              authority here; an unrelated roster state must not leave a
+              permanent "checking connection" banner above settled results. */}
           {!reading || reading.phase === "loading" ? <p role="status">{nextWord("cloudAllLoading")}</p> : <>
             {reading.value.kind === "unavailable" && <p role="status">{problemWord(reading.value.reason)}</p>}
+            {reading.value.kind === "ready" && !reading.value.complete &&
+              <p role="status">{nextWord("cloudAllPartialMachine")}</p>}
             {presentationLoading && <p role="status">{nextWord("cloudAllLoading")}</p>}
             {presentationFailed && <p role="alert">{nextWord("cloudAllNameUnavailable")} <button type="button"
               onClick={() => { presentationPasses.current.delete(machine.id); presentationFailures.current.delete(machine.id)
                 refreshPresentation((revision) => revision + 1) }}>{nextWord("cloudAllTryAgain")}</button></p>}
             {presentationLoading || presentationFailed ? null : rows.length === 0 ? reading.value.unknownTargets ? null : reading.value.kind === "ready" ?
-              <p>{reading.value.rows.length === 0 ? nextWord("cloudAllEmptyMachine") : nextWord("cloudAllNoMatch")}</p> : null
+              <p>{reading.value.rows.length === 0 ? nextWord(reading.value.complete ? "cloudAllEmptyMachine" : "cloudAllPartialEmpty") : nextWord("cloudAllNoMatch")}</p> : null
               : <ul className="rows" role="listbox" aria-label={`${machine.name} ${nextWord("cloudSingleSessions")}`}>
                 {rows.map(({ row, depth, branchThrough, ancestorThrough }) => {
                   const presentation = presentations.current.get(destinationKey(row.destination))

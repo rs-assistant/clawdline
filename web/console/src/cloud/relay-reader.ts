@@ -26,7 +26,7 @@ import type { CarriedWord, CarryTable } from "./carry.js"
 import type { Health, SessionRow, SessionsSnapshot, TaskList, TaskRow, TranscriptPage } from "@clawdline/contract"
 import type { StreamHandle, StreamHandlers, StreamTransport } from "@clawdline/core"
 import type { CloudWriteClient, WriteHost, WriteRoute } from "./relay-writer.js"
-import type { MachineListPresentation, SessionDestination, SessionListPresentation } from "./all-machine-sessions.js"
+import type { MachineListPresentation, MachineSessionProjection, SessionDestination, SessionListPresentation } from "./all-machine-sessions.js"
 import { authenticatedRefusalKey } from "./refusal-client.js"
 
 /** One machine and one of its sessions, as the relay's channels name them. */
@@ -564,8 +564,12 @@ export interface RelayReaderOptions {
   fleetTarget?: () => SessionDestination | null
   /** Display facts from the already authorized per-machine list read. */
   fleetPresentation?: (target: SessionDestination) => SessionListPresentation | null
+  /** A newer, authenticated fleet batch keeps an older ss/ replay from shrinking the list. */
+  fleetPresentations?: (machineID: string) => MachineListPresentation[]
   /** The same bounded, pinned machine list used by the fleet when rich rows are missing. */
-  listPresentations?: (machineID: string, expectedCount: number) => Promise<MachineListPresentation[] | null>
+  listPresentations?: (machineID: string, expectedCount: number | null) => Promise<MachineListPresentation[] | null>
+  /** The fleet's verified per-machine Session set; the classic list reads this first. */
+  machineProjection?: (machineID: string) => Promise<MachineSessionProjection>
   /** Resolve an exact execution through the verified status source if ss/ replay is missing. */
   resolveSession?: (machineID: string, sessionID: string) => Promise<SessionDestination | null>
   /** Recheck one visible fleet mutation against the latest ss/ pass. */
@@ -628,6 +632,8 @@ export class RelayReader {
   /** The opened destination this reader last asked the machine to restate, and when. */
   private rowAsked: { key: string; at: number } | null = null
   private presentationRead: { pass: string; until: number; promise: Promise<MachineListPresentation[] | null> } | null = null
+  private listRetryTimer: ReturnType<typeof setTimeout> | null = null
+  private listRetryMs = 5_000
   /** The one machine this reads. */
   readonly machine: string
 
@@ -1436,7 +1442,7 @@ export class RelayReader {
     })
   }
 
-  private presentationsForPass(pass: string, expectedCount: number): Promise<MachineListPresentation[] | null> {
+  private presentationsForPass(pass: string, expectedCount: number | null): Promise<MachineListPresentation[] | null> {
     const now = this.now()
     const held = this.presentationRead
     if (held?.pass === pass && held.until > now) return held.promise
@@ -1445,9 +1451,76 @@ export class RelayReader {
     const reading = { pass, until: now + 60_000, promise }
     this.presentationRead = reading
     void promise.then((rows) => {
-      if (this.presentationRead === reading && (!rows || rows.length < expectedCount)) reading.until = this.now() + 5_000
+      // Without a signed marker there is no count to certify a partial read.
+      // Keep checking while the person is on this machine; one row is not the
+      // whole list merely because it was the first row to arrive.
+      if (this.presentationRead === reading && (!rows || expectedCount === null || rows.length < expectedCount))
+        reading.until = this.now() + 5_000
     })
     return promise
+  }
+
+  private async projectedReading(): Promise<{ snapshot: SessionsSnapshot; settled: boolean } | null> {
+    if (!this.options.classicStatus || !this.options.machineProjection) return null
+    let projection: MachineSessionProjection
+    try { projection = await this.options.machineProjection(this.machine) } catch { return null }
+    if (projection.kind !== "ready" && !projection.rows?.length) return null
+    const projectedRows = projection.rows ?? []
+    const pass = String(projection.snapshotGeneration ?? "") + ":" +
+      String(projection.kind === "ready" ? projection.presentationGeneration ?? "" : "")
+    const presentations = projectedRows.length && this.options.listPresentations
+      ? await this.presentationsForPass(pass, projectedRows.length) : null
+    const byExecution = new Map((presentations ?? []).map((row) =>
+      [this.machine + "\u0000" + row.destination.sessionID + "\u0000" + row.destination.executionGeneration, row]))
+    const missingTitles = projectedRows.some((row) => !byExecution.has(this.machine + "\u0000" +
+      row.destination.sessionID + "\u0000" + row.destination.executionGeneration))
+    const machineRows: CloudRow[] = projectedRows.map((row) => {
+      const presentation = byExecution.get(this.machine + "\u0000" + row.destination.sessionID + "\u0000" +
+        row.destination.executionGeneration)
+      const status = presentation?.status?.state === row.state ? presentation.status : undefined
+      const { identity: _displayIdentity, ...displayStatus } = status ?? {}
+      return { ...displayStatus, id: row.destination.sessionID, session: row.destination.sessionID,
+        machine: this.machine, execution_generation: row.destination.executionGeneration,
+        label: presentation?.title ?? row.destination.sessionID, cwd: presentation?.cwd,
+        icon: presentation?.icon, assistant: row.assistant, backend: row.backend, state: row.state,
+        source: { freshness: row.freshness === "current" ? "current" : "unverified",
+          observed_at: row.observedAt / 1000 } }
+    })
+    const whole = projection.kind === "ready" && projection.complete && !missingTitles
+    const sessions = machineRows.filter((row) => {
+      const id = String(row.session ?? row.id ?? "")
+      const closedAt = this.closedAt.get(id)
+      if (closedAt === undefined) return true
+      const source = row.source as { freshness: string; observed_at: number }
+      if (source.freshness === "current" && source.observed_at > closedAt) {
+        this.closedAt.delete(id)
+        return true
+      }
+      return false
+    }).map(consoleRow)
+    if (whole) {
+      const present = new Set(machineRows.map((row) => String(row.session ?? row.id ?? "")))
+      for (const id of this.closedAt.keys()) if (!present.has(id)) this.closedAt.delete(id)
+    }
+    this.generation += 1
+    const snapshot: SessionsSnapshot = {
+      at: Math.floor((projection.observedAt ?? this.now()) / 1000),
+      scan: { complete: whole, completed: { complete: whole, sequence: this.generation },
+        emptyAuthoritative: whole, epoch: this.epoch, generation: this.generation, provenance: "cloud" },
+      sessions,
+    }
+    if (whole) {
+      if (this.listRetryTimer) clearTimeout(this.listRetryTimer)
+      this.listRetryTimer = null
+      this.listRetryMs = 5_000
+    } else if (!this.listRetryTimer && this.streams.size) {
+      this.listRetryTimer = setTimeout(() => {
+        this.listRetryTimer = null
+        this.listRetryMs = Math.min(this.listRetryMs * 2, 60_000)
+        for (const stream of this.streams) this.queueFrame(stream)
+      }, this.listRetryMs)
+    }
+    return { snapshot, settled: sessions.length > 0 || whole }
   }
 
   private async snapshotReading(): Promise<{ snapshot: SessionsSnapshot; settled: boolean }> {
@@ -1471,21 +1544,43 @@ export class RelayReader {
       }
     }
     const client = this.connected()
+    const projected = await this.projectedReading()
+    if (projected) return projected
     const all = await client.sessions()
     this.sayDrift()
     const recovering = (all.scan.recovering ?? []).includes(this.machine)
     const failed = (all.scan.failures ?? []).some((f) => f.machine === this.machine)
     const statusMarker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
-      | { payload?: { complete?: unknown; snapshot_generation?: unknown;
+      | { payload?: { at?: unknown; complete?: unknown; snapshot_generation?: unknown;
         inventory?: { version?: unknown; sessions?: unknown } } } | undefined
     const statusIDs = statusMarker?.payload?.complete === true && statusMarker.payload.inventory?.version === 1 &&
       Array.isArray(statusMarker.payload.inventory.sessions)
       ? statusMarker.payload.inventory.sessions.filter((id): id is string => typeof id === "string" && !!id) : null
     const inventory = client.sessionInventoryByMachine?.get(this.machine)
-    let expected = this.options.classicStatus
+    const inventoryKeys = inventoryRowKeys(inventory)
+    let expected: Set<string> | null = this.options.classicStatus
       ? statusIDs === null ? null : new Set(statusIDs.map((id) => this.machine + "\u0000" + id))
-      : inventoryRowKeys(inventory)
+      : inventoryKeys ? new Set(inventoryKeys) : null
     const hasInventory = this.options.classicStatus ? expected !== null : inventory !== undefined
+    let newerFleetRows = false
+    const newerFleetExecutions = new Map<string, string>()
+    if (this.options.classicStatus && expected && typeof statusMarker?.payload?.at === "number" &&
+      Number.isFinite(statusMarker.payload.at)) {
+      const markerAt = Number(statusMarker!.payload!.at) * 1000
+      for (const row of this.options.fleetPresentations?.(this.machine) ?? []) {
+        const projection = row.projection
+        if (projection?.freshness !== "current" || projection.observedAt <= markerAt ||
+          projection.destination.machineID !== this.machine ||
+          projection.destination.sessionID !== row.destination.sessionID ||
+          projection.destination.executionGeneration !== row.destination.executionGeneration) continue
+        const key = this.machine + "\u0000" + row.destination.sessionID
+        newerFleetExecutions.set(row.destination.sessionID, row.destination.executionGeneration)
+        if (!expected.has(key)) {
+          expected.add(key)
+          newerFleetRows = true
+        }
+      }
+    }
     const machineRows = all.sessions.filter((row) => {
       if (row.machine !== this.machine) return false
       if (!this.options.classicStatus) return true
@@ -1496,12 +1591,21 @@ export class RelayReader {
       return typeof status?.payload?.execution_generation === "string" &&
         row.execution_generation === status.payload.execution_generation
     })
+    for (let index = machineRows.length - 1; index >= 0; index--) {
+      const row = machineRows[index]
+      const id = typeof row.session === "string" ? row.session : row.id
+      const newer = typeof id === "string" ? newerFleetExecutions.get(id) : undefined
+      if (newer && row.execution_generation !== newer) {
+        machineRows.splice(index, 1)
+        newerFleetRows = true
+      }
+    }
     let recoveredFromList = false
     if (this.options.classicStatus && this.options.listPresentations &&
       (!expected || machineRows.length < expected.size)) {
       const pass = String(statusMarker?.payload?.snapshot_generation ?? "") + ":" +
         String((statusMarker?.payload as { presentation_generation?: unknown } | undefined)?.presentation_generation ?? "")
-      const presentations = await this.presentationsForPass(pass, expected?.size ?? 1)
+      const presentations = await this.presentationsForPass(pass, expected?.size ?? null)
       if (!expected && presentations?.length) {
         expected = new Set(presentations.map((row) => this.machine + "\u0000" + row.destination.sessionID))
       }
@@ -1519,13 +1623,15 @@ export class RelayReader {
         const signedRow = data?.machine_id === this.machine && data.session_id === target.sessionID &&
           data.execution_generation === target.executionGeneration &&
           data.snapshot_generation === statusMarker?.payload?.snapshot_generation &&
-          data.source?.freshness === "current"
+          ["current", "unverified", "missing"].includes(String(data.source?.freshness))
         const pinnedRow = presentation.projection?.freshness === "current" &&
           presentation.projection.destination.machineID === this.machine &&
           presentation.projection.destination.sessionID === target.sessionID &&
           presentation.projection.destination.executionGeneration === target.executionGeneration &&
           presentation.projection.state === presentation.status?.state &&
-          (presentation.projection.snapshotGeneration?.startsWith("direct:") ||
+          (presentation.projection.snapshotGeneration?.startsWith("direct:") &&
+            (typeof statusMarker?.payload?.at !== "number" ||
+              presentation.projection.observedAt >= statusMarker.payload.at * 1000) ||
             presentation.projection.snapshotGeneration === statusMarker?.payload?.snapshot_generation)
         if (hasInventory && !signedRow && !pinnedRow) continue
         const { identity: _displayIdentity, ...displayStatus } = presentation.status ?? {}
@@ -1535,7 +1641,7 @@ export class RelayReader {
           assistant: signedRow ? data?.assistant : presentation.projection?.assistant,
           backend: signedRow ? data?.backend : presentation.projection?.backend,
           state: signedRow ? data?.state : presentation.status?.state ?? "unknown",
-          source: signedRow ? data?.source : { freshness: "current",
+          source: signedRow ? data?.source : { freshness: presentation.projection?.freshness === "current" ? "current" : "unverified",
             observed_at: (presentation.projection?.observedAt ?? this.now()) / 1000 } })
         held.add(key)
       }
@@ -1572,7 +1678,7 @@ export class RelayReader {
       return this.machine + "\u0000" + id
     }))
     const hasEveryRow = expected === null ? !this.options.classicStatus : [...expected].every((key) => heldKeys.has(key))
-    const whole = hasInventory && hasEveryRow && !recovering && !failed
+    const whole = hasInventory && hasEveryRow && !newerFleetRows && !recovering && !failed
     const sessions = machineRows.filter((row) => {
       const id = typeof row.session === "string" ? row.session : typeof row.id === "string" ? row.id : ""
       const closedAt = this.closedAt.get(id)
@@ -1609,8 +1715,22 @@ export class RelayReader {
     }
     // The original page can show verified rich rows as they arrive. The ss/
     // marker remains the deletion barrier; a gap never claims an empty list.
-    return { snapshot, settled: whole || failed || (this.options.classicStatus === true &&
-      (hasInventory || recoveredFromList) && machineRows.length > 0) }
+    const settled = whole || failed || (this.options.classicStatus === true &&
+      (hasInventory || recoveredFromList) && machineRows.length > 0)
+    if (whole) {
+      if (this.listRetryTimer) clearTimeout(this.listRetryTimer)
+      this.listRetryTimer = null
+      this.listRetryMs = 5_000
+    } else if (this.options.classicStatus && !this.listRetryTimer && this.streams.size) {
+      // A missing ss/ marker emits no event. Retry the still-open page with
+      // backoff so a failed carrier does not leave it waiting forever.
+      this.listRetryTimer = setTimeout(() => {
+        this.listRetryTimer = null
+        this.listRetryMs = Math.min(this.listRetryMs * 2, 60_000)
+        for (const stream of this.streams) this.queueFrame(stream)
+      }, this.listRetryMs)
+    }
+    return { snapshot, settled }
   }
 
   /**
