@@ -12,7 +12,7 @@ import { destinationKey, displayedPresentationStatus, presentationPass, projecti
   type SessionListPresentation, type SessionProjectionSource, type FleetMachine,
   type ProjectedSession } from "./all-machine-sessions.js"
 import { STATUS_FRESH_MS } from "./status-projection.js"
-import { STATUS_MARKER_RETRY_MS } from "./status-source.js"
+import { STATUS_GAP_RETRY_MS, STATUS_MARKER_RETRY_MS } from "./status-source.js"
 import { arrangeFleetRows, fleetWaitingKey } from "./fleet-order.js"
 import { matchesFleetFilter, type FleetFilter } from "./fleet-filters.js"
 import { CarrierDot } from "./CarrierDot.js"
@@ -91,12 +91,13 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
         if (!live || abort.signal.aborted) return
         if (value.kind === "ready") scheduleMachineReady(machineID)
         setReadings((before) => ({ ...before, [machineID]: { phase: "settled",
-          value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined, value) } }))
+          value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined,
+            value, STATUS_GAP_RETRY_MS) } }))
       }, (error: unknown) => {
         if (!live || abort.signal.aborted) return
         setReadings((before) => ({ ...before, [machineID]: { phase: "settled",
           value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined,
-            { kind: "unavailable", reason: problemOf(error) }) } }))
+            { kind: "unavailable", reason: problemOf(error) }, STATUS_GAP_RETRY_MS) } }))
       })
     }
     const stop = source.subscribe(({ machineID, sessionID, kind }) => {
@@ -134,12 +135,13 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
           if (!abort.signal.aborted) {
             if (value.kind === "ready") scheduleMachineReady(machineID)
             setReadings((before) => ({ ...before, [machineID]: { phase: "settled",
-              value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined, value) } }))
+              value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined,
+                value, STATUS_GAP_RETRY_MS) } }))
           }
         }, (error: unknown) => {
           if (!abort.signal.aborted) setReadings((before) => ({ ...before, [machineID]: { phase: "settled",
             value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined,
-              { kind: "unavailable", reason: problemOf(error) }) } }))
+              { kind: "unavailable", reason: problemOf(error) }, STATUS_GAP_RETRY_MS) } }))
         })
       }
     }, Math.max(1, earliest - Date.now()))
@@ -335,7 +337,10 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               authority here; an unrelated roster state must not leave a
               permanent "checking connection" banner above settled results. */}
           {!reading || reading.phase === "loading" ? <p role="status">{nextWord("cloudAllLoading")}</p> : <>
-            {reading.value.kind === "unavailable" && <p role="status">{problemWord(reading.value.reason)}</p>}
+            {/* // refusal-ok: Unknown means the list is still being verified; its reason stays in the reading for the scheduled retry. */}
+            {reading.value.kind === "unavailable" && (reading.value.reason === "unknown"
+              ? !reading.value.rows?.length && <p role="status">{nextWord("cloudAllLoading")}</p>
+              : <p role="status">{problemWord(reading.value.reason)}</p>)}
             {reading.value.kind === "ready" && !reading.value.complete &&
               <p role="status">{nextWord("cloudAllPartialMachine")}</p>}
             {presentationLoading && <p role="status">{nextWord("cloudAllLoading")}</p>}

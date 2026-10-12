@@ -95,6 +95,10 @@ test("a temporary status read failure retains the last list without making its r
     assert.equal(destinationAvailable(row("one", "s", "1").destination, held), "waiting")
     assert.equal(checkedProjection("one", held), held)
   }
+  const retry = settleProjection("one", previous, { kind: "unavailable", reason: "unknown" }, 5_000)
+  assert.ok(retry.kind === "unavailable")
+  assert.ok(retry.retryAt !== undefined && retry.retryAt >= Date.now() + 4_000 && retry.retryAt <= Date.now() + 5_000)
+  assert.equal(projectionRefreshAt(retry, 300_000), retry.retryAt)
   assert.equal(settleProjection("one", previous, { kind: "unavailable", reason: "no_permission" }).rows, undefined)
 })
 
@@ -151,6 +155,7 @@ test("current status is reread when its earliest status time expires", () => {
   assert.equal(projectionRefreshAt(ready("one", [{ ...row("one", "s", "1"), freshness: "stale", observedAt: 1 }]),
     300_000), 301_001)
   assert.equal(projectionRefreshAt({ kind: "unavailable", reason: "stale" }, 300_000), null)
+  assert.equal(projectionRefreshAt({ kind: "unavailable", reason: "unknown", retryAt: 1200 }, 300_000), 1200)
   assert.equal(projectionRefreshAt({ kind: "unavailable", reason: "offline", retryAt: 1200 }, 300_000), 1200)
   assert.equal(projectionRefreshAt({ kind: "unavailable", reason: "event_gap", retryAt: 1200 }, 300_000), 1200)
   assert.equal(projectionRefreshAt({ ...one, observedAt: 900, snapshotGeneration: "direct:900" },
