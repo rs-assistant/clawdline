@@ -595,6 +595,38 @@ test("only an s row received after exact detail open may supply its menu", () =>
   assert.equal(client.detailSnapshots.size, 0)
 })
 
+// On 2026-10-12 a Session stopped on a question was open on the page, and the
+// machine logged its transcript channel delivered every minute and its rich-row
+// channel to nobody: the next transcript read had trimmed the quiet s/ as idle,
+// and the row carrying the question never arrived.
+test("an opened detail's rich row is not trimmed as idle by the next read, and is let go on close", () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  let now = 0
+  client.now = () => now
+  client.ready = true
+  client.subscriptionLimit = 8
+  client.subscriptionIdleMs = 120_000
+  client.subscriptionHolds = new Map()
+  client.pendingSubscriptions = new Set()
+  client.socketSubscriptions = new Map()
+  client.subscriptionFrames = []
+  client.resubscribes = new Map()
+  client.openedDetails = new Set()
+  client.detailSnapshots = new Map()
+  const sent = []
+  client._send = (frame) => sent.push(frame)
+  const destination = { machineID: "m", sessionID: "s", executionGeneration: genA }
+  client.openDetail(destination)
+  client.subscribe(["s/m/s", "t/m/s"])
+  now = 10 * 60_000
+  client.subscribe(["t/m/other"])
+  assert.ok(client.socketSubscriptions.has("s/m/s"), "the opened rich row was trimmed")
+  assert.ok(!sent.some((f) => f.type === "unsubscribe" && f.channels.includes("s/m/s")))
+  client.openDetail(destination)
+  client.closeDetail(destination)
+  assert.equal(client.subscriptionHolds.has("s/m/s"), false, "a second open of the same detail held it twice")
+})
+
 test("r/ capability is learned only from this socket's full machine descriptor", () => {
   const client = Object.create(StatusCloudClient.prototype)
   client.readContentCapabilities = new Map()

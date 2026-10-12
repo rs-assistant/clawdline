@@ -1494,7 +1494,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       presentation.projection.state !== status.state) return null
     // The pinned list deliberately omits closeability and terminal internals.
     // The fallback opens content only; an unknown closeability cannot authorize
-    // an end action while the rich stream is catching up.
+    // an end action while the rich stream is catching up. The waiting card
+    // reads the same provenance to say a missing menu has not arrived yet,
+    // rather than that the machine could not read it (`session/Waiting.tsx`).
     const closeability: SessionRow["closeability"] = {
       activity_generation: 0, attestation_id: null, mover: null,
       obligation_generation: 0, observed_at: 0, provenance: [], reasons: [],

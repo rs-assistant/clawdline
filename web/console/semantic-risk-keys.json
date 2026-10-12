@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5069,
+  "englishKeys": 5070,
   "counts": {
-    "negation": 1467,
+    "negation": 1468,
     "state": 699,
     "permission": 298,
     "deletion": 90,
     "uncertainty": 147
   },
-  "unionCount": 2223,
+  "unionCount": 2224,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1144,6 +1144,7 @@
       "next.machineReclaimNone",
       "next.machineReclaimReasonIntentNotRecorded",
       "next.machineWorkspaceInvalid",
+      "next.menuArrivingSay",
       "next.menuFromTranscript",
       "next.menuMoved",
       "next.menuNoScreenSay",
@@ -4400,6 +4401,7 @@
     "next.machineUpdateAvailable",
     "next.machineUpdateDiffers",
     "next.machineWorkspaceInvalid",
+    "next.menuArrivingSay",
     "next.menuCancelSent",
     "next.menuFromTranscript",
     "next.menuMoved",
