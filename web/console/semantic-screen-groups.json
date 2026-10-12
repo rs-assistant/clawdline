@@ -1,8 +1,8 @@
 {
   "version": 1,
   "englishContentKeys": 5071,
-  "riskKeys": 2222,
-  "nonRiskCount": 2849,
+  "riskKeys": 2227,
+  "nonRiskCount": 2844,
   "groups": [
     {
       "name": "bar / other",
@@ -1640,7 +1640,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 204,
+      "count": 199,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1721,12 +1721,7 @@
         "next.cloudDeviceLimitLoading",
         "next.cloudDeviceRemoveCancel",
         "next.cloudDeviceSeen",
-        "next.cloudForget",
-        "next.cloudForgetAskCurrent",
-        "next.cloudForgetOne",
         "next.cloudForgetSaid",
-        "next.cloudForgetTitle",
-        "next.cloudForgetting",
         "next.cloudInstallLede",
         "next.cloudMachineActions",
         "next.cloudMachineID",

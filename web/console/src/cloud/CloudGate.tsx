@@ -258,6 +258,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         : { at: "checking" },
   )
   const [who, setWho] = useState<{ account: string; device: string } | null>(null)
+  const [managingMachines, setManagingMachines] = useState(false)
   const [machineList, setMachineList] = useState<MachineListState>({ phase: "loading" })
   const machines = machineList.phase === "ready" ? machineList.machines : null
   const [problem, setProblem] = useState<AccessProblem | null>(null)
@@ -627,6 +628,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     // or the header keeps naming the machine this tab chose first while the
     // list below it is another machine's.
     setChosen(machine)
+    setManagingMachines(false)
     setScreen({ at: "console" })
   }, [transport, forgotten, pointAt])
 
@@ -1030,7 +1032,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // list is asked again whenever it changes, so a machine that was still
   // arriving is opened on the pass that lists it.
   useEffect(() => {
-    if (screen.at !== "machines" || !machines || !who) return
+    if (screen.at !== "machines" || managingMachines || !machines || !who) return
     const exact = destinationFromFragment(location.hash)
     // A Session destination is the fleet's own address; a document address is
     // one machine's page, and the fleet would put the Session list over it.
@@ -1045,7 +1047,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     if (opening.at !== "console") return
     setFleetScope(opening.fleet)
     choose(machines.find((machine) => machine.id === opening.machine)!, opening.remember)
-  }, [screen, machines, who, choose, remembered])
+  }, [screen, managingMachines, machines, who, choose, remembered])
 
   /**
    * Leave the machine this tab chose and start again at the list. This drops
@@ -1058,6 +1060,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     } catch {
       /* nothing remembered */
     }
+    setManagingMachines(true)
     setScreen({ at: "machines" })
   }, [who])
 
@@ -1069,6 +1072,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     } catch {
       /* the console still stays on the machine already attached */
     }
+    setManagingMachines(false)
     setScreen({ at: "console" })
   }, [reading, who])
 
