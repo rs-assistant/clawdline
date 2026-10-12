@@ -11,8 +11,10 @@
    top: on a phone the 驗收 page's 16px top padding left a strip under the
    header where the record showed through above the bar. Each page that
    carries a bar says its own top padding here as --page-bar-lift, beside the
-   rule that sets it, and the bar sticks that much higher: flush with the
-   header. verify.e2e.ts holds the bar's top to the page's top. */
+   rule that sets it, and the bar sits and sticks that much higher: flush
+   with the header from the first paint, not only once the page scrolls.
+   verify.e2e.ts holds the bar's top to the page's top, unscrolled and
+   scrolled. */
 
 .board-page { --page-bar-lift: 24px; }
 .projects { --page-bar-lift: clamp(16px, 3vw, 34px); }
@@ -25,10 +27,19 @@
     position: sticky; top: calc(-1 * var(--page-bar-lift, 0px)); z-index: 4;
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
     min-height: 44px; padding-block: 8px; margin-bottom: 16px;
+    margin-top: calc(-1 * var(--page-bar-lift, 0px));
     background: var(--bg);
     box-shadow: 0 0 0 100vmax var(--bg);
-    clip-path: inset(0 -100vmax);
+    clip-path: inset(-100vmax -100vmax 0);
 }
+
+/* iOS rubber-bands a scroller pulled past its top, and the sticky bar moves
+   down with it, opening a gap under the header (seen on a phone, 2026-10-12,
+   the scroll indicator still showing). A page that carries a bar does not
+   bounce; where a browser bounces anyway, the bar's colour reaches up (the
+   clip above lets its spread shadow out on top, under the header), so what
+   opens is more bar, not the page behind it. */
+.page:has(.page-bar) { overscroll-behavior-y: none; }
 .page-bar-start, .page-bar-end { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .page-bar-end { margin-left: auto; }
 

@@ -1838,7 +1838,11 @@ export class RelayReader {
     // does not go through `machineRead` (`client.transcript`).
     try {
       const wordsStarted = Date.now()
-      await this.settledWords("transcript")
+      // A generation-pinned read names its machine. The copied client's
+      // truncated remembered word list is not a refusal; its current client
+      // sends the named read and the machine answers authoritatively. Waiting
+      // five seconds for orch/ here only delays a cold conversation.
+      if (!this.options.classicStatus) await this.settledWords("transcript")
       wordsMs = Date.now() - wordsStarted
       if (this.options.classicStatus && !client.transcriptForGeneration) {
         throw Object.assign(new Error("Pinned Session reading is unavailable"), { code: "cloud_not_carried" })
@@ -2083,6 +2087,20 @@ export class RelayReader {
       return this.pinnedSession(session)
     } catch (error) {
       const condition = (error as { condition?: unknown })?.condition
+      // The fleet already read this exact display row through the paired
+      // machine. If the retained status marker is late, its separate recovery
+      // can take many seconds. Ask the pinned machine now; it rechecks the
+      // generation and permission before returning any content. A newer
+      // status row naming another execution is an explicit contradiction.
+      if (["no_marker", "no_row", "marker_stale", "row_stale", "observed_stale"].includes(String(condition))) {
+        const target = this.options.fleetTarget?.()
+        const displayed = target?.machineID === this.machine && target.sessionID === session
+          ? this.options.fleetPresentation?.(target) : null
+        const status = this.client?.statusSnapshots?.get(JSON.stringify([this.machine, session])) as
+          | { payload?: { execution_generation?: unknown } } | undefined
+        const known = status?.payload?.execution_generation
+        if (displayed && (!known || known === target!.executionGeneration) && !signal?.aborted) return target!
+      }
       // The marker lists this Session and its row is not here. That is a row
       // to ask for, not an execution that changed: the relay retains it, the
       // list already recovers it this way for a gap in its own pass, and

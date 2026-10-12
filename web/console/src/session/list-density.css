@@ -21,6 +21,12 @@
   max-width: 100%;
 }
 
+/* Keep the third grid row when a session has no status to display. */
+.row .state:empty {
+  display: flex;
+  min-height: 18px;
+}
+
 .row .state > .session-live-line {
   flex: 1 1 12ch;
   min-width: 0;

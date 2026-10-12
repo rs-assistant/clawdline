@@ -287,6 +287,10 @@ test("phone: the list and a record fit 390px, the table scrolls inside itself, a
     assert.equal(await run(`document.getElementById("nav-verify")?.textContent?.trim()`), "驗收")
     assert.match(await run(`document.querySelector("#verify-open .verify-due").textContent`), /^還有 6 天 1 小時到期$/)
     assert.equal(await run(`document.querySelectorAll("#verify-open > li").length`), 1, "only the open record is listed")
+    // The bar is flush with the header as the page first appears, unscrolled.
+    const rest = await run(`(() => ({ bar: document.querySelector("#verify .page-bar").getBoundingClientRect().top,
+      page: document.getElementById("verify").getBoundingClientRect().top, scrolled: document.getElementById("verify").scrollTop }))()`)
+    assert.ok(rest.scrolled === 0 && Math.abs(rest.bar - rest.page) < 1, "the bar does not touch the top of the unscrolled page: " + JSON.stringify(rest))
     let width = await run(WIDTH)
     await shot("verify-list-390")
     assert.equal(width.inner, 390)
