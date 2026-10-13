@@ -99,6 +99,12 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
     !["working", "waiting", "idle", "unknown"].includes(String(record(row.status)?.state)))) return null
   const ids = sessions.map((row: Record<string, unknown> | null) => String(row!.id))
   if (new Set(ids).size !== ids.length) return null
+  const byConversation = new Map<string, string | null>()
+  for (const row of sessions) {
+    const conversation = record(row!.status)?.sessionId
+    if (typeof conversation !== "string" || !conversation) continue
+    byConversation.set(conversation, byConversation.has(conversation) ? null : String(row!.id))
+  }
   // The signed ss/ set can prove that an incomplete local scan nevertheless
   // names every Session in that set. Without that proof, show only the rows
   // the machine did name. Absence then proves nothing, including an empty list.
@@ -109,8 +115,11 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
     snapshotGeneration,
     rows: sessions.map((row: Record<string, unknown> | null) => {
       const status = record(row!.status)!
+      const ownerConversation = record(status.epic_parent)?.owner_session_id
+      const parentSessionID = typeof ownerConversation === "string" ? byConversation.get(ownerConversation) : null
       return { destination: { machineID, sessionID: String(row!.id),
         executionGeneration: String(row!.execution_generation) }, state: String(status.state),
+      parentSessionID: parentSessionID && parentSessionID !== row!.id ? parentSessionID : undefined,
       freshness: "current" as const, observedAt: nowMs, snapshotGeneration }
     }) } }
 }

@@ -67,6 +67,7 @@ var sessionFields = map[string]string{
 	"projects#PlaceResumed.session":                  conversation,
 	"schedules#ScheduleRequest.session_id":           conversation,
 	"sessions#SessionRow.sessionId":                  conversation,
+	"sessions#SessionRow.parent_session_id":          "terminal: the current Cloud status row's visual parent terminal id; retire when Cloud ancestry uses conversation ids",
 	"session-status#SessionStatus.session_id":        "terminal: the ss/ row's terminal id, pinned by execution_generation; retire when status rows use conversation ids",
 	"session-status#SessionStatus.parent_session_id": "terminal: the listed parent terminal id for visual ancestry; retire when status ancestry uses conversation ids",
 	// The Epic assignment actor records the owner's conversation at dispatch

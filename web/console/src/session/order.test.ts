@@ -194,6 +194,15 @@ test("a child stays under its visible root when the task's screen snapshot misse
   assert.equal(visualDepths([root, kid], [task], () => true).get("kid"), 1)
 })
 
+test("a Cloud status parent keeps a child under its root without a task or Board fields", () => {
+  const root = row("root", "idle", "Root")
+  const child = row("child", "working", "Child", { parent_session_id: "root" })
+  const other = row("other", "idle", "Other")
+  assert.deepEqual(order([root, child, other], { root: 10, other: 50 }), ["other", "root", "child"])
+  assert.equal(visualDepths([root, child, other], [], () => true).get("child"), 1)
+  assert.equal(visualDepths([child, other], [], () => true).get("child"), 0)
+})
+
 test("an Epic assigned independent Root appears under its owner, with its own broker child", () => {
   const owner = row("owner", "idle", "Architect", { sessionId: "owner-conversation" })
   const feature = row("feature", "working", "Feature", {

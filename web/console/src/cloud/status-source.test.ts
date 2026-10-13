@@ -186,6 +186,23 @@ test("a cold status gap uses one complete pinned machine list for rows and title
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 })
 
+test("a cold pinned list retains an Epic child's visible parent", async () => {
+  const { client } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
+  const original = client.listPresentationsForMachine
+  client.listPresentationsForMachine = async (machine) => {
+    const reply = await original(machine)
+    const base = reply.sessions[0]
+    return { ...reply, sessions: [
+      { ...base, id: "root", title: "Root", status: { ...base.status, state: "idle", sessionId: "root-conversation" } },
+      { ...base, id: "child", title: "Child", status: { ...base.status, state: "idle",
+        epic_parent: { owner_session_id: "root-conversation", epic_id: "epic" } } },
+    ] }
+  }
+  const reading = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(reading.rows?.find((row) => row.destination.sessionID === "child")?.parentSessionID, "root")
+})
+
 test("a cold browser asks once before the machine descriptor arrives", async () => {
   const { client, calls } = clientFixture()
   client.readContentCapabilities.delete(machineID)

@@ -1513,6 +1513,7 @@ export class RelayReader {
       const { identity: _displayIdentity, ...displayStatus } = status ?? {}
       return { ...displayStatus, id: row.destination.sessionID, session: row.destination.sessionID,
         machine: this.machine, execution_generation: row.destination.executionGeneration,
+        parent_session_id: row.parentSessionID,
         label: presentation?.title ?? row.destination.sessionID, cwd: presentation?.cwd,
         icon: presentation?.icon, assistant: row.assistant, backend: row.backend, state: row.state,
         source: { freshness: row.freshness === "current" ? "current" : "unverified",
@@ -1650,6 +1651,7 @@ export class RelayReader {
         const status = client.statusSnapshots?.get(JSON.stringify([this.machine, target.sessionID])) as
           | { payload?: { snapshot_generation?: unknown; execution_generation?: unknown;
             machine_id?: unknown; session_id?: unknown; state?: unknown; assistant?: unknown; backend?: unknown;
+            parent_session_id?: unknown;
             source?: { freshness?: unknown; observed_at?: unknown } } } | undefined
         const data = status?.payload
         const signedRow = data?.machine_id === this.machine && data.session_id === target.sessionID &&
@@ -1669,6 +1671,8 @@ export class RelayReader {
         const { identity: _displayIdentity, ...displayStatus } = presentation.status ?? {}
         machineRows.push({ ...displayStatus, id: target.sessionID, session: target.sessionID,
           machine: this.machine, execution_generation: target.executionGeneration, label: presentation.title,
+          parent_session_id: signedRow && typeof data?.parent_session_id === "string"
+            ? data.parent_session_id : presentation.projection?.parentSessionID,
           cwd: presentation.cwd, icon: presentation.icon,
           assistant: signedRow ? data?.assistant : presentation.projection?.assistant,
           backend: signedRow ? data?.backend : presentation.projection?.backend,
@@ -1686,6 +1690,7 @@ export class RelayReader {
       const status = client.statusSnapshots?.get(JSON.stringify([this.machine, target.sessionID])) as
         | { payload?: { snapshot_generation?: unknown; execution_generation?: unknown;
           machine_id?: unknown; session_id?: unknown; state?: unknown; assistant?: unknown; backend?: unknown;
+          parent_session_id?: unknown;
           source?: { freshness?: unknown; observed_at?: unknown } } } | undefined
       const data = status?.payload
       if (presentation?.title && data?.machine_id === this.machine && data.session_id === target.sessionID &&
@@ -1698,6 +1703,7 @@ export class RelayReader {
         const { identity: _displayIdentity, ...displayStatus } = presentation.status ?? {}
         machineRows.push({ ...displayStatus, id: target.sessionID, session: target.sessionID,
           machine: this.machine, execution_generation: target.executionGeneration,
+          parent_session_id: typeof data.parent_session_id === "string" ? data.parent_session_id : undefined,
           label: presentation.title, cwd: presentation.cwd, icon: presentation.icon,
           assistant: data.assistant, backend: data.backend, state: data.state, source: data.source })
       }

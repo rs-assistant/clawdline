@@ -5773,6 +5773,10 @@ type SessionRow struct {
 	Menu         *SessionMenu `json:"menu,omitempty"`
 	Owed         *WorkOwed    `json:"owed,omitempty"`
 
+	// Visual parent terminal ID supplied by a current Cloud status projection. Absent
+	// in the local Session list and when the parent is not in that projection.
+	ParentSessionID string `json:"parent_session_id,omitempty"`
+
 	// The built-in persona (GET /v1/personas) this session was launched as, read back
 	// from its process command line; absent for none, and absent on a row with no
 	// process reading.

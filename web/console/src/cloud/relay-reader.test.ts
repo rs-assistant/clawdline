@@ -7,6 +7,8 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import type { SessionsSnapshot, TranscriptPage } from "@clawdline/contract"
 import { documentIdentityForSession } from "../legacy/js/net/document-links.js"
+// @ts-expect-error -- Node runs the source test with type stripping.
+import { arrangeSessions } from "../session/order.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { RelayReader, headerReadDiagnostics, ROW_RESTATE_MS, TRANSCRIPT_LINE_REREAD_MS, TRANSCRIPT_MAX_REUSE_MS, type CloudEvent, type CloudIdentity, type CloudReadClient, type CloudRow, type CloudSchedules, type CloudSnippets } from "./relay-reader.ts"
 import { failureFromMac } from "../legacy/js/net/cloud-failure.js"
@@ -614,6 +616,29 @@ test("the single-machine page uses the fleet projection before a blocked rich sn
   const restored = await r.snapshot()
   assert.deepEqual(restored.sessions.map((row) => row.label), ["Title s1", "Title s2", "Title s3"])
   assert.equal(restored.scan.complete, true)
+})
+
+test("the Cloud single-machine list keeps status ancestry through its displayed rows", async () => {
+  const client = new FakeClient()
+  client.sessions = async () => { throw new Error("the rich snapshot must not gate the list") }
+  const execution = "a".repeat(32)
+  const rows = ["root", "child", "other"].map((sessionID) => ({
+    destination: { machineID: "mac-a", sessionID, executionGeneration: execution },
+    state: sessionID === "child" ? "working" as const : "idle" as const, freshness: "current" as const,
+    observedAt: 1000, parentSessionID: sessionID === "child" ? "root" : undefined,
+  }))
+  const reader = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: 1000,
+      snapshotGeneration: "a".repeat(32), rows }),
+    listPresentations: async () => rows.map((row) => ({
+      destination: row.destination, title: row.destination.sessionID, status: { state: row.state }, projection: row,
+    })),
+  })
+  reader.attach(client)
+  const snapshot = await reader.snapshot()
+  assert.equal(snapshot.sessions.find((row) => row.id === "child")?.parent_session_id, "root")
+  assert.deepEqual(arrangeSessions({ sessions: snapshot.sessions, filter: "", tasks: [], shaping: () => true,
+    hold: null }).map((row) => row.id), ["other", "root", "child"])
 })
 
 // On 2026-10-12 a Session stopped on a menu was open on app.clawdline.com and
