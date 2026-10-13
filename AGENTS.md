@@ -65,6 +65,10 @@ node tools/check-mirror-tests.mjs       # no console test asserts on the shape o
   slot, run it later. A queued `tools/check.sh` hands itself to a callback and exits 76: a root
   ends its turn and waits for the notice; a child waits in place. See `docs/working-rules.md` for
   the incident and procedure.
+- **After compilation, remove the cache you created for that build** once its commands have exited
+  and no other process uses it. Confirm the exact path belongs to this task before removing it.
+  Do not clear the default shared Go cache, another Session's cache, or a broker-managed gate cache
+  as routine post-build cleanup. See `docs/disk-lifecycle.md` for ownership and shared-cache rules.
 
 - A test that needs a Unix facility asks for it through a per-platform file
   (`gone_unix_test.go` beside `gone_other_test.go`), not through `syscall` inline.

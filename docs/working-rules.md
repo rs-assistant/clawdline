@@ -104,6 +104,13 @@ script once; a nested `heavy` runs directly.
 enables it by default for roots. End that turn and wait for the notice. Children and failed
 handoffs keep the in-turn wait.
 
+When a build or check uses a private cache created by this Session (for example an explicitly set
+`GOCACHE` in its own scratch directory), remove that exact cache after the command and any child
+processes exit. Check the resolved path and ownership first; if either is uncertain, keep it for
+owner review. The normal Go build cache is shared by all Sessions, and broker-managed gate caches
+follow their task's registered cleanup decision. Neither is a Session's disposable build output.
+The shared-cache emergency procedure is in `docs/disk-lifecycle.md`.
+
 ## A push is not a background chore to run beside a build
 
 The pre-push hook asks GitHub about main's latest CI run. It once read the whole history twice too,
