@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ComponentPropsWithRe
 import type { SessionRow } from "@clawdline/contract"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
-import { BRAND_MARK, sessionMark, sessionName } from "../brand-mark.js"
+import { BRAND_MARK, projectedSessionIdentity, sessionMark, sessionName } from "../brand-mark.js"
 import { requestConfirm } from "../overlays/events.js"
 import { ACTION_WIDTH, actionWidth, archivable, revealFor, swipes, type Reveal } from "./swipe.js"
 import { conversationNotStarted } from "./readiness.js"
@@ -23,10 +23,12 @@ export function SessionRowLayout({ children, className, ...props }: ComponentPro
 
 /** Status-only rows keep the original list structure without inventing rich Session content. */
 export function ProjectedRow({ title, sessionID, machineID, machineName, assistant, state, stateLabel, icon, cwd,
+  machineScope = false, coordinatorBound = false,
   freshness, lastMovementAt, attention, open, selectionKey, depth, branchThrough, ancestorThrough, status, swiped = false, onOpen, onClose, onArchive, consumePress }: {
   title: string; sessionID: string; machineID: string; machineName: string
   assistant?: "claude" | "codex"
   icon?: SessionRow["icon"]; cwd?: string
+  machineScope?: boolean; coordinatorBound?: boolean
   state: string; stateLabel: string; freshness: string; lastMovementAt?: number; attention: boolean; open: boolean
   depth: number; branchThrough: boolean; ancestorThrough: boolean
   status?: Partial<SessionRow>
@@ -34,7 +36,9 @@ export function ProjectedRow({ title, sessionID, machineID, machineName, assista
   swiped?: boolean; onClose?: (element: HTMLButtonElement) => void; onArchive?: (element: HTMLButtonElement) => void; consumePress?: () => boolean
 }) {
   const ref = useRef<HTMLLIElement>(null)
-  const mark = icon ?? BRAND_MARK
+  const identity = projectedSessionIdentity(title, icon, machineScope, coordinatorBound)
+  const mark = identity.icon
+  const shownTitle = identity.title
   const role = rowPersonaLine(usePersonas(machineID), status?.persona)
   useLayoutEffect(() => { if (state === "working") L.paintSpinner(ref.current?.querySelector<HTMLCanvasElement>("canvas.spin") ?? null) }, [state])
   const width = onArchive ? actionWidth(status?.sessionId) : ACTION_WIDTH
@@ -42,34 +46,39 @@ export function ProjectedRow({ title, sessionID, machineID, machineName, assista
   const activate = () => { if (!consumePress?.() && ref.current) onOpen(ref.current) }
   return <SessionRowLayout ref={ref} role="option" tabIndex={0} data-id={selectionKey} data-swipe-width={width} data-selection-key={selectionKey}
     data-state={state} data-attention={attention ? "open" : undefined}
+    data-coordinator={coordinatorBound ? "1" : undefined}
+    data-machine-pending={identity.pending ? "1" : undefined}
     data-depth={depth ? String(depth) : undefined} data-tree-through={branchThrough ? "1" : undefined}
-    aria-selected={open ? "true" : "false"} aria-label={`${title}, ${machineName}, ${stateLabel}, ${freshness}`}
+    aria-selected={open ? "true" : "false"} aria-label={`${shownTitle}, ${machineName}, ${stateLabel}, ${freshness}`}
     className={open ? "open projected-row" : "projected-row"}
     onClick={activate} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") {
       event.preventDefault(); activate()
     } }}>
     <span className="kid" hidden={!depth} aria-hidden="true" />
     {ancestorThrough && <span className="tree-ancestor" aria-hidden="true" />}
-    <Mark icon={mark} cellPx={4} />
-    <div className="title" style={{ color: L.accentTint(mark.accent) }}><span className="label">{title}</span>
+    {identity.crown ? <span className="coordinator-mark" aria-hidden="true"><Mark icon={mark} cellPx={4} />
+      <span className="clawdfather-crown" aria-hidden="true" /></span> : <Mark icon={mark} cellPx={4} />}
+    <div className="title" style={{ color: L.accentTint(mark.accent) }}><span className="label">{shownTitle}</span>
       {assistant && <span className="who" dangerouslySetInnerHTML={{ __html: L.whoHTML(assistant) }} />}</div>
     <div className="meta"><span className="machine" title={machineName}>{machineName}</span>
       {cwd && <span className="path">{L.path(cwd)}</span>}
-      {lastMovementAt && <span className="session-activity">{sessionActivityWord({ activity: { known: true, at: lastMovementAt / 1000 } })}</span>}</div>
+      {lastMovementAt && <span className="session-activity">{sessionActivityWord({ activity: { known: true, at: lastMovementAt / 1000 } })}</span>}
+      {machineScope && coordinatorBound ? <span className="coordinator-chip" aria-hidden="true">Clawdfather</span> : null}</div>
     {status ? <StateLine row={{ ...status, id: sessionID, state } as SessionRow}
       role={role} useLocalTasks={false} suffix={freshness} />
       : <div className="state">{state === "working" && <canvas className="spin" aria-hidden="true" />}
         <span>{stateLabel}</span>{freshness && <span className="session-activity">{freshness}</span>}
         {attention && <span className="session-attention"><span className="session-attention-dot" /></span>}</div>}
+    {identity.pending ? <p className="machine-registration" role="status">{nextWord("machineSessionPendingShort")}</p> : null}
     {onArchive && <button className="swipe-archive" type="button" hidden={!swiped}
-      aria-label={nextWord("swipeArchiveLabel", { session: title })}
-      title={nextWord("swipeArchiveLabel", { session: title })}
+      aria-label={nextWord("swipeArchiveLabel", { session: shownTitle })}
+      title={nextWord("swipeArchiveLabel", { session: shownTitle })}
       onClick={(event) => { event.stopPropagation(); onArchive(event.currentTarget) }}>
       <span className="word">{nextWord("swipeArchiveAction")}</span>
     </button>}
     {onClose && <button className="swipe-end" type="button" hidden={!swiped}
-      aria-label={nextWord("swipeEndLabel", { session: title })}
-      title={nextWord("swipeEndLabel", { session: title })}
+      aria-label={nextWord("swipeEndLabel", { session: shownTitle })}
+      title={nextWord("swipeEndLabel", { session: shownTitle })}
       onClick={(event) => { event.stopPropagation(); onClose(event.currentTarget) }}>
       <span className="word">{nextWord("swipeCloseAction")}</span>
     </button>}
@@ -433,6 +442,7 @@ export function Row({
       aria-selected={selected ? "true" : "false"}
       aria-disabled="false"
       data-coordinator={coordinator ? "1" : undefined}
+      data-machine-pending={row.machine_scope && !coordinator ? "1" : undefined}
       data-depth={place.chip && place.depth ? String(place.depth) : undefined}
       data-tree-through={branchThrough ? "1" : undefined}
       data-epic-parent={row.epic_parent && depth ? row.epic_parent.epic_id : undefined}
@@ -442,7 +452,7 @@ export function Row({
       <span className="kid" hidden={!place.depth} aria-hidden="true" />
       {ancestorThrough ? <span className="tree-ancestor" aria-hidden="true" /> : null}
       {row.epic_parent && depth ? <span className="sr-only">{catalogWord("inline", "9ba541d50c44")}</span> : null}
-      {coordinator ? (
+      {row.machine_scope || coordinator ? (
         // The machine steward's identity is visible without promising a
         // command panel that this console does not provide.
         <span className="coordinator-mark" aria-hidden="true">

@@ -1474,7 +1474,7 @@ test("machine registration remains visible after a fresh Session read and clears
           width: canvas?.width, height: canvas?.height, pixel: pixel ? [...pixel] : null }
       })()`)
       assert.equal(pendingIdentity.name, "Clawdfather")
-      assert.equal(pendingIdentity.crown, false)
+      assert.equal(pendingIdentity.crown, true)
       assert.equal(pendingIdentity.width, pendingIdentity.height * 2)
       assert.deepEqual(pendingIdentity.pixel, [217, 119, 87, 255])
       await tab.run(`document.querySelector('#rows > li.row')?.click()`)

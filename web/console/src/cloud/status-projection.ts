@@ -67,6 +67,7 @@ export function statusProjection(client: StatusProjectionClient | null, machine:
       parentSessionID: typeof data.parent_session_id === "string" && data.parent_session_id !== session
         ? data.parent_session_id : undefined,
       machineScope: data.machine_scope === true,
+      coordinatorBound: data.coordinator_bound === true,
       state: String(data.state),
       freshness: stale || rowStale ? "stale" : source!.freshness === "current" ? "current" :
         source!.freshness === "unverified" ? "stale" : "unknown",

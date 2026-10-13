@@ -301,6 +301,10 @@
   display: none;
 }
 
+.row[data-machine-pending="1"] .clawdfather-crown {
+  opacity: 0.55;
+}
+
 /* Keep the legacy identity in the option's accessible name on a phone,
  * where the visible word leaves and the decorative crown remains. */
 .row .coordinator-identity {
