@@ -16,7 +16,7 @@ function dismissedVersion(): string | null {
 }
 
 /** The session list can start an update directly, then stay to show its result. */
-export function UpdateBanner() {
+export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) {
   const read = useSyncExternalStore(subscribeUpdate, currentUpdateRead, currentUpdateRead)
   const [dismissed, setDismissed] = useState(dismissedVersion)
   const [target, setTarget] = useState("")
@@ -114,7 +114,7 @@ export function UpdateBanner() {
     : dismissedResult ? null : problem?.sentence || view.progress || (completed ? view.done || nextWord("updateHealthy", { to: target }) : null)
 
   return (
-    <div className="update-banner" id="update-banner" role="status" data-version={version || target}>
+    <div className="update-banner" id={embedded ? undefined : "update-banner"} role="status" data-version={version || target}>
       {version && !sending && !following && !completed && !problem ? (
         <span className="update-banner-say" lang={catalogWordLanguage("next", "updateBanner")}>{nextWord("updateBanner", { version })}</span>
       ) : null}
