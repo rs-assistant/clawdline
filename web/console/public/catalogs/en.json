@@ -3693,6 +3693,7 @@
   "next.worktreeRemoveConfirm": "Delete worktree",
   "next.worktreeRemoveBusy": "Deleting…",
   "next.worktreeRemoveFailed": "Could not delete the worktree.",
+  "next.worktreeRemoveUnavailable": "This worktree cannot be deleted yet. It must be landed, clean, and confirmed unused. Refresh the observation and check the reasons on its card.",
   "next.proposalNeedsYourDecision": "The system has no to-do it can reassess. Finishing work will not withdraw this proposal; answer it, or it will wait until expiry.",
   "next.proposalNotNow": "Not now",
   "next.proposalResolve": "Already done / no longer applies",
