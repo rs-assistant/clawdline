@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5117,
-  "riskKeys": 2244,
-  "nonRiskCount": 2873,
+  "englishContentKeys": 5125,
+  "riskKeys": 2247,
+  "nonRiskCount": 2878,
   "groups": [
     {
       "name": "bar / other",
@@ -1921,7 +1921,7 @@
     },
     {
       "name": "next / other",
-      "count": 124,
+      "count": 129,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2004,6 +2004,11 @@
         "next.smartTitleConfirmTitle",
         "next.smartTitleWorking",
         "next.stackStatusNotRun",
+        "next.startProgressDone",
+        "next.startProgressHint",
+        "next.startProgressOpen",
+        "next.startProgressResumeTitle",
+        "next.startProgressTitle",
         "next.swipeArchiveAction",
         "next.swipeArchiveLabel",
         "next.swipeCloseAction",

@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5117,
+  "englishKeys": 5125,
   "counts": {
     "negation": 1470,
-    "state": 702,
+    "state": 705,
     "permission": 299,
     "deletion": 106,
     "uncertainty": 149
   },
-  "unionCount": 2244,
+  "unionCount": 2247,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -2003,6 +2003,9 @@
       "next.smartTitleConfirmSayAuto",
       "next.smartTitleSaved",
       "next.smartTitleSavedBy",
+      "next.startProgressArrive",
+      "next.startProgressAsk",
+      "next.startProgressBackground",
       "next.terminalAllCloudEmpty",
       "next.terminalAllEmpty",
       "next.terminalAllMachineAccessDenied",
@@ -4582,6 +4585,9 @@
     "next.stacksFailed",
     "next.stacksNone",
     "next.stacksTruncated",
+    "next.startProgressArrive",
+    "next.startProgressAsk",
+    "next.startProgressBackground",
     "next.terminalActionFailed",
     "next.terminalAllCloudEmpty",
     "next.terminalAllEmpty",
