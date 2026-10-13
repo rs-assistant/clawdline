@@ -25,9 +25,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/devices"
+	"github.com/sainteye/clawdline/internal/config"
 	cloudtransport "github.com/sainteye/clawdline/internal/transport/cloud"
 )
 
@@ -59,6 +62,62 @@ func cloudDaemonJSON(method, path string, body any, out any) error {
 	return json.Unmarshal(data, out)
 }
 
+// A copied pairing command can run in a shell carrying an obsolete test state
+// directory. Use the installed daemon only when that directory has no token,
+// the port is the installed port, and its own token authenticates a read.
+func cloudPairRequest(method, path string, body any) (*http.Request, error) {
+	port, err := daemonPort()
+	if err != nil {
+		return nil, err
+	}
+	return cloudPairRequestFor(method, path, body, config.Load(), config.DefaultDir(), port,
+		os.Getenv("CLAWDLINE_NEXT_PORT") == "")
+}
+
+func cloudPairRequestFor(method, path string, body any, cfg config.Config, defaultDir string, port int, allowFallback bool) (*http.Request, error) {
+	req, err := daemonRequestWithConfig(method, path, body, cfg, port)
+	if err == nil || cfg.Dir == defaultDir || !allowFallback {
+		return req, err
+	}
+	if _, statErr := os.Stat(filepath.Join(cfg.Dir, devices.LocalTokenFile)); !os.IsNotExist(statErr) {
+		return nil, err
+	}
+	installed := config.Config{Dir: defaultDir}
+	check, checkErr := daemonRequestWithConfig(http.MethodGet, "/v1/cloud/status", nil, installed, port)
+	if checkErr != nil {
+		return nil, err
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	answer, checkErr := client.Do(check)
+	if checkErr != nil {
+		return nil, err
+	}
+	answer.Body.Close()
+	if answer.StatusCode != http.StatusOK {
+		return nil, err
+	}
+	return daemonRequestWithConfig(method, path, body, installed, port)
+}
+
+func cloudPairJSON(method, path string, body any, out any) error {
+	req, err := cloudPairRequest(method, path, body)
+	if err != nil {
+		return err
+	}
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode >= 400 {
+		return errors.New(refusalText(res))
+	}
+	if out == nil {
+		return nil
+	}
+	return json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(out)
+}
+
 // cloudPairCommand shows a pairing link and waits, or finishes a pairing from
 // a code the person carried from their browser.
 func cloudPairCommand(args []string) {
@@ -69,7 +128,7 @@ func cloudPairCommand(args []string) {
 
 	if *offer != "" {
 		var state cloudtransport.PairingState
-		if err := cloudDaemonJSON(http.MethodPost, "/v1/cloud/pairing/offer",
+		if err := cloudPairJSON(http.MethodPost, "/v1/cloud/pairing/offer",
 			map[string]any{"offer": strings.TrimSpace(*offer)}, &state); err != nil {
 			fail(err)
 		}
@@ -78,7 +137,7 @@ func cloudPairCommand(args []string) {
 	}
 
 	var state cloudtransport.PairingState
-	if err := cloudDaemonJSON(http.MethodPost, "/v1/cloud/pairing", nil, &state); err != nil {
+	if err := cloudPairJSON(http.MethodPost, "/v1/cloud/pairing", nil, &state); err != nil {
 		fail(err)
 	}
 	fmt.Println(cliCopy("cloud", "pair.open_1", "Open this on the browser you want to pair, signed in to the same"))
@@ -98,7 +157,7 @@ func cloudPairCommand(args []string) {
 	for time.Now().Before(deadline) {
 		time.Sleep(cloudtransport.PairingPollInterval)
 		var now cloudtransport.PairingState
-		if err := cloudDaemonJSON(http.MethodGet, "/v1/cloud/pairing", nil, &now); err != nil {
+		if err := cloudPairJSON(http.MethodGet, "/v1/cloud/pairing", nil, &now); err != nil {
 			fail(err)
 		}
 		switch now.Phase {
