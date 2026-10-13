@@ -11,6 +11,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
+	"github.com/sainteye/clawdline/internal/domain/notificationrule"
 	"github.com/sainteye/clawdline/internal/domain/session"
 	"github.com/sainteye/clawdline/internal/productcopy"
 )
@@ -467,5 +468,35 @@ func TestAnEndTheStoreCouldNotRecordIsWrittenOnTheNextSweep(t *testing.T) {
 	r.at(20*time.Minute, s)
 	if n := r.at(30*time.Minute, s); n != 1 {
 		t.Fatal("the next question was taken for the old stop")
+	}
+}
+
+// A user rule changes the actual due time, even when the general waiting
+// switch is off, and still spends one durable stop rather than two pushes.
+func TestCustomWaitingRuleChoosesMatchedSessionAndDeduplicates(t *testing.T) {
+	r := newWaitingRig(t)
+	r.w.Enabled = func() bool { return false }
+	r.w.Rules = func() ([]notificationrule.Rule, error) {
+		return []notificationrule.Rule{{ID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Enabled: true, AfterMinutes: 3, LabelContains: "important"}}, nil
+	}
+	matched := asking("matched")
+	matched.Label = "Important work"
+	other := asking("other")
+	r.at(0, matched, other)
+	if n := r.at(2*time.Minute, matched, other); n != 0 {
+		t.Fatalf("early push: %d", n)
+	}
+	if n := r.at(3*time.Minute, matched, other); n != 1 {
+		t.Fatalf("matching rule pushed %d", n)
+	}
+	if n := r.at(11*time.Minute, matched, other); n != 0 {
+		t.Fatalf("duplicate or unmatched push: %d", n)
+	}
+	if len(r.pushes(matched)) != 1 || len(r.pushes(other)) != 0 {
+		t.Fatal("wrong Session was notified")
+	}
+	var effect orchestrator.WaitingPush
+	if err := json.Unmarshal(r.pushes(matched)[0].Payload, &effect); err != nil || !effect.Custom || effect.Terminal != matched.ID {
+		t.Fatalf("wrong custom destination: %+v, %v", effect, err)
 	}
 }

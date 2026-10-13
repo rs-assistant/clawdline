@@ -223,6 +223,8 @@ test("one word, one list, and every route names a word the table carries", () =>
     ["GET", "/v1/capacity"],
     ["GET", "/v1/settings/default-models"],
     ["POST", "/v1/settings/default-models"],
+    ["GET", "/v1/notification-rules"],
+    ["POST", "/v1/notification-rules"],
     ["GET", "/v1/settings/work-gates"],
     ["POST", "/v1/settings/work-gates"],
     ["GET", "/v1/machine/usage"],
@@ -281,6 +283,8 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("capacity" in CARRIED)
   assert.ok("default-models" in CARRIED)
   assert.ok("default-models-update" in CARRIED)
+  assert.ok("notification-rules" in CARRIED)
+  assert.ok("notification-rules-update" in CARRIED)
   assert.ok("work-gate-settings" in CARRIED)
   assert.ok("work-gate-settings-update" in CARRIED)
   assert.ok("machine-usage" in CARRIED)
@@ -313,7 +317,7 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("sessions.list" in CARRIED)
   // An opened waiting Session's one row, asked when its question has not come.
   assert.ok("sessions.row" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 155)
+  assert.equal(Object.keys(CARRIED).length, 157)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {
@@ -758,6 +762,8 @@ test("the default-model block stays visible on Cloud and asks only its narrow ro
   const api = readFileSync(resolve(console_, "src/pages/settings/api.ts"), "utf8")
   assert.equal(writeRoute("GET", "/v1/settings/default-models")?.word, "default-models")
   assert.equal(writeRoute("POST", "/v1/settings/default-models")?.word, "default-models-update")
+  assert.equal(writeRoute("GET", "/v1/notification-rules")?.word, "notification-rules")
+  assert.equal(writeRoute("POST", "/v1/notification-rules")?.word, "notification-rules-update")
 })
 
 test("the work-gate block stays visible on Cloud and asks only its narrow route", () => {

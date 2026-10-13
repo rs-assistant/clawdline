@@ -14,3 +14,13 @@
 .notification-row input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
 .notification-error { color: var(--bad) !important; }
 .notification-unavailable ul { margin: 10px 0 0; padding-left: 22px; color: var(--muted); line-height: 1.8; }
+.notification-custom { margin-top: 28px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; }
+.notification-custom h2 { margin-top: 0; }
+.notification-custom-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.notification-custom-row label { display: flex; align-items: center; gap: 10px; }
+.notification-custom-row input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); }
+.notification-custom-row button, .notification-custom-form button { min-height: 40px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
+.notification-custom-form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.notification-custom-form label { display: grid; gap: 5px; flex: 1 1 160px; }
+.notification-custom-form input { width: 100%; min-height: 40px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); }
+.notification-custom small { color: var(--muted); }

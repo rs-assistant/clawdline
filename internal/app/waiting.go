@@ -11,6 +11,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
+	"github.com/sainteye/clawdline/internal/domain/notificationrule"
 	"github.com/sainteye/clawdline/internal/domain/session"
 	"github.com/sainteye/clawdline/internal/productcopy"
 )
@@ -54,6 +55,8 @@ type Waiting struct {
 	Role func(ctx context.Context, terminal string) (WaitingRole, bool)
 	// Enabled is the person's switch. Nil is on.
 	Enabled func() bool
+	// Rules are read for each sweep so changes apply without a restart.
+	Rules func() ([]notificationrule.Rule, error)
 	// Language reads the product language when a push intent is recorded.
 	// Nil uses English; retries use the persisted title and body.
 	Language func() string
@@ -176,11 +179,20 @@ func (w *Waiting) Observe(ctx context.Context, r session.Inventory) (int, error)
 	seen := map[string]bool{}
 	var ended []string
 	type due struct {
-		key string
-		s   session.Session
-		st  *waitingStop
+		key    string
+		s      session.Session
+		st     *waitingStop
+		custom bool
 	}
 	var owed []due
+	var rules []notificationrule.Rule
+	if w.Rules != nil {
+		var err error
+		rules, err = w.Rules()
+		if err != nil {
+			return 0, err
+		}
+	}
 	for _, s := range r.Sessions {
 		if !s.IsAssistant() {
 			continue
@@ -203,8 +215,13 @@ func (w *Waiting) Observe(ctx context.Context, r session.Inventory) (int, error)
 				w.stops[key] = st
 			}
 			st.seen = now
-			if !st.settled && now.Sub(st.since) >= w.after() {
-				owed = append(owed, due{key, s, st})
+			selected, custom := notificationrule.Match(rules, s.Label)
+			after := w.after()
+			if custom {
+				after = time.Duration(selected.AfterMinutes) * time.Minute
+			}
+			if !st.settled && now.Sub(st.since) >= after {
+				owed = append(owed, due{key: key, s: s, st: st, custom: custom})
 			}
 		case session.StateUnknown:
 			// Nothing is known about it, which ends nothing.
@@ -244,7 +261,7 @@ func (w *Waiting) Observe(ctx context.Context, r session.Inventory) (int, error)
 	}
 	pushed := 0
 	for _, d := range owed {
-		ok, err := w.settle(ctx, d.key, d.s, d.st, now)
+		ok, err := w.settle(ctx, d.key, d.s, d.st, now, d.custom)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -260,8 +277,8 @@ func (w *Waiting) Observe(ctx context.Context, r session.Inventory) (int, error)
 
 // settle decides one due stop and writes the decision down. It answers
 // whether a push was recorded.
-func (w *Waiting) settle(ctx context.Context, key string, s session.Session, st *waitingStop, now time.Time) (bool, error) {
-	if w.Enabled != nil && !w.Enabled() {
+func (w *Waiting) settle(ctx context.Context, key string, s session.Session, st *waitingStop, now time.Time, custom bool) (bool, error) {
+	if !custom && w.Enabled != nil && !w.Enabled() {
 		// Left undecided: turned back on while it still stands, it is pushed.
 		return false, nil
 	}
@@ -306,7 +323,7 @@ func (w *Waiting) settle(ctx context.Context, key string, s session.Session, st 
 		language = w.Language()
 	}
 	title, body := waitingTextLanguage(language, s, role, hasRole, now.Sub(st.since), now)
-	push, err := json.Marshal(orchestrator.WaitingPush{Key: key, Terminal: s.ID, Title: title, Body: body,
+	push, err := json.Marshal(orchestrator.WaitingPush{Key: key, Terminal: s.ID, Title: title, Body: body, Custom: custom,
 		Tag: "waiting-" + s.ID})
 	if err != nil {
 		return false, err

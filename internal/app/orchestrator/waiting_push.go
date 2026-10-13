@@ -29,6 +29,7 @@ type WaitingPush struct {
 	Title    string `json:"title"`
 	Body     string `json:"body"`
 	Tag      string `json:"tag"`
+	Custom   bool   `json:"custom,omitempty"`
 }
 
 // runWaitingPush sends one stopped session's push to every device that asked
@@ -39,7 +40,7 @@ func runWaitingPush(ctx context.Context, b *Broker, e store.Effect) effectResult
 	if err := json.Unmarshal(e.Payload, &p); err != nil || p.Key == "" || p.Title == "" {
 		return effectResult{state: store.EffectFailed, outcome: "the effect carries no stop"}
 	}
-	if b.PushEnabled != nil && !b.PushEnabled("push_on_waiting") {
+	if !p.Custom && b.PushEnabled != nil && !b.PushEnabled("push_on_waiting") {
 		return effectResult{state: store.EffectDone, outcome: "disabled_by_user"}
 	}
 	if b.Push == nil {

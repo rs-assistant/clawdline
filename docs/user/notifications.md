@@ -57,6 +57,14 @@ The page explains these gaps without offering switches that would have no effect
 The `orchestrator_agent_notify` switch is on by default. When it is off,
 `clawdline notify` is refused with `agent_notify_disabled`.
 
+## Custom notification timing
+
+Under **客製化通知時機** (Custom notification timing), add a rule with a wait of 1–120 minutes and an optional Session name fragment. When the Session waits for an answer or permission and its name contains that fragment (case insensitive), the earliest matching enabled rule sets the delay for that wait. An empty fragment matches every Session. The custom rule replaces the standard ten-minute waiting trigger for that Session; it works independently of the standard waiting switch. The notification opens the waiting Session. Each stop produces at most one push, even if several rules match or the setting changes while it waits. The existing six-per-hour machine limit still applies.
+
+Rules are stored on the chosen machine, up to 16 per machine. They can be disabled or deleted on the Notifications page. A disabled rule no longer matches; the standard waiting setting applies if no other enabled rule matches. Existing waiting notifications cannot be retracted or repeated by editing rules.
+
+These rules currently cover **Session waiting for an answer or permission**. Other notification events retain their individual switches above.
+
 ## Turn them off
 
 Press **關閉這台裝置的通知** under **通知** on the same device. To stop a browser from asking at all,

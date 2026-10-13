@@ -60,6 +60,8 @@ export const CARRIED = {
   capacity: "GET /v1/capacity",
   "default-models": "GET /v1/settings/default-models",
   "default-models-update": "POST /v1/settings/default-models",
+  "notification-rules": "GET /v1/notification-rules",
+  "notification-rules-update": "POST /v1/notification-rules",
   document: "GET /v1/sessions/{id}/documents/{scope}/{path}",
   documents: "GET /v1/sessions/{id}/documents",
   "work-gate-settings": "GET /v1/settings/work-gates",

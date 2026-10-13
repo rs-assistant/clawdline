@@ -232,6 +232,8 @@ test("each console route is the Cloud word the machine lists, and nothing else",
     ["GET", "/v1/places", "places"],
     ["GET", "/v1/settings/default-models", "default-models"],
     ["POST", "/v1/settings/default-models", "default-models-update"],
+    ["GET", "/v1/notification-rules", "notification-rules"],
+    ["POST", "/v1/notification-rules", "notification-rules-update"],
     ["GET", "/v1/settings/work-gates", "work-gate-settings"],
     ["POST", "/v1/settings/work-gates", "work-gate-settings-update"],
     ["POST", "/v1/update/apply", "update-apply"],
@@ -2283,6 +2285,7 @@ test("every read the writer carries is one it waits for, and no write is", () =>
     ["/v1/usage/sessions/s1", "usage"],
     ["/v1/capacity", "capacity"],
     ["/v1/settings/default-models", "default-models"],
+    ["/v1/notification-rules", "notification-rules"],
     ["/v1/settings/work-gates", "work-gate-settings"],
     ["/v1/sessions/restorable", "restorable"],
     ["/v1/sessions/archived", "archived"],
@@ -2313,4 +2316,16 @@ test("every read the writer carries is one it waits for, and no write is", () =>
   for (const [method, path] of [["POST", "/v1/sessions/s1/send"], ["POST", "/v1/places/p1/start"], ["POST", "/v1/verifications"]]) {
     assert.ok(!CARRIED_READS.has(writeRoute(method, path)!.op), `${method} ${path} never waits`)
   }
+})
+
+test("a phone edits a custom notification rule on the chosen machine", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  const rule = { id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", enabled: true, after_minutes: 3, label_contains: "urgent" }
+  assert.equal(writeRoute("GET", "/v1/notification-rules")?.word, "notification-rules")
+  assert.equal((await reader.fetch("/v1/notification-rules")).status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "notification-rules", {}, "read"])
+  assert.equal((await reader.fetch("/v1/notification-rules", post({ action: "create", rule }))).status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "notification-rules-update", { changes: { action: "create", rule } }, "action"])
+  assert.equal((await reader.fetch("/v1/notification-rules?all=1")).status, 501)
 })
