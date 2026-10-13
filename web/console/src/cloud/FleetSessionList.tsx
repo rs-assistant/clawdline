@@ -390,12 +390,14 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
       aria-label={nextWord(machineAction === "start" ? "cloudStartWhere" : "cloudSwitch")}
       onCancel={(event) => { event.preventDefault(); setMachineAction(null) }}>
       <h2>{nextWord(machineAction === "start" ? "cloudStartWhere" : "cloudSwitch")}</h2>
-      {machines.map((machine) => <button key={machine.id} type="button" onClick={() => {
+      {machines.map((machine) => <button className="cloud-all-machine-option" key={machine.id} type="button" onClick={() => {
         const action = machineAction
         setMachineAction(null)
         if (action) onMachineAction?.(machine.id, action)
       }}>{machine.name} · {machine.platform}</button>)}
-      <button type="button" onClick={() => setMachineAction(null)}>{nextWord("cloudActionCancel")}</button>
+      <div className="cloud-all-machine-actions">
+        <button className="cloud-all-machine-cancel" type="button" onClick={() => setMachineAction(null)}>{nextWord("cloudActionCancel")}</button>
+      </div>
     </dialog>
   </>
 }
