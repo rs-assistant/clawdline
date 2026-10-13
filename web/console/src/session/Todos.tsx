@@ -29,6 +29,7 @@ import { announceWorkItemChanged, onWorkItemChanged } from "../pages/work/item-c
 import { sessionTodosReady } from "./readiness.js"
 import { nextWord } from "../next-strings.js"
 import { SessionUsage } from "../pages/work/TokenBill.js"
+import { retainCreatedTodos, showCreatedTodo } from "./todo-created.js"
 import "../pages/work/work.css"
 import "./todos.css"
 
@@ -51,6 +52,11 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
   const [busy, setBusy] = useState("")
   const ticket = useRef(0)
   const reader = useRef<OneRead | null>(null)
+  // A create reply proves the durable row exists. Keep that receipt on screen
+  // until a full read observes it; a delayed Cloud read must not make a
+  // successful Linux write look as though it vanished.
+  const createdTodos = useRef(new Map<string, DirectTodoV2>())
+  const createdTodoSession = useRef("")
   const expanded = useRef(false)
   const rowID = row?.id ?? ""
   const rowSessionID = row?.sessionId ?? ""
@@ -65,8 +71,9 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
       if (expanded.current) {
         const next = await readWithOneRetry(() => readSessionWorkV2(rowID, rowSessionID))
         if (mine === ticket.current) {
-          setPage(next)
-          setSummary({ ok: true, ...todoProgress(next, rowSessionID), truncated: next.truncated })
+          const visible = retainCreatedTodos(next, createdTodos.current)
+          setPage(visible)
+          setSummary({ ok: true, ...todoProgress(visible, rowSessionID), truncated: visible.truncated })
           setReadFailure(null)
         }
       } else {
@@ -87,6 +94,10 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
     // same Session. Key the answer to its stable id: otherwise every refresh
     // clears a good answer, flashes "loading", and asks the work API again.
     ticket.current += 1
+    if (createdTodoSession.current !== rowID) {
+      createdTodos.current.clear()
+      createdTodoSession.current = rowID
+    }
     expanded.current = false
     setOpen(false); setAdding(false); setEditing(null); setEditText(""); setText(""); setImages([]); setPage(null); setSummary(null); setFailure("")
     setReadFailure(null); setReading(false)
@@ -194,10 +205,19 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
           void run("new", async () => {
             const pictures = await Promise.all(images.map((file) => prepareReferencePicture(file)))
             const answer = await createDirectTodoV2(rowID, value)
-            let version = answer.todo.version
+            let created = answer.todo
+            createdTodos.current.set(created.id, created)
+            setPage((current) => showCreatedTodo(current, created))
+            setSummary((current) => current
+              ? { ...current, waiting: current.waiting + 1 }
+              : { ok: true, done: 0, active: 0, waiting: 1, truncated: false })
+            let version = created.version
             for (let index = 0; index < pictures.length; index++) {
               const uploaded = await addDirectTodoV2Image(rowID, answer.todo.id, version, pictures[index], index)
               version = uploaded.todo.version
+              created = { ...uploaded.todo, images: [...(created.images ?? []), ...(uploaded.todo.images ?? [])] }
+              createdTodos.current.set(created.id, created)
+              setPage((current) => showCreatedTodo(current, created))
             }
           }).then((ok) => { if (ok) { setText(""); setImages([]); setAdding(false); setOpen(true) } })
         }}>

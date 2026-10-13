@@ -106,6 +106,11 @@ func TestOpenRefusesALinkedFile(t *testing.T) {
 		if err := os.WriteFile(outside, []byte("SENTINEL\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
+		// Clawdline starts work with an owner-only umask. State the public
+		// target this test protects instead of relying on the parent process.
+		if err := os.Chmod(outside, 0o644); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.Mkdir(dir, 0o700); err != nil {
 			t.Fatal(err)
 		}
@@ -142,6 +147,9 @@ func TestALinkMadeLaterIsNotFollowed(t *testing.T) {
 	outside := filepath.Join(root, "outside")
 	token := strings.Repeat("t", 43)
 	if err := os.WriteFile(outside, []byte(token), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(outside, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range credentialFiles {
