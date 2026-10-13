@@ -199,32 +199,33 @@ func TestPicturesArePastedIntoCodex(t *testing.T) {
 	}
 }
 
-func TestCodexPicturesRefuseWhenAttachmentIsUnavailable(t *testing.T) {
+func TestCodexPicturesFallBackToPathsWhenAttachmentIsUnavailable(t *testing.T) {
 	a, host, lender, drops := pictureFixture(t, session.AssistantCodex)
 	a.Pictures.Pasteboard = nil
-	_, err := a.SendWithPictures(context.Background(), "%7", "look", []string{pngURL(t, 1, 1)})
-	if ref, ok := err.(Refusal); !ok || ref.Code != "pictures_unavailable" {
-		t.Fatalf("err %v", err)
+	if _, err := a.SendWithPictures(context.Background(), "%7", "look", []string{pngURL(t, 1, 1)}); err != nil {
+		t.Fatal(err)
 	}
-	if len(host.acts) != 0 || len(files(t, drops)) != 0 {
+	if len(host.acts) != 1 || !strings.HasPrefix(host.acts[0], "send:look /") || len(files(t, drops)) != 1 {
 		t.Fatalf("acts %q files %v", host.acts, files(t, drops))
 	}
+
+	a, host, lender, drops = pictureFixture(t, session.AssistantCodex)
 	a.Pictures.Pasteboard = lender
 	lender.borrowErr = errors.New("clipboard busy")
-	_, err = a.SendWithPictures(context.Background(), "%7", "look", []string{pngURL(t, 1, 1)})
-	if ref, ok := err.(Refusal); !ok || ref.Code != "pictures_unavailable" {
-		t.Fatalf("err %v", err)
+	if _, err := a.SendWithPictures(context.Background(), "%7", "look", []string{pngURL(t, 1, 1)}); err != nil {
+		t.Fatal(err)
 	}
-	if len(host.acts) != 0 || len(files(t, drops)) != 0 {
+	if len(host.acts) != 1 || !strings.HasPrefix(host.acts[0], "send:look /") || len(files(t, drops)) != 1 {
 		t.Fatalf("acts %q files %v", host.acts, files(t, drops))
 	}
+
+	a, host, lender, drops = pictureFixture(t, session.AssistantCodex)
 	lender.borrowErr = nil
 	lender.refuse["*"] = true
-	_, err = a.SendWithPictures(context.Background(), "%7", "", []string{pngURL(t, 1, 1)})
-	if ref, ok := err.(Refusal); !ok || ref.Code != "send_failed" {
-		t.Fatalf("err %v", err)
+	if _, err := a.SendWithPictures(context.Background(), "%7", "", []string{pngURL(t, 1, 1)}); err != nil {
+		t.Fatal(err)
 	}
-	if len(host.acts) != 0 || len(files(t, drops)) != 0 {
+	if len(host.acts) != 2 || !strings.HasPrefix(host.acts[0], "type:/") || host.acts[1] != enter || len(files(t, drops)) != 1 {
 		t.Fatalf("acts %q files %v", host.acts, files(t, drops))
 	}
 }
