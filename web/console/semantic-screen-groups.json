@@ -1,8 +1,8 @@
 {
   "version": 1,
   "englishContentKeys": 5101,
-  "riskKeys": 2239,
-  "nonRiskCount": 2862,
+  "riskKeys": 2240,
+  "nonRiskCount": 2861,
   "groups": [
     {
       "name": "bar / other",
@@ -1640,7 +1640,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 199,
+      "count": 198,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1648,7 +1648,6 @@
         "next.cloudActionAnswer",
         "next.cloudActionAnswerKey",
         "next.cloudActionCancel",
-        "next.cloudActionChanged",
         "next.cloudActionCheckReceipt",
         "next.cloudActionCheckRequired",
         "next.cloudActionClose",
