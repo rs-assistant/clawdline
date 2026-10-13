@@ -176,6 +176,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `role_drafter_out_of_quota` | `internal/transport/http/squad_role_draft.go` |
 | `run_unknown` | `internal/transport/http/runs.go` |
 | `scope_mismatch` | `internal/transport/http/squad.go` |
+| `send_required` | `internal/transport/http/projects.go` |
 | `session_actor_required` | `internal/transport/http/squad_actor.go`, `internal/transport/http/squad_events.go` |
 | `session_cannot_create_item` | `internal/transport/http/work_v2.go` |
 | `session_cannot_decide` | `internal/transport/http/work.go` |
@@ -218,4 +219,5 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `via_is_for_sessions` | `internal/transport/http/work.go` |
 | `worktree_lifecycle_busy` | `internal/transport/http/projects.go` |
 | `worktree_lifecycle_failed` | `internal/transport/http/projects.go` |
+| `worktree_remove_failed` | `internal/transport/http/projects.go` |
 | `write_failed` | `internal/transport/http/snippets.go`, `internal/transport/http/squad.go` |

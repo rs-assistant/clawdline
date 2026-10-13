@@ -757,7 +757,7 @@ func TestTheVocabularyAndTheImplementedListAgreeWithTheCatalog(t *testing.T) {
 		"schedule-run", "schedule-webhook-bind-v1", "snippets", "snippet-create", "snippet-update", "snippet-delete",
 		"snippet-order", "push-key", "push-subscribe", "push-unsubscribe", "push-test", "diagnostics.events",
 		"board", "board-command", "board.items", "timeline", "projects", "project-file-list", "project-file-read", "project-file-save", "project-tree-list", "project-tree-read", "project-unify-plan", "project-unify-apply", "project-worktree-lifecycle",
-		"project-worktree-lifecycle-refresh", "capacity", "default-models", "default-models-update", "work-gate-settings", "work-gate-settings-update", "machine-usage", "update", "update-apply", "personas",
+		"project-worktree-lifecycle-refresh", "project-worktree-remove", "capacity", "default-models", "default-models-update", "work-gate-settings", "work-gate-settings-update", "machine-usage", "update", "update-apply", "personas",
 		"work.proposals", "work.decisions", "work.decision", "work.digests",
 		"work.v2.item", "work.v2.items", "work.v2.search", "work.v2.proposals", "work.v2.session-todos", "work.v2.image", "work.v2.create",
 		"work.v2.gate-export", "work.v2.gate-decision", "work.v2.gate-purge",

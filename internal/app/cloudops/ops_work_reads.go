@@ -611,6 +611,23 @@ func init() {
 					Path: "/v1/projects/" + segment(p.project) + "/worktrees/refresh",
 					Body: []byte("{}")}
 			}},
+		op{name: "project-worktree-remove",
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "project", "worktree") {
+					return plan{}, false
+				}
+				p, ok := actionPlan(b, false)
+				project, projectOK := b.nonEmpty("project")
+				id, idOK := b.nonEmpty("worktree")
+				if !ok || !projectOK || len(project) > 200 || !idOK || len(id) != 27 || !strings.HasPrefix(id, "wt-") {
+					return plan{}, false
+				}
+				p.project, p.id = project, id
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "DELETE", Path: "/v1/projects/" + segment(p.project) + "/worktrees/" + segment(p.id)}
+			}},
 
 		op{name: "timeline", read: true,
 			decode: func(b body) (plan, bool) {
