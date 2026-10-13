@@ -15,5 +15,5 @@ export function pendingFailureSentence(code: string): string {
 
 /** Whether the composer would still accept the same write. */
 export function pendingFailureCanRetry(code: string): boolean {
-  return code !== "execution_generation_changed" && !writeIsOff(code)
+  return !writeIsOff(code)
 }

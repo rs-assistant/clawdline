@@ -5072,7 +5072,7 @@
   "next.cloudActionOffline": "This machine is offline.",
   "next.cloudActionStale": "This machine’s status is stale.",
   "next.cloudActionUnknown": "The target’s current state is unknown.",
-  "next.cloudActionChanged": "This Session’s execution generation changed.",
+  "next.cloudActionChanged": "This Session's current execution could not be verified. Open its current execution, then try again.",
   "next.cloudActionRevoked": "This browser’s access to the machine was revoked.",
   "next.cloudActionContentPermission": "This browser cannot read this Session’s content.",
   "next.cloudActionOperationPermission": "This browser cannot operate this Session.",

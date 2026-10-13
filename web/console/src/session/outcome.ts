@@ -31,7 +31,7 @@ const NOT_DONE: ReadonlySet<string> = new Set([
   // The body or the route.
   "bad_request", "empty_text", "too_large", "not_found", "method_not_allowed",
   // The session.
-  "session_not_found", "session_unknown", "backend_unsupported", "pictures_unavailable",
+  "session_not_found", "session_unknown", "execution_generation_changed", "backend_unsupported", "pictures_unavailable",
   // A question on the session's screen: nothing was typed at it.
   "session_asking",
   // Its terminal's lane was full.
