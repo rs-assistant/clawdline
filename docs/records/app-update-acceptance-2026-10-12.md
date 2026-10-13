@@ -31,14 +31,21 @@ isolated state root and connected to the production Cloud. Account approval retu
 identity, its daemon logged `cloud ready`, and `clawdline cloud pair` completed with an iPhone
 viewer whose browser and machine key fingerprints matched. The daemon subsequently logged that
 the paired viewer had been heard from. Production served the `ab82bd6e` hosted console with
-CloudGate during this run. These observations establish account login, pairing, and a live relay
-connection, but not the phone's terminal rendering or a command receipt.
+CloudGate during this run. Those first observations established account login, pairing, and a
+live relay connection; the later phone terminal observation and receipt are recorded below.
 
-The v0.10.0 terminal handler explicitly refuses its `/v1/terminals` route when reached through
-Cloud with `terminal_cloud_not_supported`. That source-level incompatibility is a reason to
-inspect the hosted console's actionable update prompt on the paired phone, not evidence that
-the phone showed it. The acceptance step remains open until the phone view and command receipts
-or the applicable incompatibility prompt have been observed end to end.
+The v0.10.0 terminal handler refuses generic Cloud HTTP `/v1/terminals` with
+`terminal_cloud_not_supported`; the hosted console uses the separate encrypted terminal
+channels. On 2026-10-13 the paired iPhone first showed `terminal_unsupported` in its terminal
+list. The daemon log identified the actual fixture fault: its terminal socket path was 123 bytes,
+above the 104-byte Unix socket limit. Restarting the same isolated v0.10.0 machine identity
+through a short state-directory symlink removed that fault. The iPhone then showed the empty
+terminal list, and, after a throwaway terminal was opened on the isolated daemon, sent
+`printf 'phone-ok\n'` from the hosted terminal view. The daemon's terminal history contained
+the command and its `phone-ok` output, while its Cloud terminal log recorded successful input
+receipts. These observations complete the phone terminal-view and command-receipt check for
+this old-daemon/new-Cloud pair. The socket-path failure was fixture setup, not evidence that
+the old daemon lacked the Cloud terminal protocol or needed an update prompt.
 
 ## Installation matrix
 
