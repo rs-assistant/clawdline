@@ -1877,6 +1877,20 @@ test("a phone reads and changes only the two default models", async () => {
   assert.equal(writeRoute("POST", "/v1/settings/browser"), null)
 })
 
+test("a phone manages machine notification switches without subscribing this browser", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  const read = await reader.fetch("/v1/settings/notifications")
+  assert.equal(read.status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "notification-settings", {}, "read"])
+  const write = await reader.fetch("/v1/settings/notifications", post({ push_on_waiting: false }))
+  assert.equal(write.status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "notification-settings-update", {
+    changes: { push_on_waiting: false },
+  }, "action"])
+  assert.equal((await reader.fetch("/v1/settings/notifications?all=1")).status, 501)
+})
+
 test("a phone reads and changes only the two work gates", async () => {
   const client = new FakeClient()
   const { reader } = seam(client)
@@ -2283,6 +2297,7 @@ test("every read the writer carries is one it waits for, and no write is", () =>
     ["/v1/usage/sessions/s1", "usage"],
     ["/v1/capacity", "capacity"],
     ["/v1/settings/default-models", "default-models"],
+    ["/v1/settings/notifications", "notification-settings"],
     ["/v1/settings/work-gates", "work-gate-settings"],
     ["/v1/sessions/restorable", "restorable"],
     ["/v1/sessions/archived", "archived"],

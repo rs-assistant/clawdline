@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react"
 import type { SettingsRequest, SettingsSnapshot } from "@clawdline/contract"
-import { readBrowserSettings, writeBrowserSettings } from "./settings/api.js"
+import { readNotificationSettings, writeNotificationSettings } from "./settings/api.js"
 import { settingsFailureSentence } from "./settings/window/failure.js"
 import { pushShape, sendPushTest, startPush, subscribePush, togglePush } from "../push/push.js"
 import { legacyState } from "../legacy/overlay-bridge.js"
@@ -49,7 +49,7 @@ function NotificationsPage({ shown }: { shown: boolean }) {
     if (!shown) return
     startPush()
     let live = true
-    void readBrowserSettings().then((answer) => {
+    void readNotificationSettings().then((answer) => {
       if (live) { setSettings(answer); setError("") }
     }, (cause: unknown) => { if (live) setError(settingsFailureSentence(cause)) })
     return () => { live = false }
@@ -60,7 +60,7 @@ function NotificationsPage({ shown }: { shown: boolean }) {
     setPending(key)
     setError("")
     try {
-      const answer = await writeBrowserSettings({ [key]: !current(settings, key) } as Partial<SettingsRequest>)
+      const answer = await writeNotificationSettings({ [key]: !current(settings, key) } as Partial<SettingsRequest>)
       setSettings(answer)
     } catch (cause) {
       setError(settingsFailureSentence(cause))

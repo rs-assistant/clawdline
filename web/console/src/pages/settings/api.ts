@@ -74,6 +74,10 @@ export function readBrowserSettings(): Promise<SettingsSnapshot> {
   return call({ method: "GET" }, "/v1/settings/browser")
 }
 
+export function readNotificationSettings(): Promise<SettingsSnapshot> {
+  return call({ method: "GET" }, "/v1/settings/notifications")
+}
+
 /**
  * Change the keys given; a key left out, or sent as null, is left as the file
  * has it.
@@ -89,6 +93,10 @@ export function writeSettings(change: Partial<SettingsRequest>): Promise<Setting
 
 export function writeBrowserSettings(change: Partial<SettingsRequest>): Promise<SettingsSnapshot> {
   return writeSettingsTo("/v1/settings/browser", change)
+}
+
+export function writeNotificationSettings(change: Partial<SettingsRequest>): Promise<SettingsSnapshot> {
+  return writeSettingsTo("/v1/settings/notifications", change)
 }
 
 function writeSettingsTo(path: string, change: Partial<SettingsRequest>): Promise<SettingsSnapshot> {
