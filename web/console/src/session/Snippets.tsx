@@ -192,14 +192,14 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const whose = machine ? L.machineFor(row).label : ""
   const shown = snippetOrder(model)
   const projectKey = model.project ? model.project.key : ""
-  const workflows = projectUnresolved ? [] : (answer?.snippets ?? []).filter((item) => item.scope === "workflow" && item.project === projectKey)
+  const workflows = (answer?.snippets ?? []).filter((item) => item.scope === "workflow" && (!item.project || (!projectUnresolved && item.project === projectKey)))
   const currentWorkflow = workflows.find((item) => item.id === selectedWorkflow?.id) ?? null
   useEffect(() => {
     if (selectedWorkflow && !currentWorkflow) setSelectedWorkflow(null)
   }, [selectedWorkflow, currentWorkflow])
 
   const startWorkflow = async () => {
-    if (!currentWorkflow || projectUnresolved || startingWorkflow) return
+    if (!currentWorkflow || (projectUnresolved && !!currentWorkflow.project) || startingWorkflow) return
     setStartingWorkflow(true); setWorkflowError("")
     try {
       const text = workflowTodoText(currentWorkflow.id, currentWorkflow.title, currentWorkflow.body)
@@ -584,24 +584,32 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
           onClick={pressed}
           dangerouslySetInnerHTML={{ __html: listHTML }}
         /> : <div className="snippet-list workflow-picker" id="workflow-picker" role="tabpanel" aria-labelledby="workflow-tab">
-          <button type="button" className="workflow-reload" disabled={loading} onClick={() => { void refresh() }}>{W("reload")}</button>
+          <div className="workflow-picker-toolbar"><span>{W("chooseWorkflow")}</span>
+            <button type="button" className="workflow-reload" disabled={loading} onClick={() => { void refresh() }}>{W("reload")}</button></div>
           {loading && <p role="status">{W("loading")}</p>}
           {error && <p role="alert">{error}</p>}
-          {!loading && !error && !projectUnresolved && workflows.length === 0 && <p>{W("noSessionWorkflows")}</p>}
-          {workflows.map((item) => <button type="button" key={item.id} className="workflow-picker-row"
-            aria-pressed={currentWorkflow?.id === item.id} onClick={() => { setSelectedWorkflow(item); setWorkflowError("") }}>
-            <strong>{item.title}</strong><span>{item.body}</span>
-          </button>)}
-          {currentWorkflow && <div className="workflow-launch">
-            <h3>{currentWorkflow.title}</h3><p>{currentWorkflow.body}</p>
-            <button type="button" disabled={startingWorkflow} onClick={() => void startWorkflow()}>{startingWorkflow ? W("starting") : W("start")}</button>
-          </div>}
+          {!loading && !error && !projectUnresolved && workflows.length === 0 && <p className="snippets-note">{W("noSessionWorkflows")}</p>}
+          {([true, false] as const).map((global) => {
+            const group = workflows.filter((item) => !item.project === global)
+            if (!group.length) return null
+            return <div className="snippet-group workflow-picker-group" key={String(global)}>
+              <h3 className="snippet-group-title">{global ? W("global") : W("projectOnly")}</h3>
+              {group.map((item) => <button type="button" key={item.id} className="workflow-picker-row"
+                aria-pressed={currentWorkflow?.id === item.id} onClick={() => { setSelectedWorkflow(item); setWorkflowError("") }}>
+                <strong>{item.title}</strong><span>{item.body}</span>
+              </button>)}
+            </div>
+          })}
+        </div>}
+        {tab === "workflow" && currentWorkflow && <div className="workflow-launch">
+          <span className="workflow-launch-label">{W("reviewLaunch")}</span><h3>{currentWorkflow.title}</h3><p>{currentWorkflow.body}</p>
           {workflowError && <p role="alert">{workflowError}</p>}
         </div>}
         <p className="said" id="snippets-said" role="status" aria-live="polite">
           {said}
         </p>
         <div className="buttons">
+          {tab === "workflow" && <button className="workflow-start" type="button" disabled={!currentWorkflow || startingWorkflow} onClick={() => void startWorkflow()}>{startingWorkflow ? W("starting") : W("start")}</button>}
           <button className="chip" id="snippets-close" type="button" ref={closeButton} onClick={onClose}>
             {T.webClose}
           </button>

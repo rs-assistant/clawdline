@@ -1,10 +1,14 @@
 /** The Workflow surface's English source and Taiwan Traditional Chinese copy. */
 const words = {
   en: {
-    reload: "Reload", intro: "Save a complete launch message for each Project. Skill import fills an editable draft.",
+    reload: "Reload", intro: "Save a launch message for this Project or every Project on this machine. Skill import fills an editable draft.",
     projectUnavailable: "Could not read Projects. Try again.", workflowUnavailable: "Could not read this Project's Workflows or Skills. Try again.",
     loading: "Loading…", new: "Create Workflow", fromSkill: "Create from Skill", chooseSkill: "Choose a Skill",
     empty: "This Project has no Workflows yet.", edit: "Edit Workflow", name: "Name", message: "Launch message",
+    emptyTitle: "Give this Project a repeatable start", emptyDetail: "Save a launch message once, then start it from any Session in this Project.",
+    importSkill: "Import a Skill", editAction: "Edit", workflowCount: "Saved Workflows", projectLabel: "Project",
+    global: "Global", projectOnly: "This Project", availability: "Available in", globalHint: "Available in every Project on this machine.",
+    chooseWorkflow: "Choose a Workflow to start", reviewLaunch: "Ready to start", noSkills: "No Project Skills available to import",
     save: "Save", cancel: "Cancel", delete: "Delete", needsText: "Enter a name and launch message.",
     saveUnknown: "The save result is unknown. Reload the list before trying again.",
     deleteUnknown: "The delete result is unknown. Reload the list.",
@@ -21,10 +25,14 @@ const words = {
     complete: "Mark done", reopen: "Reopen", send: "Send",
   },
   "zh-Hant": {
-    reload: "重新讀取", intro: "為每個 Project 保存完整的啟動訊息。從 Skill 帶入後仍可編輯。",
+    reload: "重新讀取", intro: "為這個 Project 或這台機器上的所有 Project 儲存啟動訊息。從 Skill 帶入後仍可編輯。",
     projectUnavailable: "無法讀取 Project，請重試。", workflowUnavailable: "無法讀取此 Project 的 Workflow 或 Skill，請重試。",
     loading: "讀取中…", new: "建立 Workflow", fromSkill: "從 Skill 建立", chooseSkill: "選擇 Skill",
     empty: "這個 Project 還沒有 Workflow。", edit: "編輯 Workflow", name: "名稱", message: "啟動訊息",
+    emptyTitle: "為這個 Project 建立常用流程", emptyDetail: "儲存完整的啟動訊息，之後就能從這個 Project 的 Session 啟動。",
+    importSkill: "從 Skill 帶入", editAction: "編輯", workflowCount: "已儲存的 Workflow", projectLabel: "Project",
+    global: "全域", projectOnly: "這個 Project", availability: "使用範圍", globalHint: "這台機器上的所有 Project 都能使用。",
+    chooseWorkflow: "選擇要啟動的 Workflow", reviewLaunch: "確認啟動", noSkills: "這個 Project 沒有可帶入的 Skill",
     save: "儲存", cancel: "取消", delete: "刪除", needsText: "請填寫名稱與啟動訊息。",
     saveUnknown: "儲存結果無法確認；請重新讀取清單後再試。",
     deleteUnknown: "刪除結果無法確認；請重新讀取清單。",
