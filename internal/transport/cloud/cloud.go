@@ -256,7 +256,8 @@ func (s Service) Answer(ctx context.Context, request Inbound) cloudops.Answer {
 	// to the request. Log only authenticated envelope metadata and the typed
 	// outcome; never the command body, message text, or credentials.
 	if answer.Mutating {
-		if s.Acted != nil && answer.OK() && answer.Subject != "" && answer.Subject != cloudops.MachineReplySession {
+		if s.Acted != nil && answer.OK() && answer.Subject != "" &&
+			(answer.Subject != cloudops.MachineReplySession || answer.Operation == "start" || answer.Operation == "resume") {
 			s.Acted()
 		}
 		s.logf("cloud: command answered: operation=%s session=%s status=%d code=%s sender=%s seq=%d",
