@@ -50,8 +50,8 @@ upgraded from and rolled back to; a release whose store change an older binary c
 
    The scan reads every unpacked file and the printable strings of each binary. In a binary only
    a private word or this machine's home directory is a finding: a binary carries every literal of
-   its dependencies, which the source-file exemptions were not written for. CI's fixed-rule scan
-   is not publication approval (`tools/check-private-ci.sh`).
+   its dependencies, which the source-file exemptions were not written for. CI does not run this
+   scan; its green result is not publication approval.
 4. Install it from the public URL on a clean machine ([user/install.md](user/install.md)).
 
 Release notes come from `docs/release-notes/<version>.md` when that file exists, otherwise from
