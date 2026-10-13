@@ -193,12 +193,16 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const shown = snippetOrder(model)
   const projectKey = model.project ? model.project.key : ""
   const workflows = projectUnresolved ? [] : (answer?.snippets ?? []).filter((item) => item.scope === "workflow" && item.project === projectKey)
+  const currentWorkflow = workflows.find((item) => item.id === selectedWorkflow?.id) ?? null
+  useEffect(() => {
+    if (selectedWorkflow && !currentWorkflow) setSelectedWorkflow(null)
+  }, [selectedWorkflow, currentWorkflow])
 
   const startWorkflow = async () => {
-    if (!selectedWorkflow || startingWorkflow) return
+    if (!currentWorkflow || projectUnresolved || startingWorkflow) return
     setStartingWorkflow(true); setWorkflowError("")
     try {
-      const text = workflowTodoText(selectedWorkflow.id, selectedWorkflow.title, selectedWorkflow.body)
+      const text = workflowTodoText(currentWorkflow.id, currentWorkflow.title, currentWorkflow.body)
       const created = await createDirectTodoV2(row.id, text)
       await directTodoActionV2(row.id, created.todo.id, "send")
       document.dispatchEvent(new CustomEvent("clawdline:workflow-started"))
@@ -580,15 +584,16 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
           onClick={pressed}
           dangerouslySetInnerHTML={{ __html: listHTML }}
         /> : <div className="snippet-list workflow-picker" id="workflow-picker" role="tabpanel" aria-labelledby="workflow-tab">
+          <button type="button" className="workflow-reload" disabled={loading} onClick={() => { void refresh() }}>{W("reload")}</button>
           {loading && <p role="status">{W("loading")}</p>}
           {error && <p role="alert">{error}</p>}
           {!loading && !error && !projectUnresolved && workflows.length === 0 && <p>{W("noSessionWorkflows")}</p>}
           {workflows.map((item) => <button type="button" key={item.id} className="workflow-picker-row"
-            aria-pressed={selectedWorkflow?.id === item.id} onClick={() => { setSelectedWorkflow(item); setWorkflowError("") }}>
+            aria-pressed={currentWorkflow?.id === item.id} onClick={() => { setSelectedWorkflow(item); setWorkflowError("") }}>
             <strong>{item.title}</strong><span>{item.body}</span>
           </button>)}
-          {selectedWorkflow && <div className="workflow-launch">
-            <h3>{selectedWorkflow.title}</h3><p>{selectedWorkflow.body}</p>
+          {currentWorkflow && <div className="workflow-launch">
+            <h3>{currentWorkflow.title}</h3><p>{currentWorkflow.body}</p>
             <button type="button" disabled={startingWorkflow} onClick={() => void startWorkflow()}>{startingWorkflow ? W("starting") : W("start")}</button>
           </div>}
           {workflowError && <p role="alert">{workflowError}</p>}

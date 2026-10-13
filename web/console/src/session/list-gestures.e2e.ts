@@ -1791,6 +1791,20 @@ test("a phone imports a Skill as editable Workflow text, starts it, and sees its
       }; look()
     })`)
     await tab.shot("workflow-session-done")
+    await tab.press('#session-todos > summary')
+    await tab.press('#detail-snippets')
+    await tab.press('.snippets-tabs button:last-child')
+    await tab.press('.workflow-picker-row')
+    workflowRecords = []
+    await tab.press('.workflow-reload')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (!document.querySelector('.workflow-launch button') && !document.querySelector('.workflow-picker-row')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('a removed Workflow stayed launchable after reload'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
   }))
 
 test("Clawdfather stays first above a waiting Session on phone and desktop", () =>
