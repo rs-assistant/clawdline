@@ -68,6 +68,8 @@ interface StartHost {
   openId(): string | null
   /** Read the list now rather than on the stream's next beat. */
   refresh(): void
+  /** Open from the confirmed start reply; return false to use the inventory path. */
+  openStarted?: (answer: L.StartAnswer, place: Place | null, finish: () => boolean) => boolean
 }
 
 const HOLD = 15000 // how long the band waits before it admits it has stopped waiting
@@ -99,7 +101,7 @@ let pasts: PastRow[] | null = null
 let pastsUnread = false
 let capped = false
 let reading = false
-let wait: { id: string; from: string | null; late: boolean; place: Place } | null = null
+let wait: { id: string; from: string | null; late: boolean; eager: boolean; place: Place } | null = null
 let detached: string | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 let placesGeneration = 0
@@ -732,8 +734,8 @@ function press(id: string): void {
     .then((d) => {
       startPress.settle(() => {
         pressing = null
-        began(d && d.id, place || (id === MACHINE_PLACE
-          ? { id, label: "Clawdfather", path: nextWord("machineSessionScope") } : null), d && d.attach)
+        began(d, place || (id === MACHINE_PLACE
+          ? { id, label: "Clawdfather", path: nextWord("machineSessionScope") } : null))
       })
     })
     .catch((e: Failure) => {
@@ -774,7 +776,7 @@ function pick(sessionID: string): void {
     .then((d) => {
       startPress.settle(() => {
         pressing = null
-        began(d && d.id, { id: place.id, label: row.title, path: place.path, icon: place.icon }, d && d.attach)
+        began(d, { id: place.id, label: row.title, path: place.path, icon: place.icon, machine: place.machine })
       })
     })
     .catch((e: Failure) => {
@@ -793,14 +795,15 @@ function pick(sessionID: string): void {
     })
 }
 
-function began(id: string | undefined, place: Place | null, attach: string | undefined): void {
-  detached = attach || null
+function began(answer: L.StartAnswer | undefined, place: Place | null): void {
+  const id = answer?.id
+  detached = answer?.attach || null
   close()
   if (!id) {
     band(detached ? detachedWords() : T().webStartSlow, true)
     return
   }
-  wait = { id, from: host.openId(), late: false, place: place || { id: "" } }
+  wait = { id, from: host.openId(), late: false, eager: false, place: place || { id: "" } }
   band(detached ? detachedWords() : T().webStartWaiting, false)
   renderList()
   // The Swift server nudges its watcher here, so the new row arrives the way
@@ -813,6 +816,23 @@ function began(id: string | undefined, place: Place | null, attach: string | und
     band(detached ? detachedWords() : T().webStartSlow, true)
     renderList()
   }, HOLD)
+  if (answer && host.openStarted && wait?.id === id) {
+    const pending = wait
+    pending.eager = true
+    if (!host.openStarted(answer, place, () => finishStarted(id)) && wait === pending) pending.eager = false
+  }
+}
+
+function finishStarted(id: string): boolean {
+  if (!wait || wait.id !== id || wait.late || host.openId() !== wait.from) return false
+  wait = null
+  landed = id
+  if (timer) clearTimeout(timer)
+  timer = null
+  detached = null
+  hideBand()
+  renderList()
+  return true
 }
 
 function detachedWords(): string {
@@ -936,7 +956,7 @@ export const Start = {
       renderList()
       return false
     }
-    if (!wait || !arrived(wait.id)) return false
+    if (!wait || wait.eager || !arrived(wait.id)) return false
     const { id, from, late } = wait
     landed = late ? null : id
     wait = null

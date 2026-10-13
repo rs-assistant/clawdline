@@ -8,6 +8,7 @@ import { visualBranches, visualDepths } from "./session/order.js"
 import { Detail } from "./session/Detail.js"
 import type { FleetDetailProblem } from "./cloud/all-machine-sessions.js"
 import { Start, StartSheet, StartingRow } from "./session/Start.js"
+import type { StartAnswer, StartPlaceRow } from "./legacy/start-bridge.js"
 import { SessionToolbar } from "./session/SessionToolbar.js"
 import { Command, CommandSheet } from "./session/Command.js"
 import { Starting } from "./session/Starting.js"
@@ -54,6 +55,7 @@ export function SessionsPage({
   onOpen,
   onBack,
   onDid,
+  onStarted,
   streamTasks = null,
   fleetList,
   fleetDetailKey,
@@ -88,6 +90,7 @@ export function SessionsPage({
   onOpen: (id: string) => void
   onBack: () => void
   onDid: () => void
+  onStarted?: (answer: StartAnswer, place: StartPlaceRow | null, finish: () => boolean) => boolean
   /**
    * The task list the live stream carries (`FleetState.tasks` while
    * `tasksLive`), or null when the stream is not carrying one; then the list is
@@ -169,11 +172,14 @@ export function SessionsPage({
   onOpenRef.current = onOpen
   const onDidRef = useRef(onDid)
   onDidRef.current = onDid
+  const onStartedRef = useRef(onStarted)
+  onStartedRef.current = onStarted
   useEffect(() => {
     Start.host({
       open: (id) => onOpenRef.current(id),
       openId: () => openIdRef.current,
       refresh: () => onDidRef.current(),
+      openStarted: (answer, place, finish) => onStartedRef.current?.(answer, place, finish) ?? false,
     })
     Command.host({
       open: (id) => onOpenRef.current(id),
