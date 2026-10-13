@@ -157,6 +157,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const [selectedWorkflow, setSelectedWorkflow] = useState<Snippet | null>(null)
   const [startingWorkflow, setStartingWorkflow] = useState(false)
   const [workflowError, setWorkflowError] = useState("")
+  const [projectUnresolved, setProjectUnresolved] = useState(false)
   const [answer, setAnswer] = useState<SnippetAnswer | null>(answered[row.id] ?? null)
   const [loading, setLoading] = useState(!answered[row.id])
   const [error, setError] = useState("")
@@ -191,7 +192,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const whose = machine ? L.machineFor(row).label : ""
   const shown = snippetOrder(model)
   const projectKey = model.project ? model.project.key : ""
-  const workflows = (answer?.snippets ?? []).filter((item) => item.scope === "workflow" && item.project === projectKey)
+  const workflows = projectUnresolved ? [] : (answer?.snippets ?? []).filter((item) => item.scope === "workflow" && item.project === projectKey)
 
   const startWorkflow = async () => {
     if (!selectedWorkflow || startingWorkflow) return
@@ -215,9 +216,24 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
     const ticket = ++reading.current
     return readSnippets(row.id)
       .then(async (next) => {
-        if (next.project || !machine) return next
-        const resolved = await readWorkflowProject(row.id)
-        return { ...next, project: resolved.project }
+        if (next.project || !machine) {
+          if (alive.current && ticket === reading.current) setProjectUnresolved(false)
+          return next
+        }
+        try {
+          const resolved = await readWorkflowProject(row.id)
+          if (!resolved.project) throw new Error("missing Project identity")
+          if (alive.current && ticket === reading.current) { setProjectUnresolved(false); setWorkflowError("") }
+          return { ...next, project: resolved.project }
+        } catch {
+          // An older machine still serves the Snippet tab. It cannot promise
+          // which Project's Workflow belongs in this Session.
+          if (alive.current && ticket === reading.current) {
+            setWorkflowError(W("projectResolveUnavailable"))
+            setProjectUnresolved(true)
+          }
+          return next
+        }
       })
       .then((next) => {
         if (!alive.current || ticket !== reading.current) return
@@ -566,7 +582,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
         /> : <div className="snippet-list workflow-picker" id="workflow-picker" role="tabpanel" aria-labelledby="workflow-tab">
           {loading && <p role="status">{W("loading")}</p>}
           {error && <p role="alert">{error}</p>}
-          {!loading && !error && workflows.length === 0 && <p>{W("noSessionWorkflows")}</p>}
+          {!loading && !error && !projectUnresolved && workflows.length === 0 && <p>{W("noSessionWorkflows")}</p>}
           {workflows.map((item) => <button type="button" key={item.id} className="workflow-picker-row"
             aria-pressed={selectedWorkflow?.id === item.id} onClick={() => { setSelectedWorkflow(item); setWorkflowError("") }}>
             <strong>{item.title}</strong><span>{item.body}</span>

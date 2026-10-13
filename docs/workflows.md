@@ -17,6 +17,10 @@ continues to insert text without sending. Selecting a Workflow shows its
 entire saved message and Start sends it to this Session. A Workflow belongs to
 the same Project key as the Session. The list is machine-specific, including
 when the Console is reached through Cloud.
+Cloud asks the selected machine to resolve a Session's Project, so a Session
+in a subdirectory or worktree can see its canonical Project Workflow. If that
+read is unavailable on an older machine, the Snippet tab still works and the
+Workflow tab names the update requirement.
 
 ## Storage and execution
 
@@ -50,4 +54,4 @@ assistant to use a Skill, but Clawdline does not interpret that instruction.
 - The fold distinguishes sent/read from complete, and an unsent run remains
   recoverable after a failed send.
 - The phone E2E path imports a Skill, saves the Workflow, starts it from the
-  Session mark, and sees its progress in the fold.
+  Session mark, sees its progress in the fold, and marks it complete.
