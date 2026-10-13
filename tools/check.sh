@@ -85,6 +85,7 @@ check "windows go vet ./..." env GOOS=windows go vet ./...
 check "go test ./..." go test ./...
 check "contract-gen -check" go run ./tools/contract-gen -check
 check "check-legacy-css.sh" tools/check-legacy-css.sh
+check "check-rounded-side-borders.mjs" node web/console/tools/check-rounded-side-borders.mjs
 check "check-machine-words.sh" tools/check-machine-words.sh
 check "check-shell-expansions.sh" tools/check-shell-expansions.sh
 check "check-private.sh" tools/check-private.sh
