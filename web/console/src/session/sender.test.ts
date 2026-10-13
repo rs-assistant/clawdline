@@ -91,6 +91,18 @@ test("try again after a definite refusal sends despite a failed read-back", asyn
   assert.equal(h.cards.card(card.token)?.state, "accepted")
 })
 
+test("retry after an execution change uses a fresh request", async () => {
+  const h = harness()
+  h.answer({ ok: false, status: 409, code: "execution_generation_changed" })
+  const card = h.cards.add("s", "follow up", [], T0)
+  await h.sender.deliver(card)
+  assert.equal(h.cards.card(card.token)?.state, "failed")
+  await h.sender.resend(card.token)
+  assert.equal(h.posts.length, 2)
+  assert.notEqual(h.posts[1].request, h.posts[0].request)
+  assert.equal(h.posts[1].text, h.posts[0].text)
+})
+
 test("try again after an uncertain send still stops when read-back fails", async () => {
   const h = harness()
   h.answer({ ok: false, status: 504, code: "cloud_read_timeout", outcome: "unknown" })
