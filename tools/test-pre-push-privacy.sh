@@ -1,12 +1,12 @@
 #!/bin/sh
-# Prove that the pre-push hook asks the privacy checker about the commits this
-# push would add — not about the whole history — and that every answer other
-# than clean refuses the push.
+# Prove that the pre-push hook checks the working tree once and never starts a
+# historical privacy scan. Every working-tree answer other than clean still
+# refuses the push.
 #
 # The checker itself is stubbed: its rules have their own tests
 # (tools/check-private), and what is tested here is the hook's question and
-# what it does with the answer. The stub records every call so the test can
-# say the history was read once, over a range, with no checkpoint.
+# what it does with the answer. The stub records every call and fails if the
+# removed historical mode is invoked.
 set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/.." && pwd)
@@ -28,18 +28,19 @@ git init --bare -q "$tmp/public.git"
 git init -q -b main "$tmp/work"
 mkdir -p "$tmp/work/tools/git-hooks"
 cp "$root/tools/git-hooks/pre-push" "$tmp/work/tools/git-hooks/pre-push"
-# The stub: every call is appended to calls.txt, and answer.txt (when it
-# exists) is the exit status of a -history call. The working-tree call stays
-# clean so a refusal can only come from the history one.
+# The stub: every call is appended to calls.txt, answer.txt (when it exists)
+# is the working-tree answer, and any historical call is an immediate error.
 cat >"$tmp/work/tools/check-private.sh" <<STUB
 #!/bin/sh
 printf '%s\n' "\${*:-working-tree}" >>"$tmp/calls.txt"
-case "\$1" in
-  -history) if [ -f "$tmp/answer.txt" ]; then
-              echo "docs/note.md:3: private-word — history only, not in the working tree"
-              exit "\$(cat "$tmp/answer.txt")"
-            fi ;;
-esac
+if [ "\${1:-}" = -history ]; then
+  echo "historical privacy scan was not disabled" >&2
+  exit 99
+fi
+if [ -f "$tmp/answer.txt" ]; then
+  echo "docs/note.md:3: private-word — still in the working tree"
+  exit "\$(cat "$tmp/answer.txt")"
+fi
 exit 0
 STUB
 chmod +x "$tmp/work/tools/git-hooks/pre-push" "$tmp/work/tools/check-private.sh"
@@ -69,43 +70,38 @@ push() {
 expect() { grep -Fq "$1" "$tmp/push.out" || fail "the output does not say: $1"; }
 calls() { grep -c . "$tmp/calls.txt" || true; }
 
-# 1. The first push of a ref the remote does not have publishes its whole
-#    history, so that is what the hook asks about.
+# 1. The first push checks the working tree once and never asks for history.
 commit
 push ok
-[ "$(calls)" = 2 ] || fail "the hook made $(calls) check-private call(s), want two"
-grep -Fq -- "-history -revs=$(git -C "$tmp/work" rev-parse HEAD) -checkpoint -" "$tmp/calls.txt" ||
-  fail "the first push did not ask about the whole history: $(cat "$tmp/calls.txt")"
+[ "$(calls)" = 1 ] || fail "the hook made $(calls) check-private call(s), want one"
+grep -Fxq -- "working-tree" "$tmp/calls.txt" ||
+  fail "the first push made an unexpected privacy call: $(cat "$tmp/calls.txt")"
 
-# 2. The next push asks about the commits it would add, once, and keeps no
-#    checkpoint. This is the whole point: the question is a range.
-before=$(git -C "$tmp/work" rev-parse HEAD)
+# 2. A later push has the same one working-tree check, not a range scan.
 commit
 commit
 push ok
-[ "$(calls)" = 2 ] || fail "the hook made $(calls) check-private call(s), want two"
-grep -Fq -- "-history -revs=$(git -C "$tmp/work" rev-parse HEAD) -since=$before -checkpoint -" "$tmp/calls.txt" ||
-  fail "the push did not ask about its own range: $(cat "$tmp/calls.txt")"
+[ "$(calls)" = 1 ] || fail "the hook made $(calls) check-private call(s), want one"
+grep -Fxq -- "working-tree" "$tmp/calls.txt" ||
+  fail "the later push made an unexpected privacy call: $(cat "$tmp/calls.txt")"
 
-# 3. A finding in those commits refuses the push, with the finding and where
-#    to read about it.
+# 3. A working-tree finding refuses the push and names the finding.
 echo 1 >"$tmp/answer.txt"
 commit
 push refused
-expect 'the commits this push would add are not clean of private material'
+expect 'the working tree is not clean of private material'
 expect 'docs/note.md:3: private-word'
-expect 'docs/publishing.md'
 
-# 4. Could-not-check and undetermined are not a pass either.
+# 4. Could-not-check and undetermined working-tree answers are not a pass.
 echo 2 >"$tmp/answer.txt"
 push refused
-expect 'are not clean of private material'
+expect 'working tree is not clean of private material'
 echo 3 >"$tmp/answer.txt"
 push refused
-expect 'are not clean of private material'
+expect 'working tree is not clean of private material'
 
 # 5. Clean again: it lands.
 rm "$tmp/answer.txt"
 push ok
 
-echo "push privacy guard: a push asks about the commits it would add, once, and any answer but clean refuses it"
+echo "push privacy guard: a push checks the working tree once, never scans history, and any answer but clean refuses it"

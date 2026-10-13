@@ -369,6 +369,18 @@ func pickerKeyLine(tail []string) bool {
 	return strings.HasPrefix(last, "Enter to select") && strings.HasSuffix(last, "Esc to cancel")
 }
 
+// codexApprovalKeyLine is the footer under Codex's command-approval picker.
+// Unlike its trust picker, the command approval puts an environment and the
+// complete command between its question and choices, then leaves two blank
+// rows before the choices. That makes proximity to prose deliberately fail;
+// this exact final instruction is the picker's stronger proof instead.
+func codexApprovalKeyLine(tail []tailLine) bool {
+	if len(tail) == 0 {
+		return false
+	}
+	return trimSpaces(tail[len(tail)-1].element) == "Press enter to confirm or esc to cancel"
+}
+
 // askedOver is the same question asked of the physical lines, for a dialog
 // whose frame is not what marks its top: prose drawn directly over the row,
 // with at most one blank row of padding between them. Two blanks are an edge
@@ -703,7 +715,7 @@ func codexMenu(tail []tailLine, lines []string) (Menu, bool) {
 			break
 		}
 	}
-	if len(options) < 2 || (!askedOver(lines, tail[first].offset) && pickerQuestion == "") {
+	if len(options) < 2 || (!askedOver(lines, tail[first].offset) && pickerQuestion == "" && !codexApprovalKeyLine(tail)) {
 		return Menu{}, false
 	}
 	menu := Menu{Options: options, Selected: firstSelected(options), Numbered: true}
