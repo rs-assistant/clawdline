@@ -278,6 +278,8 @@ export type WriteRoute =
   | { op: "default-models-update"; word: Carried<"default-models-update"> }
   | { op: "work-gate-settings"; word: Carried<"work-gate-settings"> }
   | { op: "work-gate-settings-update"; word: Carried<"work-gate-settings-update"> }
+  | { op: "notification-settings"; word: Carried<"notification-settings"> }
+  | { op: "notification-settings-update"; word: Carried<"notification-settings-update"> }
   | { op: "board-command"; word: Carried<"board-command"> }
   | { op: "machine-usage"; word: Carried<"machine-usage"> }
   | { op: "update"; word: Carried<"update"> }
@@ -450,6 +452,7 @@ export const CARRIED_READS: ReadonlySet<WriteRoute["op"]> = new Set<WriteRoute["
   "capacity",
   "default-models",
   "work-gate-settings",
+  "notification-settings",
   "restorable",
   "archived",
   "machine-usage",
@@ -516,6 +519,9 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
     }
     if (head === "settings" && a === "work-gates" && segments.length === 2) {
       return { op: "work-gate-settings", word: "work-gate-settings" }
+    }
+    if (head === "settings" && a === "notifications" && segments.length === 2) {
+      return { op: "notification-settings", word: "notification-settings" }
     }
     if (head === "sessions" && a === "restorable" && segments.length === 2) {
       return { op: "restorable", word: "restorable-sessions" }
@@ -645,6 +651,9 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   }
   if (head === "settings" && a === "work-gates" && segments.length === 2) {
     return { op: "work-gate-settings-update", word: "work-gate-settings-update" }
+  }
+  if (head === "settings" && a === "notifications" && segments.length === 2) {
+    return { op: "notification-settings-update", word: "notification-settings-update" }
   }
   if (head === "board" && segments.length === 1) {
     return { op: "board-command", word: "board-command" }
@@ -867,6 +876,8 @@ function spellingOf(route: WriteRoute): Spelling {
     case "default-models-update":
     case "work-gate-settings":
     case "work-gate-settings-update":
+    case "notification-settings":
+    case "notification-settings-update":
     case "squad-write":
     case "squad-package":
     case "board-command":
@@ -1326,6 +1337,7 @@ export class RelayWriter {
       case "capacity":
       case "default-models":
       case "work-gate-settings":
+      case "notification-settings":
       case "machine-usage":
       case "update":
       case "update-fresh": {
@@ -1642,6 +1654,12 @@ export class RelayWriter {
         return this.machineWorkV2(client, route.word, {}, headerOf(init, "idempotency-key"))
       }
       case "work-gate-settings-update": {
+        for (const [key] of url.searchParams) {
+          throw failure("cloud_not_carried", `${url.pathname}?${key}= is not carried over Clawdline Cloud: change it on the machine.`, 501)
+        }
+        return this.machineWorkV2(client, route.word, { changes: await bodyOf(init) }, headerOf(init, "idempotency-key"))
+      }
+      case "notification-settings-update": {
         for (const [key] of url.searchParams) {
           throw failure("cloud_not_carried", `${url.pathname}?${key}= is not carried over Clawdline Cloud: change it on the machine.`, 501)
         }

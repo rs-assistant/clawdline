@@ -43,6 +43,16 @@ var browserSettings = map[string]bool{
 	"claude_auto_compact_window": true, "iterm_scan": true,
 }
 
+// notificationSettings is the machine-wide event policy. A device's ability
+// to subscribe is independent of these switches.
+var notificationSettings = map[string]bool{
+	"push_on_waiting": true, "orchestrator_agent_notify": true,
+	"push_on_board_decision": true, "push_on_board_done": true,
+	"push_on_schedule_failure": true, "push_on_capacity": true,
+	"push_on_dead_letter": true, "push_on_app_release_success": true,
+	"push_on_cloud_release_success": true, "push_on_release_failure": true,
+}
+
 // settingsRequestBodyLimit bounds both the full local settings write and the
 // two-key route carried to Cloud. The latter has the same bound before and
 // after transport (internal/app/cloudops.defaultModelsCloudBodyLimit).
@@ -253,6 +263,75 @@ func (s *Server) workGateSettingsRoute(w http.ResponseWriter, r *http.Request) {
 		if len(changes) == 0 {
 			_, err = f.Read()
 		} else {
+			_, err = f.Set(changes)
+		}
+		if err != nil {
+			writeSettingsFailure(w, f, err)
+			return
+		}
+		answer, err := read()
+		if err != nil {
+			writeSettingsFailure(w, f, err)
+			return
+		}
+		writeJSON(w, answer)
+	default:
+		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "GET or POST")
+	}
+}
+
+// notificationSettingsRoute exposes only event switches to a paired console.
+// It never returns paths, remote settings, or browser subscription material.
+func (s *Server) notificationSettingsRoute(w http.ResponseWriter, r *http.Request) {
+	f := s.settingsFile()
+	read := func() (map[string]json.RawMessage, error) {
+		v, err := f.Read()
+		if err != nil {
+			return nil, err
+		}
+		answer := make(map[string]json.RawMessage)
+		for key := range notificationSettings {
+			if raw, ok := v.Raw[key]; ok {
+				var valid bool
+				if json.Unmarshal(raw, &valid) == nil && string(raw) != "null" {
+					answer[key] = raw
+				}
+			}
+		}
+		return answer, nil
+	}
+	switch r.Method {
+	case http.MethodGet, http.MethodHead:
+		answer, err := read()
+		if err != nil {
+			writeSettingsFailure(w, f, err)
+			return
+		}
+		writeJSON(w, answer)
+	case http.MethodPost:
+		if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+			writeRefusal(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "a notification settings write is application/json")
+			return
+		}
+		var body map[string]json.RawMessage
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, settingsRequestBodyLimit))
+		if err := dec.Decode(&body); err != nil || body == nil {
+			writeRefusal(w, http.StatusBadRequest, "bad_request", "that body is not a notification settings change")
+			return
+		}
+		for key := range body {
+			if !notificationSettings[key] {
+				writeRawRefusal(w, http.StatusBadRequest, "bad_request", "not a notification setting key: "+key)
+				return
+			}
+		}
+		changes, refusal := settingsChanges(body)
+		if refusal != nil {
+			writeRawRefusal(w, http.StatusBadRequest, refusal.code, refusal.message)
+			return
+		}
+		var err error
+		if len(changes) > 0 {
 			_, err = f.Set(changes)
 		}
 		if err != nil {

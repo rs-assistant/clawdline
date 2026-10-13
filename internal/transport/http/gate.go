@@ -506,6 +506,10 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 		if !(v.Allowed && (v.Local || v.Caps.Has(auth.Send))) {
 			return http.StatusForbidden, "forbidden", "This device may read, and not change work gates."
 		}
+	case p == "/v1/settings/notifications":
+		if !(v.Allowed && (v.Local || v.Caps.Has(auth.Send))) {
+			return http.StatusForbidden, "forbidden", "This device may read, and not change notification preferences."
+		}
 	case p == "/v1/squad-packages/preview" || p == "/v1/squad-packages/export":
 		// Preview grants and public exports leave catalog and settings unchanged.
 		// The export handler separately requires Send for selected private scopes.

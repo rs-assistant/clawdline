@@ -219,6 +219,7 @@ func TestGateCoversEveryChange(t *testing.T) {
 		"/v1/sessions/%25x/send", "/v1/sessions/%25x/interrupt", "/v1/sessions/%25x/close",
 		"/v1/settings",
 		"/v1/settings/browser",
+		"/v1/settings/notifications",
 		"/v1/settings/default-models",
 		"/v1/settings/work-gates",
 		"/v1/projects/p/worktrees/refresh",
