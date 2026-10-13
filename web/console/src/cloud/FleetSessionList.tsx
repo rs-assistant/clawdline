@@ -228,7 +228,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     const presentationLoading = !!missingTitle && !presentationFailed
     const filtered = reading?.phase === "settled" && reading.value.rows
       ? reading.value.rows.filter((row) => matchesFleetFilter(row, statusFilter) &&
-        (!search || `${machine.name} ${machine.id} ${machine.platform} ${presentations.current.get(destinationKey(row.destination))?.title ?? ""} ${row.destination.sessionID} ${stateWord(row.state)}`
+        (!search || `${machine.name} ${machine.id} ${machine.platform} ${row.machineScope ? "Clawdfather" : (presentations.current.get(destinationKey(row.destination))?.title ?? "")} ${row.destination.sessionID} ${stateWord(row.state)}`
           .toLocaleLowerCase().includes(search))) : []
     const shown = filtered.map((row) => {
       const presentation = presentations.current.get(destinationKey(row.destination))
@@ -355,6 +355,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
                   const presentation = presentations.current.get(destinationKey(row.destination))
                   return <ProjectedRow key={destinationKey(row.destination)}
                     title={presentation?.title || row.destination.sessionID} icon={presentation?.icon} cwd={presentation?.cwd}
+                    machineScope={row.machineScope === true} coordinatorBound={row.coordinatorBound === true}
                     status={displayedPresentationStatus(row, presentation)}
                     sessionID={row.destination.sessionID} machineID={machine.id} machineName={machine.name}
                     assistant={row.assistant ?? presentation?.assistant} state={row.state} stateLabel={stateWord(row.state)}
@@ -367,10 +368,12 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
                     swiped={swiped === destinationKey(row.destination)}
                     consumePress={() => swipe.tookThePress()}
                     onClose={row.freshness === "current" && machine.freshness === "current"
-                      ? () => { swipe.closeOpen(); thawOrder(); onCloseRequest(row.destination, presentation?.title || row.destination.sessionID) } : undefined}
+                      ? () => { swipe.closeOpen(); thawOrder(); onCloseRequest(row.destination,
+                        row.machineScope ? "Clawdfather" : presentation?.title || row.destination.sessionID) } : undefined}
                     onArchive={row.freshness === "current" && machine.freshness === "current" &&
                       archivable(displayedPresentationStatus(row, presentation)?.sessionId)
-                      ? () => { swipe.closeOpen(); thawOrder(); onArchiveRequest(row.destination, presentation?.title || row.destination.sessionID) } : undefined}
+                      ? () => { swipe.closeOpen(); thawOrder(); onArchiveRequest(row.destination,
+                        row.machineScope ? "Clawdfather" : presentation?.title || row.destination.sessionID) } : undefined}
                     onOpen={() => onOpen(row.destination)} />
                 })}</ul>}
           </>}
@@ -388,14 +391,23 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
         console onto the machine, which is what their sheets read. */}
     <dialog ref={machineDialog} className="cloud-all-machine-dialog"
       aria-label={nextWord(machineAction === "start" ? "cloudStartWhere" : "cloudSwitch")}
-      onCancel={(event) => { event.preventDefault(); setMachineAction(null) }}>
+      onCancel={(event) => { event.preventDefault(); setMachineAction(null) }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return
+        const { left, right, top, bottom } = event.currentTarget.getBoundingClientRect()
+        if (event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom) {
+          setMachineAction(null)
+        }
+      }}>
       <h2>{nextWord(machineAction === "start" ? "cloudStartWhere" : "cloudSwitch")}</h2>
-      {machines.map((machine) => <button key={machine.id} type="button" onClick={() => {
+      {machines.map((machine) => <button className="cloud-all-machine-option" key={machine.id} type="button" onClick={() => {
         const action = machineAction
         setMachineAction(null)
         if (action) onMachineAction?.(machine.id, action)
       }}>{machine.name} · {machine.platform}</button>)}
-      <button type="button" onClick={() => setMachineAction(null)}>{nextWord("cloudActionCancel")}</button>
+      <div className="cloud-all-machine-actions">
+        <button className="cloud-all-machine-cancel" type="button" onClick={() => setMachineAction(null)}>{nextWord("cloudActionCancel")}</button>
+      </div>
     </dialog>
   </>
 }

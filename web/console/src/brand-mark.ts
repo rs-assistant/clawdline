@@ -15,3 +15,10 @@ export function sessionName(row: SessionRow): string {
 export function sessionMark(row: SessionRow): Icon | undefined {
   return row.machine_scope || row.coordinator ? BRAND_MARK : row.icon
 }
+
+export function projectedSessionIdentity(title: string, icon: Icon | undefined, machineScope: boolean,
+  coordinatorBound: boolean): { title: string; icon: Icon; crown: boolean; pending: boolean } {
+  return machineScope
+    ? { title: "Clawdfather", icon: BRAND_MARK, crown: true, pending: !coordinatorBound }
+    : { title, icon: icon ?? BRAND_MARK, crown: false, pending: false }
+}

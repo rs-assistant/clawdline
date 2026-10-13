@@ -317,17 +317,28 @@ if [ "$WAS_RUNNING" = 1 ]; then
   echo "reopened $INSTALL_APP; waiting for its daemon on 127.0.0.1:${PORT}…"
   ok=0
   for ((i = 0; i < 60; i++)); do
-    if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:$PORT/v1/health" || true)" = 200 ]; then
+    if [ "$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "http://127.0.0.1:$PORT/" || true)" = 200 ]; then
       ok=1; break
     fi
     sleep 2
   done
   if [ "$ok" = 0 ]; then
-    echo "error: $INSTALL_APP was reopened but http://127.0.0.1:$PORT/v1/health did not answer 200" >&2
+    echo "error: $INSTALL_APP was reopened but http://127.0.0.1:$PORT/ did not answer 200" >&2
     echo "       within 120 seconds; the daemon's daemon.log says why." >&2
     exit 1
   fi
   echo "the daemon answers on 127.0.0.1:$PORT"
+  token_file="${CLAWDLINE_NEXT_DIR:-$HOME/.config/clawdline-next}/local-token"
+  [ -r "$token_file" ] || { echo "error: local token is unavailable for BUILD.json verification" >&2; exit 1; }
+  token=$(cat "$token_file")
+  served=$(printf 'header = "Authorization: Bearer %s"\n' "$token" |
+    curl --config - -fsS --max-time 2 "http://127.0.0.1:$PORT/BUILD.json" || true)
+  if [ "$served" != "$(cat "$INSTALL_APP/Contents/Resources/web/BUILD.json")" ]; then
+    echo "error: the running app does not serve the installed BUILD.json" >&2
+    exit 1
+  fi
+  CLAWDLINE_RELEASE_NOTIFY_BIN="$INSTALL_APP/Contents/MacOS/clawdline" \
+    tools/notify-release-success.sh app "$stamp"
 fi
 if [ -e "$BACKUP" ]; then rm -rf "$BACKUP"; fi
 

@@ -23,6 +23,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/terminal/owned"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
+	"github.com/sainteye/clawdline/internal/app/tmuxview"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	"github.com/sainteye/clawdline/internal/domain/persona"
@@ -544,7 +545,10 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 			return capacity.Reading{Known: true, Used: int64(len(total.Kinds))}
 		},
 		capacity.ITermViewerOpenSeconds: func() capacity.Reading {
-			return capacity.Reading{Known: true, Note: "per-viewer deadline; no retained wait"}
+			return capacity.Reading{Known: true, Note: "background viewer deadline; no start waits for it"}
+		},
+		capacity.ITermViewerConcurrent: func() capacity.Reading {
+			return capacity.Reading{Known: true, Used: int64(tmuxview.ViewerOpenCount())}
 		},
 		capacity.ITermStallSaidBytes: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-failure tail of osascript's stderr; held with the failure"}

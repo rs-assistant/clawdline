@@ -20,6 +20,8 @@ The workspace is an organizational boundary, not a filesystem sandbox. A provide
 
 The current start action opens a neutral Session and returns `registration: pending`. In that Session, `clawdline coordinator bind` registers its conversation ID or, for a prior offline binding, rebinds with the observed ID and generation. An online holder or unknown liveness cannot be replaced. The start answer is not a role registration receipt.
 
+Local and Cloud Session lists identify a machine-workspace Session as Clawdfather from its machine scope, even before registration. The crown is muted and the row says registration is pending until the broker confirms the role; a generic provider title or icon must not hide the Session's purpose on a phone. Cloud status carries only a machine-scope bit and a bound-role bit, not the coordinator record or private label.
+
 The Clawdfather mark opens a short list of machine-stewardship suggestions in place of that Session's ordinary Snippets entry. Choosing one inserts its prompt into the composer for review; it does not send or execute anything.
 
 **Coordinate Session resources** opens a read of Sessions, lease holders and queue positions, file waits, task/callback records and durable pause receipts. Each source keeps its observation time or a named read error. Its suggested request asks Clawdfather to order conflicting operations using the existing leases and waits. The pause protocol waits for the receiver's safe-point receipt before calling it paused; `docs/session-resource-coordination.md` records the flow and recovery rules.

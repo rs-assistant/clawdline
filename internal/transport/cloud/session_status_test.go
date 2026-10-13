@@ -308,6 +308,26 @@ func TestStatusCarriesOnlyExistingTaskAndEpicAncestry(t *testing.T) {
 	}
 }
 
+func TestStatusCarriesMachineRoleWithoutItsPrivateLabel(t *testing.T) {
+	row := map[string]any{
+		"state": "idle", "machine_scope": true, "label": "private title",
+		"coordinator": map[string]any{"label": "private role label", "status": "online"},
+		"source":      map[string]any{"freshness": "current"},
+	}
+	bound := ProjectSessionStatus("mac_a", "%19", row, true, 100)
+	if !bound.MachineScope || !bound.CoordinatorBound {
+		t.Fatalf("bound machine identity missing: %+v", bound)
+	}
+	encoded, err := json.Marshal(bound)
+	if err != nil || strings.Contains(string(encoded), "private") {
+		t.Fatalf("machine status disclosed a private label: %s (%v)", encoded, err)
+	}
+	delete(row, "coordinator")
+	if pending := ProjectSessionStatus("mac_a", "%19", row, true, 100); !pending.MachineScope || pending.CoordinatorBound {
+		t.Fatalf("pending machine identity is not distinct: %+v", pending)
+	}
+}
+
 func TestStatusResolvesTaskRootFromConversationWhenScreenLinkIsMissing(t *testing.T) {
 	rows := map[string]map[string]any{
 		"root":  {"sessionId": "root-conversation"},

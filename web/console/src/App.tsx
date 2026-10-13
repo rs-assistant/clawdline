@@ -27,6 +27,8 @@ import { hasDocumentIntent } from "./legacy/documents-bridge.js"
 import { NewBuild } from "./NewBuild.js"
 import { MachineDashboard } from "./machine/MachineDashboard.js"
 import { Start } from "./session/Start.js"
+import { startedRow } from "./session/started-row.js"
+import type { StartAnswer, StartPlaceRow } from "./legacy/start-bridge.js"
 import { SidebarIcon, type SidebarIconName } from "./SidebarIcon.js"
 import { scanRecovering, sessionCountState, sessionReadingChinese, totalSessionWords } from "./session-reading.js"
 import {
@@ -396,16 +398,22 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   }, [!!cloudSessions, !!fleetList])
 
   const receivedRows = fleet.snapshot?.sessions ?? []
+  const [started, setStarted] = useState<SessionRow | null>(null)
+  useEffect(() => {
+    if (started && receivedRows.some((row) => row.id === started.id)) setStarted(null)
+  }, [receivedRows, started])
   // The fleet already holds a pinned, execution-matched display row. Its
   // conversation may arrive before the old one-machine rich-row stream; the
   // opened pane can use that same row while the stream catches up.
+  const availableRows = started && !receivedRows.some((row) => row.id === started.id)
+    ? [started, ...receivedRows] : receivedRows
   const rows = useMemo(() => fleetTarget && fleetReaderMachine === fleetTarget.machineID && fleetTargetRow &&
     fleetTargetRow.id === fleetTarget.sessionID &&
     fleetTargetRow.execution_generation === fleetTarget.executionGeneration &&
-    !receivedRows.some((row) => row.id === fleetTarget.sessionID &&
+    !availableRows.some((row) => row.id === fleetTarget.sessionID &&
       row.execution_generation === fleetTarget.executionGeneration)
-    ? [...receivedRows, fleetTargetRow] : receivedRows,
-  [receivedRows, fleetTarget && destinationKey(fleetTarget), fleetReaderMachine, fleetTargetRow])
+    ? [...availableRows, fleetTargetRow] : availableRows,
+  [availableRows, fleetTarget && destinationKey(fleetTarget), fleetReaderMachine, fleetTargetRow])
   // The opened fleet Session, waiting for its own row. The pane has nothing to
   // draw until the row is here, and the cloud layer decides how long that may
   // go on without being said (`cloud/opened-row.ts`).
@@ -474,6 +482,17 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
       writeHash(fleetList && fleetTarget ? destinationFragment(fleetTarget) : sessionFragment(id))
     }
     if (!keepFocus && !phone()) rowNode(id)?.focus({ preventScroll: true })
+  }
+
+  const openStarted = (answer: StartAnswer, place: StartPlaceRow | null, finish: () => boolean): boolean => {
+    if (followsRelay() || import.meta.env.VITE_HOSTED_CONSOLE) return false
+    const row = startedRow(answer, place)
+    if (!row) return false
+    if (!finish()) return true
+    rowsRef.current = [row, ...rowsRef.current.filter((item) => item.id !== row.id)]
+    setStarted(row)
+    openSession(row.id)
+    return true
   }
 
   // The session the address asked for (`openWanted`, `input/route.js`), once
@@ -1021,6 +1040,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         onOpen={(id) => openSession(id)}
         onBack={() => closeDetail()}
         onDid={fleet.refresh}
+        onStarted={openStarted}
         streamTasks={fleet.tasksLive ? fleet.tasks : null}
         fleetList={fleetList?.(filter, setFilter)}
         fleetDetailKey={fleetList && fleetTarget ? destinationKey(fleetTarget) : undefined}

@@ -23,58 +23,62 @@ import (
 	"log"
 	"time"
 
-	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/app/ports"
 )
 
 // Backend is the session backend a viewed session is recorded under.
 const Backend = "tmux"
 
-// A browser can use the tmux pane as soon as it exists. A stalled iTerm2
-// viewer must not hold the start reply for the adapter's 20-second Apple Event
-// limit. The pane remains available and Attach names it when this expires.
-const viewerOpenLimit = 2 * time.Second
+// The optional viewer runs after the pane has been returned. One attempt at a
+// time prevents stalled Apple Events from accumulating when starts arrive in a
+// burst; a busy viewer lane is skipped because the browser already has the pane.
+const viewerOpenLimit = 20 * time.Second
+const viewerSlotLimit = 1
+
+var viewerSlot = make(chan struct{}, viewerSlotLimit)
+
+// ViewerOpenCount is the number of optional iTerm2 viewer attempts in flight.
+func ViewerOpenCount() int { return len(viewerSlot) }
 
 // Opened is a session started in tmux.
 type Opened struct {
 	// PaneID is the tmux pane the program runs in: the session's id.
 	PaneID string
-	// TabID is the iTerm2 session id of the viewer tab, empty when no tab
-	// opened.
-	TabID string
-	// Attach is what a person types to see the session, filled exactly when
-	// no tab opened to show it.
+	// The viewer finishes independently of the start reply. These fields stay
+	// empty for callers that still consume the common start result.
+	TabID  string
 	Attach string
 }
 
 // Open starts command in a new detached tmux session called name, in cwd, on
-// the person's default tmux server, and opens an iTerm2 tab attached to that
-// session alone.
+// the person's default tmux server. It then attempts to open an iTerm2 viewer
+// in the background. The browser can read and type into the pane immediately.
 //
-// What it answers, by case:
-//   - tmux session and tab: the pane, and the tab's id.
-//   - tmux session, no tab: still the pane — the work started and must not
-//     be started again — with Attach saying how to see it. Why the tab did
-//     not open is logged.
-//   - no tmux session: the launcher's error, and no tab is opened.
+// A viewer failure is logged; it does not turn a running browser Session into
+// a detached start. Only a failed tmux launch fails the start reply.
 func Open(ctx context.Context, l ports.Launcher, cwd, name, command string) (Opened, error) {
 	pane, err := l.NewTmuxSession(ctx, cwd, name, command)
 	if err != nil {
 		return Opened{}, err
 	}
-	out := Opened{PaneID: pane}
-	line, err := l.PrepareTmuxViewer(ctx, name)
-	if err == nil {
-		viewerCtx, cancel := context.WithTimeout(ctx, viewerOpenLimit)
-		out.TabID, err = l.NewITermTab(viewerCtx, line)
-		cancel()
+	select {
+	case viewerSlot <- struct{}{}:
+		go func() {
+			defer func() { <-viewerSlot }()
+			viewerCtx, cancel := context.WithTimeout(context.Background(), viewerOpenLimit)
+			defer cancel()
+			line, err := l.PrepareTmuxViewer(viewerCtx, name)
+			if err == nil {
+				_, err = l.NewITermTab(viewerCtx, line)
+			}
+			if err != nil {
+				log.Printf("tmuxview: tmux session %s (pane %s) started, but no iTerm2 tab shows it: %v", name, pane, err)
+			}
+		}()
+	default:
+		log.Printf("tmuxview: tmux session %s (pane %s) started; iTerm2 viewer busy", name, pane)
 	}
-	if err != nil {
-		out.TabID = ""
-		out.Attach = projects.TmuxAttachSessionCommand(name)
-		log.Printf("tmuxview: tmux session %s (pane %s) started, but no iTerm2 tab shows it: %v", name, pane, err)
-	}
-	return out, nil
+	return Opened{PaneID: pane}, nil
 }
 
 // SessionName is a new tmux session name for a session nobody else names:

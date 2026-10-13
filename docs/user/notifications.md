@@ -42,14 +42,16 @@ arrives on this device.
 | A schedule misses its run, dispatch is refused, or its file cannot be read | Missed and refused runs require **Notify on failure** on the schedule. An invalid file is reported when its fingerprint changes. These open the list. |
 | A capacity row crosses a notification threshold | The capacity monitor sends the recorded notice; it opens the list. |
 | A task completion notice becomes a dead letter | Once for that dead letter; it opens the root Session while present. |
+| A Cloud or running macOS app release passes its production checks | With **Notify me when Cloud or app releases succeed** on, one notification per build and release type; each opens the list. A failed check sends none. |
 | You press **Send a test** | Only the asking device receives it. It opens the selected Session when the machine can still verify it; otherwise it opens the list. |
 
 Tapping a waiting notification opens that session. A newer notification about the same session
 replaces the older one.
 
-The Go Settings page also displays switches for Session delivery, fan-out and
-deploy completion. Those settings are stored, but this daemon currently has no
-sender that reads them. They do not add notification cases to the table above.
+The Go Settings page also displays switches for Session delivery and fan-out.
+Those settings are stored, but this daemon currently has no sender that reads
+them. Release notifications are sent by the shipped deployment checks after
+success, and the deployment switch is off by default.
 
 The `orchestrator_agent_notify` switch is on by default. When it is off,
 `clawdline notify` is refused with `agent_notify_disabled`.

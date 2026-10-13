@@ -68,6 +68,9 @@ export interface PastRow {
 export interface StartAnswer {
   id?: string
   attach?: string
+  backend?: "iterm" | "tmux" | "owned"
+  assistant?: "claude" | "codex"
+  cwd?: string
 }
 
 /** A refusal as `net/fetch.js` hands it on: the code, and `app` when there is one. */

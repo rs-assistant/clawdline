@@ -98,6 +98,31 @@ func TestACloudCommandThatRanLeavesOneAuditLine(t *testing.T) {
 	}
 }
 
+func TestAStartWakesTheSessionPublisherLikeAnEnd(t *testing.T) {
+	fake := NewFake(4)
+	acted := 0
+	service := Service{MachineID: "mac-01", Bridge: answering(t), Transport: fake,
+		Acted: func() { acted++ }, Log: func(string, ...any) {}}
+	commands := []map[string]any{
+		{"type": "start", "session": cloudops.MachineReplySession, "request": "req-start",
+			"place": "/project", "assistant": "codex", "model": ""},
+		{"type": "resume", "session": cloudops.MachineReplySession, "request": "req-resume",
+			"place": "/project", "past": "conversation", "assistant": "codex"},
+		{"type": "end", "session": "%19", "request": "req-end", "accept_loss": false,
+			"expected_closeability_version": ""},
+	}
+	for n, body := range commands {
+		answer := service.Answer(context.Background(), Inbound{Channel: "ctl/mac-01", Class: "ctl",
+			Sender: "viewer-device-01", Sequence: uint64(420 + n), Plaintext: plaintext(t, body)})
+		if !answer.OK() {
+			t.Fatalf("%s answered %d %s", body["type"], answer.Status, answer.Code)
+		}
+	}
+	if acted != len(commands) {
+		t.Fatalf("start, resume and end woke the Session publisher %d times, want %d", acted, len(commands))
+	}
+}
+
 // TestAnAnswerWithNowhereToGoIsRecordedRatherThanSent.
 func TestAnAnswerWithNowhereToGoIsRecordedRatherThanSent(t *testing.T) {
 	fake := NewFake(4)

@@ -196,8 +196,8 @@ func (s Starter) Start(ctx context.Context, place projects.Place, assistant, mod
 }
 
 // openViewed is PlanITermTmux for the start route: a tmux session of its own,
-// shown in an iTerm2 tab. A tab that did not open is not a failed start — the
-// assistant is already running — so Attach says how to see it instead.
+// available to the browser as soon as the pane exists. The optional iTerm2
+// viewer opens in the background and cannot delay or alter the start reply.
 func (s Starter) openViewed(ctx context.Context, place projects.Place, model, command string) (Started, error) {
 	opened, err := tmuxview.Open(ctx, s.Launcher, place.Path, tmuxview.SessionName("session"), command)
 	if err != nil {

@@ -1898,7 +1898,7 @@ export class RelayWriter {
     let generation: string
     if (exact) {
       if (!this.host.admitExactTarget) throw failure("execution_check_unavailable", "The selected Session cannot be checked now.", 503)
-      await this.host.admitExactTarget(exact)
+      if (word !== "archive-session") await this.host.admitExactTarget(exact)
       identity = { machine: exact.machineID, session: exact.sessionID }
       generation = exact.executionGeneration
     } else {

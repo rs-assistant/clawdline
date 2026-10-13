@@ -46,30 +46,49 @@ export function CloudSessionSheets({ machineID, machines, source, pending, onCon
     let closed = false
     let active = 0
     let stopOpen: () => void = () => undefined
-    const open = (sessionID: string) => {
+    const open = (sessionID: string, accept: () => boolean = () => true, machine?: string) => {
       stopOpen()
       const mine = ++active
       let busy = false
+      let again = false
+      let settled = false
       const find = async () => {
-        if (closed || mine !== active || busy) return
+        if (closed || mine !== active || settled) return
+        if (busy) { again = true; return }
         busy = true
         try {
-          for (const id of looking.current) {
+          for (const id of machine ? [machine] : looking.current) {
             const reading = await source.readMachine(id, new AbortController().signal)
             if (closed || mine !== active) return
             const row = reading.rows?.find((item) => item.destination.machineID === id &&
               item.destination.sessionID === sessionID && item.freshness === "current")
-            if (row) { opened.current(row.destination); stopOpen(); return }
+            if (row) {
+              settled = true
+              if (accept()) opened.current(row.destination)
+              stopOpen()
+              return
+            }
           }
         } catch { /* the next status event can retry this exact destination */ }
-        finally { busy = false }
+        finally {
+          busy = false
+          if (again && !settled) { again = false; void find() }
+        }
       }
       stopOpen = source.subscribe((event) => {
-        if (looking.current.includes(event.machineID) && (!event.sessionID || event.sessionID === sessionID)) void find()
+        if ((machine ? event.machineID === machine : looking.current.includes(event.machineID)) &&
+          (!event.sessionID || event.sessionID === sessionID)) void find()
       })
       void find()
     }
-    Start.host({ open, openId: () => null, refresh: () => undefined })
+    Start.host({ open, openId: () => null, refresh: () => undefined,
+      openStarted: (answer, place, finish) => {
+        if (!answer.id) return false
+        const from = location.hash
+        open(answer.id, () => location.hash === from && finish(), place?.machine)
+        return true
+      },
+    })
     Command.host({ open, refresh: () => undefined })
     return () => { closed = true; active++; stopOpen() }
   }, [machineID, source])
