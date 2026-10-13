@@ -370,6 +370,20 @@ test("an opened exact Session is not sent after its execution changes", async ()
   assert.deepEqual(client.calls, [])
 })
 
+test("archive reaches machine admission when the browser projection cannot verify it", async () => {
+  const client = new FakeClient()
+  const reader = new RelayReader("mac-a", {
+    fleetTarget: () => ({ machineID: "mac-a", sessionID: "s1", executionGeneration: EXECUTION }),
+    admitFleetMutation: async () => { throw refusal("execution_generation_changed", { status: 409 }) },
+  })
+  const writer = new RelayWriter(reader.writeHost)
+  reader.carryWrites({ route: writeRoute, answer: (route, method, url, init) => writer.answer(route, method, url, init) })
+  reader.attach(client)
+  const res = await reader.fetch("/v1/sessions/s1/archive", post({}, { "Idempotency-Key": "archive-pinned" }))
+  assert.equal(res.status, 200)
+  assert.deepEqual(client.calls.filter((call) => call[0] === "_read").map((call) => call[2]), ["archive-session"])
+})
+
 test("a session mutation without a key or current generation never leaves the browser", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
