@@ -3,7 +3,7 @@ import { RefusalError } from "@clawdline/core"
 import "./action-confirm.css"
 import { client } from "../client.js"
 import * as L from "../legacy/bridge.js"
-import { getClosingId, setClosingId } from "./events.js"
+import { closeExecutionChanged, getClosingId, setClosingId } from "./events.js"
 import {
   byId,
   closeabilityLines,
@@ -740,6 +740,10 @@ function finishEnd(id: string, ticket: number, ok: boolean, error?: unknown): vo
     host.refresh()
     if (ok) toast(endKind === "archive" ? nextWord("archiveDone") : T.webEndSession + " ✓", false)
     else if (error instanceof RefusalError && error.code === "close_release_failed") toast(nextWord("endWorkReleaseFailed"), true)
+    else if (error instanceof RefusalError && error.code === "execution_generation_changed") {
+      closeExecutionChanged(id, endKind)
+      toastFailure(error, T.webRequestFailed)
+    }
     else toastFailure(error, T.webRequestFailed)
   })
 }

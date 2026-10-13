@@ -206,7 +206,8 @@ export class Sender {
     const { cards, now } = this.deps
     const previous = cards.card(token)
     const failed = previous?.state === "failed"
-    const newRequest = previous?.state === "unknown" && previous.absent && previous.failure === "send_failed"
+    const newRequest = previous?.failure === "execution_generation_changed" ||
+      (previous?.state === "unknown" && previous.absent && previous.failure === "send_failed")
     const failure = previous?.failure || READ_BACK_FAILED
     const card = cards.retrying(token)
     if (!card) return

@@ -5072,7 +5072,7 @@
   "next.cloudActionOffline": "這台機器離線。",
   "next.cloudActionStale": "這台機器的狀態已過期。",
   "next.cloudActionUnknown": "無法確認目標目前的狀態。",
-  "next.cloudActionChanged": "這個 Session 的執行世代已更換。",
+  "next.cloudActionChanged": "無法確認這個 Session 仍是剛才開啟的執行。請開啟目前的執行，再重試。",
   "next.cloudActionRevoked": "這個瀏覽器對該機器的存取權已撤銷。",
   "next.cloudActionContentPermission": "這個瀏覽器無權讀取此 Session 的內容。",
   "next.cloudActionOperationPermission": "這個瀏覽器無權操作此 Session。",
