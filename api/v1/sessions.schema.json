@@ -157,7 +157,8 @@
 	  "required": ["task_id", "reason"],
 	  "properties": {
 	    "task_id": { "type": "string" },
-	    "reason": { "description": "The heavy command's declared reason, for the icon's title and accessible name.", "type": "string" }
+	    "reason": { "description": "The heavy command's declared reason, shown in the Session list and transcript.", "type": "string" },
+	    "started_at": { "description": "Unix seconds when the running callback acquired the heavy compile slot.", "type": "integer" }
 	  }
 	},
 	"EpicSessionParent": {

@@ -46,6 +46,7 @@ import { outcomeOf, sitsUnsubmitted, waitsOnQuestion } from "./outcome.js"
 import { INTERRUPTED } from "./persist.js"
 import { enter, look, pendingSends, resend } from "./send.js"
 import { turnPendingSpinners } from "./spinners.js"
+import { elapsedWords } from "./working-clock.js"
 import "./pending.css"
 import "./working-line.css"
 import { conversationNotStarted } from "./readiness.js"
@@ -462,7 +463,7 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
   // Newest end: the bottom, or the top when the transcript reads newest first.
   const cardsDrawn = (newestFirst ? [...cards].reverse() : cards).map(pendingHTML)
   const live = working ? <WorkingLine key="working" line={session?.line ?? ""} /> : null
-  const heavy = heavyWork ? <HeavyWorkLine key="heavy" reason={heavyWork.reason} /> : null
+  const heavy = heavyWork ? <HeavyWorkLine key="heavy" reason={heavyWork.reason} startedAt={heavyWork.started_at} /> : null
   // The working line is newer than any card: the turn it stands for is the
   // one answering them.
   const pending = newestFirst ? [heavy, live, ...cardsDrawn] : [...cardsDrawn, live, heavy]
@@ -687,12 +688,19 @@ function WorkingLine({ line }: { line: string }) {
 }
 
 /** The callback can still be running after the provider's turn becomes idle. */
-function HeavyWorkLine({ reason }: { reason: string }) {
+function HeavyWorkLine({ reason, startedAt }: { reason: string; startedAt?: number }) {
+  const [now, setNow] = useState(() => Date.now() / 1000)
+  useEffect(() => {
+    if (!startedAt) return
+    const timer = window.setInterval(() => setNow(Date.now() / 1000), 1000)
+    return () => window.clearInterval(timer)
+  }, [startedAt])
+  const elapsed = startedAt ? elapsedWords(now - startedAt) : ""
   return (
     <div className="tx-working tx-heavy" role="status">
       <span aria-hidden="true">🏗️</span>
       <canvas className="spin" aria-hidden="true"></canvas>
-      <span className="line">{[nextWord("sessionCallbackActive"), reason].filter(Boolean).join(" · ")}</span>
+      <span className="line">{[nextWord("sessionCallbackActive"), reason, elapsed].filter(Boolean).join(" · ")}</span>
     </div>
   )
 }

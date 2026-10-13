@@ -5425,9 +5425,12 @@ type SessionCoordinatorCommand struct {
 }
 
 type SessionHeavyWork struct {
-	// The heavy command's declared reason, for the icon's title and accessible name.
+	// The heavy command's declared reason, shown in the Session list and transcript.
 	Reason string `json:"reason"`
-	TaskID string `json:"task_id"`
+
+	// Unix seconds when the running callback acquired the heavy compile slot.
+	StartedAt int64  `json:"started_at,omitempty"`
+	TaskID    string `json:"task_id"`
 }
 
 // The facts behind the status line under an open session. This daemon serves
