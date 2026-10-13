@@ -437,6 +437,8 @@ const words = {
     cloudMachineSessions: "{count} sessions",
     cloudAllRefresh: "Refresh",
     cloudAllRefreshing: "Refreshing…",
+    cloudAllRefreshDone: "Refreshed",
+    cloudAllRefreshFailed: "Refresh unavailable",
     cloudAccessProblem:
       "Machine {machine}'s data could not be read in this browser ({code}). Pair that machine with this browser again; if it still cannot be read, sign in again.",
     cloudSwitch: "Other machines",
@@ -1622,6 +1624,8 @@ const words = {
     cloudMachineSessions: "{count} 個 session",
     cloudAllRefresh: "重新整理",
     cloudAllRefreshing: "正在重新整理…",
+    cloudAllRefreshDone: "已重新整理",
+    cloudAllRefreshFailed: "無法重新整理",
     cloudAccessProblem: "機器 {machine} 的資料在這個瀏覽器讀不出來（{code}）。請重新配對這台機器；若仍然讀不到，請重新登入。",
     cloudSwitch: "換一台機器",
     cloudAllMachines: "所有機器",

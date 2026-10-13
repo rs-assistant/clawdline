@@ -163,6 +163,8 @@
 .cloud-all-refresh svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor;
     stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .cloud-all-refresh[aria-busy="true"] svg { animation: cloud-all-refresh-turn .9s linear infinite; }
+.cloud-all-refresh[data-state="loading"], .cloud-all-refresh[data-state="done"] {
+    color: var(--accent); border-color: var(--accent-ed); }
 .cloud-all-refresh:disabled { cursor: default; }
 @keyframes cloud-all-refresh-turn { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {

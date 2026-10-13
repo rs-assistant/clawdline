@@ -4141,6 +4141,8 @@
   "next.cloudAllTryAgain": "Try again",
   "next.cloudAllRefresh": "Refresh",
   "next.cloudAllRefreshing": "Refreshing…",
+  "next.cloudAllRefreshDone": "Refreshed",
+  "next.cloudAllRefreshFailed": "Refresh unavailable",
   "next.cloudAllFilterIdle": "Idle",
   "next.cloudAllSessionCount": "{count} Sessions",
   "next.cloudPeerMachineUnnamed": "Machine {number}",

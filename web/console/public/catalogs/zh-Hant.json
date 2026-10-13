@@ -4141,6 +4141,8 @@
   "next.cloudAllTryAgain": "再試一次",
   "next.cloudAllRefresh": "重新整理",
   "next.cloudAllRefreshing": "正在重新整理…",
+  "next.cloudAllRefreshDone": "已重新整理",
+  "next.cloudAllRefreshFailed": "無法重新整理",
   "next.cloudAllFilterIdle": "靜置",
   "next.cloudAllSessionCount": "{count} 個 Session",
   "next.cloudPeerMachineUnnamed": "機器 {number}",
