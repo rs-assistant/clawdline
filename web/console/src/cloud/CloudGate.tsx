@@ -1511,6 +1511,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               const answer = await request.call(client.current, crypto.randomUUID(), helper, "pair-agent-start",
                 { offer, machine_id: target.id, machine_name: target.name }, "action", 130_000) as Record<string, unknown>
               if (answer?.mode === "agent" && typeof answer.task_id === "string" && answer.task_id) {
+                // The helper owns the new AI Session. Keep its Console mounted
+                // behind the pairing card so the person can see its activity.
+                const helperMachine = quickMachines.find((machine) => machine.id === helper)
+                if (helperMachine) choose(helperMachine, false)
                 return { ok: true, mode: "agent", taskID: answer.task_id, trust: typeof answer.trust === "string" ? answer.trust : "" }
               }
               return { ok: false, error: "unreadable_helper_answer" }
@@ -1725,7 +1729,8 @@ function GateCard(props: {
   const nameQuestion = !pairing && !question && naming && screen.at === "machines" ? naming : null
   const open = pairing ? "pair" : question ? "forget" : nameQuestion ? "rename" : screen.at
   return (
-    <div className="door" data-step="cloud" data-cloud-screen={open}>
+    <div className="door" data-step="cloud" data-cloud-screen={open}
+      data-pair-console={pairing && screen.at === "console" ? "true" : undefined}>
       <div
         className="door-card"
         role={question || nameQuestion ? "alertdialog" : "dialog"}

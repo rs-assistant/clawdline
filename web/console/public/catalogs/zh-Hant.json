@@ -4245,6 +4245,7 @@
   "next.roleCreateSave": "儲存角色",
   "next.sessionWaitingOnNamedSession": "等待 Session：{session}",
   "next.notificationNav": "通知",
+  "next.cloudPairAgentWindow": "協助機器的 Session 畫面就在這張卡片後方。現在可以關閉視窗，AI 仍會繼續執行；之後回到這個瀏覽器確認配對結果。",
   "projects.activityInProgress": "{n} 項進行中",
   "projects.activityLastKnown": "上次紀錄：{n}",
   "projects.activityNone": "目前無進行中項目",

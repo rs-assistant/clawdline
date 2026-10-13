@@ -2,6 +2,9 @@
    machine list, and the way back to it once a machine is on screen. Written in
    the door's own tokens so it reads as the same card. */
 
+/* Keep the helping machine's live Console visible while its AI pairs. */
+.door[data-pair-console="true"] { background: rgba(10, 10, 13, .72); }
+
 .cloud-machines { list-style: none; margin: 4px 0 6px 0; padding: 0; }
 .cloud-machines li { margin: 0 0 8px 0; }
 .cloud-machines button {
