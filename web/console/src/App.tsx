@@ -198,7 +198,8 @@ function rowNode(id: string): HTMLElement | null {
  */
 export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
   fleetReaderMachine = null,
-  fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetCloseIntent = null, onFleetCloseIntentHandled,
+  fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
+  fleetCloseIntent = null, onFleetCloseIntentHandled,
   hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions }: {
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
   cloudSessions?: ReactNode
@@ -211,6 +212,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   /** Whether the opened fleet Session's own row is still missing from this machine's rows. */
   onFleetDetailPending?: (pending: boolean) => void
   onFleetClose?: () => void
+  fleetActionIntent?: { target: SessionDestination; title: string; kind: "end" | "archive" } | null
+  onFleetActionIntentHandled?: () => void
   fleetCloseIntent?: { target: SessionDestination; title: string; kind?: "end" | "archive"; recovered?: boolean } | null
   onFleetCloseIntentHandled?: () => void
   hideSessionCounts?: boolean
@@ -525,6 +528,17 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
 
   // A fleet swipe names an exact execution. Wait until its machine's rich
   // session row has arrived before opening the ordinary close confirmation.
+  useEffect(() => {
+    if (!fleetList || !fleetActionIntent || !fleetTarget ||
+      destinationKey(fleetActionIntent.target) !== destinationKey(fleetTarget) ||
+      fleetReaderMachine !== fleetActionIntent.target.machineID) return
+    const row = rows.find((candidate) => candidate.id === fleetActionIntent.target.sessionID &&
+      candidate.execution_generation === fleetActionIntent.target.executionGeneration)
+    if (!row) return
+    if (fleetActionIntent.kind === "archive" && !row.sessionId) return
+    onFleetActionIntentHandled?.()
+    requestConfirm({ kind: fleetActionIntent.kind, id: row.id, subject: fleetActionIntent.title, focus: "cancel" })
+  }, [fleetList, fleetActionIntent, fleetTarget, fleetReaderMachine, rows])
   useEffect(() => {
     if (!fleetList || !fleetCloseIntent || !fleetTarget ||
       destinationKey(fleetCloseIntent.target) !== destinationKey(fleetTarget) ||

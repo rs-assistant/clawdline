@@ -134,6 +134,7 @@
 | `iterm.stall_said_bytes` | 512 | `bytes` | `evict_oldest` | `diagnostics` | — |
 | `iterm.stall_section_bytes` | 524288 | `bytes` | `refuse` | `diagnostics` | — |
 | `iterm.stall_step_seconds` | 30 | `seconds` | `refuse` | `diagnostics` | — |
+| `iterm.viewer_open_seconds` | 2 | `seconds` | `refuse` | `diagnostics, log` | — |
 | `leases.queue` | 64 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `log.daemon` | 10485760 | `bytes` | `rotate` | `diagnostics, notice` | — |
 | `memory.description_bytes` | 512 | `bytes` | `refuse` | `diagnostics, sender` | — |

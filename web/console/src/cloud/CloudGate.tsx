@@ -1142,8 +1142,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
    * reloading the page restored the same unreadable target and the same
    * sentence, with nothing on screen that could change either.
    */
+  const [fleetActionIntent, setFleetActionIntent] = useState<{ target: SessionDestination; title: string; kind: "end" | "archive" } | null>(null)
   const [fleetCloseIntent, setFleetCloseIntent] = useState<{ target: SessionDestination; title: string; kind?: "end" | "archive"; recovered?: boolean } | null>(null)
   const closeFleetTarget = useCallback(() => {
+    setFleetActionIntent(null)
     setFleetCloseIntent(null)
     setFleetTarget(null)
     setFleetDetailProblem(null)
@@ -1577,6 +1579,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             onFleetDetailPending={noteRowPending}
             fleetReaderMachine={readerMachine}
             onFleetClose={closeFleetTarget}
+            fleetActionIntent={fleetActionIntent}
+            onFleetActionIntentHandled={() => setFleetActionIntent(null)}
             fleetCloseIntent={fleetCloseIntent}
             onFleetCloseIntentHandled={() => setFleetCloseIntent(null)}
             fleetList={fleetScope ? (filter, onFilter) => <FleetSessionList
