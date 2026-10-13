@@ -63,31 +63,20 @@ An object too large to read (`privacy.MaximumObjectBytes`, 16 MB) is also 3, nam
 When a run both finds things and cannot decide, it exits 1 and says on the summary line that this
 is not the whole answer. Both are red; "there are 558 of them" is the one somebody can act on.
 
-## Two gates, because this history is already red
+## Historical scans are manual audits
 
 `ef067d70`'s three lines are in this repository's history for good, unless somebody rewrites it —
 which is a decision about the whole repository and not a patch. A check that is red for ever is a
 check people stop reading, and then it may as well not exist.
 
-So there are two gates, and they ask different questions.
+Automatic pre-commit, pre-push, and CI checks read the working tree only. They do not invoke
+`-history`, keep a history checkpoint, or scan the commits a push would add. The history command
+remains available for an explicit audit, but it is not a routine gate.
 
-**Before a commit: `-history -new`.** It prints every standing finding, marks the ones the
-checkpoint had not already recorded with `[new]`, and is red only for those. 3.9 seconds. The
-question it answers is the only one a commit can act on: *did what I am about to add put
-something else in?* Without a checkpoint it believes nothing is standing, so everything is new
-and it is red — the first run of the day on a fresh clone is the full answer, not a free pass.
-
-**Before an initial publication or a history rewrite: `-history -full -revs=--all`, and read all
-of it.** Every ref, every commit, nothing skipped, no notion of standing. What comes back is the
-list of everything the repository could publish, and every line is a decision somebody has to
-take before replacing public history and not after.
-
-**Before a routine push: `-history -revs=<local> -since=<remote>`.** That is what the tracked
-pre-push hook runs, and it is the routine question itself: *do the commits this push would add
-carry anything private?* `-since` reads only the commits the remote does not already have, and
-keeps no checkpoint, so nothing it reports is recorded as read — which is what made `-new` wrong
-in a hook, where a refused push passed on the second attempt. What the remote already publishes is
-not re-judged: taking it back out is a history rewrite, not a push refusal.
+**Before an initial publication or a history rewrite, when explicitly requested:** run
+`-history -full -revs=--all` and read all of it. Every ref, every commit, nothing skipped, no notion
+of standing. What comes back is the list of everything the repository could publish, and every
+line is a decision somebody has to take before replacing public history and not after.
 
 The hook used to answer the same question by comparison — read the whole history at the remote
 commit, read it again at the local one, refuse when the second carried more findings — because
@@ -99,9 +88,9 @@ build, and one did, and the two together wedged a push for two and a half hours.
 old refs had accumulated, 2026-09-22: `-history -full -revs=--all` read 2,254 commits, 13,809
 objects and 923.1 MB in 602.1 seconds.
 
-`tools/test-pre-push-privacy.sh` holds the hook to it: one history call per push, over the range,
-with no checkpoint, and every answer but clean — a finding, could-not-check, undetermined —
-refuses the push and leaves the remote ref where it was.
+The earlier automatic range scan is retained here as a measured record, not as current behavior.
+`tools/test-pre-push-privacy.sh` now proves that the hook makes one working-tree check and no
+historical call.
 
 ## What a finding says, and what it never says
 
