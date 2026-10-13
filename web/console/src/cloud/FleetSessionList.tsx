@@ -261,9 +261,9 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   }).filter(({ machine, rows }) => (statusFilter === "all" || rows.length > 0) && (!search || rows.length > 0 ||
     `${machine.name} ${machine.id} ${machine.platform}`.toLocaleLowerCase().includes(search)))
   useEffect(() => {
-    if (swiped && !groups.some(({ machine, rows }) => !collapsed[machine.id] && machine.freshness === "current" &&
+    if (swiped && !groups.some(({ machine, reading, rows }) => !(collapsed[machine.id] ?? emptyMachine(reading)) && machine.freshness === "current" &&
       rows.some(({ row }) => destinationKey(row.destination) === swiped && row.freshness === "current"))) swipe.closeOpen()
-  }, [swiped, groups.map(({ machine, rows }) => machine.id + ":" + machine.freshness + ":" + !!collapsed[machine.id] + ":" +
+  }, [swiped, groups.map(({ machine, reading, rows }) => machine.id + ":" + machine.freshness + ":" + (collapsed[machine.id] ?? emptyMachine(reading)) + ":" +
     rows.map(({ row }) => destinationKey(row.destination) + ":" + row.freshness).join(",")).join("|")])
   const freezeOrder = () => {
     for (const { machine, rows, waitingKey } of groups) {
@@ -329,12 +329,13 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
       <div className="cloud-all-groups">
         {groups.map(({ machine, reading, rows, presentationFailed, presentationLoading }) => {
           const carrier = carrierOf?.(machine.id) ?? null
+          const isCollapsed = collapsed[machine.id] ?? emptyMachine(reading)
           return <section key={machine.id} className="cloud-all-group"
           aria-label={`${machine.name} ${machine.id}` + (carrier ? ` · ${nextWord(carrier.word, { machine: machine.name })}` : "")}>
           <h2 className="cloud-all-group-heading">
-            <button type="button" aria-expanded={!collapsed[machine.id]}
-              aria-label={nextWord(collapsed[machine.id] ? "cloudAllExpandMachine" : "cloudAllCollapseMachine", { machine: machine.name })}
-              onClick={() => setCollapsed((before) => ({ ...before, [machine.id]: !before[machine.id] }))}>
+            <button type="button" aria-expanded={!isCollapsed}
+              aria-label={nextWord(isCollapsed ? "cloudAllExpandMachine" : "cloudAllCollapseMachine", { machine: machine.name })}
+              onClick={() => setCollapsed((before) => ({ ...before, [machine.id]: !isCollapsed }))}>
               {/* The dot leads the machine's name, so every machine's light
                   lines up in one column down the list. Inside the button it can
                   only be seen, because the button states its own label; the
@@ -346,7 +347,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               </span>
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
             </button></h2>
-          {!collapsed[machine.id] && <>
+          {!isCollapsed && <>
           {/* A verified Session reading can settle before the roster's machine
               freshness changes. Its own completeness and row freshness are the
               authority here; an unrelated roster state must not leave a
@@ -425,6 +426,11 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
       </div>
     </dialog>
   </>
+}
+
+function emptyMachine(reading: Reading | undefined): boolean {
+  return reading?.phase === "settled" && reading.value.kind === "ready" &&
+    reading.value.complete && reading.value.rows.length === 0
 }
 
 function problemOf(error: unknown): ProjectionProblem {
