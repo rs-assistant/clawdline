@@ -331,7 +331,6 @@ function taskPlace(row: SessionRow, depth: number): {
 
 function agentCount(row: SessionRow): string {
   const provider = (row.agents ?? []).filter((agent) => agent.state === "running").length
-  if (row.agents_reading?.state !== "complete") return provider ? `${provider}+?` : "?"
   return provider ? String(provider) : ""
 }
 
