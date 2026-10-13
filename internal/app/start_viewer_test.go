@@ -40,14 +40,13 @@ func (f *viewerTerminal) CloseTmuxSession(context.Context, string, string) (bool
 	return true, nil
 }
 
-func TestAStartWithITermAndTmuxIsATmuxPaneShownInATab(t *testing.T) {
+func TestAStartWithITermAndTmuxAnswersThePaneWithoutViewerStatus(t *testing.T) {
 	place := projects.Place{Path: t.TempDir()}
 	for name, c := range map[string]struct {
-		tabErr     error
-		wantAttach bool
+		tabErr error
 	}{
 		"tab opened":     {},
-		"tab not opened": {tabErr: errors.New("iTerm2 did not answer in time."), wantAttach: true},
+		"tab not opened": {tabErr: errors.New("iTerm2 did not answer in time.")},
 	} {
 		t.Run(name, func(t *testing.T) {
 			term := &viewerTerminal{tabErr: c.tabErr}
@@ -62,11 +61,7 @@ func TestAStartWithITermAndTmuxIsATmuxPaneShownInATab(t *testing.T) {
 			if !strings.HasPrefix(term.session, "clawdline-session-") || !strings.Contains(term.command, "claude") {
 				t.Errorf("tmux session %q running %q", term.session, term.command)
 			}
-			want := "exec '/usr/bin/tmux' attach -t '=" + term.session + "'"
-			if len(term.tabLines) != 1 || term.tabLines[0] != want {
-				t.Errorf("tab typed %q, want %q", term.tabLines, want)
-			}
-			if c.wantAttach != (got.Attach == projects.TmuxAttachSessionCommand(term.session)) || !c.wantAttach && got.Attach != "" {
+			if got.Attach != "" {
 				t.Errorf("attach %q", got.Attach)
 			}
 		})

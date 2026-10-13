@@ -156,37 +156,23 @@ function renderList(): void {
   listeners.forEach((fn) => fn())
 }
 
-/** `Waiting` (`view/waits.js`) for `Waits.startPress`: shown after 150ms, kept 320ms. */
+/** Show progress only when a start takes longer than a tap. */
 const startPress = {
   visible: false,
-  shown: 0,
   timer: null as ReturnType<typeof setTimeout> | null,
   start() {
     if (this.visible || this.timer) return
     this.timer = setTimeout(() => {
       this.timer = null
       this.visible = true
-      this.shown = Date.now()
       draw()
     }, 150)
   },
   settle(then: () => void) {
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
-    const finish = () => {
-      this.visible = false
-      then()
-    }
-    if (!this.visible) {
-      finish()
-      return
-    }
-    const left = 320 - (Date.now() - this.shown)
-    if (left <= 0) {
-      finish()
-      return
-    }
-    setTimeout(finish, left)
+    this.visible = false
+    then()
   },
 }
 
