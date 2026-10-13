@@ -15,6 +15,7 @@ type notificationRuleChange struct {
 	Action string                 `json:"action"`
 	Rule   *notificationrule.Rule `json:"rule,omitempty"`
 	ID     string                 `json:"id,omitempty"`
+	Text   string                 `json:"text,omitempty"`
 	Key    string                 `json:"key,omitempty"`
 	Value  *bool                  `json:"value,omitempty"`
 }
@@ -77,11 +78,28 @@ func (s *Server) notificationRulesRoute(w http.ResponseWriter, r *http.Request) 
 			writeRefusal(w, http.StatusBadRequest, "bad_request", "invalid notification rule change")
 			return
 		}
+		if change.Action == "preview" {
+			if change.Rule != nil || change.ID != "" || change.Key != "" || change.Value != nil {
+				writeRefusal(w, http.StatusBadRequest, "invalid_notification_rule", "The notification situation is invalid.")
+				return
+			}
+			preview, err := notificationrule.ParseSituation(change.Text)
+			if err != nil {
+				writeRawRefusal(w, http.StatusUnprocessableEntity, "notification_situation_unsupported", "This situation cannot send a notification yet. Try: When a Session needs my answer, notify me.")
+				return
+			}
+			writeJSON(w, map[string]any{"preview": preview})
+			return
+		}
 		if (change.Action == "create" || change.Action == "update") && (change.Rule == nil || !change.Rule.Valid() || change.ID != "" || change.Key != "" || change.Value != nil) ||
 			change.Action == "delete" && (change.ID == "" || change.Rule != nil || change.Key != "" || change.Value != nil) ||
 			change.Action == "preference" && (!notificationPreferenceKeys[change.Key] || change.Value == nil || change.Rule != nil || change.ID != "") ||
 			change.Action != "create" && change.Action != "update" && change.Action != "delete" && change.Action != "preference" {
 			writeRefusal(w, http.StatusBadRequest, "invalid_notification_rule", "The notification rule condition is invalid.")
+			return
+		}
+		if change.Text != "" {
+			writeRefusal(w, http.StatusBadRequest, "invalid_notification_rule", "Text belongs to a preview request.")
 			return
 		}
 		var invalid = errors.New("invalid rule change")

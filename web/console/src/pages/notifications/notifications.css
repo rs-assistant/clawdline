@@ -22,5 +22,10 @@
 .notification-custom-row button, .notification-custom-form button { min-height: 40px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
 .notification-custom-form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
 .notification-custom-form label { display: grid; gap: 5px; flex: 1 1 160px; }
-.notification-custom-form input { width: 100%; min-height: 40px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); }
+.notification-custom-form textarea { width: 100%; min-height: 86px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); resize: vertical; font: inherit; }
+.notification-custom-examples { display: grid; gap: 8px; margin: 8px 0 16px; }
+.notification-custom-examples button { width: fit-content; text-align: left; border: 0; padding: 4px 0; background: none; color: var(--accent); cursor: pointer; }
+.notification-custom-preview { display: grid; gap: 8px; padding: 14px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 10px; }
+.notification-custom-preview p { margin: 0; color: var(--ink); }
+.notification-custom-preview button { width: fit-content; min-height: 40px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
 .notification-custom small { color: var(--muted); }

@@ -63,9 +63,11 @@ The page explains these gaps without offering switches that would have no effect
 The `orchestrator_agent_notify` switch is on by default. When it is off,
 `clawdline notify` is refused with `agent_notify_disabled`.
 
-## Custom notification timing
+## Describe a notification situation
 
-Under **客製化通知時機** (Custom notification timing), add a rule with a wait of 1–120 minutes and an optional Session name fragment. When the Session waits for an answer or permission and its name contains that fragment (case insensitive), the earliest matching enabled rule sets the delay for that wait. An empty fragment matches every Session. The custom rule replaces the standard ten-minute waiting trigger for that Session; it works independently of the standard waiting switch. The notification opens the waiting Session. Each stop produces at most one push, even if several rules match or the setting changes while it waits. The existing six-per-hour machine limit still applies.
+Under **用一句話設定通知**, describe the situation in a sentence, then press **理解這句話**. The page shows the precise condition it understood before **儲存這條規則** becomes available. For example: "當 Session 等我回答時通知我"; "當 Session 等我回答超過 5 分鐘時通知我"; or "當名稱包含「部署」的 Session 等我回答時通知我". An unrecognized or unsupported situation is refused and not saved. The rule parser accepts the displayed examples and their answer/permission variants in English and Taiwan Traditional Chinese. It does not ask a paid external language model to infer new triggers.
+
+A sentence without a wait time sends when the machine first observes the Session waiting. A sentence with a wait may specify 1–120 minutes. A matching rule replaces the standard ten-minute timing for that wait and works independently of the standard waiting switch. A name condition is case insensitive. The notification opens the waiting Session. Each stop produces at most one push, even if several rules match or the setting changes while it waits. The existing six-per-hour machine limit still applies.
 
 Rules are stored on the chosen machine, up to 16 per machine. They can be disabled or deleted on the Notifications page. A disabled rule no longer matches; the standard waiting setting applies if no other enabled rule matches. Existing waiting notifications cannot be retracted or repeated by editing rules.
 
