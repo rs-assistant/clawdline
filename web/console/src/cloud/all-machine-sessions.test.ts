@@ -27,6 +27,14 @@ test("same Session id on two machines has distinct URLs, keys and destinations a
   assert.equal(destinationAvailable(a.destination, ready("machine/a", [a])), "ready")
 })
 
+test("a push address selects the exact Cloud execution while retaining the local session field", () => {
+  const destination = row("machine/a", "%14", "7").destination
+  const address = `#session=%2514&machine=machine%2Fa&generation=${destination.executionGeneration}`
+  assert.deepEqual(destinationFromFragment(address), destination)
+  assert.equal(destinationFromFragment("#session=%2514"), null)
+  assert.equal(destinationFromFragment(address.replace(destination.executionGeneration, "bad")), null)
+})
+
 test("a reused Session id with a new execution generation cannot open or reuse old content", () => {
   const old = row("machine/a", "same", "7")
   const current = row("machine/a", "same", "8")

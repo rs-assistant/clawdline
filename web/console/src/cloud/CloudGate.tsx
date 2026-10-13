@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { SessionRow } from "@clawdline/contract"
 import App from "../App.js"
+import { CLOSE_EXECUTION_CHANGED } from "../overlays/events.js"
 import { BRAND_MARK } from "../brand-mark.js"
 import type { ConnectionLight } from "../connection-state.js"
 import * as L from "../legacy/bridge.js"
@@ -267,6 +268,19 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const fleetScopeRef = useRef(fleetScope)
   fleetScopeRef.current = fleetScope
   const [fleetTarget, setFleetTarget] = useState<SessionDestination | null>(() => destinationFromFragment(location.hash))
+  // A notification can focus an already open Home Screen app. Its worker
+  // changes the fragment without remounting CloudGate, so follow that address
+  // as well as the one present at boot.
+  useEffect(() => {
+    const followNotification = () => {
+      const destination = destinationFromFragment(location.hash)
+      if (!destination) return
+      setFleetScope(true)
+      setFleetTarget(destination)
+    }
+    window.addEventListener("hashchange", followNotification)
+    return () => window.removeEventListener("hashchange", followNotification)
+  }, [])
   const [fleetDetailProblem, setFleetDetailProblem] = useState<{ key: string } & FleetDetailProblem | null>(null)
   // A detail read that failed for a reason that may pass — a capability not
   // published yet, a status reading still settling — is read again on a press.
@@ -1116,7 +1130,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const leaveFleet = () => { setFleetScope(false); setFleetTarget(null) }
 
   const openFleetSession = (target: SessionDestination) => {
-    setFleetActionIntent(null)
+    setFleetCloseIntent(null)
     setFleetTarget(target)
     history.replaceState(history.state, "", destinationFragment(target))
   }
@@ -1128,15 +1142,37 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
    * reloading the page restored the same unreadable target and the same
    * sentence, with nothing on screen that could change either.
    */
-  const [fleetActionIntent, setFleetActionIntent] = useState<{ target: SessionDestination; title: string; kind: "end" | "archive" } | null>(null)
+  const [fleetCloseIntent, setFleetCloseIntent] = useState<{ target: SessionDestination; title: string; kind?: "end" | "archive"; recovered?: boolean } | null>(null)
   const closeFleetTarget = useCallback(() => {
-    setFleetActionIntent(null)
+    setFleetCloseIntent(null)
     setFleetTarget(null)
     setFleetDetailProblem(null)
     if (destinationFromFragment(location.hash)) {
       history.replaceState(history.state, "", location.pathname + location.search + "#all-machines")
     }
   }, [])
+
+  useEffect(() => {
+    const recoverClose = (event: Event) => {
+      const detail = (event as CustomEvent<{ id?: string; kind?: "end" | "archive" }>).detail
+      const selected = fleetTargetRef.current
+      if (!selected || selected.sessionID !== detail?.id || !client.current) return
+      const connected = client.current
+      void liveSessionSource.readMachine(selected.machineID, new AbortController().signal).then((projection) => {
+        if (client.current !== connected || destinationKey(fleetTargetRef.current ?? selected) !== destinationKey(selected)) return
+        const next = supersedingDestination(selected, projection) ??
+          (destinationAvailable(selected, projection) === "ready" ? selected : null)
+        if (!next) { setFleetReadAgain((count) => count + 1); return }
+        setFleetTarget(next)
+        history.replaceState(history.state, "", destinationFragment(next))
+        // The old confirmation is spent. The new one names the verified
+        // execution, and only its next explicit press may close it.
+        setFleetCloseIntent({ target: next, title: next.sessionID, kind: detail.kind === "archive" ? "archive" : "end", recovered: true })
+      }).catch(() => setFleetReadAgain((count) => count + 1))
+    }
+    document.addEventListener(CLOSE_EXECUTION_CHANGED, recoverClose)
+    return () => document.removeEventListener(CLOSE_EXECUTION_CHANGED, recoverClose)
+  }, [liveSessionSource])
 
   // The fleet scope shows "所有機器" in the header rather than one machine's
   // name. Only the opened three-part target changes the original Session
@@ -1541,8 +1577,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             onFleetDetailPending={noteRowPending}
             fleetReaderMachine={readerMachine}
             onFleetClose={closeFleetTarget}
-            fleetActionIntent={fleetActionIntent}
-            onFleetActionIntentHandled={() => setFleetActionIntent(null)}
+            fleetCloseIntent={fleetCloseIntent}
+            onFleetCloseIntentHandled={() => setFleetCloseIntent(null)}
             fleetList={fleetScope ? (filter, onFilter) => <FleetSessionList
             machines={quickMachines.map((machine) => ({
               id: machine.id, name: machine.name || machine.label || machine.id,
@@ -1555,8 +1591,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             carrierOf={carrierOf}
             onPresentations={noteFleetPresentations}
             onProjection={noteFleetProjection}
-            onCloseRequest={(target, title) => { openFleetSession(target); setFleetActionIntent({ target, title, kind: "end" }) }}
-            onArchiveRequest={(target, title) => { openFleetSession(target); setFleetActionIntent({ target, title, kind: "archive" }) }}
+            onCloseRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title }) }}
+            onArchiveRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title, kind: "archive" }) }}
             onMachineAction={runMachineTool}
           /> : undefined} />
           <CloudSessionSheets machineID={reading ?? chosen.id}

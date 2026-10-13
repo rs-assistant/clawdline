@@ -12,6 +12,7 @@ import { useSyncExternalStore } from "react"
  */
 export const OPEN_INFO = "clawdline:open-info"
 export const OPEN_CONFIRM = "clawdline:open-confirm"
+export const CLOSE_EXECUTION_CHANGED = "clawdline:close-execution-changed"
 export const GO_PAGE = "clawdline:go-page"
 /** A cancelable check before the shell hides a page with an open editor. */
 export const BEFORE_PAGE_CHANGE = "clawdline:before-page-change"
@@ -70,6 +71,11 @@ export function requestPage(request: PageRequest): void {
 /** Open the confirmation for one action (`#session-end` is `requestConfirm({ kind: "end" })`). */
 export function requestConfirm(request: ConfirmRequest): void {
   document.dispatchEvent(new CustomEvent<ConfirmRequest>(OPEN_CONFIRM, { detail: request }))
+}
+
+/** Ask a fleet page to reselect the current execution before another close confirmation. */
+export function closeExecutionChanged(id: string, kind: "end" | "archive"): void {
+  document.dispatchEvent(new CustomEvent(CLOSE_EXECUTION_CHANGED, { detail: { id, kind } }))
 }
 
 /**

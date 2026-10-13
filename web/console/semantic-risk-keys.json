@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5101,
+  "englishKeys": 5106,
   "counts": {
-    "negation": 1469,
-    "state": 700,
+    "negation": 1470,
+    "state": 701,
     "permission": 298,
     "deletion": 106,
-    "uncertainty": 147
+    "uncertainty": 148
   },
-  "unionCount": 2239,
+  "unionCount": 2241,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -991,6 +991,7 @@
       "next.brokerTasksUnknown",
       "next.closeReasonBoardUnstarted",
       "next.cloudAccessProblem",
+      "next.cloudActionChanged",
       "next.cloudActionContentPermission",
       "next.cloudActionMenuUnverified",
       "next.cloudActionNoQuestion",
@@ -1876,6 +1877,7 @@
       "next.closeReasonDispatchTodo",
       "next.closeReasonTodo",
       "next.cloudActionAcknowledge",
+      "next.cloudActionChanged",
       "next.cloudActionCheckFirst",
       "next.cloudActionFailure",
       "next.cloudActionRelayAccepted",
@@ -2632,6 +2634,7 @@
       "legacy.webCoordUnknown",
       "legacy.webCountUnreadable",
       "legacy.webDevicePairingUnknown",
+      "legacy.webFailOriginUnknown",
       "legacy.webImageUnknown",
       "legacy.webInfoUnknown",
       "legacy.webInfoWhyUnknown",
@@ -3608,6 +3611,7 @@
     "legacy.webFailNoAnswer",
     "legacy.webFailNoMac",
     "legacy.webFailNotFound",
+    "legacy.webFailOriginUnknown",
     "legacy.webFailOtherTab",
     "legacy.webFailReadOnly",
     "legacy.webFailReceiptKeyRequired",
@@ -4128,6 +4132,7 @@
     "next.closeReasonTodo",
     "next.cloudAccessProblem",
     "next.cloudActionAcknowledge",
+    "next.cloudActionChanged",
     "next.cloudActionCheckFirst",
     "next.cloudActionChecking",
     "next.cloudActionContentPermission",
