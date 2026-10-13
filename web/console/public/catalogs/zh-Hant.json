@@ -4238,6 +4238,7 @@
   "next.roleCreateFailed": "無法建立角色。",
   "next.roleCreateSaving": "正在儲存…",
   "next.roleCreateSave": "儲存角色",
+  "next.sessionWaitingOnNamedSession": "等待 Session：{session}",
   "projects.activityInProgress": "{n} 項進行中",
   "projects.activityLastKnown": "上次紀錄：{n}",
   "projects.activityNone": "目前無進行中項目",

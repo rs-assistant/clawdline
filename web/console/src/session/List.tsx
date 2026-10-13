@@ -169,7 +169,9 @@ function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape
       }
     }
     if (!peerSaid && !useLocalTasks) {
-      const waiting = nextWord("sessionWaitingOnSession")
+      const waiting = row.work_provenance === "broker" && row.work_note
+        ? nextWord("sessionWaitingOnNamedSession", { session: row.work_note })
+        : nextWord("sessionWaitingOnSession")
       peerSaid = `<span class="coordination-wait">${L.glyphHTML("⏳", waiting)}</span>`
     }
   }
