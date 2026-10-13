@@ -12,6 +12,7 @@ import { TAB } from "./tab.js"
 import { closeTerminalPane, openTerminalPage } from "./navigate.js"
 import { firstSize } from "./TerminalProjectList.js"
 import { KEY_ROW, bindTerminalKeyboard, isRegionKey, readClipboardPaste, withCtrl } from "./keys.js"
+import { PasteField } from "./PasteField.js"
 import { holderWords, terminalRefusalWords, terminalShortID } from "./words.js"
 import { acquireVisibleTerminal, beginCloudTerminal, cloudTerminalBody, keyRefusalControl, keyRefusalNotice, reconnectCloudTerminal, shownKeyRefusal, type KeyRefusalNotice } from "./cloud-view.js"
 import { beginTerminalClose, observeTerminalEnded, observeTerminalRunning, settleTerminalClose, terminalCloseState, watchTerminalClose } from "../../cloud/terminal-close-state.js"
@@ -90,6 +91,7 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
   const [ctrl, setCtrl] = useState(false)
   const [pasteMessage, setPasteMessage] = useState("")
   const [pasting, setPasting] = useState(false)
+  const [nativePaste, setNativePaste] = useState(false)
   const pasteBusy = useRef(false)
   const ctrlArmed = useRef(false)
   const [confirm, setConfirm] = useState<"takeover" | "reacquire" | null>(null)
@@ -346,7 +348,8 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
       const outcome = await readClipboardPaste(navigator.clipboard,
         () => session?.snapshot.canType && !history ? null : "terminalPasteUnavailable",
         text => session!.paste(text))
-      if (outcome) setPasteMessage(nextWord(outcome))
+      if (outcome === "terminalPasteReadFailed" || outcome === "terminalPasteEmpty") setNativePaste(true)
+      else if (outcome) setPasteMessage(nextWord(outcome))
     } catch (failure) { setError(reason(failure)) }
     finally { pasteBusy.current = false; setPasting(false) }
   }
@@ -466,5 +469,10 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
           aria-pressed={value === "ctrl" ? ctrl : undefined} onPointerDown={(event) => event.preventDefault()} onClick={() => sendKey(value)}>{name}</button>)}
     </div>
     {pasteMessage && <p className="terminal-note" role="status">{pasteMessage}</p>}
+    {nativePaste && history === null && <PasteField available={snapshot.canType} close={() => setNativePaste(false)} send={async text => {
+      if (!session?.snapshot.canType || history !== null) { setPasteMessage(nextWord("terminalPasteUnavailable")); return false }
+      try { await session.paste(text); keySent(); return true }
+      catch (failure) { keyFailed(failure); return false }
+    }} />}
   </div>
 }
