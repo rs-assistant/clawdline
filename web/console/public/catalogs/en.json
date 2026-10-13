@@ -227,6 +227,7 @@
   "http.23ea994b69eb9608": "A Git diff needs a changed path",
   "http.23ff71c6df9bb9c5": "A leftover is raised for the root the delivery belongs to, and that task's root is another session.",
   "http.24441a1dbefaa423": "result.json is there but is not this task's: its protocol, task_id, status or task_secret does not match. Nothing was settled.",
+  "http.24c54e54f30574bb": "Agent notifications were turned off by the user. Turn them on in Settings → Remote.",
   "http.2548e391d31850eb": "The body is not a board command.",
   "http.2586d552ac968964": "Reopen terminal work before changing its reference images.",
   "http.259ee8e426421b44": "That session is not inside a Git repository",

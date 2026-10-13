@@ -227,6 +227,7 @@
   "http.23ea994b69eb9608": "Git diff 需要已变更的路径。",
   "http.23ff71c6df9bb9c5": "后续事项应交给该交付所属的根 Session，而该任务的根 Session 是另一个 Session。",
   "http.24441a1dbefaa423": "result.json 存在，但不属于这项任务：其 protocol、task_id、status 或 task_secret 不符。未确定任何结果。",
+  "http.24c54e54f30574bb": "当事人已关闭 Agent 通知。请到「设定 → 远端」开启。",
   "http.2548e391d31850eb": "请求本文不是 Board 命令。",
   "http.2586d552ac968964": "变更参考图片前，请重新开启已结束的工作。",
   "http.259ee8e426421b44": "该 Session 不在 Git 仓库内。",

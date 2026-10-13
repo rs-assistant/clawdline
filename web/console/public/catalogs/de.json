@@ -227,6 +227,7 @@
   "http.23ea994b69eb9608": "Ein Git Diff braucht einen geänderten Pfad",
   "http.23ff71c6df9bb9c5": "Ein Restposten wird dem Root vorgeschlagen, zu dem die Lieferung gehört; der Root dieser Aufgabe ist eine andere Session.",
   "http.24441a1dbefaa423": "result.json ist vorhanden, gehört aber nicht zu dieser Aufgabe: protocol, task_id, status oder task_secret stimmen nicht überein. Es wurde kein Ergebnis festgestellt.",
+  "http.24c54e54f30574bb": "Die Person hat Agent-Benachrichtigungen deaktiviert. Aktivieren Sie sie unter Einstellungen → Fernzugriff.",
   "http.2548e391d31850eb": "Der Anfragetext ist kein Board-Befehl.",
   "http.2586d552ac968964": "Öffnen Sie die abgeschlossene Arbeit erneut, bevor Sie ihre Referenzbilder ändern.",
   "http.259ee8e426421b44": "Diese Session befindet sich nicht in einem Git-Repository",
