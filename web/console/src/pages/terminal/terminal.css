@@ -123,7 +123,7 @@
 .terminal-loading { position: absolute; inset: 12px auto auto 12px; margin: 0; }
 /* A refused key is said on the screen itself, where the person is looking, with the way back. */
 .terminal-key-refused { position: sticky; top: 8px; left: 8px; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-    max-width: calc(100% - 16px); margin: 8px; padding: 8px 10px; box-sizing: border-box; border-left: 2px solid var(--warn); border-radius: 8px;
+    max-width: calc(100% - 16px); margin: 8px; padding: 8px 10px; box-sizing: border-box; border-radius: 8px;
     background: var(--card); color: var(--ink); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
 .terminal-key-refused p { flex: 1 1 16em; margin: 0; }
 .terminal-key-refused .board-button { min-height: 40px; padding: 6px 12px; }

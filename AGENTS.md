@@ -51,6 +51,7 @@ GOOS=windows tools/heavy.sh go vet ./...      # the Windows-only files, and ever
 tools/heavy.sh go test ./...
 go run ./tools/contract-gen -check      # Go and TypeScript are generated together
 tools/check-legacy-css.sh               # the byte-for-byte copies still match
+node web/console/tools/check-rounded-side-borders.mjs # no rounded surfaces with accent side borders
 tools/check-machine-words.sh            # no shown sentence calls the machine a Mac
 tools/check-shell-expansions.sh         # no $name runs into a non-ASCII character
 tools/check-private.sh                  # nothing of the person's is in a public repo

@@ -36,6 +36,7 @@ import "./legacy/session-board.css"
 import "./legacy/documents.css"
 import "./legacy/user-messages.css"
 import "./legacy/snippets.css"
+import "./side-border-overrides.css"
 
 import "./shell.css"
 import "./font-scale.css"
