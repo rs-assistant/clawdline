@@ -21,6 +21,14 @@ import type { RelayReader } from "./relay-reader.js"
  */
 let activeReader: RelayReader | null = null
 let networkFetch: typeof globalThis.fetch | null = null
+let cloudConnectionRetry: (() => void) | null = null
+export function setCloudConnectionRetry(retry: (() => void) | null): void {
+  cloudConnectionRetry = retry
+}
+/** A message card's retry may wake a parked browser line; the local console has no reader. */
+export function retryCloudConnection(): void {
+  cloudConnectionRetry?.()
+}
 const fleetListeners = new Set<{ url: string; handlers: StreamHandlers; handle: StreamHandle }>()
 const changingFleet: StreamTransport = {
   open(url, handlers) {

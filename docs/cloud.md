@@ -74,6 +74,8 @@ The connection backs off and reconnects. An outbound spool owns publish order an
 
 The hosted console also records a content-free `cloud.write.failed` viewer event for a refused write. Its word, code, layer, outcome, connection state and stage distinguish a refusal before publication from one whose envelope may have reached the relay or machine. The event carries no message text or request body and is delivered through `diagnostics.events` to the paired machine's daemon log. A read or mutation waiting for a complete command descriptor follows a replacement Cloud client instead of spending the remaining five-second wait on a retired one. A mutation checks that current client's descriptor again before publishing.
 
+The browser's Cloud line reconnects in the background after a temporary failure. Reaching the consecutive-attempt limit changes it to one probe per maximum backoff interval; it does not leave an open Session waiting indefinitely for a visibility or network event. Returning to the page or regaining network can advance the probe, subject to the minimum spacing between attempts. A person's retry on a retained message card also wakes the line before the card reads the transcript and considers resending. The card still preserves its request key and checks for an already visible turn, so reconnection never licenses a blind duplicate. Permanent protocol and authorization refusals keep their terminal handling; repeated relay `forbidden` refusals remain bounded rather than being probed continuously.
+
 ## Which machine the hosted console is on
 
 An account with more than one readable machine opens on **all of them**: the fleet list is the

@@ -178,7 +178,12 @@ export function newCloudSession(options: { config: CloudConfig; deviceKind: stri
 
 export const keepConnected = keepConnectedOriginal as (
   session: CloudSession,
-  options: { onState: (update: CloudUpdate) => void },
+  options: {
+    onState: (update: CloudUpdate) => void
+    initialBackoffMs?: number
+    maximumBackoffMs?: number
+    maximumConnectFailures?: number
+  },
 ) => CloudConnection
 
 /** A machine's link, decoded and checked (`decodePairingInvitation`); throws `invitation_expired` or `bad_*`. */

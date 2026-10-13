@@ -17,21 +17,23 @@ function harness() {
   const cards = new PendingSends()
   const posts: { session: string; text: string; request: string }[] = []
   const answers: (Posted | "throw")[] = []
+  const steps: string[] = []
   let turns: SeenTurn[] | null = []
   const sender = new Sender({
     cards,
     now: () => clock.t,
+    wakeConnection: () => { steps.push("wake") },
     post: async (card) => {
       posts.push({ session: card.session, text: card.text, request: card.request })
       const next = answers.shift() ?? { ok: true }
       if (next === "throw") throw new Error("the network went away")
       return next
     },
-    readBack: async () => turns,
+    readBack: async () => { steps.push("read"); return turns },
     outcomeOf,
   })
   return {
-    clock, cards, posts, sender,
+    clock, cards, posts, sender, steps,
     answer: (a: Posted | "throw") => answers.push(a),
     transcript: (t: SeenTurn[] | null) => { turns = t },
   }
@@ -86,6 +88,7 @@ test("try again after a definite refusal sends despite a failed read-back", asyn
   await h.sender.deliver(card)
   h.transcript(null)
   await h.sender.resend(card.token)
+  assert.deepEqual(h.steps.slice(-2), ["wake", "read"], "retry wakes Cloud before checking the transcript")
   assert.equal(h.posts.length, 2, "a failed read cannot block a send known not to have arrived")
   assert.equal(h.posts[1].request, h.posts[0].request)
   assert.equal(h.cards.card(card.token)?.state, "accepted")
