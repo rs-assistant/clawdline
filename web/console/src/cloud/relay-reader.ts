@@ -1515,7 +1515,7 @@ export class RelayReader {
         machine: this.machine, execution_generation: row.destination.executionGeneration,
         parent_session_id: row.parentSessionID,
         label: presentation?.title ?? row.destination.sessionID, cwd: presentation?.cwd,
-        icon: presentation?.icon, assistant: row.assistant, backend: row.backend, state: row.state,
+        icon: presentation?.icon, assistant: row.assistant ?? presentation?.assistant, backend: row.backend, state: row.state,
         source: { freshness: row.freshness === "current" ? "current" : "unverified",
           observed_at: row.observedAt / 1000 } }
     })
@@ -1674,7 +1674,7 @@ export class RelayReader {
           parent_session_id: signedRow && typeof data?.parent_session_id === "string"
             ? data.parent_session_id : presentation.projection?.parentSessionID,
           cwd: presentation.cwd, icon: presentation.icon,
-          assistant: signedRow ? data?.assistant : presentation.projection?.assistant,
+          assistant: signedRow ? data?.assistant ?? presentation.assistant : presentation.projection?.assistant ?? presentation.assistant,
           backend: signedRow ? data?.backend : presentation.projection?.backend,
           state: signedRow ? data?.state : presentation.status?.state ?? "unknown",
           source: signedRow ? data?.source : { freshness: presentation.projection?.freshness === "current" ? "current" : "unverified",
