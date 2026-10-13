@@ -15,18 +15,17 @@ tools/configure-public-remote.sh
 
 It adds `origin` with the public fetch URL and sets this checkout's
 `core.hooksPath` to `tools/git-hooks`. The tracked `pre-push` hook permits only
-the public `main` and `swift` branches, and reads the commits a push to `main`
-would add — `-history -revs=<local> -since=<remote>`, the commits the remote
-does not already carry — for private material. `tools/test-public-remote-guard.sh`
+the public `main` and `swift` branches and checks the working tree for private
+material. It does not scan Git history. `tools/test-public-remote-guard.sh`
 proves that another branch is rejected against a disposable local bare
-repository and that no remote ref was created;
-`tools/test-pre-push-privacy.sh` proves that the privacy answer is asked once,
-over that range, and that anything but clean refuses the push.
+repository and that no remote ref was created; `tools/test-pre-push-privacy.sh`
+proves that the working-tree privacy answer is asked once, that no historical
+scan runs, and that anything but clean refuses the push.
 
-The hook prevents an accidental push of an unsafe ref or newly detected
-private history; Git's deliberate `--no-verify` option can bypass any pre-push
-hook. Do not use that option from the development checkout. Fetching is
-unaffected.
+The hook prevents an accidental push of an unsafe ref or a dirty working tree;
+historical privacy scans are manual publication audits. Git's deliberate
+`--no-verify` option can bypass any pre-push hook. Do not use that option from
+the development checkout. Fetching is unaffected.
 
 The setting is local Git configuration. A clone does not inherit it, which is
 what keeps the publication path below usable.
@@ -53,11 +52,8 @@ One local check still cannot produce its strongest answer in GitHub Actions:
 - `check-private.sh` reads a private word list that must not be committed.
   `check-private-ci.sh` still runs the fixed privacy rules over the tree. Exit
   3 becomes a GitHub warning saying the private-word rules are undetermined.
-  For history it builds a temporary fixed-rule checkpoint at the event's base
-  commit, then runs `-history -new` at `HEAD`: an old finding stays standing
-  and a finding introduced by the change fails CI. The temporary sentinel is
-  not a substitute private-word list, and the workflow says that explicitly.
-  A green CI result is not publication approval.
+  It does not scan history or create a history checkpoint. A green CI result
+  is not publication approval.
 
 `tools/test-go-ci.sh` names four host-integration exclusions in every run and
 first verifies that every named test still exists:

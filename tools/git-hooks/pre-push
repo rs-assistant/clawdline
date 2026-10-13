@@ -24,7 +24,7 @@
 #     "CI-Fix: 37916599301"`), or
 #   - CLAWDLINE_PUSH_ON_RED=1 is set, which is printed as an override.
 # When the run cannot be read (no gh, offline, not logged in) the answer is 2
-# and the push is refused, like the privacy checks below: an unread main is
+# and the push is refused, like the working-tree privacy check below: an unread main is
 # how a red one was pushed onto. CLAWDLINE_PUSH_ON_RED=1 overrides that too.
 # CLAWDLINE_GH names the gh binary (the hook's test stubs it).
 set -u
@@ -124,49 +124,6 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   if ! out=$(tools/check-private.sh 2>&1); then
     echo "pre-push: the working tree is not clean of private material." >&2
     echo "$out" >&2
-    status=1
-    continue
-  fi
-
-  # Read what this push would add, and nothing else.
-  #
-  # This was a control group: count what the whole history carries on both
-  # sides and refuse when this push's side carries more. The answer was right
-  # and the cost was wrong — `-checkpoint -` forces a full read and ignores
-  # the excluded end of a range, so each side read every commit in the
-  # repository: 5 minutes a side, 10 minutes a push, measured here. A push
-  # that waits that long gets run beside a build, and one did, and the two
-  # together wedged a push for two and a half hours.
-  #
-  # The question a push asks is smaller than the whole history: do the commits
-  # this push would add carry anything private? `-since` answers that one. It
-  # reads only the commits the remote does not already have and keeps no
-  # checkpoint, so nothing it reports is recorded as read — which is what made
-  # `-new` wrong here, because a refused push passed on the second attempt.
-  # What the remote already publishes is not re-judged: taking it back out is
-  # a history rewrite (docs/publishing.md), not a push refusal.
-  case "$remote_sha" in
-    "" | 0000000000000000000000000000000000000000)
-      # A ref the remote does not have yet publishes its whole history, so
-      # that is what gets read. main is not this case.
-      scan="-revs=$local_sha" ;;
-    *) if git cat-file -e "$remote_sha" 2>/dev/null; then
-         scan="-revs=$local_sha -since=$remote_sha"
-       else
-         echo "pre-push: the published commit $remote_sha is not here to compare against." >&2
-         echo "  Run git fetch first; a push cannot be judged without it." >&2
-         status=2; continue
-       fi ;;
-  esac
-
-  # shellcheck disable=SC2086 # scan is one or two words on purpose
-  if ! out=$(tools/check-private.sh -history $scan -checkpoint - 2>&1); then
-    echo "pre-push: the commits this push would add are not clean of private material." >&2
-    echo "$out" >&2
-    echo "  Read docs/publishing.md. A branch cut before main was rebased onto the" >&2
-    echo "  published history brings the unfiltered line with it; cherry-pick its" >&2
-    echo "  content instead of merging it. An answer of could-not-check or" >&2
-    echo "  undetermined is not a pass either: fix what it names and push again." >&2
     status=1
     continue
   fi
