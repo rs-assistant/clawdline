@@ -7310,6 +7310,36 @@ export interface SettingsRequest {
   product_language: string | null
 
   /**
+   * Notify after the app release is verified.
+   */
+  push_on_app_release_success: boolean | null
+
+  /**
+   * Notify when a Board decision needs an answer.
+   */
+  push_on_board_decision: boolean | null
+
+  /**
+   * Notify when a Board item is completed.
+   */
+  push_on_board_done: boolean | null
+
+  /**
+   * Notify when a capacity threshold is crossed.
+   */
+  push_on_capacity: boolean | null
+
+  /**
+   * Notify after the Cloud release is verified.
+   */
+  push_on_cloud_release_success: boolean | null
+
+  /**
+   * Notify when a task completion cannot reach its Session.
+   */
+  push_on_dead_letter: boolean | null
+
+  /**
    * Notify when a session reports a delivery.
    */
   push_on_delivery: boolean | null
@@ -7323,6 +7353,21 @@ export interface SettingsRequest {
    * Notify when a whole batch of dispatched work ends.
    */
   push_on_fanout: boolean | null
+
+  /**
+   * Notify when an App install or Cloud verification fails.
+   */
+  push_on_release_failure: boolean | null
+
+  /**
+   * Notify when a schedule fails or its file is unreadable.
+   */
+  push_on_schedule_failure: boolean | null
+
+  /**
+   * Notify when a Session waits for the person.
+   */
+  push_on_waiting: boolean | null
 
   /**
    * Whether anything but this Mac may read the session list.
@@ -7577,6 +7622,36 @@ export interface SettingsSnapshot {
   product_language: string | null
 
   /**
+   * Notify after the app release is verified.
+   */
+  push_on_app_release_success: boolean | null
+
+  /**
+   * Notify when a Board decision needs an answer.
+   */
+  push_on_board_decision: boolean | null
+
+  /**
+   * Notify when a Board item is completed.
+   */
+  push_on_board_done: boolean | null
+
+  /**
+   * Notify when a capacity threshold is crossed.
+   */
+  push_on_capacity: boolean | null
+
+  /**
+   * Notify after the Cloud release is verified.
+   */
+  push_on_cloud_release_success: boolean | null
+
+  /**
+   * Notify when a task completion cannot reach its Session.
+   */
+  push_on_dead_letter: boolean | null
+
+  /**
    * Notify when a session reports a delivery.
    */
   push_on_delivery: boolean | null
@@ -7590,6 +7665,21 @@ export interface SettingsSnapshot {
    * Notify when a whole batch of dispatched work ends.
    */
   push_on_fanout: boolean | null
+
+  /**
+   * Notify when an App install or Cloud verification fails.
+   */
+  push_on_release_failure: boolean | null
+
+  /**
+   * Notify when a schedule fails or its file is unreadable.
+   */
+  push_on_schedule_failure: boolean | null
+
+  /**
+   * Notify when a Session waits for the person.
+   */
+  push_on_waiting: boolean | null
 
   /**
    * Whether anything but this Mac may read the session list.

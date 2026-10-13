@@ -62,7 +62,7 @@ import {
  * stylesheet is that app's. The drawer is `input/sidebar.js` and the page
  * switch is `core/pages.js`, rule for rule.
  */
-type Page = "sessions" | "devices" | "projects" | "timeline" | "plan" | "settings" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
+type Page = "sessions" | "devices" | "projects" | "timeline" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
 
 /** What became of a session the address asked for: see `openAsked`. */
 type Asked = "none" | "waiting" | "opened" | "gone"
@@ -79,6 +79,7 @@ const PAGES: { id: Page; nav: string; icon: SidebarIconName; key?: string; text?
   { id: "projects", nav: "nav-projects", icon: "projects", key: "webProjects", ready: false },
   { id: "plan", nav: "nav-plan", icon: "plan", key: "webPlan", ready: false },
   { id: "settings", nav: "nav-settings", icon: "settings", key: "webSettings", ready: false },
+  { id: "notifications", nav: "nav-notifications", icon: "notifications", ready: false },
 ]
 
 /**
@@ -949,7 +950,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
               title={tooOldTitle(p.id)}
             >
               <SidebarIcon name={p.icon} />
-              {p.key ? T[p.key] : p.text}
+              {p.id === "notifications" ? nextWord("notificationNav") : p.key ? T[p.key] : p.text}
               {tooOldMark(p.id)}
             </button>
           ))}

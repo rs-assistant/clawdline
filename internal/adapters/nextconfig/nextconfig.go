@@ -504,6 +504,15 @@ var Settables = []Settable{
 	{Name: "push_on_fanout", Kind: "bool"},
 	{Name: "smart_notifications", Kind: "bool"},
 	{Name: "push_on_deploy", Kind: "bool"},
+	{Name: "push_on_waiting", Kind: "bool"},
+	{Name: "push_on_board_decision", Kind: "bool"},
+	{Name: "push_on_board_done", Kind: "bool"},
+	{Name: "push_on_schedule_failure", Kind: "bool"},
+	{Name: "push_on_capacity", Kind: "bool"},
+	{Name: "push_on_dead_letter", Kind: "bool"},
+	{Name: "push_on_app_release_success", Kind: "bool"},
+	{Name: "push_on_cloud_release_success", Kind: "bool"},
+	{Name: "push_on_release_failure", Kind: "bool"},
 	{Name: "orchestrator_agent_notify", Kind: "bool"},
 	// Whether the daemon polls iTerm2 over Apple Events; absent is on
 	// (docs/interface.md "Turning iTerm2 scanning off").

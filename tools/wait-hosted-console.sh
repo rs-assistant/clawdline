@@ -34,6 +34,7 @@ case "$deadline" in
 esac
 origin=${CLAWDLINE_CONSOLE_URL:-https://app.clawdline.com}
 full=$(git rev-parse --verify --quiet "$sha^{commit}") || { echo "$sha is not a commit here" >&2; exit 2; }
+trap 'rc=$?; if [ "$rc" -eq 1 ]; then sh tools/notify-release-failure.sh cloud "$full"; fi' EXIT
 
 # reached: the served stamp is <sha> or descends from it.
 reached() {

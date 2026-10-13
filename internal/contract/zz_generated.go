@@ -6099,6 +6099,24 @@ type SettingsRequest struct {
 	// human-readable CLI copy only.
 	ProductLanguage *string `json:"product_language"`
 
+	// Notify after the app release is verified.
+	PushOnAppReleaseSuccess *bool `json:"push_on_app_release_success"`
+
+	// Notify when a Board decision needs an answer.
+	PushOnBoardDecision *bool `json:"push_on_board_decision"`
+
+	// Notify when a Board item is completed.
+	PushOnBoardDone *bool `json:"push_on_board_done"`
+
+	// Notify when a capacity threshold is crossed.
+	PushOnCapacity *bool `json:"push_on_capacity"`
+
+	// Notify after the Cloud release is verified.
+	PushOnCloudReleaseSuccess *bool `json:"push_on_cloud_release_success"`
+
+	// Notify when a task completion cannot reach its Session.
+	PushOnDeadLetter *bool `json:"push_on_dead_letter"`
+
 	// Notify when a session reports a delivery.
 	PushOnDelivery *bool `json:"push_on_delivery"`
 
@@ -6107,6 +6125,15 @@ type SettingsRequest struct {
 
 	// Notify when a whole batch of dispatched work ends.
 	PushOnFanout *bool `json:"push_on_fanout"`
+
+	// Notify when an App install or Cloud verification fails.
+	PushOnReleaseFailure *bool `json:"push_on_release_failure"`
+
+	// Notify when a schedule fails or its file is unreadable.
+	PushOnScheduleFailure *bool `json:"push_on_schedule_failure"`
+
+	// Notify when a Session waits for the person.
+	PushOnWaiting *bool `json:"push_on_waiting"`
 
 	// Whether anything but this Mac may read the session list.
 	Remote *bool `json:"remote"`
@@ -6269,6 +6296,24 @@ type SettingsSnapshot struct {
 	// unsupported saved values render as English.
 	ProductLanguage *string `json:"product_language"`
 
+	// Notify after the app release is verified.
+	PushOnAppReleaseSuccess *bool `json:"push_on_app_release_success"`
+
+	// Notify when a Board decision needs an answer.
+	PushOnBoardDecision *bool `json:"push_on_board_decision"`
+
+	// Notify when a Board item is completed.
+	PushOnBoardDone *bool `json:"push_on_board_done"`
+
+	// Notify when a capacity threshold is crossed.
+	PushOnCapacity *bool `json:"push_on_capacity"`
+
+	// Notify after the Cloud release is verified.
+	PushOnCloudReleaseSuccess *bool `json:"push_on_cloud_release_success"`
+
+	// Notify when a task completion cannot reach its Session.
+	PushOnDeadLetter *bool `json:"push_on_dead_letter"`
+
 	// Notify when a session reports a delivery.
 	PushOnDelivery *bool `json:"push_on_delivery"`
 
@@ -6277,6 +6322,15 @@ type SettingsSnapshot struct {
 
 	// Notify when a whole batch of dispatched work ends.
 	PushOnFanout *bool `json:"push_on_fanout"`
+
+	// Notify when an App install or Cloud verification fails.
+	PushOnReleaseFailure *bool `json:"push_on_release_failure"`
+
+	// Notify when a schedule fails or its file is unreadable.
+	PushOnScheduleFailure *bool `json:"push_on_schedule_failure"`
+
+	// Notify when a Session waits for the person.
+	PushOnWaiting *bool `json:"push_on_waiting"`
 
 	// Whether anything but this Mac may read the session list.
 	Remote *bool `json:"remote"`

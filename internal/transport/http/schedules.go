@@ -88,6 +88,9 @@ func (s *Server) scheduleBook() *app.ScheduleBook {
 		},
 		Audit: s.audit,
 		Notify: func(ctx context.Context, title, body, tag string) {
+			if !s.notificationEnabled("push_on_schedule_failure") {
+				return
+			}
 			// A push that could not be sent is logged by the sender; the run
 			// it is about has already been decided and recorded.
 			_, _ = s.PushSend(ctx, title, body, "", tag, "")

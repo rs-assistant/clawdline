@@ -22,7 +22,7 @@ func (s *Server) waiting() *app.Waiting {
 	if w, ok := waitingByServer.Load(s); ok {
 		return w.(*app.Waiting)
 	}
-	w := &app.Waiting{Store: s.store, After: waitingAfter(), Enabled: s.agentNotifyEnabled, Language: s.productLanguage}
+	w := &app.Waiting{Store: s.store, After: waitingAfter(), Enabled: func() bool { return s.notificationEnabled("push_on_waiting") }, Language: s.productLanguage}
 	if s.broker != nil {
 		// The push goes out the way the capacity push does: recorded with its
 		// decision in one transaction, then run by the broker's outbox, whose
@@ -46,8 +46,8 @@ func (s *Server) productLanguage() string {
 }
 
 // agentNotifyEnabled is the person's `orchestrator_agent_notify` switch, read
-// at every use so turning it off needs no restart. It is the one switch there
-// is for pushes about what sessions are doing; absent or unreadable is on.
+// at every use so turning it off needs no restart. Session waiting has its
+// own preference; absent or unreadable is on for agent-authored pushes.
 func (s *Server) agentNotifyEnabled() bool {
 	values, err := nextconfig.Open(s.cfg.Dir).Read()
 	if err != nil {
