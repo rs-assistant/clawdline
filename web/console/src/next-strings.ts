@@ -434,6 +434,7 @@ const words = {
     scheduleMoveDeleteFailed:
       "The schedule now runs on {machine}. The old copy is still on {source}, disabled; delete it there. {why}",
     cloudMachineSessions: "{count} sessions",
+    cloudAllRefresh: "Refresh sessions",
     cloudAccessProblem:
       "Machine {machine}'s data could not be read in this browser ({code}). Pair that machine with this browser again; if it still cannot be read, sign in again.",
     cloudSwitch: "Other machines",
@@ -793,6 +794,7 @@ const words = {
     archiveDone: "Archived. It is under Archive in the sidebar.",
     archiving: "Archiving…",
     archiveNav: "Archive",
+    notificationNav: "Notifications",
     archiveEyebrow: "Sessions",
     archivePageTitle: "Archived Sessions",
     archiveLede:
@@ -1615,6 +1617,7 @@ const words = {
     scheduleMoveCreateFailedDisabled: "{machine} 拒絕建立這份排程，而 {source} 上的原排程沒能重新啟用：它還在那裡，目前停用。{why}",
     scheduleMoveDeleteFailed: "排程已經在 {machine} 上執行。舊的那份還在 {source}，目前停用；請到那台機器刪掉它。{why}",
     cloudMachineSessions: "{count} 個 session",
+    cloudAllRefresh: "重新整理 Session",
     cloudAccessProblem: "機器 {machine} 的資料在這個瀏覽器讀不出來（{code}）。請重新配對這台機器；若仍然讀不到，請重新登入。",
     cloudSwitch: "換一台機器",
     cloudAllMachines: "所有機器",
@@ -1925,6 +1928,7 @@ const words = {
     archiveDone: "已封存，在側欄的「封存」裡。",
     archiving: "封存中…",
     archiveNav: "封存",
+    notificationNav: "通知",
     archiveEyebrow: "Session",
     archivePageTitle: "封存的 Session",
     archiveLede: "這些 Session 為了釋放記憶體而封存。對話都還在，按「叫回」會在原本的資料夾、用原本的助手重新打開。",

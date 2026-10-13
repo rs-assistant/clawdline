@@ -36,7 +36,8 @@ else
   notifier=clawdline
 fi
 language=$("$notifier" setting get product_language 2>/dev/null || true)
-enabled=$("$notifier" setting get push_on_deploy 2>/dev/null || true)
+enabled=$("$notifier" setting get "push_on_${kind}_release_success" 2>/dev/null || true)
+case "$enabled" in *': on'|*': off') ;; *) enabled=$("$notifier" setting get push_on_deploy 2>/dev/null || true) ;; esac
 case "$enabled" in *': on') ;; *) exit 0 ;; esac
 case "$language" in *zh-Hant*) title=$title_zh; body=$body_zh ;; esac
 if "$notifier" notify --title "$title" --body "$body"; then

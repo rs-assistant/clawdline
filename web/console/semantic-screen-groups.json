@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5110,
+  "englishContentKeys": 5113,
   "riskKeys": 2242,
-  "nonRiskCount": 2868,
+  "nonRiskCount": 2871,
   "groups": [
     {
       "name": "bar / other",
@@ -367,7 +367,7 @@
     },
     {
       "name": "http / other",
-      "count": 557,
+      "count": 558,
       "sources": [
         "internal/productcopy/http_refusals/en.json"
       ],
@@ -638,6 +638,7 @@
         "http.79814e5ac1b4dbf9",
         "http.79bcbdfec4a509aa",
         "http.79de2bd3b748825c",
+        "http.7a152f1c0aca7343",
         "http.7b6bae045cfbba95",
         "http.7bed3fef7770d790",
         "http.7c15e7448e6f4d1c",
@@ -1644,7 +1645,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 198,
+      "count": 199,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1700,6 +1701,7 @@
         "next.cloudAllMachines",
         "next.cloudAllNameUnread",
         "next.cloudAllPlatform",
+        "next.cloudAllRefresh",
         "next.cloudAllSearch",
         "next.cloudAllSessionCount",
         "next.cloudAllSessionID",
@@ -1917,7 +1919,7 @@
     },
     {
       "name": "next / other",
-      "count": 123,
+      "count": 124,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1960,6 +1962,7 @@
         "next.newBuildReload",
         "next.noticeManyLeftovers",
         "next.noticeOneLeftover",
+        "next.notificationNav",
         "next.proposalResolveEvidence",
         "next.proposalResolveSubmit",
         "next.providerWork",

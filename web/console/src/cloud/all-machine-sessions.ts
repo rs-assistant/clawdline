@@ -23,6 +23,8 @@ export interface FleetMachine {
 /** Metadata from a pinned, read_transcript-authorized list read. */
 export interface SessionListPresentation {
   title: string
+  /** Time of the authenticated machine list that supplied this status. */
+  observedAt?: number
   assistant?: "claude" | "codex"
   cwd?: string
   icon?: Icon
@@ -34,6 +36,12 @@ export interface MachineListPresentation extends SessionListPresentation {
   destination: SessionDestination
   /** Current exact execution verified around the pinned list read. */
   projection?: ProjectedSession
+}
+
+/** A status projection contains no name; never present its routing id as one. */
+export function fleetRowTitle(row: ProjectedSession, presentation: SessionListPresentation | undefined,
+  unavailableWord: string): string {
+  return row.machineScope ? "Clawdfather" : presentation?.title || unavailableWord
 }
 
 /** Keep a prior list reading for the same execution, unless fresh ss/ contradicts its state. */
@@ -54,7 +62,8 @@ export function presentationPass(reading: Extract<MachineSessionProjection, { ki
 export function displayedPresentationStatus(row: ProjectedSession,
   presentation: SessionListPresentation | undefined): Partial<SessionRow> | undefined {
   const status = presentation?.status
-  return row.freshness === "current" && status?.state && status.state !== row.state ? undefined : status
+  return row.freshness === "current" && status?.state && status.state !== row.state &&
+    (!Number.isFinite(presentation?.observedAt) || presentation!.observedAt! < row.observedAt) ? undefined : status
 }
 
 export interface ProjectedSession {

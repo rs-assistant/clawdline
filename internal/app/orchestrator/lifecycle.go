@@ -628,7 +628,7 @@ const machineNotifyTask = ""
 func (b *Broker) notifyAllowed() error {
 	if b.NotifyEnabled != nil && !b.NotifyEnabled() {
 		return refuse(http.StatusConflict, "agent_notify_disabled",
-			"Agent notifications were turned off by the user. Turn them on in Settings → Remote.")
+			"Agent notifications were turned off by the user. Turn them on in Notifications.")
 	}
 	return nil
 }

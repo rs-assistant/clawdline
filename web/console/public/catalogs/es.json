@@ -636,6 +636,7 @@
   "http.79de2bd3b748825c": "El cursor de eventos debe ser un número de secuencia no negativo.",
   "http.79ecca38aa1c8919": "No se encontró el directorio de trabajo de esa sesión",
   "http.79f767282a388fd5": "La solicitud de paquete debe ser un objeto JSON sin claves duplicadas.",
+  "http.7a152f1c0aca7343": "La persona desactivó las notificaciones del Agent. Actívelas en Notificaciones.",
   "http.7a9f746e2233167d": "Esta línea de Cloud no puede rotar una clave.",
   "http.7ae1806ec2c52361": "Esta clave ya fue utilizada en una solicitud diferente; no se realizó ninguna acción. Utilice una clave nueva.",
   "http.7b60aa169d77d4b7": "Eso no se pudo hacer.",

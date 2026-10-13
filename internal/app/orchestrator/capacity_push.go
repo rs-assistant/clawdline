@@ -46,6 +46,9 @@ func runCapacityPush(ctx context.Context, b *Broker, e store.Effect) effectResul
 	if err := json.Unmarshal(e.Payload, &p); err != nil || p.Name == "" || p.Title == "" {
 		return effectResult{state: store.EffectFailed, outcome: "the effect carries no notice"}
 	}
+	if b.PushEnabled != nil && !b.PushEnabled("push_on_capacity") {
+		return effectResult{state: store.EffectDone, outcome: "disabled_by_user"}
+	}
 	if b.Push == nil {
 		return effectResult{state: store.EffectFailed, outcome: "this daemon cannot push"}
 	}

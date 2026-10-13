@@ -122,6 +122,14 @@ undone. Numbers come from a run, not from memory.
 
 ## How every delivery report ends
 
+When a root Session has finished and verified a turn, including any required commit, run
+`clawdline session report --summary "One concrete sentence about what was delivered."` as the
+last action before the final answer. Confirm that the command succeeded; the final answer and the
+two status lines below do not create the Session delivery receipt. If the command is refused,
+say that the Session status was not updated and give the refusal reason. Do not report a turn that
+is unfinished, only diagnostic, blocked, or waiting for the person, and never report a child's turn.
+Read `clawdline guide` for the current command and receipt semantics before using it.
+
 The final response for every task ends with exactly two unbulleted status lines, in this order,
 with no text, heading, code fence or other content after them. Choose the GitHub line and the
 Build/Cloud line independently from the evidence for the current delivery.

@@ -2,6 +2,7 @@ package http
 
 import (
 	"testing"
+	"time"
 
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 )
@@ -9,7 +10,7 @@ import (
 func TestOnlyTheRunningHeavyCallbackOwnsTheSessionMarker(t *testing.T) {
 	const taskID = "c0000000-0000-4000-8000-000000000001"
 	const sessionID = "d0000000-0000-4000-8000-000000000001"
-	holder := orchestrator.LeaseHolder{CallbackTaskID: taskID, Session: sessionID, Phase: "running", Liveness: "alive", Reason: "go test"}
+	holder := orchestrator.LeaseHolder{CallbackTaskID: taskID, Session: sessionID, Phase: "running", Liveness: "alive", Reason: "go test", AcquiredAt: time.Unix(1730000000, 0)}
 	record := orchestrator.Record{ID: taskID, State: orchestrator.StateBriefed,
 		Callback: &orchestrator.Callback{Intent: orchestrator.CallbackIntentHeavy}, Root: &orchestrator.RootRef{SessionID: sessionID}}
 	assert := func(name string, h orchestrator.LeaseHolder, r orchestrator.Record, want bool) {
@@ -18,7 +19,7 @@ func TestOnlyTheRunningHeavyCallbackOwnsTheSessionMarker(t *testing.T) {
 		if (work != nil) != want {
 			t.Fatalf("%s: id %q, work %+v, want marker %t", name, id, work, want)
 		}
-		if want && (id != sessionID || work.TaskID != taskID || work.Reason != "go test") {
+		if want && (id != sessionID || work.TaskID != taskID || work.Reason != "go test" || work.StartedAt != 1730000000) {
 			t.Fatalf("%s: id %q, work %+v", name, id, work)
 		}
 	}

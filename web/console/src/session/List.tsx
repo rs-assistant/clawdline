@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ComponentPropsWithRe
 import type { SessionRow } from "@clawdline/contract"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
-import { BRAND_MARK, projectedSessionIdentity, sessionCoordinatorBound, sessionMark, sessionName } from "../brand-mark.js"
+import { projectedSessionIdentity, sessionCoordinatorBound, sessionMark, sessionName } from "../brand-mark.js"
 import { requestConfirm } from "../overlays/events.js"
 import { ACTION_WIDTH, actionWidth, archivable, revealFor, swipes, type Reveal } from "./swipe.js"
 import { conversationNotStarted } from "./readiness.js"
@@ -19,6 +19,38 @@ import "./swipe-archive.css"
 /** The same selectable list-row frame serves a local row and a light Cloud status row. */
 export function SessionRowLayout({ children, className, ...props }: ComponentPropsWithRef<"li">) {
   return <li {...props} className={["row", className].filter(Boolean).join(" ")}>{children}</li>
+}
+
+/** Identity and activity are the same cells in a local or a fleet list. */
+function RowIdentity({ title, icon, assistant, crown = false, bound = false }: {
+  title: string; icon: SessionRow["icon"]; assistant?: SessionRow["assistant"]
+  crown?: boolean; bound?: boolean
+}) {
+  const who = assistant ? L.whoHTML(assistant) : ""
+  return <>
+    {crown ? <span className="coordinator-mark" aria-hidden="true"><Mark icon={icon} cellPx={4} />
+      <span className="clawdfather-crown" aria-hidden="true" /></span> : <Mark icon={icon} cellPx={4} />}
+    {bound && <span className="coordinator-identity">Clawdfather</span>}
+    <div className="title" style={{ color: L.accentTint(icon?.accent) }}><span className="label">{title}</span>
+      <span className="who" hidden={!who} dangerouslySetInnerHTML={{ __html: who }} /></div>
+  </>
+}
+
+function RowActivity({ at }: { at?: number }) {
+  const word = sessionActivityWord({ activity: at ? { known: true, at } : undefined })
+  return word ? <span className="session-activity">{word}</span> : null
+}
+
+function SwipeAction({ kind, title, hidden, onClick, word, closeability }: {
+  kind: "archive" | "close"; title: string; hidden: boolean; onClick: (button: HTMLButtonElement) => void; word?: string
+  closeability?: string
+}) {
+  const label = nextWord(kind === "archive" ? "swipeArchiveLabel" : "swipeEndLabel", { session: title })
+  return <button className={kind === "archive" ? "swipe-archive" : "swipe-end"} type="button" hidden={hidden}
+    data-closeability={closeability}
+    aria-label={label} title={label} onClick={(event) => { event.stopPropagation(); onClick(event.currentTarget) }}>
+    <span className="word">{word ?? nextWord(kind === "archive" ? "swipeArchiveAction" : "swipeCloseAction")}</span>
+  </button>
 }
 
 /** Status-only rows keep the original list structure without inventing rich Session content. */
@@ -56,13 +88,10 @@ export function ProjectedRow({ title, sessionID, machineID, machineName, assista
     } }}>
     <span className="kid" hidden={!depth} aria-hidden="true" />
     {ancestorThrough && <span className="tree-ancestor" aria-hidden="true" />}
-    {identity.crown ? <span className="coordinator-mark" aria-hidden="true"><Mark icon={mark} cellPx={4} />
-      <span className="clawdfather-crown" aria-hidden="true" /></span> : <Mark icon={mark} cellPx={4} />}
-    <div className="title" style={{ color: L.accentTint(mark.accent) }}><span className="label">{shownTitle}</span>
-      {assistant && <span className="who" dangerouslySetInnerHTML={{ __html: L.whoHTML(assistant) }} />}</div>
+    <RowIdentity title={shownTitle} icon={mark} assistant={assistant} crown={identity.crown} />
     <div className="meta"><span className="machine" title={machineName}>{machineName}</span>
       {cwd && <span className="path">{L.path(cwd)}</span>}
-      {lastMovementAt && <span className="session-activity">{sessionActivityWord({ activity: { known: true, at: lastMovementAt / 1000 } })}</span>}
+      <RowActivity at={lastMovementAt ? lastMovementAt / 1000 : undefined} />
       {machineScope && coordinatorBound ? <span className="coordinator-chip" aria-hidden="true">Clawdfather</span> : null}</div>
     {status ? <StateLine row={{ ...status, id: sessionID, state } as SessionRow}
       role={role} useLocalTasks={false} suffix={freshness} />
@@ -70,18 +99,8 @@ export function ProjectedRow({ title, sessionID, machineID, machineName, assista
         <span>{stateLabel}</span>{freshness && <span className="session-activity">{freshness}</span>}
         {attention && <span className="session-attention"><span className="session-attention-dot" /></span>}</div>}
     {identity.pending ? <p className="machine-registration" role="status">{nextWord("machineSessionPendingShort")}</p> : null}
-    {onArchive && <button className="swipe-archive" type="button" hidden={!swiped}
-      aria-label={nextWord("swipeArchiveLabel", { session: shownTitle })}
-      title={nextWord("swipeArchiveLabel", { session: shownTitle })}
-      onClick={(event) => { event.stopPropagation(); onArchive(event.currentTarget) }}>
-      <span className="word">{nextWord("swipeArchiveAction")}</span>
-    </button>}
-    {onClose && <button className="swipe-end" type="button" hidden={!swiped}
-      aria-label={nextWord("swipeEndLabel", { session: shownTitle })}
-      title={nextWord("swipeEndLabel", { session: shownTitle })}
-      onClick={(event) => { event.stopPropagation(); onClose(event.currentTarget) }}>
-      <span className="word">{nextWord("swipeCloseAction")}</span>
-    </button>}
+    {onArchive && <SwipeAction kind="archive" title={shownTitle} hidden={!swiped} onClick={onArchive} />}
+    {onClose && <SwipeAction kind="close" title={shownTitle} hidden={!swiped} onClick={onClose} />}
   </SessionRowLayout>
 }
 
@@ -129,7 +148,7 @@ function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape
   const callbackLabel = nextWord("sessionCallbackActive")
   const callbackDetail = [callbackLabel, row.heavy_work?.reason].filter(Boolean).join(" · ")
   const callbackSaid = row.heavy_work
-    ? `<span class="session-callback-active" role="img" aria-label="${L.escapeHTML(callbackDetail)}" title="${L.escapeHTML(callbackDetail)}">🏗️${L.workState(row).state === "working" ? "" : '<canvas class="spin" aria-hidden="true"></canvas>'}</span>`
+    ? `<span class="session-callback-active" title="${L.escapeHTML(callbackDetail)}"><span aria-hidden="true">🏗️</span><span class="session-callback-label">${L.escapeHTML(row.heavy_work.reason || callbackLabel)}</span>${L.workState(row).state === "working" ? "" : '<canvas class="spin" aria-hidden="true"></canvas>'}</span>`
     : ""
   const n = row.shells?.length ?? 0
   const shellsSaid = n
@@ -385,7 +404,6 @@ export function Row({
   swiped: boolean
   onOpen: (id: string) => void
 }) {
-  const who = L.whoHTML(row.assistant)
   const coordinator = L.coordinatorRowModel(row)
   const bound = sessionCoordinatorBound(row)
   const place = taskPlace(row, depth)
@@ -415,7 +433,6 @@ export function Row({
   const name = sessionName(row)
   // 封存 only where there is a conversation to bring back (`swipe.ts`).
   const canArchive = archivable(row.sessionId)
-  const activity = sessionActivityWord(row)
   // A gesture that moved the row, and the press that put an uncovered action
   // away, are not presses on the row (`swipe.ts`, `tookThePress`).
   const onPress = () => {
@@ -423,7 +440,6 @@ export function Row({
     onOpen(row.id)
   }
   const icon = sessionMark(row)
-  const mark = <Mark icon={icon} cellPx={4} />
   // The role this session was launched as (docs/personas.md), when the
   // machine's catalog names it: its bot and full name at the head of the third
   // line, with name and summary as its title. An id the catalog does not have
@@ -452,25 +468,11 @@ export function Row({
       <span className="kid" hidden={!place.depth} aria-hidden="true" />
       {ancestorThrough ? <span className="tree-ancestor" aria-hidden="true" /> : null}
       {row.epic_parent && depth ? <span className="sr-only">{catalogWord("inline", "9ba541d50c44")}</span> : null}
-      {row.machine_scope || bound ? (
-        // The machine steward's identity is visible without promising a
-        // command panel that this console does not provide.
-        <span className="coordinator-mark" aria-hidden="true">
-          {mark}
-          <span className="clawdfather-crown" aria-hidden="true" />
-        </span>
-      ) : (
-        mark
-      )}
-      {bound && <span className="coordinator-identity">Clawdfather</span>}
-      <div className="title" style={{ color: L.accentTint(icon?.accent) }}>
-        <span className="label">{name}</span>
-        <span className="who" hidden={!who} dangerouslySetInnerHTML={{ __html: who }} />
-      </div>
+      <RowIdentity title={name} icon={icon} assistant={row.assistant} crown={!!row.machine_scope || bound} bound={bound} />
       <div className="meta">
         <span className="path">{L.path(row.cwd)}</span>
         <span className="tty">{row.tty || row.backend || ""}</span>
-        {activity ? <span className="session-activity">{activity}</span> : null}
+        <RowActivity at={row.activity?.known ? row.activity.at : undefined} />
         <span className="agents-chip" hidden={!agentCount(row)} title={L.strings.webAgents}>
           <span className="dot" />
           <span className="n">{agentCount(row)}</span>
@@ -504,35 +506,10 @@ export function Row({
           opens a confirmation that names the row, never the archive itself.
           Not drawn for a row with no conversation id, which the daemon would
           refuse. */}
-      {canArchive ? (
-        <button
-          className="swipe-archive"
-          type="button"
-          hidden={!swiped}
-          aria-label={nextWord("swipeArchiveLabel", { session: name })}
-          title={nextWord("swipeArchiveLabel", { session: name })}
-          onClick={(event) => {
-            event.stopPropagation()
-            requestConfirm({ kind: "archive", id: row.id, opener: event.currentTarget, subject: name, focus: "cancel" })
-          }}
-        >
-          <span className="word">{nextWord("swipeArchiveAction")}</span>
-        </button>
-      ) : null}
-      <button
-        className="swipe-end"
-        type="button"
-        hidden={!swiped}
-        data-closeability={reveal.state}
-        aria-label={nextWord("swipeEndLabel", { session: name })}
-        title={nextWord("swipeEndLabel", { session: name })}
-        onClick={(event) => {
-          event.stopPropagation()
-          requestConfirm({ kind: "end", id: row.id, opener: event.currentTarget, subject: name, focus: "cancel" })
-        }}
-      >
-        <span className="word">{reveal.word}</span>
-      </button>
+      {canArchive ? <SwipeAction kind="archive" title={name} hidden={!swiped}
+        onClick={(button) => requestConfirm({ kind: "archive", id: row.id, opener: button, subject: name, focus: "cancel" })} /> : null}
+      <SwipeAction kind="close" title={name} hidden={!swiped} word={reveal.word} closeability={reveal.state}
+        onClick={(button) => requestConfirm({ kind: "end", id: row.id, opener: button, subject: name, focus: "cancel" })} />
     </SessionRowLayout>
   )
 }

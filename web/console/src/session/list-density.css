@@ -106,13 +106,16 @@
 
 /* A running heavy callback's owner stays visible beside the ordinary state. */
 .row .state > .session-callback-active {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  min-width: 0;
   color: var(--warn);
-  font: 16px/1.2 sans-serif;
+  font: 11.5px/1.2 var(--mono);
 }
+.row .session-callback-active > span:first-child { font: 16px/1 sans-serif; flex: 0 0 auto; }
+.row .session-callback-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 .row .session-callback-active > canvas.spin { flex: 0 0 auto; }
 

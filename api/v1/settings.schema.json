@@ -190,6 +190,15 @@
           "nullable": true,
           "type": "boolean"
         },
+        "push_on_waiting": { "description": "Notify when a Session waits for the person.", "nullable": true, "type": "boolean" },
+        "push_on_board_decision": { "description": "Notify when a Board decision needs an answer.", "nullable": true, "type": "boolean" },
+        "push_on_board_done": { "description": "Notify when a Board item is completed.", "nullable": true, "type": "boolean" },
+        "push_on_schedule_failure": { "description": "Notify when a schedule fails or its file is unreadable.", "nullable": true, "type": "boolean" },
+        "push_on_capacity": { "description": "Notify when a capacity threshold is crossed.", "nullable": true, "type": "boolean" },
+        "push_on_dead_letter": { "description": "Notify when a task completion cannot reach its Session.", "nullable": true, "type": "boolean" },
+        "push_on_app_release_success": { "description": "Notify after the app release is verified.", "nullable": true, "type": "boolean" },
+        "push_on_cloud_release_success": { "description": "Notify after the Cloud release is verified.", "nullable": true, "type": "boolean" },
+        "push_on_release_failure": { "description": "Notify when an App install or Cloud verification fails.", "nullable": true, "type": "boolean" },
         "orchestrator_agent_notify": {
           "description": "Whether an agent may push a sentence of its own.",
           "nullable": true,
@@ -431,6 +440,15 @@
           "nullable": true,
           "type": "boolean"
         },
+        "push_on_waiting": { "description": "Notify when a Session waits for the person.", "nullable": true, "type": "boolean" },
+        "push_on_board_decision": { "description": "Notify when a Board decision needs an answer.", "nullable": true, "type": "boolean" },
+        "push_on_board_done": { "description": "Notify when a Board item is completed.", "nullable": true, "type": "boolean" },
+        "push_on_schedule_failure": { "description": "Notify when a schedule fails or its file is unreadable.", "nullable": true, "type": "boolean" },
+        "push_on_capacity": { "description": "Notify when a capacity threshold is crossed.", "nullable": true, "type": "boolean" },
+        "push_on_dead_letter": { "description": "Notify when a task completion cannot reach its Session.", "nullable": true, "type": "boolean" },
+        "push_on_app_release_success": { "description": "Notify after the app release is verified.", "nullable": true, "type": "boolean" },
+        "push_on_cloud_release_success": { "description": "Notify after the Cloud release is verified.", "nullable": true, "type": "boolean" },
+        "push_on_release_failure": { "description": "Notify when an App install or Cloud verification fails.", "nullable": true, "type": "boolean" },
         "orchestrator_agent_notify": {
           "description": "Whether an agent may push a sentence of its own.",
           "nullable": true,

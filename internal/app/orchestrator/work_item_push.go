@@ -29,6 +29,9 @@ func runWorkItemCompletedPush(ctx context.Context, b *Broker, e store.Effect) ef
 	if err := json.Unmarshal(e.Payload, &p); err != nil || p.WorkID == "" || p.WorkID != e.Subject || p.Title == "" || p.Body == "" {
 		return effectResult{state: store.EffectFailed, outcome: "the effect carries no completed work item"}
 	}
+	if b.PushEnabled != nil && !b.PushEnabled("push_on_board_done") {
+		return effectResult{state: store.EffectDone, outcome: "disabled_by_user"}
+	}
 	if b.Push == nil {
 		return effectResult{state: store.EffectFailed, outcome: "this daemon cannot push"}
 	}

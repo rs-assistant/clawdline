@@ -166,7 +166,7 @@ function rows(): Row[] {
   if (readingScenario === "expired") return []
   if (readingScenario === "callback-owner") return [
     row(SAFE, "示範：Go 測試", safeCloseability(), Date.now() / 1000,
-      { heavy_work: callbackDone ? undefined : { task_id: "callback-heavy", reason: "Go tests" } }),
+      { heavy_work: callbackDone ? undefined : { task_id: "callback-heavy", reason: "Go tests", started_at: Math.floor(Date.now() / 1000) - 72 } }),
     row(BLOCKED, "Wait callback running", blockedCloseability(), 200),
     row(UNKNOWN, "Heavy callback queued", unknownCloseability(), 100),
   ]
@@ -1255,8 +1255,7 @@ test("a phone marks only the Session whose heavy callback is running", () =>
           listWidth: document.querySelector("#list-scroll")?.scrollWidth,
           viewportWidth: window.innerWidth }
       })()`)
-      assert.equal(badge.text, "🏗️")
-      assert.equal(badge.label, "重工作業進行中 · Go tests")
+      assert.equal(badge.text, "🏗️Go tests")
       assert.ok(badge.title?.includes("Go tests"), JSON.stringify(badge))
       assert.equal(badge.visible, true)
       assert.ok(badge.spinnerWidth > 0, JSON.stringify(badge))
@@ -1277,7 +1276,7 @@ test("a phone marks only the Session whose heavy callback is running", () =>
         }
         read()
       })`)
-      assert.equal(inside.text, "🏗️重工作業進行中 · Go tests")
+      assert.match(inside.text, /^🏗️重工作業進行中 · Go tests · 1m \d+s$/)
       assert.ok(inside.width > 0)
       assert.equal(inside.nativeWorking, false)
       callbackDone = true
