@@ -55,14 +55,14 @@ export function createUpdateReadStore(read: (fresh: boolean) => Promise<UpdateRe
     return inFlight
   }
 
-  const recheck = () => {
+  const recheck = (): Promise<UpdateRead> => {
     // A request started before the page slept cannot prove the current
     // version. It may finish after this one, so ignore its late answer.
     generation++
     lostFocus = false
     inFlight = null
     publish({ kind: "checking" })
-    void readNow(true)
+    return readNow(true)
   }
 
   // The Settings panel also has a timer while an update moves. A browser
@@ -139,7 +139,7 @@ export function createUpdateReadStore(read: (fresh: boolean) => Promise<UpdateRe
     }
   }
 
-  return { refresh, publish, subscribe, current: () => reading }
+  return { refresh, recheck, publish, subscribe, current: () => reading }
 }
 
 /**
@@ -246,6 +246,13 @@ export function classifyApplyAnswer(answer: Answer): ApplyAnswer {
   if (older(answer.status, code)) return { kind: "older" }
   if (unreachable(answer.status) && !code) return { kind: "unreachable" }
   return { kind: "refused", code: code || "http_" + answer.status, detail: refusalDetail(answer.parsed) }
+}
+
+/** A button press may install only the newest answer to its fresh source check. */
+export function canStartUpdateAfterFresh(checked: UpdateRead, current: UpdateRead | null): boolean {
+  return checked === current && checked.kind === "status" &&
+    checked.status.install_kind === "release" && checked.status.state === "update_available" &&
+    Boolean(buildName(checked.status.latest)) && !applyMoving(checked.status)
 }
 
 /** A stamp as the panel prints it: its first eight characters. */

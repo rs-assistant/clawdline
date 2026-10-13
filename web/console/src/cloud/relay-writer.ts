@@ -316,6 +316,7 @@ export type WriteRoute =
   | { op: "snippet-delete"; word: Carried<"snippet-delete">; snippet: string }
   | { op: "snippet-order"; word: Carried<"snippet-order"> }
   | { op: "worktree-refresh"; word: Carried<"project-worktree-lifecycle-refresh">; project: string }
+  | { op: "worktree-remove"; word: Carried<"project-worktree-remove">; project: string; worktree: string }
   | { op: "work-v2-create"; word: Carried<"work.v2.create"> }
   | { op: "work-decision-answer"; word: Carried<"work.decision-answer">; id: string }
   | { op: "work-v2-edit"; word: Carried<"work.v2.edit">; id: string }
@@ -624,6 +625,10 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   if (head === "verifications" && a && segments.length === 2 && method === "DELETE") {
     return { op: "verification-delete", word: "verification.delete", id: a }
   }
+  if (head === "projects" && a && b === "worktrees" && c && /^wt-[0-9a-f]{24}$/.test(c)
+      && segments.length === 4 && method === "DELETE") {
+    return { op: "worktree-remove", word: "project-worktree-remove", project: a, worktree: c }
+  }
   if (method !== "POST") return null
   if (head === "squad" && a === "catalog" && segments.length === 2) return { op: "squad-write", word: "squad.catalog.update" }
   if (head === "squad" && a === "role-draft" && segments.length === 2) return { op: "squad-write", word: "squad.role-draft" }
@@ -857,6 +862,7 @@ function spellingOf(route: WriteRoute): Spelling {
     case "snippet-order":
       return "flat"
     case "worktree-refresh":
+    case "worktree-remove":
     case "default-models":
     case "default-models-update":
     case "work-gate-settings":
@@ -1597,6 +1603,13 @@ export class RelayWriter {
           { project: route.project },
           "action",
         )
+      }
+      case "worktree-remove": {
+        if (typeof client._machineRequest !== "function") {
+          throw failure("cloud_not_carried", "project-worktree-remove", 501)
+        }
+        return client._machineRequest(this.host.machine, "project-worktree-remove",
+          { project: route.project, worktree: route.worktree }, "action")
       }
       case "default-models-update": {
         for (const [key] of url.searchParams) {

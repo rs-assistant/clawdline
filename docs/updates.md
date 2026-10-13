@@ -198,8 +198,11 @@ The panel shows the running and latest version (a short commit for a source buil
 - An older daemon — no `install_kind`, or a `501 not_implemented` for the POST — gets the earlier
   quiet line or the needs-update sentence, never "讀取失敗".
 
-On a release install with `update_available`, the session list also shows a banner linking to
-Settings, dismissed per version in the browser's storage.
+On a release install with `update_available`, the session list also shows a per-version banner.
+Its **立即更新** button rechecks the signed release source, starts the update directly, and shows
+progress and the final result in the same place. A withdrawn release or an unavailable source
+cannot be installed from an old banner. Dismissing the banner is remembered per version in that
+browser. Settings retains the full version check, release notes, and update controls.
 
 On a release install, the fresh route rereads the signed manifest. A 404 clears a withdrawn release;
 an unreachable or invalid source produces `unknown` instead of showing a cached version as

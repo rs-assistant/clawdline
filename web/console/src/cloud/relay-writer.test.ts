@@ -248,6 +248,7 @@ test("each console route is the Cloud word the machine lists, and nothing else",
     ["DELETE", "/v1/orchestrator/schedules/sch-1", "schedule-delete"],
     ["POST", "/v1/orchestrator/schedules/sch-1/run", "schedule-run"],
     ["POST", "/v1/projects/%2Frepo/worktrees/refresh", "project-worktree-lifecycle-refresh"],
+    ["DELETE", "/v1/projects/%2Frepo/worktrees/wt-0123456789abcdef01234567", "project-worktree-remove"],
     ["PUT", "/v1/projects/cloud-p1/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "project-file-save"],
     ["POST", "/v1/projects/cloud-p1/unify", "project-unify-apply"],
     // The plan is a read, answered by `relay-reader.ts`.

@@ -95,7 +95,10 @@ type Place = { id: string; projectId?: string; path?: string; machine?: string }
 
 export interface WorktreeSourceRow {
   worktreeId?: string
+  path?: string
   branch?: string
+  classifications?: string[]
+  status?: { complete?: boolean; staged?: number | null; modified?: number | null; untracked?: number | null }
   target?: string
   owner?: { title?: string; evidence?: string } | null
   context?: {
@@ -103,12 +106,17 @@ export interface WorktreeSourceRow {
     createdAt?: string; startedAt?: string; finishedAt?: string
     originSession?: { title?: string }
   } | null
-  cleanup?: { blockers?: Array<{ code?: string }> } | null
+  cleanup?: { eligible?: boolean; blockers?: Array<{ code?: string }> } | null
 }
 let latestWorktreeRows = new Map<string, WorktreeSourceRow>()
 
 export function worktreeSourceRow(id: string): WorktreeSourceRow | undefined {
   return latestWorktreeRows.get(id)
+}
+
+export async function removeLandedWorktree(project: string, worktree: string): Promise<void> {
+  await jsonFetch("/v1/projects/" + encodeURIComponent(project) + "/worktrees/" + encodeURIComponent(worktree),
+    { method: "DELETE" })
 }
 
 const post = (body: unknown): RequestInit => ({
