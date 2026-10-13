@@ -340,6 +340,7 @@ export function statusSource(current: () => StatusClient | null): SessionProject
           const status = record(session.status)
           const statusState = status?.state
           result.push({ destination, projection: currentRows.get(key), title: session.title.trim(),
+            assistant: session.assistant === "claude" || session.assistant === "codex" ? session.assistant : undefined,
             cwd: typeof session.cwd === "string" ? session.cwd : undefined,
             status: status && typeof status.work_state === "string" &&
               (statusState === "working" || statusState === "waiting" || statusState === "idle" || statusState === "unknown")
