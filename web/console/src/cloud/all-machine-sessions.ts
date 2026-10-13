@@ -23,6 +23,8 @@ export interface FleetMachine {
 /** Metadata from a pinned, read_transcript-authorized list read. */
 export interface SessionListPresentation {
   title: string
+  /** Time of the authenticated machine list that supplied this status. */
+  observedAt?: number
   assistant?: "claude" | "codex"
   cwd?: string
   icon?: Icon
@@ -54,7 +56,8 @@ export function presentationPass(reading: Extract<MachineSessionProjection, { ki
 export function displayedPresentationStatus(row: ProjectedSession,
   presentation: SessionListPresentation | undefined): Partial<SessionRow> | undefined {
   const status = presentation?.status
-  return row.freshness === "current" && status?.state && status.state !== row.state ? undefined : status
+  return row.freshness === "current" && status?.state && status.state !== row.state &&
+    (!Number.isFinite(presentation?.observedAt) || presentation!.observedAt! < row.observedAt) ? undefined : status
 }
 
 export interface ProjectedSession {

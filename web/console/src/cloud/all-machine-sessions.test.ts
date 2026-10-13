@@ -134,6 +134,10 @@ test("a new pass retains the same execution's work line until fresh status contr
   assert.equal(displayedPresentationStatus(current, presentation), presentation.status)
   assert.equal(displayedPresentationStatus({ ...current, freshness: "stale", state: "idle" }, presentation), presentation.status)
   assert.equal(displayedPresentationStatus({ ...current, state: "waiting" }, presentation), undefined)
+  assert.equal(displayedPresentationStatus({ ...current, state: "waiting", observedAt: 1000 },
+    { ...presentation, observedAt: 1001 }), presentation.status)
+  assert.equal(displayedPresentationStatus({ ...current, state: "waiting", observedAt: 1002 },
+    { ...presentation, observedAt: 1001 }), undefined)
 })
 
 test("retained observations remain readable but cannot authorize content", () => {

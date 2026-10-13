@@ -4138,6 +4138,7 @@
   "next.cloudActionRestoreDraft": "Return rejected message and pictures to the composer",
   "next.cloudAllUnconfirmed": "Still checking what {machine} can do. Nothing needs updating yet.",
   "next.cloudAllTryAgain": "Try again",
+  "next.cloudAllRefresh": "Refresh sessions",
   "next.cloudAllFilterIdle": "Idle",
   "next.cloudAllSessionCount": "{count} Sessions",
   "next.cloudPeerMachineUnnamed": "Machine {number}",
