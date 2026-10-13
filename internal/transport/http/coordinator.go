@@ -229,9 +229,16 @@ func machineStartBlock(st app.State, stateDir string) string {
 		}
 		return "coordinator_online"
 	}
-	// A missing workspace Session in a partial inventory is not proof that it
-	// does not exist. Keep a pending, unregistered Session from duplicating.
-	if !st.Seen.Inventory.Complete {
+	// A previous binding already identifies the managed machine Session, and
+	// its own source has proved it offline above. A deliberately disabled
+	// unrelated source must not make replacement impossible forever. First
+	// registration still needs the whole inventory to rule out an unregistered
+	// machine Session; actual read failures also keep the refusal.
+	complete := st.Seen.Inventory.Complete
+	if st.Record != nil && st.Liveness == coordinator.Offline {
+		complete = st.Seen.Inventory.CompleteApartFromDisabled()
+	}
+	if !complete {
 		return "coordinator_liveness_unknown"
 	}
 	for _, live := range st.Seen.Sessions {
