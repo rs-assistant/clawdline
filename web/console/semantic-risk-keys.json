@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5106,
+  "englishKeys": 5107,
   "counts": {
     "negation": 1470,
-    "state": 701,
+    "state": 702,
     "permission": 298,
     "deletion": 106,
     "uncertainty": 148
   },
-  "unionCount": 2241,
+  "unionCount": 2242,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1993,6 +1993,7 @@
       "next.sendKeptWords",
       "next.sessionNotStartedShort",
       "next.sessionStopSent",
+      "next.sessionWaitingOnNamedSession",
       "next.sessionWaitingOnSession",
       "next.sessionsListWaitHint",
       "next.signedInCapsSendTerminal",
@@ -4541,6 +4542,7 @@
     "next.sessionStateUnrecognizedDetail",
     "next.sessionStateUnrecognizedList",
     "next.sessionStopSent",
+    "next.sessionWaitingOnNamedSession",
     "next.sessionWaitingOnSession",
     "next.sessionsListIncompleteTitle",
     "next.sessionsListUnansweredTitle",

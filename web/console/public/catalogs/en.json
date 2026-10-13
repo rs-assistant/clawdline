@@ -4238,6 +4238,7 @@
   "next.roleCreateFailed": "The role could not be created.",
   "next.roleCreateSaving": "Saving…",
   "next.roleCreateSave": "Save role",
+  "next.sessionWaitingOnNamedSession": "Waiting for Session: {session}",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

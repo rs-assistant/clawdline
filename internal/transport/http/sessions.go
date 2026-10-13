@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -323,6 +324,11 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 			epicParent:          epicParents[string(item.Assistant)+"\x00"+item.ConversationID],
 			acceptance:          rowAcceptance(item.ConversationID, pending, pendingErr),
 		})
+		// The light Cloud list has no task collection. Carry the names of live
+		// child Sessions with a broker peer wait so its hourglass can name them.
+		if row.WorkState == contract.WorkStateWaitingSession && row.WorkProvenance == contract.WorkProvenanceBroker {
+			row.WorkNote = waitingChildNames(item, lives[i], swift, labels)
+		}
 		if attentionErr == nil && item.ConversationID != "" && conversationMatches[item.ConversationID] == 1 &&
 			row.Source != nil && row.Source.Freshness == contract.SourceFreshnessCurrent &&
 			(item.Binding == session.BindingCommandLine || item.Binding == session.BindingOpenFile ||
@@ -910,6 +916,38 @@ func wireObservation(obs session.Observation) *contract.BearingsSource {
 }
 
 var errSwiftUnknown = errors.New("the Swift store could not be read")
+
+// waitingChildNames names only live children tied to this exact root conversation.
+// A title of the task is not the identity of the Session doing it.
+func waitingChildNames(root session.Session, live swiftstore.Live, snapshot swiftstore.Snapshot, labels map[string]string) string {
+	parent := snapshot.OwnTask(live)
+	var names []string
+	seen := map[string]bool{}
+	for _, t := range snapshot.Tasks {
+		if !t.Live() {
+			continue
+		}
+		direct := root.ConversationID != "" && t.RootSession != nil && *t.RootSession == root.ConversationID &&
+			((t.RootAssistant == nil && root.Assistant == session.AssistantClaude) ||
+				(t.RootAssistant != nil && *t.RootAssistant == string(root.Assistant)))
+		child := parent != nil && t.ParentTask != nil && *t.ParentTask == parent.ID
+		if !direct && !child {
+			continue
+		}
+		name := ""
+		if t.ChildTerminal != nil {
+			name = labels[*t.ChildTerminal]
+		}
+		if name == "" && t.ChildSession != nil {
+			name = *t.ChildSession
+		}
+		if name != "" && !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	return strings.Join(names, " · ")
+}
 
 // ownWaitingOnPeer is this daemon's own record of a session parked on another.
 func ownWaitingOnPeer(item session.Session, owed []task.Obligation) bool {
