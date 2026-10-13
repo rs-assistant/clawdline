@@ -1,8 +1,7 @@
 # Notifications
 
-After this page your phone or computer gets a notification when a session has been waiting for your
-answer, when an agent tells you something, or when a schedule fails — and you can send yourself a
-test to prove it arrives.
+This page lists the notifications the current Go daemon can send. A browser can
+also send a test notification to its own device.
 
 ## How it works
 
@@ -33,19 +32,27 @@ arrives on this device.
 
 ## What you are told about
 
-| When | Sent by |
+| When | Condition and destination |
 | --- | --- |
-| A session has been stopped on a question or a permission prompt for **10 minutes** without an answer | The daemon, once per stop, at most 6 an hour. A question answered sooner is never pushed |
-| An agent calls `clawdline notify --title … --body …` | The session itself (title up to 80 characters, body up to 500) |
-| A schedule's run fails, when **失敗時通知我** is on | The scheduler ([schedules.md](schedules.md)) |
+| A Session waits on a question or permission for **10 minutes** | Once per stop, at most 6 per hour per machine; it opens that Session. The `orchestrator_agent_notify` switch controls this. |
+| An agent calls `clawdline notify --title … --body …` or a task's notification route | Subject to `orchestrator_agent_notify` and the agent notification limit; `--session` opens the named Session. |
+| An agent creates an unsolicited human intervention Note | Subject to `orchestrator_agent_notify`; it opens the owning Session. |
+| A blocking Board decision needs an answer | Once per pending decision, at most 30 per hour per machine; it opens the list. |
+| A Board item enters `done` | One outbox notification for that completion; it opens the assigned Session while that Session is still present. |
+| A schedule misses its run, dispatch is refused, or its file cannot be read | Missed and refused runs require **Notify on failure** on the schedule. An invalid file is reported when its fingerprint changes. These open the list. |
+| A capacity row crosses a notification threshold | The capacity monitor sends the recorded notice; it opens the list. |
+| A task completion notice becomes a dead letter | Once for that dead letter; it opens the root Session while present. |
+| You press **Send a test** | Only the asking device receives it. It opens the selected Session when the machine can still verify it; otherwise it opens the list. |
 
 Tapping a waiting notification opens that session. A newer notification about the same session
 replaces the older one.
 
-Agent notifications and the waiting-for-you notification follow one switch on the machine,
-`orchestrator_agent_notify`, on by default and shown in the macOS app's settings window. When it
-is off, `clawdline notify` is refused with
-`agent_notify_disabled`.
+The Go Settings page also displays switches for Session delivery, fan-out and
+deploy completion. Those settings are stored, but this daemon currently has no
+sender that reads them. They do not add notification cases to the table above.
+
+The `orchestrator_agent_notify` switch is on by default. When it is off,
+`clawdline notify` is refused with `agent_notify_disabled`.
 
 ## Turn them off
 

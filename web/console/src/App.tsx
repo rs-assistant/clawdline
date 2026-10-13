@@ -22,6 +22,7 @@ import { nextWord } from "./next-strings.js"
 import { bootLocalCatalog } from "./catalog.js"
 import { namesSession, sessionFragment, sessionsInFragment } from "./session/address.js"
 import { destinationFragment, destinationFromFragment, destinationKey, type FleetDetailProblem, type SessionDestination } from "./cloud/all-machine-sessions.js"
+import { notificationAddress } from "./push/navigation.js"
 import { hasDocumentIntent } from "./legacy/documents-bridge.js"
 import { NewBuild } from "./NewBuild.js"
 import { MachineDashboard } from "./machine/MachineDashboard.js"
@@ -210,7 +211,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   /** Whether the opened fleet Session's own row is still missing from this machine's rows. */
   onFleetDetailPending?: (pending: boolean) => void
   onFleetClose?: () => void
-  fleetCloseIntent?: { target: SessionDestination; title: string } | null
+  fleetCloseIntent?: { target: SessionDestination; title: string; kind?: "end" | "archive"; recovered?: boolean } | null
   onFleetCloseIntentHandled?: () => void
   hideSessionCounts?: boolean
   focusCloudSessions?: boolean
@@ -228,6 +229,17 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   const tooOldMark = (id: string) => tooOld(id) ? <small className="sidebar-needs-update"> · {nextWord("machineNeedsUpdateShort")}</small> : null
   const [page, setPage] = useState<Page>(() => location.pathname === "/billing/done"
     ? "plan" : hasDocumentIntent(location.hash) ? "documents" : "sessions")
+  useEffect(() => {
+    const worker = navigator.serviceWorker
+    if (!worker) return
+    const follow = (event: MessageEvent) => {
+      if (event.data?.type !== "navigate") return
+      const address = notificationAddress(event.data.url, location.href)
+      if (address) location.assign(address)
+    }
+    worker.addEventListener("message", follow)
+    return () => worker.removeEventListener("message", follow)
+  }, [])
   const [menu, setMenu] = useState(false)
   // The machine dashboard, opened from the counts (machine/MachineDashboard.tsx).
   const [machine, setMachine] = useState(false)
@@ -519,9 +531,10 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
       fleetReaderMachine !== fleetCloseIntent.target.machineID) return
     const row = rows.find((candidate) => candidate.id === fleetCloseIntent.target.sessionID &&
       candidate.execution_generation === fleetCloseIntent.target.executionGeneration)
-    if (!row) return
+    if (!row && !fleetCloseIntent.recovered) return
     onFleetCloseIntentHandled?.()
-    requestConfirm({ kind: "end", id: row.id, subject: fleetCloseIntent.title, focus: "cancel" })
+    requestConfirm({ kind: fleetCloseIntent.kind ?? "end", id: fleetCloseIntent.target.sessionID,
+      subject: fleetCloseIntent.title, focus: "cancel" })
   }, [fleetList, fleetCloseIntent, fleetTarget, fleetReaderMachine, rows])
 
   // `closeDetail`: the session goes, the highlight stays. On a phone the list
