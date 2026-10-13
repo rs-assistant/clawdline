@@ -34,7 +34,7 @@ import { conversationNotStarted } from "./readiness.js"
 import { agentName, agentStateWord } from "./WorkTree.js"
 import { nextWord } from "../next-strings.js"
 import { archivable } from "./swipe.js"
-import { BRAND_MARK, sessionName } from "../brand-mark.js"
+import { BRAND_MARK, detailSessionName } from "../brand-mark.js"
 import { headPersona, type HeadPersona } from "../personas.js"
 import { PersonaBot, usePersonas } from "./PersonaBot.js"
 import "./work-tree.css"
@@ -268,7 +268,7 @@ export function Detail({
           >
             <span className="who detail-who">
               <span className="name" id="detail-name" style={mark ? { color: L.accentTint(mark.accent) } : undefined}>
-                {row ? sessionName(row) : listUnknown ? "" : T.webNoSessionOpen}
+                {row ? detailSessionName(row) : listUnknown ? "" : T.webNoSessionOpen}
               </span>
               <span className="sub" id="detail-sub">
                 {role ? <DetailPersona head={role} /> : null}
@@ -320,7 +320,7 @@ export function Detail({
 
       <div className={home ? "scroller tx-scroll home" : "scroller tx-scroll"} id="tx-scroll">
         <div className={home ? "tx home" : "tx"} id="tx">
-          {row ? <Transcript id={row.id} agentId={selectedAgent?.id} onAgent={chooseAgent} /> :
+          {row ? <Transcript id={row.id} row={row} agentId={selectedAgent?.id} onAgent={chooseAgent} /> :
             emptyProblem ? <div className="cloud-detail-problem" role="status">
               <p>{emptyProblem.text}</p>
               {emptyProblem.action && <button type="button" className="cloud-detail-act"

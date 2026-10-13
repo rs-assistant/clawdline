@@ -1,7 +1,15 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 // @ts-expect-error -- Node's type-stripping runner resolves the source .ts file.
-import { BRAND_MARK, projectedSessionIdentity } from "./brand-mark.ts"
+import { BRAND_MARK, detailSessionName, projectedSessionIdentity } from "./brand-mark.ts"
+import type { SessionRow } from "@clawdline/contract"
+
+test("a new conversation has a readable detail title before its list name arrives", () => {
+  const row = { id: "%" + 677, label: "%" + 677, assistant: "codex", identity: "no_record" } as SessionRow
+  assert.equal(detailSessionName(row), "Codex Session")
+  assert.equal(detailSessionName({ ...row, label: "A named task" }), "A named task")
+  assert.equal(detailSessionName({ ...row, identity: "registry" }), row.id)
+})
 
 test("Cloud Session cards keep the machine identity through registration", () => {
   const provider = { accent: "#55aa77", cells: [["#55aa77"]] }

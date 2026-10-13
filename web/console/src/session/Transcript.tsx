@@ -122,19 +122,21 @@ interface EarlierPages {
 
 export function Transcript({
   id,
+  row,
   agentId,
   onAgent,
 }: {
   id: string
+  row?: SessionRow
   agentId?: string
   onAgent?: (id: string) => void
 }) {
   // Keyed, so a different session starts from nothing: no previous session's
   // turns, error or opened folds are shown under the new name.
-  return <TranscriptOf key={`${id}:${agentId ?? ""}`} id={id} agentId={agentId} onAgent={onAgent} />
+  return <TranscriptOf key={`${id}:${agentId ?? ""}`} id={id} row={row} agentId={agentId} onAgent={onAgent} />
 }
 
-function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; onAgent?: (id: string) => void }) {
+function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: SessionRow; agentId?: string; onAgent?: (id: string) => void }) {
   // The page last read, and whether the pane is on its fast pace: the read
   // asks only for what was appended to it unless this is the safety read of
   // the whole page (`transcript-follow.ts`).
@@ -165,7 +167,7 @@ function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; 
   const cards = agentId ? [] : pendingSends.of(id)
   const following = cards.some((card) => card.state !== "failed")
   const newestSendAt = cards.reduce((at, card) => (card.state !== "failed" && card.sentAt > at ? card.sentAt : at), 0)
-  const session = useSession(id)
+  const session = useSession(id, row)
   // The fast pace ends FOLLOW_WINDOW_MS after the newest send; this draw is
   // what moves the pace back when it does.
   const [, setPaceClock] = useState(0)
@@ -1761,8 +1763,8 @@ function copyFrom(ev: MouseEvent<HTMLElement>) {
  * filter has hidden it. The speaker's name and mark come from its assistant,
  * and the live sweep from its state.
  */
-function useSession(id: string): SessionRow | undefined {
-  const shown = L.orderedRows().find((r) => r.id === id)
+function useSession(id: string, row?: SessionRow): SessionRow | undefined {
+  const shown = row ?? L.orderedRows().find((r) => r.id === id)
   const [fetched, setFetched] = useState<SessionRow | undefined>(undefined)
   const missing = !shown
   useEffect(() => {
