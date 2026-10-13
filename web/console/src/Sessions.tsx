@@ -12,6 +12,7 @@ import type { StartAnswer, StartPlaceRow } from "./legacy/start-bridge.js"
 import { SessionToolbar } from "./session/SessionToolbar.js"
 import { Command, CommandSheet } from "./session/Command.js"
 import { Starting } from "./session/Starting.js"
+import { StartProgressDialog } from "./session/StartProgress.js"
 import { UpdateBanner } from "./machine/UpdateBanner.js"
 import { RestoreCard, RestoreHero, RestoreSheet, useRestoreOffer } from "./session/Restore.js"
 import { offerShape } from "./session/restore-offer.js"
@@ -359,6 +360,7 @@ export function SessionsPage({
           </section>)}
       </main>
       <StartSheet />
+      <StartProgressDialog />
       <CommandSheet />
       {restoring && (
         <RestoreSheet sessions={restoring} onClose={() => setRestoring(null)} onChanged={restore.refresh} />
