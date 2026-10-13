@@ -435,7 +435,8 @@ const words = {
     scheduleMoveDeleteFailed:
       "The schedule now runs on {machine}. The old copy is still on {source}, disabled; delete it there. {why}",
     cloudMachineSessions: "{count} sessions",
-    cloudAllRefresh: "Refresh sessions",
+    cloudAllRefresh: "Refresh",
+    cloudAllRefreshing: "Refreshing…",
     cloudAccessProblem:
       "Machine {machine}'s data could not be read in this browser ({code}). Pair that machine with this browser again; if it still cannot be read, sign in again.",
     cloudSwitch: "Other machines",
@@ -1619,7 +1620,8 @@ const words = {
     scheduleMoveCreateFailedDisabled: "{machine} 拒絕建立這份排程，而 {source} 上的原排程沒能重新啟用：它還在那裡，目前停用。{why}",
     scheduleMoveDeleteFailed: "排程已經在 {machine} 上執行。舊的那份還在 {source}，目前停用；請到那台機器刪掉它。{why}",
     cloudMachineSessions: "{count} 個 session",
-    cloudAllRefresh: "重新整理 Session",
+    cloudAllRefresh: "重新整理",
+    cloudAllRefreshing: "正在重新整理…",
     cloudAccessProblem: "機器 {machine} 的資料在這個瀏覽器讀不出來（{code}）。請重新配對這台機器；若仍然讀不到，請重新登入。",
     cloudSwitch: "換一台機器",
     cloudAllMachines: "所有機器",

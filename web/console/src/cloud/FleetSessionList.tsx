@@ -51,12 +51,18 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   const presentationFailures = useRef(new Map<string, string>())
   const [presentationRevision, refreshPresentation] = useState(0)
   const [manualRefresh, setManualRefresh] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
   const previousTarget = useRef(target)
   const refreshList = () => {
     presentationPasses.current.clear()
     presentationFailures.current.clear()
     setManualRefresh((value) => value + 1)
     refreshPresentation((value) => value + 1)
+  }
+  const refreshFromButton = () => {
+    if (refreshing) return
+    setRefreshing(true)
+    refreshList()
   }
   useEffect(() => {
     if (previousTarget.current && !target) refreshList()
@@ -87,6 +93,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
 
   useEffect(() => {
     if (!source) {
+      setRefreshing(false)
       setReadings(Object.fromEntries(machines.map((machine) => [machine.id, {
         phase: "settled", value: { kind: "unavailable", reason: "old_version" },
       }])))
@@ -94,6 +101,12 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     }
     let live = true
     const aborts = new Map<string, AbortController>()
+    const pendingRefresh = new Set(manualRefresh ? machines.map((machine) => machine.id) : [])
+    if (manualRefresh && pendingRefresh.size === 0) setRefreshing(false)
+    const finishRefresh = (machineID: string) => {
+      if (!pendingRefresh.delete(machineID)) return
+      if (pendingRefresh.size === 0) setRefreshing(false)
+    }
     const read = (machineID: string) => {
       aborts.get(machineID)?.abort()
       const abort = new AbortController()
@@ -102,12 +115,14 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
         ({ ...before, [machineID]: { phase: "loading" } }))
       void source.readMachine(machineID, abort.signal).then((value) => {
         if (!live || abort.signal.aborted) return
+        finishRefresh(machineID)
         if (value.kind === "ready") scheduleMachineReady(machineID)
         setReadings((before) => ({ ...before, [machineID]: { phase: "settled",
           value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined,
             value, STATUS_GAP_RETRY_MS) } }))
       }, (error: unknown) => {
         if (!live || abort.signal.aborted) return
+        finishRefresh(machineID)
         setReadings((before) => ({ ...before, [machineID]: { phase: "settled",
           value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined,
             { kind: "unavailable", reason: problemOf(error) }, STATUS_GAP_RETRY_MS) } }))
@@ -318,7 +333,11 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
       onMouseEnter={freezeOrder} onMouseLeave={thawOrder} onTouchStart={freezeOrder}
       onTouchEnd={() => window.setTimeout(() => { if (swipe.openId() === null) thawOrder() }, 1200)}>
       <div className="cloud-all-status-filters" role="group" aria-label={nextWord("cloudAllState")}>
-        <button type="button" className="cloud-all-status-filter" onClick={refreshList}>{nextWord("cloudAllRefresh")}</button>
+        <button type="button" className="cloud-all-status-filter cloud-all-refresh" onClick={refreshFromButton}
+          disabled={refreshing} aria-busy={refreshing} aria-label={refreshing ? nextWord("cloudAllRefreshing") : nextWord("cloudAllRefresh")}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12a7 7 0 1 1-2.05-4.95" /><path d="M19 4.5V9h-4.5" /></svg>
+          <span>{nextWord("cloudAllRefresh")}</span>
+        </button>
         <button type="button" className="cloud-all-status-filter" aria-pressed={statusFilter === "attention"}
           onClick={() => setStatusFilter((value) => value === "attention" ? "all" : "attention")}>{nextWord("cloudAllAttention")}</button>
         <button type="button" className="cloud-all-status-filter" aria-pressed={statusFilter === "working"}
