@@ -227,6 +227,7 @@
   "http.23ea994b69eb9608": "Git diff에는 변경된 경로가 필요합니다.",
   "http.23ff71c6df9bb9c5": "남은 항목은 결과물이 속한 루트에 제기해야 하는데, 해당 작업의 루트는 다른 session입니다.",
   "http.24441a1dbefaa423": "result.json은 있지만 이 작업의 것이 아닙니다. protocol, task_id, status 또는 task_secret이 일치하지 않습니다. 아무것도 확정하지 않았습니다.",
+  "http.24c54e54f30574bb": "본인이 Agent 알림을 껐습니다. Settings → Remote에서 다시 켜세요.",
   "http.2548e391d31850eb": "요청 본문은 Board 명령이 아닙니다.",
   "http.2586d552ac968964": "참고 이미지를 변경하기 전에 종료 단계의 작업을 다시 여세요.",
   "http.259ee8e426421b44": "해당 Session은 Git 저장소 안에 있지 않습니다.",

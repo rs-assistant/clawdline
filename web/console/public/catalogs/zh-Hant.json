@@ -227,6 +227,7 @@
   "http.23ea994b69eb9608": "Git diff 需要已變更的路徑。",
   "http.23ff71c6df9bb9c5": "後續事項應交給該交付所屬的根 Session，而該任務的根 Session 是另一個 Session。",
   "http.24441a1dbefaa423": "result.json 存在，但不屬於這項任務：其 protocol、task_id、status 或 task_secret 不符。未確定任何結果。",
+  "http.24c54e54f30574bb": "當事人已關閉 Agent 通知。請到「設定 → 遠端」開啟。",
   "http.2548e391d31850eb": "請求本文不是 Board 命令。",
   "http.2586d552ac968964": "變更參考圖片前，請重新開啟已結束的工作。",
   "http.259ee8e426421b44": "該 Session 不在 Git 儲存庫內。",

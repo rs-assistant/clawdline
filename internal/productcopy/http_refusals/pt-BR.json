@@ -167,6 +167,7 @@
   "http.23ea994b69eb9608": "Um Git diff precisa de um caminho modificado",
   "http.23ff71c6df9bb9c5": "Uma pendência é apresentada à raiz à qual a entrega pertence, e a raiz dessa tarefa é outra Session.",
   "http.24441a1dbefaa423": "result.json está presente, mas não pertence a esta tarefa: seus valores de protocol, task_id, status ou task_secret não coincidem. Nada foi resolvido.",
+  "http.24c54e54f30574bb": "As notificações do Agent foram desativadas pelo usuário. Ative-as em Configuração → Remoto.",
   "http.2548e391d31850eb": "O corpo não é um comando de Board.",
   "http.2586d552ac968964": "Reabra o trabalho em estado final antes de alterar suas imagens de referência.",
   "http.259ee8e426421b44": "Essa sessão não está dentro de um repositório de Git",
