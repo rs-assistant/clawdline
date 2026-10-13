@@ -42,5 +42,5 @@ func heavyCallbackOwner(holder *orchestrator.LeaseHolder, record orchestrator.Re
 		(record.State != orchestrator.StateQueued && record.State != orchestrator.StateSpawning && record.State != orchestrator.StateBriefed) {
 		return "", nil
 	}
-	return holder.Session, &contract.SessionHeavyWork{TaskID: record.ID, Reason: holder.Reason}
+	return holder.Session, &contract.SessionHeavyWork{TaskID: record.ID, Reason: holder.Reason, StartedAt: holder.AcquiredAt.Unix()}
 }

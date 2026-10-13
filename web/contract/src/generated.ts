@@ -6393,9 +6393,14 @@ export interface SessionCoordinatorCommand {
 
 export interface SessionHeavyWork {
   /**
-   * The heavy command's declared reason, for the icon's title and accessible name.
+   * The heavy command's declared reason, shown in the Session list and transcript.
    */
   reason: string
+
+  /**
+   * Unix seconds when the running callback acquired the heavy compile slot.
+   */
+  started_at?: number
   task_id: string
 }
 
