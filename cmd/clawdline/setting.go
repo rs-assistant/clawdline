@@ -73,6 +73,7 @@ var settingKeys = map[string]struct {
 	"planning_gate":     {parse: parseSettingBool, show: showSettingBool, takes: "on/off or true/false"},
 	"verify_gate":       {parse: parseSettingBool, show: showSettingBool, takes: "on/off or true/false"},
 	"update_auto_apply": {parse: parseSettingBool, show: showSettingBool, takes: "on/off or true/false"},
+	"push_on_deploy":    {parse: parseSettingBool, show: showSettingBool, takes: "on/off or true/false"},
 	"product_language": {
 		parse: func(s string) (any, bool) {
 			for _, language := range nextconfig.ProductLanguages {

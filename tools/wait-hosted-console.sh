@@ -76,4 +76,5 @@ echo "the served $bundle takes the Cloud branch (CloudGate x$gates)"
 if [ -f web/console/public/catalogs/en.json ]; then
   python3 tools/check-hosted-catalogs.py "$origin" $strict_catalogs || exit 1
 fi
+tools/notify-release-success.sh cloud "$stamp"
 exit 0
