@@ -158,27 +158,6 @@ export function rowPersonaLine(
   return persona ? { persona, name: personaName(persona), title: personaTitle(persona) } : null
 }
 
-const REMEMBERED = "clawdline.start.persona"
-
-/** The start sheet's last choice in this browser; "" for none. */
-export function rememberedPersona(): string {
-  try {
-    return localStorage.getItem(REMEMBERED) || ""
-  } catch {
-    // refusal-ok: a browser without storage just does not remember.
-    return ""
-  }
-}
-
-export function rememberPersona(id: string): void {
-  try {
-    if (id) localStorage.setItem(REMEMBERED, id)
-    else localStorage.removeItem(REMEMBERED)
-  } catch {
-    // refusal-ok: a browser without storage just does not remember.
-  }
-}
-
 /**
  * The teams a persona can belong to (`teams` in personas.schema.json), in the
  * order the role row's switcher lists them. The console names them
