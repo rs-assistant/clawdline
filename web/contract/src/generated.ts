@@ -6853,6 +6853,12 @@ export interface SessionRow {
   owed?: WorkOwed
 
   /**
+   * Visual parent terminal ID supplied by a current Cloud status projection. Absent
+   * in the local Session list and when the parent is not in that projection.
+   */
+  parent_session_id?: string
+
+  /**
    * The built-in persona (GET /v1/personas) this session was launched as, read back
    * from its process command line; absent for none, and absent on a row with no
    * process reading.

@@ -23,6 +23,7 @@ export interface FleetMachine {
 /** Metadata from a pinned, read_transcript-authorized list read. */
 export interface SessionListPresentation {
   title: string
+  assistant?: "claude" | "codex"
   cwd?: string
   icon?: Icon
   /** Display fields from the same per-machine batch read as the title. */

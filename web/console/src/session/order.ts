@@ -248,6 +248,13 @@ function visualParents(list: SessionRow[], tasks: readonly TaskRow[], shaping: (
     if (isCoordinator(row)) continue
     childOf.set(kid, root)
   }
+  // The Cloud single-machine page reconstructs its rows from ss/ status and
+  // pinned display reads. The status carries terminal ancestry, while the
+  // display read omits the Board relationship that produced it.
+  for (const row of list) {
+    const parent = row.parent_session_id
+    if (parent && parent !== row.id && here.has(parent) && !isCoordinator(row)) childOf.set(row.id, parent)
+  }
   // A Board assignment is independent in the broker. Its immutable actor
   // still gives it presentation ancestry under the Epic owner who opened it.
   // Resolve conversations only inside this visible list; an absent or

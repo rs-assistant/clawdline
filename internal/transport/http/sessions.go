@@ -67,6 +67,7 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 		// No transcript, menu or Git data leaves this route.
 		type status struct {
 			SessionID        string                        `json:"sessionId,omitempty"`
+			EpicParent       *contract.EpicSessionParent   `json:"epic_parent,omitempty"`
 			Persona          string                        `json:"persona,omitempty"`
 			State            contract.SessionState         `json:"state"`
 			WorkState        contract.WorkState            `json:"work_state"`
@@ -98,7 +99,7 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 		for _, row := range snapshot.Sessions {
 			rows = append(rows, presentation{ID: row.ID, Title: row.Label, CWD: row.CWD,
 				Icon: row.Icon, ExecutionGeneration: row.ExecutionGeneration,
-				Status: status{SessionID: row.SessionID, Persona: row.Persona, State: row.State, WorkState: row.WorkState, WorkNote: row.WorkNote,
+				Status: status{SessionID: row.SessionID, EpicParent: row.EpicParent, Persona: row.Persona, State: row.State, WorkState: row.WorkState, WorkNote: row.WorkNote,
 					WorkProvenance: row.WorkProvenance, WorkMovedBy: row.WorkMovedBy,
 					WorkPersonNeeded: row.WorkPersonNeeded, Line: row.Line, Shells: row.Shells,
 					HeavyWork: row.HeavyWork, Source: row.Source, Activity: row.Activity,

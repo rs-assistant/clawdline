@@ -15,6 +15,11 @@ esac
 
 actual=$(git rev-parse HEAD)
 [ "$actual" = "$commit" ] || { echo "checkout is $actual, not requested release $commit" >&2; exit 2; }
+case $(uname -m) in
+  x86_64 | amd64) arch=amd64 ;;
+  aarch64 | arm64) arch=arm64 ;;
+  *) echo "unsupported Linux architecture: $(uname -m)" >&2; exit 2 ;;
+esac
 
 parent=$(dirname "$release")
 mkdir -p "$parent"
@@ -37,7 +42,7 @@ unset VITE_HOSTED_CONSOLE || true
 # owner-only.
 ( umask 022; go test ./... )
 go vet ./...
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=true -o "$stage/clawdline" ./cmd/clawdline
+CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -buildvcs=true -o "$stage/clawdline" ./cmd/clawdline
 ( cd web && npm ci --ignore-scripts && npm run check && npm run build )
 cp -R web/console/dist "$stage/dist"
 # The tmux a release carries (docs/design-decisions.md D72), when one was
@@ -61,7 +66,7 @@ main=$(find "$stage/dist/assets" -maxdepth 1 -type f -name 'main-*.js' -print)
   echo "local console does not contain exactly one main bundle" >&2
   exit 1
 }
-if rg -q 'CloudGate' "$main"; then
+if grep -q 'CloudGate' "$main"; then
   echo "local console contains CloudGate; refusing to install a hosted build" >&2
   exit 1
 fi
