@@ -818,6 +818,18 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		method: "POST", path: "/v1/settings/default-models",
 		body2: `{"codex_default_model":"gpt-6"}`,
 	}, {
+		word:    "notification-rules",
+		body:    map[string]any{"type": "notification-rules", "session": machine, "request": "req-rules"},
+		session: machine, name: "read:req-rules",
+		method: "GET", path: "/v1/notification-rules",
+	}, {
+		word: "notification-rules-update",
+		body: map[string]any{"type": "notification-rules-update", "session": machine, "request": "req-rules-write",
+			"changes": map[string]any{"action": "delete", "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+		session: machine, name: "action:req-rules-write",
+		method: "POST", path: "/v1/notification-rules",
+		body2: `{"action":"delete","id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}`,
+	}, {
 		word:    "work-gate-settings",
 		body:    map[string]any{"type": "work-gate-settings", "session": machine, "request": "req-gates"},
 		session: machine, name: "read:req-gates",

@@ -168,6 +168,11 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/notification-rules",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/orchestrator/assistants",
       "guide": "inventory"
     },
@@ -528,12 +533,12 @@
     },
     {
       "method": "*",
-      "pattern": "/v1/update/fresh",
+      "pattern": "/v1/update/apply",
       "guide": "connect"
     },
     {
       "method": "*",
-      "pattern": "/v1/update/apply",
+      "pattern": "/v1/update/fresh",
       "guide": "connect"
     },
     {

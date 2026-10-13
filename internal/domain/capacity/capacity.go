@@ -229,6 +229,9 @@ const (
 	HumanInterventionDocument = "session.human_intervention_document_bytes"
 	HumanInterventionDraft    = "session.human_intervention_draft_bytes"
 	SettingsRequestBodyBytes  = "settings.request_body_bytes"
+	NotificationRulesRows     = "notification.rules_rows"
+	NotificationRuleLabel     = "notification.rule_label_characters"
+	NotificationRuleWait      = "notification.rule_wait_seconds"
 	SessionTitleRequestBytes  = "session.title_request_bytes"
 	SessionTitleCharacters    = "session.title_characters"
 	SessionTitleRows          = "session.title_rows"
@@ -2383,6 +2386,26 @@ func Register() []Entry {
 			EvictedBy: Daemon,
 			Sources: []string{"internal/transport/http.settingsRequestBodyLimit",
 				"internal/app/cloudops.defaultModelsCloudBodyLimit"},
+		},
+		{
+			// A person's custom waiting conditions in config.json. A new
+			// rule is refused once the list is full; existing rules remain.
+			Name: NotificationRulesRows, Class: Evidence, Unit: Rows,
+			Limit: 16, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Health, Sender}, EvictedBy: Person,
+			Sources: []string{"internal/domain/notificationrule.MaximumRules"},
+		},
+		{
+			Name: NotificationRuleLabel, Class: Buffer, Unit: Characters,
+			Limit: 80, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/notificationrule.MaximumLabelRunes"},
+		},
+		{
+			Name: NotificationRuleWait, Class: Observation, Unit: Seconds,
+			Limit: 120 * 60, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/notificationrule.MaxMinutes"},
 		},
 		{
 			// One title write. The body holds one short string; anything larger

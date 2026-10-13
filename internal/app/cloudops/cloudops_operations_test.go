@@ -757,7 +757,7 @@ func TestTheVocabularyAndTheImplementedListAgreeWithTheCatalog(t *testing.T) {
 		"schedule-run", "schedule-webhook-bind-v1", "snippets", "session-snippets", "snippet-create", "snippet-update", "snippet-delete",
 		"snippet-order", "push-key", "push-subscribe", "push-unsubscribe", "push-test", "diagnostics.events",
 		"board", "board-command", "board.items", "timeline", "projects", "project-file-list", "project-file-read", "project-file-save", "project-tree-list", "project-tree-read", "project-unify-plan", "project-unify-apply", "project-worktree-lifecycle",
-		"project-worktree-lifecycle-refresh", "project-worktree-remove", "capacity", "default-models", "default-models-update", "work-gate-settings", "work-gate-settings-update", "notification-settings", "notification-settings-update", "machine-usage", "update", "update-apply", "personas",
+		"project-worktree-lifecycle-refresh", "project-worktree-remove", "capacity", "default-models", "default-models-update", "notification-rules", "notification-rules-update", "work-gate-settings", "work-gate-settings-update", "notification-settings", "notification-settings-update", "machine-usage", "update", "update-apply", "personas",
 		"work.proposals", "work.decisions", "work.decision", "work.digests",
 		"work.v2.item", "work.v2.items", "work.v2.search", "work.v2.proposals", "work.v2.session-todos", "work.v2.image", "work.v2.create",
 		"work.v2.gate-export", "work.v2.gate-decision", "work.v2.gate-purge",
@@ -1887,5 +1887,24 @@ func TestBridgeFixedClockRefusalCarriesKeyButDynamicCopyDoesNot(t *testing.T) {
 	raw := bridgeRefusalBase(Refusal{Code: "dynamic", Message: "This machine is still confirming the time; try again shortly."})
 	if _, ok := raw["detail_key"]; ok {
 		t.Fatalf("unmarked matching prose gained a key: %#v", raw)
+	}
+}
+
+func TestNotificationRulesCrossOnlyTheirMachineRoute(t *testing.T) {
+	r := &router{}
+	read := Bridge{MachineID: "mac-01", Router: r}.Handle(context.Background(), request(t, ClassCtl,
+		map[string]any{"type": "notification-rules", "session": MachineReplySession, "request": "req-read"}))
+	if read.Status != 200 || r.last().Method != "GET" || r.last().Path != "/v1/notification-rules" {
+		t.Fatalf("read: %+v %+v", read, r.seen)
+	}
+	r = &router{}
+	write := open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "notification-rules-update", "session": MachineReplySession, "request": "req-write",
+		"changes": map[string]any{"action": "delete", "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+	}))
+	got := r.last()
+	if write.Status != 200 || got.Method != "POST" || got.Path != "/v1/notification-rules" ||
+		got.Header[actorHeader] != actorDevice || got.Header["Idempotency-Key"] != "req-write" {
+		t.Fatalf("write: %+v %+v", write, got)
 	}
 }

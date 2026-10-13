@@ -146,6 +146,9 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `memory.name_bytes` | 64 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `naming.context_bytes` | 12288 | `bytes` | `evict_oldest` | `diagnostics` | — |
 | `naming.tail_entries` | 400 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `notification.rule_label_characters` | 80 | `characters` | `refuse` | `diagnostics, sender` | — |
+| `notification.rule_wait_seconds` | 7200 | `seconds` | `evict_oldest` | `diagnostics, sender` | — |
+| `notification.rules_rows` | 16 | `rows` | `refuse` | `diagnostics, health, sender` | — |
 | `orchestrator.opening_stuck_seconds` | 1800 | `seconds` | `evict_oldest` | `diagnostics` | — |
 | `personas.catalog` | 64 | `rows` | `refuse` | `diagnostics` | — |
 | `personas.suggestion_context_bytes` | 16384 | `bytes` | `evict_oldest` | `diagnostics` | — |

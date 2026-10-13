@@ -99,3 +99,24 @@ func TestAWaitingPushSaysWhatThePushServicesAnswered(t *testing.T) {
 		t.Fatalf("an effect with no stop: %+v", got)
 	}
 }
+
+func TestCustomWaitingPushWorksWhenStandardWaitingIsOff(t *testing.T) {
+	sent := 0
+	b := &Broker{PushEnabled: func(string) bool { return false }, Push: func(_ context.Context, _, _, terminal, _ string) (int, int, error) {
+		if terminal != "session-a" {
+			t.Fatalf("opened %q", terminal)
+		}
+		sent++
+		return 1, 0, nil
+	}}
+	effect := func(custom bool) store.Effect {
+		body, _ := json.Marshal(WaitingPush{Key: "session-a|conv", Terminal: "session-a", Title: "Waiting", Custom: custom})
+		return store.Effect{Payload: body}
+	}
+	if got := runWaitingPush(context.Background(), b, effect(false)); got.outcome != "disabled_by_user" {
+		t.Fatalf("standard: %+v", got)
+	}
+	if got := runWaitingPush(context.Background(), b, effect(true)); got.outcome != "pushed" || sent != 1 {
+		t.Fatalf("custom: %+v, sent=%d", got, sent)
+	}
+}

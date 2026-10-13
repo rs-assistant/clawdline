@@ -492,6 +492,10 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 		if !(v.Allowed && (v.Local || send)) {
 			return http.StatusForbidden, "forbidden", "This device may read, and not change machine settings."
 		}
+	case p == "/v1/notification-rules":
+		if !(v.Allowed && (v.Local || send)) {
+			return http.StatusForbidden, "forbidden", "This device may read, and not change notification rules."
+		}
 	case p == "/v1/settings/default-models":
 		// This narrow route is the Settings surface carried to a paired phone.
 		// A local console may write it, and a remote device needs Send just as
