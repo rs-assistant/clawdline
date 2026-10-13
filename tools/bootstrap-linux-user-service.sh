@@ -84,7 +84,7 @@ if [ "$migrating" -eq 1 ]; then
 fi
 
 expected=$(sed -n 's/.*"stamp":"\([0-9a-f]*\)".*/\1/p' "$current/dist/BUILD.json")
-token=$(cat "$service_home/.config/clawdline-next/local-token")
+token_file=$service_home/.config/clawdline-next/local-token
 deploy_health_seconds=$(
   cd "$repo"
   runuser -u "$service_user" -- env HOME="$service_home" \
@@ -94,8 +94,15 @@ deploy_health_seconds=$(
 healthy=0
 deadline=$((SECONDS + deploy_health_seconds))
 while [ "$SECONDS" -lt "$deadline" ]; do
+  token=""
+  if [ -r "$token_file" ]; then
+    token=$(cat "$token_file")
+  fi
   page=$(curl --connect-timeout 1 --max-time 2 -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:7727/ || true)
-  build=$(curl --connect-timeout 1 --max-time 2 -fsS -H "Authorization: Bearer $token" http://127.0.0.1:7727/BUILD.json 2>/dev/null || true)
+  build=""
+  if [ -n "$token" ]; then
+    build=$(curl --connect-timeout 1 --max-time 2 -fsS -H "Authorization: Bearer $token" http://127.0.0.1:7727/BUILD.json 2>/dev/null || true)
+  fi
   stamp=$(printf '%s' "$build" | sed -n 's/.*"stamp":"\([0-9a-f]*\)".*/\1/p')
   if [ "$page" = 200 ] && [ "$stamp" = "$expected" ]; then
     healthy=1

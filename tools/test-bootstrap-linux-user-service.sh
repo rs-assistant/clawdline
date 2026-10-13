@@ -183,4 +183,15 @@ if grep -Fq 'bootstrap complete' "$w/out"; then
   fail "migrating machine, disable denied: claimed completion"
 fi
 
-echo "bootstrap: a fresh machine and a migrating one both finish, twice; real failures still stop it"
+# 7. On a fresh machine, the service can begin answering before it has written
+# its local token. Bootstrap waits for that token within the health deadline.
+world late
+rm "$home/.config/clawdline-next/local-token"
+( sleep 1; printf 'token\n' >"$home/.config/clawdline-next/local-token" ) &
+token_writer=$!
+bootstrap
+wait "$token_writer"
+[ "$status" -eq 0 ] || fail "fresh machine, delayed token: exited $status, want 0"
+grep -Fq 'bootstrap complete' "$w/out" || fail "fresh machine, delayed token: no completion line"
+
+echo "bootstrap: fresh and migrating machines finish; delayed token and failures are handled"
