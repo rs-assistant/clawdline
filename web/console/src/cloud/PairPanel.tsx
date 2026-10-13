@@ -331,7 +331,10 @@ export function PairPanel(props: {
                       </label>
                     )}
                     {following ? (
-                      agentProgress(handOff.name, send)
+                      <>
+                        {agentProgress(handOff.name, send)}
+                        <p className="fine">{nextWord("cloudPairAgentWindow")}</p>
+                      </>
                     ) : (
                       <>
                         <button

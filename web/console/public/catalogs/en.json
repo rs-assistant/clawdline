@@ -4245,6 +4245,7 @@
   "next.roleCreateSave": "Save role",
   "next.sessionWaitingOnNamedSession": "Waiting for Session: {session}",
   "next.notificationNav": "Notifications",
+  "next.cloudPairAgentWindow": "The helping machine's Sessions are behind this card. You can close this window while its AI continues; return to this browser to check the pairing result.",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

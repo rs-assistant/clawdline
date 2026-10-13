@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5113,
+  "englishKeys": 5114,
   "counts": {
     "negation": 1470,
     "state": 702,
-    "permission": 298,
+    "permission": 299,
     "deletion": 106,
     "uncertainty": 148
   },
-  "unionCount": 2242,
+  "unionCount": 2243,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -2342,6 +2342,7 @@
       "next.cloudPairAgentHandWhen",
       "next.cloudPairAgentProgressTitle",
       "next.cloudPairAgentPrompt",
+      "next.cloudPairAgentWindow",
       "next.cloudPairAsking",
       "next.cloudPairCloudHand",
       "next.cloudPairCloudHandWhen",
@@ -4248,6 +4249,7 @@
     "next.cloudPairAgentRefused",
     "next.cloudPairAgentSending",
     "next.cloudPairAgentStarting",
+    "next.cloudPairAgentWindow",
     "next.cloudPairAsking",
     "next.cloudPairCloudHand",
     "next.cloudPairCloudHandWhen",
