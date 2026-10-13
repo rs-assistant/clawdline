@@ -268,6 +268,24 @@ func TestCodexPickerIsStillRead(t *testing.T) {
 	}
 }
 
+// Codex's command approval includes the environment and the full command
+// between its question and choices. The current layout leaves two blank rows
+// before those choices, so the ordinary proximity proof cannot identify the
+// dialog. Its final key line is the proof that these numbered rows are the
+// still-open approval picker, rather than a numbered draft in the composer.
+func TestCodexCommandApprovalWithACommandBodyIsStillRead(t *testing.T) {
+	m, ok := ReadMenu(fixture(t, "menu-codex-command-approval.txt"), AssistantCodex, false)
+	if !ok {
+		t.Fatal("no menu on a Codex command approval with a command body")
+	}
+	if got := labels(m); got != "Yes, proceed (y)|No, and tell Codex what to do differently (esc)" {
+		t.Fatalf("labels %q", got)
+	}
+	if m.Selected == nil || *m.Selected != 1 || !m.Numbered {
+		t.Fatalf("menu %+v", m)
+	}
+}
+
 func TestCodexModelPickerNamesItsQuestion(t *testing.T) {
 	screen := "  Select Model and Effort\n\n\n  1. GPT-6.1-Sol (default)\n› 2. GPT-6-Sol (current)\n  3. GPT-6-Luna\n\n  enter select · esc back\n"
 	m, ok := ReadMenu(screen, AssistantCodex, false)

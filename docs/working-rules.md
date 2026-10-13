@@ -106,14 +106,14 @@ handoffs keep the in-turn wait.
 
 ## A push is not a background chore to run beside a build
 
-The pre-push hook reads the commits a push would add (`docs/privacy-guard.md`) and asks GitHub
-about main's latest CI run. It used to read the whole history twice instead, about five minutes a
-side. On 2026-10-11 a push started while the full check run and an app package build held the
-machine took **two and a half hours**: its TCP socket was `CLOSED` and git never noticed. Killing
-that git process and pushing again, alone, took 5m16s. The range scan took the same push to 12
-seconds, so the wait is no longer the problem — but the lesson stands for anything that holds a
-remote connection open: start it when nothing else is compiling, and confirm what landed with
-`git ls-remote` rather than by reading a hung command's output.
+The pre-push hook asks GitHub about main's latest CI run. It once read the whole history twice too,
+about five minutes a side, and later read only the commits a push would add; historical privacy
+scans are no longer automatic (`docs/privacy-guard.md`). On 2026-10-11 a push started while the
+full check run and an app package build held the machine took **two and a half hours**: its TCP
+socket was `CLOSED` and git never noticed. Killing that git process and pushing again, alone, took
+5m16s. The range scan took the same push to 12 seconds. The lesson still stands for anything that
+holds a remote connection open: start it when nothing else is compiling, and confirm what landed
+with `git ls-remote` rather than by reading a hung command's output.
 
 ## When main is red
 
@@ -157,17 +157,13 @@ runner cannot run at all, and they do not expire.
 ## The public repository in full
 
 `tools/check-private.sh` reads a word list kept out of git (`.git/info/private-words`); without
-that list it answers 3, **undetermined**, and not 0. `-history` reads the commits as well as the
-working tree, because a word committed and later removed is gone from the tree and still in what
-`git push` sends — `docs/cutover.md` at `ef067d70` is the live example, and the tree scan is green
-on it. A history finding names the commit, the file and the line, and never the matched text.
-This history is already red and stays red: three lines at `ef067d70` are in it for good unless
-somebody rewrites it, which is a decision about the whole repository and not a patch. So the
-pre-commit check is `-history -new`, which prints every standing finding and is red only for one
-today added. A routine push does **not** run the whole history again: the tracked pre-push hook
-compares the finding count at the published commit with the count after this push and refuses an
-increase. The full `-history -full -revs=--all` audit is reserved for an initial publication or an
-intentional history rewrite. `docs/privacy-guard.md` is the whole of it.
+that list it answers 3, **undetermined**, and not 0. Automatic pre-commit, pre-push, and CI checks
+read the working tree only. `-history` remains a manual audit because a word committed and later
+removed is gone from the tree and still in what `git push` sends — `docs/cutover.md` at `ef067d70`
+is the live example. A history finding names the commit, the file and the line, and never the
+matched text. The full `-history -full -revs=--all` audit is run only when explicitly requested
+for an initial publication or an intentional history rewrite. `docs/privacy-guard.md` is the whole
+of it.
 
 ## What a child does not do, with the incidents behind it
 

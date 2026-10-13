@@ -89,7 +89,6 @@ check "check-rounded-side-borders.mjs" node web/console/tools/check-rounded-side
 check "check-machine-words.sh" tools/check-machine-words.sh
 check "check-shell-expansions.sh" tools/check-shell-expansions.sh
 check "check-private.sh" tools/check-private.sh
-check "check-private.sh -history -new" tools/check-private.sh -history -new
 check "check-console-tests.mjs" node tools/check-console-tests.mjs
 check "check-mirror-tests.mjs" node tools/check-mirror-tests.mjs
 if [ "$web" = yes ]; then

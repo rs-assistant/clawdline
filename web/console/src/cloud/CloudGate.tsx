@@ -1130,7 +1130,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const leaveFleet = () => { setFleetScope(false); setFleetTarget(null) }
 
   const openFleetSession = (target: SessionDestination) => {
-    setFleetActionIntent(null)
+    setFleetCloseIntent(null)
     setFleetTarget(target)
     history.replaceState(history.state, "", destinationFragment(target))
   }
@@ -1595,8 +1595,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             carrierOf={carrierOf}
             onPresentations={noteFleetPresentations}
             onProjection={noteFleetProjection}
-            onCloseRequest={(target, title) => { openFleetSession(target); setFleetActionIntent({ target, title, kind: "end" }) }}
-            onArchiveRequest={(target, title) => { openFleetSession(target); setFleetActionIntent({ target, title, kind: "archive" }) }}
+            onCloseRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title }) }}
+            onArchiveRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title, kind: "archive" }) }}
             onMachineAction={runMachineTool}
           /> : undefined} />
           <CloudSessionSheets machineID={reading ?? chosen.id}

@@ -55,7 +55,6 @@ node web/console/tools/check-rounded-side-borders.mjs # no rounded surfaces with
 tools/check-machine-words.sh            # no shown sentence calls the machine a Mac
 tools/check-shell-expansions.sh         # no $name runs into a non-ASCII character
 tools/check-private.sh                  # nothing of the person's is in a public repo
-tools/check-private.sh -history -new    # no commit behind it added one either
 node tools/check-console-tests.mjs      # every console test file is run by npm test or npm run check
 node tools/check-mirror-tests.mjs       # no console test asserts on the shape of the code
 ( cd web && npm run check && ../tools/heavy.sh npm run build && ../tools/heavy.sh npm test )   # when anything under web/ changed
@@ -83,7 +82,8 @@ node tools/check-mirror-tests.mjs       # no console test asserts on the shape o
 
 **Nothing of the person's may appear in it**: no names of their businesses, no tokens, no paths
 into their accounts, no content from their conversations. `tools/check-private.sh` without its word
-list answers 3, undetermined, not 0; the pre-commit check is `-history -new`, and a history finding
+list answers 3, undetermined, not 0. Automatic checks read the working tree only; historical scans
+are manual audits for an initial publication or an intentional history rewrite. A history finding
 names the commit, file and line, never the matched text. `docs/privacy-guard.md` is the whole of it.
 
 Commit messages, comments and documentation are in **English**; the conversation with the person

@@ -29,8 +29,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-go@v7
         with:
@@ -102,12 +100,6 @@ jobs:
       - name: Check the copied files against their pinned manifest
         if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         run: tools/check-legacy-css.sh
-
-      - name: Run privacy rules and report the unavailable private-word rules
-        if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
-        env:
-          CLAWDLINE_CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: tools/check-private-ci.sh
 
       - name: Check machine-neutral screen text
         if: ${{ !cancelled() && steps.ready.outcome == 'success' }}

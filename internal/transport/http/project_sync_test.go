@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/sainteye/clawdline/internal/app/cloudops"
+	"github.com/sainteye/clawdline/internal/domain/icon"
 	domain "github.com/sainteye/clawdline/internal/domain/projectsync"
 )
 
@@ -84,7 +85,9 @@ func TestCloudCarriesProjectSettingsFromASourceToAMirror(t *testing.T) {
 	}
 
 	// The mirror's icon is the source's.
-	current := dst.server.icons.For(there)
+	if _, source := dst.server.icons.Resolve(there); source != icon.SourceMirrored {
+		t.Fatalf("the project icon source is %q before detach, want mirror", source)
+	}
 	a, _ = dst.ask(t, 5, map[string]any{"type": "project-mirror", "session": machine, "request": "state"})
 	var state struct {
 		Projects []domain.Record `json:"projects"`
@@ -96,8 +99,8 @@ func TestCloudCarriesProjectSettingsFromASourceToAMirror(t *testing.T) {
 	if !a.OK() {
 		t.Fatalf("detach: %d %s", a.Status, a.Payload)
 	}
-	if own := dst.server.icons.For(there); own.Accent == current.Accent {
-		t.Fatal("a detached project still draws the mirrored mark")
+	if _, source := dst.server.icons.Resolve(there); source == icon.SourceMirrored {
+		t.Fatal("a detached project still uses the mirrored mark")
 	}
 }
 
