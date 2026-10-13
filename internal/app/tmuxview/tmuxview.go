@@ -21,6 +21,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log"
+	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/app/ports"
@@ -28,6 +29,11 @@ import (
 
 // Backend is the session backend a viewed session is recorded under.
 const Backend = "tmux"
+
+// A browser can use the tmux pane as soon as it exists. A stalled iTerm2
+// viewer must not hold the start reply for the adapter's 20-second Apple Event
+// limit. The pane remains available and Attach names it when this expires.
+const viewerOpenLimit = 2 * time.Second
 
 // Opened is a session started in tmux.
 type Opened struct {
@@ -59,7 +65,9 @@ func Open(ctx context.Context, l ports.Launcher, cwd, name, command string) (Ope
 	out := Opened{PaneID: pane}
 	line, err := l.PrepareTmuxViewer(ctx, name)
 	if err == nil {
-		out.TabID, err = l.NewITermTab(ctx, line)
+		viewerCtx, cancel := context.WithTimeout(ctx, viewerOpenLimit)
+		out.TabID, err = l.NewITermTab(viewerCtx, line)
+		cancel()
 	}
 	if err != nil {
 		out.TabID = ""

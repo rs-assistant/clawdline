@@ -340,6 +340,8 @@ const (
 	// The osascript run kinds counted apart for the hourly line and
 	// /v1/diagnostics (the iTerm2 scan experiment, docs/interface.md).
 	ITermOsascriptKinds = "iterm.osascript_kinds"
+	// A tmux Session is already running while iTerm2 opens its optional viewer.
+	ITermViewerOpenSeconds = "iterm.viewer_open_seconds"
 	// How old one source's own answer may be and still vouch for its rows
 	// while a slower source holds the refresh.
 	CacheSourceAnswer = "cache.source_answer"
@@ -1923,6 +1925,16 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics, Log},
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/adapters/terminal.osascriptKindsLimit"},
+		},
+		{
+			// Opening the optional iTerm2 viewer after a tmux pane exists
+			// cannot consume the full Apple Event deadline of a Session start.
+			// Past this limit the pane is returned with its attach command.
+			Name: ITermViewerOpenSeconds, Class: Buffer, Unit: Seconds,
+			Limit: 2, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Log},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/app/tmuxview.viewerOpenLimit"},
 		},
 		{
 			// The end of what osascript wrote on stderr that one failure line

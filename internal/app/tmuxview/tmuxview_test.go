@@ -5,6 +5,7 @@ import (
 	"errors"
 	"regexp"
 	"testing"
+	"time"
 )
 
 // launcher is a terminal that records what it was asked and fails what it is
@@ -82,6 +83,31 @@ func TestOpenWithoutATabStillAnswersThePane(t *testing.T) {
 				t.Errorf("tmux was asked for %d sessions, want 1", len(l.sessions)/3)
 			}
 		})
+	}
+}
+
+type stalledViewer struct{ launcher }
+
+func (l *stalledViewer) NewITermTab(ctx context.Context, _ string) (string, error) {
+	<-ctx.Done()
+	return "", ctx.Err()
+}
+
+func TestAStalledViewerCannotHoldAnAlreadyStartedSessionForTwentySeconds(t *testing.T) {
+	l := &stalledViewer{}
+	start := time.Now()
+	got, err := Open(context.Background(), l, "/work", "clawdline-session-0f0f0f0f", "claude")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(start); elapsed > viewerOpenLimit+time.Second {
+		t.Fatalf("the started pane waited %s for an optional viewer", elapsed)
+	}
+	if got.PaneID != "%42" || got.Attach != "tmux attach -t '=clawdline-session-0f0f0f0f'" {
+		t.Fatalf("the stalled viewer hid the running pane: %+v", got)
+	}
+	if len(l.sessions) != 3 {
+		t.Fatalf("opened %d sessions, want one", len(l.sessions)/3)
 	}
 }
 

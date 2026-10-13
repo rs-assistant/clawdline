@@ -543,6 +543,9 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 			total, _ := terminal.OsascriptReading()
 			return capacity.Reading{Known: true, Used: int64(len(total.Kinds))}
 		},
+		capacity.ITermViewerOpenSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-viewer deadline; no retained wait"}
+		},
 		capacity.ITermStallSaidBytes: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-failure tail of osascript's stderr; held with the failure"}
 		},
