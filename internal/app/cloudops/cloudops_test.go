@@ -776,6 +776,12 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		method: "POST", path: "/v1/projects/%2Fworkspace%2Fexample/worktrees/refresh",
 		body2: `{}`,
 	}, {
+		word: "project-worktree-remove",
+		body: map[string]any{"type": "project-worktree-remove", "session": machine,
+			"request": "req-worktree-remove", "project": "project-abc", "worktree": "wt-0123456789abcdef01234567"},
+		session: machine, name: "action:req-worktree-remove",
+		method: "DELETE", path: "/v1/projects/project-abc/worktrees/wt-0123456789abcdef01234567",
+	}, {
 		// `upcoming` travels on every read because both of its values mean
 		// something; the empty filters do not travel at all, because this
 		// route reads an absent parameter and an empty one differently.

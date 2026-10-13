@@ -130,6 +130,7 @@ export const CARRIED = {
   "project-mirror-apply": "POST /v1/project-sync/mirror",
   "project-mirror-detach": "DELETE /v1/project-sync/mirror?repo=",
   "project-worktree-lifecycle-refresh": "POST /v1/projects/{project}/worktrees/refresh",
+  "project-worktree-remove": "DELETE /v1/projects/{project}/worktrees/{worktree}",
   projects: "GET /v1/projects",
   "pair-agent-start": "POST /v1/cloud/pairing/agent",
   "pair-agent-status": "GET /v1/cloud/pairing/agent/{task}",

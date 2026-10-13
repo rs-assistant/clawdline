@@ -7,7 +7,7 @@ import { localizePinnedProjectStatus, projectOpenLabel } from "./projects/projec
 import { decoratePinnedWorktree } from "./projects/pinned-worktree-copy.js"
 import { useLayoutEffect, useRef, useState } from "react"
 import type { PageModule } from "./types.js"
-import { bindProjects, latestProjectReadRefusal, latestWorktreeReadRefusal, worktreeSourceRow, type ProjectsPage } from "../legacy/projects-bridge.js"
+import { bindProjects, latestProjectReadRefusal, latestWorktreeReadRefusal, removeLandedWorktree, worktreeSourceRow, type ProjectsPage } from "../legacy/projects-bridge.js"
 import { machineWording } from "../legacy/machine-copy.js"
 import { ActionConfirm, Info, requestPage, shown as overlayShown } from "../overlays/index.js"
 import sectionMarkup from "./projects/section.html?raw"
@@ -28,6 +28,7 @@ const PROJECTS_ADDRESS = {
 
 type ProjectTarget = {
   id: string
+  projectId?: string
   label?: string
   path?: string
   activeItemCount?: number
@@ -70,6 +71,10 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   const [removeBusy, setRemoveBusy] = useState(false)
   const [removeError, setRemoveError] = useState("")
   const removeDialog = useRef<HTMLDialogElement>(null)
+  const [worktreeTarget, setWorktreeTarget] = useState<{ id: string; path: string; project: ProjectTarget } | null>(null)
+  const [worktreeBusy, setWorktreeBusy] = useState(false)
+  const [worktreeError, setWorktreeError] = useState("")
+  const worktreeDialog = useRef<HTMLDialogElement>(null)
 
   useLayoutEffect(() => {
     const button = document.getElementById("projects-add")
@@ -100,6 +105,29 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       setRemoveError(failureSentence(error, nextWord("projectsRemoveFailed")))
     } finally {
       setRemoveBusy(false)
+    }
+  }
+
+  useLayoutEffect(() => {
+    const dialog = worktreeDialog.current
+    if (!dialog) return
+    if (worktreeTarget && !dialog.open) dialog.showModal()
+    if (!worktreeTarget && dialog.open) dialog.close()
+  }, [worktreeTarget])
+
+  async function confirmWorktreeRemove() {
+    if (!worktreeTarget || worktreeBusy) return
+    setWorktreeBusy(true)
+    setWorktreeError("")
+    try {
+      await removeLandedWorktree(worktreeTarget.project.projectId || worktreeTarget.project.id, worktreeTarget.id)
+      const project = worktreeTarget.project
+      setWorktreeTarget(null)
+      await page.current?.openLifecycle(project)
+    } catch (error) {
+      setWorktreeError(failureSentence(error, nextWord("worktreeRemoveFailed")))
+    } finally {
+      setWorktreeBusy(false)
     }
   }
 
@@ -167,11 +195,40 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
     const decorate = () => {
       decoratePinnedWorktree(lifecycle, worktreeSourceRow)
       showProjectRefusalDetail(lifecycle.querySelector<HTMLElement>("#project-worktree-status"), latestWorktreeReadRefusal())
+      for (const card of lifecycle.querySelectorAll<HTMLElement>(".worktree-card[data-worktree-id]")) {
+        const existing = card.querySelector(".worktree-remove")
+        const id = card.dataset.worktreeId || ""
+        const row = worktreeSourceRow(id)
+        const clean = row?.status?.complete === true && row.status.staged === 0
+          && row.status.modified === 0 && row.status.untracked === 0
+        if (!row?.cleanup?.eligible || !clean || !row.classifications?.includes("landed_identical_residue")) {
+          existing?.remove()
+          continue
+        }
+        if (existing) continue
+        card.querySelector(".worktree-cleanup-assessment")?.remove()
+        const button = document.createElement("button")
+        button.type = "button"
+        button.className = "worktree-remove"
+        button.dataset.worktreeId = id
+        button.textContent = nextWord("worktreeRemoveButton")
+        card.appendChild(button)
+      }
+    }
+    const onRemove = (event: Event) => {
+      const button = (event.target as Element | null)?.closest<HTMLButtonElement>("button.worktree-remove[data-worktree-id]")
+      if (!button || !lifecycle.contains(button)) return
+      const project = page.current?.state.place
+      const row = worktreeSourceRow(button.dataset.worktreeId || "")
+      if (!project || !row?.worktreeId || !row.path) return
+      setWorktreeError("")
+      setWorktreeTarget({ id: row.worktreeId, path: row.path, project })
     }
     const observer = new MutationObserver(decorate)
     observer.observe(lifecycle, { childList: true, subtree: true })
+    lifecycle.addEventListener("click", onRemove)
     decorate()
-    return () => observer.disconnect()
+    return () => { observer.disconnect(); lifecycle.removeEventListener("click", onRemove) }
   }, [])
 
   useLayoutEffect(() => {
@@ -372,6 +429,17 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       <div className="project-remove-actions">
         <button type="button" disabled={removeBusy} onClick={() => setRemoveTarget(null)}>{nextWord("projectsRemoveCancel")}</button>
         <button type="button" disabled={removeBusy} onClick={() => void confirmRemove()}>{removeBusy ? nextWord("projectsRemoveBusy") : nextWord("projectsRemoveConfirm")}</button>
+      </div>
+    </dialog>
+    <dialog className="project-remove-dialog" ref={worktreeDialog}
+      onCancel={(event) => { if (worktreeBusy) event.preventDefault() }}
+      onClose={() => { if (!worktreeBusy) setWorktreeTarget(null) }}>
+      <h2>{nextWord("worktreeRemoveTitle")}</h2>
+      <p>{nextWord("worktreeRemoveDescription", { path: worktreeTarget?.path || "" })}</p>
+      {worktreeError && <p className="project-remove-error" role="alert">{worktreeError}</p>}
+      <div className="project-remove-actions">
+        <button type="button" disabled={worktreeBusy} onClick={() => setWorktreeTarget(null)}>{nextWord("projectsRemoveCancel")}</button>
+        <button type="button" disabled={worktreeBusy} onClick={() => void confirmWorktreeRemove()}>{worktreeBusy ? nextWord("worktreeRemoveBusy") : nextWord("worktreeRemoveConfirm")}</button>
       </div>
     </dialog>
     </>
