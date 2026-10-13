@@ -51,7 +51,8 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   const presentationFailures = useRef(new Map<string, string>())
   const [presentationRevision, refreshPresentation] = useState(0)
   const [manualRefresh, setManualRefresh] = useState(0)
-  const [refreshing, setRefreshing] = useState(false)
+  const [refreshFeedback, setRefreshFeedback] = useState<"idle" | "loading" | "done" | "failed">("idle")
+  const refreshStartedAt = useRef(0)
   const previousTarget = useRef(target)
   const refreshList = () => {
     presentationPasses.current.clear()
@@ -60,10 +61,17 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     refreshPresentation((value) => value + 1)
   }
   const refreshFromButton = () => {
-    if (refreshing) return
-    setRefreshing(true)
+    if (refreshFeedback === "loading") return
+    if (!source) { setRefreshFeedback("failed"); return }
+    refreshStartedAt.current = Date.now()
+    setRefreshFeedback("loading")
     refreshList()
   }
+  useEffect(() => {
+    if (refreshFeedback !== "done" && refreshFeedback !== "failed") return
+    const timer = window.setTimeout(() => setRefreshFeedback("idle"), 1800)
+    return () => window.clearTimeout(timer)
+  }, [refreshFeedback])
   useEffect(() => {
     if (previousTarget.current && !target) refreshList()
     previousTarget.current = target
@@ -93,19 +101,24 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
 
   useEffect(() => {
     if (!source) {
-      setRefreshing(false)
+      if (refreshFeedback === "loading") setRefreshFeedback("failed")
       setReadings(Object.fromEntries(machines.map((machine) => [machine.id, {
         phase: "settled", value: { kind: "unavailable", reason: "old_version" },
       }])))
       return
     }
     let live = true
+    let resultTimer: number | undefined
     const aborts = new Map<string, AbortController>()
-    const pendingRefresh = new Set(manualRefresh ? machines.map((machine) => machine.id) : [])
-    if (manualRefresh && pendingRefresh.size === 0) setRefreshing(false)
+    const pendingRefresh = new Set(refreshFeedback === "loading" ? machines.map((machine) => machine.id) : [])
+    const showResult = () => {
+      resultTimer = window.setTimeout(() => setRefreshFeedback("done"),
+        Math.max(0, 750 - (Date.now() - refreshStartedAt.current)))
+    }
+    if (refreshFeedback === "loading" && pendingRefresh.size === 0) showResult()
     const finishRefresh = (machineID: string) => {
       if (!pendingRefresh.delete(machineID)) return
-      if (pendingRefresh.size === 0) setRefreshing(false)
+      if (pendingRefresh.size === 0) showResult()
     }
     const read = (machineID: string) => {
       aborts.get(machineID)?.abort()
@@ -143,7 +156,12 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
       read(machineID)
     })
     for (const machine of machines) read(machine.id)
-    return () => { live = false; stop(); for (const abort of aborts.values()) abort.abort() }
+    return () => {
+      live = false
+      if (resultTimer !== undefined) window.clearTimeout(resultTimer)
+      stop()
+      for (const abort of aborts.values()) abort.abort()
+    }
   }, [source, manualRefresh, machines.map((machine) => machine.id + ":" + machine.freshness).join("\0")])
 
   useEffect(() => {
@@ -334,9 +352,11 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
       onTouchEnd={() => window.setTimeout(() => { if (swipe.openId() === null) thawOrder() }, 1200)}>
       <div className="cloud-all-status-filters" role="group" aria-label={nextWord("cloudAllState")}>
         <button type="button" className="cloud-all-status-filter cloud-all-refresh" onClick={refreshFromButton}
-          disabled={refreshing} aria-busy={refreshing} aria-label={refreshing ? nextWord("cloudAllRefreshing") : nextWord("cloudAllRefresh")}>
+          data-state={refreshFeedback} disabled={refreshFeedback === "loading"} aria-busy={refreshFeedback === "loading"}>
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12a7 7 0 1 1-2.05-4.95" /><path d="M19 4.5V9h-4.5" /></svg>
-          <span>{nextWord("cloudAllRefresh")}</span>
+          <span aria-live="polite">{nextWord(refreshFeedback === "loading" ? "cloudAllRefreshing" :
+            refreshFeedback === "done" ? "cloudAllRefreshDone" :
+            refreshFeedback === "failed" ? "cloudAllRefreshFailed" : "cloudAllRefresh")}</span>
         </button>
         <button type="button" className="cloud-all-status-filter" aria-pressed={statusFilter === "attention"}
           onClick={() => setStatusFilter((value) => value === "attention" ? "all" : "attention")}>{nextWord("cloudAllAttention")}</button>
