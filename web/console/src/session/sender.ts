@@ -34,6 +34,8 @@ export type Posted = { ok: true } | { ok: false; status: number | null; code: st
 export interface SenderDeps {
   cards: PendingSends
   now(): number
+  /** Wake the hosted browser's Cloud line before checking whether retrying is safe. */
+  wakeConnection?(): void
   /** Post one attempt of the card, under `card.request`. A throw is an attempt nothing answered. */
   post(card: PendingSend): Promise<Posted>
   /** Press Enter on the card's words where they sit typed and never submitted (`postEnter`). A throw is a press nothing answered. */
@@ -211,6 +213,7 @@ export class Sender {
     const failure = previous?.failure || READ_BACK_FAILED
     const card = cards.retrying(token)
     if (!card) return
+    this.deps.wakeConnection?.()
     const turns = await this.readBack(card.session)
     if (!turns && !failed) {
       cards.uncertain(token, failure)

@@ -1533,6 +1533,7 @@ export class RelayReader {
       return { ...displayStatus, id: row.destination.sessionID, session: row.destination.sessionID,
         machine: this.machine, execution_generation: row.destination.executionGeneration,
         parent_session_id: row.parentSessionID,
+        machine_scope: row.machineScope === true, coordinator_bound: row.coordinatorBound === true,
         label: presentation?.title ?? row.destination.sessionID, cwd: presentation?.cwd,
         icon: presentation?.icon, assistant: row.assistant ?? presentation?.assistant, backend: row.backend, state: row.state,
         source: { freshness: row.freshness === "current" ? "current" : "unverified",

@@ -21,7 +21,8 @@ import { verifyWord } from "./pages/verify/words.js"
 import { nextWord } from "./next-strings.js"
 import { bootLocalCatalog } from "./catalog.js"
 import { namesSession, sessionFragment, sessionsInFragment } from "./session/address.js"
-import { destinationFragment, destinationFromFragment, destinationKey, type FleetDetailProblem, type SessionDestination } from "./cloud/all-machine-sessions.js"
+import { destinationFragment, destinationFromFragment, destinationKey, identifyOpenedFleetRow,
+  type FleetDetailProblem, type ProjectedSession, type SessionDestination } from "./cloud/all-machine-sessions.js"
 import { notificationAddress } from "./push/navigation.js"
 import { hasDocumentIntent } from "./legacy/documents-bridge.js"
 import { NewBuild } from "./NewBuild.js"
@@ -200,7 +201,7 @@ function rowNode(id: string): HTMLElement | null {
  * pills beside each other left the counts no room to be read.
  */
 export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
-  fleetReaderMachine = null,
+  fleetTargetIdentity = null, fleetReaderMachine = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
   hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions }: {
@@ -210,6 +211,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   fleetList?: (filter: string, onFilter: (value: string) => void) => ReactNode
   fleetTarget?: SessionDestination | null
   fleetTargetRow?: SessionRow | null
+  fleetTargetIdentity?: Pick<ProjectedSession, "machineScope" | "coordinatorBound"> | null
   fleetReaderMachine?: string | null
   fleetDetailProblem?: FleetDetailProblem | null
   /** Whether the opened fleet Session's own row is still missing from this machine's rows. */
@@ -407,13 +409,14 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   // opened pane can use that same row while the stream catches up.
   const availableRows = started && !receivedRows.some((row) => row.id === started.id)
     ? [started, ...receivedRows] : receivedRows
-  const rows = useMemo(() => fleetTarget && fleetReaderMachine === fleetTarget.machineID && fleetTargetRow &&
+  const rows = useMemo(() => identifyOpenedFleetRow(fleetTarget && fleetReaderMachine === fleetTarget.machineID && fleetTargetRow &&
     fleetTargetRow.id === fleetTarget.sessionID &&
     fleetTargetRow.execution_generation === fleetTarget.executionGeneration &&
     !availableRows.some((row) => row.id === fleetTarget.sessionID &&
       row.execution_generation === fleetTarget.executionGeneration)
-    ? [...availableRows, fleetTargetRow] : availableRows,
-  [availableRows, fleetTarget && destinationKey(fleetTarget), fleetReaderMachine, fleetTargetRow])
+    ? [...availableRows, fleetTargetRow] : availableRows, fleetTarget, fleetReaderMachine, fleetTargetIdentity),
+  [availableRows, fleetTarget && destinationKey(fleetTarget), fleetReaderMachine, fleetTargetRow,
+    fleetTargetIdentity?.machineScope, fleetTargetIdentity?.coordinatorBound])
   // The opened fleet Session, waiting for its own row. The pane has nothing to
   // draw until the row is here, and the cloud layer decides how long that may
   // go on without being said (`cloud/opened-row.ts`).
@@ -1044,6 +1047,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         streamTasks={fleet.tasksLive ? fleet.tasks : null}
         fleetList={fleetList?.(filter, setFilter)}
         fleetDetailKey={fleetList && fleetTarget ? destinationKey(fleetTarget) : undefined}
+        fleetCoordinatorBound={!!fleetList && !!fleetTarget && fleetTargetIdentity?.machineScope === true &&
+          fleetTargetIdentity.coordinatorBound === true}
         fleetDetailPending={fleetDetailPending}
         fleetDetailProblem={fleetList && fleetTarget ? fleetDetailProblem : null}
       />}

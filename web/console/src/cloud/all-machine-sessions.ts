@@ -91,6 +91,14 @@ export interface ProjectedSession {
   failedAgentCount?: number
 }
 
+/** A signed fleet identity applies only to the opened execution on its reader machine. */
+export function identifyOpenedFleetRow(rows: SessionRow[], target: SessionDestination | null,
+  readerMachine: string | null, identity: Pick<ProjectedSession, "machineScope" | "coordinatorBound"> | null): SessionRow[] {
+  if (!target || readerMachine !== target.machineID || identity?.machineScope !== true) return rows
+  return rows.map((row) => row.id === target.sessionID && row.execution_generation === target.executionGeneration
+    ? { ...row, machine_scope: true, coordinator_bound: identity.coordinatorBound === true } : row)
+}
+
 /**
  * Why a Session's conversation is not on screen, and the one press that
  * answers it. A reason with nothing a person can do about it carries no

@@ -1,4 +1,6 @@
 import type { Icon, SessionRow } from "@clawdline/contract"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { conversationNotStarted } from "./session/readiness.ts"
 
 // The wordmark and every machine workspace Session share the same mark.
 export const BRAND_MARK: Icon = {
@@ -12,8 +14,23 @@ export function sessionName(row: SessionRow): string {
   return row.machine_scope || row.coordinator ? "Clawdfather" : row.label || row.tty || row.id
 }
 
+/** A just-opened pane has an identity before its display name reaches the list. */
+export function detailSessionName(row: SessionRow): string {
+  if (row.machine_scope || row.coordinator) return sessionName(row)
+  if (conversationNotStarted(row) && (!row.label || row.label === row.id) && (!row.tty || row.tty === row.id)) {
+    const assistant = row.assistant === "codex" ? "Codex" : row.assistant === "claude" ? "Claude" : "Assistant"
+    return `${assistant} Session`
+  }
+  return sessionName(row)
+}
+
 export function sessionMark(row: SessionRow): Icon | undefined {
   return row.machine_scope || row.coordinator ? BRAND_MARK : row.icon
+}
+
+/** The signed Cloud status identifies a bound role without carrying its commands. */
+export function sessionCoordinatorBound(row: SessionRow | null | undefined): boolean {
+  return !!row?.coordinator || (row as (SessionRow & { coordinator_bound?: boolean }) | null | undefined)?.coordinator_bound === true
 }
 
 export function projectedSessionIdentity(title: string, icon: Icon | undefined, machineScope: boolean,
