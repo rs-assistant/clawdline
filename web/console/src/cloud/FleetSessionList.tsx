@@ -391,7 +391,14 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
         console onto the machine, which is what their sheets read. */}
     <dialog ref={machineDialog} className="cloud-all-machine-dialog"
       aria-label={nextWord(machineAction === "start" ? "cloudStartWhere" : "cloudSwitch")}
-      onCancel={(event) => { event.preventDefault(); setMachineAction(null) }}>
+      onCancel={(event) => { event.preventDefault(); setMachineAction(null) }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return
+        const { left, right, top, bottom } = event.currentTarget.getBoundingClientRect()
+        if (event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom) {
+          setMachineAction(null)
+        }
+      }}>
       <h2>{nextWord(machineAction === "start" ? "cloudStartWhere" : "cloudSwitch")}</h2>
       {machines.map((machine) => <button className="cloud-all-machine-option" key={machine.id} type="button" onClick={() => {
         const action = machineAction
