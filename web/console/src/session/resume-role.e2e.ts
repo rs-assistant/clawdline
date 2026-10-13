@@ -74,7 +74,7 @@ function document(): string {
   const words = JSON.parse(readFileSync(join(dist, "strings", "zh-Hant.json"), "utf8"))
   words.lang = "zh-Hant"
   words.dir = "ltr"
-  const slot = "<script>window.__strings=" + JSON.stringify(words).replaceAll("</", "<\\/") + "</script>"
+  const slot = "<script>localStorage.setItem('ui_language','zh-Hant');window.__strings=" + JSON.stringify(words).replaceAll("</", "<\\/") + "</script>"
   return html.replace("<!-- clawdline:strings -->", slot).replace("<!-- clawdline:cloud -->", "")
 }
 
@@ -84,6 +84,9 @@ function daemon(): Server {
     const path = url.pathname
     if (path === "/v1/sessions") return json(res, 200, snapshot())
     if (path === "/v1/health") return json(res, 200, { ok: true })
+    if (path === "/v1/strings" && url.searchParams.get("lang") === "zh-Hant") {
+      return json(res, 200, JSON.parse(readFileSync(join(dist, "catalogs", "zh-Hant.json"), "utf8")))
+    }
     if (path === "/v1/orchestrator/tasks") return json(res, 200, { at: Date.now(), tasks: [] })
     if (path === "/v1/personas") return json(res, 200, personas)
     if (path === "/v1/sessions/restorable") return json(res, 200, offer)
@@ -332,7 +335,6 @@ after(async () => {
 /** Open the start sheet, tick "resume", and enter the api place. */
 async function toPastList(tab: Tab): Promise<Seen> {
   await tab.go("/")
-  await tab.run(`localStorage.setItem("clawdline.start.persona", "frontend")`)
   await tab.click("#start-go")
   await tab.until("the places are listed", (s) => s.places > 0)
   await tab.click("#start-resume .chip.check")
@@ -342,13 +344,30 @@ async function toPastList(tab: Tab): Promise<Seen> {
   return tab.until("the past conversations and the role row are drawn", (s) => s.pasts.length === 2 && s.roleShown)
 }
 
+test("each new start begins with no role, including after an earlier choice", async () => {
+  const tab = await Tab.open(browser, 390, 844, true)
+  try {
+    await tab.go("/")
+    await tab.run(`localStorage.setItem("clawdline.start.persona", "frontend")`)
+    await tab.click("#start-go")
+    assert.deepEqual((await tab.until("the new start shows no role", (s) => s.roleShown)).chosen, ["不指定"])
+    await tab.pressChip("#start-persona", "架構師")
+    await tab.until("the chosen role is shown", (s) => s.chosen[0] === "架構師")
+    await tab.click("#start-close")
+    await tab.click("#start-go")
+    assert.deepEqual((await tab.until("the next start shows no role", (s) => s.roleShown)).chosen, ["不指定"])
+  } finally {
+    await tab.close()
+  }
+})
+
 for (const [label, width, height, mobile] of [["phone", 390, 844, true], ["desktop", 1280, 800, false]] as const) {
   test(`${label}: the resume step offers the roles with none chosen, and a pick reaches the route`, async () => {
     const tab = await Tab.open(browser, width, height, mobile)
     try {
       resumes = []
       const seen = await toPastList(tab)
-      assert.deepEqual(seen.chosen, ["不指定"], "the start's remembered role is not carried into a resume")
+      assert.deepEqual(seen.chosen, ["不指定"], "a resume starts without a role")
       assert.deepEqual(seen.roles, ["不指定", "架構師", "前端工程師", "程式碼審查", "技術寫作"])
       assert.ok(seen.wide <= width, "nothing runs off the side: " + seen.wide)
       await tab.shot(`resume-roles-${label}`)
