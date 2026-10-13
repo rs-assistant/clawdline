@@ -197,7 +197,7 @@ function rowNode(id: string): HTMLElement | null {
  */
 export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
   fleetReaderMachine = null,
-  fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetCloseIntent = null, onFleetCloseIntentHandled,
+  fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions }: {
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
   cloudSessions?: ReactNode
@@ -210,8 +210,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   /** Whether the opened fleet Session's own row is still missing from this machine's rows. */
   onFleetDetailPending?: (pending: boolean) => void
   onFleetClose?: () => void
-  fleetCloseIntent?: { target: SessionDestination; title: string } | null
-  onFleetCloseIntentHandled?: () => void
+  fleetActionIntent?: { target: SessionDestination; title: string; kind: "end" | "archive" } | null
+  onFleetActionIntentHandled?: () => void
   hideSessionCounts?: boolean
   focusCloudSessions?: boolean
   onLeaveCloudSessions?: () => void
@@ -514,15 +514,16 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   // A fleet swipe names an exact execution. Wait until its machine's rich
   // session row has arrived before opening the ordinary close confirmation.
   useEffect(() => {
-    if (!fleetList || !fleetCloseIntent || !fleetTarget ||
-      destinationKey(fleetCloseIntent.target) !== destinationKey(fleetTarget) ||
-      fleetReaderMachine !== fleetCloseIntent.target.machineID) return
-    const row = rows.find((candidate) => candidate.id === fleetCloseIntent.target.sessionID &&
-      candidate.execution_generation === fleetCloseIntent.target.executionGeneration)
+    if (!fleetList || !fleetActionIntent || !fleetTarget ||
+      destinationKey(fleetActionIntent.target) !== destinationKey(fleetTarget) ||
+      fleetReaderMachine !== fleetActionIntent.target.machineID) return
+    const row = rows.find((candidate) => candidate.id === fleetActionIntent.target.sessionID &&
+      candidate.execution_generation === fleetActionIntent.target.executionGeneration)
     if (!row) return
-    onFleetCloseIntentHandled?.()
-    requestConfirm({ kind: "end", id: row.id, subject: fleetCloseIntent.title, focus: "cancel" })
-  }, [fleetList, fleetCloseIntent, fleetTarget, fleetReaderMachine, rows])
+    if (fleetActionIntent.kind === "archive" && !row.sessionId) return
+    onFleetActionIntentHandled?.()
+    requestConfirm({ kind: fleetActionIntent.kind, id: row.id, subject: fleetActionIntent.title, focus: "cancel" })
+  }, [fleetList, fleetActionIntent, fleetTarget, fleetReaderMachine, rows])
 
   // `closeDetail`: the session goes, the highlight stays. On a phone the list
   // comes back and a `#session=…` or `#page=…` address goes with the detail,
