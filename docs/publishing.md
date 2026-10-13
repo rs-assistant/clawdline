@@ -48,16 +48,10 @@ clean copy fail. A missing source is likewise named rather than silently
 skipped. The old `--allow-missing-source` spelling remains accepted so older CI
 invocations run the same pinned check; it no longer weakens or skips anything.
 
-One local check still cannot produce its strongest answer in GitHub Actions:
-
-- `check-private.sh` reads a private word list that must not be committed.
-  `check-private-ci.sh` still runs the fixed privacy rules over the tree. Exit
-  3 becomes a GitHub warning saying the private-word rules are undetermined.
-  For history it builds a temporary fixed-rule checkpoint at the event's base
-  commit, then runs `-history -new` at `HEAD`: an old finding stays standing
-  and a finding introduced by the change fails CI. The temporary sentinel is
-  not a substitute private-word list, and the workflow says that explicitly.
-  A green CI result is not publication approval.
+GitHub Actions does not run the privacy scan. `check-private.sh` reads a private
+word list that must not be committed, so run the required local and publication
+checks on a machine that has that list. A green CI result is not publication
+approval.
 
 `tools/test-go-ci.sh` names four host-integration exclusions in every run and
 first verifies that every named test still exists:
