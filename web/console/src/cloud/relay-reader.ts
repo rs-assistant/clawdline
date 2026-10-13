@@ -1512,6 +1512,11 @@ export class RelayReader {
       const status = presentation?.status?.state === row.state ? presentation.status : undefined
       const { identity: _displayIdentity, ...displayStatus } = status ?? {}
       return { ...displayStatus, id: row.destination.sessionID, session: row.destination.sessionID,
+        // The signed projection and this presentation name the same execution.
+        // Its conversation id stays valid while their activity states cross in
+        // flight; dropping it here makes the Session work fold say no message
+        // was sent and suppresses the Board read until a later list pass.
+        ...(presentation?.status?.sessionId ? { sessionId: presentation.status.sessionId } : {}),
         machine: this.machine, execution_generation: row.destination.executionGeneration,
         parent_session_id: row.parentSessionID,
         machine_scope: row.machineScope === true, coordinator_bound: row.coordinatorBound === true,

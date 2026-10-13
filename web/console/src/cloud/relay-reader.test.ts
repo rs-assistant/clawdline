@@ -645,6 +645,23 @@ test("the Cloud single-machine list keeps status ancestry through its displayed 
     hold: null }).map((row) => row.id), ["other", "root", "child"])
 })
 
+test("a projected state transition keeps the pinned conversation for Session work", async () => {
+  const client = new FakeClient()
+  const execution = "a".repeat(32)
+  const destination = { machineID: "mac-a", sessionID: "s1", executionGeneration: execution }
+  const row = { destination, state: "waiting", freshness: "current" as const, observedAt: 1000 }
+  const reader = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: 1000,
+      snapshotGeneration: execution, rows: [row] }),
+    listPresentations: async () => [{ destination, title: "A Session",
+      status: { state: "working", sessionId: "conversation-1", work_state: "working" }, projection: row }],
+  })
+  reader.attach(client)
+  const snapshot = await reader.snapshot()
+  assert.equal(snapshot.sessions[0].state, "waiting", "the current projection still decides activity")
+  assert.equal(snapshot.sessions[0].sessionId, "conversation-1", "the Board read keeps its stable conversation")
+})
+
 // On 2026-10-12 a Session stopped on a menu was open on app.clawdline.com and
 // its rich s/ row was arriving, yet the waiting card said Clawdline could not
 // read the choices: the row drawn was put together from the status and the
