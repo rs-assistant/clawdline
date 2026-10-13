@@ -83,7 +83,7 @@ func (s *Server) sessionGitRoute(w http.ResponseWriter, r *http.Request, id stri
 }
 
 // sessionGitDiffRoute answers only for a path in a fresh status reading. That
-// makes a read-only paired device able to inspect a change without turning the
+// lets a paired device inspect a change without turning the
 // route into a general file reader.
 func (s *Server) sessionGitDiffRoute(w http.ResponseWriter, r *http.Request, id string) {
 	if !s.ownsSessions() {

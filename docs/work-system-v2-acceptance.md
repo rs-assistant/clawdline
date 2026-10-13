@@ -37,7 +37,7 @@ description, `agent_decides` deployment policy, version 1, and one creation even
 
 Negative controls:
 
-- read-only device: `403`, no row/event;
+- unpaired device: `403`, no row/event;
 - machine/orchestrator credential: `403 session_cannot_create_item`;
 - task secret: `403`;
 - unknown or unavailable Project identity: typed refusal, no fallback by path/name;

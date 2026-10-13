@@ -374,6 +374,12 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		method: "GET", path: "/v1/snippets",
 		answers: &router{body: `{"snippets":[]}`},
 	}, {
+		word:    "session-snippets",
+		body:    map[string]any{"type": "session-snippets", "session": machine, "request": "req-session-snippets", "row": "session-one"},
+		session: machine, name: "read:req-session-snippets",
+		method: "GET", path: "/v1/snippets", query: map[string]string{"session": "session-one"},
+		answers: &router{body: `{"project":{"key":"/repo","label":"Project"},"snippets":[]}`},
+	}, {
 		// Asking for the key is the first thing a phone does when somebody
 		// presses "notify me", and the whole registration stops here when it
 		// is not carried.

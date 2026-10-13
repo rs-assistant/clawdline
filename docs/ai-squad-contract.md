@@ -163,8 +163,7 @@ private export require a write-capable human route. A session capability only
 reads its own snapshot and submits its own events through HTTP; a shared
 machine token does not by itself authorize those operations. Current paired
 reader permission is machine-wide, including Project content, and the UI must
-say so. Anonymous and unpaired devices are denied; Cloud read-only devices
-cannot write. The Cloud relay command table must explicitly include every
+say so. Anonymous and unpaired devices are denied. The Cloud relay command table must explicitly include every
 new route and retain its permission check. Do not put private content into
 URLs, logs, telemetry, public Git, or unencrypted browser caches.
 

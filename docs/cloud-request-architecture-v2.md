@@ -459,7 +459,8 @@ offers its last cursor. If the cursor is valid, Cloud sends the suffix; if not, 
 hot cache, never product data.
 
 Read capability authorises status and transcript fetches. It does not imply `send_prompt` and does
-not require publishing `ctl`. This lets a read-only phone work as a genuinely read-only device.
+not require publishing `ctl`. Current paired devices are not offered a separate read-only mode;
+the capability distinction still keeps reads from authorizing writes by itself.
 Per-plane/per-epoch data keys are wrapped only to roster devices with that plane's capability.
 Revocation rotates the affected plane for new writes. New devices receive only the retained epoch
 key ring their capability and product policy permit; deleting an epoch/session key is the

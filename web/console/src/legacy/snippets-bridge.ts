@@ -35,7 +35,7 @@ export interface Snippet {
   id: string
   title: string
   body: string
-  scope: "global" | "project"
+  scope: "global" | "project" | "workflow"
   /** Absent on a global snippet — never null; see `snippetCreateBody`. */
   project?: string
   position: number

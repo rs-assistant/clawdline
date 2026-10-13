@@ -72,7 +72,7 @@ const (
 	//
 	// **A read attaches a pipe, and a pipe is machine state.** Watching is
 	// deliberately read-level — looking at a screen types nothing, and the app
-	// being replicated lets a read-only device look — but on tmux each watched
+	// being replicated lets a paired reader look — but on tmux each watched
 	// pane costs a `pipe-pane`, which is a `sh -c` tmux forks and a FIFO in
 	// this daemon's directory. Nothing bounded how many could be alive at
 	// once, so a device that may only read could name one session after

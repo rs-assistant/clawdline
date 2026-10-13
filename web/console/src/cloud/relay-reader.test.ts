@@ -1488,6 +1488,17 @@ test("the snippet list is asked of the machine the session is on, and is that ma
   assert.equal(last.word, "snippets")
 })
 
+test("a Cloud Session asks its machine to resolve the Project before offering Workflows", async () => {
+  const client = new FakeClient()
+  client.readAnswer = async (word) => word === "session-snippets"
+    ? { project: { key: "/repo/project", label: "Project" }, snippets: [] }
+    : { read: word }
+  const response = await reader(client, { t: 1000 }).fetch("/v1/workflow-project?session=s1")
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { project: { key: "/repo/project", label: "Project" }, snippets: [] })
+  assert.deepEqual(client.reads.at(-1), { machine: "mac-a", word: "session-snippets", body: { row: "s1" } })
+})
+
 // The same distinction the schedule list is drawn around, and the sheet has
 // two different things to draw for it: an empty group offers the starters,
 // and a refusal says what could not be read. A refusal must never arrive as
