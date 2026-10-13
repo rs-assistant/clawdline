@@ -153,14 +153,12 @@ test("health's version and level are read only when present; absent is unknown, 
   assert.equal(sameMachineVersion({ version: "1" }, { version: "1", apiLevel: 1 }), false)
 })
 
-test("the needs-update words, with and without a version, link to Settings and name the machine as a machine", () => {
+test("the needs-update words name the machine and preserve its reported version", () => {
   const without = needsUpdateWords({}, {}, nextWord)
   assert.equal(without.version, null)
-  assert.equal(without.href, SETTINGS_UPDATE_HREF)
-  // Settings, at its update panel; `page=` alone is what routing reads.
   assert.equal(SETTINGS_UPDATE_HREF, "#page=settings&focus=update")
   assert.match(without.sentence, /Update it to use this|更新後就能使用/)
-  assert.doesNotMatch(without.sentence + without.link, /\bMac\b/)
+  assert.doesNotMatch(without.sentence, /\bMac\b/)
 
   const fromHealth = needsUpdateWords(null, { version: "v1.2.3" }, nextWord)
   assert.match(fromHealth.version!, /v1\.2\.3/)

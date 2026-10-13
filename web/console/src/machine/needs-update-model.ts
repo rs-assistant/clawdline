@@ -25,15 +25,13 @@ export interface NeedsUpdateFact {
 }
 
 type Words = (
-  key: "machineNeedsUpdate" | "machineNeedsUpdateVersion" | "machineNeedsUpdateLink",
+  key: "machineNeedsUpdate" | "machineNeedsUpdateVersion",
   holes?: Record<string, string | number>,
 ) => string
 
 /**
- * Where the needs-update line and the update banner send a person: the
- * Settings page, scrolled to its update panel with the keyboard on the panel's
- * title (`asksForUpdatePanel`, update-model.ts). The page reads only `page=`,
- * so the address still opens Settings on a console that ignores `focus=`.
+ * The Settings page's optional deep link to its update panel. Incompatibility
+ * prompts use the direct update action and do not send a person here.
  */
 export const SETTINGS_UPDATE_HREF = "#page=settings&focus=update"
 
@@ -60,8 +58,6 @@ export interface NeedsUpdateWords {
   sentence: string
   /** 「目前版本：…」, or null when no version is known. */
   version: string | null
-  link: string
-  href: string
 }
 
 /**
@@ -74,7 +70,5 @@ export function needsUpdateWords(fact: NeedsUpdateFact | null | undefined, known
   return {
     sentence: word("machineNeedsUpdate"),
     version: version ? word("machineNeedsUpdateVersion", { version }) : null,
-    link: word("machineNeedsUpdateLink"),
-    href: SETTINGS_UPDATE_HREF,
   }
 }
