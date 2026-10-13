@@ -141,9 +141,14 @@
     border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
 .cloud-all-machine-dialog::backdrop { background: rgba(0, 0, 0, .72); }
 .cloud-all-machine-dialog h2 { margin: 0 0 12px; font-size: 16px; }
-.cloud-all-machine-dialog button { display: block; width: 100%; min-height: 44px; margin: 4px 0; padding: 8px 10px;
+.cloud-all-machine-option { display: block; width: 100%; min-height: 44px; margin: 4px 0; padding: 8px 10px;
     border: 1px solid var(--line); border-radius: 8px; text-align: left; color: var(--ink); }
-.cloud-all-machine-dialog button:hover { background: var(--card-hi); }
+.cloud-all-machine-option:hover { background: var(--card-hi); }
+.cloud-all-machine-actions { display: flex; justify-content: flex-end; margin-top: 12px; padding-top: 10px;
+    border-top: 1px solid var(--line); }
+.cloud-all-machine-cancel { min-height: 44px; padding: 8px 12px; color: var(--dim); }
+.cloud-all-machine-cancel:hover { color: var(--ink); }
+.cloud-all-machine-dialog button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cloud-all-list-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 12px 24px; }
 .cloud-all-groups { display: grid; gap: 16px; }
 .cloud-all-group { min-width: 0; }
