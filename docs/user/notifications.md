@@ -9,6 +9,12 @@ Notifications are standard Web Push. The daemon on your machine sends them itsel
 HTTPS to your browser's push service; no Clawdline account is needed. Each browser or phone that
 should be told subscribes once.
 
+The switches under **When to notify me** belong to the selected machine. You
+can change them from the hosted console even when the browser you are using
+cannot receive notifications. That browser's permission and subscription are
+controlled separately under **This device**. A paired device needs Send
+permission to change the machine's switches.
+
 ## Before you start
 
 - A browser can subscribe only on a secure page: `http://127.0.0.1:7727` on the machine itself,

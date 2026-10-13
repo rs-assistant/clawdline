@@ -385,12 +385,12 @@ showed before this feature, never a sheet that breaks after a press.
   a role, and the name is as wide as with no role. No persona, or one the catalog does not name,
   draws nothing (`headPersona`).
 - **Start sheet.** A row of role chips under the assistant chips, "No role" first and chosen by
-  default. It scrolls sideways on a phone. The choice becomes the start route's `/as/{persona}`
-  and is remembered in this browser only.
+  default on every opening. It scrolls sideways on a phone. The choice for this start becomes
+  the start route's `/as/{persona}`.
 - **Resuming from a place.** After the person picks a place to resume in, the same role row stands
   over its past conversations, "No role" chosen. A past conversation's list does not say which
-  role it had, so nothing is preselected and the start sheet's remembered choice is not carried
-  over. A role makes the resume route `…/resume/{assistant}/{conversation}/as/{persona}`; both
+  role it had, so nothing is preselected. A role makes the resume route
+  `…/resume/{assistant}/{conversation}/as/{persona}`; both
   sheets build their paths in `web/console/src/session/place-routes.ts`, and
   `place-routes.test.ts` checks that Cloud's `writeRoute` reads each one back as the same resume.
 - **Restoring after a reboot.** Each row on the restore sheet shows the role it was launched with

@@ -280,6 +280,8 @@ export type WriteRoute =
   | { op: "notification-rules-update"; word: Carried<"notification-rules-update"> }
   | { op: "work-gate-settings"; word: Carried<"work-gate-settings"> }
   | { op: "work-gate-settings-update"; word: Carried<"work-gate-settings-update"> }
+  | { op: "notification-settings"; word: Carried<"notification-settings"> }
+  | { op: "notification-settings-update"; word: Carried<"notification-settings-update"> }
   | { op: "board-command"; word: Carried<"board-command"> }
   | { op: "machine-usage"; word: Carried<"machine-usage"> }
   | { op: "update"; word: Carried<"update"> }
@@ -453,6 +455,7 @@ export const CARRIED_READS: ReadonlySet<WriteRoute["op"]> = new Set<WriteRoute["
   "default-models",
   "notification-rules",
   "work-gate-settings",
+  "notification-settings",
   "restorable",
   "archived",
   "machine-usage",
@@ -520,6 +523,9 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
     if (head === "notification-rules" && segments.length === 1) return { op: "notification-rules", word: "notification-rules" }
     if (head === "settings" && a === "work-gates" && segments.length === 2) {
       return { op: "work-gate-settings", word: "work-gate-settings" }
+    }
+    if (head === "settings" && a === "notifications" && segments.length === 2) {
+      return { op: "notification-settings", word: "notification-settings" }
     }
     if (head === "sessions" && a === "restorable" && segments.length === 2) {
       return { op: "restorable", word: "restorable-sessions" }
@@ -650,6 +656,9 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   }
   if (head === "settings" && a === "work-gates" && segments.length === 2) {
     return { op: "work-gate-settings-update", word: "work-gate-settings-update" }
+  }
+  if (head === "settings" && a === "notifications" && segments.length === 2) {
+    return { op: "notification-settings-update", word: "notification-settings-update" }
   }
   if (head === "board" && segments.length === 1) {
     return { op: "board-command", word: "board-command" }
@@ -874,6 +883,8 @@ function spellingOf(route: WriteRoute): Spelling {
     case "notification-rules-update":
     case "work-gate-settings":
     case "work-gate-settings-update":
+    case "notification-settings":
+    case "notification-settings-update":
     case "squad-write":
     case "squad-package":
     case "board-command":
@@ -1334,6 +1345,7 @@ export class RelayWriter {
       case "default-models":
       case "notification-rules":
       case "work-gate-settings":
+      case "notification-settings":
       case "machine-usage":
       case "update":
       case "update-fresh": {
@@ -1565,6 +1577,10 @@ export class RelayWriter {
         // local route reads (`title`, `body`, `scope`, `project`), and the machine
         // is what decides whether it is a snippet and where it lands.
         const snippet = await bodyOf(init)
+        if (url.searchParams.has("machine")) {
+          if (typeof client._machineRequest !== "function") throw failure("cloud_not_carried", "snippet-create", 501)
+          return client._machineRequest(this.namedMachine(url), "snippet-create", { snippet }, "action")
+        }
         if (typeof client.createSnippet !== "function") {
           throw failure("cloud_not_carried", "snippet-create", 501)
         }
@@ -1572,12 +1588,20 @@ export class RelayWriter {
       }
       case "snippet-update": {
         const snippet = await bodyOf(init)
+        if (url.searchParams.has("machine")) {
+          if (typeof client._machineRequest !== "function") throw failure("cloud_not_carried", "snippet-update", 501)
+          return client._machineRequest(this.namedMachine(url), "snippet-update", { id: route.snippet, snippet }, "action")
+        }
         if (typeof client.updateSnippet !== "function") {
           throw failure("cloud_not_carried", "snippet-update", 501)
         }
         return client.updateSnippet(route.snippet, snippet, this.snippetIdentity(url))
       }
       case "snippet-delete": {
+        if (url.searchParams.has("machine")) {
+          if (typeof client._machineRequest !== "function") throw failure("cloud_not_carried", "snippet-delete", 501)
+          return client._machineRequest(this.namedMachine(url), "snippet-delete", { id: route.snippet }, "action")
+        }
         if (typeof client.deleteSnippet !== "function") {
           throw failure("cloud_not_carried", "snippet-delete", 501)
         }
@@ -1642,6 +1666,12 @@ export class RelayWriter {
         return this.machineWorkV2(client, route.word, {}, headerOf(init, "idempotency-key"))
       }
       case "work-gate-settings-update": {
+        for (const [key] of url.searchParams) {
+          throw failure("cloud_not_carried", `${url.pathname}?${key}= is not carried over Clawdline Cloud: change it on the machine.`, 501)
+        }
+        return this.machineWorkV2(client, route.word, { changes: await bodyOf(init) }, headerOf(init, "idempotency-key"))
+      }
+      case "notification-settings-update": {
         for (const [key] of url.searchParams) {
           throw failure("cloud_not_carried", `${url.pathname}?${key}= is not carried over Clawdline Cloud: change it on the machine.`, 501)
         }

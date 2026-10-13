@@ -278,6 +278,7 @@ const words = {
     cloudPairAgentCancelled: "Cancelled. Nothing ran.",
     cloudPairAgentRefused: "It was not handed over ({reason}). You can still paste the instruction yourself below.",
     cloudPairAgentProgressTitle: "Pairing {machine} through the AI here",
+    cloudPairAgentWindow: "The helping machine's Sessions are behind this card. You can close this window while its AI continues; return to this browser to check the pairing result.",
     cloudPairAgentStarting: "Waiting for the AI to start…",
     cloudPairAgentDialog: "The AI's terminal is asking a question. Answer it in that tab and it carries on.",
     cloudPairAgentWorking: "The AI is connecting to {machine}…",
@@ -434,6 +435,8 @@ const words = {
     scheduleMoveDeleteFailed:
       "The schedule now runs on {machine}. The old copy is still on {source}, disabled; delete it there. {why}",
     cloudMachineSessions: "{count} sessions",
+    cloudAllRefresh: "Refresh",
+    cloudAllRefreshing: "Refreshing…",
     cloudAccessProblem:
       "Machine {machine}'s data could not be read in this browser ({code}). Pair that machine with this browser again; if it still cannot be read, sign in again.",
     cloudSwitch: "Other machines",
@@ -1489,6 +1492,7 @@ const words = {
     cloudPairAgentCancelled: "已取消，沒有執行任何東西。",
     cloudPairAgentRefused: "沒有交出去（{reason}）。仍然可以在下面自己貼指令。",
     cloudPairAgentProgressTitle: "正在透過這裡的 AI 配對 {machine}",
+    cloudPairAgentWindow: "協助機器的 Session 畫面就在這張卡片後方。現在可以關閉視窗，AI 仍會繼續執行；之後回到這個瀏覽器確認配對結果。",
     cloudPairAgentStarting: "等 AI 啟動…",
     cloudPairAgentDialog: "AI 的終端機正在問問題，到那個分頁回答後就會繼續。",
     cloudPairAgentWorking: "AI 正在連到 {machine}…",
@@ -1616,6 +1620,8 @@ const words = {
     scheduleMoveCreateFailedDisabled: "{machine} 拒絕建立這份排程，而 {source} 上的原排程沒能重新啟用：它還在那裡，目前停用。{why}",
     scheduleMoveDeleteFailed: "排程已經在 {machine} 上執行。舊的那份還在 {source}，目前停用；請到那台機器刪掉它。{why}",
     cloudMachineSessions: "{count} 個 session",
+    cloudAllRefresh: "重新整理",
+    cloudAllRefreshing: "正在重新整理…",
     cloudAccessProblem: "機器 {machine} 的資料在這個瀏覽器讀不出來（{code}）。請重新配對這台機器；若仍然讀不到，請重新登入。",
     cloudSwitch: "換一台機器",
     cloudAllMachines: "所有機器",

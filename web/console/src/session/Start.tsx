@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
-import { loadPersonas, personaById, personasNow, rememberPersona, rememberTeam, rememberedPersona, rememberedTeam, switchTeam } from "../personas.js"
+import { loadPersonas, personaById, personasNow, rememberTeam, rememberedTeam, switchTeam } from "../personas.js"
 import { drawRoleRow } from "./RoleRow.js"
 import "./persona.css"
 import "./machine-start.css"
@@ -43,8 +43,8 @@ import { catalogWord } from "../catalog.js"
  *   the original's own fallback for an unambiguous row.
  * - **A role row** (docs/personas.md), which the original never had: the
  *   machine's persona catalog as chips under the assistant chips, "No role"
- *   first and chosen until the person picks another. The last choice is
- *   remembered in this browser. The row is not drawn when the catalog is empty
+ *   first and chosen until the person picks another. Each opening begins with
+ *   no role. The row is not drawn when the catalog is empty
  *   — an older daemon, or a machine on Cloud that does not offer `personas`.
  *   Resuming draws the same row over a place's past conversations, for the
  *   resume route's `/as/{persona}`. It starts at "No role" each time a place
@@ -311,7 +311,6 @@ function drawPersona(): void {
       resumeAs = id
     } else {
       persona = id
-      rememberPersona(id)
     }
   }
   drawRoleRow(row, {
@@ -865,7 +864,7 @@ function openMode(machine: boolean, requested: StartMode = "session", on: { id: 
   el("start").hidden = false
   said("")
   leave()
-  persona = rememberedPersona()
+  persona = ""
   team = rememberedTeam()
   if (mode === "session") void loadPersonas(undefined, onMachine?.id ?? null).then(() => draw())
   if (!wait) load()

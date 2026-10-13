@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { flushSync } from "react-dom"
 import type { SessionRow } from "@clawdline/contract"
 import App from "../App.js"
 import { CLOSE_EXECUTION_CHANGED } from "../overlays/events.js"
@@ -9,6 +10,7 @@ import { nextWord } from "../next-strings.js"
 import { bootCatalog } from "../catalog.js"
 import { cardsAreFor } from "../session/send.js"
 import { namesSession, sessionFragment } from "../session/address.js"
+import { startedRow } from "../session/started-row.js"
 import {
   chooseTransport,
   cloudOnboardingMode,
@@ -267,6 +269,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const fleetScopeRef = useRef(fleetScope)
   fleetScopeRef.current = fleetScope
   const [fleetTarget, setFleetTarget] = useState<SessionDestination | null>(() => destinationFromFragment(location.hash))
+  const [confirmedStart, setConfirmedStart] = useState<{ machineID: string; row: SessionRow } | null>(null)
+  const startedObserved = useCallback((id: string) => {
+    setConfirmedStart((current) => current?.row.id === id ? null : current)
+  }, [])
   // A notification can focus an already open Home Screen app. Its worker
   // changes the fragment without remounting CloudGate, so follow that address
   // as well as the one present at boot.
@@ -1505,6 +1511,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               const answer = await request.call(client.current, crypto.randomUUID(), helper, "pair-agent-start",
                 { offer, machine_id: target.id, machine_name: target.name }, "action", 130_000) as Record<string, unknown>
               if (answer?.mode === "agent" && typeof answer.task_id === "string" && answer.task_id) {
+                // The helper owns the new AI Session. Keep its Console mounted
+                // behind the pairing card so the person can see its activity.
+                const helperMachine = quickMachines.find((machine) => machine.id === helper)
+                if (helperMachine) choose(helperMachine, false)
                 return { ok: true, mode: "agent", taskID: answer.task_id, trust: typeof answer.trust === "string" ? answer.trust : "" }
               }
               return { ok: false, error: "unreadable_helper_answer" }
@@ -1568,6 +1578,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
           <App key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
+            cloudStartedRow={!fleetScope && confirmedStart?.machineID === reading ? confirmedStart.row : null}
+            onCloudStartedObserved={startedObserved}
             cloudPeerAccess={(active) => <PeerAccessPage active={active}
               machines={(shown.phase === "ready" ? shown.machines : []).map((machine) => ({
               id: machine.id, name: machine.name || machine.label || machine.id,
@@ -1614,7 +1626,14 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           <CloudSessionSheets machineID={reading ?? chosen.id}
             machines={quickMachines.map((machine) => machine.id)}
             source={liveSessionSource}
-            pending={pendingTool} onConsumed={consumeTool} onOpened={openStarted} />
+            pending={pendingTool} onConsumed={consumeTool} onOpened={openStarted}
+            onStartConfirmed={(answer, place) => {
+              if (fleetScopeRef.current) return
+              const row = startedRow(answer, place)
+              // The projection may already be cached. Commit the provisional row
+              // before its address can be read against the previous complete list.
+              if (row) flushSync(() => setConfirmedStart({ machineID: place?.machine ?? reading ?? chosen.id, row }))
+            }} />
         </CloudAccountContext.Provider>
       )}
       {words && (screen.at !== "console" || pairing) && (
@@ -1710,7 +1729,8 @@ function GateCard(props: {
   const nameQuestion = !pairing && !question && naming && screen.at === "machines" ? naming : null
   const open = pairing ? "pair" : question ? "forget" : nameQuestion ? "rename" : screen.at
   return (
-    <div className="door" data-step="cloud" data-cloud-screen={open}>
+    <div className="door" data-step="cloud" data-cloud-screen={open}
+      data-pair-console={pairing && screen.at === "console" ? "true" : undefined}>
       <div
         className="door-card"
         role={question || nameQuestion ? "alertdialog" : "dialog"}

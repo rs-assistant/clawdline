@@ -1,5 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react"
 import type { SettingsRequest, SettingsSnapshot } from "@clawdline/contract"
+import { readNotificationSettings, writeNotificationSettings } from "./settings/api.js"
+import { settingsFailureSentence } from "./settings/window/failure.js"
 import { pushShape, sendPushTest, startPush, subscribePush, togglePush } from "../push/push.js"
 import { legacyState } from "../legacy/overlay-bridge.js"
 import { client } from "../client.js"
@@ -67,8 +69,11 @@ function NotificationsPage({ shown }: { shown: boolean }) {
     startPush()
     let live = true
     void notificationRules().then((answer) => {
-      if (live) { setSettings(answer.preferences); setCustomRules(answer.rules); setError("") }
+      if (live) { setCustomRules(answer.rules); setError("") }
     }, (cause: unknown) => { if (live) setError(cause instanceof Error ? cause.message : String(cause)) })
+    void readNotificationSettings().then((answer) => {
+      if (live) { setSettings(answer); setError("") }
+    }, (cause: unknown) => { if (live) setError(settingsFailureSentence(cause)) })
     return () => { live = false }
   }, [shown])
 
@@ -77,9 +82,8 @@ function NotificationsPage({ shown }: { shown: boolean }) {
     setPending(key)
     setError("")
     try {
-      const answer = await notificationRules({ action: "preference", key, value: !current(settings, key) })
-      setSettings(answer.preferences)
-      setCustomRules(answer.rules)
+      const answer = await writeNotificationSettings({ [key]: !current(settings, key) } as Partial<SettingsRequest>)
+      setSettings(answer)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     } finally {

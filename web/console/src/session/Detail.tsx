@@ -39,6 +39,7 @@ import { headPersona, type HeadPersona } from "../personas.js"
 import { PersonaBot, usePersonas } from "./PersonaBot.js"
 import "./work-tree.css"
 import "./git-status.css"
+import "./empty-detail.css"
 
 /**
  * Whether this transport can read a project's snippets — `snippetControls(api).read`
@@ -223,7 +224,7 @@ export function Detail({
         <button className="back" id="back" onClick={onBack} aria-label={T.webBackLabel} disabled={ending}>
           ‹ {T.webBack}
         </button>
-        <div className="detail-identity-block">
+        <div className="detail-identity-block" hidden={!row}>
           <button
             className="detail-mark-go"
             id="detail-snippets"
@@ -270,7 +271,7 @@ export function Detail({
           >
             <span className="who detail-who">
               <span className="name" id="detail-name" style={mark ? { color: L.accentTint(mark.accent) } : undefined}>
-                {row ? detailSessionName(row) : listUnknown ? "" : T.webNoSessionOpen}
+                {row ? detailSessionName(row) : ""}
               </span>
               <span className="sub" id="detail-sub">
                 {role ? <DetailPersona head={role} /> : null}
@@ -337,7 +338,7 @@ export function Detail({
           the way to the next one is where the last one was. */}
       {row ? <BackgroundStrip row={row} selected={agentId} onAgent={chooseAgent} onShell={openShell} /> : null}
       {selectedAgent ? null : <Composer row={row} onDid={onDid} onSent={onSent} onScreen={() => setScreenOpen(true)} restoredDraft={savedComposerDraft} suggestedDraft={suggestedDraft} />}
-      {selectedAgent ? null : <StatusLine row={row} onOpenGit={() => setGitOpen(true)} />}
+      {selectedAgent || !row ? null : <StatusLine row={row} onOpenGit={() => setGitOpen(true)} />}
       {/* `input/user-messages.js` puts its overlay on the body at import; this
           one is drawn into the body from here, because the `⋯` row that opens
           it is this component's. */}

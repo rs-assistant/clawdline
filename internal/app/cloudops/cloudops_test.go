@@ -374,6 +374,12 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		method: "GET", path: "/v1/snippets",
 		answers: &router{body: `{"snippets":[]}`},
 	}, {
+		word:    "session-snippets",
+		body:    map[string]any{"type": "session-snippets", "session": machine, "request": "req-session-snippets", "row": "session-one"},
+		session: machine, name: "read:req-session-snippets",
+		method: "GET", path: "/v1/snippets", query: map[string]string{"session": "session-one"},
+		answers: &router{body: `{"project":{"key":"/repo","label":"Project"},"snippets":[]}`},
+	}, {
 		// Asking for the key is the first thing a phone does when somebody
 		// presses "notify me", and the whole registration stops here when it
 		// is not carried.
@@ -835,6 +841,18 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: machine, name: "action:req-gates-write",
 		method: "POST", path: "/v1/settings/work-gates",
 		body2: `{"planning_gate":true,"verify_gate":true}`,
+	}, {
+		word:    "notification-settings",
+		body:    map[string]any{"type": "notification-settings", "session": machine, "request": "req-notifications"},
+		session: machine, name: "read:req-notifications",
+		method: "GET", path: "/v1/settings/notifications",
+	}, {
+		word: "notification-settings-update",
+		body: map[string]any{"type": "notification-settings-update", "session": machine, "request": "req-notifications-write",
+			"changes": map[string]any{"push_on_waiting": false}},
+		session: machine, name: "action:req-notifications-write",
+		method: "POST", path: "/v1/settings/notifications",
+		body2: `{"push_on_waiting":false}`,
 	}, {
 		// The dashboard behind the session counts: machine-wide and
 		// parameterless, as the local route is.

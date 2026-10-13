@@ -37,8 +37,8 @@ import (
 //     without this a Cloud viewer would be judged as the machine itself.
 //  2. The gate's token, as every route: no token is 401.
 //  3. This machine's own token (`Verdict.Local`), or a paired device that is
-//     still paired and may send. Read-only devices and the orchestrator token
-//     cannot use terminals. Typing still requires the control lease.
+//     still paired and may send. The orchestrator token cannot use terminals.
+//     Typing still requires the control lease.
 
 // terminalState is what the terminal routes keep on the Server.
 type terminalState struct {

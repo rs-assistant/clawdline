@@ -73,7 +73,7 @@ func TestTheCancelRouteAdmitsTheRootAndThePersonOnly(t *testing.T) {
 	// A paired device that may only read is refused before the broker is asked.
 	reader := access{verdict: auth.Verdict{Allowed: true, Device: "d1", Caps: auth.NewCaps(auth.Read)}}
 	if rec := send(id, `{"reason":"r"}`, "k1", reader); rec.Code != http.StatusForbidden {
-		t.Fatalf("a read-only device: %d %s", rec.Code, rec.Body)
+		t.Fatalf("a caller with read capability: %d %s", rec.Code, rec.Body)
 	}
 	// A field the route does not take is refused, not ignored.
 	if rec := send(id, `{"reason":"r","state":"success"}`, "k1", session); rec.Code != http.StatusBadRequest {

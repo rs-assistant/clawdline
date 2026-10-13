@@ -92,6 +92,7 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | `*` | `/v1/settings` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/settings/browser` | 4 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/settings/default-models` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
+| `*` | `/v1/settings/notifications` | 8 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/settings/work-gates` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/snippets` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/snippets/` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |

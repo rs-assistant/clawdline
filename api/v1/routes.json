@@ -444,6 +444,11 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/settings/notifications",
+      "since": 8
+    },
+    {
+      "method": "*",
       "pattern": "/v1/settings/work-gates",
       "since": 1
     },

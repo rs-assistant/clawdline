@@ -18,7 +18,7 @@ import (
 //
 // **Deliberately a GET.** Watching a screen types nothing and changes no
 // session, and a POST would put it behind the send gate, which is about running
-// code on this machine. A device that may only read must still be able to look.
+// code on this machine. A read should never need that action's authority.
 func screenPath(r *http.Request) (string, bool) {
 	return sessionVerbIs(r, "screen", http.MethodGet, http.MethodHead)
 }
