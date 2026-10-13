@@ -104,6 +104,12 @@ func Dir() string {
 	if v := os.Getenv("CLAWDLINE_NEXT_DIR"); v != "" {
 		return v
 	}
+	return DefaultDir()
+}
+
+// DefaultDir is the installed daemon's ordinary state location, independent
+// of an environment override carried by a shell.
+func DefaultDir() string {
 	switch runtime.GOOS {
 	case "windows":
 		if v := os.Getenv("APPDATA"); v != "" {

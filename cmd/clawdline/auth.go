@@ -67,6 +67,10 @@ func daemonRequest(method, path string, body any) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+	return daemonRequestWithConfig(method, path, body, cfg, port)
+}
+
+func daemonRequestWithConfig(method, path string, body any, cfg config.Config, port int) (*http.Request, error) {
 	token, err := localToken(cfg)
 	if err != nil {
 		return nil, err
