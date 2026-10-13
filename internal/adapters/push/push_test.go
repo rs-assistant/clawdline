@@ -397,6 +397,18 @@ func TestASessionAddressSurvivesATmuxPaneID(t *testing.T) {
 	}
 }
 
+func TestCloudSessionAddressKeepsLocalAndFleetIdentity(t *testing.T) {
+	t.Parallel()
+	generation := "0123456789abcdef0123456789abcdef"
+	want := "/#session=%2514&machine=mac%2Fone&generation=" + generation
+	if got := SessionDestinationURL("%14", "mac/one", generation); got != want {
+		t.Fatalf("SessionDestinationURL = %q, want %q", got, want)
+	}
+	if got := SessionDestinationURL("%14", "", generation); got != SessionURL("%14") {
+		t.Fatalf("unidentified machine got %q", got)
+	}
+}
+
 // TestATopicIsShortAndIsNotAPrefix. RFC 8030 §5.4 caps a topic at 32 URL-safe
 // base64 characters, and two ids that share a prefix must not collapse.
 func TestATopicIsShortAndIsNotAPrefix(t *testing.T) {
