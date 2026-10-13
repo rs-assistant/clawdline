@@ -325,6 +325,9 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         const after = await readMachine(machineID, signal)
         if (signal.aborted || current() !== client || after.kind !== "ready" ||
           pinnedReadSupport(client, machineID) === "no" || !Array.isArray(reply?.sessions)) return null
+        const listObservedAt = Number(reply.at) * 1000
+        const trustworthyListTime = Number.isFinite(listObservedAt) &&
+          Math.abs((client.now?.() ?? Date.now()) - listObservedAt) <= STATUS_FRESH_MS
         const currentRows = new Map(after.rows.map((row) => [destinationKey(row.destination), row]))
         const visible = new Set(before.rows.map((row) => destinationKey(row.destination)))
         const result: MachineListPresentation[] = []
@@ -340,6 +343,7 @@ export function statusSource(current: () => StatusClient | null): SessionProject
           const status = record(session.status)
           const statusState = status?.state
           result.push({ destination, projection: currentRows.get(key), title: session.title.trim(),
+            observedAt: trustworthyListTime ? listObservedAt : undefined,
             assistant: session.assistant === "claude" || session.assistant === "codex" ? session.assistant : undefined,
             cwd: typeof session.cwd === "string" ? session.cwd : undefined,
             status: status && typeof status.work_state === "string" &&
