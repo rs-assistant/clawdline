@@ -44,6 +44,7 @@ const UNKNOWN = pane(703)
 const SPARE = pane(704)
 const NEEDS_ATTESTATION = pane(705)
 const RETAINED = pane(706)
+const NEW = pane(708)
 
 type ReadingScenario =
   | "normal"
@@ -417,6 +418,9 @@ function daemon(): Server {
     if (path === "/v1/places/%40machine/start/codex" && req.method === "POST") {
       machineStarts.push({ path, key: String(req.headers["idempotency-key"] ?? "") })
       return json(res, 200, { id: pane(707) })
+    }
+    if (path.startsWith("/v1/places/project-fixture/start") && req.method === "POST") {
+      return json(res, 200, { id: NEW, backend: "tmux", assistant: "codex", cwd: "/tmp/fixture" })
     }
     if (path === "/v1/work/v2/items" && req.method === "GET") {
       workProjectReads.push(url.searchParams.get("project") ?? "")
@@ -1342,6 +1346,33 @@ test("closing the new Session sheet returns focus to its opener", () =>
       assert.deepEqual(await tab.run(`({ hidden: document.getElementById('start').hidden, focused: document.activeElement?.id })`),
         { hidden: true, focused: "start-go" })
     }
+  }))
+
+test("a confirmed new pane opens on the phone before an inventory row exists", () =>
+  inTab(async (tab) => {
+    await list(tab)
+    await tab.press("#start-go")
+    await tab.run(`new Promise((resolve, reject) => {
+      const began = Date.now()
+      const look = () => {
+        if (document.querySelector('#start-list .place[data-id="project-fixture"]')) resolve(true)
+        else if (Date.now() - began > 5000) reject(new Error('project did not load'))
+        else setTimeout(look, 20)
+      }
+      look()
+    })`)
+    await tab.press('#start-list .place[data-id="project-fixture"]')
+    await tab.run(`new Promise((resolve, reject) => {
+      const began = Date.now()
+      const look = () => {
+        if (document.getElementById('app')?.dataset.view === 'detail') resolve(true)
+        else if (Date.now() - began > 2000) reject(new Error('new pane did not open'))
+        else setTimeout(look, 20)
+      }
+      look()
+    })`)
+    assert.equal(await tab.run(`document.querySelector('#pane-detail #detail-head') !== null`), true)
+    assert.equal(await tab.run(`document.querySelector('#rows .row[data-id="${NEW}"]') !== null`), true)
   }))
 
 test("the machine dashboard owns Clawdfather creation on phone and desktop", () =>
