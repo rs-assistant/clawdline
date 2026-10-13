@@ -241,6 +241,7 @@ func newBroker(s *Server) *orchestrator.Broker {
 		// notification so turning it off needs no restart. Absent or
 		// unreadable is the setting's default, on.
 		NotifyEnabled: s.agentNotifyEnabled,
+		PushEnabled:   s.notificationEnabled,
 		ProcessStart:  swiftstore.ProcessStart,
 		LeaseLine:     int(CapacityLimit(capacity.LeasesQueue)),
 		OpenWaits:     int(CapacityLimit(capacity.WaitsOpen)),

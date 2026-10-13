@@ -650,6 +650,9 @@ func heldReasonLanguage(language, code string) string {
 // runDeadLetterPush sends the one push a dead letter owes. Tapping it opens
 // the root the notice was for, when this machine is watching it.
 func runDeadLetterPush(ctx context.Context, b *Broker, e store.Effect) effectResult {
+	if b.PushEnabled != nil && !b.PushEnabled("push_on_dead_letter") {
+		return effectResult{state: store.EffectDone, outcome: "disabled_by_user"}
+	}
 	var d deadLetterEffect
 	_ = json.Unmarshal(e.Payload, &d)
 	r, _, err := b.Record(ctx, e.Subject)

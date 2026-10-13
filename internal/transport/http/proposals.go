@@ -60,6 +60,7 @@ func (s *Server) participation() *app.Participation {
 	}
 	p := app.NewParticipation(s.work())
 	p.ProductLanguage = s.productLanguage
+	p.PushEnabled = func() bool { return s.notificationEnabled("push_on_board_decision") }
 	p.ProposalLimit = CapacityLimit(capacity.ProposalsOpen)
 	p.DecisionLimit = CapacityLimit(capacity.DecisionsOpen)
 	p.DigestLimit = CapacityLimit(capacity.WorkDigests)

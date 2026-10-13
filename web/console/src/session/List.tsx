@@ -148,7 +148,7 @@ function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape
   const callbackLabel = nextWord("sessionCallbackActive")
   const callbackDetail = [callbackLabel, row.heavy_work?.reason].filter(Boolean).join(" · ")
   const callbackSaid = row.heavy_work
-    ? `<span class="session-callback-active" role="img" aria-label="${L.escapeHTML(callbackDetail)}" title="${L.escapeHTML(callbackDetail)}">🏗️${L.workState(row).state === "working" ? "" : '<canvas class="spin" aria-hidden="true"></canvas>'}</span>`
+    ? `<span class="session-callback-active" title="${L.escapeHTML(callbackDetail)}"><span aria-hidden="true">🏗️</span><span class="session-callback-label">${L.escapeHTML(row.heavy_work.reason || callbackLabel)}</span>${L.workState(row).state === "working" ? "" : '<canvas class="spin" aria-hidden="true"></canvas>'}</span>`
     : ""
   const n = row.shells?.length ?? 0
   const shellsSaid = n

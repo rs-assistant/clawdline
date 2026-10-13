@@ -50,6 +50,8 @@ type Participation struct {
 	// is a daemon with no push path: a blocking decision is then recorded as
 	// not_subscribed.
 	Push func(ctx context.Context, title, body, tag string) (sent, failed int, err error)
+	// PushEnabled reads the person's Board decision notification preference.
+	PushEnabled func() bool
 	// ProductLanguage is read when a blocking decision's push is rendered.
 	// Nil uses English and does not affect the decision's authored question.
 	ProductLanguage func() string
@@ -1050,6 +1052,8 @@ func (p *Participation) PushDecision(ctx context.Context, id string) work.PushSt
 			return err
 		}
 		switch {
+		case p.PushEnabled != nil && !p.PushEnabled():
+			outcome = work.PushNotSubscribed
 		case n >= decisionPushHourLimit:
 			outcome = work.PushOverBudget
 		case p.Push == nil:

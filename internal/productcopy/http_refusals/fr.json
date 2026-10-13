@@ -572,6 +572,7 @@
   "http.79de2bd3b748825c": "Le cursor d'événement doit être un numéro de séquence non négatif.",
   "http.79ecca38aa1c8919": "Impossible de trouver le répertoire de travail de cette session",
   "http.79f767282a388fd5": "La demande de paquet doit être un objet JSON sans clés dupliquées.",
+  "http.7a152f1c0aca7343": "La personne a désactivé les notifications de l’Agent. Activez-les dans Notifications.",
   "http.7a9f746e2233167d": "Cette connexion Cloud ne peut pas renouveler une clé.",
   "http.7ae1806ec2c52361": "Cette clé a déjà servi pour une autre requête ; rien n'a été effectué. Utilisez une nouvelle clé.",
   "http.7b60aa169d77d4b7": "Cela ne pouvait pas être fait.",

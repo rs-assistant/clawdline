@@ -793,6 +793,7 @@ const words = {
     archiveDone: "Archived. It is under Archive in the sidebar.",
     archiving: "Archiving…",
     archiveNav: "Archive",
+    notificationNav: "Notifications",
     archiveEyebrow: "Sessions",
     archivePageTitle: "Archived Sessions",
     archiveLede:
@@ -1925,6 +1926,7 @@ const words = {
     archiveDone: "已封存，在側欄的「封存」裡。",
     archiving: "封存中…",
     archiveNav: "封存",
+    notificationNav: "通知",
     archiveEyebrow: "Session",
     archivePageTitle: "封存的 Session",
     archiveLede: "這些 Session 為了釋放記憶體而封存。對話都還在，按「叫回」會在原本的資料夾、用原本的助手重新打開。",

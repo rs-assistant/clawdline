@@ -981,33 +981,6 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
           <Row label={W.settingsRemoteServe} hint={W.settingsRemoteHint} first>
             <Switch label={W.settingsRemoteServe} on={!!now("remote")} onChange={flip("remote")} />
           </Row>
-          <Row label={W.settingsPushDelivery} hint={W.settingsPushDeliveryHint}>
-            <Switch
-              label={W.settingsPushDelivery}
-              on={!!now("push_on_delivery")}
-              onChange={flip("push_on_delivery")}
-            />
-          </Row>
-          <Row label={W.settingsPushFanout} hint={W.settingsPushFanoutHint}>
-            <Switch label={W.settingsPushFanout} on={!!now("push_on_fanout")} onChange={flip("push_on_fanout")} />
-          </Row>
-          <Row label={W.settingsSmartNotifications} hint={W.settingsSmartNotificationsHint}>
-            <Switch
-              label={W.settingsSmartNotifications}
-              on={!!now("smart_notifications")}
-              onChange={flip("smart_notifications")}
-            />
-          </Row>
-          <Row label={W.settingsPushDeploy} hint={W.settingsPushDeployHint}>
-            <Switch label={W.settingsPushDeploy} on={!!now("push_on_deploy")} onChange={flip("push_on_deploy")} />
-          </Row>
-          <Row label={W.settingsAgentNotify} hint={W.settingsAgentNotifyNote}>
-            <Switch
-              label={W.settingsAgentNotify}
-              on={!!now("orchestrator_agent_notify")}
-              onChange={flip("orchestrator_agent_notify")}
-            />
-          </Row>
         </div>
         <div className="sw-column">
           {!embedded && cloudBlock()}

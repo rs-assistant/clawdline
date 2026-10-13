@@ -91,8 +91,13 @@ BUILD="$STAGING/$NAME.app"
 PROMOTION="$INSTALL_DIR/.$NAME.staging.$$"
 BACKUP="$INSTALL_DIR/.$NAME.previous.$$"
 KEEP_STAGING=0
+RELEASE_INSTALL_ATTEMPT=0
 cleanup() {
   local rc=$?
+  if [ "$rc" -ne 0 ] && [ "$RELEASE_INSTALL_ATTEMPT" = 1 ] && [ "$RESTART" = 1 ]; then
+    CLAWDLINE_RELEASE_NOTIFY_BIN="$INSTALL_APP/Contents/MacOS/clawdline" \
+      sh tools/notify-release-failure.sh app "$stamp" || true
+  fi
   [ "$KEEP_STAGING" = 1 ] || rm -rf "$STAGING"
   [ "$PROMOTION" = "$BUILD" ] || rm -rf "$PROMOTION"
   exit "$rc"
@@ -256,6 +261,7 @@ if [ -n "$BUILD_ONLY" ]; then
   echo "built $BUILD_ONLY/$NAME.app; nothing was installed"
   exit 0
 fi
+RELEASE_INSTALL_ATTEMPT=1
 
 # A disposable worktree may build for the app in the primary checkout. Copy
 # into a sibling of that app before stopping it, so the final rename stays on

@@ -158,6 +158,9 @@ type Broker struct {
 	// both agent notification routes answer 409 agent_notify_disabled before
 	// judging anything else. Nil is on, the setting's default.
 	NotifyEnabled func() bool
+	// PushEnabled reads a named event preference at the moment its outbox effect runs.
+	// Nil preserves the default behavior of brokers without a settings file.
+	PushEnabled func(key string) bool
 	// WorkUnitEdge is told a task's admission (edge "start") and its end
 	// (edge "end", with its terminal state) after each has committed, so the
 	// token ledger can take a cursor (docs/token-ledger.md "One unit of
