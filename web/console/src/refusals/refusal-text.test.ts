@@ -28,6 +28,14 @@ test("a code-only failure keeps its screen-owned sentence", () => {
   assert.match(sentence, /offline/u)
 })
 
+test("Cloud failures identify the reporting component without blaming a timeout", () => {
+  assert.match(failureSentence({ layer: "relay", code: "internal" }), /Cloud service · internal/u)
+  assert.match(failureSentence({ layer: "mac_route", code: "busy" }), /Machine · busy/u)
+  assert.match(failureSentence({ layer: "browser", code: "bad_frame" }), /Browser · bad_frame/u)
+  assert.match(failureSentence({ layer: "relay", code: "machine_offline" }), /Cloud reports machine offline · machine_offline/u)
+  assert.match(failureSentence({ code: "cloud_read_timeout" }), /Source unconfirmed · cloud_read_timeout/u)
+})
+
 test("a durable receipt refusal uses the editable catalog and keeps its code", () => {
   const sentence = failureSentence({ code: "receipt_outcome_unknown" }, "Generic failure")
   assert.match(sentence, /earlier action may have run/u)
@@ -61,11 +69,11 @@ test("a secondary catalog owns the frame and code-only sentence while ref and ac
       ref: { sender: "web_fixture", seq: 123 },
       acknowledge: () => { acknowledged++ },
     })
-    assert.equal(sentence, `${japanese["legacy.webFailForbidden"]}（forbidden · fixture·123）`)
+    assert.equal(sentence, `${japanese["legacy.webFailForbidden"]}（Source unconfirmed · forbidden · fixture·123）`)
     assert.equal(acknowledged, 1)
 
     const wire = failureSentence({ code: "unknown_wire_code", detail: "Raw producer detail." })
-    assert.equal(wire, "Raw producer detail.（unknown_wire_code）")
+    assert.equal(wire, "Raw producer detail.（Source unconfirmed · unknown_wire_code）")
     assert.notEqual(english["legacy.webFailWithTag"], japanese["legacy.webFailWithTag"])
   } finally {
     resetCatalogForTest()

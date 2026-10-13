@@ -21,6 +21,17 @@ const SESSION_RECEIPT_SENTENCES: Readonly<Record<string, string>> = {
   receipt_capacity: "webFailReceiptCapacity",
 }
 
+function originKey(error: unknown, code: unknown): string {
+  if (code === "machine_offline") return "webFailOriginMachineOffline"
+  const layer = error && typeof error === "object" && "layer" in error ? error.layer : undefined
+  if (layer === "relay") return "webFailOriginCloud"
+  if (layer === "browser") return "webFailOriginBrowser"
+  if (["mac_transport", "mac_preflight", "mac_ledger", "mac_route", "mac_reply"].includes(String(layer))) {
+    return "webFailOriginMachine"
+  }
+  return "webFailOriginUnknown"
+}
+
 /** Keep the copied failure semantics, with the selected catalog owning the complete frame. */
 export function failureSentence(
   error: unknown,
@@ -38,6 +49,7 @@ export function failureSentence(
     sentence,
     fallback: typeof options === "string" ? options : options?.fallback,
   } : options)
+  const tag = `${catalogWord("legacy", originKey(error, code))} · ${said.tag}`
   return catalogWord("legacy", "webFailWithTag")
-    .replace(/\{text\}|\{tag\}/gu, (part) => part === "{text}" ? said.text : said.tag)
+    .replace(/\{text\}|\{tag\}/gu, (part) => part === "{text}" ? said.text : tag)
 }
