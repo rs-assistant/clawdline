@@ -300,8 +300,11 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     destination: SessionDestination; projection?: ProjectedSession }>())
   const fleetPresentationReceivedAt = useRef(new Map<string, number>())
   const fleetProjections = useRef(new Map<string, { reading: MachineSessionProjection; receivedAt: number }>())
+  const [fleetProjectionRevision, refreshFleetProjection] = useState(0)
   const noteFleetProjection = useCallback((machineID: string, reading: MachineSessionProjection) => {
+    if (fleetProjections.current.get(machineID)?.reading === reading) return
     fleetProjections.current.set(machineID, { reading, receivedAt: Date.now() })
+    refreshFleetProjection((revision) => revision + 1)
   }, [])
   const [fleetPresentationRevision, refreshFleetPresentation] = useState(0)
   const noteFleetPresentations = useCallback((machineID: string,
@@ -1553,6 +1556,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       isClaude: presentation.projection.assistant === "claude",
       evidence: "none", closeability } as SessionRow
   }, [fleetScope, fleetTarget && destinationKey(fleetTarget), fleetPresentationRevision])
+  const fleetTargetIdentity = useMemo(() => {
+    if (!fleetScope || !fleetTarget) return null
+    const reading = fleetProjections.current.get(fleetTarget.machineID)?.reading
+    return reading?.kind === "ready"
+      ? reading.rows.find((row) => destinationKey(row.destination) === destinationKey(fleetTarget) &&
+        row.freshness === "current") ?? null : null
+  }, [fleetScope, fleetTarget && destinationKey(fleetTarget), fleetProjectionRevision])
   return (
     <>
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
@@ -1568,6 +1578,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             onLeaveCloudSessions={leaveFleet}
             fleetTarget={fleetScope ? fleetTarget : null}
             fleetTargetRow={fleetTargetRow}
+            fleetTargetIdentity={fleetTargetIdentity?.freshness === "current" ? fleetTargetIdentity : null}
             fleetDetailProblem={fleetScope && fleetTarget
               ? fleetDetailProblem?.key === destinationKey(fleetTarget)
                 ? { text: fleetDetailProblem.text, action: fleetDetailProblem.action }

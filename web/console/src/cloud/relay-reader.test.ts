@@ -591,6 +591,7 @@ test("the single-machine page uses the fleet projection before a blocked rich sn
   const rows = ["s1", "s2", "s3"].map((sessionID) => ({
     destination: { machineID: "mac-a", sessionID, executionGeneration: execution },
     state: "idle", freshness: "current" as const, observedAt: 1000,
+    machineScope: sessionID === "s1", coordinatorBound: sessionID === "s1",
   }))
   let titles = 3, now = 1000
   let presentationGeneration = "a"
@@ -605,6 +606,9 @@ test("the single-machine page uses the fleet projection before a blocked rich sn
   r.attach(client)
   const first = await r.snapshot()
   assert.deepEqual(first.sessions.map((row) => row.label), ["Title s1", "Title s2", "Title s3"])
+  assert.equal(first.sessions[0].machine_scope, true)
+  assert.equal((first.sessions[0] as typeof first.sessions[0] & { coordinator_bound?: boolean }).coordinator_bound, true)
+  assert.equal(first.sessions[1].machine_scope, false)
   assert.equal(first.scan.complete, true)
   titles = 1
   presentationGeneration = "b"

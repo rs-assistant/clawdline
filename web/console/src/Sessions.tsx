@@ -59,6 +59,7 @@ export function SessionsPage({
   streamTasks = null,
   fleetList,
   fleetDetailKey,
+  fleetCoordinatorBound = false,
   fleetDetailPending = false,
   fleetDetailProblem,
 }: {
@@ -100,6 +101,7 @@ export function SessionsPage({
   /** The same page frame and detail, with only the list supplied by the Cloud fleet adapter. */
   fleetList?: ReactNode
   fleetDetailKey?: string
+  fleetCoordinatorBound?: boolean
   fleetDetailPending?: boolean
   fleetDetailProblem?: FleetDetailProblem | null
 }) {
@@ -345,6 +347,7 @@ export function SessionsPage({
         </section>
 
         <Detail key={fleetDetailKey} row={fleetDetailPending ? null : open} tasks={tasks} onOpenSession={onOpen} onBack={onBack} onDid={onDid}
+          projectedCoordinatorBound={fleetCoordinatorBound}
           onSent={streamTasks !== null ? undefined : onDid}
           listUnknown={listUnknown || fleetDetailPending} loadingDetail={fleetDetailPending} emptyProblem={fleetDetailProblem} />
         {/* In terminal mode the second column is the terminal's, as it is the

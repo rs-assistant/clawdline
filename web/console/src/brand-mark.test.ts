@@ -9,6 +9,7 @@ test("a new conversation has a readable detail title before its list name arrive
   assert.equal(detailSessionName(row), "Codex Session")
   assert.equal(detailSessionName({ ...row, label: "A named task" }), "A named task")
   assert.equal(detailSessionName({ ...row, identity: "registry" }), row.id)
+  assert.equal(detailSessionName({ ...row, machine_scope: true }), "Clawdfather")
 })
 
 test("Cloud Session cards keep the machine identity through registration", () => {

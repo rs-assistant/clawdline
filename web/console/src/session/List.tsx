@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ComponentPropsWithRe
 import type { SessionRow } from "@clawdline/contract"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
-import { BRAND_MARK, projectedSessionIdentity, sessionMark, sessionName } from "../brand-mark.js"
+import { BRAND_MARK, projectedSessionIdentity, sessionCoordinatorBound, sessionMark, sessionName } from "../brand-mark.js"
 import { requestConfirm } from "../overlays/events.js"
 import { ACTION_WIDTH, actionWidth, archivable, revealFor, swipes, type Reveal } from "./swipe.js"
 import { conversationNotStarted } from "./readiness.js"
@@ -387,6 +387,7 @@ export function Row({
 }) {
   const who = L.whoHTML(row.assistant)
   const coordinator = L.coordinatorRowModel(row)
+  const bound = sessionCoordinatorBound(row)
   const place = taskPlace(row, depth)
   const waiting = (row.coordination?.waitingOn ?? []).length
   const owed = (row.coordination?.waitedOnBy ?? []).length
@@ -440,8 +441,8 @@ export function Row({
       data-coordination={waiting ? "waiting" : owed ? "owed" : undefined}
       aria-selected={selected ? "true" : "false"}
       aria-disabled="false"
-      data-coordinator={coordinator ? "1" : undefined}
-      data-machine-pending={row.machine_scope && !coordinator ? "1" : undefined}
+      data-coordinator={bound ? "1" : undefined}
+      data-machine-pending={row.machine_scope && !bound ? "1" : undefined}
       data-depth={place.chip && place.depth ? String(place.depth) : undefined}
       data-tree-through={branchThrough ? "1" : undefined}
       data-epic-parent={row.epic_parent && depth ? row.epic_parent.epic_id : undefined}
@@ -451,7 +452,7 @@ export function Row({
       <span className="kid" hidden={!place.depth} aria-hidden="true" />
       {ancestorThrough ? <span className="tree-ancestor" aria-hidden="true" /> : null}
       {row.epic_parent && depth ? <span className="sr-only">{catalogWord("inline", "9ba541d50c44")}</span> : null}
-      {row.machine_scope || coordinator ? (
+      {row.machine_scope || bound ? (
         // The machine steward's identity is visible without promising a
         // command panel that this console does not provide.
         <span className="coordinator-mark" aria-hidden="true">
@@ -461,7 +462,7 @@ export function Row({
       ) : (
         mark
       )}
-      {coordinator && <span className="coordinator-identity">{coordinator.badge}</span>}
+      {bound && <span className="coordinator-identity">Clawdfather</span>}
       <div className="title" style={{ color: L.accentTint(icon?.accent) }}>
         <span className="label">{name}</span>
         <span className="who" hidden={!who} dangerouslySetInnerHTML={{ __html: who }} />
@@ -474,9 +475,9 @@ export function Row({
           <span className="dot" />
           <span className="n">{agentCount(row)}</span>
         </span>
-        {coordinator && (
-          <span className="coordinator-chip" title={coordinator.label} aria-hidden="true">
-            {coordinator.badge}
+        {bound && (
+          <span className="coordinator-chip" title={coordinator?.label ?? "Clawdfather"} aria-hidden="true">
+            Clawdfather
           </span>
         )}
         {/* The original clears the title to "" rather than removing it, so the
@@ -491,7 +492,7 @@ export function Row({
         </span>
       </div>
       <StateLine row={row} role={role} />
-      {row.machine_scope && !row.coordinator ? (
+      {row.machine_scope && !bound ? (
         <p className="machine-registration" role="status">{nextWord("machineSessionPendingRow")}</p>
       ) : null}
       {/* The phone's swipe control, in `buildRow`'s markup and uncovered by

@@ -34,7 +34,7 @@ import { conversationNotStarted } from "./readiness.js"
 import { agentName, agentStateWord } from "./WorkTree.js"
 import { nextWord } from "../next-strings.js"
 import { archivable } from "./swipe.js"
-import { BRAND_MARK, detailSessionName } from "../brand-mark.js"
+import { BRAND_MARK, detailSessionName, sessionCoordinatorBound } from "../brand-mark.js"
 import { headPersona, type HeadPersona } from "../personas.js"
 import { PersonaBot, usePersonas } from "./PersonaBot.js"
 import "./work-tree.css"
@@ -88,6 +88,7 @@ export function Detail({
   onSent,
   listUnknown = false,
   loadingDetail = false,
+  projectedCoordinatorBound = false,
   emptyProblem,
 }: {
   row: SessionRow | null
@@ -103,6 +104,7 @@ export function Detail({
   onSent?: () => void
   listUnknown?: boolean
   loadingDetail?: boolean
+  projectedCoordinatorBound?: boolean
   emptyProblem?: FleetDetailProblem | null
 }) {
   const T = L.strings
@@ -250,7 +252,7 @@ export function Detail({
                 id="detail-clawdfather-crown"
                 role="img"
                 aria-label={catalogWord("inline", "5d559e858210")}
-                hidden={!L.coordinatorForSession(row)}
+                hidden={!sessionCoordinatorBound(row) && !(row?.machine_scope && projectedCoordinatorBound)}
               />
               <canvas id="detail-mark" ref={markRef} width={0} height={0} />
             </span>
@@ -272,7 +274,7 @@ export function Detail({
               </span>
               <span className="sub" id="detail-sub">
                 {role ? <DetailPersona head={role} /> : null}
-                {detailSub(row)}
+                {detailSub(row, projectedCoordinatorBound)}
               </span>
             </span>
           </button>
@@ -419,11 +421,11 @@ function DetailPersona({ head }: { head: HeadPersona }) {
  * shaping the list: "what was this for" has an answer long after the row went
  * back to normal. No pane id.
  */
-function detailSub(row: SessionRow | null): string {
+function detailSub(row: SessionRow | null, projectedCoordinatorBound = false): string {
   if (!row) return ""
   const T = L.strings
   const sub: string[] = [L.path(row.cwd)]
-  if (row.machine_scope && !row.coordinator) sub.push(nextWord("machineSessionPendingShort"))
+  if (row.machine_scope && !sessionCoordinatorBound(row) && !projectedCoordinatorBound) sub.push(nextWord("machineSessionPendingShort"))
   if (row.tty) sub.push(row.tty)
   if (row.state === "waiting") sub.push(T.sessionWaiting)
   else if (row.state === "working") sub.push(T.webStateWorking)

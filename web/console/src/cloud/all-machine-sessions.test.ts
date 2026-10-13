@@ -1,8 +1,9 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import type { SessionRow } from "@clawdline/contract"
 import {
   afterEventGap, checkedProjection, destinationAvailable, destinationFragment, destinationFromFragment,
-  displayedPresentationStatus,
+  displayedPresentationStatus, identifyOpenedFleetRow,
   destinationKey, prependOlderPage, projectionRefreshAt, settleProjection, SessionDetailCache,
   supersedingDestination,
   type MachineSessionProjection, type ProjectedSession,
@@ -15,6 +16,23 @@ const row = (machineID: string, sessionID: string, executionGeneration: string):
 })
 const ready = (machine: string, rows: ProjectedSession[]): MachineSessionProjection =>
   checkedProjection(machine, { kind: "ready", complete: true, observedAt: 1000, rows })
+
+test("the opened Cloud detail uses the signed machine identity for only its exact execution", () => {
+  const target = row("machine/a", "%14", "7").destination
+  const rich = { id: target.sessionID, execution_generation: target.executionGeneration,
+    label: "Ordinary title", machine_scope: false } as SessionRow
+  const replaced = { ...rich, execution_generation: row("machine/a", "%14", "8").destination.executionGeneration }
+  const identity = { machineScope: true, coordinatorBound: true }
+  const identified = identifyOpenedFleetRow([rich, replaced], target, target.machineID, identity)
+  assert.equal(identified[0].machine_scope, true)
+  assert.equal((identified[0] as SessionRow & { coordinator_bound?: boolean }).coordinator_bound, true)
+  assert.equal(identified[0].label, "Ordinary title")
+  assert.equal(identified[1], replaced)
+  assert.equal(rich.machine_scope, false)
+  assert.equal(identifyOpenedFleetRow([rich], target, "machine/b", identity)[0], rich)
+  assert.equal(identifyOpenedFleetRow([rich], target, target.machineID,
+    { machineScope: false, coordinatorBound: true })[0], rich)
+})
 
 test("same Session id on two machines has distinct URLs, keys and destinations after reload", () => {
   const a = row("machine/a", "%14", "7")

@@ -16,6 +16,7 @@ export function sessionName(row: SessionRow): string {
 
 /** A just-opened pane has an identity before its display name reaches the list. */
 export function detailSessionName(row: SessionRow): string {
+  if (row.machine_scope || row.coordinator) return sessionName(row)
   if (conversationNotStarted(row) && (!row.label || row.label === row.id) && (!row.tty || row.tty === row.id)) {
     const assistant = row.assistant === "codex" ? "Codex" : row.assistant === "claude" ? "Claude" : "Assistant"
     return `${assistant} Session`
@@ -25,6 +26,11 @@ export function detailSessionName(row: SessionRow): string {
 
 export function sessionMark(row: SessionRow): Icon | undefined {
   return row.machine_scope || row.coordinator ? BRAND_MARK : row.icon
+}
+
+/** The signed Cloud status identifies a bound role without carrying its commands. */
+export function sessionCoordinatorBound(row: SessionRow | null | undefined): boolean {
+  return !!row?.coordinator || (row as (SessionRow & { coordinator_bound?: boolean }) | null | undefined)?.coordinator_bound === true
 }
 
 export function projectedSessionIdentity(title: string, icon: Icon | undefined, machineScope: boolean,
