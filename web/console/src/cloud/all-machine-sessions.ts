@@ -74,6 +74,7 @@ export interface ProjectedSession {
   backend?: "tmux" | "iterm" | "ps"
   parentSessionID?: string
   machineScope?: boolean
+  coordinatorBound?: boolean
   state: string
   freshness: "current" | "stale" | "unknown"
   needsAttention?: boolean

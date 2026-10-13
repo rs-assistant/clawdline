@@ -28,6 +28,7 @@ type SessionStatus struct {
 	Backend             string `json:"backend,omitempty"`
 	ParentSessionID     string `json:"parent_session_id,omitempty"`
 	MachineScope        bool   `json:"machine_scope,omitempty"`
+	CoordinatorBound    bool   `json:"coordinator_bound,omitempty"`
 	State               string `json:"state"`
 	Source              struct {
 		Provenance string `json:"provenance"`
@@ -67,6 +68,7 @@ func ProjectSessionStatus(machine, id string, row map[string]any, complete bool,
 		out.Backend = v
 	}
 	out.MachineScope, _ = row["machine_scope"].(bool)
+	_, out.CoordinatorBound = row["coordinator"].(map[string]any)
 	if v, _ := row["state"].(string); v == "working" || v == "waiting" || v == "idle" || v == "unknown" {
 		out.State = v
 	}
