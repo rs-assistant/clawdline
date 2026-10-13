@@ -3693,6 +3693,7 @@
   "next.worktreeRemoveConfirm": "刪除工作樹",
   "next.worktreeRemoveBusy": "刪除中…",
   "next.worktreeRemoveFailed": "無法刪除工作樹。",
+  "next.worktreeRemoveUnavailable": "目前無法刪除這棵工作樹。它必須已併入主線、沒有未提交的檔案，且確認沒有 Session 使用。請重新觀測並查看卡片上的原因。",
   "next.proposalNeedsYourDecision": "系統沒有待辦可重新判定；工作完成不會撤回這筆提議，請自行回答，否則它會等到過期。",
   "next.proposalNotNow": "現在不要",
   "next.proposalResolve": "已完成／不再適用",
