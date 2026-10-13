@@ -1373,6 +1373,18 @@ test("a confirmed new pane opens on the phone before an inventory row exists", (
     })`)
     assert.equal(await tab.run(`document.querySelector('#pane-detail #detail-head') !== null`), true)
     assert.equal(await tab.run(`document.querySelector('#rows .row[data-id="${NEW}"]') !== null`), true)
+    const empty = await tab.run(`new Promise((resolve, reject) => {
+      const began = Date.now()
+      const look = () => {
+        const words = document.querySelector('#tx .tx-note')?.textContent || ''
+        if (words) resolve(words)
+        else if (Date.now() - began > 2000) reject(new Error('new conversation state did not arrive'))
+        else setTimeout(look, 20)
+      }
+      look()
+    })`)
+    assert.match(empty, /No messages yet|還沒有訊息/)
+    assert.doesNotMatch(empty, /Nothing to read|還沒有可讀內容/)
   }))
 
 test("the machine dashboard owns Clawdfather creation on phone and desktop", () =>

@@ -11,6 +11,7 @@ test("a confirmed pane opens before inventory without inventing permission to cl
   assert.equal(row?.closeability.state, "unknown")
   assert.equal(row?.closeability.version, "")
   assert.equal(row?.state, "unknown")
+  assert.equal(row?.identity, "no_record")
 })
 
 test("a reply without a pane backend or assistant waits for the inventory", () => {

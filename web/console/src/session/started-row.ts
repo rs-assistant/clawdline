@@ -13,6 +13,7 @@ export function startedRow(answer: StartAnswer, place: StartPlaceRow | null): Se
     label: place?.label,
     isClaude: answer.assistant === "claude",
     evidence: "none",
+    identity: "no_record",
     state: "unknown",
     work_state: "unknown",
     closeability: {
