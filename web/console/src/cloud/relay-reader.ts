@@ -229,7 +229,7 @@ export interface CloudReadClient {
    * and `tasks` are: a copied client older than the word must be refused by
    * name rather than throw where nobody is catching.
    */
-  snippets?(identity: CloudIdentity, options?: { fresh?: boolean }): Promise<CloudSnippets>
+  snippets?(identity?: CloudIdentity, options?: { fresh?: boolean }): Promise<CloudSnippets>
   transcript(identity: CloudIdentity, phases?: unknown, demand?: { foreground?: boolean }): Promise<unknown>
   transcriptForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, signal?: AbortSignal): Promise<unknown>
   transcriptPageForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, before: number, signal?: AbortSignal): Promise<unknown>
@@ -1066,7 +1066,26 @@ export class RelayReader {
           this.note(method, path, "relay", undefined, { word })
           return json(200, { schedules, at: answer.at || Math.floor(this.now() / 1000), unanswered })
         }
+        case "/v1/workflow-project": {
+          const selectedSession = url.searchParams.get("session")
+          if (!selectedSession) return this.refuse(method, path, 400, "bad_request", "No session was named.")
+          return await this.machineRead(init?.signal, method, path, "session-snippets", { row: selectedSession })
+        }
         case "/v1/snippets": {
+          // The Workflow page reads reusable text for the selected machine
+          // without needing an open Session. The Project still comes from
+          // that machine's registered places, never from a browser path.
+          if (url.searchParams.has("machine") && !url.searchParams.has("session")) {
+            const machine = url.searchParams.get("machine") || this.machine
+            const client = this.connected()
+            if (typeof client.snippets !== "function") {
+              return this.refuse(method, path, 501, "cloud_not_carried", "This console cannot read workflows.")
+            }
+            const answer = await client.snippets(undefined, { fresh: true })
+            const snippets = (answer.snippets ?? []).filter((row) => row?.machine === machine)
+            this.note(method, path, "relay", undefined, { word: "snippets" })
+            return json(200, { snippets })
+          }
           // 常用句 — the sheet a phone could not open. Both halves were true
           // at once: this machine's catalog knew the word and had no route behind
           // it, so the seam listed it in `NO_MACHINE_ROUTE` and refused the read

@@ -25,12 +25,13 @@ import (
 type Scope string
 
 const (
-	Global  Scope = "global"
-	Project Scope = "project"
+	Global   Scope = "global"
+	Project  Scope = "project"
+	Workflow Scope = "workflow"
 )
 
-// KnownScope reports whether s is one of the two.
-func KnownScope(s Scope) bool { return s == Global || s == Project }
+// KnownScope reports whether s is a reusable text scope.
+func KnownScope(s Scope) bool { return s == Global || s == Project || s == Workflow }
 
 // The bounds, **counted in UTF-8 bytes**.
 //
@@ -181,7 +182,7 @@ func ParseFields(body map[string]any) (Fields, *Refusal) {
 // against a path nobody chose. An empty path beside `scope: "project"` is the
 // same refusal as no key, because an empty path is not a project.
 func ScopeAgrees(f Fields) bool {
-	if f.Scope == Project {
+	if f.Scope == Project || f.Scope == Workflow {
 		return f.HasProject && f.Project != ""
 	}
 	return !f.HasProject
@@ -233,7 +234,7 @@ func Patch(current Record, f Fields, now int64) (Record, *Refusal) {
 	}
 	// A scope that stays `project` keeps the project it was already filed
 	// under, so a save that only changes the title need not repeat the path.
-	if !f.HasProject && merged.Scope == Project && current.Project != "" {
+	if !f.HasProject && (merged.Scope == Project || merged.Scope == Workflow) && current.Project != "" {
 		merged.Project, merged.HasProject = current.Project, true
 	}
 	return build(current.ID, merged, current.Position, current.CreatedAt, now)
@@ -254,11 +255,11 @@ func build(id string, f Fields, position, createdAt, updatedAt int64) (Record, *
 	}
 	if !KnownScope(f.Scope) {
 		return Record{}, refuse(400, CodeMalformed,
-			"A snippet's scope is `global` or `project`.", nil)
+			"A reusable text's scope is `global`, `project`, or `workflow`.", nil)
 	}
 	if !ScopeAgrees(f) {
 		return Record{}, refuse(400, CodeScopeMismatch,
-			"Project snippets need one project path; global snippets cannot carry one.", nil)
+			"Project snippets and workflows need one project path; global snippets cannot carry one.", nil)
 	}
 	if len(title) > MaxTitleBytes || len(body) > MaxBodyBytes || len(f.Project) > MaxProjectBytes {
 		return Record{}, refuse(400, CodeTooLong,
@@ -270,7 +271,7 @@ func build(id string, f Fields, position, createdAt, updatedAt int64) (Record, *
 			})
 	}
 	project := ""
-	if f.Scope == Project {
+	if f.Scope == Project || f.Scope == Workflow {
 		project = f.Project
 	}
 	return Record{
@@ -340,6 +341,8 @@ func InScope(records []Record, projectKey string) []Record {
 	for _, r := range records {
 		switch {
 		case r.Scope == Project && projectKey != "" && r.Project == projectKey:
+			mine = append(mine, r)
+		case r.Scope == Workflow && projectKey != "" && r.Project == projectKey:
 			mine = append(mine, r)
 		case r.Scope == Global:
 			global = append(global, r)

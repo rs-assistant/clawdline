@@ -70,6 +70,10 @@ let readingScenario: ReadingScenario = "normal"
 let callbackDone = false
 let inlineDecisionFixture = false
 let inlineDecisionAnswers = 0
+const workflowID = "00000000-0000-4000-8000-000000000041"
+let workflowRecords: Row[] = []
+let workflowTodo: Row | null = null
+let workflowSends = 0
 let sessionGap = false
 let sessionGapComplete = false
 
@@ -414,6 +418,44 @@ function daemon(): Server {
       places: [{ id: "project-fixture", label: "Clawdline", path: "/tmp/fixture", icon: null }],
       assistants: [{ id: "codex", label: "Codex" }],
     })
+    if (path === "/v1/projects/project-fixture/files" && req.method === "GET") return json(res, 200, {
+      files: [{ id: "skill-fixture", name: "SKILL.md", location: ".agents/skills/ship-today/SKILL.md",
+        source: "project", assistant: "codex", kind: "skill", status: "ready", editable: true }],
+      truncated: false, skipped: [],
+    })
+    if (path === "/v1/snippets" && req.method === "GET") return json(res, 200, {
+      project: url.searchParams.has("session") ? { key: "/tmp/fixture", label: "Clawdline" } : undefined,
+      snippets: workflowRecords,
+    })
+    if (path === "/v1/snippets" && req.method === "POST") {
+      let body = ""
+      req.on("data", (part) => { body += part })
+      req.on("end", () => {
+        const record = JSON.parse(body)
+        workflowRecords = [{ id: workflowID, ...record, position: 100, created_at: 1, updated_at: 1 }]
+        json(res, 200, workflowRecords[0])
+      })
+      return
+    }
+    if (path === "/v1/work/v2/session-todos/" + encodeURIComponent(SAFE) && req.method === "POST") {
+      let body = ""
+      req.on("data", (part) => { body += part })
+      req.on("end", () => {
+        workflowTodo = { id: "workflow-todo-fixture", text: JSON.parse(body).text, created_at: 5,
+          sent_at: null, read_at: null, completed_at: null, version: 1 }
+        json(res, 200, { todo: workflowTodo })
+      })
+      return
+    }
+    if (path === "/v1/work/v2/session-todos/" + encodeURIComponent(SAFE) + "/workflow-todo-fixture/send" && req.method === "POST") {
+      workflowSends++
+      workflowTodo = { ...workflowTodo, sent_at: 6, version: 2 }
+      return json(res, 200, { todo: workflowTodo })
+    }
+    if (path === "/v1/work/v2/session-todos/" + encodeURIComponent(SAFE) + "/workflow-todo-fixture/complete" && req.method === "POST") {
+      workflowTodo = { ...workflowTodo, completed_at: 7, version: 3 }
+      return json(res, 200, { todo: workflowTodo })
+    }
     if (path === "/v1/places/%40machine/start/codex" && req.method === "POST") {
       machineStarts.push({ path, key: String(req.headers["idempotency-key"] ?? "") })
       return json(res, 200, { id: pane(707) })
@@ -625,7 +667,8 @@ function daemon(): Server {
               version: 1,
             }]
         : []
-      const direct = sessionID === BLOCKED
+      const direct = ownsSafe && workflowTodo ? [workflowTodo]
+        : sessionID === BLOCKED
         ? [{ id: "todo-fixture", text: "Review the release note", created_at: 1, sent_at: 2, read_at: 3, completed_at: null, version: 3,
             images: [{ id: "todo-image-fixture", title: "release-evidence.png", media_type: "image/png", byte_count: 68,
               width: 1, height: 1, position: 0, created_by: "fixture", created_at: 1 }] }]
@@ -1628,6 +1671,95 @@ test("an ordinary Session keeps the Snippets icon", () =>
     await tab.press("#detail-snippets")
     assert.equal(await tab.run(`document.getElementById('snippets')?.hidden`), false)
     assert.equal(await tab.run(`document.getElementById('clawdfather-suggestions') === null`), true)
+  }))
+
+test("a phone imports a Skill as editable Workflow text, starts it, and sees its durable progress", () =>
+  inTab(async (tab) => {
+    workflowRecords = []; workflowTodo = null; workflowSends = 0
+    await tab.go("/#page=workflow")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-actions select option[value="skill-fixture"]')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Workflow Skill option did not arrive'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.run(`(() => {
+      const select = document.querySelector('.workflow-actions select')
+      select.value = 'skill-fixture'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "ship-today")
+    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /ship-today/)
+    await tab.press('.workflow-editor button[type="submit"]')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-list button')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('saved Workflow did not appear'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.equal(workflowRecords.length, 1)
+    assert.equal(workflowRecords[0].scope, "workflow")
+    await tab.shot("workflow-project-page")
+    await tab.run(`location.hash = ${JSON.stringify("session=" + encodeURIComponent(SAFE))}`)
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('#detail-snippets')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Session detail did not appear'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press("#detail-snippets")
+    await tab.press('.snippets-tabs button:last-child')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-picker-row')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Session Workflow did not appear'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press('.workflow-picker-row')
+    await tab.shot("workflow-session-launch")
+    await tab.press('.workflow-launch button')
+    await new Promise<void>((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (workflowTodo && workflowSends === 1) return resolve()
+        if (Date.now() > deadline) return reject(new Error('Workflow did not create a to-do'))
+        setTimeout(look, 25)
+      }; look()
+    })
+    assert.ok(workflowTodo, "Workflow launch created a durable to-do")
+    assert.equal(workflowSends, 1)
+    await tab.press('#session-todos > summary')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.session-workflow-row')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Workflow progress did not appear: ' + document.querySelector('#session-todos')?.outerHTML.slice(0, 3000)))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.equal(workflowSends, 1)
+    assert.match(String((workflowTodo as Row | null)?.text), /Clawdline-Workflow/)
+    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /ship-today/)
+    await tab.shot("workflow-session-progress")
+    await tab.press('.session-workflow-row summary')
+    await tab.press('.session-workflow-row button')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.session-workflow-row[data-state="done"]')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('completed Workflow did not appear'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.shot("workflow-session-done")
   }))
 
 test("Clawdfather stays first above a waiting Session on phone and desktop", () =>

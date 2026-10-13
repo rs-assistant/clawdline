@@ -196,6 +196,7 @@ export const CARRIED = {
   "snippet-order": "POST /v1/snippets/order",
   "snippet-update": "PATCH /v1/snippets/{id}",
   snippets: "GET /v1/snippets",
+  "session-snippets": "GET /v1/workflow-project?session={id}",
   start: "POST /v1/places/{id}/start[/{assistant}[/{model}][/as/{persona}]]",
   timeline: "GET /v1/timeline?project=&entry=&cursor=&environment=&category=&upcoming=",
   transcript: "GET /v1/transcript?session={id}",

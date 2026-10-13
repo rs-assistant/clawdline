@@ -1557,6 +1557,10 @@ export class RelayWriter {
         // local route reads (`title`, `body`, `scope`, `project`), and the machine
         // is what decides whether it is a snippet and where it lands.
         const snippet = await bodyOf(init)
+        if (url.searchParams.has("machine")) {
+          if (typeof client._machineRequest !== "function") throw failure("cloud_not_carried", "snippet-create", 501)
+          return client._machineRequest(this.namedMachine(url), "snippet-create", { snippet }, "action")
+        }
         if (typeof client.createSnippet !== "function") {
           throw failure("cloud_not_carried", "snippet-create", 501)
         }
@@ -1564,12 +1568,20 @@ export class RelayWriter {
       }
       case "snippet-update": {
         const snippet = await bodyOf(init)
+        if (url.searchParams.has("machine")) {
+          if (typeof client._machineRequest !== "function") throw failure("cloud_not_carried", "snippet-update", 501)
+          return client._machineRequest(this.namedMachine(url), "snippet-update", { id: route.snippet, snippet }, "action")
+        }
         if (typeof client.updateSnippet !== "function") {
           throw failure("cloud_not_carried", "snippet-update", 501)
         }
         return client.updateSnippet(route.snippet, snippet, this.snippetIdentity(url))
       }
       case "snippet-delete": {
+        if (url.searchParams.has("machine")) {
+          if (typeof client._machineRequest !== "function") throw failure("cloud_not_carried", "snippet-delete", 501)
+          return client._machineRequest(this.namedMachine(url), "snippet-delete", { id: route.snippet }, "action")
+        }
         if (typeof client.deleteSnippet !== "function") {
           throw failure("cloud_not_carried", "snippet-delete", 501)
         }
