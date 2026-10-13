@@ -24,7 +24,11 @@ git worktree add -f <scratch>/<name> HEAD
   landing as soon as it lands. A branch cut before 2026-09-22 can only be cherry-picked
   (`docs/working-rules.md`).
 - After recording a landing, run `tools/check-worktrees.sh` (a dry run: 0 nothing owed, 1 landed
-  residue, 2 could not check, 3 unknown) and inspect it before `--apply`. For a read-only
+  residue, 2 could not check, 3 unknown). Inspect it, then run `--apply` for every proved
+  `landed_clean` checkout. Remove a root-owned task worktree after its commit is on `main`, its
+  checkout is clean, and no owner is using it. Never use age or ancestry alone to delete an
+  unknown, active, dirty, or unlanded checkout. In every delivery, tell the person how many
+  worktrees were removed and which candidates were kept, with their reasons. For a read-only
   throwaway checkout use `tools/check-worktrees.sh --ephemeral -- <command>`. `docs/worktrees.md`.
 - A dispatched child's worktree path comes from the task record
   (`GET /v1/orchestrator/tasks/<id>` → `.task.worktree.path`), never composed.
