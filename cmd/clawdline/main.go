@@ -332,6 +332,7 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		Receipts:       srv.CloudSessionReceipts(),
 		AdmitExecution: srv.CloudAdmitExecution,
 		Sessions:       srv.CloudSessions,
+		SessionsFresh:  srv.CloudSessionsFresh,
 		// The daemon's own routes, gate and all. A Cloud request is answered by
 		// exactly the handler a paired browser on this machine's own network
 		// reaches — one set of permission checks, not two.

@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/contract"
 )
 
@@ -45,6 +46,10 @@ type latest[T any] struct {
 	ok     bool
 	flight chan struct{}
 	err    error
+	// flightStarted is when the build in flight began, and valueStarted when
+	// the build behind value did: what `since` compares a moment against.
+	flightStarted time.Time
+	valueStarted  time.Time
 	// builds counts the builds that ran, for the tests that prove sharing.
 	builds atomic.Int64
 }
@@ -70,7 +75,20 @@ func (l *latest[T]) peek() (T, bool) {
 
 // refresh builds now, or waits for the build that is already running.
 func (l *latest[T]) refresh() (T, error) {
+	return l.refreshFrom(context.Background(), false)
+}
+
+// refreshFrom is refresh with base's values, never its cancellation, on the
+// build's context: how `since` tells the build which scan it may read. `own`
+// waits out a build in flight and then builds, instead of taking its answer.
+func (l *latest[T]) refreshFrom(base context.Context, own bool) (T, error) {
 	l.mu.Lock()
+	for own && l.flight != nil {
+		flight := l.flight
+		l.mu.Unlock()
+		<-flight
+		l.mu.Lock()
+	}
 	if flight := l.flight; flight != nil {
 		l.mu.Unlock()
 		<-flight
@@ -80,12 +98,14 @@ func (l *latest[T]) refresh() (T, error) {
 	}
 	flight := make(chan struct{})
 	l.flight = flight
+	started := time.Now()
+	l.flightStarted = started
 	l.mu.Unlock()
 
 	// The build has a clock of its own and not a reader's: a tab that closes
 	// while the build runs must not cancel it for every other reader waiting
 	// on it.
-	ctx, cancel := context.WithTimeout(context.Background(), productBuildSeconds*time.Second)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(base), productBuildSeconds*time.Second)
 	value, err := l.build(ctx)
 	cancel()
 	l.builds.Add(1)
@@ -94,7 +114,7 @@ func (l *latest[T]) refresh() (T, error) {
 	defer l.mu.Unlock()
 	l.err = err
 	if err == nil {
-		l.value, l.at, l.ok = value, time.Now(), true
+		l.value, l.at, l.ok, l.valueStarted = value, time.Now(), true, started
 	} else if l.ok {
 		// A failed build leaves the last good value where peek finds it, and
 		// get will try again rather than serve it as fresh.
@@ -107,6 +127,20 @@ func (l *latest[T]) refresh() (T, error) {
 		return zero, err
 	}
 	return value, nil
+}
+
+// since answers a value from a build of its own, begun at or after `t`, whose
+// readings come from scans begun at or after `t` too (app.WithReadingSince). A
+// build in flight is waited out, never joined: it was not asked for `t`, and
+// its readings may be the held scan from before it.
+//
+// Measured on 2026-10-12: the Cloud publisher's looks 246 ms and 1242 ms after a
+// press both asked for a build now, both joined a build that had begun before
+// the press, and the pressed Session's row went out six seconds later on the
+// next ordinary pass. With the build taken fresh the looks still sent another
+// Session's row: the build read the inventory's held scan, which was older.
+func (l *latest[T]) since(t time.Time) (T, error) {
+	return l.refreshFrom(app.WithReadingSince(context.Background(), t), true)
 }
 
 // listProducer is the one clock behind every session-list and task-list reader.
@@ -202,6 +236,24 @@ func (p *listProducer) snapshot() sessionsSnapshotWire {
 // taskList is the first task page no older than one tick.
 func (p *listProducer) taskList() (contract.TaskList, error) {
 	return p.tasks.get(p.every)
+}
+
+// CloudSessionsFresh is CloudSessions built now: the publisher's look right
+// after a press from a page (cloud.Publisher.Fresh), when the shared product
+// may still be the screen from before the press.
+func (s *Server) CloudSessionsFresh(context.Context) ([]byte, bool) {
+	if !s.ownsSessions() {
+		return nil, false
+	}
+	value, err := s.lists().sessions.since(time.Now())
+	if err != nil {
+		return nil, false
+	}
+	body, err := json.Marshal(value)
+	if err != nil {
+		return nil, false
+	}
+	return body, true
 }
 
 // CloudSessions is the session list as the Cloud publisher reads it: the

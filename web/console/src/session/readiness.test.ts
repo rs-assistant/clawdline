@@ -3,6 +3,7 @@ import assert from "node:assert/strict"
 import type { SessionRow } from "@clawdline/contract"
 // @ts-expect-error -- a `.ts` path, for node; see order.test.ts.
 import { conversationNotStarted } from "./readiness.ts"
+import { sessionWorkStateHTML } from "../legacy/js/view/derive.js"
 
 function row(extra: Partial<SessionRow>): SessionRow {
   return {
@@ -29,4 +30,18 @@ test("a provider with no first record is not an unreadable screen", () => {
     false,
     "a real read failure stays a failure",
   )
+})
+
+test("an ended turn is distinct from an idle new session and an unreadable session", () => {
+  const finished = sessionWorkStateHTML(row({ state: "idle", activity: { known: true, at: 1 } }))
+  assert.match(finished, /turn ended · delivery not reported/)
+  assert.doesNotMatch(finished, /session-work-check/)
+
+  const fresh = sessionWorkStateHTML(row({ state: "idle", activity: { known: false, unknown_reason: "no_record" } }))
+  assert.match(fresh, /idle · delivery not reported/)
+  assert.doesNotMatch(fresh, /turn ended/)
+
+  const unreadable = sessionWorkStateHTML(row({ state: "unknown", activity: { known: true, at: 1 } }))
+  assert.match(unreadable, /status unknown/)
+  assert.doesNotMatch(unreadable, /turn ended/)
 })

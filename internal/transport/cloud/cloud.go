@@ -120,6 +120,10 @@ type Service struct {
 	Log func(format string, args ...any)
 	// Now is the clock a read's answer is timed by. Nil is time.Now.
 	Now func() time.Time
+	// Acted is told when a command changed a Session and was answered: the
+	// publisher looks again now rather than on its next pass (Publisher.Settle),
+	// so the page sees the press land. Nil does nothing.
+	Acted func()
 }
 
 // slowReadAnswer is how long a read may take, from arrival to its answer
@@ -252,6 +256,9 @@ func (s Service) Answer(ctx context.Context, request Inbound) cloudops.Answer {
 	// to the request. Log only authenticated envelope metadata and the typed
 	// outcome; never the command body, message text, or credentials.
 	if answer.Mutating {
+		if s.Acted != nil && answer.OK() && answer.Subject != "" && answer.Subject != cloudops.MachineReplySession {
+			s.Acted()
+		}
 		s.logf("cloud: command answered: operation=%s session=%s status=%d code=%s sender=%s seq=%d",
 			operationOrUnknown(answer.Operation), subjectOrUnknown(answer.Subject), answer.Status,
 			codeOrOK(answer.Code), request.Sender, request.Sequence)

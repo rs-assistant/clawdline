@@ -8,7 +8,11 @@ import type { PageModule } from "./types.js"
 import { squadApi, type PackPreview, type SkillSourceRow, type SquadAPI } from "./squad/api.js"
 import { ReceiptGate, sourceLabel, visiblePersonas, type SquadDraft, type SquadPersona, type SquadReadState, type SquadSkill, type SquadView } from "./squad/model.js"
 import { ACTIVE_SKILL_BYTES, activeSkillBytes, makeSkill, sameSkill, skillInputError, type SkillTransaction } from "./squad/skill-create.js"
+import { PersonaCreator } from "./squad/PersonaCreator.js"
+import { forgetPersonas } from "../personas.js"
 import "./squad/squad.css"
+import "../page-bar.css"
+import { arriveAtDetail, detailInHash, enterDetail, leaveDetail } from "../page-detail.js"
 
 const keyOf = (scope: string, persona: string) => `${scope}\u0000${persona}\u0000handbook`
 const errorCode = (error: unknown) => typeof (error as { code?: unknown })?.code === "string" ? (error as { code: string }).code : "read_failed"
@@ -129,6 +133,11 @@ function SkillDetail({ skill }: { skill: SquadSkill | null }) {
       {skill.folder && <><h5>{catalogWord("inline", "b189237d831b")}</h5>{skill.files?.length ? <ul>{skill.files.map((file) => <li key={file.path}>{file.path}</li>)}</ul> : <p>{catalogWord("inline", "f975303092e1")}</p>}</>}
     </> : <p>{catalogWord("inline", "401707655263")}</p>}
   </section>
+}
+
+/** The width the stylesheet shows the persona as its own screen at. */
+function phoneLayout(): boolean {
+  return matchMedia("(max-width: 760px)").matches
 }
 
 function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadAPI }) {
@@ -316,6 +325,10 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
   }
   const choosePersona = (id: string) => {
     returnScroll.current = pageElement.current?.scrollTop ?? 0
+    // On a phone the persona is a screen of its own over the roster, so it is a
+    // history step (`#page=squad&id=…`, page-detail.ts) and the browser's Back
+    // returns to the roster. Side by side it is a selection, not a step.
+    if (phoneLayout()) enterDetail("squad", id)
     setSelected(id); setSkillId(""); setMobileView("detail")
     requestAnimationFrame(() => {
       if (matchMedia("(max-width: 760px)").matches) detailPanel.current?.scrollIntoView({ block: "start" })
@@ -324,6 +337,12 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
     })
   }
   const backToRoster = () => {
+    // Over this page's own step that is also Back; the roster is shown now
+    // rather than when popstate arrives, and that arrival changes nothing more.
+    leaveDetail("squad")
+    showRoster()
+  }
+  const showRoster = () => {
     setMobileView("roster")
     requestAnimationFrame(() => { cardRefs.current.get(selected)?.querySelector("button")?.focus(); pageElement.current?.scrollTo({ top: returnScroll.current }) })
   }
@@ -609,7 +628,7 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
     if (!packPreview) return
     if (importPrivateScopes.length && !importPrivateConfirm) { setPackError(catalogWord("literal", "9d1b0d17990f")); return }
     setBusy("adopt"); setPackError("")
-    try { await api.adopt(packPreview, packChoices, importPrivateScopes); closePack(); await load(scope); setNotice({ text: catalogWord("literal", "9a9a62474225") }) }
+    try { await api.adopt(packPreview, packChoices, importPrivateScopes); forgetPersonas(); closePack(); await load(scope); setNotice({ text: catalogWord("literal", "9a9a62474225") }) }
     catch (error) {
       if (["version_conflict", "settings_changed", "preview_expired", "preview_invalid"].includes(errorCode(error))) setPackError(catalogWord("literal", "be71ec45cc65"))
       else setPackError(catalogFormat("template", "4cc0e44397c7", [errorDetail(error)]))
@@ -661,6 +680,32 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
     return () => { active = false; if (timer) clearTimeout(timer) }
   }, [shown, !!data, scope, api, enqueueUse])
 
+  const showRosterRef = useRef(showRoster)
+  showRosterRef.current = showRoster
+  // The browser's Back and Forward over a persona's step, and an address that
+  // arrived naming one (once the roster that holds it has been read).
+  const arrivedPersona = useRef("")
+  useEffect(() => {
+    if (!shown) return
+    if (!arrivedPersona.current) arrivedPersona.current = detailInHash("squad", location.hash)
+    const follow = () => {
+      if (!location.hash.includes("page=squad")) return
+      const id = detailInHash("squad", location.hash)
+      if (id) { setSelected(id); setSkillId(""); setMobileView("detail") }
+      else showRosterRef.current()
+    }
+    window.addEventListener("popstate", follow)
+    return () => window.removeEventListener("popstate", follow)
+  }, [shown])
+  useEffect(() => {
+    const id = arrivedPersona.current
+    if (!id || !data) return
+    arrivedPersona.current = ""
+    if (!data.personas.some((row) => row.id === id) || !phoneLayout()) return
+    arriveAtDetail("squad", id)
+    setSelected(id); setSkillId(""); setMobileView("detail")
+  }, [data])
+
   return <section id="squad" ref={pageElement} className="page squad-page" hidden={!shown} aria-labelledby="squad-title">
     <div className="squad-wrap">
       <header className="squad-header"><div><p className="squad-eyebrow">{catalogWord("inline", "23a2521dacc1")}</p><h1 id="squad-title" tabIndex={-1}>{catalogWord("inline", "7b2e2228ee05")}</h1>
@@ -681,13 +726,14 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
             <button type="button" onClick={(event) => openPack("import", event.currentTarget)}>{catalogWord("inline", "3d94747fe80d")}</button>
             <button type="button" onClick={(event) => openPack("export", event.currentTarget)}>{catalogWord("inline", "21ef789fd56d")}</button></div></aside>
         <div className="squad-roster" aria-labelledby="squad-roster-title"><div className="squad-panel-head"><div><h2 id="squad-roster-title">{catalogWord("inline", "9d19a6eff5a7")}</h2><p>{catalogWord("inline", "7f40e97b7bdb")}</p></div><span>{catalogFormat("count", "squadRoles", [shownPersonas.length])}</span></div>
+          <div className="squad-create-actions"><PersonaCreator api={api} canWrite={canWrite} catalogVersion={data.catalogVersion} onSaved={async (id) => { forgetPersonas(); setTeam("clawdline.team.custom"); setSearch(""); await load(scope); setSelected(id); if (phoneLayout()) setMobileView("detail") }} /></div>
           <label className="squad-search">{catalogWord("inline", "b5ddf97c42d3")}<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={catalogWord("inline", "1fa038b1af83")} /></label>
           {shownPersonas.length ? <div className="squad-cards">{shownPersonas.map((row) => <div key={row.id} ref={(node) => { if (node) cardRefs.current.set(row.id, node); else cardRefs.current.delete(row.id) }}>
             <PersonaCard persona={row} selected={selected === row.id} animated={using?.persona === row.id && data.motion.value && !motionReduced} onPick={() => choosePersona(row.id)} />
           </div>)}</div> : <div className="squad-empty"><h3>{data.personas.length ? catalogWord("literal", "03e05dc9c519") : catalogWord("literal", "b9f440f7bb3d")}</h3><p>{data.personas.length ? catalogWord("literal", "7942cb67343e") : catalogWord("literal", "3dfb93dd1061")}</p>
             {data.personas.length > 0 && <button type="button" onClick={() => { setTeam(""); setSearch("") }}>{catalogWord("inline", "6dc87a09ba68")}</button>}</div>}</div>
         <div className="squad-detail" ref={detailPanel} aria-labelledby="squad-detail-title">{persona ? <>
-          <button className="squad-back" type="button" onClick={backToRoster}>{catalogWord("inline", "a614ac7abbc2")}</button>
+          <div className="page-bar squad-back-bar"><button className="squad-back" type="button" onClick={backToRoster}>{catalogWord("inline", "a614ac7abbc2")}</button></div>
           <div className="squad-profile"><IconCanvas icon={persona.icon} size={5} /><div><p>{catalogWord("inline", "863e4b25f68c")}</p><h2 id="squad-detail-title" ref={detailTitle} tabIndex={-1}>{persona.name}</h2><span>{persona.subtitle}</span></div></div>
           <div className="squad-meta"><span>{persona.teamIds.map((id) => data.teams.find((row) => row.id === id)?.name ?? id).join(" · ") || catalogWord("literal", "800a6095679f")}</span>
             <details className="squad-meta-detail"><summary>{catalogWord("inline", "230d9c9e189c")}</summary>

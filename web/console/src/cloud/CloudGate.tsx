@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import type { SessionRow } from "@clawdline/contract"
 import App from "../App.js"
 import { BRAND_MARK } from "../brand-mark.js"
 import type { ConnectionLight } from "../connection-state.js"
@@ -63,9 +64,11 @@ import { carrierReading, type CarrierReading } from "./carrier-state.js"
 import { CloudSessionSheets, type PendingMachineAction } from "./CloudSessionSheets.js"
 import { PeerAccessPage } from "./PeerAccessPage.js"
 import { destinationAvailable, destinationFragment, destinationFromFragment, destinationKey,
-  supersedingDestination, type FleetDetailProblem, type SessionContent,
-  type SessionDestination, type SessionListPresentation, type SessionProjectionSource } from "./all-machine-sessions.js"
+  supersedingDestination, type FleetDetailProblem, type MachineListPresentation,
+  type MachineSessionProjection, type ProjectedSession, type SessionContent, type SessionDestination,
+  type SessionListPresentation, type SessionProjectionSource } from "./all-machine-sessions.js"
 import { statusSource } from "./status-source.js"
+import { STATUS_FRESH_MS, statusProjection } from "./status-projection.js"
 import { RelayWriter, writeRoute } from "./relay-writer.js"
 import { installScheduleWebhookManagement } from "./schedule-webhooks.js"
 import { installCloudPush, type CloudPushClient } from "./cloud-push.js"
@@ -255,6 +258,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         : { at: "checking" },
   )
   const [who, setWho] = useState<{ account: string; device: string } | null>(null)
+  const [managingMachines, setManagingMachines] = useState(false)
   const [machineList, setMachineList] = useState<MachineListState>({ phase: "loading" })
   const machines = machineList.phase === "ready" ? machineList.machines : null
   const [problem, setProblem] = useState<AccessProblem | null>(null)
@@ -279,15 +283,35 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const [readerMachine, setReaderMachine] = useState<string | null>(null)
   const fleetTargetRef = useRef<SessionDestination | null>(null)
   fleetTargetRef.current = fleetScope ? fleetTarget : null
-  const fleetPresentations = useRef(new Map<string, SessionListPresentation & { destination: SessionDestination }>())
+  const fleetPresentations = useRef(new Map<string, SessionListPresentation & {
+    destination: SessionDestination; projection?: ProjectedSession }>())
+  const fleetPresentationReceivedAt = useRef(new Map<string, number>())
+  const fleetProjections = useRef(new Map<string, { reading: MachineSessionProjection; receivedAt: number }>())
+  const noteFleetProjection = useCallback((machineID: string, reading: MachineSessionProjection) => {
+    fleetProjections.current.set(machineID, { reading, receivedAt: Date.now() })
+  }, [])
+  const [fleetPresentationRevision, refreshFleetPresentation] = useState(0)
   const noteFleetPresentations = useCallback((machineID: string,
-    rows: readonly (SessionListPresentation & { destination: SessionDestination })[]) => {
-    for (const [key, row] of fleetPresentations.current) {
-      if (row.destination.machineID === machineID) fleetPresentations.current.delete(key)
+    rows: readonly (SessionListPresentation & { destination: SessionDestination;
+      projection?: ProjectedSession })[]) => {
+    // A presentation pass may answer only its first row while ss/ replays the
+    // rest. Keep the prior verified rows for a machine switch; the reader
+    // checks each row's exact execution and freshness against the marker.
+    for (const row of rows) {
+      for (const [key, held] of fleetPresentations.current) {
+        if (held.destination.machineID === machineID &&
+          held.destination.sessionID === row.destination.sessionID &&
+          held.destination.executionGeneration !== row.destination.executionGeneration) {
+          fleetPresentations.current.delete(key)
+          fleetPresentationReceivedAt.current.delete(key)
+        }
+      }
+      const key = destinationKey(row.destination)
+      fleetPresentations.current.set(key, row)
+      fleetPresentationReceivedAt.current.set(key, Date.now())
     }
-    for (const row of rows) fleetPresentations.current.set(destinationKey(row.destination), row)
-    const target = fleetTargetRef.current
-    if (target?.machineID === machineID && reader.current?.machine === machineID && client.current)
+    refreshFleetPresentation((revision) => revision + 1)
+    if (reader.current?.machine === machineID && client.current)
       reader.current.attach(client.current)
   }, [])
   /** A console is on screen, for a machine this browser can read. */
@@ -484,12 +508,43 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const pointAt = useCallback((machineID: string, current: CloudClientHandle): RelayReader => {
     if (reader.current?.machine === machineID) return reader.current
     const config = transport.kind === "cloud" ? transport.config : null
+    const heldFleetRows = (machineID: string) => [...fleetPresentations.current.entries()]
+      .filter(([key, row]) => row.destination.machineID === machineID &&
+        !!row.projection &&
+        Date.now() - (fleetPresentationReceivedAt.current.get(key) ?? 0) <= STATUS_FRESH_MS)
+      .map(([, row]) => row)
     const next = new RelayReader(machineID, {
       strings: () => (config ? catalog(config) : Promise.resolve({})),
       carry: CARRY_TABLE,
       classicStatus: true,
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
+      fleetPresentations: heldFleetRows,
+      machineProjection: (machineID) => {
+        const held = fleetProjections.current.get(machineID)
+        if (held && Date.now() - held.receivedAt <= STATUS_FRESH_MS) {
+          const live = statusProjection(client.current, machineID)
+          if (live.kind === "ready" && live.observedAt > (held.reading.observedAt ?? 0))
+            return Promise.resolve(live)
+          return Promise.resolve(held.reading)
+        }
+        return liveSessionSource.readMachine(machineID, new AbortController().signal)
+      },
+      listPresentations: async (machineID) => {
+        // Reuse the fleet's already verified rows, even if a newer
+        // presentation pass has only delivered its first title. A partial
+        // batch remains visibly partial until the signed set catches up.
+        const held = heldFleetRows(machineID)
+        if (held.length) return held as MachineListPresentation[]
+        return await liveSessionSource.readMachinePresentations?.(
+          machineID, new AbortController().signal) ?? null
+      },
+      resolveSession: async (machineID, sessionID) => {
+        const reading = await liveSessionSource.readMachine(machineID, new AbortController().signal)
+        return reading.kind === "ready"
+          ? reading.rows.find((row) => row.destination.sessionID === sessionID && row.freshness === "current")?.destination ?? null
+          : null
+      },
       admitFleetMutation,
     })
     const writer = new RelayWriter(next.writeHost)
@@ -512,7 +567,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     // was one machine's for its whole life. They are not any more.
     forgetPersonas()
     return next
-  }, [transport, admitFleetMutation])
+  }, [transport, admitFleetMutation, liveSessionSource])
 
   /**
    * Read `machine`, and — unless `remember` says otherwise — record it as the
@@ -573,6 +628,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     // or the header keeps naming the machine this tab chose first while the
     // list below it is another machine's.
     setChosen(machine)
+    setManagingMachines(false)
     setScreen({ at: "console" })
   }, [transport, forgotten, pointAt])
 
@@ -976,7 +1032,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // list is asked again whenever it changes, so a machine that was still
   // arriving is opened on the pass that lists it.
   useEffect(() => {
-    if (screen.at !== "machines" || !machines || !who) return
+    if (screen.at !== "machines" || managingMachines || !machines || !who) return
     const exact = destinationFromFragment(location.hash)
     // A Session destination is the fleet's own address; a document address is
     // one machine's page, and the fleet would put the Session list over it.
@@ -991,7 +1047,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     if (opening.at !== "console") return
     setFleetScope(opening.fleet)
     choose(machines.find((machine) => machine.id === opening.machine)!, opening.remember)
-  }, [screen, machines, who, choose, remembered])
+  }, [screen, managingMachines, machines, who, choose, remembered])
 
   /**
    * Leave the machine this tab chose and start again at the list. This drops
@@ -1004,6 +1060,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     } catch {
       /* nothing remembered */
     }
+    setManagingMachines(true)
     setScreen({ at: "machines" })
   }, [who])
 
@@ -1015,6 +1072,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     } catch {
       /* the console still stays on the machine already attached */
     }
+    setManagingMachines(false)
     setScreen({ at: "console" })
   }, [reading, who])
 
@@ -1431,11 +1489,36 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // Once drawn, the console stays: the copied modules bind to the document
   // once, so a refusal after that (a revoked device, a line that gave up) is
   // drawn over it, as the door is over a local console (`door/Door.tsx`).
+  const fleetTargetRow = useMemo(() => {
+    if (!fleetScope || !fleetTarget) return null
+    const presentation = fleetPresentations.current.get(destinationKey(fleetTarget))
+    const status = presentation?.status
+    if (!presentation || !status || typeof status.work_state !== "string" ||
+      typeof status.state !== "string" || presentation.projection?.freshness !== "current" ||
+      presentation.projection.state !== status.state) return null
+    // The pinned list deliberately omits closeability and terminal internals.
+    // The fallback opens content only; an unknown closeability cannot authorize
+    // an end action while the rich stream is catching up. The waiting card
+    // reads the same provenance to say a missing menu has not arrived yet,
+    // rather than that the machine could not read it (`session/Waiting.tsx`).
+    const closeability: SessionRow["closeability"] = {
+      activity_generation: 0, attestation_id: null, mover: null,
+      obligation_generation: 0, observed_at: 0, provenance: [], reasons: [],
+      session_generation: 0, source: { freshness: "unknown", max_age_seconds: 0,
+        observed_at: 0, provenance: "pinned_list" }, state: "unknown", version: "",
+    }
+    return { ...status, id: fleetTarget.sessionID, session: fleetTarget.sessionID,
+      machine: fleetTarget.machineID, execution_generation: fleetTarget.executionGeneration,
+      label: presentation.title, cwd: presentation.cwd, icon: presentation.icon,
+      backend: presentation.projection.backend, assistant: presentation.projection.assistant,
+      isClaude: presentation.projection.assistant === "claude",
+      evidence: "none", closeability } as SessionRow
+  }, [fleetScope, fleetTarget && destinationKey(fleetTarget), fleetPresentationRevision])
   return (
     <>
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
-          <App aside={aside} hideSessionCounts={fleetScope}
+          <App key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
             cloudPeerAccess={(active) => <PeerAccessPage active={active}
               machines={(shown.phase === "ready" ? shown.machines : []).map((machine) => ({
               id: machine.id, name: machine.name || machine.label || machine.id,
@@ -1445,6 +1528,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             focusCloudSessions={fleetScope}
             onLeaveCloudSessions={leaveFleet}
             fleetTarget={fleetScope ? fleetTarget : null}
+            fleetTargetRow={fleetTargetRow}
             fleetDetailProblem={fleetScope && fleetTarget
               ? fleetDetailProblem?.key === destinationKey(fleetTarget)
                 ? { text: fleetDetailProblem.text, action: fleetDetailProblem.action }
@@ -1470,6 +1554,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             onOpen={openFleetSession}
             carrierOf={carrierOf}
             onPresentations={noteFleetPresentations}
+            onProjection={noteFleetProjection}
             onCloseRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title }) }}
             onMachineAction={runMachineTool}
           /> : undefined} />

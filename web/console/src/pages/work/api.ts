@@ -91,9 +91,17 @@ function query(params: Record<string, string | undefined>): string {
 export const readDecisions = () => call<DecisionPage>("/v1/work/decisions")
 export const readDecision = (id: string) => call<{ decision: Decision }>(`/v1/work/decisions/${encodeURIComponent(id)}`)
 /** The machine's real project directory: existing places it recognizes, newest first (at most forty). */
-export const copyProjectIcon = (id: string, icon: unknown, expected: unknown) =>
-  mutate<{ ok: boolean; icon: unknown }>(`/v1/projects/${encodeURIComponent(id)}/icon`, { icon, expected }, "PUT")
 export const readProjectPlaces = (machine?: string) => call<ProjectPlacePage>("/v1/places" + query({ machine }))
+export interface ProjectFolderPage {
+  path: string
+  parent?: string
+  folders: { name: string; path: string }[]
+  truncated: boolean
+}
+export const readProjectFolders = (path?: string, machine?: string) =>
+  call<ProjectFolderPage>("/v1/project-folders" + query({ path, machine }))
+export const addProjectPlace = (path: string, machine?: string) =>
+  mutate<{ registered: boolean }>("/v1/places" + query({ machine }), { paths: [path] })
 export const removeProjectPlace = (place: ProjectPlace) =>
   mutate<{ registered: boolean }>("/v1/places", { place: place.id, paths: [place.path] }, "DELETE")
 /** Project settings sync (docs/project-sync.md), as internal/domain/projectsync spells it. */

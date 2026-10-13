@@ -40,6 +40,20 @@ test("a reused Session id with a new execution generation cannot open or reuse o
   assert.equal(cache.get(old.destination), undefined)
 })
 
+test("a partial authenticated list opens named executions but proves no Session absent", () => {
+  const known = row("machine/a", "known", "7")
+  const missing = row("machine/a", "unscanned", "8")
+  const partial = checkedProjection("machine/a", { kind: "ready", complete: false,
+    observedAt: 1000, rows: [known] })
+  assert.equal(partial.kind, "ready")
+  assert.equal(destinationAvailable(known.destination, partial), "ready")
+  assert.equal(destinationAvailable(missing.destination, partial), "waiting")
+  assert.equal(supersedingDestination(missing.destination, partial), null)
+  assert.equal(destinationAvailable(missing.destination, checkedProjection("machine/a", {
+    kind: "ready", complete: false, observedAt: 1000, rows: [],
+  })), "waiting")
+})
+
 test("slow or offline machines do not make the fast machine's projection empty", () => {
   const fast = ready("fast", [row("fast", "s1", "1")])
   const slow: MachineSessionProjection = { kind: "unavailable", reason: "offline" }
@@ -81,6 +95,10 @@ test("a temporary status read failure retains the last list without making its r
     assert.equal(destinationAvailable(row("one", "s", "1").destination, held), "waiting")
     assert.equal(checkedProjection("one", held), held)
   }
+  const retry = settleProjection("one", previous, { kind: "unavailable", reason: "unknown" }, 5_000)
+  assert.ok(retry.kind === "unavailable")
+  assert.ok(retry.retryAt !== undefined && retry.retryAt >= Date.now() + 4_000 && retry.retryAt <= Date.now() + 5_000)
+  assert.equal(projectionRefreshAt(retry, 300_000), retry.retryAt)
   assert.equal(settleProjection("one", previous, { kind: "unavailable", reason: "no_permission" }).rows, undefined)
 })
 
@@ -137,6 +155,7 @@ test("current status is reread when its earliest status time expires", () => {
   assert.equal(projectionRefreshAt(ready("one", [{ ...row("one", "s", "1"), freshness: "stale", observedAt: 1 }]),
     300_000), 301_001)
   assert.equal(projectionRefreshAt({ kind: "unavailable", reason: "stale" }, 300_000), null)
+  assert.equal(projectionRefreshAt({ kind: "unavailable", reason: "unknown", retryAt: 1200 }, 300_000), 1200)
   assert.equal(projectionRefreshAt({ kind: "unavailable", reason: "offline", retryAt: 1200 }, 300_000), 1200)
   assert.equal(projectionRefreshAt({ kind: "unavailable", reason: "event_gap", retryAt: 1200 }, 300_000), 1200)
   assert.equal(projectionRefreshAt({ ...one, observedAt: 900, snapshotGeneration: "direct:900" },

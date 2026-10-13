@@ -25,6 +25,13 @@ The exact broker task record is ownership evidence. A location under a worktree 
 is why a checkout made by another session, including one under a familiar temporary directory,
 stays `unknown` unless the broker actually associates it with this task.
 
+The Projects worktree page offers **Delete worktree** only for a task-owned checkout that the
+machine reports as landed, clean, and unused. The DELETE route observes the repository and live
+sessions again; a stale button cannot authorize removal. Git removes the checkout without
+`--force`, leaving the branch and commits intact. Dirty, active, foreign, and uncertain rows have
+no delete button and the route refuses them if called directly. The browser can request this
+through Clawdline Cloud; the owning machine makes the final decision.
+
 ## Commands and exit status
 
 The default is a dry run:
@@ -50,8 +57,11 @@ removing a worktree leaves its branch and commits in the repository.
 
 Run the dry check after each landing is recorded. This timing matters: before the landing record,
 the system must say `unlanded`; after it, the broker can prove both the target and the absent child
-owner. The daemon's own periodic reclamation remains the backstop for broker-owned task trees. The
-repository guard is the visible receipt at the root's integration boundary.
+owner. Apply every proved `landed_clean` result after reading the dry run. Remove a root-owned task
+checkout when its commit is on `main`, it is clean, and its owner is done with it. Report the count
+removed and the reason for each candidate kept, even if no checkout was removed. The daemon's own
+periodic reclamation remains the backstop for broker-owned task trees. The repository guard is the
+visible receipt at the root's integration boundary.
 
 ## Root-owned temporary trees
 

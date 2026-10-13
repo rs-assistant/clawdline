@@ -24,6 +24,8 @@ function row(extra: Partial<SessionRow>): SessionRow {
 
 test("a new Session waits for its first conversation before reading to-dos", () => {
   assert.equal(sessionTodosReady(row({ identity: "no_record", sessionId: "" })), false)
+  assert.equal(sessionTodosReady(row({ sessionId: "" })), false,
+    "a newly listed terminal without a conversation id must not report a failed read")
   assert.equal(sessionTodosReady(row({ sessionId: "conversation-1" })), true)
   assert.equal(sessionTodosReady(row({ activity: { known: false, unknown_reason: "unreadable" }, sessionId: "" })), true,
     "an actual identity failure keeps the terminal-compatible read path")

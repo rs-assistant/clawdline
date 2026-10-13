@@ -329,14 +329,17 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		},
 		"projectsync.manifest_projects": func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-manifest guard"} },
 		"projectsync.project_files":     func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-project guard"} },
-		"projectfiles.list":             func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-inventory file count guard"} },
-		"projectfiles.scan_entries":     func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-skill-directory scan guard"} },
-		"projectfiles.tree_path_bytes":  func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-Project-tree request guard"} },
-		"projectfiles.tree_depth":       func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-Project-tree request guard"} },
-		"projectfiles.file_bytes":       func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-file read and save guard"} },
-		"projectfiles.write_bytes":      func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-request save body guard"} },
-		"projectsync.file_bytes":        func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-file guard"} },
-		"projectsync.path_bytes":        func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-path guard"} },
+		"projects.folder_rows": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-directory folder listing guard"}
+		},
+		"projectfiles.list":            func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-inventory file count guard"} },
+		"projectfiles.scan_entries":    func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-skill-directory scan guard"} },
+		"projectfiles.tree_path_bytes": func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-Project-tree request guard"} },
+		"projectfiles.tree_depth":      func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-Project-tree request guard"} },
+		"projectfiles.file_bytes":      func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-file read and save guard"} },
+		"projectfiles.write_bytes":     func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-request save body guard"} },
+		"projectsync.file_bytes":       func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-file guard"} },
+		"projectsync.path_bytes":       func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-path guard"} },
 		capacity.SessionsShellOutputBytes: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-read window; no retained buffer"}
 		},
@@ -1073,6 +1076,12 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		capacity.CloudViewerEventsLine: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-row log line guard; no retained buffer"}
 		},
+		capacity.CloudSessionRowID: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-read guard on the id a sessions.row names; no retained buffer"}
+		},
+		capacity.CloudSessionRowAsks: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "asks live in the Cloud link's publisher and drain each pass; not measured here"}
+		},
 		capacity.CloudViewerEventsSeen: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "batch ids live in the Cloud link and reset with it; not measured here"}
 		},
@@ -1179,6 +1188,12 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		},
 		capacity.ConsoleStatusMarkerRetry: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console retry of a missing Cloud status inventory; daemon cannot measure another device's reads"}
+		},
+		capacity.ConsolePinnedListReadTimeout: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console pinned machine list read deadline; daemon cannot measure another device's wait"}
+		},
+		capacity.ConsoleStatusMarkerRecoveryWait: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console retained inventory replay deadline; daemon cannot measure another device's wait"}
 		},
 		capacity.ConsoleOpenedRowRestate: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console relay reader cadence for the opened Session's own row; daemon cannot measure another device's reads"}

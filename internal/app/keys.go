@@ -115,6 +115,10 @@ func (a Actions) Key(ctx context.Context, id, key, expect string) (session.Sessi
 			Detail: "The terminal command did not complete: " + err.Error()}
 	}
 	a.record(ctx, "session.key", s.ID, p.note)
+	// The screen the press left is read live for a moment, so the list and
+	// the Cloud publisher's next looks show it rather than the held screen
+	// from before the press (HeldScreens.Pressed).
+	a.Inventory.Held.Pressed(s.ID)
 	return s, nil
 }
 

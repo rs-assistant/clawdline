@@ -2,7 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import type { UpdateStatus } from "@clawdline/contract"
 import {
-  createUpdateReadStore, updateBannerVersion, UPDATE_READ_EVERY_MS,
+  canStartUpdateAfterFresh, createUpdateReadStore, updateBannerVersion, UPDATE_READ_EVERY_MS,
   type UpdateRead, type UpdateReadEnvironment,
 // @ts-expect-error -- a `.ts` path for node's type-stripping test runner.
 } from "./update-model.ts"
@@ -31,6 +31,7 @@ function environment() {
     visible: () => visible,
     onVisibilityChange: (listener) => on("visibilitychange", listener),
     onFocus: (listener) => on("focus", listener),
+    onPageShow: (listener) => on("pageshow", listener),
     onOnline: (listener) => on("online", listener),
     setInterval: (listener, ms) => {
       assert.equal(ms, UPDATE_READ_EVERY_MS)
@@ -53,10 +54,31 @@ function environment() {
 const settle = () => new Promise<void>((resolve) => setImmediate(resolve))
 const bannerVersion = (read: UpdateRead | null) => updateBannerVersion(read?.kind === "status" ? read.status : null, null)
 
+test("a direct update press rechecks the source and never applies a withdrawn or stale release", async () => {
+  const time = environment()
+  const answers: UpdateRead[] = [status("update_available"), status("unknown"), status("update_available")]
+  const store = createUpdateReadStore(async () => answers.shift()!, time.env)
+  const stop = store.subscribe(() => {})
+  await settle()
+  assert.equal(bannerVersion(store.current()), "v2")
+  const withdrawn = await store.recheck()
+  assert.equal(canStartUpdateAfterFresh(withdrawn, store.current()), false)
+  assert.equal(bannerVersion(store.current()), null)
+  const available = await store.recheck()
+  assert.equal(canStartUpdateAfterFresh(available, store.current()), true)
+  assert.equal(canStartUpdateAfterFresh(available, withdrawn), false, "a superseded answer cannot authorize a press")
+  if (available.kind === "status") {
+    const moving: UpdateRead = { kind: "status", status: { ...available.status, apply: { state: "downloading" } } }
+    assert.equal(canStartUpdateAfterFresh(moving, moving), false, "a second press cannot start while installation moves")
+  }
+  stop()
+})
+
 test("a hidden page makes no periodic reads and checks immediately after a stale return", async () => {
   const time = environment()
   let reads = 0
-  const store = createUpdateReadStore(async () => { reads++; return status("update_available") }, time.env)
+  const fresh: boolean[] = []
+  const store = createUpdateReadStore(async (mustRefresh) => { reads++; fresh.push(mustRefresh); return status("update_available") }, time.env)
   const stop = store.subscribe(() => {})
   await settle()
   assert.equal(reads, 1)
@@ -69,8 +91,10 @@ test("a hidden page makes no periodic reads and checks immediately after a stale
   assert.deepEqual(await store.refresh(), store.current(), "the Settings timer cannot poll in background")
   assert.equal(reads, 1)
   time.show(true)
+  assert.equal(store.current()?.kind, "checking", "an old banner is hidden while the new answer is pending")
   await settle()
   assert.equal(reads, 2)
+  assert.deepEqual(fresh, [true, true], "opening and returning both ask the release host")
   assert.equal(time.timers(), 1)
   stop()
   assert.equal(time.listeners(), 0)
@@ -134,5 +158,36 @@ test("a remounted view rechecks an aged shared reading", async () => {
   const stop = store.subscribe(() => {})
   await settle()
   assert.equal(reads, 2)
+  stop()
+})
+
+test("a restored phone page discards a late pre-background answer", async () => {
+  const time = environment()
+  const pending: Array<(read: UpdateRead) => void> = []
+  const store = createUpdateReadStore(() => new Promise((resolve) => { pending.push(resolve) }), time.env)
+  const stop = store.subscribe(() => {})
+  pending.shift()!(status("update_available"))
+  await settle()
+  assert.equal(bannerVersion(store.current()), "v2")
+
+  time.advance(UPDATE_READ_EVERY_MS)
+  time.tick()
+  const beforeSleep = pending.shift()!
+  time.show(false)
+  time.show(true)
+  assert.equal(store.current()?.kind, "checking")
+  assert.equal(bannerVersion(store.current()), null)
+  const afterWake = pending.shift()!
+  beforeSleep(status("update_available"))
+  await settle()
+  assert.equal(store.current()?.kind, "checking", "the old response cannot restore a withdrawn banner")
+  afterWake(status("current"))
+  await settle()
+  assert.equal(bannerVersion(store.current()), null)
+
+  time.fire("pageshow")
+  assert.equal(store.current()?.kind, "checking", "back-forward restoration checks immediately")
+  pending.shift()!(status("current"))
+  await settle()
   stop()
 })

@@ -3,6 +3,7 @@ import { client } from "../client.js"
 import * as L from "../legacy/bridge.js"
 import { smartTitle as requestSmartTitle } from "../legacy/command-bridge.js"
 import { nextWord } from "../next-strings.js"
+import { pressKey } from "../press-key.js"
 import { contextCell } from "../session/context.js"
 import { resetWhen } from "../session/reset-when.js"
 import { repositoryNote } from "./links-note.js"
@@ -190,6 +191,11 @@ function canSwitch(): boolean {
   const s = session()
   return !!(s && host.writable() && s.state === "idle" && !busy)
 }
+/** A Codex row may be unknown while its terminal remains writable. A deliberate press can open its picker. */
+function canOpenCodexPicker(): boolean {
+  const s = session()
+  return !!(s && host.writable() && (s.state === "idle" || s.state === "unknown") && !busy)
+}
 /** A dated model finds its versioned row without selecting a shorter version. */
 function onModel(current: string, m: SessionModel): boolean {
   return !!current && (current === m.id ||
@@ -288,6 +294,19 @@ function modelsHTML(models: SessionModel[], current: string): string {
     'placeholder="' + esc(T.webInfoModelOther) + '" aria-label="' + esc(T.webInfoModelOther) + '"' + (can ? "" : " disabled") + ">" +
     '<button type="submit" class="chip"' + (can ? "" : " disabled") + ">" + esc(T.webSend) + "</button></form>"
   return '<div class="models">' + chips + other + "</div>" + (can ? "" : note(T.webInfoModelBusy))
+}
+
+function codexModelHTML(models: SessionModel[], current: string): string {
+  const can = canOpenCodexPicker()
+  const chips = models.map((model) => {
+    const on = onModel(current, model)
+    return '<button type="button" class="m" data-model-picker="1" title="' + esc(nextWord("infoOpenModelPicker")) + '"' +
+      (on ? ' data-on="1" aria-current="true"' : "") + (can && !on ? "" : " disabled") + '>' + esc(model.name) + '</button>'
+  }).join("")
+  const other = '<button type="button" class="m" data-model-picker="1"' +
+    (can ? "" : " disabled") + '>' + esc(T.webInfoModelOther) + '</button>'
+  return '<div class="models">' + chips + other + '</div>' +
+    (can ? "" : note(T.webInfoModelBusy))
 }
 
 /**
@@ -506,7 +525,9 @@ function html(d: Facts): string {
   const role = roleHTML(session())
   if (role) out += sec(++i, nextWord("personaPicker"), "", role)
   // Read-only pairings get no buttons rather than dead ones.
-  if (models.length && host.writable()) out += sec(++i, T.webInfoSwitchModel, "", modelsHTML(models, current))
+  if (host.writable() && (models.length || s.assistant === "codex")) {
+    out += sec(++i, T.webInfoSwitchModel, "", s.assistant === "codex" ? codexModelHTML(models, current) : modelsHTML(models, current))
+  }
   out += sec(++i, nextWord("infoContext"), "", contextHTML(d.context))
   out += sec(++i, T.webInfoUsage, "", usageHTML(u))
   if (d.limits) {
@@ -691,7 +712,15 @@ export const Info = {
     if (data && s && statusShape(s) !== stateSeen) draw()
   },
 
-  /** `/model <word>`, typed into the session as one line. One word: a second would be typed as part of it. */
+  /**
+   * `/model <word>`, typed into the session as one line. One word: a second
+   * would be typed as part of it.
+   *
+   * The press mints its own key, as every Session write does: a machine read
+   * through Clawdline Cloud refuses a `send` without one, and this chip had
+   * nothing to send under it — the card said `idempotency_key_required` and
+   * the model never changed.
+   */
   switchTo(raw: string, name: string): void {
     const id = forId
     const word = String(raw || "").trim().split(/\s+/)[0] || ""
@@ -699,7 +728,7 @@ export const Info = {
     busy = true
     said("")
     draw()
-    client.send(id, "/model " + word).then(
+    client.send(id, "/model " + word, pressKey("model")).then(
       () => {
         if (forId !== id) return
         busy = false
@@ -717,6 +746,13 @@ export const Info = {
         draw()
       },
     )
+  },
+
+  openModelPicker(): void {
+    const id = forId
+    if (!id || data?.session?.assistant !== "codex" || !canOpenCodexPicker()) return
+    Info.close()
+    client.send(id, "/model", pressKey("model-picker")).catch((e) => toast(why(e)))
   },
 
   editTitle(): void {
@@ -837,6 +873,11 @@ export function bindInfo(): () => void {
   const onBody = (ev: MouseEvent) => {
     const t = ev.target as Element | null
     if (!t || !t.closest) return
+    const picker = t.closest<HTMLButtonElement>("button[data-model-picker]")
+    if (picker) {
+      if (!picker.disabled) Info.openModelPicker()
+      return
+    }
     const chip = t.closest<HTMLButtonElement>("button[data-model]")
     if (chip) {
       if (!chip.disabled) Info.switchTo(chip.dataset.model || "", chip.dataset.name || "")

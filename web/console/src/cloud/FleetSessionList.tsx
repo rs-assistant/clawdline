@@ -9,9 +9,10 @@ import { SessionToolbar } from "../session/SessionToolbar.js"
 import { ScheduleSection, scheduleMachineReady } from "../pages/schedules.js"
 import { destinationKey, displayedPresentationStatus, presentationPass, projectionRefreshAt, settleProjection,
   type MachineSessionProjection, type ProjectionProblem, type SessionDestination,
-  type SessionListPresentation, type SessionProjectionSource, type FleetMachine } from "./all-machine-sessions.js"
+  type SessionListPresentation, type SessionProjectionSource, type FleetMachine,
+  type ProjectedSession } from "./all-machine-sessions.js"
 import { STATUS_FRESH_MS } from "./status-projection.js"
-import { STATUS_MARKER_RETRY_MS } from "./status-source.js"
+import { STATUS_GAP_RETRY_MS, STATUS_MARKER_RETRY_MS } from "./status-source.js"
 import { arrangeFleetRows, fleetWaitingKey } from "./fleet-order.js"
 import { matchesFleetFilter, type FleetFilter } from "./fleet-filters.js"
 import { CarrierDot } from "./CarrierDot.js"
@@ -22,7 +23,7 @@ type Reading = { phase: "loading" } | { phase: "settled"; value: MachineSessionP
 
 /** Only the fleet list is new; the conversation and composer belong to SessionsPage. */
 export function FleetSessionList({ machines, source, target, filter, onFilter, onOpen,
-  carrierOf, onMachineAction, onCloseRequest, onPresentations }: {
+  carrierOf, onMachineAction, onCloseRequest, onPresentations, onProjection }: {
   machines: readonly FleetMachine[]
   source: SessionProjectionSource | null
   /** Which road this page's reads of that machine take, read as the row is drawn. */
@@ -31,11 +32,19 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   filter: string
   onFilter: (value: string) => void
   onOpen: (target: SessionDestination) => void
-  onPresentations?: (machineID: string, rows: readonly (SessionListPresentation & { destination: SessionDestination })[]) => void
+  onPresentations?: (machineID: string, rows: readonly (SessionListPresentation & {
+    destination: SessionDestination; projection?: ProjectedSession })[]) => void
+  onProjection?: (machineID: string, reading: MachineSessionProjection) => void
   onMachineAction?: (machineID: string, action: MachineToolbarAction) => void
   onCloseRequest: (target: SessionDestination, title: string) => void
 }) {
   const [readings, setReadings] = useState<Record<string, Reading>>({})
+  useEffect(() => {
+    for (const machine of machines) {
+      const reading = readings[machine.id]
+      if (reading?.phase === "settled") onProjection?.(machine.id, reading.value)
+    }
+  }, [readings, machines, onProjection])
   const presentations = useRef(new Map<string, { machineID: string; sessionID: string; pass: string } & SessionListPresentation>())
   const presentationPasses = useRef(new Map<string, string>())
   const presentationFailures = useRef(new Map<string, string>())
@@ -82,12 +91,13 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
         if (!live || abort.signal.aborted) return
         if (value.kind === "ready") scheduleMachineReady(machineID)
         setReadings((before) => ({ ...before, [machineID]: { phase: "settled",
-          value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined, value) } }))
+          value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined,
+            value, STATUS_GAP_RETRY_MS) } }))
       }, (error: unknown) => {
         if (!live || abort.signal.aborted) return
         setReadings((before) => ({ ...before, [machineID]: { phase: "settled",
           value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined,
-            { kind: "unavailable", reason: problemOf(error) }) } }))
+            { kind: "unavailable", reason: problemOf(error) }, STATUS_GAP_RETRY_MS) } }))
       })
     }
     const stop = source.subscribe(({ machineID, sessionID, kind }) => {
@@ -125,12 +135,13 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
           if (!abort.signal.aborted) {
             if (value.kind === "ready") scheduleMachineReady(machineID)
             setReadings((before) => ({ ...before, [machineID]: { phase: "settled",
-              value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined, value) } }))
+              value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined,
+                value, STATUS_GAP_RETRY_MS) } }))
           }
         }, (error: unknown) => {
           if (!abort.signal.aborted) setReadings((before) => ({ ...before, [machineID]: { phase: "settled",
             value: settleProjection(machineID, before[machineID]?.phase === "settled" ? before[machineID].value : undefined,
-              { kind: "unavailable", reason: problemOf(error) }) } }))
+              { kind: "unavailable", reason: problemOf(error) }, STATUS_GAP_RETRY_MS) } }))
         })
       }
     }, Math.max(1, earliest - Date.now()))
@@ -179,8 +190,11 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               status: row.status ?? previous?.status,
             })
           }
-          onPresentations?.(machineID, rows)
           const expected = readings[machineID]
+          const projected = new Map(expected?.phase === "settled" && expected.value.kind === "ready"
+            ? expected.value.rows.map((row) => [destinationKey(row.destination), row] as const) : [])
+          onPresentations?.(machineID, rows.map((row) => ({ ...row,
+            projection: projected.get(destinationKey(row.destination)) })))
           const missing = expected?.phase === "settled" && expected.value.kind === "ready" &&
             expected.value.rows.some((row) => row.freshness === "current" &&
               !presentations.current.has(destinationKey(row.destination)))
@@ -318,24 +332,31 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
             </button></h2>
           {!collapsed[machine.id] && <>
-          {machine.freshness !== "current" && reading?.phase === "settled" && reading.value.kind === "ready" &&
-            <p role="status">{machine.freshness === "stale" ? nextWord("cloudAllStaleSource") : nextWord("cloudAllUnknownSource")}</p>}
+          {/* A verified Session reading can settle before the roster's machine
+              freshness changes. Its own completeness and row freshness are the
+              authority here; an unrelated roster state must not leave a
+              permanent "checking connection" banner above settled results. */}
           {!reading || reading.phase === "loading" ? <p role="status">{nextWord("cloudAllLoading")}</p> : <>
-            {reading.value.kind === "unavailable" && <p role="status">{problemWord(reading.value.reason)}</p>}
+            {/* // refusal-ok: Unknown means the list is still being verified; its reason stays in the reading for the scheduled retry. */}
+            {reading.value.kind === "unavailable" && (reading.value.reason === "unknown"
+              ? !reading.value.rows?.length && <p role="status">{nextWord("cloudAllLoading")}</p>
+              : <p role="status">{problemWord(reading.value.reason)}</p>)}
+            {reading.value.kind === "ready" && !reading.value.complete &&
+              <p role="status">{nextWord("cloudAllPartialMachine")}</p>}
             {presentationLoading && <p role="status">{nextWord("cloudAllLoading")}</p>}
             {presentationFailed && <p role="alert">{nextWord("cloudAllNameUnavailable")} <button type="button"
               onClick={() => { presentationPasses.current.delete(machine.id); presentationFailures.current.delete(machine.id)
                 refreshPresentation((revision) => revision + 1) }}>{nextWord("cloudAllTryAgain")}</button></p>}
             {presentationLoading || presentationFailed ? null : rows.length === 0 ? reading.value.unknownTargets ? null : reading.value.kind === "ready" ?
-              <p>{reading.value.rows.length === 0 ? nextWord("cloudAllEmptyMachine") : nextWord("cloudAllNoMatch")}</p> : null
+              <p>{reading.value.rows.length === 0 ? nextWord(reading.value.complete ? "cloudAllEmptyMachine" : "cloudAllPartialEmpty") : nextWord("cloudAllNoMatch")}</p> : null
               : <ul className="rows" role="listbox" aria-label={`${machine.name} ${nextWord("cloudSingleSessions")}`}>
                 {rows.map(({ row, depth, branchThrough, ancestorThrough }) => {
                   const presentation = presentations.current.get(destinationKey(row.destination))
                   return <ProjectedRow key={destinationKey(row.destination)}
                     title={presentation?.title || row.destination.sessionID} icon={presentation?.icon} cwd={presentation?.cwd}
                     status={displayedPresentationStatus(row, presentation)}
-                    sessionID={row.destination.sessionID} machineName={machine.name} platform={machine.platform}
-                    assistant={row.assistant} backend={row.backend} state={row.state} stateLabel={stateWord(row.state)}
+                    sessionID={row.destination.sessionID} machineID={machine.id} machineName={machine.name}
+                    assistant={row.assistant} state={row.state} stateLabel={stateWord(row.state)}
                     freshness={row.freshness === "current" ? "" : nextWord(
                       row.freshness === "stale" ? "cloudAllStale" : "cloudAllUnknown")}
                     lastMovementAt={row.lastMovementAt} attention={row.needsAttention === true}

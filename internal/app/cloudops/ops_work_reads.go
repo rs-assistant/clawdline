@@ -419,6 +419,42 @@ func init() {
 
 		// The Projects page's catalog and worktree lifecycle. `places` above is
 		// carried separately.
+		op{name: "project-folders", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.hasOneOf([]string{"type", "session", "request"}, []string{"type", "session", "request", "path"}) {
+					return plan{}, false
+				}
+				p, ok := machinePlan(b)
+				if !ok {
+					return plan{}, false
+				}
+				path, ok := b.str("path")
+				if _, present := b["path"]; present && (!ok || len(path) > 4096) {
+					return plan{}, false
+				}
+				p.path = path
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "GET", Path: "/v1/project-folders", Query: map[string]string{"path": p.path}}
+			}},
+		op{name: "project-add",
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "path") {
+					return plan{}, false
+				}
+				p, ok := actionPlan(b, false)
+				path, valid := b.nonEmpty("path")
+				if !ok || !valid || !printable(path) || len(path) > 4096 || !filepath.IsAbs(path) {
+					return plan{}, false
+				}
+				p.path = path
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				payload, _ := json.Marshal(map[string][]string{"paths": {p.path}})
+				return LocalRequest{Method: "POST", Path: "/v1/places", Body: payload, Header: asDevice()}
+			}},
 		op{name: "project-hide",
 			decode: func(b body) (plan, bool) {
 				if !b.has("type", "session", "request", "path") {
@@ -436,12 +472,6 @@ func init() {
 				payload, _ := json.Marshal(map[string][]string{"paths": {p.path}})
 				return LocalRequest{Method: "DELETE", Path: "/v1/places", Body: payload, Header: asDevice()}
 			}},
-		op{name: "project-icon-copy",
-			decode: decodeWorkV2NamedDocument("id", "item"),
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "PUT", Path: "/v1/projects/" + segment(p.id) + "/icon", Body: p.document, Header: asDevice()}
-			},
-		},
 		op{name: "projects", read: true,
 			decode: func(b body) (plan, bool) {
 				if !b.has("type", "session", "request") {
@@ -580,6 +610,23 @@ func init() {
 				return LocalRequest{Method: "POST",
 					Path: "/v1/projects/" + segment(p.project) + "/worktrees/refresh",
 					Body: []byte("{}")}
+			}},
+		op{name: "project-worktree-remove",
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "project", "worktree") {
+					return plan{}, false
+				}
+				p, ok := actionPlan(b, false)
+				project, projectOK := b.nonEmpty("project")
+				id, idOK := b.nonEmpty("worktree")
+				if !ok || !projectOK || len(project) > 200 || !idOK || len(id) != 27 || !strings.HasPrefix(id, "wt-") {
+					return plan{}, false
+				}
+				p.project, p.id = project, id
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "DELETE", Path: "/v1/projects/" + segment(p.project) + "/worktrees/" + segment(p.id)}
 			}},
 
 		op{name: "timeline", read: true,
@@ -768,6 +815,18 @@ func init() {
 			},
 			route: func(p plan) LocalRequest {
 				return LocalRequest{Method: "GET", Path: "/v1/update"}
+			}},
+		// A foreground return requires a fresh signed manifest. A distinct word
+		// keeps older machines' update read wire shape unchanged.
+		op{name: "update-fresh", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request") {
+					return plan{}, false
+				}
+				return machinePlan(b)
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "GET", Path: "/v1/update/fresh"}
 			}},
 
 		// The Settings page's 「立即更新」 (docs/updates.md): install the newest

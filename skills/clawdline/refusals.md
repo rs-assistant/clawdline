@@ -17,18 +17,18 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `bad_offer` | `internal/transport/http/cloud_agent.go` |
 | `bad_path` | `internal/transport/http/page.go` |
 | `bad_query` | `internal/transport/http/work_v2_reference_images.go` |
-| `bad_request` | `internal/transport/http/actions.go`, `internal/transport/http/auth.go`, `internal/transport/http/board.go`, `internal/transport/http/body.go`, `internal/transport/http/callbacks.go`, `internal/transport/http/cloud.go`, `internal/transport/http/cloud_agent.go`, `internal/transport/http/cloud_peer.go`, `internal/transport/http/cloud_viewer.go`, `internal/transport/http/diagnostics.go`, `internal/transport/http/documents.go`, `internal/transport/http/gate.go`, `internal/transport/http/git.go`, `internal/transport/http/images.go`, `internal/transport/http/intent.go`, `internal/transport/http/keys.go`, `internal/transport/http/machine_usage.go`, `internal/transport/http/orchestrator.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_icons.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/project_tree.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/projects.go`, `internal/transport/http/push.go`, `internal/transport/http/pwa.go`, `internal/transport/http/schedules.go`, `internal/transport/http/server.go`, `internal/transport/http/session_archive.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/settings.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/start.go`, `internal/transport/http/tasks.go`, `internal/transport/http/terminals.go`, `internal/transport/http/todos.go`, `internal/transport/http/tracks.go`, `internal/transport/http/transcript.go`, `internal/transport/http/tunnel.go`, `internal/transport/http/update.go`, `internal/transport/http/usage.go`, `internal/transport/http/usage_work_units.go`, `internal/transport/http/verify.go`, `internal/transport/http/voice.go`, `internal/transport/http/waits.go`, `internal/transport/http/work.go`, `internal/transport/http/workflow.go` |
+| `bad_request` | `internal/transport/http/actions.go`, `internal/transport/http/auth.go`, `internal/transport/http/board.go`, `internal/transport/http/body.go`, `internal/transport/http/callbacks.go`, `internal/transport/http/cloud.go`, `internal/transport/http/cloud_agent.go`, `internal/transport/http/cloud_peer.go`, `internal/transport/http/cloud_viewer.go`, `internal/transport/http/diagnostics.go`, `internal/transport/http/documents.go`, `internal/transport/http/gate.go`, `internal/transport/http/git.go`, `internal/transport/http/images.go`, `internal/transport/http/intent.go`, `internal/transport/http/keys.go`, `internal/transport/http/machine_usage.go`, `internal/transport/http/orchestrator.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_folders.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/project_tree.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/projects.go`, `internal/transport/http/push.go`, `internal/transport/http/pwa.go`, `internal/transport/http/schedules.go`, `internal/transport/http/server.go`, `internal/transport/http/session_archive.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/settings.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_role_draft.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/start.go`, `internal/transport/http/tasks.go`, `internal/transport/http/terminals.go`, `internal/transport/http/todos.go`, `internal/transport/http/tracks.go`, `internal/transport/http/transcript.go`, `internal/transport/http/tunnel.go`, `internal/transport/http/update.go`, `internal/transport/http/usage.go`, `internal/transport/http/usage_work_units.go`, `internal/transport/http/verify.go`, `internal/transport/http/voice.go`, `internal/transport/http/waits.go`, `internal/transport/http/work.go`, `internal/transport/http/workflow.go` |
 | `bad_tree_path` | `internal/transport/http/project_tree.go` |
 | `board_command_too_large` | `internal/transport/http/board.go` |
 | `board_response_too_large` | `internal/transport/http/board.go` |
 | `board_selector_not_implemented` | `internal/transport/http/board.go` |
 | `board_store_unreadable` | `internal/transport/http/board_settings.go` |
 | `board_unavailable` | `internal/transport/http/board.go` |
-| `body_too_large` | `internal/transport/http/body.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_icons.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/projects.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_session_name.go` |
+| `body_too_large` | `internal/transport/http/body.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/projects.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_role_draft.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_session_name.go` |
 | `broker_unavailable` | `internal/transport/http/cloud_agent.go` |
 | `browser_setting_unavailable` | `internal/transport/http/settings.go` |
 | `builtin_read_only` | `internal/transport/http/squad.go` |
-| `busy` | `internal/transport/http/intent.go`, `internal/transport/http/session_smart_title.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/voice.go`, `internal/transport/http/work_v2_persona_suggestion.go` |
+| `busy` | `internal/transport/http/intent.go`, `internal/transport/http/session_smart_title.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_role_draft.go`, `internal/transport/http/voice.go`, `internal/transport/http/work_v2_persona_suggestion.go` |
 | `capacity_full` | `internal/transport/http/squad.go` |
 | `catalog_unreadable` | `internal/transport/http/tasks.go` |
 | `child_kind_not_allowed` | `internal/domain/work/v2.go` |
@@ -63,7 +63,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `execution_target_required` | `internal/transport/http/images.go` |
 | `expired` | `internal/transport/http/auth.go` |
 | `file_permission` | `internal/transport/http/project_files.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_unify.go` |
-| `forbidden` | `internal/transport/http/actions.go`, `internal/transport/http/auth.go`, `internal/transport/http/board.go`, `internal/transport/http/callbacks.go`, `internal/transport/http/cloud_peer.go`, `internal/transport/http/coordinator.go`, `internal/transport/http/focus.go`, `internal/transport/http/gate.go`, `internal/transport/http/handoffs.go`, `internal/transport/http/human_interventions.go`, `internal/transport/http/images.go`, `internal/transport/http/intent.go`, `internal/transport/http/orchestrator.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_icons.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/runs.go`, `internal/transport/http/schedules.go`, `internal/transport/http/session_pauses.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/start.go`, `internal/transport/http/terminals.go`, `internal/transport/http/todos.go`, `internal/transport/http/update.go`, `internal/transport/http/voice.go`, `internal/transport/http/waits.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/workflow.go` |
+| `forbidden` | `internal/transport/http/actions.go`, `internal/transport/http/auth.go`, `internal/transport/http/board.go`, `internal/transport/http/callbacks.go`, `internal/transport/http/cloud_peer.go`, `internal/transport/http/coordinator.go`, `internal/transport/http/focus.go`, `internal/transport/http/gate.go`, `internal/transport/http/handoffs.go`, `internal/transport/http/human_interventions.go`, `internal/transport/http/images.go`, `internal/transport/http/intent.go`, `internal/transport/http/orchestrator.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/runs.go`, `internal/transport/http/schedules.go`, `internal/transport/http/session_pauses.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/start.go`, `internal/transport/http/terminals.go`, `internal/transport/http/todos.go`, `internal/transport/http/update.go`, `internal/transport/http/voice.go`, `internal/transport/http/waits.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/workflow.go` |
 | `force_refused` | `internal/transport/http/agent_session_close.go` |
 | `gate_snapshot_required` | `internal/domain/work/v2.go` |
 | `git_failed` | `internal/transport/http/git.go` |
@@ -73,10 +73,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `git_timeout` | `internal/transport/http/git.go` |
 | `git_too_large` | `internal/transport/http/git.go` |
 | `git_unavailable` | `internal/transport/http/git.go` |
-| `home_unavailable` | `internal/transport/http/project_files.go` |
-| `icon_capacity` | `internal/transport/http/project_icons.go` |
-| `icon_changed` | `internal/transport/http/project_icons.go` |
-| `icon_store_unavailable` | `internal/transport/http/project_icons.go` |
+| `home_unavailable` | `internal/transport/http/project_files.go`, `internal/transport/http/project_folders.go` |
 | `idempotency_conflict` | `internal/transport/http/squad.go` |
 | `idempotency_key_required` | `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/work.go` |
 | `idempotency_key_reused` | `internal/transport/http/receipts.go` |
@@ -88,13 +85,13 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `invalid_deployment_policy` | `internal/domain/work/v2.go` |
 | `invalid_event` | `internal/transport/http/squad_events.go` |
 | `invalid_gate_result` | `internal/transport/http/orchestrator.go` |
-| `invalid_icon` | `internal/transport/http/project_icons.go` |
 | `invalid_initial_phase` | `internal/domain/work/v2.go` |
 | `invalid_kind` | `internal/domain/work/v2.go`, `internal/transport/http/proposals.go` |
 | `invalid_landing_evidence` | `internal/domain/work/v2.go` |
 | `invalid_page_size` | `internal/transport/http/squad_events.go` |
 | `invalid_phase` | `internal/transport/http/work_v2.go` |
 | `invalid_project` | `internal/transport/http/project_sync.go` |
+| `invalid_project_path` | `internal/transport/http/project_folders.go` |
 | `invalid_project_paths` | `internal/transport/http/projects.go` |
 | `invalid_request` | `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_session_name.go` |
 | `invalid_source` | `internal/transport/http/squad_skill_sources.go` |
@@ -118,7 +115,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `memory_full` | `internal/transport/http/project_memory.go` |
 | `memory_group_not_found` | `internal/transport/http/project_memory.go` |
 | `memory_unreadable` | `internal/transport/http/project_memory.go` |
-| `method_not_allowed` | `internal/transport/http/actions.go`, `internal/transport/http/agents.go`, `internal/transport/http/callbacks.go`, `internal/transport/http/devstacks.go`, `internal/transport/http/handoffs.go`, `internal/transport/http/images.go`, `internal/transport/http/intent.go`, `internal/transport/http/orchestrator.go`, `internal/transport/http/personas.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_icons.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/project_tree.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/projects.go`, `internal/transport/http/proposals.go`, `internal/transport/http/reports.go`, `internal/transport/http/runs.go`, `internal/transport/http/screen.go`, `internal/transport/http/session_archive.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/settings.go`, `internal/transport/http/shells.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_events.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/terminals.go`, `internal/transport/http/timeline.go`, `internal/transport/http/tracks.go`, `internal/transport/http/update.go`, `internal/transport/http/usage.go`, `internal/transport/http/verify.go`, `internal/transport/http/voice.go`, `internal/transport/http/waits.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_persona_suggestion.go`, `internal/transport/http/work_v2_reference_images.go`, `internal/transport/http/work_v2_session_todos.go`, `internal/transport/http/workflow.go` |
+| `method_not_allowed` | `internal/transport/http/actions.go`, `internal/transport/http/agents.go`, `internal/transport/http/callbacks.go`, `internal/transport/http/devstacks.go`, `internal/transport/http/handoffs.go`, `internal/transport/http/images.go`, `internal/transport/http/intent.go`, `internal/transport/http/orchestrator.go`, `internal/transport/http/personas.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_folders.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/project_tree.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/projects.go`, `internal/transport/http/proposals.go`, `internal/transport/http/reports.go`, `internal/transport/http/runs.go`, `internal/transport/http/screen.go`, `internal/transport/http/session_archive.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/settings.go`, `internal/transport/http/shells.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_events.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_role_draft.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/terminals.go`, `internal/transport/http/timeline.go`, `internal/transport/http/tracks.go`, `internal/transport/http/update.go`, `internal/transport/http/usage.go`, `internal/transport/http/verify.go`, `internal/transport/http/voice.go`, `internal/transport/http/waits.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_persona_suggestion.go`, `internal/transport/http/work_v2_reference_images.go`, `internal/transport/http/work_v2_session_todos.go`, `internal/transport/http/workflow.go` |
 | `mirror_capacity` | `internal/transport/http/project_sync.go` |
 | `mirror_source_mismatch` | `internal/transport/http/project_sync.go` |
 | `mirror_store_unavailable` | `internal/transport/http/project_sync.go` |
@@ -130,6 +127,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `no_namer` | `internal/transport/http/session_smart_title.go` |
 | `no_persona_suggester` | `internal/transport/http/work_v2_persona_suggestion.go` |
 | `no_planner` | `internal/transport/http/intent.go` |
+| `no_role_drafter` | `internal/transport/http/squad_role_draft.go` |
 | `no_root` | `internal/transport/http/proposals.go` |
 | `no_run` | `internal/transport/http/runs.go` |
 | `no_web_root` | `internal/transport/http/page.go` |
@@ -153,8 +151,9 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `persona_suggestion_failed` | `internal/transport/http/work_v2_persona_suggestion.go` |
 | `phase_not_editable` | `internal/transport/http/work_v2.go` |
 | `plan_failed` | `internal/transport/http/intent.go` |
-| `project_mirrored` | `internal/transport/http/project_icons.go` |
-| `project_not_found` | `internal/transport/http/project_files.go`, `internal/transport/http/project_icons.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_tree.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/tracks.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_agent.go` |
+| `project_folder_unavailable` | `internal/transport/http/project_folders.go` |
+| `project_folder_unreadable` | `internal/transport/http/project_folders.go` |
+| `project_not_found` | `internal/transport/http/project_files.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_tree.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/tracks.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_agent.go` |
 | `project_not_offered` | `internal/transport/http/project_sync.go` |
 | `project_registry_failed` | `internal/transport/http/projects.go` |
 | `project_required` | `internal/domain/work/v2.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/timeline.go` |
@@ -173,8 +172,11 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `reset_failed` | `internal/transport/http/work_v2.go` |
 | `restore_batch_too_large` | `internal/transport/http/session_restore.go` |
 | `review_required_not_applicable` | `internal/domain/work/v2.go` |
+| `role_draft_failed` | `internal/transport/http/squad_role_draft.go` |
+| `role_drafter_out_of_quota` | `internal/transport/http/squad_role_draft.go` |
 | `run_unknown` | `internal/transport/http/runs.go` |
 | `scope_mismatch` | `internal/transport/http/squad.go` |
+| `send_required` | `internal/transport/http/projects.go` |
 | `session_actor_required` | `internal/transport/http/squad_actor.go`, `internal/transport/http/squad_events.go` |
 | `session_cannot_create_item` | `internal/transport/http/work_v2.go` |
 | `session_cannot_decide` | `internal/transport/http/work.go` |
@@ -217,4 +219,5 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `via_is_for_sessions` | `internal/transport/http/work.go` |
 | `worktree_lifecycle_busy` | `internal/transport/http/projects.go` |
 | `worktree_lifecycle_failed` | `internal/transport/http/projects.go` |
+| `worktree_remove_failed` | `internal/transport/http/projects.go` |
 | `write_failed` | `internal/transport/http/snippets.go`, `internal/transport/http/squad.go` |

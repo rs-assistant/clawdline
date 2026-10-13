@@ -37,6 +37,18 @@
 .squad-pack-actions p { margin: 0; color: var(--dim); font-size: 12px; }
 .squad-pack-actions button { padding: 8px 12px; text-align: left; font-size: 12px; }
 .squad-search { display: grid; gap: 5px; margin: 13px 0; color: var(--dim); font-size: 12px; }
+.squad-create-actions { margin-top: 12px; }
+.squad-create-actions > button { width: 100%; min-height: 44px; padding: 8px 12px; border-color: var(--accent-ed); background: var(--accent-in); text-align: left; font-size: 13px; }
+.squad-role-create { width: min(720px, calc(100vw - 24px)); }
+.squad-role-create :is(.squad-role-ai, .squad-role-form) { display: grid; gap: 12px; margin-top: 18px; }
+.squad-role-create .squad-role-ai { padding: 14px; border: 1px solid var(--accent-ed); border-radius: 10px; background: var(--accent-in); }
+.squad-role-create h3, .squad-role-create p { margin: 0; }
+.squad-role-create h3 { font-size: 16px; }
+.squad-role-create label { display: grid; gap: 6px; font-size: 13px; }
+.squad-role-create :is(input, textarea) { width: 100%; padding: 10px; line-height: 1.5; }
+.squad-role-create textarea { resize: vertical; }
+.squad-role-create .squad-role-ai > button { padding: 8px 12px; }
+.squad-role-create .squad-role-form > p, .squad-role-create .squad-role-ai > p { color: var(--dim); font-size: 12px; }
 .squad-search input { min-height: 40px; padding: 8px 11px; font-size: 13px; }
 .squad-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .squad-cards > div { min-width: 0; }
@@ -53,6 +65,10 @@
 .squad-card-foot span:first-child { color: var(--ink); }
 .squad-detail { overflow: hidden; }
 .squad-back { display: none; }
+/* On a phone the way back to the roster is the shared page bar (page-bar.css),
+   held at the top of the page while a long persona is read; side by side there
+   is no way back to show. */
+.squad-page .squad-back-bar { display: none; }
 .squad-profile { display: flex; gap: 14px; align-items: center; min-width: 0; padding: 20px; background: linear-gradient(110deg, var(--card-hi), rgba(217,119,87,.13)); }
 .squad-profile p { margin: 0 0 4px; color: var(--dim); font: 10px/1.4 var(--mono); }
 .squad-profile h2 { margin: 0; font-size: 24px; line-height: 1.2; }
@@ -183,7 +199,11 @@
   .squad-roster { margin-bottom: 18px; }
   .squad-detail { width: 100%; }
   .squad-skill-jump { display: inline-flex; margin: 0 20px 14px; padding: 8px 12px; font-size: 12px; }
-  .squad-back { display: inline-flex; align-items: center; margin: 12px 0 0 12px; padding: 7px 11px; font-size: 12px !important; }
+  .squad-back { display: inline-flex; align-items: center; margin: 0 0 0 12px; padding: 7px 11px; font-size: 12px !important; }
+  .squad-page .squad-back-bar { display: flex; margin-bottom: 4px; background: var(--card); box-shadow: none; clip-path: none; }
+  /* clip, not hidden: a hidden overflow is a scroller of its own, and the bar
+     inside it would stick to it rather than to the page. */
+  .squad-detail { overflow: clip; }
   .squad-layout[data-mobile-view="detail"] .squad-rail, .squad-layout[data-mobile-view="detail"] .squad-roster { display: none; }
   .squad-layout[data-mobile-view="roster"] .squad-detail { display: none; }
   .squad-loading { display: block; }

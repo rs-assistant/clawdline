@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 // @ts-expect-error -- node's type-stripping runner resolves the source .ts file.
-import { pinnedQuestion, statusSource, STATUS_GAP_RETRY_MS, STATUS_MARKER_RETRY_MS } from "./status-source.ts"
+import { pinnedQuestion, statusSource, STATUS_GAP_RETRY_MS } from "./status-source.ts"
 
 const machineID = "one"
 const sessionID = "same"
@@ -48,7 +48,8 @@ function clientFixture() {
     async listPresentationsForMachine(machine: string) {
       calls.push("sessions.list:" + machine)
       return { at, complete: true, sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
-        status: { state: "idle", work_state: "ready", work_note: "Queued heavy command finished", work_provenance: "self" } }] }
+        status: { state: "idle", work_state: "ready", work_note: "Queued heavy command finished", work_provenance: "self",
+          persona: "product-manager" } }] }
     },
     async infoForGeneration(destination: { executionGeneration: string }) {
       calls.push("info:" + destination.executionGeneration)
@@ -87,6 +88,7 @@ test("a status row event names the Session whose list title should refresh", () 
 test("a new browser replays a missing status marker once and recovers the Session list", async () => {
   const { client } = clientFixture()
   client.readContentCapabilities.delete(machineID)
+  client.listPresentationsForMachine = async () => { throw new Error("older machine") }
   const key = JSON.stringify([machineID, inventory])
   const marker = client.statusSnapshots.get(key)
   client.statusSnapshots.delete(key)
@@ -107,6 +109,7 @@ test("a new browser replays a missing status marker once and recovers the Sessio
 test("an unanswered marker is retried at most once per minute", async () => {
   const { client } = clientFixture()
   client.readContentCapabilities.delete(machineID)
+  client.listPresentationsForMachine = async () => { throw new Error("older machine") }
   client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
   let reads = 0
   ;(client as typeof client & { recoverStatusMarker: (machine: string) => Promise<boolean> }).recoverStatusMarker = async () => {
@@ -116,7 +119,7 @@ test("an unanswered marker is retried at most once per minute", async () => {
   const source = statusSource(() => client as never)
   const first = await source.readMachine(machineID, new AbortController().signal)
   assert.equal(first.kind, "unavailable")
-  if (first.kind === "unavailable") assert.ok(first.retryAt! > Date.now() + STATUS_MARKER_RETRY_MS - 1000)
+  if (first.kind === "unavailable") assert.ok(first.retryAt! > Date.now() + STATUS_GAP_RETRY_MS - 1000)
   await source.readMachine(machineID, new AbortController().signal)
   assert.equal(reads, 1)
 })
@@ -163,37 +166,144 @@ test("status-only list never subscribes to or reads rich content", async () => {
 
 test("a cold status gap uses one complete pinned machine list for rows and titles", async () => {
   const { client, calls } = clientFixture()
+  const list = client.listPresentationsForMachine
+  client.listPresentationsForMachine = async (machine) => {
+    const reply = await list(machine)
+    return { ...reply, sessions: reply.sessions.map((row) => ({ ...row,
+      status: { ...row.status, sessionId: "conversation-41" } })) }
+  }
   client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
   const source = statusSource(() => client as never)
   const reading = await source.readMachine(machineID, new AbortController().signal)
   assert.equal(reading.kind, "ready")
   assert.equal(reading.rows?.[0]?.destination.executionGeneration, executionGeneration)
+  assert.equal(reading.rows?.[0]?.snapshotGeneration, reading.snapshotGeneration,
+    "a direct row carries the generation the single-machine reader verifies")
   const titles = await source.readMachinePresentations?.(machineID, new AbortController().signal)
   assert.deepEqual(titles?.map((row) => row.title), ["The real title"])
+  assert.equal(titles?.[0]?.status?.sessionId, "conversation-41",
+    "the pinned Cloud row retains the conversation that owns its attention notes")
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 })
 
-test("an incomplete machine scan fills a gap only with the signed inventory's exact Session set", async () => {
+test("a cold browser asks once before the machine descriptor arrives", async () => {
+  const { client, calls } = clientFixture()
+  client.readContentCapabilities.delete(machineID)
+  client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
+  const source = statusSource(() => client as never)
+  assert.equal((await source.readMachine(machineID, new AbortController().signal)).kind, "ready")
+  assert.equal((await source.readMachine(machineID, new AbortController().signal)).kind, "ready")
+  assert.deepEqual(calls, ["sessions.list:" + machineID])
+})
+
+test("a failed cold list retries after the short bound and recovers without a marker", async () => {
+  const { client, calls } = clientFixture()
+  const diagnostics: { event: string; data: Record<string, unknown> }[] = []
+  ;(client as typeof client & { viewerEvents: { record: (event: string, data: Record<string, unknown>) => void } })
+    .viewerEvents = { record: (event, data) => { diagnostics.push({ event, data }) } }
+  client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
+  let now = Date.now()
+  client.now = () => now
+  let fail = true
+  client.listPresentationsForMachine = async (machine: string) => {
+    calls.push("sessions.list:" + machine)
+    if (fail) throw new Error("carrier_closed")
+    return { at: Math.floor(now / 1000), complete: true,
+      sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "Recovered",
+        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] }
+  }
+  const source = statusSource(() => client as never)
+  const first = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(first.kind, "unavailable")
+  if (first.kind === "unavailable") assert.equal(first.retryAt, now + STATUS_GAP_RETRY_MS)
+  now += STATUS_GAP_RETRY_MS - 1
+  assert.equal((await source.readMachine(machineID, new AbortController().signal)).kind, "unavailable")
+  assert.equal(calls.length, 1)
+  now += 1
+  const second = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(second.kind, "unavailable")
+  if (second.kind === "unavailable") assert.equal(second.retryAt, now + STATUS_GAP_RETRY_MS * 2)
+  assert.equal(calls.length, 2)
+  fail = false
+  now += STATUS_GAP_RETRY_MS * 2 - 1
+  assert.equal((await source.readMachine(machineID, new AbortController().signal)).kind, "unavailable")
+  assert.equal(calls.length, 2)
+  now += 1
+  const recovered = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(recovered.kind, "ready")
+  assert.equal(recovered.rows?.[0]?.destination.executionGeneration, executionGeneration)
+  assert.equal(calls.length, 3)
+  assert.deepEqual(diagnostics.map((row) => [row.event, row.data.code, row.data.failures]), [
+    ["cloud.status_list.failed", "untyped", 1], ["cloud.status_list.failed", "untyped", 2],
+  ])
+  assert.equal(JSON.stringify(diagnostics).includes("carrier_closed"), false)
+})
+
+test("a stale retained status pass recovers from one pinned machine list without repeated reads", async () => {
+  const { client, calls, row } = clientFixture()
+  row.projected_at -= 600
+  client.listPresentationsForMachine = async (machine: string) => {
+    calls.push("sessions.list:" + machine)
+    return { at: Math.floor(Date.now() / 1000), complete: false,
+      sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
+        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] }
+  }
+  const source = statusSource(() => client as never)
+  const first = await source.readMachine(machineID, new AbortController().signal)
+  const second = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(first.kind, "ready")
+  assert.equal(second.kind, "ready")
+  assert.deepEqual(calls, ["sessions.list:" + machineID])
+  assert.deepEqual((await source.readMachinePresentations?.(machineID, new AbortController().signal))?.map((row) => row.title),
+    ["The real title"])
+  assert.deepEqual(calls, ["sessions.list:" + machineID])
+})
+
+test("a stale marker cannot turn an incomplete direct list into a complete one", async () => {
+  const { client, row } = clientFixture()
+  row.projected_at -= 600
+  const marker = client.statusSnapshots.get(JSON.stringify([machineID, inventory])) as {
+    payload: { at: number }
+  }
+  marker.payload.at -= 600
+  client.listPresentationsForMachine = async () => ({ at: Math.floor(Date.now() / 1000), complete: false,
+    sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
+      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] })
+  const read = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(read.kind, "ready")
+  if (read.kind === "ready") {
+    assert.equal(read.complete, false)
+    assert.equal(read.rows.length, 1)
+  }
+})
+
+test("an incomplete machine scan is complete only with the signed inventory's exact Session set", async () => {
   const { client, calls } = clientFixture()
   client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
   client.listPresentationsForMachine = async (machine: string) => {
     calls.push("sessions.list:" + machine)
     return { at: Math.floor(Date.now() / 1000), complete: false,
       sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
-        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] }
+        status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] }
   }
   const source = statusSource(() => client as never)
-  assert.equal((await source.readMachine(machineID, new AbortController().signal)).kind, "ready")
+  const certified = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(certified.kind, "ready")
+  if (certified.kind === "ready") assert.equal(certified.complete, true)
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 
   const other = clientFixture()
   other.client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
   other.client.listPresentationsForMachine = async () => ({ at: Math.floor(Date.now() / 1000), complete: false,
     sessions: [{ id: "different", execution_generation: executionGeneration, title: "Wrong set",
-      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self" } }] })
+      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] })
   other.client.recoverStatusRow = async () => false
-  assert.equal((await statusSource(() => other.client as never).readMachine(machineID, new AbortController().signal)).kind,
-    "unavailable")
+  const partial = await statusSource(() => other.client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(partial.kind, "ready")
+  if (partial.kind === "ready") {
+    assert.equal(partial.complete, false)
+    assert.equal(partial.rows[0].destination.sessionID, "different")
+  }
 })
 
 test("a refused pinned list falls back to exact retained-row recovery", async () => {
@@ -215,10 +325,20 @@ test("one machine list read joins only the current Session execution", async () 
   const rows = await source.readMachinePresentations?.(machineID, new AbortController().signal)
   assert.deepEqual(rows?.map((item) => item.title), ["The real title"])
   assert.equal(rows?.[0]?.status?.work_note, "Queued heavy command finished")
+  assert.equal(rows?.[0]?.status?.persona, "product-manager")
   assert.deepEqual(calls, ["sessions.list:" + machineID])
   row.execution_generation = "ffffffffffffffffffffffffffffffff"
   assert.deepEqual(await source.readMachinePresentations?.(machineID, new AbortController().signal), [])
   assert.deepEqual(calls, ["sessions.list:" + machineID, "sessions.list:" + machineID])
+})
+
+test("a cold browser reads current Session names before the content descriptor arrives", async () => {
+  const { client, calls } = clientFixture()
+  client.readContentCapabilities.delete(machineID)
+  const rows = await statusSource(() => client as never).readMachinePresentations?.(
+    machineID, new AbortController().signal)
+  assert.deepEqual(rows?.map((row) => row.title), ["The real title"])
+  assert.deepEqual(calls, ["sessions.list:" + machineID])
 })
 
 test("Relay-confirmed offline applies to one machine only and expires to unknown", async () => {
@@ -250,14 +370,26 @@ test("Relay-confirmed offline applies to one machine only and expires to unknown
 
 test("opening and leaving an exact detail subscribes, reads pinned content, and releases both channels", async () => {
   const { client, calls } = clientFixture()
+  const timings: { event: string; data: Record<string, unknown> }[] = []
+  ;(client as typeof client & { viewerEvents: { record: (event: string, data: Record<string, unknown>) => void } })
+    .viewerEvents = { record: (event, data) => { timings.push({ event, data }) } }
   const source = statusSource(() => client as never)
   const destination = { machineID, sessionID, executionGeneration }
   const detail = await source.readDetail(destination, new AbortController().signal)
   assert.equal(detail.kind, "ready")
   assert.equal(detail.kind === "ready" && detail.info.title, "Pinned")
   assert.equal(detail.kind === "ready" && detail.nextBefore, 123)
+  assert.equal(timings.length, 1)
+  assert.equal(timings[0].event, "cloud.detail.first_read")
+  assert.equal(timings[0].data.outcome, "ready")
+  assert.equal(typeof timings[0].data.info_ms, "number")
+  assert.equal(typeof timings[0].data.transcript_ms, "number")
+  assert.equal(JSON.stringify(timings).includes("Pinned"), false)
+  await source.readDetail(destination, new AbortController().signal)
+  assert.equal(timings.length, 1, "an open detail's routine reread does not create another diagnostic")
   source.closeDetail?.(destination)
   assert.deepEqual(calls, ["subscribe:s/one/same,t/one/same", "info:" + executionGeneration,
+    "transcript:" + executionGeneration, "info:" + executionGeneration,
     "transcript:" + executionGeneration, "unsubscribe:s/one/same,t/one/same"])
 })
 
@@ -416,6 +548,7 @@ test("a stale status row refuses content without subscribing", async () => {
 test("a missing ss row settles before it can shake the visible list", async () => {
   const { client, calls } = clientFixture()
   client.readContentCapabilities.delete(machineID)
+  client.listPresentationsForMachine = async () => { throw new Error("older machine") }
   client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
   const source = statusSource(() => client as never)
   const recovered = await source.readMachine(machineID, new AbortController().signal)
@@ -428,6 +561,7 @@ test("a missing ss row settles before it can shake the visible list", async () =
 test("a failed retained-row request keeps the machine in event_gap", async () => {
   const { client, calls } = clientFixture()
   client.readContentCapabilities.delete(machineID)
+  client.listPresentationsForMachine = async () => { throw new Error("older machine") }
   let now = Date.now()
   client.now = () => now
   client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]));
@@ -462,7 +596,7 @@ test("a stale machine refuses detail before subscribing to content", async () =>
   assert.deepEqual(calls, [])
 })
 
-test("an r/ capability blocks only detail, and an unread one is not called an old machine", async () => {
+test("an explicit r/ refusal blocks detail while an unread descriptor permits an exact attempt", async () => {
   const { client, calls } = clientFixture()
   const source = statusSource(() => client as never)
   const destination = { machineID, sessionID, executionGeneration }
@@ -473,19 +607,16 @@ test("an r/ capability blocks only detail, and an unread one is not called an ol
   delete descriptor.supported
   assert.deepEqual(await source.readDetail(destination, new AbortController().signal),
     { kind: "unavailable", reason: "old_version" })
-  // Published but no longer fresh, and never published at all, are the same
-  // thing: this browser does not know yet. Calling either one an old machine
-  // sent a person to update a machine that was current, which is what they
-  // could neither understand nor act on.
+  // A signed, current execution can ask its own machine before orch/ arrives.
+  // The machine still checks the exact execution and read permission.
   descriptor.supported = true
   descriptor.at -= 301
-  assert.deepEqual(await source.readDetail(destination, new AbortController().signal),
-    { kind: "unavailable", reason: "unconfirmed" })
+  assert.equal((await source.readDetail(destination, new AbortController().signal)).kind, "ready")
   client.readContentCapabilities.delete(machineID)
-  assert.deepEqual(await source.readDetail(destination, new AbortController().signal),
-    { kind: "unavailable", reason: "unconfirmed" })
-  // Neither answer may reach for content on the wire.
-  assert.deepEqual(calls, [])
+  assert.equal((await source.readDetail(destination, new AbortController().signal)).kind, "ready")
+  assert.equal((await source.readOlder?.(destination, 123, new AbortController().signal))?.kind, "ready")
+  assert.deepEqual(calls.filter((call) => call.startsWith("info:")), ["info:" + executionGeneration,
+    "info:" + executionGeneration])
 })
 
 test("an opened rich row names only the same execution and current question", async () => {

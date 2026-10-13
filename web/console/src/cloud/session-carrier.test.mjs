@@ -118,6 +118,31 @@ test("a read on an open carrier spends no relay subscription channel", async () 
   assert.equal(client.carrierReads.size, 0)
 })
 
+test("a cold read finishes on the relay before trying a carrier, and a refused read does not open one", async () => {
+  const carrier = openCarrier()
+  carrier.open = false
+  let offers = 0
+  carrier.ensure = async () => { offers++; return false }
+  const client = carrierClient(carrier)
+
+  const first = read(client)
+  await flush()
+  assert.equal(offers, 0, "carrier negotiation competed with the foreground read")
+  assert.equal(client.sent.length, 1)
+  assert.equal(client.sent[0].carrier, null)
+  client._settleRead(KEY, { entries: ["from relay"] }, null)
+  assert.deepEqual(await first, { entries: ["from relay"] })
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.equal(offers, 1, "a successful read did not warm the optional path")
+
+  const failed = read(client)
+  await flush()
+  client._settleRead(KEY, null, Object.assign(new Error("refused"), { code: "cloud_read_unavailable" }))
+  await assert.rejects(failed, /refused/)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.equal(offers, 1, "a refused read opened another carrier")
+})
+
 test("fault injection: a carrier that dies holding a read has it asked again on the relay", async () => {
   const carrier = openCarrier()
   const client = carrierClient(carrier)

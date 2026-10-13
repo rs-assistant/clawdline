@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
 import { loadPersonas, personaById, personasNow, rememberPersona, rememberTeam, rememberedPersona, rememberedTeam, switchTeam } from "../personas.js"
@@ -6,11 +6,15 @@ import { drawRoleRow } from "./RoleRow.js"
 import "./persona.css"
 import "./machine-start.css"
 import "./start-loading.css"
+import "./start-projects.css"
 import { hostedConsole, listTerminals, openTerminal, readTerminalMachine, TerminalRequestError } from "../pages/terminal/api.js"
 import { firstSize } from "../pages/terminal/TerminalProjectList.js"
 import { openNewTerminal, openTerminalPage } from "../pages/terminal/navigate.js"
 import { TAB } from "../pages/terminal/tab.js"
 import { terminalRefusalWords, unavailableWords } from "../pages/terminal/words.js"
+import { ProjectFolderPicker } from "../pages/projects/ProjectFolderPicker.js"
+import { removeProjectPlace } from "../pages/work/api.js"
+import { catalogWord } from "../catalog.js"
 
 /**
  * Starting a session, and picking one back up — `input/start.js`, function for
@@ -116,6 +120,8 @@ let machineOnly = false
 let onMachine: { id: string; name: string } | null = null
 type StartMode = "session" | "terminal"
 let mode: StartMode = "session"
+let editingProjects = false
+let requestRemoveProject: (place: Place) => void = () => {}
 let terminalAccess: { state: "loading" | "ready" | "blocked"; reason: string } = { state: "loading", reason: "" }
 let terminalGeneration = 0
 
@@ -427,8 +433,16 @@ function draw(): void {
   if (sheetHidden()) return
   el("start-say").classList.remove("loading")
   const list = el("start-list")
+  list.dataset.editing = editingProjects ? "1" : "0"
   const box = el<HTMLInputElement>("start-filter")
   const machineAction = el<HTMLButtonElement>("start-machine-action")
+  const projectActions = el("start-project-actions")
+  projectActions.hidden = machineOnly || mode !== "session" || !!at || !write
+  const editProjects = el<HTMLButtonElement>("start-edit-projects")
+  const editLabel = catalogWord("projects", editingProjects ? "editDone" : "editList")
+  editProjects.setAttribute("aria-label", editLabel)
+  editProjects.title = editLabel
+  editProjects.setAttribute("aria-pressed", editingProjects ? "true" : "false")
   el("start-title").textContent = machineOnly ? "Clawdfather" : mode === "terminal" ? nextWord("terminalStartTitle") : T().webStart
   machineAction.hidden = !machineOnly
   machineAction.disabled = !!pressing || !!wait || !with_ || !write
@@ -493,8 +507,8 @@ function draw(): void {
       : loading && !places
         ? T().webLoading
         : places && !places.length
-          ? T().webStartEmpty
-          : T().webStartPick,
+          ? catalogWord("projects", "emptyAdd")
+          : "",
   )
 
   box.hidden = terminalAccess.state !== "ready" && mode === "terminal" || !(places && places.length > MANY)
@@ -510,7 +524,7 @@ function draw(): void {
     row.type = "button"
     row.className = "place"
     row.dataset.id = p.id
-    row.disabled = !!pressing || !!wait
+    row.disabled = !!pressing || !!wait || editingProjects
     if (pressing === p.id) row.dataset.busy = "1"
     row.innerHTML = '<canvas></canvas><span class="name"></span><span class="where"></span>'
 
@@ -531,6 +545,16 @@ function draw(): void {
     }
 
     li.appendChild(row)
+    if (editingProjects) {
+      const remove = document.createElement("button")
+      remove.type = "button"
+      remove.className = "start-project-remove"
+      remove.dataset.id = p.id
+      remove.setAttribute("aria-label", nextWord("projectsRemoveFor", { project: p.label || p.path || "" }))
+      remove.disabled = !p.path
+      remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18" /></svg>'
+      li.appendChild(remove)
+    }
     list.appendChild(li)
   })
   edge()
@@ -830,6 +854,7 @@ function openMode(machine: boolean, requested: StartMode = "session", on: { id: 
   opener = machine ? el("counts") : active instanceof HTMLElement && active !== document.body ? active : el("start-go")
   machineOnly = machine
   mode = machine ? "session" : requested
+  editingProjects = false
   el("start-title").textContent = machine ? "Clawdfather" : T().webStart
   el("start").hidden = false
   said("")
@@ -956,6 +981,28 @@ export const Start = {
 export function StartSheet() {
   const T = L.strings
   const bound = useRef(false)
+  const [folderOpen, setFolderOpen] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<Place | null>(null)
+  const [removeBusy, setRemoveBusy] = useState(false)
+  const [removeError, setRemoveError] = useState("")
+  const removeDialog = useRef<HTMLDialogElement>(null)
+  requestRemoveProject = (place) => { setRemoveError(""); setRemoveTarget(place) }
+  useEffect(() => {
+    const dialog = removeDialog.current
+    if (!dialog) return
+    if (removeTarget && !dialog.open) dialog.showModal()
+    if (!removeTarget && dialog.open) dialog.close()
+  }, [removeTarget])
+  async function confirmRemoveProject() {
+    if (!removeTarget?.path || removeBusy) return
+    setRemoveBusy(true); setRemoveError("")
+    try {
+      await removeProjectPlace({ id: removeTarget.id, label: removeTarget.label || removeTarget.path, path: removeTarget.path })
+      setRemoveTarget(null)
+      load(true)
+    } catch (cause) { setRemoveError(L.failureSentence(cause)) }
+    finally { setRemoveBusy(false) }
+  }
   useEffect(() => {
     if (bound.current) return
     bound.current = true
@@ -969,7 +1016,15 @@ export function StartSheet() {
     const onMachine = () => press(MACHINE_PLACE)
     const onInput = () => Start.typed(filter.value)
     const onScroll = () => Start.scrolled()
+    const onAddProject = () => setFolderOpen(true)
+    const onEditProjects = () => { editingProjects = !editingProjects; draw() }
     const onList = (ev: Event) => {
+      const remove = (ev.target as Element).closest?.<HTMLButtonElement>(".start-project-remove")
+      if (remove?.dataset.id) {
+        const place = (places || []).find(p => p.id === remove.dataset.id)
+        if (place) requestRemoveProject(place)
+        return
+      }
       const row = (ev.target as Element).closest ? (ev.target as Element).closest<HTMLButtonElement>(".place") : null
       if (!row || row.disabled) return
       if (row.dataset.session) pick(row.dataset.session)
@@ -981,6 +1036,7 @@ export function StartSheet() {
     // not reached for a press this sheet has answered.
     const onKey = (ev: KeyboardEvent) => {
       if (sheetHidden()) return
+      if (document.querySelector(".project-folder-picker[open], .project-remove-dialog[open]")) return
       if (document.getElementById("action-confirm")?.hidden === false) return
       if (document.getElementById("info")?.hidden === false) return
       const meta = ev.metaKey || ev.ctrlKey
@@ -1019,6 +1075,8 @@ export function StartSheet() {
     sheet.addEventListener("click", onSheet)
     el("start-close").addEventListener("click", onClose)
     el("start-machine-action").addEventListener("click", onMachine)
+    el("start-add-project").addEventListener("click", onAddProject)
+    el("start-edit-projects").addEventListener("click", onEditProjects)
     filter.addEventListener("input", onInput)
     list.addEventListener("scroll", onScroll, { passive: true })
     list.addEventListener("click", onList)
@@ -1033,6 +1091,8 @@ export function StartSheet() {
       sheet.removeEventListener("click", onSheet)
       el("start-close")?.removeEventListener("click", onClose)
       el("start-machine-action")?.removeEventListener("click", onMachine)
+      el("start-add-project")?.removeEventListener("click", onAddProject)
+      el("start-edit-projects")?.removeEventListener("click", onEditProjects)
       filter.removeEventListener("input", onInput)
       list.removeEventListener("scroll", onScroll)
       list.removeEventListener("click", onList)
@@ -1041,6 +1101,7 @@ export function StartSheet() {
   }, [])
 
   return (
+    <>
     <div className="overlay" id="start" hidden>
       <div className="sheet" role="dialog" aria-modal="true" id="start-sheet" aria-labelledby="start-title">
         <h2 id="start-title" tabIndex={-1}>{T.webStart}</h2>
@@ -1054,23 +1115,38 @@ export function StartSheet() {
             <span className="clawdfather-crown" aria-hidden="true" />
             <span className="label">{nextWord("machineSessionStart")}</span>
           </button>
-          <input
-            className="find"
-            id="start-filter"
-            type="search"
-            name="p2k"
-            placeholder={T.webStartFilter}
-            hidden
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            data-1p-ignore=""
-            data-lpignore="true"
-            data-bwignore=""
-            data-form-type="other"
-            aria-label={T.webStartFilter}
-          />
+          <div className="start-project-filter-row">
+            <input
+              className="find"
+              id="start-filter"
+              type="search"
+              name="p2k"
+              placeholder={T.webStartFilter}
+              hidden
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              data-1p-ignore=""
+              data-lpignore="true"
+              data-bwignore=""
+              data-form-type="other"
+              aria-label={T.webStartFilter}
+            />
+            <div className="start-project-actions" id="start-project-actions" hidden>
+              <button id="start-add-project" type="button" aria-label={catalogWord("projects", "addButton")}
+                title={catalogWord("projects", "addButton")}>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" /></svg>
+              </button>
+              <button id="start-edit-projects" type="button" aria-label={catalogWord("projects", "editList")}
+                title={catalogWord("projects", "editList")} aria-pressed="false">
+                <svg className="start-edit-pencil" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z" /><path d="m14 7 3 3" />
+                </svg>
+                <svg className="start-edit-done" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6" /></svg>
+              </button>
+            </div>
+          </div>
           <ul className="places" id="start-list"></ul>
           <p className="said" id="start-said" role="status" aria-live="polite"></p>
         </div>
@@ -1080,6 +1156,19 @@ export function StartSheet() {
         </button>
       </div>
     </div>
+    <ProjectFolderPicker open={folderOpen} machine={onMachine?.id} onClose={() => setFolderOpen(false)} onAdded={() => load(true)} />
+      <dialog ref={removeDialog} className="project-remove-dialog"
+        onCancel={event => { if (removeBusy) event.preventDefault(); else setRemoveTarget(null) }}
+        onClose={() => { if (!removeBusy) setRemoveTarget(null) }}>
+        <h2>{nextWord("projectsRemoveTitle")}</h2>
+        <p>{nextWord("projectsRemoveDescription", { project: removeTarget?.label || removeTarget?.path || "" })}</p>
+        {removeError && <p role="alert">{removeError}</p>}
+        <div className="project-remove-actions">
+          <button type="button" disabled={removeBusy} onClick={() => setRemoveTarget(null)}>{nextWord("projectsRemoveCancel")}</button>
+          <button type="button" disabled={removeBusy} onClick={() => void confirmRemoveProject()}>{removeBusy ? nextWord("projectsRemoveBusy") : nextWord("projectsRemoveConfirm")}</button>
+        </div>
+    </dialog>
+    </>
   )
 }
 

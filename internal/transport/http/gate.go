@@ -384,7 +384,7 @@ func machineScoped(p string) bool {
 		// Storing a session's pictures is the orchestrator's (images.go); the
 		// handler refuses a device, as the Swift app does.
 		return true
-	case "/v1/update", "/v1/update/apply":
+	case "/v1/update", "/v1/update/fresh", "/v1/update/apply":
 		// `clawdline update` on this machine reads its own daemon's answer,
 		// and `--apply` asks it to install a release and follows the update
 		// (update.go); a device needs send to apply.

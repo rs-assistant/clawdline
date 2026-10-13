@@ -220,7 +220,7 @@ func (s *Server) placesRoute(w http.ResponseWriter, r *http.Request) {
 // whose start sheet reads GET /v1/places. A write never silently falls back to
 // a second state directory when the daemon cannot be reached.
 func (s *Server) registeredPlacesRoute(w http.ResponseWriter, r *http.Request) {
-	if !machineAuthed(r) && !(r.Method == http.MethodDelete && maySend(r)) {
+	if !machineAuthed(r) && !((r.Method == http.MethodDelete || r.Method == http.MethodPost) && maySend(r)) {
 		writeRefusal(w, http.StatusForbidden, "machine_required", "Only this machine may change its registered Projects.")
 		return
 	}
@@ -361,8 +361,8 @@ func (s *Server) projectCatalogRoute(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, contract.ProjectCatalogAnswer{At: time.Now().Unix(), Catalog: catalog})
 }
 
-// projectsRoute is ProjectWorktreeHTTP's read and refresh, and nothing else:
-// the cleanup preview and apply are not routes on this daemon.
+// projectsRoute reads worktrees, refreshes the observation, and removes one
+// freshly verified landed checkout on a person's explicit request.
 func (s *Server) projectsRoute(w http.ResponseWriter, r *http.Request) {
 	// The string the mux dispatched by, split before anything is decoded, so
 	// this route and the gate's `machineScoped` read the same shape
@@ -404,8 +404,40 @@ func (s *Server) projectsRoute(w http.ResponseWriter, r *http.Request) {
 		s.projectUnifyRoute(w, r, parts[0])
 		return
 	}
-	if len(parts) == 2 && parts[0] != "" && parts[1] == "icon" {
-		s.projectIconRoute(w, r, parts[0])
+	if len(parts) == 3 && parts[0] != "" && parts[1] == "worktrees" && strings.HasPrefix(parts[2], "wt-") {
+		if r.Method != http.MethodDelete {
+			writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "DELETE only")
+			return
+		}
+		if !maySend(r) {
+			writeRefusal(w, http.StatusForbidden, "send_required", "Deleting a worktree requires send access to this machine.")
+			return
+		}
+		if r.URL.RawQuery != "" || r.ContentLength > 0 {
+			writeRefusal(w, http.StatusBadRequest, "bad_request", "Worktree removal takes no query or body.")
+			return
+		}
+		readers := s.projectReaders()
+		select {
+		case readers.busy <- struct{}{}:
+		default:
+			writeRefusal(w, http.StatusTooManyRequests, "worktree_lifecycle_busy", "Worktree lifecycle work is already queued on this machine; try again shortly.")
+			return
+		}
+		snap, err := readers.lifecycle.RemoveLanded(parts[0], parts[2])
+		<-readers.busy
+		var refusal *projects.Refusal
+		if errors.As(err, &refusal) {
+			writeRefusal(w, refusal.Status, refusal.Code, refusal.Message)
+			return
+		}
+		if err != nil {
+			writeRawRefusal(w, http.StatusInternalServerError, "worktree_remove_failed", err.Error())
+			return
+		}
+		writeJSON(w, struct {
+			Snapshot *projects.Snapshot `json:"projectWorktreeLifecycle"`
+		}{snap})
 		return
 	}
 	if len(parts) < 2 || parts[0] == "" || parts[1] != "worktrees" || len(parts) > 3 ||

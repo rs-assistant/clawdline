@@ -70,6 +70,7 @@ export const CARRIED = {
   // The Settings page's update panel and the list's banner (`machine/update.ts`):
   // whether this machine trails the latest build, a machine read with no parameter.
   update: "GET /v1/update",
+  "update-fresh": "GET /v1/update/fresh",
   // The Settings page's 「立即更新」 (`machine/UpdatePanel.tsx`): install the
   // newest release of the machine's channel, a machine command with no body.
   "update-apply": "POST /v1/update/apply",
@@ -85,6 +86,8 @@ export const CARRIED = {
   intents: "POST /v1/intents",
   "past-sessions": "GET /v1/places/{id}/sessions[/{assistant}]",
   places: "GET /v1/places",
+  "project-folders": "GET /v1/project-folders?path=&machine=",
+  "project-add": "POST /v1/places?machine=",
   "project-hide": "DELETE /v1/places",
   // The built-in personas a start may name (docs/personas.md): a machine read
   // with no parameter. A machine that does not list it is refused by the copied
@@ -98,6 +101,7 @@ export const CARRIED = {
   "squad.settings.update": "PUT /v1/squad/settings",
   "squad.motion.update": "PUT /v1/squad/motion",
   "squad.catalog.update": "POST /v1/squad/catalog",
+  "squad.role-draft": "POST /v1/squad/role-draft",
   "squad-session-bindings": "GET /v1/squad/session-bindings",
   "squad-session-snapshot": "GET /v1/squad/session-snapshots/{conversation}",
   "squad-event-head": "GET /v1/squad/events/head",
@@ -117,7 +121,6 @@ export const CARRIED = {
   "project-unify-apply": "POST /v1/projects/{project}/unify",
   "project-tree-list": "GET /v1/projects/{project}/tree?directory=",
   "project-tree-read": "GET /v1/projects/{project}/tree/file?path=",
-  "project-icon-copy": "PUT /v1/projects/{id}/icon",
   // Project settings sync (docs/project-sync.md). The two source reads are
   // also asked of *another* paired machine by `cloud/project-sync.ts`, which
   // is how a mirror reads its source without either machine reaching the other.
@@ -127,6 +130,7 @@ export const CARRIED = {
   "project-mirror-apply": "POST /v1/project-sync/mirror",
   "project-mirror-detach": "DELETE /v1/project-sync/mirror?repo=",
   "project-worktree-lifecycle-refresh": "POST /v1/projects/{project}/worktrees/refresh",
+  "project-worktree-remove": "DELETE /v1/projects/{project}/worktrees/{worktree}",
   projects: "GET /v1/projects",
   "pair-agent-start": "POST /v1/cloud/pairing/agent",
   "pair-agent-status": "GET /v1/cloud/pairing/agent/{task}",
@@ -183,6 +187,9 @@ export const CARRIED = {
   // a failed carried read is one (`cloud.read.failed`, `relay-reader.ts`).
   "diagnostics.events": "cloud-client.js _deliverViewerEvents (after a recorded failure)",
   "sessions.snapshot.initial": "cloud-client.js first _recoverSessions attempt (when advertised)",
+  // An opened waiting Session whose question has not come asks for its one row
+  // (`relay-reader.ts` askForOpenedQuestion), when the machine advertises it.
+  "sessions.row": "relay-reader.ts askForOpenedQuestion (when advertised)",
   "smart-title": "POST /v1/sessions/{id}/smart-title",
   "snippet-create": "POST /v1/snippets",
   "snippet-delete": "DELETE /v1/snippets/{id}",

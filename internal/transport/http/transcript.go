@@ -148,6 +148,13 @@ func (s *Server) transcriptPageBefore(id string, item session.Session, limit int
 	page := contract.TranscriptPage{ID: id, Entries: []contract.TranscriptEntry{}}
 	path := recordPath(item)
 	if path == "" {
+		if item.Binding == session.BindingNoRecord {
+			// A new assistant has not written its first conversation yet.
+			// This is an empty transcript even when the list row that says
+			// no_record has not reached the browser.
+			page.Evidence = contract.EvidenceTranscript
+			return page
+		}
 		page.Evidence = contract.EvidenceNone
 		page.Note = unlocatedNote(item)
 		return page

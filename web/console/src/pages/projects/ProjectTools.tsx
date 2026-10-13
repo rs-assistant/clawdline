@@ -1,5 +1,4 @@
 import { catalogWord } from "../../catalog.js"
-import { IconCopy } from "./IconCopy.js"
 import { ProjectSetup } from "./ProjectSetup.js"
 import type { ProjectSetupHandle } from "./ProjectSetup.js"
 import { ProjectSync } from "./ProjectSync.js"
@@ -7,7 +6,7 @@ import type { Ref } from "react"
 import "./project-tools.css"
 
 /**
- * Configuration is secondary to choosing a Project. Keep the three maintenance
+ * Configuration is secondary to choosing a Project. Keep maintenance
  * surfaces together behind one native disclosure so the Project list remains
  * the page's primary journey while every tool stays keyboard reachable.
  */
@@ -27,7 +26,6 @@ export function ProjectTools({ shown, changed, setupRef }: { shown: boolean; cha
       <p className="project-tools-intro">{catalogWord("inline", "4956bcafb9bc")}</p>
       <ProjectSetup shown={shown} ref={setupRef} />
       <ProjectSync shown={shown} changed={changed} />
-      <IconCopy shown={shown} changed={changed} />
     </div>
   </details>
 }

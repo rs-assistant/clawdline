@@ -70,5 +70,4 @@ test("Project maintenance is one secondary group while the Project list stays ou
   assert.match(tools, /<details className="project-tools"/)
   assert.match(tools, /<ProjectSetup\b/)
   assert.match(tools, /<ProjectSync/)
-  assert.match(tools, /<IconCopy/)
 })

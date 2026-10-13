@@ -185,10 +185,12 @@ type Checker struct {
 	Disabled bool
 	Now      func() time.Time
 
-	mu        sync.Mutex
-	latest    contract.BuildStamp
-	checkedAt time.Time
-	lastErr   string
+	mu              sync.Mutex
+	refreshMu       sync.Mutex
+	lastRefreshDone time.Time
+	latest          contract.BuildStamp
+	checkedAt       time.Time
+	lastErr         string
 }
 
 // New is the daemon's checker, configured from the environment.
@@ -210,6 +212,12 @@ func (c *Checker) now() time.Time {
 // Refresh asks the cloud once. A failure keeps the last good answer and
 // records the error beside it.
 func (c *Checker) Refresh(ctx context.Context) {
+	started := time.Now()
+	c.refreshMu.Lock()
+	defer func() { c.lastRefreshDone = time.Now(); c.refreshMu.Unlock() }()
+	if c.lastRefreshDone.After(started) {
+		return // an overlapping check already read the source
+	}
 	if c.Disabled {
 		return
 	}

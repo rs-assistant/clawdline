@@ -9,16 +9,19 @@
                     <h1 id="projects-title" tabindex="-1" data-next-word="projectsTitle"></h1>
                     <p class="projects-lede" id="projects-lede" data-next-word="projectsLede"></p>
                 </div>
-                <span class="projects-stat" id="projects-count"></span>
+                <div class="projects-heading-actions"><button id="projects-add" type="button"></button><span class="projects-stat" id="projects-count"></span></div>
             </div>
-            <div id="project-icon-copy-host"></div>
+            <div id="project-tools-host"></div>
             <p class="projects-status" id="projects-status" role="status" aria-live="polite"></p>
             <ol class="projects-rows" id="projects-rows"></ol>
         </div>
 
         <div id="projects-detail-view" hidden>
-            <button class="projects-back" id="projects-back" type="button" data-next-word="projectsBack"></button>
-            <button class="projects-back" id="project-open-work" type="button" data-next-word="projectsOpenWork"></button>
+            <!-- The way back stays on screen however far down the Project is read (page-bar.css). -->
+            <div class="page-bar projects-bar">
+                <div class="page-bar-start"><button class="projects-back" id="projects-back" type="button" data-next-word="projectsBack"></button></div>
+                <div class="page-bar-end"><button class="projects-back" id="project-open-work" type="button" data-next-word="projectsOpenWork"></button></div>
+            </div>
             <div class="projects-heading project-identity">
                 <canvas class="project-mark none" id="project-mark" width="0" height="0" aria-hidden="true"></canvas>
                 <div>

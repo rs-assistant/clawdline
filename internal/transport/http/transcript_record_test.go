@@ -70,6 +70,19 @@ func TestANewSessionsTranscriptIsEmptyNotAnError(t *testing.T) {
 
 }
 
+func TestAnUnboundNewSessionsTranscriptIsEmptyNotAnError(t *testing.T) {
+	item := session.Session{ID: "%8", Assistant: session.AssistantCodex, Binding: session.BindingNoRecord}
+	page := (&Server{}).transcriptPage(item.ID, item, 200)
+	if page.Evidence != contract.EvidenceTranscript || page.Note != "" || len(page.Entries) != 0 {
+		t.Fatalf("new session without a conversation id: evidence=%q note=%q entries=%d", page.Evidence, page.Note, len(page.Entries))
+	}
+	item.Binding = session.BindingUnreadable
+	page = (&Server{}).transcriptPage(item.ID, item, 200)
+	if page.Evidence != contract.EvidenceNone || page.Note == "" {
+		t.Fatalf("unreadable binding must remain a failure: evidence=%q note=%q", page.Evidence, page.Note)
+	}
+}
+
 // A record that is there and cannot be read is a failure, and says so — in
 // words that name what went wrong and not where.
 func TestAnUnreadableTranscriptFailsWithoutNamingItsPath(t *testing.T) {

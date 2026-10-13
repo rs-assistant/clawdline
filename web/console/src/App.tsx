@@ -195,7 +195,8 @@ function rowNode(id: string): HTMLElement | null {
  * light and draws both in one control (`cloud/CloudGate.tsx`) — on a phone two
  * pills beside each other left the counts no room to be read.
  */
-export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetReaderMachine = null,
+export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
+  fleetReaderMachine = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetCloseIntent = null, onFleetCloseIntentHandled,
   hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions }: {
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
@@ -203,6 +204,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   cloudPeerAccess?: ReactNode | ((active: boolean) => ReactNode)
   fleetList?: (filter: string, onFilter: (value: string) => void) => ReactNode
   fleetTarget?: SessionDestination | null
+  fleetTargetRow?: SessionRow | null
   fleetReaderMachine?: string | null
   fleetDetailProblem?: FleetDetailProblem | null
   /** Whether the opened fleet Session's own row is still missing from this machine's rows. */
@@ -377,7 +379,17 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
     return () => window.removeEventListener("hashchange", routeTo)
   }, [!!cloudSessions, !!fleetList])
 
-  const rows = fleet.snapshot?.sessions ?? []
+  const receivedRows = fleet.snapshot?.sessions ?? []
+  // The fleet already holds a pinned, execution-matched display row. Its
+  // conversation may arrive before the old one-machine rich-row stream; the
+  // opened pane can use that same row while the stream catches up.
+  const rows = useMemo(() => fleetTarget && fleetReaderMachine === fleetTarget.machineID && fleetTargetRow &&
+    fleetTargetRow.id === fleetTarget.sessionID &&
+    fleetTargetRow.execution_generation === fleetTarget.executionGeneration &&
+    !receivedRows.some((row) => row.id === fleetTarget.sessionID &&
+      row.execution_generation === fleetTarget.executionGeneration)
+    ? [...receivedRows, fleetTargetRow] : receivedRows,
+  [receivedRows, fleetTarget && destinationKey(fleetTarget), fleetReaderMachine, fleetTargetRow])
   // The opened fleet Session, waiting for its own row. The pane has nothing to
   // draw until the row is here, and the cloud layer decides how long that may
   // go on without being said (`cloud/opened-row.ts`).
@@ -842,6 +854,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         {!hideSessionCounts && <Counts
           reading={sessionCountState(fleet)}
           recovering={!!fleet.snapshot && scanRecovering(fleet.snapshot.scan)}
+          partialCloudList={fleet.snapshot?.scan.provenance === "cloud" && !fleet.snapshot.scan.complete &&
+            fleet.snapshot.sessions.length > 0}
           onOpen={() => setMachine(true)}
         />}
         {typeof aside === "function" ? aside(light) : (
@@ -1031,10 +1045,12 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
 function Counts({
   reading,
   recovering,
+  partialCloudList,
   onOpen,
 }: {
   reading: ReturnType<typeof sessionCountState>
   recovering: boolean
+  partialCloudList: boolean
   onOpen: () => void
 }) {
   const T = L.strings
@@ -1074,7 +1090,10 @@ function Counts({
   // The line is up — this band is drawn from a snapshot that arrived — so the
   // sentence is about the list, not about the app (`Sessions.tsx`'s empty
   // state, and `next-strings.ts` on why these are two words and not one).
-  if (recovering && reading.phase === "ready") bits.push({ cls: "part quiet", text: nextWord("sessionsListWaitTitle") })
+  if (partialCloudList && reading.phase === "ready")
+    bits.push({ cls: "part quiet", text: nextWord("sessionsListIncompleteTitle") })
+  else if (recovering && reading.phase === "ready")
+    bits.push({ cls: "part quiet", text: nextWord("sessionsListWaitTitle") })
   if (rows.length > 0 && !working && !waiting && !unknown && !shells && !recovering) {
     bits.push({ cls: "part quiet", text: catalogWord("literal", "1b40e6344265") })
   }

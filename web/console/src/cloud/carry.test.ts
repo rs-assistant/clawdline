@@ -200,7 +200,7 @@ test("one word, one list, and every route names a word the table carries", () =>
     ["DELETE", "/v1/snippets/sn-1"],
     ["POST", "/v1/snippets/order"],
     ["POST", "/v1/projects/%2Frepo/worktrees/refresh"],
-    ["PUT", "/v1/projects/p1/icon"],
+    ["DELETE", "/v1/projects/%2Frepo/worktrees/wt-0123456789abcdef01234567"],
     ["PUT", "/v1/projects/p1/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
     ["POST", "/v1/project-sync/mirror"],
     ["DELETE", "/v1/project-sync/mirror"],
@@ -227,6 +227,7 @@ test("one word, one list, and every route names a word the table carries", () =>
     ["POST", "/v1/settings/work-gates"],
     ["GET", "/v1/machine/usage"],
     ["GET", "/v1/update"],
+    ["GET", "/v1/update/fresh"],
     ["POST", "/v1/update/apply"],
     ["GET", "/v1/verifications"],
     ["GET", "/v1/verifications/v1"],
@@ -310,7 +311,9 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok(!("project-unify-apply" in DEFERRED))
   // The fleet list's one machine-level title read (5ff7f4ee).
   assert.ok("sessions.list" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 150)
+  // An opened waiting Session's one row, asked when its question has not come.
+  assert.ok("sessions.row" in CARRIED)
+  assert.equal(Object.keys(CARRIED).length, 155)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {
@@ -608,11 +611,11 @@ test("the Git panel's read reaches the machine, and its refusals keep their name
   assert.equal(refused.status, 404)
   assert.equal(((await refused.json()) as { error: string }).error, "not_a_repo")
 
-  // And a session this page holds no row for is refused rather than addressed
-  // by the raw id (F5), as every other session read is.
+  // A missing row cannot prove the machine has removed the Session. The page
+  // refuses the unverified target without addressing the raw id (F5).
   const gone = await reader.fetch("/v1/sessions/s9/git")
-  assert.equal(gone.status, 404)
-  assert.equal(((await gone.json()) as { error: string }).error, "session_not_found")
+  assert.equal(gone.status, 409)
+  assert.equal(((await gone.json()) as { error: string }).error, "session_unknown")
 })
 
 test("the live screen is a machine read of `screen` for the session, and its answer crosses as sent", async () => {
@@ -642,11 +645,10 @@ test("the live screen is a machine read of `screen` for the session, and its ans
   assert.equal(refused.status, 404)
   assert.equal(((await refused.json()) as { error: string }).error, "session_not_found")
 
-  // And a session this page holds no row for is refused rather than addressed
-  // by the raw id (F5).
+  // A missing row is unverified rather than proved absent (F5).
   const gone = await reader.fetch("/v1/sessions/s9/screen")
-  assert.equal(gone.status, 404)
-  assert.equal(((await gone.json()) as { error: string }).error, "session_not_found")
+  assert.equal(gone.status, 409)
+  assert.equal(((await gone.json()) as { error: string }).error, "session_unknown")
 })
 
 test("the status line's read reaches the machine, and its context cell draws", async () => {

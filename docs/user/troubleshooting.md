@@ -77,7 +77,6 @@ An update that does not come up healthy rolls back by itself; the console's Sett
 | You see | It means | Do this |
 | --- | --- | --- |
 | `mirror_source_mismatch` | Another machine already owns that project's settings here | Choose that machine as the source, or run `project import --replace-source` to hand it over |
-| `project_mirrored` when changing an icon | The project is mirrored from another machine | Change it on the source, or make it this machine's own again ([projects.md](projects.md)) |
 | `clone_failed` | The receiving machine could not reach the remote with its own credentials | Clone it by hand into the named directory, then sync again |
 
 ## Still stuck

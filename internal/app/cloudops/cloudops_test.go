@@ -280,6 +280,12 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: machine, name: "action:req-squad-catalog-write",
 		method: "POST", path: "/v1/squad/catalog", body2: `{"expected_version":0}`,
 	}, {
+		word: "squad.role-draft",
+		body: map[string]any{"type": "squad.role-draft", "session": machine,
+			"request": "req-squad-role-draft", "changes": map[string]any{"description": "Review release notes"}},
+		session: machine, name: "action:req-squad-role-draft",
+		method: "POST", path: "/v1/squad/role-draft", body2: `{"description":"Review release notes"}`,
+	}, {
 		word: "squad.settings.update",
 		body: map[string]any{"type": "squad.settings.update", "session": machine,
 			"request": "req-squad-settings-write", "changes": map[string]any{"expected_version": 0}},
@@ -690,9 +696,13 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		path:  "/v1/work/v2/human-interventions/conversation%3A10000000-0000-4000-8000-000000000002/10000000-0000-4000-8000-000000000003/read",
 		body2: `{"expected_version":1}`,
 	}, {
-		word:    "project-icon-copy",
-		body:    map[string]any{"type": "project-icon-copy", "session": machine, "request": "req-icon", "id": "p1", "item": map[string]any{}},
-		session: machine, name: "action:req-icon", method: "PUT", path: "/v1/projects/p1/icon", body2: `{}`,
+		word:    "project-folders",
+		body:    map[string]any{"type": "project-folders", "session": machine, "request": "req-folders", "path": "/projects"},
+		session: machine, name: "read:req-folders", method: "GET", path: "/v1/project-folders", query: map[string]string{"path": "/projects"},
+	}, {
+		word:    "project-add",
+		body:    map[string]any{"type": "project-add", "session": machine, "request": "req-add", "path": "/projects/example"},
+		session: machine, name: "action:req-add", method: "POST", path: "/v1/places", body2: `{"paths":["/projects/example"]}`,
 	}, {
 		word:    "project-manifest",
 		body:    map[string]any{"type": "project-manifest", "session": machine, "request": "req-manifest"},
@@ -766,6 +776,12 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		method: "POST", path: "/v1/projects/%2Fworkspace%2Fexample/worktrees/refresh",
 		body2: `{}`,
 	}, {
+		word: "project-worktree-remove",
+		body: map[string]any{"type": "project-worktree-remove", "session": machine,
+			"request": "req-worktree-remove", "project": "project-abc", "worktree": "wt-0123456789abcdef01234567"},
+		session: machine, name: "action:req-worktree-remove",
+		method: "DELETE", path: "/v1/projects/project-abc/worktrees/wt-0123456789abcdef01234567",
+	}, {
 		// `upcoming` travels on every read because both of its values mean
 		// something; the empty filters do not travel at all, because this
 		// route reads an absent parameter and an empty one differently.
@@ -821,6 +837,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		body:    map[string]any{"type": "update", "session": machine, "request": "req-update"},
 		session: machine, name: "read:req-update",
 		method: "GET", path: "/v1/update",
+	}, {
+		word:    "update-fresh",
+		body:    map[string]any{"type": "update-fresh", "session": machine, "request": "req-update-fresh"},
+		session: machine, name: "read:req-update-fresh",
+		method: "GET", path: "/v1/update/fresh",
 	}, {
 		// The Settings page's 「立即更新」: a machine command with no parameter.
 		word:    "update-apply",
@@ -1094,6 +1115,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		body: map[string]any{"type": "sessions.snapshot.initial", "session": machine,
 			"request": "req-initial-rows"},
 		session: machine, name: "read:req-initial-rows", code: "unknown_command", status: 400,
+	}, {
+		word: "sessions.row",
+		body: map[string]any{"type": "sessions.row", "session": machine,
+			"request": "req-one-row", "row": "%7"},
+		session: machine, name: "read:req-one-row", code: "unknown_command", status: 400,
 	}, {
 		word: "schedule",
 		body: map[string]any{"type": "schedule", "session": machine, "request": "req-schedule",

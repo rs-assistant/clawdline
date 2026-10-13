@@ -31,6 +31,8 @@ export interface SessionListPresentation {
 
 export interface MachineListPresentation extends SessionListPresentation {
   destination: SessionDestination
+  /** Current exact execution verified around the pinned list read. */
+  projection?: ProjectedSession
 }
 
 /** Keep a prior list reading for the same execution, unless fresh ss/ contradicts its state. */
@@ -107,7 +109,7 @@ export type MachineSessionProjection =
    * the list needs this to know a title or work note may have changed. Absent
    * against a machine that does not send it, and the key falls back.
    */
-  | { kind: "ready"; complete: true; observedAt: number; snapshotGeneration?: string; presentationGeneration?: string;
+  | { kind: "ready"; complete: boolean; observedAt: number; snapshotGeneration?: string; presentationGeneration?: string;
       rows: ProjectedSession[]; unknownTargets?: number }
   | { kind: "unavailable"; reason: ProjectionProblem; observedAt?: number; rows?: ProjectedSession[]; retryAt?: number;
       complete?: true; snapshotGeneration?: string; unknownTargets?: number }
@@ -183,7 +185,7 @@ export function checkedProjection(machineID: string, reply: MachineSessionProjec
   if (reply.kind === "unavailable" && !reply.rows) return reply
   const rows = reply.rows
   if (!rows) return { kind: "unavailable", reason: "bad_projection" }
-  if (reply.kind === "ready" && (reply.complete !== true || !Number.isFinite(reply.observedAt)))
+  if (reply.kind === "ready" && (typeof reply.complete !== "boolean" || !Number.isFinite(reply.observedAt)))
     return { kind: "unavailable", reason: "bad_projection" }
   if (reply.kind === "unavailable" && (!Number.isFinite(reply.observedAt) ||
     !["stale", "offline", "event_gap", "unknown", "unresponsive"].includes(reply.reason) ||
@@ -202,7 +204,7 @@ export function checkedProjection(machineID: string, reply: MachineSessionProjec
 export function destinationAvailable(destination: SessionDestination, projection: MachineSessionProjection | undefined): "ready" | "waiting" | "changed" | "stale" | "unknown" {
   if (!projection || projection.kind !== "ready") return "waiting"
   const row = projection.rows.find((item) => destinationKey(item.destination) === destinationKey(destination))
-  return row ? row.freshness === "current" ? "ready" : row.freshness : "changed"
+  return row ? row.freshness === "current" ? "ready" : row.freshness : projection.complete ? "changed" : "waiting"
 }
 
 /**
@@ -242,8 +244,13 @@ export function afterEventGap(before: MachineSessionProjection | undefined, retr
 
 /** A temporary status read failure cannot erase the last visible list or authorize its actions. */
 export function settleProjection(machineID: string, before: MachineSessionProjection | undefined,
-  incoming: MachineSessionProjection): MachineSessionProjection {
-  const checked = checkedProjection(machineID, incoming)
+  incoming: MachineSessionProjection, unknownRetryMs?: number): MachineSessionProjection {
+  const checkedReply = checkedProjection(machineID, incoming)
+  // Store the deadline with this reading. Other machines can update the list
+  // repeatedly without postponing its next attempt.
+  const checked = checkedReply.kind === "unavailable" && checkedReply.reason === "unknown" &&
+    !Number.isFinite(checkedReply.retryAt) && unknownRetryMs !== undefined
+    ? { ...checkedReply, retryAt: Date.now() + unknownRetryMs } : checkedReply
   if (checked.kind !== "unavailable" || checked.rows ||
     !["event_gap", "unknown", "unresponsive", "stale", "offline"].includes(checked.reason)) return checked
   if (checked.reason === "event_gap") return afterEventGap(before, checked.retryAt)
@@ -258,9 +265,11 @@ export function settleProjection(machineID: string, before: MachineSessionProjec
 /** Schedule a status-only read when the earliest trusted status time expires. */
 export function projectionRefreshAt(projection: MachineSessionProjection, freshnessMs: number,
   directRefreshMs = freshnessMs): number | null {
-  if (projection.kind !== "ready") return (projection.reason === "offline" || projection.reason === "event_gap" ||
-    projection.reason === "unknown") && Number.isFinite(projection.retryAt)
-    ? projection.retryAt! : null
+  if (projection.kind !== "ready") {
+    return (projection.reason === "offline" || projection.reason === "event_gap" ||
+      projection.reason === "unknown" || projection.reason === "stale") && Number.isFinite(projection.retryAt)
+      ? projection.retryAt! : null
+  }
   if (projection.snapshotGeneration?.startsWith("direct:")) return projection.observedAt + directRefreshMs + 1
   return Math.min(projection.observedAt, ...projection.rows.filter((row) => row.freshness === "current")
     .map((row) => row.observedAt)) + freshnessMs + 1

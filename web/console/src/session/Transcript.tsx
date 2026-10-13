@@ -161,7 +161,7 @@ function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; 
     },
     [id, agentId],
   )
-  useSyncExternalStore(pendingSends.subscribe, pendingSends.getVersion)
+  const pendingVersion = useSyncExternalStore(pendingSends.subscribe, pendingSends.getVersion)
   const cards = agentId ? [] : pendingSends.of(id)
   const following = cards.some((card) => card.state !== "failed")
   const newestSendAt = cards.reduce((at, card) => (card.state !== "failed" && card.sentAt > at ? card.sentAt : at), 0)
@@ -222,6 +222,11 @@ function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; 
   useLayoutEffect(() => {
     if (data && !agentId) pendingSends.reconcile(id, data.entries, Date.now())
   }, [data, id, agentId])
+  useLayoutEffect(() => {
+    if (!agentId && session?.assistant === "codex" && session.state === "waiting") {
+      pendingSends.settleModelPicker(id, session.menu?.question ?? "")
+    }
+  }, [agentId, id, pendingVersion, session?.assistant, session?.state, session?.menu?.question])
   // The cards' spinners turn on the page's one clock, drawn once now so they
   // have their size before the clock's next tick.
   useLayoutEffect(turnPendingSpinners)

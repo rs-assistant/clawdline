@@ -149,6 +149,18 @@ test("capability, content and pairing revocation refuse a write before its envel
   assert.equal(f.calls.length, 0)
 })
 
+test("a cut saved command list leaves pinned actions unknown until the live list arrives", async () => {
+  const f = fixture()
+  const saved = ["send", ...Array.from({ length: 63 }, (_, i) => `earlier-${i}`)]
+  f.client.machineDescriptor = () => ({ machine: { commands: saved } })
+  assert.equal(await f.service.availability(context, "send"), "unknown")
+  assert.equal(f.calls.length, 0)
+  Object.assign(f.client, { orchestratorSnapshots: new Map([["machine-a", { machine: { commands: ["send", "session-receipt"] } }]]) })
+  assert.equal(await f.service.availability(context, "send"), null)
+  Object.assign(f.client, { orchestratorSnapshots: new Map([["machine-a", { machine: { commands: ["send"] } }]]) })
+  assert.equal(await f.service.availability(context, "send"), "unsupported")
+})
+
 test("missing transcript permission only disables answers; close blockers only disable close", async () => {
   const f = fixture()
   const noTranscript: ActionContext = { ...context, content: { kind: "unavailable", reason: "no_permission" } }

@@ -454,8 +454,19 @@ export function sessionWorkStateHTML(s) {
         said = '<span class="session-work-copy" data-work-state="' + projected.state +
             '" title="' + attr(copy) + '">' + sessionStatusGlyphHTML(icon, copy) + "</span>";
     } else if (projected.state === "unknown") {
+        // An observed idle assistant tells us the terminal has stopped moving,
+        // even when nobody reported whether the work was delivered. Say both
+        // facts instead of making the whole row sound unreadable. An unknown
+        // terminal reading still keeps the honest unknown label.
+        var unknownCopy = T.sessionWorkUnknown;
+        if (s && s.state === "idle" && !projected.failedClosed) {
+            // A conversation record plus the observed idle terminal says a
+            // turn has ended. Neither fact alone proves a delivered result.
+            unknownCopy = s.activity && s.activity.known
+                ? T.sessionTurnEndedUnreported : T.sessionWorkIdleUnreported;
+        }
         said = '<span class="session-work-copy" data-work-state="unknown" title="' +
-            attr(T.sessionWorkUnknown) + '">' + attr(T.sessionWorkUnknown) + "</span>";
+            attr(unknownCopy) + '">' + attr(unknownCopy) + "</span>";
     }
     return said + owedBadgeHTML(s);
 }

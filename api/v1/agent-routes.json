@@ -382,6 +382,11 @@
       "guide": "project"
     },
     {
+      "method": "GET",
+      "pattern": "/v1/project-folders",
+      "guide": "project"
+    },
+    {
       "method": "*",
       "pattern": "/v1/project-sync/",
       "guide": "project"
@@ -514,6 +519,11 @@
     {
       "method": "*",
       "pattern": "/v1/update",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/update/fresh",
       "guide": "connect"
     },
     {

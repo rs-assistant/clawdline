@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5050,
-  "riskKeys": 2214,
-  "nonRiskCount": 2836,
+  "englishContentKeys": 5100,
+  "riskKeys": 2238,
+  "nonRiskCount": 2862,
   "groups": [
     {
       "name": "bar / other",
@@ -1215,7 +1215,7 @@
     },
     {
       "name": "legacy / other",
-      "count": 155,
+      "count": 157,
       "sources": [
         "src/legacy/js/core/i18n.js"
       ],
@@ -1281,6 +1281,8 @@
         "legacy.webDevicesLede",
         "legacy.webEmptyFilterHint",
         "legacy.webEmptyNoneHint",
+        "legacy.webEmptyWaitHint",
+        "legacy.webEmptyWaitTitle",
         "legacy.webEndSession",
         "legacy.webFilterLabel",
         "legacy.webFilterPlaceholder",
@@ -1638,7 +1640,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 203,
+      "count": 199,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1671,6 +1673,7 @@
         "next.cloudAllAttention",
         "next.cloudAllAttentionNeeded",
         "next.cloudAllBack",
+        "next.cloudAllCheckingConnection",
         "next.cloudAllCloseBlocked",
         "next.cloudAllCloseGone",
         "next.cloudAllCollapseMachine",
@@ -1718,12 +1721,7 @@
         "next.cloudDeviceLimitLoading",
         "next.cloudDeviceRemoveCancel",
         "next.cloudDeviceSeen",
-        "next.cloudForget",
-        "next.cloudForgetAskCurrent",
-        "next.cloudForgetOne",
         "next.cloudForgetSaid",
-        "next.cloudForgetTitle",
-        "next.cloudForgetting",
         "next.cloudInstallLede",
         "next.cloudMachineActions",
         "next.cloudMachineID",
@@ -1916,7 +1914,7 @@
     },
     {
       "name": "next / other",
-      "count": 105,
+      "count": 123,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1963,6 +1961,23 @@
         "next.proposalResolveSubmit",
         "next.providerWork",
         "next.pushCloudReached",
+        "next.roleCreateAI",
+        "next.roleCreateClose",
+        "next.roleCreateDefinition",
+        "next.roleCreateDescribe",
+        "next.roleCreateDrafting",
+        "next.roleCreateGenerate",
+        "next.roleCreateID",
+        "next.roleCreateIDHint",
+        "next.roleCreateName",
+        "next.roleCreateOpen",
+        "next.roleCreateRequired",
+        "next.roleCreateReview",
+        "next.roleCreateSave",
+        "next.roleCreateSaving",
+        "next.roleCreateSummary",
+        "next.roleCreateTitle",
+        "next.roleCreateUsage",
         "next.schedulesHeading",
         "next.schedulesListLabel",
         "next.schedulesLoading",
@@ -1975,6 +1990,7 @@
         "next.sessionStop",
         "next.sessionTrySendingAgain",
         "next.sessionWriteDisabled",
+        "next.sessionsListWaitTitle",
         "next.smartTitleAction",
         "next.smartTitleButton",
         "next.smartTitleConfirmTitle",
@@ -2030,7 +2046,7 @@
     },
     {
       "name": "next / persona",
-      "count": 23,
+      "count": 24,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2051,6 +2067,7 @@
         "next.personaSource",
         "next.personaSuggestedKinds",
         "next.personaTeamBusiness",
+        "next.personaTeamCustom",
         "next.personaTeamDesign",
         "next.personaTeamEngineering",
         "next.personaTeamMarketing",
@@ -2301,7 +2318,7 @@
     },
     {
       "name": "projects / other",
-      "count": 15,
+      "count": 24,
       "sources": [
         "src/pages/projects/project-list.ts"
       ],
@@ -2309,7 +2326,16 @@
         "projects.activityInProgress",
         "projects.activityLastKnown",
         "projects.activityPartial",
+        "projects.addButton",
         "projects.boardLede",
+        "projects.editList",
+        "projects.folderAdd",
+        "projects.folderCancel",
+        "projects.folderHint",
+        "projects.folderList",
+        "projects.folderParent",
+        "projects.folderPath",
+        "projects.folderTitle",
         "projects.setupProjectRoot",
         "projects.setupUnifyDrift",
         "projects.setupUnifyDriftCount",

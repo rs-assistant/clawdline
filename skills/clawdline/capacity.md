@@ -42,6 +42,8 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `cloud.peer_outbox` | 512 | `rows` | `refuse` | `diagnostics, notice, health` | — |
 | `cloud.peer_pairs` | 128 | `rows` | `refuse` | `diagnostics, notice, health` | — |
 | `cloud.relay_queue` | 64 | `rows` | `refuse` | `diagnostics, notice, cloud_status, log, sender` | — |
+| `cloud.session_row_asks` | 64 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `cloud.session_row_id_bytes` | 256 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `cloud.session_row_volatile_seconds` | 15 | `seconds` | `expire` | `diagnostics` | — |
 | `cloud.spool` | 2000 | `rows` | `refuse` | `diagnostics, notice, log` | — |
 | `cloud.spool_bytes` | 16777216 | `bytes` | `refuse` | `diagnostics, notice, log` | — |
@@ -92,10 +94,12 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `console.health_live_seconds` | 90 | `seconds` | `expire` | `diagnostics` | — |
 | `console.opened_row_quiet_seconds` | 8 | `seconds` | `expire` | `diagnostics` | — |
 | `console.opened_row_restate_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
+| `console.pinned_list_read_timeout_seconds` | 10 | `seconds` | `expire` | `diagnostics` | — |
 | `console.relay_feature_wait_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
 | `console.relay_transcript_expect_reask_seconds` | 4 | `seconds` | `expire` | `diagnostics` | — |
 | `console.session_notes_safety_seconds` | 60 | `seconds` | `expire` | `diagnostics` | — |
 | `console.status_gap_retry_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
+| `console.status_marker_recovery_wait_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
 | `console.status_marker_retry_seconds` | 60 | `seconds` | `expire` | `diagnostics` | — |
 | `console.transcript_backoff_seconds` | 30 | `seconds` | `expire` | `diagnostics` | — |
 | `console.transcript_follow_fast_seconds` | 10 | `seconds` | `expire` | `diagnostics` | — |
@@ -153,6 +157,7 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `projectfiles.tree_depth` | 64 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `projectfiles.tree_path_bytes` | 4096 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `projectfiles.write_bytes` | 262144 | `bytes` | `refuse` | `diagnostics, sender` | — |
+| `projects.folder_rows` | 128 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `projectsync.clones` | 2 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `projectsync.entry_bytes` | 4194304 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `projectsync.file_bytes` | 262144 | `bytes` | `refuse` | `diagnostics, sender` | — |

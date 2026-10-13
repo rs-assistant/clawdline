@@ -57,6 +57,10 @@
 .update-banner-say { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .update-banner-go { flex: 0 0 auto; color: var(--accent); text-decoration: none; white-space: nowrap; }
 .update-banner-go:hover { text-decoration: underline; }
+.update-banner .update-command {
+    flex: 1 1 100%; overflow-wrap: anywhere; user-select: all;
+    font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
 .update-banner .x {
     flex: 0 0 auto; color: var(--faint); font-size: 15px; line-height: 1;
     min-width: 44px; min-height: 44px; margin: -6px -4px -6px 0;
@@ -72,5 +76,5 @@
     .settings-update .update-auto .settings-switch { justify-self: start; }
     .settings-update .update-now { min-height: 44px; }
     .update-banner { flex-wrap: wrap; }
-    .update-banner-go { min-height: 32px; display: inline-flex; align-items: center; }
+    .update-banner-go { min-height: 44px; display: inline-flex; align-items: center; }
 }

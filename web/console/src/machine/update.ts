@@ -13,8 +13,8 @@ import { classifyApplyAnswer, classifyUpdateRead, createUpdateReadStore, type An
  * answer comes back sorted (`update-model.ts`), and the panel says what that
  * means rather than 「讀取失敗」.
  */
-export function readUpdate(): Promise<UpdateRead> {
-  return call("GET", "/v1/update").then(classifyUpdateRead)
+export function readUpdate(fresh = false): Promise<UpdateRead> {
+  return call("GET", fresh ? "/v1/update/fresh" : "/v1/update").then(classifyUpdateRead)
 }
 
 /**
@@ -78,6 +78,11 @@ const store = createUpdateReadStore(readUpdate, {
     window.addEventListener("focus", listener)
     return () => window.removeEventListener("focus", listener)
   },
+  onPageShow: (listener) => {
+    const restored = (event: PageTransitionEvent) => { if (event.persisted) listener() }
+    window.addEventListener("pageshow", restored)
+    return () => window.removeEventListener("pageshow", restored)
+  },
   onBlur: (listener) => {
     window.addEventListener("blur", listener)
     return () => window.removeEventListener("blur", listener)
@@ -93,6 +98,11 @@ const store = createUpdateReadStore(readUpdate, {
 /** Read now while visible; a read already on the wire is shared rather than doubled. */
 export function refreshUpdate(): Promise<UpdateRead | null> {
   return store.refresh()
+}
+
+/** Revalidate a release before a person presses the install command. */
+export function checkUpdateNow(): Promise<UpdateRead> {
+  return store.recheck()
 }
 
 /** Hand a status the press answered with to every listener, as a read would. */

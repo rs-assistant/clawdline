@@ -175,6 +175,9 @@ type LinkOptions struct {
 	// `GET /v1/sessions` answers it; the publisher reads it instead of building
 	// its own through Handler. Nil reads the route.
 	Sessions func(context.Context) ([]byte, bool)
+	// SessionsFresh is Sessions built now, for the passes right after a press
+	// (Publisher.Fresh). Nil reads Sessions.
+	SessionsFresh func(context.Context) ([]byte, bool)
 	// TerminalService is the only ingress to the local terminal service from
 	// signed Cloud envelopes. The regular Router remains forbidden.
 	TerminalService   func() (*terminals.Service, error)
@@ -743,6 +746,7 @@ func (l *Link) wire() error {
 		Router: Router{Handler: opts.Handler, Authorize: opts.Authorize,
 			AppOrigin: settings.AppOrigin},
 		Sessions: opts.Sessions,
+		Fresh:    opts.SessionsFresh,
 		// Whether a task row was written since the last pass asked. Without
 		// it the publisher cannot tell a list that moved from one that did
 		// not, and read it on every pass to find out (tasklist.go).
@@ -767,6 +771,9 @@ func (l *Link) wire() error {
 	// thing that can put the rows back on their channels.
 	l.service.Bridge.Sessions = l.publisher.Snapshot
 	l.service.Bridge.SessionsFor = l.publisher.SnapshotFrom
+	l.service.Bridge.SessionRow = l.publisher.StateRow
+	// A press from a page is shown landing at the next look, not the next pass.
+	l.service.Acted = l.publisher.Settle
 	return nil
 }
 

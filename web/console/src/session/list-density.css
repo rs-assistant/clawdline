@@ -21,6 +21,12 @@
   max-width: 100%;
 }
 
+/* Keep the third grid row when a session has no status to display. */
+.row .state:empty {
+  display: flex;
+  min-height: 18px;
+}
+
 .row .state > .session-live-line {
   flex: 1 1 12ch;
   min-width: 0;
@@ -49,6 +55,18 @@
 
 .row .meta .tty {
   flex: 1 8 6ch;
+}
+
+/* A fleet row must identify its machine even after the group heading scrolls
+ * away. The pane address is only an internal terminal locator. */
+.projected-row .meta .machine {
+  max-width: 70%;
+}
+
+@media (max-width: 600px) {
+  .projected-row .meta .machine {
+    max-width: 100%;
+  }
 }
 
 .row .meta .session-activity {

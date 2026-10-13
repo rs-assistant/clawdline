@@ -23,6 +23,10 @@ const CARRIER_SESSION = "__clawdline_machine__"
 const INVENTORY_SESSION = "__clawdline_inventory_v1__"
 /** A carrier either negotiates in a few seconds or is not available on this network. */
 const CARRIER_TIMEOUT_MS = 15_000
+/** A cold list must yield promptly when the relay or direct carrier stops answering. */
+const PINNED_LIST_READ_TIMEOUT_MS = 10_000
+/** A retained marker normally replays at once; silence must not block the direct-list fallback. */
+const STATUS_MARKER_RECOVERY_TIMEOUT_MS = 5_000
 
 function refused(code, message) {
   return Object.assign(new Error(message), { code })
@@ -147,7 +151,12 @@ export class StatusCloudClient extends CatalogCloudClient {
         }
       })
       candidates.sort((a, b) => a.machine < b.machine ? -1 : a.machine > b.machine ? 1 : 0)
-      const chosen = candidates.find((candidate) => candidate.machine === this.classicSessionMachine) ?? candidates[0]
+      // A fleet page has no single classicSessionMachine. Prefer the paired
+      // Mac's durable diagnostic log over an incidental Linux test machine
+      // whose id sorts first; a Linux-only account still has a recipient.
+      const chosen = candidates.find((candidate) => this._evidentMac(candidate.machine))
+        ?? candidates.find((candidate) => candidate.machine === this.classicSessionMachine)
+        ?? candidates[0]
       if (!chosen) throw error
       if (remember) this.viewerEvents.rememberTarget(chosen)
       return chosen
@@ -333,6 +342,19 @@ export class StatusCloudClient extends CatalogCloudClient {
       Array.isArray(remembered) && remembered.length >= 64 && !remembered.includes(type) &&
       !lacks?.has(type)) return "unknown"
     return super._machineImplements(machine, type, options)
+  }
+
+  _machinesFor(type) {
+    const found = super._machinesFor(type)
+    if (type !== "voice" || found.capable.length || !found.evidentMac) return found
+    // The archived picker drops every unknown route as soon as it sees a Mac.
+    // Its 64-word descriptor cache makes voice unknown on that very Mac while
+    // its live descriptor is between snapshots. Keep only paired, evident Macs
+    // as candidates; a named request gets the machine's authoritative answer.
+    const possible = found.unconfirmed.filter((row) => this._evidentMac(row.id))
+    if (!possible.length) return found
+    return { ...found, capable: possible,
+      unconfirmed: found.unconfirmed.filter((row) => !possible.includes(row)) }
   }
 
   /**
@@ -593,17 +615,25 @@ export class StatusCloudClient extends CatalogCloudClient {
     const previous = this.allowWrites
     this.allowWrites = true
     try {
-      // The carrier is taken only when it is already open. Negotiating one takes a
-      // round trip to a STUN server and a publish, and a transcript must not wait
-      // for that: the first read of a machine goes over the relay while the carrier
-      // opens behind it, and the reads after it take the short path.
+      // The carrier is taken only when it is already open. A cold foreground
+      // read goes over the relay before this page negotiates another path: a
+      // failed STUN/data-channel attempt on a small executor must not contend
+      // with the first conversation the person is waiting to see.
       const carrier = this._carrierFor(extra.machine_id)
       const direct = carrier?.open ? carrier : null
-      if (carrier && !direct) carrier.ensure().catch(() => {})
       const promise = direct
         ? this._readOnCarrier({ machine: extra.machine_id, session: value.session },
           direct, type, extra, answer, timeoutMs, readOptions)
         : super._read(value, type, extra, answer, timeoutMs, readOptions)
+      if (carrier && !direct) {
+        // Only a successful read warms the optional path. The timer yields to
+        // the caller's promise continuation, so the transcript can be drawn
+        // before WebRTC work begins. DirectCarrier.ensure coalesces any other
+        // reads that completed in the same turn and applies its retry bound.
+        void promise.then(() => {
+          setTimeout(() => { void carrier.ensure().catch(() => {}) }, 0)
+        }, () => {})
+      }
       proof.waiters = this.readWaiters.get(key) || null
       if (!proof.waiters) this.pinnedReadProofs.delete(key)
       return promise
@@ -750,15 +780,32 @@ export class StatusCloudClient extends CatalogCloudClient {
     this.carrierMachines.clear()
   }
 
+  /**
+   * An opened detail holds its rich row's channel for as long as it is open.
+   *
+   * Unheld, the channel was trimmed as idle by the next read: on 2026-10-12 the
+   * machine's log recorded `ch=t/<machine>/<session> fanout=1` every minute and
+   * `ch=s/<machine>/<session> fanout=0` throughout, for a Session the page had
+   * open. A Session stopped on a question is exactly the one whose row stops
+   * moving, so the row carrying the question never arrived, and the card said
+   * the machine could not read a menu it had read whole.
+   */
   openDetail(destination) {
     const channel = "s/" + channelSegment(destination.machineID) + "/" + channelSegment(destination.sessionID)
+    if (!this.openedDetails.has(channel) && this.subscriptionHolds) {
+      this.subscriptionHolds.set(channel, (this.subscriptionHolds.get(channel) || 0) + 1)
+    }
     this.openedDetails.add(channel)
     this.detailSnapshots.delete(destination.machineID + "\u0000" + destination.sessionID)
   }
 
   closeDetail(destination) {
     const channel = "s/" + channelSegment(destination.machineID) + "/" + channelSegment(destination.sessionID)
-    this.openedDetails.delete(channel)
+    if (this.openedDetails.delete(channel) && this.subscriptionHolds) {
+      const holds = (this.subscriptionHolds.get(channel) || 0) - 1
+      if (holds > 0) this.subscriptionHolds.set(channel, holds)
+      else this.subscriptionHolds.delete(channel)
+    }
     this.detailSnapshots.delete(destination.machineID + "\u0000" + destination.sessionID)
   }
 
@@ -952,7 +999,7 @@ export class StatusCloudClient extends CatalogCloudClient {
         this.pendingSubscriptions.add(channel)
         this._sendSubscriptionFrame("subscribe", [channel])
         this.socketSubscriptions.set(channel, this.now())
-        timer = this.setTimeout(() => finish(false), this.readTimeoutMs)
+        timer = this.setTimeout(() => finish(false), STATUS_MARKER_RECOVERY_TIMEOUT_MS)
       }
     } catch { finish(false) }
     return promise
@@ -977,7 +1024,46 @@ export class StatusCloudClient extends CatalogCloudClient {
     const request = crypto.randomUUID()
     return this._read({ machine: machineID, session: "__clawdline_machine__" }, "sessions.list", {
       machine_id: machineID, request,
-    }, "read:" + request, undefined, { signal })
+    }, "read:" + request, PINNED_LIST_READ_TIMEOUT_MS, { signal })
+  }
+
+  /** Let each schedule machine answer independently of its slower peers. */
+  schedules(options) {
+    if (!options?.fresh || !options.machine) return super.schedules(options)
+    if (this.retired) return this._viaSuccessor((next) => next.schedules(options))
+    const machine = options.machine
+    const found = this._machinesFor("schedules")
+    if (found.pairable.some((row) => row.id === machine)) {
+      return Promise.reject(refused("machine_pairing_required", "this browser is not paired with this machine"))
+    }
+    if (!found.rows.some((row) => row.id === machine)) {
+      return Promise.reject(refused("cloud_read_unavailable", "this machine is not in the viewer's roster"))
+    }
+    if (!found.capable.some((row) => row.id === machine)) {
+      if (found.rows.some((row) => row.id === machine) &&
+        this._machineImplements(machine, "schedules", { learned: false }) === "no") {
+        return Promise.resolve({ schedules: [], at: Math.floor(this.now() / 1000) })
+      }
+      // The roster can precede orch/. A named, paired machine may answer one
+      // bounded authenticated read before its capability descriptor arrives.
+      if (this._machineImplements(machine, "schedules", { learned: false }) === "no") {
+        return Promise.reject(refused("cloud_read_unavailable", "this machine's schedule reader is not confirmed"))
+      }
+    }
+    return this._machineRequest(machine, "schedules", {}, "read").then((answer) => {
+      const rows = Array.isArray(answer?.schedules) ? answer.schedules : []
+      const at = typeof answer?.at === "number" ? answer.at : 0
+      const previous = this.orchestratorSnapshots.get(machine) || {}
+      this.orchestratorSnapshots.set(machine,
+        Object.assign({}, previous, { schedules: rows, at: at || previous.at || 0 }))
+      return { schedules: rows.map((row) => Object.assign({}, row, { machine })),
+        at: at || Math.floor(this.now() / 1000) }
+    }).catch((error) => {
+      if (["unknown_command", "cloud_machine_unsupported"].includes(error?.code)) {
+        return { schedules: [], at: Math.floor(this.now() / 1000) }
+      }
+      throw error
+    })
   }
 
   /** Keep distinct generations from joining the copied client's per-session read waiter. */

@@ -1051,6 +1051,21 @@ It lands only on a record whose `schedule_id` is the schedule that started this 
 (`schedule_mismatch` otherwise), is signed `task:<task id>`, and is refused as `not_scheduled` for a
 task no schedule started. Find the record id with `clawdline verify list`.
 
+**Write every readout, note and verdict reason on a record for the person, not for another agent.**
+Whoever writes it — a scheduled task, a session using `clawdline verify note`, or a session closing
+the record with `clawdline verify done` — the person reads it on a phone and decides from it:
+
+- Open with the answer in one plain sentence: does the change hold, and what do you suggest
+  (accept, reject, or cannot tell yet).
+- Then one short line per criterion, in its order: the suggested state (passed, failed, cannot
+  tell) and the one or two numbers that decide it, as "before → after".
+- Say a caveat in everyday words ("most of the drop is because the tasks themselves got smaller"),
+  not as statistics. No tables, percentiles, test statistics or lists of task ids unless the person
+  asked; at most three caveats.
+- A verdict reason is one sentence.
+
+If a sentence needs the reader to know this codebase's internals to follow it, rewrite it.
+
 ## 7. Report your own finished turn
 
 When your turn is genuinely finished — the work done, verified and committed where that applies —

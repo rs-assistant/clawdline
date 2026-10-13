@@ -66,3 +66,36 @@ func TestLandingSessionsAreCurrentWhileITermIsOff(t *testing.T) {
 		t.Fatalf("sessions freshness with iTerm2 off: %s", out.Sources.Sessions.Freshness)
 	}
 }
+
+func TestCloudListIsCompleteForEnabledSourcesWhileITermIsOff(t *testing.T) {
+	s, _ := ownTodoServer(t)
+	withITermOff(s)
+	rec := httptest.NewRecorder()
+	s.sessions(rec, httptest.NewRequest(http.MethodGet, "/v1/sessions?parts=list", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("machine list: %d %s", rec.Code, rec.Body)
+	}
+	var out struct {
+		Complete bool `json:"complete"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || !out.Complete {
+		t.Fatalf("the machine list should cover every enabled source: %v %s", err, rec.Body)
+	}
+}
+
+func TestCloudListStaysPartialWhenAnEnabledSourceFails(t *testing.T) {
+	s, _ := ownTodoServer(t)
+	s.inventory.Terminals = append(s.inventory.Terminals,
+		sourceHost{inv: session.Inventory{Provenance: "tmux", Complete: false}})
+	rec := httptest.NewRecorder()
+	s.sessions(rec, httptest.NewRequest(http.MethodGet, "/v1/sessions?parts=list", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("machine list: %d %s", rec.Code, rec.Body)
+	}
+	var out struct {
+		Complete bool `json:"complete"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil || out.Complete {
+		t.Fatalf("a failed enabled source must leave the list partial: %v %s", err, rec.Body)
+	}
+}

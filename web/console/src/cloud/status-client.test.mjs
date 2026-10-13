@@ -9,6 +9,58 @@ const envelope = (ch) => ({ v: 1, ch, seq: 1, ts: 1, class: "stream", key_id: "k
 const genA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 const genB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 
+test("fleet diagnostics choose a paired Mac even when a Linux test machine sorts first", () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  client.viewerVerified = new Map([
+    ["linux-a", { sender: "agent-a" }], ["mac-z", { sender: "agent-z" }],
+  ])
+  client._machineImplements = () => "yes"
+  client._evidentMac = (machine) => machine === "mac-z"
+  const remembered = []
+  client.viewerEvents = { rememberTarget: (target) => remembered.push(target) }
+  assert.equal(client._viewerEventTarget(true).machine, "mac-z")
+  assert.equal(remembered[0].machine, "mac-z")
+  client.viewerVerified.delete("mac-z")
+  assert.equal(client._viewerEventTarget(false).machine, "linux-a",
+    "a Linux-only account still delivers its diagnostics")
+})
+
+test("one schedule machine paints without waiting for another machine", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  client.retired = false
+  client.now = () => 1_700_000
+  client.orchestratorSnapshots = new Map()
+  client._machinesFor = () => ({ rows: [{ id: "mac-a" }, { id: "linux-b" }],
+    capable: [{ id: "mac-a" }, { id: "linux-b" }], pairable: [] })
+  const asked = []
+  client._machineRequest = async (machine) => {
+    asked.push(machine)
+    if (machine !== "mac-a") throw new Error("another machine is slow")
+    return { schedules: [{ id: "first" }], at: 1_700 }
+  }
+  const answer = await client.schedules({ fresh: true, machine: "mac-a" })
+  assert.deepEqual(answer.schedules, [{ id: "first", machine: "mac-a" }])
+  assert.deepEqual(asked, ["mac-a"])
+  assert.deepEqual(client.orchestratorSnapshots.get("mac-a").schedules, [{ id: "first" }])
+})
+
+test("a cold browser asks a named paired schedule machine before its descriptor arrives", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  client.retired = false
+  client.now = () => 1_700_000
+  client.orchestratorSnapshots = new Map()
+  client._machinesFor = () => ({ rows: [{ id: "mac-a" }, { id: "linux-b" }], capable: [], pairable: [] })
+  client._machineImplements = () => "unknown"
+  const asked = []
+  client._machineRequest = async (machine) => {
+    asked.push(machine)
+    return { schedules: [{ id: "first" }], at: 1_700 }
+  }
+  const answer = await client.schedules({ fresh: true, machine: "mac-a" })
+  assert.deepEqual(answer.schedules, [{ id: "first", machine: "mac-a" }])
+  assert.deepEqual(asked, ["mac-a"])
+})
+
 test("the original one-machine page subscribes only exact rich rows named by that machine's status", () => {
   const client = Object.create(StatusCloudClient.prototype)
   client.statusSnapshots = new Map([
@@ -109,6 +161,38 @@ test("a cut remembered Linux command list cannot refuse a named transcript read"
   client.orchestratorSnapshots.clear()
   client.machineLacks.set("m", new Set(["transcript"]))
   assert.equal(client._machineImplements("m", "transcript"), "no")
+})
+
+test("a paired Mac remains the voice host while its cached command list is incomplete", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  const cached = Array.from({ length: 64 }, (_, i) => `word-${i}`)
+  client._machineRows = () => [
+    { id: "mac", pairing: "paired", freshness: "current" },
+    { id: "linux", pairing: "paired", freshness: "current" },
+  ]
+  client.orchestratorSnapshots = new Map()
+  client.machineDescriptors = new Map([
+    ["mac", { machine: { platform: "darwin", commands: cached } }],
+    ["linux", { machine: { platform: "linux", commands: ["send"] } }],
+  ])
+  client.machineLacks = new Map()
+  client.macCapabilities = new Map()
+  client.account = "account"
+  client.voiceHostStorage = null
+  client.voiceHostChoice = null
+  const host = await client.voiceHost()
+  assert.equal(host.machine, "mac")
+  const asked = []
+  client._machineRequest = async (machine, word) => {
+    asked.push([machine, word])
+    return { text: "heard" }
+  }
+  assert.deepEqual(await client.voice("audio", 16000), { text: "heard" })
+  assert.deepEqual(asked, [["mac", "voice"]])
+
+  // A complete live descriptor that omits voice is an actual refusal.
+  client.orchestratorSnapshots.set("mac", { machine: { platform: "darwin", commands: ["send"] } })
+  await assert.rejects(client.voiceHost(), { code: "cloud_voice_host_unavailable" })
 })
 
 test("status recovery frees idle relay channels before declaring an event gap", async () => {
@@ -559,6 +643,38 @@ test("only an s row received after exact detail open may supply its menu", () =>
   assert.equal(client.detailSnapshots.size, 0)
 })
 
+// On 2026-10-12 a Session stopped on a question was open on the page, and the
+// machine logged its transcript channel delivered every minute and its rich-row
+// channel to nobody: the next transcript read had trimmed the quiet s/ as idle,
+// and the row carrying the question never arrived.
+test("an opened detail's rich row is not trimmed as idle by the next read, and is let go on close", () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  let now = 0
+  client.now = () => now
+  client.ready = true
+  client.subscriptionLimit = 8
+  client.subscriptionIdleMs = 120_000
+  client.subscriptionHolds = new Map()
+  client.pendingSubscriptions = new Set()
+  client.socketSubscriptions = new Map()
+  client.subscriptionFrames = []
+  client.resubscribes = new Map()
+  client.openedDetails = new Set()
+  client.detailSnapshots = new Map()
+  const sent = []
+  client._send = (frame) => sent.push(frame)
+  const destination = { machineID: "m", sessionID: "s", executionGeneration: genA }
+  client.openDetail(destination)
+  client.subscribe(["s/m/s", "t/m/s"])
+  now = 10 * 60_000
+  client.subscribe(["t/m/other"])
+  assert.ok(client.socketSubscriptions.has("s/m/s"), "the opened rich row was trimmed")
+  assert.ok(!sent.some((f) => f.type === "unsubscribe" && f.channels.includes("s/m/s")))
+  client.openDetail(destination)
+  client.closeDetail(destination)
+  assert.equal(client.subscriptionHolds.has("s/m/s"), false, "a second open of the same detail held it twice")
+})
+
 test("r/ capability is learned only from this socket's full machine descriptor", () => {
   const client = Object.create(StatusCloudClient.prototype)
   client.readContentCapabilities = new Map()
@@ -638,7 +754,8 @@ test("a cold browser replays one missing inventory marker and shares the pending
   client.readTimeoutMs = 60000
   client.now = () => 0
   client._trimSubscriptions = () => {}
-  client.setTimeout = () => 1
+  const delays = []
+  client.setTimeout = (_callback, ms) => { delays.push(ms); return 1 }
   client.clearTimeout = () => {}
   const frames = []
   client._sendSubscriptionFrame = (type, channels) => frames.push({ type, channels })
@@ -647,6 +764,7 @@ test("a cold browser replays one missing inventory marker and shares the pending
   const first = client.recoverStatusMarker("m")
   const second = client.recoverStatusMarker("m")
   assert.equal(first, second)
+  assert.deepEqual(delays, [5_000])
   assert.deepEqual(frames, [{ type: "subscribe", channels: ["ss/m/__clawdline_inventory_v1__"] }])
   client.statusSnapshots.set(JSON.stringify(["m", "__clawdline_inventory_v1__"]), { payload: { inventory: { version: 1 } } })
   listener({ type: "session_status", identity: { machine: "m", session: "__clawdline_inventory_v1__" } })
@@ -654,6 +772,14 @@ test("a cold browser replays one missing inventory marker and shares the pending
   assert.deepEqual(frames[1], { type: "unsubscribe", channels: ["ss/m/__clawdline_inventory_v1__"] })
   assert.equal(await client.recoverStatusMarker("m"), true)
   assert.equal(frames.length, 2)
+})
+
+test("a pinned machine list has a shorter timeout than an ordinary content read", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  let received
+  client._read = (...args) => { received = args; return Promise.resolve({ complete: true, sessions: [] }) }
+  await client.listPresentationsForMachine("m", new AbortController().signal)
+  assert.equal(received[4], 10_000)
 })
 
 test("a status row arriving before recovery is used without a timeout or subscription", async () => {

@@ -1,13 +1,3 @@
-.project-icon-copy { margin: 16px 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; }
-.project-icon-copy summary { cursor: pointer; font-weight: 600; }
-.project-icon-copy p { color: var(--dim); line-height: 1.6; }
-.project-icon-copy label { display: grid; gap: 8px; }
-.project-icon-copy select { width: 100%; min-width: 0; padding: 8px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; font: inherit; }
-.project-icon-preview, .project-icon-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
-.project-icon-preview > span { display: flex; align-items: center; gap: 8px; }
-.project-icon-actions button { padding: 8px 12px; }
-.project-icon-copy [role="alert"] { color: var(--bad); }
-
 .project-setup { display: flex; align-items: center; gap: 16px; margin: 16px 0 22px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(145deg, var(--card-hi), var(--card)); }
 .project-setup-launcher-copy { min-width: 0; flex: 1; }
 .project-setup-launcher-copy h2 { margin: 2px 0 0; font-size: 17px; }

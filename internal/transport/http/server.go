@@ -182,6 +182,7 @@ type Server struct {
 	// suggestPersona is the paid model seam behind the explicit Board button.
 	// Tests replace it, so verification never consumes an assistant account.
 	suggestPersona      func(context.Context, planner.PersonaRequest, string) (planner.PersonaSuggestion, error)
+	draftRole           func(context.Context, string, string) (planner.RoleDraft, error)
 	firstSessionRequest func(session.Session) (string, error)
 	sessionTailRead     func(session.Session) (transcript.Page, error)
 	intentContext       func(context.Context) ([]planner.Place, []string)
@@ -281,6 +282,7 @@ func New(cfg config.Config) (*Server, error) {
 	localPlanner.Timeout = time.Duration(CapacityLimit(capacity.IntentPlannerSeconds)) * time.Second
 	srv.planIntent = localPlanner.Draft
 	srv.nameSession = localPlanner.Name
+	srv.draftRole = localPlanner.DraftRole
 	// One producer in front of it, so three loops are one scan.
 	srv.readings = app.NewInventoryReading(srv.inventory.Read, 0)
 	srv.readings.SetRetentionAge(CapacityLimit(capacity.CacheSessionInventory))
@@ -372,6 +374,9 @@ func (s *Server) reading(ctx context.Context) session.Inventory {
 	if s.readings == nil {
 		return s.inventory.Read(ctx)
 	}
+	if t, ok := app.ReadingSince(ctx); ok {
+		return s.readings.Since(ctx, t)
+	}
 	return s.readings.Fast(ctx)
 }
 
@@ -441,6 +446,7 @@ func (s *Server) routeTable() []route {
 		// Whether this machine trails the cloud's latest build (update.go). Any
 		// paired device, as /v1/capacity.
 		{Route{"*", "/v1/update"}, s.updateRoute},
+		{Route{"*", "/v1/update/fresh"}, s.updateRoute},
 		// Installing a newer release on a release install (update.go). This
 		// machine's token, or a device that may send.
 		{Route{"*", "/v1/update/apply"}, s.updateApplyRoute},
@@ -644,6 +650,7 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/settings/default-models"}, s.defaultModelsRoute},
 		{Route{"*", "/v1/settings/work-gates"}, s.workGateSettingsRoute},
 		{Route{"*", "/v1/places"}, s.placesRoute},
+		{Route{"GET", "/v1/project-folders"}, s.projectFoldersRoute},
 		// The input bar's server list (devstacks.go): what the projects' own
 		// `.devstack.json` files declare, and which declared ports answer.
 		{Route{"*", "/v1/devstacks"}, s.devStacksRoute},

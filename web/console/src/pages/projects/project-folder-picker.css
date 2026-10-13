@@ -1,0 +1,16 @@
+.project-folder-picker { box-sizing: border-box; width: min(540px, calc(100vw - 24px)); max-height: min(740px, calc(100vh - 24px)); padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--card); color: var(--ink); }
+.project-folder-picker::backdrop { background: rgba(0, 0, 0, .7); }
+.project-folder-picker h2 { margin: 0 0 8px; }
+.project-folder-picker p { color: var(--dim); }
+.project-folder-picker form label { display: block; margin: 14px 0 6px; }
+.project-folder-path-row { display: flex; gap: 8px; }
+.project-folder-path-row input { min-width: 0; flex: 1; }
+.project-folder-picker button, .project-folder-picker input { min-height: 38px; border: 1px solid var(--line); border-radius: 8px; background: var(--card-hi); color: var(--ink); padding: 6px 10px; }
+.project-folder-picker button { cursor: pointer; }
+.project-folder-picker button:hover:not(:disabled) { border-color: var(--accent); }
+.project-folder-picker button:focus-visible, .project-folder-picker input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.project-folder-current { overflow-wrap: anywhere; }
+.project-folder-list { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 4px; min-width: 0; max-height: min(350px, 40vh); overflow: auto; padding: 4px; border: 1px solid var(--line); border-radius: 8px; }
+.project-folder-list button { min-width: 0; max-width: 100%; text-align: start; white-space: normal; overflow-wrap: anywhere; }
+.project-folder-list p { padding: 4px 8px; }
+.project-folder-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }

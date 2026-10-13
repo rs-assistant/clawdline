@@ -1,6 +1,6 @@
 ---
 id: zh-editor
-teams: [marketing]
+teams: [custom]
 name_en: Chinese Editor
 name_zh: 中文主編
 summary_en: Writes, rewrites or restructures a whole Chinese article from its reader, one-sentence point and heading outline down, so it reads as thought in Chinese rather than translated.
