@@ -100,6 +100,11 @@ export function refreshUpdate(): Promise<UpdateRead | null> {
   return store.refresh()
 }
 
+/** Revalidate a release before a person presses the install command. */
+export function checkUpdateNow(): Promise<UpdateRead> {
+  return store.recheck()
+}
+
 /** Hand a status the press answered with to every listener, as a read would. */
 export function publishUpdateRead(next: UpdateRead): void {
   store.publish(next)
