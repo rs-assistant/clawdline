@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { nextWord } from "../next-strings.js"
 import * as L from "../legacy/bridge.js"
 import { ProjectedRow } from "../session/List.js"
-import { Swipes } from "../session/swipe.js"
+import { Swipes, archivable } from "../session/swipe.js"
 import { useSwipeToEnd } from "../session/use-swipe.js"
 import type { OrderHold } from "../session/order.js"
 import { SessionToolbar } from "../session/SessionToolbar.js"
@@ -23,7 +23,7 @@ type Reading = { phase: "loading" } | { phase: "settled"; value: MachineSessionP
 
 /** Only the fleet list is new; the conversation and composer belong to SessionsPage. */
 export function FleetSessionList({ machines, source, target, filter, onFilter, onOpen,
-  carrierOf, onMachineAction, onCloseRequest, onPresentations, onProjection }: {
+  carrierOf, onMachineAction, onCloseRequest, onArchiveRequest, onPresentations, onProjection }: {
   machines: readonly FleetMachine[]
   source: SessionProjectionSource | null
   /** Which road this page's reads of that machine take, read as the row is drawn. */
@@ -37,6 +37,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   onProjection?: (machineID: string, reading: MachineSessionProjection) => void
   onMachineAction?: (machineID: string, action: MachineToolbarAction) => void
   onCloseRequest: (target: SessionDestination, title: string) => void
+  onArchiveRequest: (target: SessionDestination, title: string) => void
 }) {
   const [readings, setReadings] = useState<Record<string, Reading>>({})
   useEffect(() => {
@@ -367,6 +368,9 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
                     consumePress={() => swipe.tookThePress()}
                     onClose={row.freshness === "current" && machine.freshness === "current"
                       ? () => { swipe.closeOpen(); thawOrder(); onCloseRequest(row.destination, presentation?.title || row.destination.sessionID) } : undefined}
+                    onArchive={row.freshness === "current" && machine.freshness === "current" &&
+                      archivable(displayedPresentationStatus(row, presentation)?.sessionId)
+                      ? () => { swipe.closeOpen(); thawOrder(); onArchiveRequest(row.destination, presentation?.title || row.destination.sessionID) } : undefined}
                     onOpen={() => onOpen(row.destination)} />
                 })}</ul>}
           </>}

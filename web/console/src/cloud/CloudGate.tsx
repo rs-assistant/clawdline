@@ -1116,7 +1116,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const leaveFleet = () => { setFleetScope(false); setFleetTarget(null) }
 
   const openFleetSession = (target: SessionDestination) => {
-    setFleetCloseIntent(null)
+    setFleetActionIntent(null)
     setFleetTarget(target)
     history.replaceState(history.state, "", destinationFragment(target))
   }
@@ -1128,9 +1128,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
    * reloading the page restored the same unreadable target and the same
    * sentence, with nothing on screen that could change either.
    */
-  const [fleetCloseIntent, setFleetCloseIntent] = useState<{ target: SessionDestination; title: string } | null>(null)
+  const [fleetActionIntent, setFleetActionIntent] = useState<{ target: SessionDestination; title: string; kind: "end" | "archive" } | null>(null)
   const closeFleetTarget = useCallback(() => {
-    setFleetCloseIntent(null)
+    setFleetActionIntent(null)
     setFleetTarget(null)
     setFleetDetailProblem(null)
     if (destinationFromFragment(location.hash)) {
@@ -1541,8 +1541,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             onFleetDetailPending={noteRowPending}
             fleetReaderMachine={readerMachine}
             onFleetClose={closeFleetTarget}
-            fleetCloseIntent={fleetCloseIntent}
-            onFleetCloseIntentHandled={() => setFleetCloseIntent(null)}
+            fleetActionIntent={fleetActionIntent}
+            onFleetActionIntentHandled={() => setFleetActionIntent(null)}
             fleetList={fleetScope ? (filter, onFilter) => <FleetSessionList
             machines={quickMachines.map((machine) => ({
               id: machine.id, name: machine.name || machine.label || machine.id,
@@ -1555,7 +1555,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             carrierOf={carrierOf}
             onPresentations={noteFleetPresentations}
             onProjection={noteFleetProjection}
-            onCloseRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title }) }}
+            onCloseRequest={(target, title) => { openFleetSession(target); setFleetActionIntent({ target, title, kind: "end" }) }}
+            onArchiveRequest={(target, title) => { openFleetSession(target); setFleetActionIntent({ target, title, kind: "archive" }) }}
             onMachineAction={runMachineTool}
           /> : undefined} />
           <CloudSessionSheets machineID={reading ?? chosen.id}
