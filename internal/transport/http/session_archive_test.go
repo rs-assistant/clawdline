@@ -96,7 +96,7 @@ func TestAnArchiveNeedsAKeyASenderAndAConversation(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.sessionAction(rec, req)
 	if rec.Code != http.StatusForbidden {
-		t.Fatalf("a read-only device: %d %s", rec.Code, rec.Body)
+		t.Fatalf("a caller with read capability: %d %s", rec.Code, rec.Body)
 	}
 	nothing := archivePane("")
 	s = archiveServer(t, nothing)
@@ -197,7 +197,7 @@ func TestRestoringArchivedAnswersEachRowThroughTheSharedPath(t *testing.T) {
 		t.Fatalf("with no key: %d", rec.Code)
 	}
 	if rec := archiveCall(t, s, asDevice(restorePost(archivedRestorePath, "r2", body), "viewer", false)); rec.Code != http.StatusForbidden {
-		t.Fatalf("a read-only device: %d", rec.Code)
+		t.Fatalf("a caller with read capability: %d", rec.Code)
 	}
 	names := make([]string, 21)
 	for i := range names {

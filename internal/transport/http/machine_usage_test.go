@@ -41,7 +41,7 @@ func TestAPairedDeviceReadsTheMachinesUsage(t *testing.T) {
 	}
 	var u contract.MachineUsage
 	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &u) != nil {
-		t.Fatalf("a read-only device: %d %s", rec.Code, rec.Body)
+		t.Fatalf("a caller with read capability: %d %s", rec.Code, rec.Body)
 	}
 	if u.Cores < 1 || u.MemoryTotalBytes <= 0 || u.MemoryUsedBytes <= 0 || u.IntervalMs <= 0 || len(u.Load) != 3 {
 		t.Fatalf("the machine: %+v", u)

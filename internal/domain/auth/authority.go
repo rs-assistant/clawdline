@@ -559,7 +559,7 @@ func (a *Authority) RevokeAll() (int, error) {
 	return removed, nil
 }
 
-// SetCapabilities accepts legacy callers without creating a read-only device.
+// SetCapabilities accepts legacy callers without changing paired-device permissions.
 // The device management route no longer exposes capability changes.
 func (a *Authority) SetCapabilities(id string, caps Caps) (Caps, error) {
 	want := Caps{Read, Send}
