@@ -100,6 +100,26 @@ func TestAReadableScreenStillDecidesTheMenu(t *testing.T) {
 	}
 }
 
+// A Codex command approval is positive screen evidence that the session is
+// waiting, even before any assistant registry has a state for the tmux pane.
+// This is the path the fleet list uses for a dispatched Linux session.
+func TestCodexCommandApprovalMakesAnUnknownTmuxSessionWaiting(t *testing.T) {
+	b, err := os.ReadFile("../domain/session/testdata/menu-codex-command-approval.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := session.Session{ID: "%62", Backend: session.BackendTmux, Assistant: session.AssistantCodex,
+		State: session.StateUnknown, Evidence: session.EvidenceProcess}
+	term := &menuTerminal{s: row, screen: string(b)}
+	got := (Inventory{Screen: term}).readScreen(context.Background(), row)
+	if got.State != session.StateWaiting || got.Evidence != session.EvidenceScreen || got.Menu == nil {
+		t.Fatalf("row state %q evidence %q menu %+v", got.State, got.Evidence, got.Menu)
+	}
+	if got.Menu.Selected == nil || *got.Menu.Selected != 1 || got.Line != session.MenuRevision(*got.Menu) {
+		t.Fatalf("menu %+v line %q", got.Menu, got.Line)
+	}
+}
+
 // A transcript whose last entry is not an unanswered AskUserQuestion has
 // nothing to say about what is drawn, so the row stays without buttons — and
 // says it had no screen, which is a different thing from a screen with a
