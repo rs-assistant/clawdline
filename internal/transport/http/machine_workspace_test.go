@@ -103,6 +103,11 @@ func TestMachineWorkspaceRejectsPublicDirectory(t *testing.T) {
 	if err := os.Mkdir(workspace, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	// The daemon runs with an owner-only umask. Make this fixture public
+	// explicitly so the test measures ensureMachineWorkspace, not its parent.
+	if err := os.Chmod(workspace, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := ensureMachineWorkspace(state); err == nil {
 		t.Fatal("a public machine workspace was accepted")
 	}
