@@ -57,3 +57,28 @@ func TestAnUnknownRegistryStatusLetsTheScreenAnswer(t *testing.T) {
 		t.Fatalf("registry idle overruled: %q", got.State)
 	}
 }
+
+// Codex keeps its composer available while a background terminal is running,
+// and its registry can consequently say idle even though the pane's current
+// status line says the turn is waiting for that terminal. The line is the
+// newer, person-facing answer: without it the Session transcript stops at the
+// preceding assistant message and gives no sign that the check is still live.
+func TestARegistryIdleCodexWaitingForABackgroundTerminalReadsWorking(t *testing.T) {
+	row := session.Session{ID: "%2", Backend: session.BackendTmux, Assistant: session.AssistantCodex,
+		State: session.StateIdle, Evidence: session.EvidenceRegistry}
+	screen := "• Waiting for background terminal (27m 06s • esc to interrupt) · 1 background terminal running\n" +
+		"  └ tools/check.sh\n" +
+		"\n" +
+		"› Ask Codex to do anything\n" +
+		"\n" +
+		"  GPT-5.6-Sol medium · ~/projects/example · main\n"
+	term := &menuTerminal{s: row, screen: screen}
+
+	got := Inventory{Screen: term}.readScreen(context.Background(), row)
+	if got.State != session.StateWorking || got.Evidence != session.EvidenceScreen {
+		t.Fatalf("background wait: %q by %q, want working by screen", got.State, got.Evidence)
+	}
+	if got.Line != "Waiting for background terminal (27m 06s • esc to interrupt)" {
+		t.Fatalf("background wait line = %q", got.Line)
+	}
+}
