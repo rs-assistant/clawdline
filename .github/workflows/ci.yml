@@ -83,7 +83,7 @@ jobs:
         if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         run: tools/test-pre-push-red-main.sh
 
-      - name: Check that pre-push does not run a historical privacy scan
+      - name: Check that pre-push reads the commits a push would add
         if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
         run: tools/test-pre-push-privacy.sh
 
@@ -105,6 +105,8 @@ jobs:
 
       - name: Run privacy rules and report the unavailable private-word rules
         if: ${{ !cancelled() && steps.ready.outcome == 'success' }}
+        env:
+          CLAWDLINE_CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: tools/check-private-ci.sh
 
       - name: Check machine-neutral screen text
