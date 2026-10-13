@@ -1,0 +1,10 @@
+/* The pinned legacy styles remain a byte-for-byte historical copy. These
+   active overrides make each rounded surface's outline uniform. */
+.composer .waiting { border-left: 1px solid var(--accent-ed); }
+.peer-card { border-left: 1px solid var(--peer-ed); }
+.message-card, .askbox { border-left: 1px solid var(--accent-ed); }
+.notice-card { border-left: 1px solid var(--line); }
+.clawdline-notice[data-tone="success"] .notice-card { border-color: var(--ok); }
+.clawdline-notice[data-tone="failure"] .notice-card,
+.clawdline-notice[data-tone="timeout"] .notice-card { border-color: var(--bad); }
+.clawdline-notice[data-tone="overlap"] .notice-card { border-color: var(--warn); }

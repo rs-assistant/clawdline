@@ -2,7 +2,6 @@
 
 .agent-report-card {
   border: 1px solid var(--peer-ed);
-  border-left: 3px solid var(--peer);
   border-radius: 10px;
   background: var(--peer-in);
   padding: 9px 11px 10px;

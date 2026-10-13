@@ -847,6 +847,7 @@ const words = {
     worktreeRemoveConfirm: "Delete worktree",
     worktreeRemoveBusy: "Deleting…",
     worktreeRemoveFailed: "Could not delete the worktree.",
+    worktreeRemoveUnavailable: "This worktree cannot be deleted yet. It must be landed, clean, and confirmed unused. Refresh the observation and check the reasons on its card.",
     projectsRefreshObservation: "Refresh observation",
     projectsLifecycleBoundary:
       "Refresh asks the owning machine for a new observation. Only landed, clean, unused worktrees can be deleted here.",
@@ -1973,6 +1974,7 @@ const words = {
     worktreeRemoveConfirm: "刪除工作樹",
     worktreeRemoveBusy: "刪除中…",
     worktreeRemoveFailed: "無法刪除工作樹。",
+    worktreeRemoveUnavailable: "目前無法刪除這棵工作樹。它必須已併入主線、沒有未提交的檔案，且確認沒有 Session 使用。請重新觀測並查看卡片上的原因。",
     projectsRefreshObservation: "重新觀測",
     projectsLifecycleBoundary: "重新觀測會向擁有版本庫的機器取得最新狀態。這裡只能刪除已落地、乾淨且未被使用的工作樹。",
     projectsDeliveredNotLanded: "做完了，沒有落地",

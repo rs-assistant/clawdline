@@ -71,7 +71,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   const [removeBusy, setRemoveBusy] = useState(false)
   const [removeError, setRemoveError] = useState("")
   const removeDialog = useRef<HTMLDialogElement>(null)
-  const [worktreeTarget, setWorktreeTarget] = useState<{ id: string; path: string; project: ProjectTarget } | null>(null)
+  const [worktreeTarget, setWorktreeTarget] = useState<{ id: string; path: string; project: ProjectTarget; canRemove: boolean } | null>(null)
   const [worktreeBusy, setWorktreeBusy] = useState(false)
   const [worktreeError, setWorktreeError] = useState("")
   const worktreeDialog = useRef<HTMLDialogElement>(null)
@@ -116,7 +116,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   }, [worktreeTarget])
 
   async function confirmWorktreeRemove() {
-    if (!worktreeTarget || worktreeBusy) return
+    if (!worktreeTarget?.canRemove || worktreeBusy) return
     setWorktreeBusy(true)
     setWorktreeError("")
     try {
@@ -199,14 +199,11 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
         const existing = card.querySelector(".worktree-remove")
         const id = card.dataset.worktreeId || ""
         const row = worktreeSourceRow(id)
-        const clean = row?.status?.complete === true && row.status.staged === 0
-          && row.status.modified === 0 && row.status.untracked === 0
-        if (!row?.cleanup?.eligible || !clean || !row.classifications?.includes("landed_identical_residue")) {
+        if (!row?.path || row.cleanup?.blockers?.some((blocker) => blocker.code === "main_worktree")) {
           existing?.remove()
           continue
         }
         if (existing) continue
-        card.querySelector(".worktree-cleanup-assessment")?.remove()
         const button = document.createElement("button")
         button.type = "button"
         button.className = "worktree-remove"
@@ -221,8 +218,12 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       const project = page.current?.state.place
       const row = worktreeSourceRow(button.dataset.worktreeId || "")
       if (!project || !row?.worktreeId || !row.path) return
+      const clean = row.status?.complete === true && row.status.staged === 0
+        && row.status.modified === 0 && row.status.untracked === 0
+      const canRemove = row.cleanup?.eligible === true && clean
+        && row.classifications?.includes("landed_identical_residue") === true
       setWorktreeError("")
-      setWorktreeTarget({ id: row.worktreeId, path: row.path, project })
+      setWorktreeTarget({ id: row.worktreeId, path: row.path, project, canRemove })
     }
     const observer = new MutationObserver(decorate)
     observer.observe(lifecycle, { childList: true, subtree: true })
@@ -436,10 +437,11 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       onClose={() => { if (!worktreeBusy) setWorktreeTarget(null) }}>
       <h2>{nextWord("worktreeRemoveTitle")}</h2>
       <p>{nextWord("worktreeRemoveDescription", { path: worktreeTarget?.path || "" })}</p>
+      {worktreeTarget && !worktreeTarget.canRemove && <p className="project-remove-error" role="status">{nextWord("worktreeRemoveUnavailable")}</p>}
       {worktreeError && <p className="project-remove-error" role="alert">{worktreeError}</p>}
       <div className="project-remove-actions">
         <button type="button" disabled={worktreeBusy} onClick={() => setWorktreeTarget(null)}>{nextWord("projectsRemoveCancel")}</button>
-        <button type="button" disabled={worktreeBusy} onClick={() => void confirmWorktreeRemove()}>{worktreeBusy ? nextWord("worktreeRemoveBusy") : nextWord("worktreeRemoveConfirm")}</button>
+        <button type="button" disabled={worktreeBusy || !worktreeTarget?.canRemove} onClick={() => void confirmWorktreeRemove()}>{worktreeBusy ? nextWord("worktreeRemoveBusy") : nextWord("worktreeRemoveConfirm")}</button>
       </div>
     </dialog>
     </>
