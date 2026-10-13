@@ -368,9 +368,9 @@ func (s *Server) pushSessionURL(ctx context.Context, id string) string {
 	}
 	read, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	for _, row := range s.screen(read) {
-		if row.TerminalID == id {
-			return adapterpush.SessionURL(id)
+	for _, row := range s.sessionsPayload(read).Sessions {
+		if row.ID == id {
+			return adapterpush.SessionDestinationURL(id, s.executionMachine(), row.ExecutionGeneration)
 		}
 	}
 	return "/"

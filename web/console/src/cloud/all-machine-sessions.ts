@@ -168,13 +168,16 @@ export function destinationFragment(value: SessionDestination): string {
 }
 
 export function destinationFromFragment(hash: string): SessionDestination | null {
-  const match = DESTINATION.exec(hash)
+  // Push URLs also contain #session first so the same notification still
+  // opens in the local, single-machine console.
+  const match = DESTINATION.exec(hash) || /^#session=([^&]+)&machine=([^&]+)&generation=([^&]+)$/.exec(hash)
   if (!match) return null
   try {
-    const machineID = decodeURIComponent(match[1])
-    const sessionID = decodeURIComponent(match[2])
+    const notification = hash.startsWith("#session=")
+    const machineID = decodeURIComponent(match[notification ? 2 : 1])
+    const sessionID = decodeURIComponent(match[notification ? 1 : 2])
     const executionGeneration = decodeURIComponent(match[3])
-    if (!machineID || !sessionID || !executionGeneration) return null
+    if (!machineID || !sessionID || !/^[0-9a-f]{32}$/.test(executionGeneration)) return null
     return { machineID, sessionID, executionGeneration }
   } catch {
     return null
