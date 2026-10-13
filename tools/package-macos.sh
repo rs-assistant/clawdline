@@ -328,7 +328,11 @@ if [ "$WAS_RUNNING" = 1 ]; then
     exit 1
   fi
   echo "the daemon answers on 127.0.0.1:$PORT"
-  served=$(curl -fsS --max-time 2 "http://127.0.0.1:$PORT/BUILD.json" || true)
+  token_file="${CLAWDLINE_NEXT_DIR:-$HOME/.config/clawdline-next}/local-token"
+  [ -r "$token_file" ] || { echo "error: local token is unavailable for BUILD.json verification" >&2; exit 1; }
+  token=$(cat "$token_file")
+  served=$(printf 'header = "Authorization: Bearer %s"\n' "$token" |
+    curl --config - -fsS --max-time 2 "http://127.0.0.1:$PORT/BUILD.json" || true)
   if [ "$served" != "$(cat "$INSTALL_APP/Contents/Resources/web/BUILD.json")" ]; then
     echo "error: the running app does not serve the installed BUILD.json" >&2
     exit 1
