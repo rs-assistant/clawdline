@@ -268,6 +268,19 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const fleetScopeRef = useRef(fleetScope)
   fleetScopeRef.current = fleetScope
   const [fleetTarget, setFleetTarget] = useState<SessionDestination | null>(() => destinationFromFragment(location.hash))
+  // A notification can focus an already open Home Screen app. Its worker
+  // changes the fragment without remounting CloudGate, so follow that address
+  // as well as the one present at boot.
+  useEffect(() => {
+    const followNotification = () => {
+      const destination = destinationFromFragment(location.hash)
+      if (!destination) return
+      setFleetScope(true)
+      setFleetTarget(destination)
+    }
+    window.addEventListener("hashchange", followNotification)
+    return () => window.removeEventListener("hashchange", followNotification)
+  }, [])
   const [fleetDetailProblem, setFleetDetailProblem] = useState<{ key: string } & FleetDetailProblem | null>(null)
   // A detail read that failed for a reason that may pass — a capability not
   // published yet, a status reading still settling — is read again on a press.
