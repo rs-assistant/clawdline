@@ -36,6 +36,12 @@ export interface MachineListPresentation extends SessionListPresentation {
   projection?: ProjectedSession
 }
 
+/** A status projection contains no name; never present its routing id as one. */
+export function fleetRowTitle(row: ProjectedSession, presentation: SessionListPresentation | undefined,
+  unavailableWord: string): string {
+  return row.machineScope ? "Clawdfather" : presentation?.title || unavailableWord
+}
+
 /** Keep a prior list reading for the same execution, unless fresh ss/ contradicts its state. */
 /**
  * The key one machine's pinned list is re-read on.

@@ -7,7 +7,7 @@ import { useSwipeToEnd } from "../session/use-swipe.js"
 import type { OrderHold } from "../session/order.js"
 import { SessionToolbar } from "../session/SessionToolbar.js"
 import { ScheduleSection, scheduleMachineReady } from "../pages/schedules.js"
-import { destinationKey, displayedPresentationStatus, presentationPass, projectionRefreshAt, settleProjection,
+import { destinationKey, displayedPresentationStatus, fleetRowTitle, presentationPass, projectionRefreshAt, settleProjection,
   type MachineSessionProjection, type ProjectionProblem, type SessionDestination,
   type SessionListPresentation, type SessionProjectionSource, type FleetMachine,
   type ProjectedSession } from "./all-machine-sessions.js"
@@ -353,8 +353,9 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               : <ul className="rows" role="listbox" aria-label={`${machine.name} ${nextWord("cloudSingleSessions")}`}>
                 {rows.map(({ row, depth, branchThrough, ancestorThrough }) => {
                   const presentation = presentations.current.get(destinationKey(row.destination))
+                  const title = fleetRowTitle(row, presentation, nextWord("cloudAllUnknown"))
                   return <ProjectedRow key={destinationKey(row.destination)}
-                    title={presentation?.title || row.destination.sessionID} icon={presentation?.icon} cwd={presentation?.cwd}
+                    title={title} icon={presentation?.icon} cwd={presentation?.cwd}
                     machineScope={row.machineScope === true} coordinatorBound={row.coordinatorBound === true}
                     status={displayedPresentationStatus(row, presentation)}
                     sessionID={row.destination.sessionID} machineID={machine.id} machineName={machine.name}
@@ -369,11 +370,11 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
                     consumePress={() => swipe.tookThePress()}
                     onClose={row.freshness === "current" && machine.freshness === "current"
                       ? () => { swipe.closeOpen(); thawOrder(); onCloseRequest(row.destination,
-                        row.machineScope ? "Clawdfather" : presentation?.title || row.destination.sessionID) } : undefined}
+                        title) } : undefined}
                     onArchive={row.freshness === "current" && machine.freshness === "current" &&
                       archivable(displayedPresentationStatus(row, presentation)?.sessionId)
                       ? () => { swipe.closeOpen(); thawOrder(); onArchiveRequest(row.destination,
-                        row.machineScope ? "Clawdfather" : presentation?.title || row.destination.sessionID) } : undefined}
+                        title) } : undefined}
                     onOpen={() => onOpen(row.destination)} />
                 })}</ul>}
           </>}

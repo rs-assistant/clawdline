@@ -3,7 +3,7 @@ import test from "node:test"
 import type { SessionRow } from "@clawdline/contract"
 import {
   afterEventGap, checkedProjection, destinationAvailable, destinationFragment, destinationFromFragment,
-  displayedPresentationStatus, identifyOpenedFleetRow,
+  displayedPresentationStatus, fleetRowTitle, identifyOpenedFleetRow,
   destinationKey, prependOlderPage, projectionRefreshAt, settleProjection, SessionDetailCache,
   supersedingDestination,
   type MachineSessionProjection, type ProjectedSession,
@@ -16,6 +16,13 @@ const row = (machineID: string, sessionID: string, executionGeneration: string):
 })
 const ready = (machine: string, rows: ProjectedSession[]): MachineSessionProjection =>
   checkedProjection(machine, { kind: "ready", complete: true, observedAt: 1000, rows })
+
+test("fleet list names come from authorized presentations, never routing ids", () => {
+  const ordinary = row("machine/a", "%14", "7")
+  assert.equal(fleetRowTitle(ordinary, { title: "Named work" }, "Unknown"), "Named work")
+  assert.equal(fleetRowTitle(ordinary, undefined, "Unknown"), "Unknown")
+  assert.equal(fleetRowTitle({ ...ordinary, machineScope: true }, undefined, "Unknown"), "Clawdfather")
+})
 
 test("the opened Cloud detail uses the signed machine identity for only its exact execution", () => {
   const target = row("machine/a", "%14", "7").destination
