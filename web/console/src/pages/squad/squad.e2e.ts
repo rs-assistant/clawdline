@@ -28,7 +28,9 @@ const definitions = Array.from({ length: 42 }, (_, index) => ({
 const catalog = {
   catalog_version: 8, definitions,
   teams: [{ team_id: "clawdline.team.design", version: "v1", source: "clawdline", license: "MIT", digest: "fixture",
-    name: names("設計小隊"), personas: definitions.map((row) => ({ id: row.definition_id, version: row.version })), builtin: true }],
+    name: names("設計小隊"), personas: definitions.map((row) => ({ id: row.definition_id, version: row.version })), builtin: true },
+  { team_id: "clawdline.team.custom", version: "1", source: "clawdline", license: "MIT", digest: "fixture",
+    name: names("客製化"), personas: [], builtin: true }],
   skills: [{ skill_id: "community.skill.draft", version: "v1", source: "community", license: "MIT", digest: "fixture",
     name: names("草稿整理"), purpose: names("整理初稿與引用"), content: "完整技能內容。\n".repeat(40), icon, builtin: false },
   { skill_id: "clawdline.skill.accessibility", version: "v1", source: "clawdline", license: "MIT", digest: "fixture",
@@ -50,6 +52,7 @@ let refuseNextSkillWrite = false
 let dropNextSkillWrite = false
 let dropNextCatalogReply = false
 const catalogWrites: { key: string; body: Record<string, any> }[] = []
+let roleDraftRequests = 0
 const catalogReceipts = new Map<string, { catalog_version: number }>()
 const settingsWrites: Record<string, unknown>[] = []
 function settings(scope: string) {
@@ -107,7 +110,8 @@ function fixture(): Server {
           const previous = catalogReceipts.get(key)
           if (previous) return json(res, 200, previous)
           if (body.expected_version !== catalog.catalog_version) return json(res, 409, { error: "version_conflict", current_version: catalog.catalog_version })
-          ;(catalog.skills as any[]).push(body.entity.skill)
+          if (body.kind === "definition") (definitions as any[]).push(body.entity.definition)
+          else (catalog.skills as any[]).push(body.entity.skill)
           catalog.catalog_version++
           const receipt = { catalog_version: catalog.catalog_version }
           catalogReceipts.set(key, receipt)
@@ -121,6 +125,10 @@ function fixture(): Server {
       if (catalogFailure === "service") return json(res, 503, { error: "store_unavailable", detail: "Storage unavailable" })
       if (catalogFailure === "invalid_response") { res.writeHead(200, { "content-type": "text/html" }); return res.end("Broken response") }
       return json(res, 200, catalog)
+    }
+    if (path === "/v1/squad/role-draft" && req.method === "POST") {
+      roleDraftRequests++
+      return json(res, 200, { name: "草稿角色", summary: "整理版本內容", body: "先核對來源，再整理重點。" })
     }
     if (path === "/v1/squad/scopes") return json(res, 200, scopes)
     if (path === "/v1/squad/skill-sources") {
@@ -305,7 +313,7 @@ test("a Project handbook version conflict retains the user's draft beside the ne
     await evaluate('document.querySelector("#squad .squad-persona-card").click()')
     await evaluate('(() => { const el = document.querySelector("#squad .squad-handbook-editor textarea"); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(el, "我的未儲存草稿"); el.dispatchEvent(new Event("input", { bubbles: true })); })()')
     assert.equal(await evaluate('document.querySelector("#squad .squad-handbook-editor textarea").value'), "我的未儲存草稿")
-    await evaluate('document.querySelector("#squad .squad-actions button").click()')
+    await evaluate('document.querySelector("#squad .squad-handbook-editor + .squad-source ~ .squad-actions button").click()')
     const conflictDeadline = Date.now() + 5_000
     while (!(await evaluate('!!document.querySelector("#squad .squad-conflict")'))) {
       if (Date.now() > conflictDeadline) throw new Error("version conflict did not show")
@@ -506,8 +514,8 @@ test("package preview preserves explicit privacy choices and stale adoption requ
   refuseAdoption = true
   await tab(1440, 900, async (evaluate) => {
     await evaluate('document.querySelector("#squad .squad-pack-actions button").click()')
-    assert.equal(await evaluate('document.querySelector("#squad dialog").open'), true)
-    await evaluate(`(() => { const input = document.querySelector('#squad dialog input[type="file"]'); const transfer = new DataTransfer(); transfer.items.add(new File([new Uint8Array([80,75,3,4])], 'squad.zip', { type: 'application/zip' })); input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('#squad .squad-file + button').click(); })()`)
+    assert.equal(await evaluate('document.querySelector("#squad dialog[aria-labelledby=squad-dialog-title]").open'), true)
+    await evaluate(`(() => { const input = document.querySelector('#squad .squad-file input[type="file"]'); const transfer = new DataTransfer(); transfer.items.add(new File([new Uint8Array([80,75,3,4])], 'squad.zip', { type: 'application/zip' })); input.files = transfer.files; input.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('#squad .squad-file + button').click(); })()`)
     const deadline = Date.now() + 5_000
     while (!(await evaluate('!!document.querySelector("#squad .squad-pack-preview")'))) {
       if (Date.now() > deadline) throw new Error("package preview did not load")
@@ -534,7 +542,7 @@ test("package preview preserves explicit privacy choices and stale adoption requ
   refuseAdoption = false
   await tab(1440, 900, async (evaluate) => {
     await evaluate('document.querySelectorAll("#squad .squad-pack-actions button")[1].click()')
-    await evaluate('document.querySelector("#squad dialog > button").click()')
+    await evaluate('document.querySelector("#squad dialog[aria-labelledby=squad-dialog-title]").querySelector(":scope > button").click()')
     const deadline = Date.now() + 5_000
     while (packageRequests.length < 1) {
       if (Date.now() > deadline) throw new Error("public package export did not run")
@@ -545,13 +553,13 @@ test("package preview preserves explicit privacy choices and stale adoption requ
   packageRequests.length = 0
   await tab(1440, 900, async (evaluate) => {
     await evaluate('document.querySelectorAll("#squad .squad-pack-actions button")[1].click()')
-    await evaluate('document.querySelectorAll("#squad dialog .squad-check input")[0].click()')
-    await evaluate('document.querySelectorAll("#squad dialog .squad-check input")[1].click()')
-    await evaluate('document.querySelector("#squad dialog > button").click()')
+    await evaluate('document.querySelector("#squad dialog[aria-labelledby=squad-dialog-title]").querySelectorAll(".squad-check input")[0].click()')
+    await evaluate('document.querySelector("#squad dialog[aria-labelledby=squad-dialog-title]").querySelectorAll(".squad-check input")[1].click()')
+    await evaluate('document.querySelector("#squad dialog[aria-labelledby=squad-dialog-title]").querySelector(":scope > button").click()')
     assert.equal(packageRequests.length, 0, "private scopes require a second confirmation")
     assert.match(await evaluate('document.querySelector("#squad .squad-dialog-error").textContent'), /請先確認/)
-    await evaluate('document.querySelectorAll("#squad dialog .squad-check input")[3].click()')
-    await evaluate('document.querySelector("#squad dialog > button").click()')
+    await evaluate('document.querySelector("#squad dialog[aria-labelledby=squad-dialog-title]").querySelectorAll(".squad-check input")[3].click()')
+    await evaluate('document.querySelector("#squad dialog[aria-labelledby=squad-dialog-title]").querySelector(":scope > button").click()')
     const deadline = Date.now() + 5_000
     while (packageRequests.length < 1) {
       if (Date.now() > deadline) throw new Error("private package export did not run")
@@ -640,10 +648,10 @@ test("real keys operate the roster, skill, dialog and named switches", async () 
       assert.equal(await evaluate('document.activeElement === document.querySelectorAll("#squad .squad-persona-card")[1]'), true)
       await evaluate('document.querySelector("#squad .squad-pack-actions button").focus()')
       await press("Enter")
-      assert.equal(await evaluate('document.querySelector("#squad dialog").open'), true)
+      assert.equal(await evaluate('document.querySelector("#squad dialog[aria-labelledby=squad-dialog-title]").open'), true)
       await press("Escape")
       await evaluate('new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
-      assert.equal(await evaluate('document.querySelector("#squad dialog").open'), false)
+      assert.equal(await evaluate('document.querySelector("#squad dialog[aria-labelledby=squad-dialog-title]").open'), false)
       assert.equal(await evaluate('document.activeElement === document.querySelector("#squad .squad-pack-actions button")'), true)
     })
     await tab(1440, 900, async (evaluate, _shot, { press, axName }) => {
@@ -1043,4 +1051,34 @@ test("long Codex skill descriptions stay inside separate choices on a phone", as
     await evaluate('document.querySelector("#squad .squad-source-option").scrollIntoView()')
     await shot("squad-mobile-skill-sources")
   })
+})
+
+test("a phone can request one AI role draft, edit it, and save it into Custom", async () => {
+  const beforeWrites = catalogWrites.length
+  const beforeDrafts = roleDraftRequests
+  const beforeRoles = definitions.length
+  await tab(390, 844, async (evaluate) => {
+    await evaluate('document.querySelector("#squad .squad-create-actions button").click()')
+    assert.equal(await evaluate('document.querySelector("#squad .squad-role-create").open'), true)
+    await evaluate(`(() => { const el = document.querySelector("#squad .squad-role-ai textarea"); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(el, "幫我核對版本說明"); el.dispatchEvent(new Event("input", { bubbles: true })); })()`)
+    await evaluate('document.querySelector("#squad .squad-role-ai button").click()')
+    const deadline = Date.now() + 10_000
+    while (!(await evaluate('document.querySelector("#squad .squad-role-form input").value === "草稿角色"'))) {
+      if (Date.now() > deadline) throw new Error("AI draft did not fill the editor")
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    assert.equal(catalogWrites.length, beforeWrites, "generating a draft does not install the role")
+    await evaluate(`(() => { const el = document.querySelector("#squad .squad-role-form input"); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(el, "我的版本主編"); el.dispatchEvent(new Event("input", { bubbles: true })); })()`)
+    await evaluate('document.querySelector("#squad .squad-role-form button[type=submit]").click()')
+    while (!(await evaluate('document.querySelector("#squad .squad-persona-card")?.textContent.includes("我的版本主編")'))) {
+      if (Date.now() > deadline + 10_000) throw new Error("saved custom role did not appear")
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true)
+  })
+  assert.equal(roleDraftRequests, beforeDrafts + 1)
+  assert.equal(catalogWrites.length, beforeWrites + 1)
+  assert.equal(catalogWrites.at(-1)?.body.kind, "definition")
+  assert.equal(catalogWrites.at(-1)?.body.entity.definition.name["zh-Hant"], "我的版本主編")
+  assert.equal(definitions.length, beforeRoles + 1)
 })

@@ -7,6 +7,7 @@ import { invalidScheduleErrorHTML } from "../schedule-errors.js"
 import { isTriggerOnly, scheduleNextLine, scheduleTimeZone, scheduleWhenFields } from "../schedule-when.js"
 import { historyRecordFor, shouldOpenHistory } from "../schedule-history-open.js"
 import { runScheduleWithForce } from "../schedule-force-run.js"
+import { laneOnScreen, laneOwesRead } from "./schedules-lane.js"
 import "../schedule-errors.css"
 import {
   createPlacesCache,
@@ -131,7 +132,10 @@ let write = true
 let arrivedFlag = false
 
 /** How this page opens a session by row id, handed in by `Sessions.tsx`. */
-const host: { open: (id: string) => void } = { open: () => {} }
+const host: { open: (id: string, machineID?: string) => void;
+  canOpen: (id: string, machineID?: string) => boolean } = {
+  open: () => {}, canOpen: (id) => !!L.byId(id),
+}
 
 /* ---- view/schedules.js: the rows ------------------------------------------ */
 
@@ -259,7 +263,7 @@ function renderSchedules(
   const fleet = scheduleFleet()
   const groups = choosesMachine(fleet) ? groupSchedules(list, unanswered, fleet) : null
   const drawn = groups ? groups.reduce((n, group) => n + group.rows.length, 0) : list.length
-  section.hidden = drawn === 0 && !groups?.length && !write
+  section.hidden = false
   if (!drawn && !groups?.length) {
     rows.innerHTML = ""
     count.textContent = ""
@@ -271,9 +275,10 @@ function renderSchedules(
         .map(
           (group) =>
             '<li class="schedule-machine" role="presentation"' +
-            (group.unanswered ? ' data-state="unanswered"' : "") +
+            (group.unanswered ? ' data-state="' + (group.unanswered === "loading" ? "loading" : "unanswered") + '"' : "") +
             ">" +
-            esc(group.unanswered ? silentMachine(group.machine) : machineWords(group.machine)) +
+            esc(group.unanswered === "loading" ? machineWords(group.machine) + " · " + nextWord("schedulesLoading") :
+              group.unanswered ? silentMachine(group.machine) : machineWords(group.machine)) +
             "</li>" +
             group.rows.map(row).join(""),
         )
@@ -318,6 +323,22 @@ function silentMachine(machine: ScheduleMachine): string {
 const Schedules = (() => {
   let started = false
   let inFlight = false
+  let lastAnswer: { schedules: ScheduleListRow[]; at?: number;
+    unanswered: NonNullable<ScheduleList["unanswered"]> } | null = null
+  let lastAnswerMachines = ""
+  let readState: "loading" | "ready" | "failed" = "loading"
+  let answerVersion = 0
+  const readyMachines = new Set<string>()
+  const retriedMissing = new Set<string>()
+  const machineKey = () => scheduleFleet()?.machines.map((machine) => machine.id).join(" ") ?? ""
+  const paintReadState = () => {
+    const state = document.getElementById("schedules-state")
+    if (!state) return
+    state.textContent = readState === "loading" ? nextWord("schedulesLoading") :
+      readState === "failed" ? nextWord(lastAnswer ? "schedulesRefreshFailed" : "schedulesReadFailed") :
+        lastAnswer?.schedules.length === 0 && lastAnswer.unanswered.length === 0 ? nextWord("schedulesEmpty") : ""
+    state.hidden = !state.textContent
+  }
   const projectBySchedule: Record<string, NonNullable<ScheduleListRow["project"]>> = {}
   // The Projects list, read at most once every few minutes (`createPlacesCache`),
   // one per machine: a place id is that machine's.
@@ -342,7 +363,7 @@ const Schedules = (() => {
     return Promise.all(
       [...byMachine].map(([key, rows]) => {
         const machine = key || undefined
-        return loadScheduleProjects(rows, (id) => scheduleApi.schedule(id, machine), placesCache(machine).read)
+        return loadScheduleProjects(rows, (id) => scheduleApi.knownSchedule(id, machine), placesCache(machine).read)
       }),
     ).then((parts) => {
       const loaded = new Map<string, ScheduleListRow>()
@@ -356,42 +377,75 @@ const Schedules = (() => {
 
   const pageHidden = () => document.hidden === true
 
+  /**
+   * Whether this section is on somebody's screen, from the layout the
+   * stylesheet decided (`schedules-lane.ts` says why it is asked this way).
+   */
+  function sectionOnScreen(): boolean {
+    if (typeof document === "undefined") return true
+    const host = document.getElementById("schedules")?.parentElement
+    if (!host) return true
+    return laneOnScreen({
+      laidOut: host.getClientRects().length > 0,
+      visibility: typeof getComputedStyle === "function" ? getComputedStyle(host).visibility : "visible",
+    })
+  }
+
+  /**
+   * The lane's tick, and every other reason to look again: the section may have
+   * come on screen — the phone's other pane, a window widened past the
+   * breakpoint, the page seen again — or it may have been off it all along.
+   * Read when what the section holds is older than the lane's own pace and
+   * somebody can see it, and nothing otherwise, so a tick a moment after a
+   * read of its own waits for the next one instead of asking twice.
+   */
+  function look(): void {
+    if (!laneOwesRead({ pageHidden: pageHidden(), lastRefreshAt, now: Date.now(), everyMs: LANE_MS, onScreen: sectionOnScreen })) return
+    refresh()
+  }
+
   function refresh(): void {
     if (inFlight || !arrivedFlag) return
+    const fleet = scheduleFleet()
+    if (choosesMachine(fleet)) { refreshFleet(fleet); return }
     inFlight = true
     lastRefreshAt = Date.now()
+    const requestedMachines = machineKey()
+    if (!lastAnswer) { readState = "loading"; paintReadState() }
     scheduleApi
       .schedules()
       .then((data) => {
+        if (requestedMachines !== machineKey()) return
         const schedules = (data && data.schedules) || []
         const at = data && data.at
         const unanswered = (data && data.unanswered) || []
         // With one machine to show, a machine that did not answer is the whole
         // inventory unknown: the same as a refusal, below. With several, it is
         // one named group and the rest still draw.
-        if (unanswered.length && !choosesMachine(scheduleFleet())) return
+        if (unanswered.length && !choosesMachine(scheduleFleet())) throw new Error("schedule inventory unanswered")
         rememberScheduleOwners(schedules)
-        renderSchedules(
-          schedules.map((schedule) => {
+        lastAnswer = { schedules: schedules.map((schedule) => {
             const project = schedule && schedule.id ? projectBySchedule[schedule.id] : undefined
             return project ? { ...schedule, project } : schedule
-          }),
-          at,
-          unanswered,
-        )
-        return loadProjects(schedules).then((withProjects) => {
+          }), at, unanswered }
+        lastAnswerMachines = requestedMachines
+        readState = "ready"
+        renderSchedules(lastAnswer.schedules, at, unanswered)
+        paintReadState()
+        const version = ++answerVersion
+        // Labels are optional. A slow project read must not hold the inventory
+        // lane open when another machine becomes readable.
+        void loadProjects(schedules).then((withProjects) => {
+          if (requestedMachines !== machineKey() || version !== answerVersion) return
           withProjects.forEach((schedule) => {
             if (schedule && schedule.id && schedule.project) projectBySchedule[schedule.id] = schedule.project
           })
-          renderSchedules(
-            withProjects.map((schedule) => {
+          lastAnswer = { schedules: withProjects.map((schedule) => {
               const project = schedule && schedule.id ? projectBySchedule[schedule.id] : undefined
               return project && !schedule.project ? { ...schedule, project } : schedule
-            }),
-            at,
-            unanswered,
-          )
-        })
+            }), at, unanswered }
+          renderSchedules(lastAnswer.schedules, at, unanswered)
+        }).catch(() => { /* Optional project labels do not invalidate the schedule inventory. */ })
       })
       .catch(() => {
         // **Nothing is drawn from here, and that is the point.** A refusal —
@@ -404,10 +458,92 @@ const Schedules = (() => {
         // truthful list after one. An inventory that really is empty still
         // arrives as an answer and still draws, which is the difference a
         // person can see (`net/schedules.js`, the same rule).
+        readState = "failed"
+        paintReadState()
       })
       .then(() => {
         inFlight = false
+        if (requestedMachines !== machineKey()) refresh()
+        else retryReadyMissing()
       })
+  }
+
+  /** Each machine paints when it answers; a slow peer does not hold the other groups. */
+  function refreshFleet(fleet: NonNullable<ReturnType<typeof scheduleFleet>>): void {
+    inFlight = true
+    lastRefreshAt = Date.now()
+    const requestedMachines = machineKey()
+    const pending = new Set(fleet.machines.map((machine) => machine.id))
+    const answers = new Map<string, ScheduleListRow[]>()
+    const failures = new Map<string, NonNullable<ScheduleList["unanswered"]>[number]>()
+    let at = 0
+    const paint = () => {
+      if (requestedMachines !== machineKey()) return
+      const schedules = [...answers.values()].flat()
+      const unanswered = [
+        ...fleet.machines.filter((machine) => pending.has(machine.id)).map((machine) =>
+          ({ machine: machine.id, code: "loading" })),
+        ...failures.values(),
+      ]
+      if (answers.size) {
+        rememberScheduleOwners(schedules)
+        lastAnswer = { schedules: schedules.map((schedule) => {
+          const project = schedule.id ? projectBySchedule[schedule.id] : undefined
+          return project ? { ...schedule, project } : schedule
+        }), at, unanswered }
+        lastAnswerMachines = requestedMachines
+        readState = pending.size ? "loading" : "ready"
+        renderSchedules(lastAnswer.schedules, at, unanswered)
+      } else if (!lastAnswer) {
+        readState = pending.size ? "loading" : "failed"
+        renderSchedules([], undefined, unanswered)
+      } else {
+        readState = pending.size ? "ready" : "failed"
+        renderSchedules(lastAnswer.schedules, lastAnswer.at, unanswered)
+      }
+      paintReadState()
+    }
+    paint()
+    void Promise.all(fleet.machines.map(async (machine) => {
+      try {
+        const data = await scheduleApi.schedules(machine.id)
+        if (requestedMachines !== machineKey()) return
+        answers.set(machine.id, (data.schedules ?? []).filter((row) => row.machine === machine.id))
+        at = Math.max(at, data.at ?? 0)
+      } catch (error) {
+        failures.set(machine.id, { machine: machine.id,
+          code: typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
+            ? error.code : "cloud_read_unavailable" })
+      } finally {
+        pending.delete(machine.id)
+        paint()
+      }
+    })).then(() => {
+      inFlight = false
+      if (requestedMachines !== machineKey()) { refresh(); return }
+      if (lastAnswer && answers.size) {
+        const version = ++answerVersion
+        const rows = lastAnswer.schedules
+        void loadProjects(rows).then((withProjects) => {
+          if (requestedMachines !== machineKey() || version !== answerVersion || !lastAnswer) return
+          withProjects.forEach((schedule) => {
+            if (schedule.id && schedule.project) projectBySchedule[schedule.id] = schedule.project
+          })
+          lastAnswer.schedules = withProjects
+          renderSchedules(withProjects, lastAnswer.at, lastAnswer.unanswered)
+        }).catch(() => {})
+      }
+      retryReadyMissing()
+    })
+  }
+
+  function retryReadyMissing(): void {
+    if (inFlight || !lastAnswer || !arrivedFlag) return
+    const missing = lastAnswer.unanswered.flatMap(({ machine }) =>
+      machine && readyMachines.has(machine) && !retriedMissing.has(machine) ? [machine] : [])
+    if (!missing.length) return
+    for (const machine of missing) retriedMissing.add(machine)
+    refresh()
   }
 
   function beginWhenAuthed(attempt: number): void {
@@ -416,7 +552,7 @@ const Schedules = (() => {
       setTimeout(() => beginWhenAuthed(attempt + 1), 250)
       return
     }
-    refresh()
+    look()
   }
 
   function watchVisibility(): void {
@@ -428,13 +564,23 @@ const Schedules = (() => {
         }
         return
       }
-      if (lane !== null) return
-      lane = setInterval(refresh, LANE_MS)
-      if (lastRefreshAt === null || Date.now() - lastRefreshAt >= LANE_MS) refresh()
+      if (lane === null) lane = setInterval(look, LANE_MS)
+      look()
     })
+    // The phone's one screen at a time is in the address and in the history
+    // entry, and the desk's second column appears when the window is wide
+    // enough: each of those can put this section back on screen without the
+    // page ever being hidden.
+    window.addEventListener("hashchange", look)
+    window.addEventListener("popstate", look)
+    window.addEventListener("resize", look)
   }
 
   return {
+    machineReady(machine: string): void {
+      readyMachines.add(machine)
+      retryReadyMissing()
+    },
     /** Read again now: a read already in the air cannot contain the row just made, so it lands first. */
     refresh(tries?: number): void {
       const n = tries || 0
@@ -445,26 +591,45 @@ const Schedules = (() => {
       refresh()
     },
     start(): void {
-      if (started) return
+      if (lastAnswer && lastAnswerMachines !== machineKey()) {
+        lastAnswer = null
+        readState = "loading"
+        lastRefreshAt = null
+      }
+      if (lastAnswer && lastAnswerMachines === machineKey())
+        renderSchedules(lastAnswer.schedules, lastAnswer.at, lastAnswer.unanswered)
+      paintReadState()
+      if (started) { look(); return }
       started = true
       beginWhenAuthed(0)
-      if (!pageHidden()) lane = setInterval(refresh, LANE_MS)
+      if (!pageHidden()) lane = setInterval(look, LANE_MS)
       watchVisibility()
       // The hosted gate learns the account's machines after this lane may have
       // drawn; the list is drawn again in groups once it knows them.
       // Only a change in which machines there are reads again; a last-seen time
       // moving does not.
-      let machines = ""
+      let machines = machineKey()
       onScheduleFleet(() => {
-        const fleet = scheduleFleet()
-        const next = fleet ? fleet.machines.map((m) => m.id).join(" ") : ""
+        const next = machineKey()
         if (next === machines) return
         machines = next
+        retriedMissing.clear()
+        answerVersion++
+        lastAnswer = null
+        readState = "loading"
+        const rows = document.getElementById("schedule-rows")
+        if (rows) rows.innerHTML = ""
+        paintReadState()
         Schedules.refresh()
       })
     },
   }
 })()
+
+/** A Session answer can make a previously unanswered schedule machine worth one fresh read. */
+export function scheduleMachineReady(machine: string): void {
+  Schedules.machineReady(machine)
+}
 
 /* ---- input/schedule.js: making, changing and removing a schedule ------------ */
 
@@ -1784,7 +1949,7 @@ const ScheduleHistory = (() => {
     drawWebhook()
   }
 
-  const terminalIsOpen = (id: string) => !!L.byId(id)
+  const terminalIsOpen = (id: string) => host.canOpen(id, scheduleOwner(scheduleId || ""))
 
   function run(taskId: string | undefined): ScheduleRun | null {
     return ((record && record.runs) || []).filter((candidate) => candidate && candidate.task_id === taskId)[0] || null
@@ -2002,8 +2167,8 @@ const ScheduleHistory = (() => {
 
   /** `Start.began`'s last step: open the resumed session once its row has arrived. */
   function openWhenArrived(id: string, tries = 0): void {
-    if (L.byId(id)) {
-      host.open(id)
+    if (host.canOpen(id, scheduleOwner(scheduleId || ""))) {
+      host.open(id, scheduleOwner(scheduleId || ""))
       return
     }
     if (tries >= 60) return
@@ -2016,13 +2181,13 @@ const ScheduleHistory = (() => {
     if (!selected) return
 
     if (action === "open") {
-      const live = selected.terminal_id && L.byId(selected.terminal_id)
+      const live = selected.terminal_id && host.canOpen(selected.terminal_id, scheduleOwner(scheduleId || ""))
       if (!live) {
         draw()
         return
       }
       close(true)
-      host.open(live.id)
+      host.open(selected.terminal_id!, scheduleOwner(scheduleId || ""))
       return
     }
 
@@ -2268,16 +2433,22 @@ function bindSection(): () => void {
  * in the original's markup and nothing paints them; `#schedule-new`'s title
  * and label are `static.js`'s.
  */
-export function ScheduleSection({ arrived, onOpen }: { arrived: boolean; onOpen?: (id: string) => void }) {
+export function ScheduleSection({ arrived, waitForFleet = false, onOpen, canOpen }: { arrived: boolean; waitForFleet?: boolean;
+  onOpen?: (id: string, machineID?: string) => void;
+  canOpen?: (id: string, machineID?: string) => boolean }) {
   arrivedFlag = arrived
   const openRef = useRef(onOpen)
   openRef.current = onOpen
+  const canOpenRef = useRef(canOpen)
+  canOpenRef.current = canOpen
 
   useLayoutEffect(() => {
     ensureOverlays()
-    host.open = (id) => openRef.current?.(id)
+    host.open = (id, machineID) => openRef.current?.(id, machineID)
+    host.canOpen = (id, machineID) => canOpenRef.current?.(id, machineID) ?? !!L.byId(id)
     paintStatic()
-    return bindSection()
+    const unbind = bindSection()
+    return () => { unbind(); host.open = () => {}; host.canOpen = (id) => !!L.byId(id) }
   }, [])
 
   // `static.js` again whenever the catalog has changed.
@@ -2286,11 +2457,14 @@ export function ScheduleSection({ arrived, onOpen }: { arrived: boolean; onOpen?
   })
 
   useEffect(() => {
-    if (arrived) Schedules.start()
-  }, [arrived])
+    if (!arrived) return
+    if (!waitForFleet || scheduleFleet()) { Schedules.start(); return }
+    const stop = onScheduleFleet(() => { if (scheduleFleet()) { stop(); Schedules.start() } })
+    return stop
+  }, [arrived, waitForFleet])
 
   return (
-    <details className="schedules" id="schedules" open hidden>
+    <details className="schedules" id="schedules" open hidden={!arrived}>
       <summary>
         <span>{nextWord("schedulesHeading")}</span>
         <span className="count" id="schedules-count"></span>
@@ -2300,6 +2474,7 @@ export function ScheduleSection({ arrived, onOpen }: { arrived: boolean; onOpen?
           </svg>
         </button>
       </summary>
+      <p id="schedules-state" role="status">{nextWord("schedulesLoading")}</p>
       <ul className="schedule-rows" id="schedule-rows" aria-label={nextWord("schedulesListLabel")}></ul>
     </details>
   )

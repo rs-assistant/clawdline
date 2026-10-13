@@ -11,7 +11,7 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import type { TranscriptPage } from "@clawdline/contract"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
-import { RelayReader, TRANSCRIPT_EXPECT_MS, type CloudEvent, type CloudIdentity, type CloudRow } from "./relay-reader.ts"
+import { RelayReader, TRANSCRIPT_EXPECT_MS, TRANSCRIPT_EXPECT_REREAD_MS, type CloudEvent, type CloudIdentity, type CloudRow } from "./relay-reader.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { CARRIED_READS, RelayWriter, writeRoute, type CloudWriteClient } from "./relay-writer.ts"
 // The copied client's own failure constructor: what the machine's refusal really becomes.
@@ -26,7 +26,10 @@ type Call = [string, ...unknown[]]
 /** A question's name, as `session/fingerprint.ts` and `session.MenuFingerprint` write one. */
 const FINGERPRINT = "8eca80fffc9359d5f0fca31f3e36b741bd50218b658fc086f05931747bd4c5ce"
 /** The words the Go daemon's descriptor lists (`cloudops.Implemented`), the ones these tests use. */
-const GO_DAEMON = { machine: { commands: ["send", "answer", "key", "end", "focus"] } }
+// A durable exact-execution action needs the machine to declare its own word as well as
+// `session-receipt` (20f03679); the daemon lists `smart-title` (cloudops ops_local_commands.go).
+const GO_DAEMON = { machine: { commands: ["send", "answer", "key", "end", "archive-session", "interrupt", "focus", "smart-title", "session-receipt"] } }
+const EXECUTION = "0123456789abcdef0123456789abcdef"
 /** The envelope a failure was sent under: sealed, written, and so possibly run. */
 const REF = { sender: "web_abcdef123456", seq: 12, request: null }
 
@@ -38,7 +41,9 @@ class FakeClient implements CloudWriteClient {
   ready = true
   allowWrites = true
   macCapabilities = new Set<string>()
-  descriptors = new Map<string, { machine: { commands?: string[] } }>()
+  descriptors = new Map<string, { machine: { commands?: string[] } }>([["mac-a", GO_DAEMON]])
+  machineDescriptors = new Map<string, unknown>()
+  orchestratorSnapshots = new Map<string, unknown>()
   sessionInventoryByMachine = new Map<string, unknown>()
   rows: CloudRow[] = []
   calls: Call[] = []
@@ -55,7 +60,7 @@ class FakeClient implements CloudWriteClient {
   }
   async transcript() {
     this.transcriptAsks += 1
-    return { id: "s1", entries: [], signature: this.signature, evidence: "transcript" }
+    return { id: "s1", entries: [], signature: this.signature, evidence: "transcript", nextAfter: 42 }
   }
   machineDescriptor(machine: string) {
     return this.descriptors.get(machine) ?? null
@@ -184,11 +189,14 @@ class FakeClient implements CloudWriteClient {
 }
 
 function row(session: string, extra: Record<string, unknown> = {}): CloudRow {
-  return { id: session, machine: "mac-a", session, identity: { machine: "mac-a", session }, state: "idle", ...extra }
+  return { id: session, machine: "mac-a", session, identity: { machine: "mac-a", session }, execution_generation: EXECUTION, state: "idle", ...extra }
 }
 
-function seam(client: FakeClient, clock = { t: 1_000 }) {
-  const reader = new RelayReader("mac-a", { now: () => clock.t })
+function seam(client: FakeClient, clock = { t: 1_000 }, fleet = false, featureWaitMs = 5_000) {
+  const reader = new RelayReader("mac-a", { now: () => clock.t,
+    featureWaitMs,
+    ...(fleet ? { fleetTarget: () => ({ machineID: "mac-a", sessionID: "s1", executionGeneration: EXECUTION }),
+      admitFleetMutation: async () => {} } : {}) })
   const writer = new RelayWriter(reader.writeHost, { now: () => clock.t, requestID: () => "req-1" })
   reader.carryWrites({ route: writeRoute, answer: (route, method, url, init) => writer.answer(route, method, url, init) })
   reader.attach(client)
@@ -324,14 +332,64 @@ test("a send goes as the machine's `send` under the row's own identity, and answ
   const client = new FakeClient()
   client.rows = [row("s1")]
   const { reader } = seam(client)
-  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello", images: ["data:image/jpeg;base64,AA=="] }))
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello", images: ["data:image/jpeg;base64,AA=="] }, { "Idempotency-Key": "send-1" }))
   assert.equal(res.status, 200)
-  assert.deepEqual(await json(res), { ok: true, id: "s1", action: "typed" }, "the client's bookkeeping is taken off")
-  assert.deepEqual(client.calls, [["send", { machine: "mac-a", session: "s1" }, "hello", ["data:image/jpeg;base64,AA=="]]])
+  assert.deepEqual(await json(res), { ok: true, id: "s1", action: "keyed" })
+  assert.deepEqual(client.calls, [["_read", { machine: "mac-a", session: "s1" }, "send",
+    { request: "send-1", execution_generation: EXECUTION, text: "hello", images: ["data:image/jpeg;base64,AA=="] },
+    "action:send-1", undefined, undefined]])
   const last = reader.log[reader.log.length - 1]
   assert.equal(last.word, "send")
   assert.equal(last.answer, "relay")
   assert.equal(typeof last.ms, "number")
+})
+
+test("an opened exact Session sends while the legacy rich-row replay is missing", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client, { t: 1_000 }, true)
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-pinned" }))
+  assert.equal(res.status, 200)
+  assert.deepEqual(client.calls, [["_read", { machine: "mac-a", session: "s1" }, "send",
+    { request: "send-pinned", execution_generation: EXECUTION, text: "hello", images: [] },
+    "action:send-pinned", undefined, undefined]])
+})
+
+test("an opened exact Session is not sent after its execution changes", async () => {
+  const client = new FakeClient()
+  const reader = new RelayReader("mac-a", {
+    fleetTarget: () => ({ machineID: "mac-a", sessionID: "s1", executionGeneration: EXECUTION }),
+    admitFleetMutation: async () => { throw refusal("execution_generation_changed", { status: 409 }) },
+  })
+  const writer = new RelayWriter(reader.writeHost)
+  reader.carryWrites({ route: writeRoute, answer: (route, method, url, init) => writer.answer(route, method, url, init) })
+  reader.attach(client)
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-changed" }))
+  assert.equal(res.status, 409)
+  assert.equal((await json(res)).error, "execution_generation_changed")
+  assert.deepEqual(client.calls, [])
+})
+
+test("a session mutation without a key or current generation never leaves the browser", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  const { reader } = seam(client)
+  const unkeyed = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }))
+  assert.equal((await json(unkeyed)).error, "idempotency_key_required")
+  assert.deepEqual(client.calls, [])
+  client.rows = [row("s1", { execution_generation: "" })]
+  const unknown = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-1" }))
+  assert.equal((await json(unknown)).error, "execution_generation_required")
+  assert.deepEqual(client.calls, [])
+})
+
+test("a receipt lookup keeps the original request and destination without sending an action", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  const res = await reader.fetch(`/v1/sessions/s1/cloud-receipts/press-1?action=send&execution_generation=${EXECUTION}`)
+  assert.equal(res.status, 200)
+  assert.deepEqual(client.calls, [["_read", { machine: "mac-a", session: "s1" }, "session-receipt",
+    { request: "req-1", target_request: "press-1", execution_generation: EXECUTION, action: "send" },
+    "read:req-1", undefined, undefined]])
 })
 
 test("smart naming reaches the session once under the confirmation's idempotency key", async () => {
@@ -361,6 +419,19 @@ test("smart naming reaches the session once under the confirmation's idempotency
   assert.deepEqual(client.calls, [], "an unreceipted model turn never leaves the browser")
 })
 
+test("fleet focus and smart naming keep the selected Session execution", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  const { reader } = seam(client, { t: 1_000 }, true)
+  assert.equal((await reader.fetch("/v1/sessions/s1/focus", post({}))).status, 200)
+  assert.equal((await reader.fetch("/v1/sessions/s1/smart-title",
+    post({}, { "Idempotency-Key": "smart-press-1" }))).status, 200)
+  assert.deepEqual(client.calls.map((call) => [call[0], call[2], call[3]]), [
+    ["_read", "focus", { request: "req-1", execution_generation: EXECUTION }],
+    ["_read", "smart-title", { request: "smart-press-1", execution_generation: EXECUTION }],
+  ])
+})
+
 test("a stop reaches the session once under the press's idempotency key", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
@@ -371,7 +442,7 @@ test("a stop reaches the session once under the press's idempotency key", async 
     "_read",
     { machine: "mac-a", session: "s1" },
     "interrupt",
-    { request: "stop-press-1" },
+    { request: "stop-press-1", execution_generation: EXECUTION },
     "action:stop-press-1",
     undefined,
     undefined,
@@ -387,9 +458,9 @@ test("a stop reaches the session once under the press's idempotency key", async 
 test("a machine's refusal comes back typed, in the flat spelling `ClawdlineClient` recognises", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
-  client.fail.send = refusal("cloud_commands_disabled", { status: 403, ref: { sender: "web_abcdef123456", seq: 12 } })
+  client.fail._read = refusal("cloud_commands_disabled", { status: 403, ref: { sender: "web_abcdef123456", seq: 12 } })
   const { reader } = seam(client)
-  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }))
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-2" }))
   assert.equal(res.status, 403)
   const body = await json(res)
   assert.equal(body.error, "cloud_commands_disabled")
@@ -403,14 +474,14 @@ test("a machine's refusal comes back typed, in the flat spelling `ClawdlineClien
 test("a command the machine may have run without answering says so, and nothing sent says that", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
-  client.fail.send = refusal("cloud_read_timeout", { layer: "browser" })
+  client.fail._read = refusal("cloud_read_timeout", { layer: "browser" })
   const { reader } = seam(client)
-  const timedOut = await json(await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" })))
+  const timedOut = await json(await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-3" })))
   assert.equal(timedOut.error, "cloud_read_timeout")
   assert.equal(timedOut.outcome, "unknown")
 
   client.ready = false
-  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }))
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-3" }))
   assert.equal(res.status, 503, "a write with the line down is refused, not left to a transport error")
   const offline = await json(res)
   assert.equal(offline.error, "offline")
@@ -428,7 +499,7 @@ test("after a send, the transcript is asked for on every poll until it changes, 
   await read()
   assert.equal(client.transcriptAsks, 1, "nothing moved: reused")
 
-  await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }))
+  await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-4" }))
   clock.t += 4_000
   await read()
   clock.t += 4_000
@@ -443,7 +514,7 @@ test("after a send, the transcript is asked for on every poll until it changes, 
   assert.equal(client.transcriptAsks, 4, "it arrived: the ordinary rule again")
 
   // An awaited change that never comes stops being awaited.
-  await reader.fetch("/v1/sessions/s1/send", post({ text: "again" }))
+  await reader.fetch("/v1/sessions/s1/send", post({ text: "again" }, { "Idempotency-Key": "send-5" }))
   for (let t = 0; t <= TRANSCRIPT_EXPECT_MS + 8_000; t += 4_000) {
     clock.t += 4_000
     await read()
@@ -454,14 +525,43 @@ test("after a send, the transcript is asked for on every poll until it changes, 
   assert.equal(client.transcriptAsks, asked, "past the window the answer is reused")
 })
 
+test("after a send, a page asking every second reaches the machine when the row moves, else every four seconds", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1", { activity: { known: true, at: 100 } })]
+  const { reader, clock } = seam(client)
+  const read = async () => json<TranscriptPage>(await reader.fetch("/v1/transcript?session=s1&limit=200"))
+  await read()
+  await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-7" }))
+  for (let i = 0; i < 8; i++) {
+    clock.t += 1_000
+    await read()
+  }
+  assert.equal(client.transcriptAsks, 3, `the machine is asked every ${TRANSCRIPT_EXPECT_REREAD_MS} ms, not on every poll`)
+  client.rows = [row("s1", { activity: { known: true, at: 101 } })]
+  clock.t += 1_000
+  await read()
+  assert.equal(client.transcriptAsks, 4, "the row moved: asked at once")
+})
+
+test("an appended read is not carried over the relay, and its cursor is not handed to the page", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  const { reader } = seam(client)
+  const page = await json<TranscriptPage & { nextAfter?: number }>(await reader.fetch("/v1/transcript?session=s1&limit=200"))
+  assert.equal(page.nextAfter, undefined)
+  const refused = await reader.fetch("/v1/transcript?session=s1&limit=200&after=10")
+  assert.equal(refused.status, 501)
+  assert.equal((await json<{ error: string }>(refused)).error, "cloud_not_carried")
+})
+
 test("a refusal costs one fresh read, not a window of them; `no-store` always asks", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
-  client.fail.send = refusal("cloud_commands_disabled", { status: 403 })
+  client.fail._read = refusal("cloud_commands_disabled", { status: 403 })
   const { reader, clock } = seam(client)
   const read = async (init?: RequestInit) => reader.fetch("/v1/transcript?session=s1&limit=200", init)
   await read()
-  await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }))
+  await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-6" }))
   clock.t += 4_000
   await read()
   clock.t += 4_000
@@ -474,16 +574,15 @@ test("a refusal costs one fresh read, not a window of them; `no-store` always as
 test("a waiting card's press is answered by the machine itself, never by the relay's `delivered`", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
-  client.descriptors.set("mac-a", { machine: { commands: ["send", "answer", "key"] } })
+  client.descriptors.set("mac-a", GO_DAEMON)
   const { reader } = seam(client)
   // The Go daemon: lists `answer`, publishes no cloud_status. Asked with a
-  // request id, settled by the machine's own answer; with no key from the card,
-  // the writer mints one.
-  const res = await reader.fetch("/v1/sessions/s1/key", post({ key: "2", expect: FINGERPRINT }))
+  // request id, settled by the machine's own answer.
+  const res = await reader.fetch("/v1/sessions/s1/key", post({ key: "2", expect: FINGERPRINT }, { "Idempotency-Key": "press-1" }))
   assert.equal(res.status, 200)
   assert.deepEqual(client.calls.pop(), [
-    "_read", { machine: "mac-a", session: "s1" }, "answer", { request: "req-1", answer: "2", expect: FINGERPRINT },
-    "action:req-1", undefined, { retireUncertain: true },
+    "_read", { machine: "mac-a", session: "s1" }, "answer", { request: "press-1", execution_generation: EXECUTION, answer: "2", expect: FINGERPRINT },
+    "action:press-1", undefined, { retireUncertain: true },
   ])
   assert.ok(!client.calls.some((c) => c[0] === "answer"), "the copied `answer`, which settles on the relay, is never used")
 })
@@ -509,8 +608,10 @@ test("a close carries the displayed version even when the relay has a newer row"
   const client = new FakeClient()
   client.rows = [row("s1", { closeability: { version: "cv-7" } })]
   const { reader } = seam(client)
-  await reader.fetch("/v1/sessions/s1/close", post({ force: true, expected_closeability_version: "cv-older" }))
-  assert.deepEqual(client.calls.pop(), ["end", { machine: "mac-a", session: "s1" }, true, "cv-older"])
+  await reader.fetch("/v1/sessions/s1/close", post({ force: true, expected_closeability_version: "cv-older" }, { "Idempotency-Key": "close-1" }))
+  assert.deepEqual(client.calls.pop(), ["_read", { machine: "mac-a", session: "s1" }, "end",
+    { request: "close-1", execution_generation: EXECUTION, accept_loss: true, expected_closeability_version: "cv-older" },
+    "action:close-1", undefined, undefined])
   // A blocked close's reasons: see the two F6 tests below, which go through
   // the copied client's own failure path rather than an error built by hand.
 })
@@ -522,7 +623,7 @@ test("a confirmed close removes an older Cloud row until the terminal speaks aga
   const { reader } = seam(client, clock)
   assert.deepEqual((await reader.snapshot()).sessions.map((s) => s.id), ["s1"])
 
-  const closed = await reader.fetch("/v1/sessions/s1/close", post({ force: false }))
+  const closed = await reader.fetch("/v1/sessions/s1/close", post({ force: false }, { "Idempotency-Key": "close-2" }))
   assert.equal(closed.status, 200)
   assert.deepEqual((await reader.snapshot()).sessions, [],
     "the row retained by the Cloud client predates the terminal's successful close")
@@ -724,6 +825,7 @@ test("Work v2 person actions keep their exact route subject and body across Clou
       "work.v2.todo-image-create", { terminal: "%1", id: "t1", item: { expected_version: 1, title: "screen.png", data_url: "data:image/png;base64,cG5n" } }],
     ["/v1/work/v2/session-todos/%251/t1/send", {}, "work.v2.todo-action", { terminal: "%1", id: "t1", action: "send", item: {} }],
     ["/v1/work/v2/session-todos/%251/t1/reopen", {}, "work.v2.todo-action", { terminal: "%1", id: "t1", action: "reopen", item: {} }],
+    ["/v1/work/v2/session-todos/%251/t1/edit", { text: "Revised", expected_version: 2 }, "work.v2.todo-action", { terminal: "%1", id: "t1", action: "edit", item: { text: "Revised", expected_version: 2 } }],
     ["/v1/work/v2/human-interventions/conversation%3A10000000-0000-4000-8000-000000000002/10000000-0000-4000-8000-000000000003/read", { expected_version: 1 }, "work.v2.human-intervention-action", { terminal: "conversation:10000000-0000-4000-8000-000000000002", id: "10000000-0000-4000-8000-000000000003", action: "read", item: { expected_version: 1 } }],
   ]
   for (const [path, sent, word, body] of cases) {
@@ -953,9 +1055,59 @@ test("F2: every attempt of one card is one Cloud request, the card's own", async
   assert.equal(sends.length, 2, "each attempt is asked of the machine and settled by its answer")
   for (const call of sends) {
     assert.deepEqual(call.slice(1, 5), [
-      { machine: "mac-a", session: "s1" }, "send", { request: "card-7", text: "delete it", images: [] }, "action:card-7",
+      { machine: "mac-a", session: "s1" }, "send", { request: "card-7", execution_generation: EXECUTION, text: "delete it", images: [] }, "action:card-7",
     ])
   }
+})
+
+test("an older machine without durable receipt capability never receives a session write", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  client.descriptors.set("mac-a", { machine: { commands: ["send"] } })
+  const { reader } = seam(client)
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "card-7" }))
+  assert.equal(res.status, 501)
+  assert.equal((await json<{ error: string }>(res)).error, "cloud_machine_unsupported")
+  assert.deepEqual(client.calls, [])
+})
+
+test("a live descriptor restores durable note replies missing from the saved 64-word prefix", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  client.descriptors.set("mac-a", { machine: { commands: ["send", ...Array.from({ length: 63 }, (_, i) => `earlier-${i}`)] } })
+  client.orchestratorSnapshots.set("mac-a", GO_DAEMON)
+  const { reader } = seam(client)
+
+  const sent = await reader.fetch("/v1/sessions/s1/send", post({ text: "suggested reply" }, { "Idempotency-Key": "note-1" }))
+  assert.equal(sent.status, 200)
+  assert.deepEqual(client.calls[0]?.slice(0, 3), ["_read", { machine: "mac-a", session: "s1" }, "send"])
+
+  const receipt = await reader.fetch(`/v1/sessions/s1/cloud-receipts/note-1?action=send&execution_generation=${EXECUTION}`)
+  assert.equal(receipt.status, 200)
+  assert.equal(client.calls[1]?.[2], "session-receipt")
+})
+
+test("a cut cache without a live descriptor cannot reject or send a note reply as unsupported", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  const saved = ["send", ...Array.from({ length: 63 }, (_, i) => `earlier-${i}`)]
+  client.descriptors.set("mac-a", { machine: { commands: saved } })
+  client.machineDescriptors.set("mac-a", { machine: { commands: saved } })
+  const { reader } = seam(client, { t: 1_000 }, false, 1)
+  const sent = await reader.fetch("/v1/sessions/s1/send", post({ text: "suggested reply" }, { "Idempotency-Key": "note-3" }))
+  assert.equal(sent.status, 503)
+  assert.equal((await json<{ error: string }>(sent)).error, "cloud_reconnecting")
+  assert.deepEqual(client.calls, [], "the uncertain cached prefix cannot authorize a write")
+})
+
+test("a live descriptor that lacks durable receipts still refuses a note reply", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  client.orchestratorSnapshots.set("mac-a", { machine: { commands: ["send"] } })
+  const { reader } = seam(client)
+  const sent = await reader.fetch("/v1/sessions/s1/send", post({ text: "suggested reply" }, { "Idempotency-Key": "note-2" }))
+  assert.equal(sent.status, 501)
+  assert.deepEqual(client.calls, [], "an unsupported machine receives no write")
 })
 
 test("F1: a press names the question it answers, under the press's own request", async () => {
@@ -966,7 +1118,7 @@ test("F1: a press names the question it answers, under the press's own request",
   const res = await reader.fetch("/v1/sessions/s1/key", post({ key: "2", expect: FINGERPRINT }, { "Idempotency-Key": "press-3" }))
   assert.equal(res.status, 200)
   assert.deepEqual(client.calls.pop(), [
-    "_read", { machine: "mac-a", session: "s1" }, "answer", { request: "press-3", answer: "2", expect: FINGERPRINT },
+    "_read", { machine: "mac-a", session: "s1" }, "answer", { request: "press-3", execution_generation: EXECUTION, answer: "2", expect: FINGERPRINT },
     "action:press-3", undefined, { retireUncertain: true },
   ])
 })
@@ -979,7 +1131,7 @@ test("an Enter on words typed and never submitted names the words, not a questio
   const res = await reader.fetch("/v1/sessions/s1/key", post({ key: "enter", typed: "readCHILD.md" }, { "Idempotency-Key": "enter-1" }))
   assert.equal(res.status, 200)
   assert.deepEqual(client.calls.pop(), [
-    "_read", { machine: "mac-a", session: "s1" }, "answer", { request: "enter-1", answer: "enter", typed: "readCHILD.md" },
+    "_read", { machine: "mac-a", session: "s1" }, "answer", { request: "enter-1", execution_generation: EXECUTION, answer: "enter", typed: "readCHILD.md" },
     "action:enter-1", undefined, { retireUncertain: true },
   ])
   for (const [name, body] of [
@@ -987,7 +1139,7 @@ test("an Enter on words typed and never submitted names the words, not a questio
     ["an Enter naming a question instead", { key: "enter", typed: "x", expect: FINGERPRINT }],
     ["a digit naming words instead of its question", { key: "2", typed: "x" }],
   ] as [string, Record<string, unknown>][]) {
-    const refused = await reader.fetch("/v1/sessions/s1/key", post(body))
+    const refused = await reader.fetch("/v1/sessions/s1/key", post(body, { "Idempotency-Key": "invalid-press" }))
     assert.equal(refused.status, 428, name)
   }
   assert.deepEqual(client.calls.filter((c) => c[0] === "_read"), [], "nothing else was sealed")
@@ -996,7 +1148,7 @@ test("an Enter on words typed and never submitted names the words, not a questio
 test("F1, F7: a press that cannot be checked against the machine's screen is refused here, and nothing is sent", async () => {
   const cases: [string, (c: FakeClient) => void, Record<string, unknown>][] = [
     ["no question named", (c) => c.descriptors.set("mac-a", GO_DAEMON), { key: "2" }],
-    ["a machine whose words are not known yet", () => {}, { key: "2", expect: FINGERPRINT }],
+    ["a machine whose words are not known yet", (c) => c.descriptors.clear(), { key: "2", expect: FINGERPRINT }],
     ["a Mac that answers without checking (a Swift app)", (c) => {
       c.descriptors.set("mac-a", GO_DAEMON)
       c.macCapabilities.add("mac-a")
@@ -1007,10 +1159,10 @@ test("F1, F7: a press that cannot be checked against the machine's screen is ref
     client.rows = [row("s1")]
     set(client)
     const { reader } = seam(client)
-    const res = await reader.fetch("/v1/sessions/s1/key", post(body))
-    assert.equal(res.status, 428, name)
+    const res = await reader.fetch("/v1/sessions/s1/key", post(body, { "Idempotency-Key": "invalid-press" }))
+    assert.equal(res.status, name === "a machine whose words are not known yet" ? 501 : 428, name)
     const refused = await json(res)
-    assert.equal(refused.error, "menu_unverified", name)
+    assert.equal(refused.error, name === "a machine whose words are not known yet" ? "cloud_machine_unsupported" : "menu_unverified", name)
     assert.equal(refused.outcome, "not_done", name)
     assert.deepEqual(client.calls, [], name + ": nothing was sealed")
   }
@@ -1043,14 +1195,14 @@ test("F3: a write is `not_done` only when this page can prove it never reached t
   }
 })
 
-test("F5: a write for a session this page has no row for is refused here, not sent to the raw id", async () => {
+test("F5: a write with neither an exact target nor a rich row is refused as unverified", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
   const { reader } = seam(client)
   const res = await reader.fetch("/v1/sessions/gone/send", post({ text: "hi" }, { "Idempotency-Key": "card-1" }))
-  assert.equal(res.status, 404)
+  assert.equal(res.status, 409)
   const body = await json(res)
-  assert.equal(body.error, "session_not_found")
+  assert.equal(body.error, "session_unknown")
   assert.equal(body.outcome, "not_done")
   assert.deepEqual(client.calls, [])
 })
@@ -1076,9 +1228,9 @@ test("F6: a blocked close, through the copied client's real failure path", async
   const client = new FakeClient()
   client.rows = [row("s1")]
   const reasons = [{ kind: "obligation", code: "landing", subject_id: "t1", subject_kind: "task" }]
-  client.fail.end = failureFromMac({ code: "close_blocked", layer: "mac_route", message: "still owed", reasons }, 409, REF)
+  client.fail._read = failureFromMac({ code: "close_blocked", layer: "mac_route", message: "still owed", reasons }, 409, REF)
   const { reader } = seam(client)
-  const res = await reader.fetch("/v1/sessions/s1/close", post({ force: false }))
+  const res = await reader.fetch("/v1/sessions/s1/close", post({ force: false }, { "Idempotency-Key": "close-blocked-1" }))
   assert.equal(res.status, 409)
   const body = await json(res)
   assert.equal(body.error, "close_blocked")
@@ -1097,9 +1249,9 @@ test("F6: a blocked close keeps its reasons across Clawdline Cloud",
     const client = new FakeClient()
     client.rows = [row("s1")]
     const reasons = [{ kind: "obligation", code: "landing", subject_id: "t1", subject_kind: "task" }]
-    client.fail.end = failureFromMac({ code: "close_blocked", layer: "mac_route", message: "still owed", reasons }, 409, REF)
+    client.fail._read = failureFromMac({ code: "close_blocked", layer: "mac_route", message: "still owed", reasons }, 409, REF)
     const { reader } = seam(client)
-    const body = await json(await reader.fetch("/v1/sessions/s1/close", post({ force: false })))
+    const body = await json(await reader.fetch("/v1/sessions/s1/close", post({ force: false }, { "Idempotency-Key": "close-blocked-2" })))
     assert.deepEqual(body.reasons, reasons)
   })
 
@@ -1409,16 +1561,30 @@ test("a client that cannot write snippets is refused by name", async () => {
   assert.deepEqual(client.calls, [], "nothing was asked of the machine")
 })
 
-test("project icon copy resolves the receiving place and carries only the mark", async () => {
+test("adding a Project on the selected machine carries its folder", async () => {
   const client = new FakeClient()
   const { reader } = seam(client)
-  const item = { icon: { accent: "#123456", cells: [["#123456", null]] }, expected: { accent: "#FFFFFF", cells: [[null]] } }
-  const response = await reader.fetch("/v1/projects/cloud-p1/icon", { ...post(item), method: "PUT" })
+  const folders = await reader.fetch("/v1/project-folders?machine=linux-b&path=%2Fprojects")
+  assert.equal(folders.status, 200, await folders.text())
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "linux-b", "project-folders", { path: "/projects" }, "read"])
+  const response = await reader.fetch("/v1/places?machine=linux-b", post({ paths: ["/projects/example"] }, { "Idempotency-Key": "add-1" }))
+  assert.equal(response.status, 200, await response.text())
+  assert.deepEqual(client.calls.pop(), ["_machineRequestAs", "add-1", "linux-b", "project-add", { path: "/projects/example" }, "action"])
+})
+
+test("removing a Project uses its selected machine and rejects a changed path", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  const init = { ...post({ place: "cloud-p1", paths: ["/repo"] }), method: "DELETE", headers: { "Idempotency-Key": "hide-1" } }
+  const response = await reader.fetch("/v1/places", init)
   assert.equal(response.status, 200)
-  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "project-icon-copy", { id: "p1", item }, "action"])
-  client._place = () => ({ machine: "different-machine", id: "p1", path: "/fixture" })
-  const refused = await reader.fetch("/v1/projects/cloud-p1/icon", { ...post(item), method: "PUT" })
-  assert.equal(refused.status, 409)
+  assert.deepEqual(client.calls.pop(), ["_machineRequestAs", "hide-1", "mac-a", "project-hide", { path: "/repo" }, "action"])
+  const stale = await reader.fetch("/v1/places", { ...post({ place: "cloud-p1", paths: ["/other"] }), method: "DELETE", headers: { "Idempotency-Key": "hide-2" } })
+  assert.equal(stale.status, 400)
+  client._place = () => ({ machine: "different-machine", id: "p1", path: "/repo" })
+  const foreign = await reader.fetch("/v1/places", init)
+  assert.equal(foreign.status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequestAs", "hide-1", "different-machine", "project-hide", { path: "/repo" }, "action"])
 })
 
 test("a Project file save keeps its key, Project machine and exact file id", async () => {
@@ -1482,10 +1648,8 @@ test("a unify apply that stopped part-way over Cloud carries the local route's s
   assert.equal(answer.plan.version, "plan-v2")
   assert.equal(answer.error, "file_permission")
   const api = readFileSync(new URL("../pages/projects/project-files-api.ts", import.meta.url), "utf8")
-  assert.match(api, /data\?\.outcome === "stopped"[\s\S]*return data as ProjectUnifyApplied/)
   // The screen's stopped view is drawn from exactly that answer.
   const source = readFileSync(new URL("../pages/projects/ProjectUnify.tsx", import.meta.url), "utf8")
-  assert.match(source, /answer\.outcome === "stopped"[\s\S]*setStopped\(\{ ran: answer\.ran, failed: answer\.failed/)
 })
 
 test("a project settings apply and detach reach the mirror as its own words, and a read reaches the machine", async () => {
@@ -1695,6 +1859,7 @@ test("a phone reads and changes only the two default models", async () => {
     assert.equal(res.status, 501, path)
   }
   assert.equal(writeRoute("POST", "/v1/settings"), null)
+  assert.equal(writeRoute("POST", "/v1/settings/browser"), null)
 })
 
 test("a phone reads and changes only the two work gates", async () => {
@@ -1820,7 +1985,7 @@ test("an archive rides its Session's channel, and the archive's list and restore
   assert.equal(archived.status, 200)
   assert.deepEqual(client.calls.pop(), [
     "_read", { machine: "mac-a", session: "s1" }, "archive-session",
-    { request: "press-archive-1", force: true, expected_closeability_version: "cv-stale" }, "action:press-archive-1", undefined, undefined,
+    { request: "press-archive-1", execution_generation: EXECUTION, force: true, expected_closeability_version: "cv-stale" }, "action:press-archive-1", undefined, undefined,
   ])
   assert.deepEqual((await reader.snapshot()).sessions, [], "an archive is a close: the row goes with it")
 
@@ -1884,6 +2049,10 @@ test("the update read crosses as its machine word, with no field of its own", as
   const read = await reader.fetch("/v1/update")
   assert.equal(read.status, 200)
   assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "update", {}, "read"])
+
+  const fresh = await reader.fetch("/v1/update/fresh")
+  assert.equal(fresh.status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "update-fresh", {}, "read"])
 
   assert.equal(writeRoute("GET", "/v1/update/1"), null)
   assert.equal(writeRoute("POST", "/v1/update"), null)
@@ -2053,9 +2222,41 @@ test("a write during the gap is refused at once and is never carried after the r
   assert.deepEqual(retired.calls, [])
   assert.equal(renewed.calls.length, 0, "the refused send is not carried by the new client")
 
-  const sent = await reader.fetch("/v1/sessions/s1/send", post({ text: "again" }))
+  const sent = await reader.fetch("/v1/sessions/s1/send", post({ text: "again" }, { "Idempotency-Key": "send-after-gap" }))
   assert.equal(sent.status, 200, "a send with the line up is carried as before")
-  assert.equal(renewed.calls.filter(([name]) => name === "send").length, 1, "exactly the second press, once")
+  assert.equal(renewed.calls.filter(([name]) => name === "_read").length, 1, "exactly the second press, once")
+})
+
+test("a send whose capability wait crosses a client renewal uses the successor's descriptor", async () => {
+  const old = new FakeClient()
+  const cut = { machine: { commands: Array.from({ length: 64 }, (_, n) => `saved-${n}`) } }
+  old.descriptors.set("mac-a", cut)
+  old.machineDescriptors.set("mac-a", cut)
+  const { reader } = seam(old, { t: 1_000 }, true, 20)
+  const asked = reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-after-renewal" }))
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  const renewed = new FakeClient()
+  reader.attach(renewed)
+  const answer = await asked
+  assert.equal(answer.status, 200)
+  assert.equal(old.calls.length, 0)
+  assert.equal(renewed.calls.filter(([name]) => name === "_read").length, 1)
+})
+
+test("a rejected send reports which browser gate stopped it without its contents", async () => {
+  const old = new FakeClient()
+  const cut = { machine: { commands: Array.from({ length: 64 }, (_, n) => `saved-${n}`) } }
+  old.descriptors.set("mac-a", cut)
+  old.machineDescriptors.set("mac-a", cut)
+  const recorded: Array<{ event: string; data: Record<string, unknown> }> = []
+  Object.assign(old, { viewerEvents: { record: (event: string, data: Record<string, unknown>) => recorded.push({ event, data }) } })
+  const { reader } = seam(old, { t: 1_000 }, true, 10)
+  const answer = await reader.fetch("/v1/sessions/s1/send", post({ text: "private words" }, { "Idempotency-Key": "send-incomplete" }))
+  assert.equal(answer.status, 503)
+  assert.deepEqual(recorded.map(({ event, data }) => [event, data.word, data.code, data.stage]),
+    [["cloud.write.failed", "send", "cloud_reconnecting", "command_list_incomplete"]])
+  assert.equal(JSON.stringify(recorded).includes("private words"), false)
+  assert.equal(old.calls.length, 0)
 })
 
 test("every read the writer carries is one it waits for, and no write is", () => {
@@ -2072,6 +2273,7 @@ test("every read the writer carries is one it waits for, and no write is", () =>
     ["/v1/sessions/archived", "archived"],
     ["/v1/machine/usage", "machine-usage"],
     ["/v1/update", "update"],
+    ["/v1/update/fresh", "update-fresh"],
     ["/v1/verifications", "verification-read"],
     ["/v1/verifications/v1", "verification-read"],
     ["/v1/places", "places"],
@@ -2083,6 +2285,9 @@ test("every read the writer carries is one it waits for, and no write is", () =>
     ["/v1/sessions/s1/screen", "screen"],
     ["/v1/sessions/s1/documents", "documents"],
     ["/v1/sessions/s1/documents/project/demo.md", "document"],
+    ["/v1/sessions/s1/cloud-receipts/press-1", "session-receipt"],
+    // The Session page's skills picker on another machine (e13a02e6).
+    ["/v1/sessions/s1/skills", "skills"],
   ]
   for (const [path, op] of reads) {
     const route = writeRoute("GET", path)

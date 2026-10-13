@@ -26,7 +26,7 @@ import (
 // releaseUpdateServer is a daemon running from release v0.10.0 of a test
 // layout, with a release host that publishes `published` (signed by a test
 // key) and a hosted BUILD.json that counts how often it is asked.
-func releaseUpdateServer(t *testing.T, dir, published string) (*Server, *atomic.Int64) {
+func releaseUpdateServer(t *testing.T, dir, published string) (*Server, *atomic.Int64, func()) {
 	t.Helper()
 	commit := strings.Repeat("a", 40)
 	base := t.TempDir()
@@ -40,6 +40,7 @@ func releaseUpdateServer(t *testing.T, dir, published string) (*Server, *atomic.
 	}
 	pub, priv, _ := ed25519.GenerateKey(nil)
 	files := map[string][]byte{}
+	var withdrawn atomic.Bool
 	if published != "" {
 		sum := sha256.Sum256([]byte("x"))
 		m, _ := json.Marshal(release.Manifest{Version: published, Commit: commit, Channel: "stable",
@@ -49,6 +50,10 @@ func releaseUpdateServer(t *testing.T, dir, published string) (*Server, *atomic.
 		files["/latest/manifest.json"], files["/latest/manifest.sig.json"] = m, sig
 	}
 	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if withdrawn.Load() {
+			http.NotFound(w, r)
+			return
+		}
 		if b, ok := files[r.URL.Path]; ok {
 			w.Write(b)
 			return
@@ -67,7 +72,7 @@ func releaseUpdateServer(t *testing.T, dir, published string) (*Server, *atomic.
 	s := &Server{cfg: config.Config{Dir: dir, Port: 7757},
 		update:        &updatecheck.Checker{URL: hosted.URL, Running: func() contract.BuildStamp { return contract.BuildStamp{Stamp: commit} }},
 		releaseUpdate: updater.NewDaemon(env, filepath.Join(layout.Current, "clawdline"))}
-	return s, &hostedHits
+	return s, &hostedHits, func() { withdrawn.Store(true) }
 }
 
 // A release install compares release versions from its signed manifest and
@@ -75,7 +80,7 @@ func releaseUpdateServer(t *testing.T, dir, published string) (*Server, *atomic.
 // commit no release carries: the same version is current, whatever the
 // hosted stamp says.
 func TestAReleaseInstallNeverReadsTheHostedBuild(t *testing.T) {
-	s, hostedHits := releaseUpdateServer(t, t.TempDir(), "v0.10.0")
+	s, hostedHits, _ := releaseUpdateServer(t, t.TempDir(), "v0.10.0")
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { s.runUpdateCheck(ctx); close(done) }()
@@ -101,7 +106,7 @@ func TestAReleaseInstallNeverReadsTheHostedBuild(t *testing.T) {
 
 	// With nothing published the answer is unknown, with the reason a
 	// console branches on, and still no hosted read.
-	s, hostedHits = releaseUpdateServer(t, t.TempDir(), "")
+	s, hostedHits, _ = releaseUpdateServer(t, t.TempDir(), "")
 	s.releaseUpdate.Checker.Refresh(context.Background())
 	rec = httptest.NewRecorder()
 	s.updateRoute(rec, httptest.NewRequest(http.MethodGet, "/v1/update", nil))
@@ -111,11 +116,42 @@ func TestAReleaseInstallNeverReadsTheHostedBuild(t *testing.T) {
 	}
 }
 
+func TestFreshUpdateReadDoesNotShowAWithdrawnRelease(t *testing.T) {
+	s, hostedHits, withdraw := releaseUpdateServer(t, t.TempDir(), "v0.11.0")
+	s.releaseUpdate.Checker.Refresh(context.Background())
+	read := func(path string) contract.UpdateStatus {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		s.updateRoute(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", path, rec.Code, rec.Body)
+		}
+		var status contract.UpdateStatus
+		if err := json.Unmarshal(rec.Body.Bytes(), &status); err != nil {
+			t.Fatal(err)
+		}
+		return status
+	}
+	if got := read("/v1/update"); got.State != contract.UpdateStateUpdateAvailable {
+		t.Fatalf("initial release: %+v", got)
+	}
+	withdraw()
+	if got := read("/v1/update"); got.State != contract.UpdateStateUpdateAvailable {
+		t.Fatalf("the ordinary read is expected to retain its cache: %+v", got)
+	}
+	if got := read("/v1/update/fresh"); got.State != contract.UpdateStateUnknown || got.Latest.Version != "" || got.Reason != updater.CodeNoReleasePublished {
+		t.Fatalf("the withdrawn release must disappear: %+v", got)
+	}
+	if hostedHits.Load() != 0 {
+		t.Fatalf("read the hosted BUILD.json %d times", hostedHits.Load())
+	}
+}
+
 // POST /v1/update/apply restarts this daemon. Paired devices reach validation,
 // and every refusal after that carries a code.
 func TestApplyingAnUpdateNeedsPairingAndAReleaseInstall(t *testing.T) {
 	f, _ := newGateFixture(t)
-	s, _ := releaseUpdateServer(t, f.g.dir, "v0.11.0")
+	s, _, _ := releaseUpdateServer(t, f.g.dir, "v0.11.0")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/update/apply", s.updateApplyRoute)
 	mux.HandleFunc("/v1/update", s.updateRoute)

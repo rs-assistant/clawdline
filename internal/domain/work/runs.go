@@ -80,6 +80,15 @@ func (r Run) Evidence() map[string]any {
 // not that an unrelated message authorized an edit.
 func AcceptanceRevisionInstruction(excerpt, itemID, title string, soleOwnedItem bool) bool {
 	words := strings.ToLower(strings.Join(strings.Fields(excerpt), " "))
+	// An answer Note appends its own ID and context after the person's reply.
+	// Its ID identifies the Note, not another Board item. Keep the reply intact.
+	const noteContext = " (clawdline 便條 "
+	if at := strings.LastIndex(words, noteContext); at >= 0 {
+		suffix := words[at+len(noteContext):]
+		if len(suffix) >= 36 && RunShaped(suffix[:36]) && strings.HasPrefix(suffix[36:], "：「") {
+			words = words[:at]
+		}
+	}
 	identified := strings.Contains(words, strings.ToLower(itemID))
 	if title = strings.ToLower(strings.TrimSpace(title)); title != "" {
 		identified = identified || strings.Contains(words, title)
@@ -111,9 +120,25 @@ func AcceptanceRevisionInstruction(excerpt, itemID, title string, soleOwnedItem 
 		if !change {
 			continue
 		}
+		// A replacement criterion can say that a former requirement is no
+		// longer needed. "不要求" contains "不要" as bytes, but it does not
+		// negate the earlier request to revise this item's acceptance.
+		denialScope := clause
+		// A colon introduces the requested replacement. Its requirements may
+		// contain "不得" without negating the instruction before the colon.
+		if colon := strings.IndexAny(denialScope, ":："); colon >= 0 {
+			intro := denialScope[:colon]
+			if (strings.Contains(intro, "驗收") || strings.Contains(intro, "acceptance")) &&
+				(strings.Contains(intro, "修訂") || strings.Contains(intro, "修改") ||
+					strings.Contains(intro, "改為") || strings.Contains(intro, "改成") ||
+					strings.Contains(intro, "revise") || strings.Contains(intro, "change")) {
+				denialScope = intro
+			}
+		}
+		denialScope = strings.NewReplacer("不要求", "", "do not require", "", "don't require", "").Replace(denialScope)
 		denied := false
 		for _, denial := range []string{"不要", "別改", "禁止", "不准", "不得", "不應", "不能", "不可以", "do not", "don't", "never", "must not", "should not"} {
-			denied = denied || strings.Contains(clause, denial)
+			denied = denied || strings.Contains(denialScope, denial)
 		}
 		if denied {
 			continue

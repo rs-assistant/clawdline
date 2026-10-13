@@ -1,12 +1,14 @@
 import { catalogWord } from "./catalog.js"
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react"
-import type { BearingsSource, RestorableSession, ScanSource, SessionRow, TaskRow } from "@clawdline/contract"
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react"
+import type { BearingsSource, RestorableSession, ScanSource, SessionRow, TaskList, TaskRow } from "@clawdline/contract"
 import { client } from "./client.js"
 import * as L from "./legacy/bridge.js"
-import { actionWidthOf, paintSwipe, Row } from "./session/List.js"
+import { Row } from "./session/List.js"
 import { visualBranches, visualDepths } from "./session/order.js"
 import { Detail } from "./session/Detail.js"
+import type { FleetDetailProblem } from "./cloud/all-machine-sessions.js"
 import { Start, StartSheet, StartingRow } from "./session/Start.js"
+import { SessionToolbar } from "./session/SessionToolbar.js"
 import { Command, CommandSheet } from "./session/Command.js"
 import { Starting } from "./session/Starting.js"
 import { UpdateBanner } from "./machine/UpdateBanner.js"
@@ -15,6 +17,7 @@ import { offerShape } from "./session/restore-offer.js"
 import "./session/empty-list.css"
 import { taskReads } from "./session/task-read.js"
 import { swipes } from "./session/swipe.js"
+import { useSwipeToEnd } from "./session/use-swipe.js"
 import { pushShape, startPush, subscribePush, togglePush } from "./push/push.js"
 import { ScheduleSection } from "./pages/schedules.js"
 import { nextWord } from "./next-strings.js"
@@ -51,6 +54,11 @@ export function SessionsPage({
   onOpen,
   onBack,
   onDid,
+  streamTasks = null,
+  fleetList,
+  fleetDetailKey,
+  fleetDetailPending = false,
+  fleetDetailProblem,
 }: {
   rows: SessionRow[]
   /** The first reading has been answered, with a list or with a failure. */
@@ -80,11 +88,21 @@ export function SessionsPage({
   onOpen: (id: string) => void
   onBack: () => void
   onDid: () => void
+  /**
+   * The task list the live stream carries (`FleetState.tasks` while
+   * `tasksLive`), or null when the stream is not carrying one; then the list is
+   * read here on its own lane.
+   */
+  streamTasks?: TaskList | null
+  /** The same page frame and detail, with only the list supplied by the Cloud fleet adapter. */
+  fleetList?: ReactNode
+  fleetDetailKey?: string
+  fleetDetailPending?: boolean
+  fleetDetailProblem?: FleetDetailProblem | null
 }) {
-  // The task list the chips, the indent and the detail header read. Fetched
-  // here rather than taken from the stream because the page's stream reader
-  // does not hand its frames to this page.
-  const tasks = useTasks(arrived, rows)
+  // The task list the chips, the indent and the detail header read: the
+  // stream's own while it carries one, fetched here while it does not.
+  const tasks = useTasks(arrived, rows, streamTasks)
   const [terminalMode, setTerminalMode] = useState(() => sessionsTerminalMode(location.hash))
   // The terminal in the second column while the list shows terminals: named
   // by the address, or (hosted) a new one being opened in a project, which is
@@ -185,7 +203,7 @@ export function SessionsPage({
   // has left the document must leave the list with it.
   const listRef = useRef<HTMLUListElement>(null)
   useEffect(() => {
-    L.registerSpinners([...(listRef.current?.querySelectorAll<HTMLCanvasElement>("canvas.spin") ?? [])])
+    if (!fleetList) L.registerSpinners([...(listRef.current?.querySelectorAll<HTMLCanvasElement>("canvas.spin") ?? [])])
   })
   useListReorderAnimation(listRef)
 
@@ -236,7 +254,7 @@ export function SessionsPage({
   const ptrRef = useRef<HTMLDivElement>(null)
   // The swipe binds first, so that by the time pull-to-refresh reads a move
   // the axis has been decided and it knows whether the gesture is its own.
-  const swipedId = useSwipeToEnd(scrollRef)
+  const swipedId = useSwipeToEnd(scrollRef, swipes)
   const ptrWord = usePullToRefresh(scrollRef, ptrRef, onDid)
   // The terminal list has the same pull, in its own scroller, so reading it
   // again needs no button on the list.
@@ -244,7 +262,7 @@ export function SessionsPage({
   const terminalPtrRef = useRef<HTMLDivElement>(null)
   const terminalReload = useRef<(() => Promise<void>) | null>(null)
   const terminalPtrWord = usePullToRefresh(terminalScrollRef, terminalPtrRef, () => terminalReload.current?.())
-  useOrderHold(scrollRef)
+  useOrderHold(scrollRef, !fleetList)
   // A row that has gone takes its uncovered action with it, rather than
   // leaving a close button standing over whatever row took its place.
   useEffect(() => {
@@ -268,86 +286,11 @@ export function SessionsPage({
         <section className="pane pane-list">
           {/* A newer release for this machine, and the way to Settings where
               it is one press (machine/UpdateBanner.tsx). */}
-          <UpdateBanner />
-          <div className="filter-row">
-            {/* Every attribute here keeps a password manager out of a box that
-                filters a list (`index.html`). Uncontrolled, because a controlled
-                input writes a `value` attribute the original does not have. */}
-            <input
-              id="filter"
-              type="search"
-              name="q7f3"
-              placeholder={T.webFilterPlaceholder}
-              autoComplete="off"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              data-1p-ignore=""
-              data-lpignore="true"
-              data-bwignore=""
-              data-form-type="other"
-              aria-label={T.webFilterLabel}
-              onChange={(e) => onFilter(e.target.value)}
-            />
-            <div className="session-mode-tabs">
-              <button className="start session-mode-choice" type="button" title={T.webListLabel} aria-label={T.webListLabel} aria-pressed={!terminalMode} onClick={() => chooseTerminalMode(false)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M8 9h8M8 12h8M8 15h6"/></svg>
-              </button>
-              <button className="start session-mode-choice" type="button" title={nextWord("terminalListMode")} aria-label={nextWord("terminalListMode")} aria-pressed={terminalMode} onClick={() => chooseTerminalMode(true)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="m7.5 10 3 2.5-3 2.5M12.5 15h4"/></svg>
-              </button>
-            </div>
-            {/* Saying what to start opens the voice-to-draft command sheet;
-                picking where to start opens the ordinary start sheet. */}
-            <button
-              className="start"
-              id="voice-go"
-              type="button"
-              title={T.webCommand}
-              aria-label={T.webCommandLabel}
-              aria-pressed="false"
-              onClick={() => Command.openAndListen()}
-            >
-              <svg className="ico ico-mic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"></rect>
-                <path
-                  d="M5.75 11.75v0.5a6.25 6.25 0 0 0 12.5 0v-0.5M12 18.5V21"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                ></path>
-              </svg>
-              <svg className="ico ico-stop" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <rect x="7" y="7" width="10" height="10" rx="2.5" fill="currentColor"></rect>
-              </svg>
-            </button>
-            <button
-              className="start"
-              id="work-create-go"
-              type="button"
-              title={catalogWord("inline", "2c58f0c0b5ae")}
-              aria-label={catalogWord("inline", "2c58f0c0b5ae")}
-              onClick={() => openNewWorkItem()}
-            >
-              <svg className="ico ico-work-add" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <rect x="4" y="5" width="11" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.7"></rect>
-                <path d="M7.5 9h4M7.5 12.5h4M18.5 10.5v7M15 14h7" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"></path>
-              </svg>
-            </button>
-            <button
-              className="start"
-              id="start-go"
-              type="button"
-              title={terminalMode ? nextWord("terminalStartTitle") : T.webStart}
-              aria-label={terminalMode ? nextWord("terminalStartTitle") : T.webStart}
-              onClick={() => terminalMode ? Start.openTerminal() : Start.open()}
-            >
-              <svg viewBox="0 0 14 14" aria-hidden="true" focusable="false">
-                <path d="M7 2.6v8.8M2.6 7h8.8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"></path>
-              </svg>
-            </button>
-          </div>
+          {fleetList ?? <><UpdateBanner />
+          <SessionToolbar onFilter={onFilter} terminalMode={terminalMode}
+            onSessions={() => chooseTerminalMode(false)} onTerminals={() => chooseTerminalMode(true)}
+            onVoice={() => Command.openAndListen()} onWork={() => openNewWorkItem()}
+            onStart={() => terminalMode ? Start.openTerminal() : Start.open()} />
           <div className="session-reading" role="status" hidden={terminalMode || !readingSaid}>
             {readingSaid}
           </div>
@@ -392,10 +335,12 @@ export function SessionsPage({
             </div>
             {terminalMode && <TerminalList shown={onScreen} filter={filter} openId={terminalPane?.terminal ?? ""} reloadRef={terminalReload} />}
           </div>
-          <NotifyFooter />
+          <NotifyFooter /></>}
         </section>
 
-        <Detail row={open} tasks={tasks} onOpenSession={onOpen} onBack={onBack} onDid={onDid} listUnknown={listUnknown} />
+        <Detail key={fleetDetailKey} row={fleetDetailPending ? null : open} tasks={tasks} onOpenSession={onOpen} onBack={onBack} onDid={onDid}
+          onSent={streamTasks !== null ? undefined : onDid}
+          listUnknown={listUnknown || fleetDetailPending} loadingDetail={fleetDetailPending} emptyProblem={fleetDetailProblem} />
         {/* In terminal mode the second column is the terminal's, as it is the
             open session's otherwise; the session detail stays mounted, hidden. */}
         {terminalMode && (terminalPane
@@ -514,8 +459,9 @@ function ListSkeleton() {
  * moment after a finger leaves it (`input/keys.js`): a list that sorts itself
  * can move a row out from under a press.
  */
-function useOrderHold(scrollRef: RefObject<HTMLDivElement | null>): void {
+function useOrderHold(scrollRef: RefObject<HTMLDivElement | null>, enabled: boolean): void {
   useEffect(() => {
+    if (!enabled) return
     const scroller = scrollRef.current
     if (!scroller) return
     const touchEnd = () => {
@@ -535,7 +481,7 @@ function useOrderHold(scrollRef: RefObject<HTMLDivElement | null>): void {
       scroller.removeEventListener("touchstart", L.freezeOrder)
       scroller.removeEventListener("touchend", touchEnd)
     }
-  }, [scrollRef])
+  }, [scrollRef, enabled])
 }
 
 /**
@@ -619,74 +565,6 @@ function useListReorderAnimation(listRef: RefObject<HTMLUListElement | null>): v
  * every frame the daemon sends, and a listener per row would be rebound with
  * them, mid-gesture.
  */
-function useSwipeToEnd(scrollRef: RefObject<HTMLDivElement | null>): string | null {
-  const swiped = useSyncExternalStore(swipes.subscribe, swipes.openId, swipes.openId)
-  useEffect(() => {
-    const scroller = scrollRef.current
-    if (!scroller) return
-    let node: HTMLElement | null = null
-    const rowAt = (target: EventTarget | null): HTMLElement | null => {
-      const el = target instanceof Element ? target.closest<HTMLElement>("li.row") : null
-      return el && scroller.contains(el) ? el : null
-    }
-    /** The row is ready to be dragged before it is dragged; see above. */
-    const arm = (el: HTMLElement) => {
-      if (!el.dataset.swipe) el.dataset.swipe = "dragging"
-    }
-    const paint = (el: HTMLElement, id: string) => {
-      paintSwipe(el, swipes.stateOf(id), swipes.offsetOf(id))
-    }
-    const start = (ev: TouchEvent) => {
-      if (ev.touches.length !== 1) return
-      const el = rowAt(ev.target)
-      const id = el?.dataset.id ?? null
-      const width = el ? actionWidthOf(el) : undefined
-      const closed = swipes.begin(id, ev.touches[0].clientX, ev.touches[0].clientY, ev.timeStamp, width)
-      if (closed) {
-        for (const other of scroller.querySelectorAll<HTMLElement>("li.row[data-swipe]")) paintSwipe(other, "", 0)
-        node = null
-        return
-      }
-      node = el
-      if (el) arm(el)
-    }
-    const move = (ev: TouchEvent) => {
-      if (!node || ev.touches.length !== 1) return
-      const axis = swipes.move(ev.touches[0].clientX, ev.touches[0].clientY, ev.timeStamp)
-      if (axis === "list") {
-        // The scroller's after all: put the row back exactly as it was, so a
-        // scroll that started over a row leaves no trace of having been armed.
-        paintSwipe(node, swipes.stateOf(node.dataset.id ?? ""), swipes.offsetOf(node.dataset.id ?? ""))
-        node = null
-        return
-      }
-      if (axis !== "row") return
-      // The order is frozen by the list's own `touchstart` listener; this only
-      // has to not fight it.
-      paint(node, node.dataset.id ?? "")
-    }
-    const end = () => {
-      const settled = swipes.end()
-      const el = node
-      node = null
-      if (!settled || !el) return
-      paint(el, settled.id)
-    }
-    scroller.addEventListener("touchstart", start, { passive: true })
-    scroller.addEventListener("touchmove", move, { passive: true })
-    scroller.addEventListener("touchend", end, { passive: true })
-    scroller.addEventListener("touchcancel", end, { passive: true })
-    return () => {
-      scroller.removeEventListener("touchstart", start)
-      scroller.removeEventListener("touchmove", move)
-      scroller.removeEventListener("touchend", end)
-      scroller.removeEventListener("touchcancel", end)
-      swipes.closeOpen()
-    }
-  }, [scrollRef])
-  return swiped
-}
-
 /**
  * Pull to refresh, phones only (`input/edges.js`): with resistance, released
  * past 62px it reads again and holds a 34px pad until the answer is in. The
@@ -777,8 +655,10 @@ function usePullToRefresh(
  * The dispatched-work list, `S.tasks` in the original.
  *
  * The original is handed the whole list on its stream's `orchestrator` frame,
- * every time a task moves. This page's stream reader (`useFleet`, outside this
- * file) passes on only session frames, so the list is read here instead: once
+ * every time a task moves, and so is this page while its stream carries that
+ * frame (`streamTasks`): then nothing is read here at all. When it does not —
+ * the relay, the quiet reads while a terminal holds the connection, a dropped
+ * stream — the list is read here instead: once
  * when the first session list arrives, again whenever the rows change shape —
  * a tab opens or closes, a session starts or stops working, which is when a
  * task is briefed or finishes — at most every 1.5 seconds, and on a 10-second
@@ -786,11 +666,15 @@ function usePullToRefresh(
  * a chip that vanished because one request failed would be a false statement
  * that the task is over.
  */
-function useTasks(arrived: boolean, rows: SessionRow[]): TaskRow[] | null {
+function useTasks(arrived: boolean, rows: SessionRow[], streamTasks: TaskList | null): TaskRow[] | null {
   const [list, setList] = useState<TaskRow[] | null>(null)
   const readRef = useRef<() => void>(() => {})
+  const streamed = streamTasks !== null
   useEffect(() => {
-    if (!arrived) return
+    if (streamTasks) setList(streamTasks.tasks ?? [])
+  }, [streamTasks])
+  useEffect(() => {
+    if (!arrived || streamed) return
     const LANE_MS = 10000
     const GAP_MS = 1500
     let alive = true
@@ -859,7 +743,7 @@ function useTasks(arrived: boolean, rows: SessionRow[]): TaskRow[] | null {
       if (timer !== null) clearTimeout(timer)
       document.removeEventListener("visibilitychange", onVisibility)
     }
-  }, [arrived])
+  }, [arrived, streamed])
   // The rows' shape: which sessions exist and what they are doing. A working
   // line that ticks every second is not a change of shape.
   const shape = rows.map((r) => `${r.id}:${r.state}:${r.work_state}`).join("|")

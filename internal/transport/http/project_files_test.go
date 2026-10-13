@@ -12,7 +12,7 @@ import (
 )
 
 func TestProjectFilesRouteListsReadsAndComparesWrites(t *testing.T) {
-	s := iconCloudStandIn(t)
+	s := projectCloudStandIn(t)
 	project, ok := s.server.workV2Project(t.Context(), s.place)
 	if !ok {
 		t.Fatal("fixture place")

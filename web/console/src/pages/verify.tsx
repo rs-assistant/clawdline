@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Verification, VerificationCriterionState, VerificationData } from "@clawdline/contract"
 import * as L from "../legacy/bridge.js"
+import { BackButton, PageBar, RefreshButton } from "../PageBar.js"
+import { useDetailAddress } from "../useDetailAddress.js"
 import type { PageModule } from "./types.js"
 import {
   addNote,
@@ -53,6 +55,9 @@ function VerifyPageView({ shown }: { shown: boolean }) {
   const T = L.strings
   const [list, setList] = useState<ListState>({ read: false })
   const [detail, setDetail] = useState<DetailState | null>(null)
+  // The open record is the address's (`#page=verify&id=…`), so the browser's
+  // Back and this page's own back control close it alike.
+  const [openId, openAddress, closeAddress] = useDetailAddress("verify", shown)
   const [busy, setBusy] = useState(false)
   const [showClosed, setShowClosed] = useState(false)
   const [, tick] = useState(0)
@@ -84,6 +89,24 @@ function VerifyPageView({ shown }: { shown: boolean }) {
     }
   }, [])
 
+  // A record opens at its top; the list comes back where it was left.
+  const page = useRef<HTMLElement>(null)
+  const listScroll = useRef(0)
+  useLayoutEffect(() => {
+    const scroller = page.current
+    if (openId) {
+      if (scroller && !detail) listScroll.current = scroller.scrollTop
+      void open(openId)
+      if (scroller) scroller.scrollTop = 0
+    } else {
+      setDetail(null)
+    }
+  }, [openId, open])
+  const listShown = !detail
+  useLayoutEffect(() => {
+    if (listShown && page.current) page.current.scrollTop = listScroll.current
+  }, [listShown])
+
   useEffect(() => {
     if (!shown) return
     void load()
@@ -103,29 +126,27 @@ function VerifyPageView({ shown }: { shown: boolean }) {
   // A write answers the record; the list reads again so its row agrees.
   const changed = (row: Verification | null) => {
     if (row) setDetail((d) => (d && d.id === row.id ? { ...d, row } : d))
-    else setDetail(null)
+    else closeAddress()
     void load()
   }
 
   return (
     <section
+      ref={page}
       id="verify"
       className="page board-page verify-page"
       data-page-view="verify"
       hidden={!shown}
       aria-labelledby="verify-title"
     >
-      <header className="board-head">
-        <div className="work-head-tools">
-          <button className="board-button" id="verify-refresh" type="button" disabled={busy}
-            onClick={() => { void load(); if (detail) void open(detail.id) }}>
-            {busy ? T.webLoading : verifyWord("refresh")}
-          </button>
-        </div>
-      </header>
       <div className="verify-wrap">
+        <PageBar
+          back={detail ? <BackButton className="verify-back" label={verifyWord("back")} onClick={closeAddress} /> : null}
+          refresh={<RefreshButton id="verify-refresh" label={busy ? T.webLoading : verifyWord("refresh")} busy={busy}
+            onClick={() => { void load(); if (detail) void open(detail.id) }} />}
+        />
         {detail ? (
-          <Detail state={detail} now={now} onBack={() => setDetail(null)} onChanged={changed} onReopen={open} />
+          <Detail state={detail} now={now} onChanged={changed} onReopen={open} />
         ) : (
           <>
             <div className="board-intro">
@@ -134,7 +155,7 @@ function VerifyPageView({ shown }: { shown: boolean }) {
               <p className="verify-lede">{verifyWord("lede")}</p>
             </div>
             <ListView list={list} now={now} showClosed={showClosed} onToggleClosed={() => setShowClosed((v) => !v)}
-              onOpen={(id) => void open(id)} />
+              onOpen={openAddress} />
           </>
         )}
       </div>
@@ -206,10 +227,9 @@ const STATES: { state: VerificationCriterionState; word: VerifyWord }[] = [
   { state: "unset", word: "markUnset" },
 ]
 
-function Detail({ state, now, onBack, onChanged, onReopen }: {
+function Detail({ state, now, onChanged, onReopen }: {
   state: DetailState
   now: number
-  onBack: () => void
   onChanged: (row: Verification | null) => void
   onReopen: (id: string) => void
 }) {
@@ -239,16 +259,10 @@ function Detail({ state, now, onBack, onChanged, onReopen }: {
     }
   }
 
-  const back = (
-    <button className="board-button verify-back" type="button" onClick={onBack}>
-      ← {verifyWord("back")}
-    </button>
-  )
   const row = state.row
   if (!row) {
     return (
       <div className="verify-detail">
-        {back}
         {state.failure ? <p className="verify-failure" role="status">{state.failure}</p> : <p>{L.strings.webLoading}</p>}
       </div>
     )
@@ -258,7 +272,6 @@ function Detail({ state, now, onBack, onChanged, onReopen }: {
 
   return (
     <article className="verify-detail" id="verify-detail" data-status={row.status}>
-      {back}
       <header className="verify-detail-head">
         <h1 tabIndex={-1} ref={heading}>{row.title}</h1>
         <p className="verify-meta">

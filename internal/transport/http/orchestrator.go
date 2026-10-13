@@ -778,7 +778,9 @@ func (s *Server) brokerLandings(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	sessionsFresh := contract.SourceFreshnessCurrent
-	if !inv.Complete {
+	// A label on the list, not a conclusion that any session is gone: a
+	// source the person turned off does not make it stale (D71).
+	if !inv.CompleteApartFromDisabled() {
 		sessionsFresh = contract.SourceFreshnessStale
 	}
 	landingsFresh := landingsFreshness(rows)
@@ -1047,6 +1049,7 @@ func (s *Server) brokerTaskRow(ctx context.Context, r orchestrator.Record) contr
 		ID:             r.ID,
 		State:          contract.TaskState(r.State),
 		Kind:           r.Kind,
+		CallbackIntent: callbackIntentOf(r),
 		Title:          r.Title,
 		Assistant:      contract.Assistant(r.Assistant),
 		ProjectDir:     r.ProjectDir,

@@ -131,6 +131,9 @@ type heldScreen struct {
 	// this session may be asked again.
 	failures   int
 	quietUntil time.Time
+	// liveUntil is the end of the window after a press in which this tmux
+	// screen is captured on every read (Pressed).
+	liveUntil time.Time
 }
 
 // ScreenCounts is what this has done to the machine, for /v1/diagnostics.
@@ -208,6 +211,10 @@ func (h *HeldScreens) Capture(ctx context.Context, s session.Session) (string, b
 		h.evictLocked(now)
 	}
 	entry.backend = s.Backend
+	if s.Backend == session.BackendTmux && now.Before(entry.liveUntil) {
+		h.mu.Unlock()
+		return h.captureNow(s)
+	}
 	previous := entry.asked
 	entry.asked = now
 	stale := entry.at.IsZero() || now.Sub(entry.at) >= heldFor(s.Backend)
@@ -301,6 +308,62 @@ func heldFor(backend session.Backend) time.Duration {
 		return ScreenHeldTmux
 	}
 	return ScreenHeldOnDemand
+}
+
+// ScreenLiveAfterPress is how long after a press from a page a tmux screen is
+// captured on every read instead of served from what is held. Measured on
+// 2026-10-12: a box ticked in a multi-select was on the pane at once and in
+// the session list five seconds later — a held screen up to ScreenHeldTmux old,
+// refreshed only behind a read, under a list product up to a tick old — and the
+// publisher's looks right after the press (cloud.SettleDelays) read the same
+// held screen and sent the row from before the press.
+const ScreenLiveAfterPress = 2 * time.Second
+
+// Pressed is told when a key or a message went to a session: for
+// ScreenLiveAfterPress its tmux screen is captured on every read, and any
+// other screen is due at once. A tmux capture is 4 ms with no lock in front
+// of it; an iTerm2 one is not, so it is refreshed behind the read as usual.
+func (h *HeldScreens) Pressed(id string) {
+	if h == nil || id == "" {
+		return
+	}
+	now := h.now()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	entry := h.held[id]
+	if entry == nil {
+		return
+	}
+	entry.liveUntil = now.Add(ScreenLiveAfterPress)
+	entry.at = time.Time{}
+}
+
+// captureNow takes one tmux capture on the caller's goroutine, for a read
+// inside a press's live window, and holds it as a refresh would.
+func (h *HeldScreens) captureNow(s session.Session) (string, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), ScreenCaptureBudget)
+	text, ok := h.host.Capture(ctx, s)
+	cancel()
+	now := h.now()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.counts.Captures++
+	if entry := h.held[s.ID]; entry != nil {
+		entry.asked = now
+		if ok {
+			entry.text, entry.readable, entry.at = text, true, now
+			entry.failures, entry.quietUntil = 0, time.Time{}
+		}
+		if !ok && entry.readable {
+			return entry.text, true
+		}
+	}
+	if !ok {
+		h.counts.Failed++
+		return "", false
+	}
+	h.counts.Served++
+	return text, true
 }
 
 // refresh takes one capture, on a clock of its own.

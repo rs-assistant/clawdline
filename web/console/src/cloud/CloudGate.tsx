@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import type { SessionRow } from "@clawdline/contract"
 import App from "../App.js"
 import { BRAND_MARK } from "../brand-mark.js"
 import type { ConnectionLight } from "../connection-state.js"
@@ -6,6 +7,7 @@ import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
 import { bootCatalog } from "../catalog.js"
 import { cardsAreFor } from "../session/send.js"
+import { namesSession, sessionFragment } from "../session/address.js"
 import {
   chooseTransport,
   cloudOnboardingMode,
@@ -27,8 +29,10 @@ import { CARRY_TABLE } from "./carry.js"
 import { afterForget, forgetMachine, honestyIsOurs, type ForgetOutcome } from "./forget.js"
 import { NAME_MAX, renameMachine, type RenameOutcome } from "./rename.js"
 import { setAccountMachines, setMachineForgetting, setMachinePairing } from "../legacy/devices-bridge.js"
+import { machinePaired } from "./pairing-completion.js"
 import { setProjectSyncSeam, syncSeamFor, type SyncClient } from "./project-sync.js"
 import { machinePresentation } from "../legacy/js/session/selection.js"
+import { forgetPersonas } from "../personas.js"
 import { accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, type AccountName } from "./unpaired-rows.js"
 import { machineSeenWord } from "./machine-seen.js"
 import { PairingRun, dropInvitation, watchInvitations, type PairStart, type PairState } from "./pair.js"
@@ -46,11 +50,25 @@ import { setTerminalHost } from "./terminal-host.js"
 import { clearTerminalCloseStates } from "./terminal-close-state.js"
 import type { TerminalCloudClient } from "./terminal-transport.js"
 import { machineForAddress } from "./document-target.js"
+import { openingFor } from "./opening.js"
+import { toolMovesConsole } from "./machine-tool.js"
 import { CloudAccountContext } from "./account-context.js"
 import { machinesByCapability } from "./machine-access.js"
 import { answerSchedulePresence, publishScheduleFleet, type ScheduleMachine } from "./schedule-machines.js"
 import { bundledCatalog, catalogURL } from "./strings.js"
 import { RelayReader } from "./relay-reader.js"
+import { OPENED_ROW_QUIET_MS, openedRowShow } from "./opened-row.js"
+import { FleetSessionList, type MachineToolbarAction } from "./FleetSessionList.js"
+import { CarrierDot } from "./CarrierDot.js"
+import { carrierReading, type CarrierReading } from "./carrier-state.js"
+import { CloudSessionSheets, type PendingMachineAction } from "./CloudSessionSheets.js"
+import { PeerAccessPage } from "./PeerAccessPage.js"
+import { destinationAvailable, destinationFragment, destinationFromFragment, destinationKey,
+  supersedingDestination, type FleetDetailProblem, type MachineListPresentation,
+  type MachineSessionProjection, type ProjectedSession, type SessionContent, type SessionDestination,
+  type SessionListPresentation, type SessionProjectionSource } from "./all-machine-sessions.js"
+import { statusSource } from "./status-source.js"
+import { STATUS_FRESH_MS, statusProjection } from "./status-projection.js"
 import { RelayWriter, writeRoute } from "./relay-writer.js"
 import { installScheduleWebhookManagement } from "./schedule-webhooks.js"
 import { installCloudPush, type CloudPushClient } from "./cloud-push.js"
@@ -118,6 +136,39 @@ export function readDeclaration(declared: string): Declared {
     : { kind: "blocked", config }
 }
 
+/**
+ * Why this Session's conversation is not on screen, and what the person can do
+ * about it. One place decides both, so no caller invents a sentence of its own.
+ *
+ * Each sentence names the machine holding the Session — not this browser and
+ * not Cloud — because "this machine cannot read it yet" left a person with no
+ * way to tell whose version was wrong or what to update. A reason that may
+ * pass on a second look carries the press that looks again; a replaced
+ * execution carries the one that opens the execution now running, and a
+ * Session that is gone carries the one that puts it away.
+ */
+function fleetDetailAnswer(reason: Extract<SessionContent, { kind: "unavailable" }>["reason"] | "no_row",
+  machine: string, running: SessionDestination | null,
+  presses: { open: (target: SessionDestination) => void; close: () => void; again: () => void }): FleetDetailProblem {
+  const again = { label: nextWord("cloudAllTryAgain"), run: presses.again }
+  switch (reason) {
+    case "changed": return running
+      ? { text: nextWord("cloudAllChanged", { machine }),
+        action: { label: nextWord("cloudAllOpenCurrent"), run: () => presses.open(running) } }
+      : { text: nextWord("cloudAllGone", { machine }),
+        action: { label: nextWord("cloudAllCloseGone"), run: presses.close } }
+    // The conversation was read; what is missing is the Session's own rich
+    // row, which only its machine publishes.
+    case "no_row": return { text: nextWord("cloudAllNoRow", { machine }), action: again }
+    case "no_permission": return { text: nextWord("cloudAllContentNoPermission", { machine }) }
+    case "old_version": return { text: nextWord("cloudAllContentOldVersion", { machine }) }
+    case "unconfirmed": return { text: nextWord("cloudAllUnconfirmed", { machine }), action: again }
+    case "offline": return { text: nextWord("cloudAllOffline") }
+    case "stale": return { text: nextWord("cloudAllStaleSource"), action: again }
+    default: return { text: nextWord("cloudAllContentUnknown"), action: again }
+  }
+}
+
 type Screen =
   | { at: "install" }
   | { at: "checking" }
@@ -134,6 +185,24 @@ type Screen =
 
 /** The machine a tab chose, so a reload reads the same one. Per account, per tab. */
 const CHOSEN = "clawdline.cloud.machine:"
+/**
+ * A toolbar press that a reload used to be in the middle of.
+ *
+ * Nothing writes this any more: naming a machine no longer reloads the page
+ * (`pointAt`). It is still read, and cleared, so a press made in a tab still
+ * running the build that did reload is honoured once after this one replaces
+ * it, instead of waiting in storage for the rest of the tab's life.
+ */
+const PENDING_TOOL = "clawdline.cloud.pending-session-tool"
+
+function pendingMachineTool(): PendingMachineAction | null {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(PENDING_TOOL) ?? "null") as PendingMachineAction | null
+    return value && typeof value.machineID === "string" &&
+      ["terminal", "voice", "work", "start", "start_terminal"].includes(value.action) &&
+      Number.isFinite(value.at) && Math.abs(Date.now() - value.at) <= 30_000 ? value : null
+  } catch { return null }
+}
 
 /** The screens on which this browser is signed in with a device key, so a pairing can start. */
 const SIGNED_IN = new Set<Screen["at"]>(["machines", "console", "pairing"])
@@ -175,7 +244,7 @@ async function catalog(config: CloudConfig): Promise<Record<string, string>> {
   return bundledCatalog(config, navigator.languages ?? [navigator.language], document.baseURI)
 }
 
-export function CloudGate({ declared }: { declared: string }) {
+export function CloudGate({ declared, sessionSource = null }: { declared: string; sessionSource?: SessionProjectionSource | null }) {
   const transport = useMemo(() => readDeclaration(declared), [declared])
   const [words, setWords] = useState(false)
   // A catalog that arrives late has words for a screen already on show
@@ -189,10 +258,81 @@ export function CloudGate({ declared }: { declared: string }) {
         : { at: "checking" },
   )
   const [who, setWho] = useState<{ account: string; device: string } | null>(null)
+  const [managingMachines, setManagingMachines] = useState(false)
   const [machineList, setMachineList] = useState<MachineListState>({ phase: "loading" })
   const machines = machineList.phase === "ready" ? machineList.machines : null
   const [problem, setProblem] = useState<AccessProblem | null>(null)
   const [chosen, setChosen] = useState<CloudMachine | null>(null)
+  const [fleetScope, setFleetScope] = useState(() => location.hash === "#all-machines" || !!destinationFromFragment(location.hash))
+  const fleetScopeRef = useRef(fleetScope)
+  fleetScopeRef.current = fleetScope
+  const [fleetTarget, setFleetTarget] = useState<SessionDestination | null>(() => destinationFromFragment(location.hash))
+  const [fleetDetailProblem, setFleetDetailProblem] = useState<{ key: string } & FleetDetailProblem | null>(null)
+  // A detail read that failed for a reason that may pass — a capability not
+  // published yet, a status reading still settling — is read again on a press.
+  // Without this the first answer was the last one until the whole page was
+  // reloaded, which restored the same unreadable target.
+  const [fleetReadAgain, setFleetReadAgain] = useState(0)
+  /**
+   * The opened Session whose own row has not arrived, and the one this browser
+   * has waited long enough for to say so (`opened-row.ts`).
+   */
+  const [rowPending, setRowPending] = useState(false)
+  const [rowAbsent, setRowAbsent] = useState<string | null>(null)
+  const noteRowPending = useCallback((pending: boolean) => setRowPending(pending), [])
+  const [readerMachine, setReaderMachine] = useState<string | null>(null)
+  const fleetTargetRef = useRef<SessionDestination | null>(null)
+  fleetTargetRef.current = fleetScope ? fleetTarget : null
+  const fleetPresentations = useRef(new Map<string, SessionListPresentation & {
+    destination: SessionDestination; projection?: ProjectedSession }>())
+  const fleetPresentationReceivedAt = useRef(new Map<string, number>())
+  const fleetProjections = useRef(new Map<string, { reading: MachineSessionProjection; receivedAt: number }>())
+  const noteFleetProjection = useCallback((machineID: string, reading: MachineSessionProjection) => {
+    fleetProjections.current.set(machineID, { reading, receivedAt: Date.now() })
+  }, [])
+  const [fleetPresentationRevision, refreshFleetPresentation] = useState(0)
+  const noteFleetPresentations = useCallback((machineID: string,
+    rows: readonly (SessionListPresentation & { destination: SessionDestination;
+      projection?: ProjectedSession })[]) => {
+    // A presentation pass may answer only its first row while ss/ replays the
+    // rest. Keep the prior verified rows for a machine switch; the reader
+    // checks each row's exact execution and freshness against the marker.
+    for (const row of rows) {
+      for (const [key, held] of fleetPresentations.current) {
+        if (held.destination.machineID === machineID &&
+          held.destination.sessionID === row.destination.sessionID &&
+          held.destination.executionGeneration !== row.destination.executionGeneration) {
+          fleetPresentations.current.delete(key)
+          fleetPresentationReceivedAt.current.delete(key)
+        }
+      }
+      const key = destinationKey(row.destination)
+      fleetPresentations.current.set(key, row)
+      fleetPresentationReceivedAt.current.set(key, Date.now())
+    }
+    refreshFleetPresentation((revision) => revision + 1)
+    if (reader.current?.machine === machineID && client.current)
+      reader.current.attach(client.current)
+  }, [])
+  /** A console is on screen, for a machine this browser can read. */
+  const consoleUp = !!chosen && screen.at === "console"
+  /**
+   * The machine the console is reading.
+   *
+   * Not always the one this tab chose: opening a fleet Session repoints the
+   * reader at that Session's machine and leaves the choice alone. Everything a
+   * person sees named, and the original one-machine list underneath it, follow
+   * the reader, because that is whose rows are on the screen.
+   */
+  const reading = readerMachine ?? chosen?.id ?? null
+  useEffect(() => {
+    const machine = fleetScope && fleetTarget ? fleetTarget.machineID : reading
+    if (!consoleUp || !machine) return
+    if (fleetScope && !fleetTarget) client.current?.disableClassicSessionView?.()
+    else client.current?.enableClassicSessionView?.(machine,
+      fleetScope ? fleetTarget?.sessionID : undefined)
+  }, [reading, fleetScope, fleetTarget && destinationKey(fleetTarget), consoleUp])
+  const [pendingTool, setPendingTool] = useState<PendingMachineAction | null>(pendingMachineTool)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const switcherRef = useRef<HTMLDivElement>(null)
   const switchButtonRef = useRef<HTMLButtonElement>(null)
@@ -245,6 +385,30 @@ export function CloudGate({ declared }: { declared: string }) {
   const session = useRef<RecoverableCloudSession | null>(null)
   const line = useRef<CloudConnection | null>(null)
   const client = useRef<CloudClientHandle | null>(null)
+  const currentActionClient = useCallback(() => client.current, [])
+  const [clientEpoch, setClientEpoch] = useState(0)
+  const liveSessionSource = useMemo(() => sessionSource ?? statusSource(() => client.current), [sessionSource])
+  /**
+   * Which road this page's reads of one machine take, read while the row is
+   * drawn rather than held in state: the carrier opens and closes on its own,
+   * and every pass of the list redraws these rows anyway. It opens nothing.
+   */
+  const carrierOf = useCallback((machine: string): CarrierReading | null => {
+    const facts = client.current?.carrierFacts?.(machine)
+    return facts ? carrierReading(facts) : null
+  }, [])
+  const admitFleetMutation = useCallback(async (target: SessionDestination) => {
+    const current = client.current
+    if (!current) throw Object.assign(new Error("The Cloud connection is unavailable."), { code: "offline" })
+    const roster = await current.machines()
+    if (!roster.machines.some((machine) => machine.id === target.machineID && machine.freshness === "current")) {
+      throw Object.assign(new Error("The destination machine is no longer current."), { code: "execution_generation_changed" })
+    }
+    const reading = await liveSessionSource.readMachine(target.machineID, new AbortController().signal)
+    if (client.current !== current || destinationAvailable(target, reading) !== "ready") {
+      throw Object.assign(new Error("The selected Session execution changed."), { code: "execution_generation_changed" })
+    }
+  }, [liveSessionSource])
   useEffect(() => clearTerminalCloseStates(), [who?.account])
   const reader = useRef<RelayReader | null>(null)
   const unlisten = useRef<(() => void) | null>(null)
@@ -325,43 +489,118 @@ export function CloudGate({ declared }: { declared: string }) {
     return () => answerSchedulePresence(null)
   }, [])
 
-  const choose = useCallback((machine: CloudMachine) => {
+  /**
+   * Point every seam on this page at `machineID`, in place.
+   *
+   * One machine at a time owns this page's `/v1/` fetches, its session stream,
+   * its transcript pictures, its terminal host and the cards kept for it, and
+   * `readThroughRelay` already carries all of them over to a new reader — that
+   * is how the fleet opens a Session on a machine other than the one under the
+   * console. A deliberate machine choice is the same move, so it is this same
+   * code. It used to be `location.reload()` instead, which threw away the
+   * console the person was looking at, and the list, the schedules and the
+   * conversation all came back from nothing to arrive where this arrives
+   * directly.
+   *
+   * Nothing here says which machine the *person* chose; that is `chosen`, and
+   * `readerMachine` below is what the page is actually reading.
+   */
+  const pointAt = useCallback((machineID: string, current: CloudClientHandle): RelayReader => {
+    if (reader.current?.machine === machineID) return reader.current
+    const config = transport.kind === "cloud" ? transport.config : null
+    const heldFleetRows = (machineID: string) => [...fleetPresentations.current.entries()]
+      .filter(([key, row]) => row.destination.machineID === machineID &&
+        !!row.projection &&
+        Date.now() - (fleetPresentationReceivedAt.current.get(key) ?? 0) <= STATUS_FRESH_MS)
+      .map(([, row]) => row)
+    const next = new RelayReader(machineID, {
+      strings: () => (config ? catalog(config) : Promise.resolve({})),
+      carry: CARRY_TABLE,
+      classicStatus: true,
+      fleetTarget: () => fleetTargetRef.current,
+      fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
+      fleetPresentations: heldFleetRows,
+      machineProjection: (machineID) => {
+        const held = fleetProjections.current.get(machineID)
+        if (held && Date.now() - held.receivedAt <= STATUS_FRESH_MS) {
+          const live = statusProjection(client.current, machineID)
+          if (live.kind === "ready" && live.observedAt > (held.reading.observedAt ?? 0))
+            return Promise.resolve(live)
+          return Promise.resolve(held.reading)
+        }
+        return liveSessionSource.readMachine(machineID, new AbortController().signal)
+      },
+      listPresentations: async (machineID) => {
+        // Reuse the fleet's already verified rows, even if a newer
+        // presentation pass has only delivered its first title. A partial
+        // batch remains visibly partial until the signed set catches up.
+        const held = heldFleetRows(machineID)
+        if (held.length) return held as MachineListPresentation[]
+        return await liveSessionSource.readMachinePresentations?.(
+          machineID, new AbortController().signal) ?? null
+      },
+      resolveSession: async (machineID, sessionID) => {
+        const reading = await liveSessionSource.readMachine(machineID, new AbortController().signal)
+        return reading.kind === "ready"
+          ? reading.rows.find((row) => row.destination.sessionID === sessionID && row.freshness === "current")?.destination ?? null
+          : null
+      },
+      admitFleetMutation,
+    })
+    const writer = new RelayWriter(next.writeHost)
+    next.carryWrites({ route: writeRoute, answer: (route, method, url, init) => writer.answer(route, method, url, init) })
+    next.attach(current)
+    reader.current = next
+    setReaderMachine(machineID)
+    setTerminalHost({ client: current as unknown as TerminalCloudClient, machine: machineID })
+    readThroughRelay(next)
+    // What the seam answered and how, for whoever is looking at this page's
+    // behaviour from devtools; nothing reads it back.
+    ;(globalThis as { __clawdlineCloudSeam?: RelayReader }).__clawdlineCloudSeam = next
+    // Which machine this page is talking to is settled here, and only here, so
+    // this is where the cards kept for it come back (F4, `session/persist.ts`).
+    // Not before: a session id is a terminal id, and a card kept for one
+    // machine's `%1` put back under another's would be words for whatever that
+    // one holds.
+    cardsAreFor(machineID)
+    // Catalogs read once "per page" were read once per machine while a page
+    // was one machine's for its whole life. They are not any more.
+    forgetPersonas()
+    return next
+  }, [transport, admitFleetMutation, liveSessionSource])
+
+  /**
+   * Read `machine`, and — unless `remember` says otherwise — record it as the
+   * machine this tab chose.
+   *
+   * `remember` is false for the machine the fleet reads underneath itself: it
+   * is `opening.ts`'s pick, not the person's, and writing it down made the
+   * fleet last exactly one page load.
+   */
+  const choose = useCallback((machine: CloudMachine, remember = true) => {
     const current = client.current
     if (!current || !machine.selectable) return
     // A machine this tab has forgotten still has decrypted snapshots behind it
     // and would open a console reading a line the account has stopped routing.
     if (forgotten.includes(machine.id)) return
     try {
-      sessionStorage.setItem(CHOSEN + (current.account ?? ""), machine.id)
+      if (remember) sessionStorage.setItem(CHOSEN + (current.account ?? ""), machine.id)
     } catch {
       /* a tab that cannot remember asks again after a reload */
     }
-    // The console's fetch and event seams are installed once for one machine.
-    // Picking the machine already underneath this chooser merely closes it;
-    // picking another records the destination first, then remounts those seams
-    // in this same tab rather than taking the person through an empty picker.
-    if (reader.current) {
-      if (reader.current.machine === machine.id) {
-        setScreen({ at: "console" })
-      } else {
-        location.reload()
-      }
-      return
-    }
+    const moving = reader.current !== null && reader.current.machine !== machine.id
+    pointAt(machine.id, current)
+    current.enableClassicSessionView?.(machine.id)
+    // A terminal closed on the machine being left is not a terminal closed on
+    // the one being opened; its id means nothing here.
+    if (moving) clearTerminalCloseStates()
     const config = transport.kind === "cloud" ? transport.config : null
-    const next = new RelayReader(machine.id, {
-      strings: () => (config ? catalog(config) : Promise.resolve({})),
-      carry: CARRY_TABLE,
-    })
-    const writer = new RelayWriter(next.writeHost)
-    next.carryWrites({ route: writeRoute, answer: (route, method, url, init) => writer.answer(route, method, url, init) })
-    next.attach(current)
-    reader.current = next
-    setTerminalHost({ client: current as unknown as TerminalCloudClient, machine: machine.id })
-    readThroughRelay(next)
-    uninstallScheduleWebhooks.current?.()
-    uninstallCloudPush.current?.()
-    if (config) {
+    // Only when there is something to change: a press that lands on the
+    // machine already underneath must not tear down a webhook registration
+    // that is in flight.
+    if (config && (moving || !uninstallScheduleWebhooks.current)) {
+      uninstallScheduleWebhooks.current?.()
+      uninstallCloudPush.current?.()
       // Notifications are the account's, not this machine's: the browser
       // subscribes once with Cloud's key and every machine on the account is
       // handed the subscription (`cloud-push.ts`).
@@ -383,18 +622,15 @@ export function CloudGate({ declared }: { declared: string }) {
         },
       })
     }
-    // What the seam answered and how, for whoever is looking at this page's
-    // behaviour from devtools; nothing reads it back.
-    ;(globalThis as { __clawdlineCloudSeam?: RelayReader }).__clawdlineCloudSeam = next
-    // Which machine this page is talking to is settled here, and only here, so
-    // this is where the cards kept for it come back (F4, `session/persist.ts`).
-    // Not before: a session id is a terminal id, and a card kept for one
-    // machine's `%1` put back under another's would be words for whatever that
-    // one holds.
-    cardsAreFor(machine.id)
+    // Always, including when the reader was already on this machine: the fleet
+    // repoints the reader under an opened Session, so a choice that lands on
+    // the machine already underneath still has to settle the person's choice,
+    // or the header keeps naming the machine this tab chose first while the
+    // list below it is another machine's.
     setChosen(machine)
+    setManagingMachines(false)
     setScreen({ at: "console" })
-  }, [transport, forgotten])
+  }, [transport, forgotten, pointAt])
 
   /** The machine this tab remembers choosing, for the account it is signed in to. */
   const remembered = useCallback(() => {
@@ -429,7 +665,7 @@ export function CloudGate({ declared }: { declared: string }) {
       const next = afterForget({
         forgotten: machine.id,
         remembered: remembered(),
-        reading: chosen?.id ?? null,
+        reading,
       })
       if (next.clearRemembered) {
         try {
@@ -447,7 +683,7 @@ export function CloudGate({ declared }: { declared: string }) {
         setScreen({ at: "machines" })
       }
     },
-    [transport, forgetting, remembered, chosen, who],
+    [transport, forgetting, remembered, reading, who],
   )
 
   /**
@@ -488,6 +724,7 @@ export function CloudGate({ declared }: { declared: string }) {
       .then((opened) => {
         if (opened) {
           claimedPairings.current.add(opened.machineID)
+          machinePaired(opened.machineID)
           setConnectionVersion((version) => version + 1)
         }
       })
@@ -525,6 +762,7 @@ export function CloudGate({ declared }: { declared: string }) {
       // reconnect so the relay replays the machine's retained snapshots.
       if (state.phase === "paired") {
         claimedPairings.current.add(state.machineID)
+        machinePaired(state.machineID)
         setConnectionVersion((version) => version + 1)
       }
       // Stopping only puts the card away. The offer and its private claim key
@@ -646,6 +884,7 @@ export function CloudGate({ declared }: { declared: string }) {
         case "connected": {
           const next = update.client
           client.current = next
+          setClientEpoch((epoch) => epoch + 1)
           setWho({ account: next.account ?? "", device: next.deviceID ?? "" })
           // The Devices page reads the account's machines through this, and
           // says so under its heading. It is the client at the moment of the
@@ -677,8 +916,12 @@ export function CloudGate({ declared }: { declared: string }) {
           })
           unlisten.current?.()
           unlisten.current = next.events((event) => {
-            // The list is for choosing; once a machine is on screen nobody is looking at it.
-            if (!reader.current && (event.type === "orchestrator" || event.type === "sessions")) listMachines()
+            // The fleet list stays visible beside an open Session. Refresh its
+            // machine freshness after a complete status pass, not after each
+            // row in that pass (which would churn the list while it arrives).
+            if (!reader.current && (event.type === "orchestrator" || event.type === "session_status")) listMachines()
+            else if (fleetScopeRef.current && (event.type === "orchestrator" ||
+              event.type === "session_status" && event.identity?.session === "__clawdline_inventory_v1__")) listMachines()
             // A decryptable inventory clears only the problem attributed to
             // that machine. One machine answering is not evidence that a
             // different machine's key problem went away.
@@ -698,6 +941,10 @@ export function CloudGate({ declared }: { declared: string }) {
           if (reader.current) {
             // A renewal or a reconnect: the console keeps reading, through the new client.
             reader.current.attach(next)
+            const target = fleetTargetRef.current
+            if (fleetScopeRef.current && !target) next.disableClassicSessionView?.()
+            else next.enableClassicSessionView?.(reader.current.machine,
+              fleetScopeRef.current ? target?.sessionID : undefined)
             setTerminalHost({ client: next as unknown as TerminalCloudClient, machine: reader.current.machine })
             setScreen({ at: "console" })
             return
@@ -781,13 +1028,26 @@ export function CloudGate({ declared }: { declared: string }) {
     }
   }, [start, connectionVersion])
 
-  // A machine this tab chose before, once it is listed again.
+  // Where this tab lands once it has a list to land on (`opening.ts`). The
+  // list is asked again whenever it changes, so a machine that was still
+  // arriving is opened on the pass that lists it.
   useEffect(() => {
-    if (screen.at !== "machines" || !machines || !who) return
-    const id = machineForAddress(location.hash, remembered())
-    const again = machines.find((m) => m.id === id && m.selectable)
-    if (again) choose(again)
-  }, [screen, machines, who, choose, remembered])
+    if (screen.at !== "machines" || managingMachines || !machines || !who) return
+    const exact = destinationFromFragment(location.hash)
+    // A Session destination is the fleet's own address; a document address is
+    // one machine's page, and the fleet would put the Session list over it.
+    const document = exact ? null : machineForAddress(location.hash, null)
+    const opening = openingFor({
+      machines,
+      addressed: exact ? { machine: exact.machineID, inFleet: true }
+        : document ? { machine: document } : null,
+      everyMachineAddressed: location.hash === "#all-machines",
+      remembered: remembered(),
+    })
+    if (opening.at !== "console") return
+    setFleetScope(opening.fleet)
+    choose(machines.find((machine) => machine.id === opening.machine)!, opening.remember)
+  }, [screen, managingMachines, machines, who, choose, remembered])
 
   /**
    * Leave the machine this tab chose and start again at the list. This drops
@@ -800,19 +1060,21 @@ export function CloudGate({ declared }: { declared: string }) {
     } catch {
       /* nothing remembered */
     }
+    setManagingMachines(true)
     setScreen({ at: "machines" })
   }, [who])
 
   /** Put away the in-place picker without changing the machine underneath it. */
   const closeMachinePicker = useCallback(() => {
-    if (!chosen) return
+    if (!reading) return
     try {
-      sessionStorage.setItem(CHOSEN + (who?.account ?? ""), chosen.id)
+      sessionStorage.setItem(CHOSEN + (who?.account ?? ""), reading)
     } catch {
       /* the console still stays on the machine already attached */
     }
+    setManagingMachines(false)
     setScreen({ at: "console" })
-  }, [chosen, who])
+  }, [reading, who])
 
   useEffect(() => {
     if (!switcherOpen) return
@@ -846,6 +1108,86 @@ export function CloudGate({ declared }: { declared: string }) {
     [machineList, names, forgotten],
   )
   const quickMachines = shown.phase === "ready" ? shown.machines.filter((machine) => machine.selectable) : []
+  // The names the detail's own sentences use, read when one is written rather
+  // than captured when the effect below was last built.
+  const machineNames = useRef(new Map<string, string>())
+  machineNames.current = new Map(quickMachines.map((machine) => [machine.id, machine.name || machine.label || machine.id]))
+
+  const leaveFleet = () => { setFleetScope(false); setFleetTarget(null) }
+
+  const openFleetSession = (target: SessionDestination) => {
+    setFleetCloseIntent(null)
+    setFleetTarget(target)
+    history.replaceState(history.state, "", destinationFragment(target))
+  }
+
+  /**
+   * Put the opened Session away, and take it out of the address with it.
+   *
+   * A destination that can no longer be read used to stay in the fragment, so
+   * reloading the page restored the same unreadable target and the same
+   * sentence, with nothing on screen that could change either.
+   */
+  const [fleetCloseIntent, setFleetCloseIntent] = useState<{ target: SessionDestination; title: string } | null>(null)
+  const closeFleetTarget = useCallback(() => {
+    setFleetCloseIntent(null)
+    setFleetTarget(null)
+    setFleetDetailProblem(null)
+    if (destinationFromFragment(location.hash)) {
+      history.replaceState(history.state, "", location.pathname + location.search + "#all-machines")
+    }
+  }, [])
+
+  // The fleet scope shows "所有機器" in the header rather than one machine's
+  // name. Only the opened three-part target changes the original Session
+  // reader underneath, and `readerMachine` is what it changed it to, so the
+  // header names that machine again the moment the fleet scope is left.
+  // The exact s/ subscription is opened by the status source after admission.
+  useEffect(() => {
+    if (!fleetScope || !fleetTarget || !client.current || !consoleUp) return
+    const key = destinationKey(fleetTarget)
+    setFleetDetailProblem(null)
+    pointAt(fleetTarget.machineID, client.current)
+    const abort = new AbortController()
+    const target = fleetTarget
+    const machine = machineNames.current.get(target.machineID) ?? target.machineID
+    void liveSessionSource.readDetail(target, abort.signal).then(async (answer) => {
+      if (abort.signal.aborted || answer.kind !== "unavailable") return
+      // An assistant that restarts keeps its terminal and takes a new
+      // generation, so a read pinned to the old one refuses — correctly. What
+      // was missing is the way out, so a refused-as-replaced read asks the
+      // machine which row took its place. Re-pinning stays a press, so nobody
+      // is moved to another execution without being told.
+      const replaced = answer.reason === "changed"
+        ? await liveSessionSource.readMachine(target.machineID, abort.signal).catch(() => null)
+        : null
+      if (abort.signal.aborted) return
+      setFleetDetailProblem({ key, ...fleetDetailAnswer(answer.reason, machine,
+        replaced ? supersedingDestination(target, replaced) : null,
+        { open: openFleetSession, close: closeFleetTarget, again: () => setFleetReadAgain((count) => count + 1) }) })
+    }, (error: unknown) => {
+      if (!abort.signal.aborted) setFleetDetailProblem({ key, text: L.failureSentence(error, nextWord("cloudAllContentUnknown")) })
+    })
+    return () => {
+      abort.abort()
+      liveSessionSource.closeDetail?.(fleetTarget)
+    }
+  }, [fleetScope, fleetTarget && destinationKey(fleetTarget), clientEpoch, consoleUp, liveSessionSource, pointAt,
+    fleetReadAgain])
+  // A row that has not come is news, not a longer wait. The conversation is
+  // read and held by then; what is missing is the Session's own rich row, and
+  // only the machine can send it, so the sentence names that machine and the
+  // press asks it again.
+  useEffect(() => {
+    setRowAbsent(null)
+    if (!rowPending || !fleetScope || !fleetTarget) return
+    const key = destinationKey(fleetTarget)
+    const since = Date.now()
+    const timer = setTimeout(() => {
+      if (openedRowShow(Date.now() - since) === "absent") setRowAbsent(key)
+    }, OPENED_ROW_QUIET_MS)
+    return () => clearTimeout(timer)
+  }, [rowPending, fleetScope, fleetTarget && destinationKey(fleetTarget), fleetReadAgain])
   // Machines on the account this browser cannot read yet. They are listed
   // under the ones it can, each with its Pair press, so pairing another
   // machine does not mean finding the full machine screen first.
@@ -866,7 +1208,7 @@ export function CloudGate({ declared }: { declared: string }) {
       online: machine.freshness === "current",
     }
   })
-  const scheduleFleetKey = chosen ? JSON.stringify([chosen.id, scheduleMachines]) : ""
+  const scheduleFleetKey = reading ? JSON.stringify([reading, scheduleMachines]) : ""
   useEffect(() => {
     publishScheduleFleet(scheduleFleetKey ? (() => {
       const [current, machines] = JSON.parse(scheduleFleetKey) as [string, ScheduleMachine[]]
@@ -876,9 +1218,80 @@ export function CloudGate({ declared }: { declared: string }) {
 
   const switchMachine = (machine: CloudMachine) => {
     setSwitcherOpen(false)
+    setFleetScope(false)
+    setFleetTarget(null)
+    // The address names a fleet that is being left, or a Session on the machine
+    // being left. A session id read against another machine is a session that
+    // machine has never had, so the address goes back to the list.
+    if (location.hash === "#all-machines" || destinationFromFragment(location.hash) ||
+      (machine.id !== reading && namesSession(location.hash))) {
+      history.replaceState(history.state, "", location.pathname + location.search + "#page=sessions")
+    }
     choose(machine)
   }
 
+  const consumeTool = useCallback(() => {
+    sessionStorage.removeItem(PENDING_TOOL)
+    setPendingTool(null)
+  }, [])
+
+  /**
+   * A fleet toolbar press that had to name a machine first.
+   *
+   * Starting a Session is a question about **where**, so the answer is a
+   * destination and not a move: the console stays on every machine, and the
+   * sheet reads that machine's Projects and roles (`session/Start.tsx`). The
+   * Session that arrives opens in the list it was started from, under its
+   * machine's heading.
+   *
+   * The others — the voice command, a work item, the terminal list — are that
+   * machine's own console features, read through the one seam this page has,
+   * so they still move the console onto it. Moving is in place now, so the
+   * person is not taken through an empty page to get there.
+   */
+  const runMachineTool = (machineID: string, action: MachineToolbarAction) => {
+    const machine = quickMachines.find((candidate) => candidate.id === machineID)
+    if (!machine) return
+    setPendingTool({ machineID, machineName: machine.name || machine.label || machine.id, action, at: Date.now() })
+    if (toolMovesConsole(action)) switchMachine(machine)
+  }
+
+  const openAllSessions = () => {
+    setSwitcherOpen(false)
+    // Every machine is this tab's choice now, so the one machine it chose
+    // before is not: leaving it recorded would reopen that machine alone on
+    // the next load from any address but this one.
+    try {
+      sessionStorage.removeItem(CHOSEN + (who?.account ?? ""))
+    } catch {
+      /* a tab that cannot forget still shows the fleet until it is reloaded */
+    }
+    history.pushState({ view: "all-machines" }, "", "#all-machines")
+    setFleetScope(true)
+    setFleetTarget(null)
+    listMachines()
+  }
+
+  /**
+   * A Session that has just been started, now that its row names an execution.
+   *
+   * Started from the fleet it opens there, under the machine it was started
+   * on, because that is the list the person pressed in; the fleet's own
+   * address is written by `openFleetSession`. On a one-machine console it
+   * opens at the original address, which is the one that page reads
+   * (`App.tsx`, `sessionsInFragment`).
+   */
+  const openStarted = useCallback((destination: SessionDestination) => {
+    if (fleetScopeRef.current) { openFleetSession(destination); return }
+    location.hash = destination.machineID === reader.current?.machine
+      ? sessionFragment(destination.sessionID) : destinationFragment(destination)
+  }, [])
+
+  // The row the header names: the machine the console is reading, under the
+  // account's own name for it. While the list is still arriving it is the row
+  // this tab chose, which is the same machine until a fleet Session repoints
+  // the reader.
+  const named = quickMachines.find((machine) => machine.id === reading) ?? chosen
   // Which machine this is and whether it answers, in one control: the
   // console's connection light is handed in (`App`'s `aside`) and drawn as the
   // dot before the name, so the phone's one header line keeps its room for the
@@ -886,20 +1299,20 @@ export function CloudGate({ declared }: { declared: string }) {
   // and at the top of the menu, with the retry the light's press used to be.
   // Switching is an in-place header choice; the full machine screen remains
   // one explicit step away for pairing, renaming and forgetting.
-  const aside = (light: ConnectionLight) => chosen && (
+  const aside = (light: ConnectionLight) => named && (
     <div className="cloud-switcher" ref={switcherRef}>
       <button
         className="cloud-switch"
         id="cloud-switch"
         type="button"
-        data-state={light.state}
+        data-state={fleetScope ? "unknown" : light.state}
         // Down, the light's own tip says "press to retry", which this press
         // does not do; the retry is in the menu.
         title={
-          (chosen.label || chosen.id) +
+          (fleetScope ? nextWord("cloudAllMachines") : named.label || named.id) +
           " · " +
-          light.label +
-          (light.state === "live" ? " — " + light.tip : "") +
+          (fleetScope ? nextWord("cloudMachinesLede") : light.label) +
+          (!fleetScope && light.state === "live" ? " — " + light.tip : "") +
           " · " +
           nextWord("cloudSwitch")
         }
@@ -910,7 +1323,7 @@ export function CloudGate({ declared }: { declared: string }) {
         onClick={() => setSwitcherOpen((open) => !open)}
       >
         <span className="dot" aria-hidden="true" />
-        <span className="cloud-switch-name">{chosen.name || chosen.label || chosen.id}</span>
+        <span className="cloud-switch-name">{fleetScope ? nextWord("cloudAllMachines") : named.name || named.label || named.id}</span>
         {/* Drawn, not typed: "⌄" sits at the bottom of its font box, so the
             text glyph hung low beside the name and high once turned over. */}
         <svg className="cloud-switch-chevron" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
@@ -924,10 +1337,10 @@ export function CloudGate({ declared }: { declared: string }) {
           role="dialog"
           aria-label={nextWord("cloudSwitch")}
         >
-          <div className="cloud-switch-conn" data-state={light.state}>
+          <div className="cloud-switch-conn" data-state={fleetScope ? "unknown" : light.state}>
             <span className="dot" aria-hidden="true" />
-            <span className="cloud-switch-conn-word">{light.label}</span>
-            {light.state === "live" ? (
+            <span className="cloud-switch-conn-word">{fleetScope ? nextWord("cloudAllMachines") : light.label}</span>
+            {fleetScope ? null : light.state === "live" ? (
               <span className="cloud-switch-conn-tip">{light.tip}</span>
             ) : (
               <button type="button" className="cloud-switch-retry" onClick={light.onRetry}>
@@ -937,9 +1350,13 @@ export function CloudGate({ declared }: { declared: string }) {
           </div>
           <p className="cloud-switch-title">{nextWord("cloudMachinesLede")}</p>
           <div className="cloud-switch-options">
+            {quickMachines.length >= 2 && <button type="button" className="cloud-switch-option"
+              data-current={fleetScope ? "true" : undefined}
+              onClick={openAllSessions}>{nextWord("cloudAllMachines")}</button>}
             {quickMachines.map((machine) => {
-              const current = machine.id === chosen.id
+              const current = !fleetScope && machine.id === reading
               const identity = machineIdentityFacts(machine)
+              const carrier = carrierOf(machine.id)
               return (
                 <button
                   type="button"
@@ -949,7 +1366,11 @@ export function CloudGate({ declared }: { declared: string }) {
                   key={machine.id}
                   onClick={() => switchMachine(machine)}
                 >
-                  <span className="cloud-switch-option-name">{machine.name || machine.label || machine.id}</span>
+                  {/* This row is a button whose name is its own content, so the
+                      dot's sentence belongs in it. */}
+                  <span className="cloud-switch-option-name">
+                    {carrier && <CarrierDot reading={carrier} machine={machine.name || machine.label || machine.id} spoken />}
+                    {machine.name || machine.label || machine.id}</span>
                   <span className="cloud-switch-option-platform">{platformWord(identity.platform)}</span>
                   {current && <span className="cloud-switch-current">{nextWord("cloudCurrentMachine")}</span>}
                 </button>
@@ -1068,11 +1489,79 @@ export function CloudGate({ declared }: { declared: string }) {
   // Once drawn, the console stays: the copied modules bind to the document
   // once, so a refusal after that (a revoked device, a line that gave up) is
   // drawn over it, as the door is over a local console (`door/Door.tsx`).
+  const fleetTargetRow = useMemo(() => {
+    if (!fleetScope || !fleetTarget) return null
+    const presentation = fleetPresentations.current.get(destinationKey(fleetTarget))
+    const status = presentation?.status
+    if (!presentation || !status || typeof status.work_state !== "string" ||
+      typeof status.state !== "string" || presentation.projection?.freshness !== "current" ||
+      presentation.projection.state !== status.state) return null
+    // The pinned list deliberately omits closeability and terminal internals.
+    // The fallback opens content only; an unknown closeability cannot authorize
+    // an end action while the rich stream is catching up. The waiting card
+    // reads the same provenance to say a missing menu has not arrived yet,
+    // rather than that the machine could not read it (`session/Waiting.tsx`).
+    const closeability: SessionRow["closeability"] = {
+      activity_generation: 0, attestation_id: null, mover: null,
+      obligation_generation: 0, observed_at: 0, provenance: [], reasons: [],
+      session_generation: 0, source: { freshness: "unknown", max_age_seconds: 0,
+        observed_at: 0, provenance: "pinned_list" }, state: "unknown", version: "",
+    }
+    return { ...status, id: fleetTarget.sessionID, session: fleetTarget.sessionID,
+      machine: fleetTarget.machineID, execution_generation: fleetTarget.executionGeneration,
+      label: presentation.title, cwd: presentation.cwd, icon: presentation.icon,
+      backend: presentation.projection.backend, assistant: presentation.projection.assistant,
+      isClaude: presentation.projection.assistant === "claude",
+      evidence: "none", closeability } as SessionRow
+  }, [fleetScope, fleetTarget && destinationKey(fleetTarget), fleetPresentationRevision])
   return (
     <>
-      {chosen && who && transport.kind === "cloud" && (
+      {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
-          <App aside={aside} />
+          <App key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
+            cloudPeerAccess={(active) => <PeerAccessPage active={active}
+              machines={(shown.phase === "ready" ? shown.machines : []).map((machine) => ({
+              id: machine.id, name: machine.name || machine.label || machine.id,
+              platform: platformWord(machineIdentityFacts(machine).platform), freshness: machine.freshness,
+              paired: machine.pairing === "paired",
+            }))} source={liveSessionSource} current={currentActionClient} />}
+            focusCloudSessions={fleetScope}
+            onLeaveCloudSessions={leaveFleet}
+            fleetTarget={fleetScope ? fleetTarget : null}
+            fleetTargetRow={fleetTargetRow}
+            fleetDetailProblem={fleetScope && fleetTarget
+              ? fleetDetailProblem?.key === destinationKey(fleetTarget)
+                ? { text: fleetDetailProblem.text, action: fleetDetailProblem.action }
+                : rowAbsent === destinationKey(fleetTarget)
+                  ? fleetDetailAnswer("no_row",
+                    machineNames.current.get(fleetTarget.machineID) ?? fleetTarget.machineID, null,
+                    { open: openFleetSession, close: closeFleetTarget, again: () => setFleetReadAgain((count) => count + 1) })
+                  : null
+              : null}
+            onFleetDetailPending={noteRowPending}
+            fleetReaderMachine={readerMachine}
+            onFleetClose={closeFleetTarget}
+            fleetCloseIntent={fleetCloseIntent}
+            onFleetCloseIntentHandled={() => setFleetCloseIntent(null)}
+            fleetList={fleetScope ? (filter, onFilter) => <FleetSessionList
+            machines={quickMachines.map((machine) => ({
+              id: machine.id, name: machine.name || machine.label || machine.id,
+              platform: platformWord(machineIdentityFacts(machine).platform), freshness: machine.freshness,
+            }))}
+            source={liveSessionSource}
+            target={fleetTarget}
+            filter={filter} onFilter={onFilter}
+            onOpen={openFleetSession}
+            carrierOf={carrierOf}
+            onPresentations={noteFleetPresentations}
+            onProjection={noteFleetProjection}
+            onCloseRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title }) }}
+            onMachineAction={runMachineTool}
+          /> : undefined} />
+          <CloudSessionSheets machineID={reading ?? chosen.id}
+            machines={quickMachines.map((machine) => machine.id)}
+            source={liveSessionSource}
+            pending={pendingTool} onConsumed={consumeTool} onOpened={openStarted} />
         </CloudAccountContext.Provider>
       )}
       {words && (screen.at !== "console" || pairing) && (
@@ -1088,7 +1577,7 @@ export function CloudGate({ declared }: { declared: string }) {
           forgetting={forgetting}
           forgotten={forgotten}
           told={told}
-          reading={chosen?.id ?? null}
+          reading={reading}
           onAsk={askForget}
           onForget={forget}
           onLeave={leave}

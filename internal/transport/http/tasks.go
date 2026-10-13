@@ -39,7 +39,23 @@ func (s *Server) tasksList(w http.ResponseWriter, r *http.Request) {
 	if v, err := strconv.Atoi(q.Get("limit")); err == nil {
 		limit = v
 	}
-	list, err := s.tasksPayload(r.Context(), cursor, limit)
+	var list contract.TaskList
+	var err error
+	if cursor == 0 && limit == 50 {
+		// The first page is the product every stream's `orchestrator` frame
+		// reads, when it is not older than one tick (producer.go). The Cloud
+		// publisher asks for exactly this page, which is why the cache is
+		// shared with it: it used to ask on every five-second pass — 288 of
+		// the 289 reads this route answered in 1,426 seconds on the running
+		// daemon on 2026-10-10 — and now asks when a task row has been
+		// written, when it states everything again, or on the
+		// `cloud.task_list_reread_seconds` floor
+		// (internal/transport/cloud tasklist.go).
+		list, err = s.lists().taskList()
+		list.Tasks = append([]contract.TaskRow(nil), list.Tasks...)
+	} else {
+		list, err = s.tasksPayload(r.Context(), cursor, limit)
+	}
 	if err != nil {
 		writeRawRefusal(w, http.StatusInternalServerError, "store_unreadable", err.Error())
 		return
@@ -106,6 +122,7 @@ func (s *Server) tasksPayload(ctx context.Context, cursor, limit int) (contract.
 				Dir:            t.Dir,
 				Title:          t.Title,
 				Kind:           t.Kind,
+				CallbackIntent: callbackIntentOf(t),
 				ScheduleID:     t.ScheduleID,
 				Persona:        t.Persona,
 			}
@@ -127,6 +144,13 @@ func (s *Server) tasksPayload(ctx context.Context, cursor, limit int) (contract.
 		Store:  storeReading(snap),
 		Source: taskListSource(now, snap),
 	}, nil
+}
+
+func callbackIntentOf(t orchestrator.Record) string {
+	if t.Callback == nil {
+		return ""
+	}
+	return t.Callback.Intent
 }
 
 // taskListSource says what the whole list is worth, in the vocabulary every

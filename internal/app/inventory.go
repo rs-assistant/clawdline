@@ -6,6 +6,7 @@ package app
 import (
 	"context"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
@@ -86,6 +87,19 @@ func (in Inventory) Read(ctx context.Context) session.Inventory {
 	order := []string{}
 
 	add := func(src session.Inventory) {
+		// A source turned off answered nothing: it makes the reading
+		// incomplete — the list is not all there is — and is recorded by
+		// name, but it is not a source answer to retain or expire (D55) and
+		// it lists no rows.
+		if src.Disabled != "" {
+			merged.Complete = false
+			if merged.DisabledSources == nil {
+				merged.DisabledSources = map[string]string{}
+			}
+			merged.DisabledSources[src.Provenance] = src.Disabled
+			merged.Notes = append(merged.Notes, src.Notes...)
+			return
+		}
 		if !src.Complete {
 			merged.Complete = false
 		}
@@ -116,17 +130,40 @@ func (in Inventory) Read(ctx context.Context) session.Inventory {
 		}
 	}
 
-	if in.Process != nil {
-		inv, _ := in.Process.Scan(ctx)
-		noteSourceAnswer(ctx, inv)
-		add(inv)
-	}
-	// Each source's answer is told to the reading as it arrives
+	// The sources are asked at once and merged in the order they were always
+	// merged in — the process table, then each terminal as listed — so the
+	// merge, and which row wins it, is what it was when they were asked one
+	// after another. Asked in turn, the process table and tmux waited behind
+	// iTerm2's list Apple Event, which may take its whole ten seconds; asked
+	// together, the reading takes as long as its slowest source and no longer.
+	// Each source's answer is still told to the reading as it arrives
 	// (InventoryReading.Fast), because the merge below waits for the slowest
 	// and a drawing in the meantime must not blame the ones that answered.
+	asks := make([]func() session.Inventory, 0, len(in.Terminals)+1)
+	if in.Process != nil {
+		asks = append(asks, func() session.Inventory {
+			inv, _ := in.Process.Scan(ctx)
+			return inv
+		})
+	}
 	for _, t := range in.Terminals {
-		inv, _ := t.Inventory(ctx)
-		noteSourceAnswer(ctx, inv)
+		asks = append(asks, func() session.Inventory {
+			inv, _ := t.Inventory(ctx)
+			return inv
+		})
+	}
+	answers := make([]session.Inventory, len(asks))
+	var wg sync.WaitGroup
+	for n, ask := range asks {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			answers[n] = ask()
+			noteSourceAnswer(ctx, answers[n])
+		}()
+	}
+	wg.Wait()
+	for _, inv := range answers {
 		add(inv)
 	}
 
@@ -312,6 +349,12 @@ func (in Inventory) named(s session.Session) session.Session {
 // in two minutes to one pane, and nothing on the phone could dismiss it. The
 // gate stays shut for it, and its idle is never overruled by ReadState.
 func (in Inventory) readScreen(ctx context.Context, s session.Session) session.Session {
+	// A tty id seen only by ps is not an iTerm2 session id. Asking iTerm2
+	// to capture it can only fail, and repeated failures can stall that
+	// source for sessions which really are in iTerm2.
+	if session.SourceForID(s.ID) == "ps" {
+		return s
+	}
 	reader := in.screens()
 	if reader == nil || !s.IsAssistant() {
 		return s

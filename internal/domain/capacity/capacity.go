@@ -154,11 +154,35 @@ const (
 // The names of the rows. Stable: they are keys on the wire and in the
 // CLAWDLINE_NEXT_CAPACITY override.
 const (
-	AuditSecurity   = "audit.security"
-	StoreDB         = "store.db"
-	BoardReceipts   = "board.receipts"
-	CloudRelayQueue = "cloud.relay_queue"
-	StoreReceipts   = "store.receipts"
+	AuditSecurity     = "audit.security"
+	StoreDB           = "store.db"
+	SessionExecutions = "session.executions"
+	SessionNoMovement = "session.no_movement_seconds"
+	// How often a Cloud Session row whose only change is volatile is re-sent.
+	CloudSessionRowVolatile = "cloud.session_row_volatile_seconds"
+	// How long the Cloud publisher may go without reading its own task list
+	// when nothing has told it the list moved.
+	CloudTaskListReread = "cloud.task_list_reread_seconds"
+	// The last committed execution scan, so an unchanged one opens no write.
+	CacheSessionExecutionMemo = "cache.session_execution_memo"
+	BoardReceipts             = "board.receipts"
+	CloudRelayQueue           = "cloud.relay_queue"
+	StoreReceipts             = "store.receipts"
+	CloudPeerPairs            = "cloud.peer_pairs"
+	CloudPeerGrants           = "cloud.peer_grants"
+	CloudPeerInbox            = "cloud.peer_inbox"
+	CloudPeerInboxPage        = "cloud.peer_inbox_page"
+	CloudPeerOutbox           = "cloud.peer_outbox"
+	CloudPeerIngress          = "cloud.peer_ingress"
+	CloudPeerBody             = "cloud.peer_body_bytes"
+	CloudPeerFrame            = "cloud.peer_frame_bytes"
+	// What a hosted page may report about its own failures (`diagnostics.events`).
+	CloudViewerEventsBatch = "cloud.viewer_events_batch_bytes"
+	CloudViewerEventsRows  = "cloud.viewer_events_logged_rows"
+	CloudViewerEventsLine  = "cloud.viewer_events_line_bytes"
+	CloudSessionRowID      = "cloud.session_row_id_bytes"
+	CloudSessionRowAsks    = "cloud.session_row_asks"
+	CloudViewerEventsSeen  = "cloud.viewer_events_seen_batches"
 	// C2: the things that had no limit at all (limits §3.3, §7.2 wave 2).
 	LogDaemon             = "log.daemon"
 	DevicesList           = "devices.list"
@@ -313,9 +337,21 @@ const (
 	ITermStallCooldown     = "iterm.stall_cooldown_seconds"
 	ITermStallSectionBytes = "iterm.stall_section_bytes"
 	ITermStallStepSeconds  = "iterm.stall_step_seconds"
+	// The osascript run kinds counted apart for the hourly line and
+	// /v1/diagnostics (the iTerm2 scan experiment, docs/interface.md).
+	ITermOsascriptKinds = "iterm.osascript_kinds"
 	// How old one source's own answer may be and still vouch for its rows
 	// while a slower source holds the refresh.
 	CacheSourceAnswer = "cache.source_answer"
+	// How long after a scan finished it may still answer a pinned read's
+	// execution check instead of the read waiting for a scan of its own.
+	CachePinnedRead = "cache.pinned_read"
+	// The Git panel's memory of directories git said hold no repository:
+	// how long one is believed, and how many are remembered.
+	CacheGitNotRepo     = "cache.git_not_repo"
+	CacheGitNotRepoRows = "cache.git_not_repo_rows"
+	// Minimum age before the machine dashboard refreshes grouped reclaim rows.
+	CacheReclaimSummary = "cache.reclaim_summary"
 	// The Project Timeline is a projection that stores nothing, so what is
 	// bounded is the read (limits §3.3).
 	TimelineEntries = "timeline.entries"
@@ -403,17 +439,42 @@ const (
 	SquadEventIDBytes            = "squad.event_id_bytes"
 	SquadEventPageRows           = "squad.event_page_rows"
 	SquadEventBodyBytes          = "squad.event_body_bytes"
+	// How the console's transcript pane reads (web/console/src/session/
+	// transcript-follow.ts) and how the Cloud seam answers it
+	// (web/console/src/cloud/relay-reader.ts). They bound requests, not
+	// storage: the browser enforces them, and they are registered here so a
+	// change to any of them is a change to this register.
+	ConsoleTranscriptSafetySeconds    = "console.transcript_safety_seconds"
+	ConsoleTranscriptFollowSeconds    = "console.transcript_follow_seconds"
+	ConsoleTranscriptMergedRows       = "console.transcript_merged_rows"
+	ConsoleTranscriptBackoffSeconds   = "console.transcript_backoff_seconds"
+	ConsoleRelayTranscriptExpectReask = "console.relay_transcript_expect_reask_seconds"
+	ConsoleRelayFeatureWait           = "console.relay_feature_wait_seconds"
+	ConsoleStatusGapRetry             = "console.status_gap_retry_seconds"
+	ConsoleStatusMarkerRetry          = "console.status_marker_retry_seconds"
+	ConsolePinnedListReadTimeout      = "console.pinned_list_read_timeout_seconds"
+	ConsoleStatusMarkerRecoveryWait   = "console.status_marker_recovery_wait_seconds"
+	ConsoleTranscriptFollowFast       = "console.transcript_follow_fast_seconds"
+	ConsoleTranscriptFollowLater      = "console.transcript_follow_later_seconds"
+	ConsoleHealthLive                 = "console.health_live_seconds"
+	ConsoleSessionNotesSafety         = "console.session_notes_safety_seconds"
+	ConsoleOpenedRowRestate           = "console.opened_row_restate_seconds"
+	ConsoleOpenedRowQuiet             = "console.opened_row_quiet_seconds"
 	// The ordinary shells this machine holds open for a person, and what one
 	// request may type into one or read back from it (limits N59).
-	TerminalCount                     = "terminal.count"
-	TerminalInputBytes                = "terminal.input_bytes"
-	TerminalPasteBytes                = "terminal.paste_bytes"
-	TerminalHistoryLines              = "terminal.history_lines"
-	TerminalLane                      = "terminal.lane"
-	TerminalViewers                   = "terminal.viewers"
-	TerminalStreams                   = "terminal.streams"
-	TerminalLeaseSeconds              = "terminal.lease_seconds"
-	TerminalGrantsBytes               = "terminal.grants_bytes"
+	TerminalCount        = "terminal.count"
+	TerminalInputBytes   = "terminal.input_bytes"
+	TerminalPasteBytes   = "terminal.paste_bytes"
+	TerminalHistoryLines = "terminal.history_lines"
+	TerminalLane         = "terminal.lane"
+	TerminalViewers      = "terminal.viewers"
+	TerminalStreams      = "terminal.streams"
+	TerminalLeaseSeconds = "terminal.lease_seconds"
+	TerminalGrantsBytes  = "terminal.grants_bytes"
+	// Every API call this daemon answers, counted by route shape and caller
+	// (`/v1/diagnostics.routes`).
+	DiagnosticsRouteStatKeys          = "diagnostics.route_stat_keys"
+	DiagnosticsRouteLatencySamples    = "diagnostics.route_latency_samples"
 	CloudTerminalRosterRefresh        = "cloud.terminal_roster_refresh_seconds"
 	CloudTerminalRosterDeadline       = "cloud.terminal_roster_deadline_seconds"
 	CloudTerminalRosterRetry          = "cloud.terminal_roster_retry_seconds"
@@ -558,6 +619,60 @@ func Register() []Entry {
 			Projects:  true,
 		},
 		{
+			// One durable identity per terminal id on this machine. Full
+			// refuses a newly observed id; no generation is silently evicted.
+			Name: SessionExecutions, Class: Evidence, Unit: Rows,
+			Limit: 4096, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Health, Sender, Log}, EvictedBy: Person,
+			Sources: []string{"internal/adapters/store.ExecutionRecordsLimit"},
+		},
+		{
+			// The one execution scan observeExecutions last committed, by
+			// terminal. A scan equal to it is answered from it and opens no
+			// write transaction; a scan naming more terminals than this is not
+			// remembered and goes to the store, as every scan did before.
+			Name: CacheSessionExecutionMemo, Class: Cache, Unit: Rows,
+			Limit: 4096, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.ExecutionMemoLimit"},
+		},
+		{
+			// A current record-movement observation stops being recent after
+			// this age. The status publisher marks no_movement and tells viewers
+			// the threshold; an unknown reading never becomes a quiet one.
+			Name: SessionNoMovement, Class: Cache, Unit: Seconds,
+			Limit: 1800, AtLimit: Expire,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.SessionNoMovementSecondsLimit"},
+		},
+		{
+			// A Cloud Session row (s/), status row (ss/) or status marker
+			// whose only change is its activity time, its sub-agents or its
+			// line's token count is re-sent at most once per this interval;
+			// the next pass after it carries the newest value. Any other
+			// change goes at once and starts that row's window again. Each
+			// row has its own window: a status row is published only when it
+			// changed, never because another row in the set did. The local
+			// event stream is not held.
+			Name: CloudSessionRowVolatile, Class: Cache, Unit: Seconds,
+			Limit: 15, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.SessionRowVolatileSecondsLimit"},
+		},
+		{
+			// The task list the machine descriptor carries is read when a task
+			// row was written, when a viewer holding nothing has been heard
+			// from, and otherwise no less often than this. It is the
+			// descriptor's own heartbeat, so the pass that re-reads is the
+			// pass that re-states; before the signal existed the list was read
+			// on every five-second pass (288 reads in 1,426 seconds on the
+			// running daemon, 2026-10-10, with no task changing).
+			Name: CloudTaskListReread, Class: Cache, Unit: Seconds,
+			Limit: 240, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.TaskListRereadSecondsLimit"},
+		},
+		{
 			// The board commands' (actor, requestId) receipts (limits N24):
 			// the store's receipt table, scope `board`, since the board's
 			// settings moved into clawdline.sqlite3 (D37, T3). They expire by
@@ -580,6 +695,129 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics, Notice},
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/adapters/store.ReceiptLimit"},
+		},
+		{
+			// Locally pinned machine-to-machine pairs are authorization evidence.
+			// No account roster fallback or automatic eviction may free a slot.
+			Name: CloudPeerPairs, Class: Evidence, Unit: Rows,
+			Limit: 128, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Notice, Health},
+			EvictedBy: Person,
+			Sources:   []string{"internal/adapters/peerstore.PairLimit"},
+		},
+		{
+			// A target's exact Session scope grants remain until a person removes
+			// them; expiry and revocation deny without erasing the evidence.
+			Name: CloudPeerGrants, Class: Evidence, Unit: Rows,
+			Limit: 512, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Notice, Health},
+			EvictedBy: Person,
+			Sources:   []string{"internal/adapters/peerstore.GrantLimit"},
+		},
+		{
+			// A received Agent message or handoff is retained as evidence.
+			Name: CloudPeerInbox, Class: Evidence, Unit: Rows,
+			Limit: 512, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Notice, Health},
+			EvictedBy: Person,
+			Sources:   []string{"internal/adapters/peerstore.InboxLimit"},
+		},
+		{
+			// One encrypted content read carries one message and its receipt.
+			Name: CloudPeerInboxPage, Class: Buffer, Unit: Rows,
+			Limit: 1, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Log},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/peerstore.InboxPageLimit"},
+		},
+		{
+			Name: CloudPeerBody, Class: Buffer, Unit: Bytes,
+			Limit: 512 << 10, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Notice, Sender},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/domain/agenthandoff.MaxBodyBytes"},
+		},
+		{
+			// One batch of a hosted page's own failure rows. Larger is
+			// refused `viewer_events_too_large`; the page drops it, counts
+			// it, and sends the rows behind it.
+			Name: CloudViewerEventsBatch, Class: Buffer, Unit: Bytes,
+			Limit: 256 << 10, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Sender},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/app/cloudops.ViewerEventsBatchBytesLimit"},
+		},
+		{
+			// Rows of one batch written as a log line each; the rest are one
+			// count on the batch's summary line.
+			Name: CloudViewerEventsRows, Class: Buffer, Unit: Rows,
+			Limit: 128, AtLimit: Coalesce,
+			Told:      []Channel{Diagnostics, Log},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/app/cloudops.ViewerEventsLoggedRowsLimit"},
+		},
+		{
+			// The Session id a `sessions.row` read names. Longer is refused
+			// `malformed_read`; no id this machine issues comes near it.
+			Name: CloudSessionRowID, Class: Buffer, Unit: Bytes,
+			Limit: 256, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Sender},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/app/cloudops.SessionRowIDBytesLimit"},
+		},
+		{
+			// `sessions.row` asks waiting for the publisher's loop. Past it
+			// the sender is answered 429 cloud_read_busy and asks again.
+			Name: CloudSessionRowAsks, Class: Buffer, Unit: Rows,
+			Limit: 64, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Sender},
+			EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.SessionRowAsksLimit",
+				"internal/transport/cloud.(*Publisher).open:chan(SessionRowAsksLimit)"},
+		},
+		{
+			// One reported row's log line; a longer one is cut and says so.
+			Name: CloudViewerEventsLine, Class: Buffer, Unit: Bytes,
+			Limit: 1024, AtLimit: Coalesce,
+			Told:      []Channel{Diagnostics, Log},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/app/cloudops.ViewerEventsLineBytesLimit"},
+		},
+		{
+			// Delivered batch ids remembered so a resent batch is not
+			// written twice. The oldest is forgotten first; a batch resent
+			// after that is written again, never lost.
+			Name: CloudViewerEventsSeen, Class: Cache, Unit: Rows,
+			Limit: 256, AtLimit: EvictOldest,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/app/cloudops.ViewerEventsSeenBatchesLimit"},
+		},
+		{
+			Name: CloudPeerFrame, Class: Buffer, Unit: Bytes,
+			Limit: 1 << 20, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Log, Sender},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/cloud.PeerFrameBytesLimit"},
+		},
+		{
+			// A source keeps the request and relay evidence for later checks.
+			Name: CloudPeerOutbox, Class: Evidence, Unit: Rows,
+			Limit: 512, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Notice, Health},
+			EvictedBy: Person,
+			Sources:   []string{"internal/adapters/peerstore.OutboxLimit"},
+		},
+		{
+			// Peer frames wait off the socket reader for fresh authorization.
+			Name: CloudPeerIngress, Class: Buffer, Unit: Rows,
+			Limit: 16, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Log, Sender},
+			EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.PeerIngressLimit",
+				"internal/transport/cloud.PeerAckIngressLimit",
+				"internal/transport/cloud.(*Link).runOnce:chan(PeerIngressLimit)",
+				"internal/transport/cloud.(*Link).runOnce:chan(PeerAckIngressLimit)"},
 		},
 		{
 			// Decrypted Cloud requests waiting for the bridge (limits N20).
@@ -1676,6 +1914,17 @@ func Register() []Entry {
 			Sources:   []string{"internal/adapters/terminal.stallFailuresLimit"},
 		},
 		{
+			// The osascript run kinds counted apart (osascript_stats.go):
+			// the fixed script names in the terminal adapter. A kind past
+			// the limit is counted as `other`, so the counts never grow
+			// and never lose a run.
+			Name: ITermOsascriptKinds, Class: Buffer, Unit: Rows,
+			Limit: 32, AtLimit: Coalesce,
+			Told:      []Channel{Diagnostics, Log},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/terminal.osascriptKindsLimit"},
+		},
+		{
 			// The end of what osascript wrote on stderr that one failure line
 			// carries. The end is kept: the Apple Event error number is there.
 			Name: ITermStallSaidBytes, Class: Observation, Unit: Bytes,
@@ -1735,6 +1984,49 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics},
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/app.SourceAnswerAgeLimit"},
+		},
+		{
+			// A pinned Cloud read (transcript, info, git, to-dos) checks that
+			// the execution it names is still the one running. A scan that
+			// finished less than this ago answers that check; an older one
+			// is replaced by a scan taken for the read, as every check was
+			// before. Three seconds: a scan started now returns rows observed
+			// as it started, so this is at most three seconds older than the
+			// fresh answer, against the 8.9 s and 13.0 s medians measured for
+			// the slow pinned reads that waited for one. Writes never use it.
+			Name: CachePinnedRead, Class: Cache, Unit: Seconds,
+			Limit: 3, AtLimit: Expire,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/app.PinnedReadAgeLimit"},
+		},
+		{
+			// A directory git answered "not a repository" for is answered
+			// that way for a minute without running git again
+			// (internal/adapters/git/notrepo.go). Only that answer is kept.
+			Name: CacheGitNotRepo, Class: Cache, Unit: Seconds,
+			Limit: 60, AtLimit: Expire,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/git.NotRepoAgeLimit"},
+		},
+		{
+			// How many such directories are remembered. Past it the one
+			// remembered longest ago is let go; a miss is one `git status`.
+			Name: CacheGitNotRepoRows, Class: Cache, Unit: Rows,
+			Limit: 256, AtLimit: EvictOldest,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/git.NotRepoRowsLimit"},
+		},
+		{
+			// The machine dashboard polls every three seconds. Grouped reclaim
+			// decisions come from the store at most once per thirty seconds.
+			Name: CacheReclaimSummary, Class: Cache, Unit: Seconds,
+			Limit: 30, AtLimit: Expire,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/transport/http.reclaimSummaryLimit"},
 		},
 		{
 			// The screens held between those captures, one per session the
@@ -1797,7 +2089,8 @@ func Register() []Entry {
 			EvictedBy: Daemon,
 		},
 		{
-			// CLAWDLINE_NEXT_DIR/places.json: explicit project directories. Each
+			// CLAWDLINE_NEXT_DIR/places.json: explicit project directories and
+			// directories deliberately hidden from the lists. Each
 			// row is a person's choice, so the daemon never evicts one; a full
 			// registry refuses a new path and `clawdline project remove` is its
 			// deliberate exit.
@@ -1964,6 +2257,11 @@ func Register() []Entry {
 			Name: "projectsync.project_files", Class: Buffer, Unit: Rows,
 			Limit: 64, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/domain/projectsync.MaxProjectFiles"},
+		},
+		{
+			Name: "projects.folder_rows", Class: Buffer, Unit: Rows,
+			Limit: 128, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.maxProjectFolderRows"},
 		},
 		{
 			Name: "projectfiles.list", Class: Buffer, Unit: Rows,
@@ -2213,6 +2511,164 @@ func Register() []Entry {
 			Sources: []string{"internal/domain/squad.MaxSquadConsoleActiveSkillBytes"},
 		},
 		{
+			// The transcript pane reads the whole newest page at least this
+			// often (SAFETY_MS); between, it reads only what was appended, when
+			// the session row says the record grew. Past it the held page
+			// expires and is read whole: that read is what catches a row that
+			// said nothing and refreshes pictures an appended read never
+			// revisits.
+			Name: ConsoleTranscriptSafetySeconds, Class: Cache, Unit: Seconds,
+			Limit: 30, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// After a send, the pane reads on its follow pace (two seconds,
+			// then four) for at most this long (FOLLOW_WINDOW_MS), then goes
+			// back to the safety pace. The
+			// card's own lifetime is session/pending.ts's and unchanged.
+			Name: ConsoleTranscriptFollowSeconds, Class: Cache, Unit: Seconds,
+			Limit: 90, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// The entries one held page may grow to by appended reads
+			// (MERGED_ROWS_LIMIT), the route's own ceiling for a page. Past it
+			// the next read is a whole one, which starts again at 200.
+			Name: ConsoleTranscriptMergedRows, Class: Cache, Unit: Rows,
+			Limit: 1000, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// A failed transcript read waits 2, 4, 8 … seconds, at most this
+			// long (BACKOFF.maxMs), before the next.
+			Name: ConsoleTranscriptBackoffSeconds, Class: Cache, Unit: Seconds,
+			Limit: 30, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// For 45 seconds after a write the Cloud seam asks the machine for
+			// the transcript again when the row moved, and otherwise at most
+			// this often (TRANSCRIPT_EXPECT_REREAD_MS); its held answer expires
+			// at this age.
+			Name: ConsoleRelayTranscriptExpectReask, Class: Cache, Unit: Seconds,
+			Limit: 4, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// How often, at most, a page asks the machine to restate its rows
+			// because the Session a person has open is not among them
+			// (ROW_RESTATE_MS, web/console/src/cloud/relay-reader.ts).
+			//
+			// A Session's rich row is published when the machine has
+			// something to say about it and restated on the Cloud status
+			// cadence, so a page that does not hold the opened one has
+			// nothing to draw it with. Measured on 2026-10-11: re-reading one
+			// from the relay's retained channel took 19.6 seconds, against
+			// 131 ms for the conversation itself; asking the machine put the
+			// row back in one second.
+			Name: ConsoleOpenedRowRestate, Class: Cache, Unit: Seconds,
+			Limit: 5, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// How long the opened Session's row may be missing before the
+			// pane stops saying it is reading and says the machine has not
+			// sent it (OPENED_ROW_QUIET_MS,
+			// web/console/src/cloud/opened-row.ts). Longer than the ask and
+			// its answer, twice over.
+			Name: ConsoleOpenedRowQuiet, Class: Cache, Unit: Seconds,
+			Limit: 8, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// How long a read waits for the chosen machine's own list of
+			// words before it is asked or refused (FEATURE_WAIT_MS,
+			// web/console/src/cloud/relay-reader.ts).
+			//
+			// A page that has just opened decides a word from the descriptor
+			// it remembered last time, whose command list the copied client
+			// cut to 64 words while this daemon publishes 151, so a read of a
+			// word past the cut refused itself before anything was sent: 11 of
+			// 21 read failures on this machine between 11:30 and 14:22 on
+			// 2026-10-10, every one of them `transcript` or
+			// `work.v2.session-todos`. This is how long such a read may wait
+			// for the live descriptor instead; past it the cut list cannot
+			// refuse the read, so the machine's signed answer decides.
+			Name: ConsoleRelayFeatureWait, Class: Cache, Unit: Seconds,
+			Limit: 5, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// A browser retries a missing retained ss/ row after a recovery
+			// was refused or timed out (STATUS_GAP_RETRY_MS,
+			// web/console/src/cloud/status-source.ts). A failed attempt must
+			// not pin the list in event_gap for the rest of the status pass.
+			Name: ConsoleStatusGapRetry, Class: Cache, Unit: Seconds,
+			Limit: 5, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// A cold browser replays one missing ss/ inventory marker, then
+			// waits before asking again while default status pushes may arrive.
+			// The same interval revalidates a successful pinned machine list used
+			// while a cold browser still has an ss/ row gap. A failed list starts
+			// at ConsoleStatusGapRetry and backs off to this bound.
+			Name: ConsoleStatusMarkerRetry, Class: Cache, Unit: Seconds,
+			Limit: 60, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// One pinned machine list read yields after ten seconds of
+			// silence (PINNED_LIST_READ_TIMEOUT_MS, status-client.js).
+			Name: ConsolePinnedListReadTimeout, Class: Cache, Unit: Seconds,
+			Limit: 10, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// One retained marker replay yields after five seconds of
+			// silence (STATUS_MARKER_RECOVERY_TIMEOUT_MS, status-client.js).
+			Name: ConsoleStatusMarkerRecoveryWait, Class: Cache, Unit: Seconds,
+			Limit: 5, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// After a send the pane reads every two seconds for this long
+			// (FOLLOW_FAST_MS), then every FOLLOW_LATER_MS until the follow
+			// window ends.
+			Name: ConsoleTranscriptFollowFast, Class: Cache, Unit: Seconds,
+			Limit: 10, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// The rest of the follow window after a send is read this often
+			// (FOLLOW_LATER_MS).
+			Name: ConsoleTranscriptFollowLater, Class: Cache, Unit: Seconds,
+			Limit: 4, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// While this machine's own event stream is open, the connection
+			// light reads /v1/health this often (HEALTH_LIVE_MS) instead of
+			// every 15 seconds; a dropped stream, or a Cloud page, keeps 15.
+			Name: ConsoleHealthLive, Class: Cache, Unit: Seconds,
+			Limit: 90, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// An open Session page's to-dos are read at least this often
+			// (TODO_SAFETY_MS), and at once when the page is seen or focused.
+			// Its attention notes are read on this pace only while their panel
+			// is open. A row that carries `attention_count` says whether there
+			// are any: none is read for a Session with none, a Session with
+			// some reads them as the page opens so that opening the panel
+			// shows words, and a count that moves on the stream is what asks
+			// again (web/console/src/session/attention-reads.ts). A row
+			// without the count keeps the faster TODO_REFRESH_MS it had.
+			Name: ConsoleSessionNotesSafety, Class: Cache, Unit: Seconds,
+			Limit: 60, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
 			// One recovery query reads this many pending launch intents. Later
 			// pages continue from a cursor instead of refusing new Sessions.
 			Name: SquadRecoveryRows, Class: Buffer, Unit: Rows,
@@ -2411,6 +2867,23 @@ func Register() []Entry {
 			Sources: []string{"internal/app/terminals.MaxViewers"},
 		},
 		{
+			// The route shapes /v1/diagnostics.routes counts. A shape past
+			// the limit coalesces into the one `overflow` count; the call is
+			// answered as before, and only its row is missing.
+			Name: DiagnosticsRouteStatKeys, Class: Buffer, Unit: Rows,
+			Limit: 512, AtLimit: Coalesce,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.MaxRouteStatKeys"},
+		},
+		{
+			// The recent durations each counted route keeps for its p50 and
+			// p90; the oldest is overwritten first. `max` is kept apart.
+			Name: DiagnosticsRouteLatencySamples, Class: Observation, Unit: Rows,
+			Limit: 256, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.MaxRouteLatencySamples"},
+		},
+		{
 			// Terminal streams the machine serves at once, the same way.
 			Name: TerminalStreams, Class: Buffer, Unit: Rows,
 			Limit: 16, AtLimit: Refuse,
@@ -2427,9 +2900,12 @@ func Register() []Entry {
 			Sources: []string{"internal/app/terminals.MaxLeaseSeconds"},
 		},
 		{
-			// Active Cloud terminal authority expires after this many seconds.
-			// The next terminal operation waits for one bounded refresh or is
-			// refused; ordinary Cloud Session traffic does not depend on it.
+			// A roster read this machine made stands behind an answer for
+			// this many seconds. The next terminal operation or Session
+			// content read waits for one bounded refresh or is refused; one
+			// read serves both lanes, and a revocation takes effect at most
+			// this long after the account records it. The ordinary Cloud
+			// command path keeps the 60 s adaptercloud.RosterRefresh.
 			Name: CloudTerminalRosterRefresh, Class: Cache, Unit: Seconds,
 			Limit: 2, AtLimit: Expire,
 			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,

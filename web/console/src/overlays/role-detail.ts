@@ -23,12 +23,13 @@ let request = 0
 const word = (names: WireNames): string => names[document.documentElement.lang === "zh-Hant" ? "zh-Hant" : "en"] || names.en
 
 async function readRole(conversation: string, persona: string): Promise<RoleReading> {
+  const definitionID = persona.includes(".") ? persona : "clawdline.persona." + persona
   if (conversation) {
     const response = await fetch(client.url("/v1/squad/session-snapshots/" + encodeURIComponent(conversation)), { credentials: "same-origin" })
     if (response.ok) {
       const result = await response.json() as RoleSnapshot
       const snapshot = result.snapshot
-      if (snapshot?.definition_id !== "clawdline.persona." + persona || typeof snapshot.definition?.body !== "string") throw new Error("role_snapshot_mismatch")
+      if (snapshot?.definition_id !== definitionID || typeof snapshot.definition?.body !== "string") throw new Error("role_snapshot_mismatch")
       return { body: snapshot.definition.body, version: snapshot.definition.version, origin: "snapshot",
         handbook: snapshot.handbook?.text || "", skills: (snapshot.skills || []).map((skill) => ({
           id: skill.id, name: skill.name, purpose: skill.purpose, content: skill.content, enabled: skill.enabled,
@@ -39,10 +40,10 @@ async function readRole(conversation: string, persona: string): Promise<RoleRead
     // may also lack this read; the catalog below is explicitly labelled current.
     if (response.status !== 404 && response.status !== 501) throw new Error("role_snapshot_unavailable")
   }
-  const response = await fetch(client.url("/v1/squad/definitions/" + encodeURIComponent("clawdline.persona." + persona)), { credentials: "same-origin" })
+  const response = await fetch(client.url("/v1/squad/definitions/" + encodeURIComponent(definitionID)), { credentials: "same-origin" })
   if (!response.ok) throw new Error("role_catalog_unavailable")
   const definition = await response.json() as WireDefinition
-  if (definition.definition_id !== "clawdline.persona." + persona || typeof definition.body !== "string") throw new Error("role_definition_missing")
+  if (definition.definition_id !== definitionID || typeof definition.body !== "string") throw new Error("role_definition_missing")
   let catalog: WireCatalog | null = null
   if (definition.skills?.length) {
     const skillResponse = await fetch(client.url("/v1/squad/catalog"), { credentials: "same-origin" })
@@ -82,7 +83,7 @@ const teamWords = {
   engineering: "personaTeamEngineering", marketing: "personaTeamMarketing",
   product: "personaTeamProduct", quality: "personaTeamQuality",
   operations: "personaTeamOperations", design: "personaTeamDesign",
-  business: "personaTeamBusiness",
+  business: "personaTeamBusiness", custom: "personaTeamCustom",
 } as const
 const kindWords = {
   epic: "personaKindEpic", feature: "personaKindFeature", issue: "personaKindIssue",

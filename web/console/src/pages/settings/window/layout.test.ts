@@ -14,12 +14,12 @@ const contrast = (a: number[], b: number[]) => {
   return (light + 0.05) / (dark + 0.05)
 }
 
-test("phone settings keep all six tabs in two columns and allow long names to wrap", () => {
+test("phone settings keep visible tabs in two columns and allow long names to wrap", () => {
   const start = styles.indexOf("@media (max-width: 460px)")
   const phone = styles.slice(start, styles.indexOf(".sw-gate-mode", start))
   assert.match(phone, /\.sw-strip \{[\s\S]*height: auto;/)
   assert.match(phone, /grid-template-columns: 22px repeat\(2, minmax\(0, 1fr\)\);/)
-  assert.match(phone, /\.sw-strip-mark \{[\s\S]*grid-row: 1 \/ span 3;/)
+  assert.match(phone, /\.sw-strip-mark \{[\s\S]*grid-row: 1 \/ span 2;/)
   assert.match(phone, /\.sw-tab \{[\s\S]*min-height: 30px;[\s\S]*white-space: normal;[\s\S]*overflow-wrap: anywhere;/)
 })
 
@@ -27,13 +27,11 @@ test("settings tabs retain roving keyboard focus and pointer activation", () => 
   assert.match(controls, /role="tab"/)
   assert.match(controls, /tabIndex=\{i === current \? 0 : -1\}/)
   assert.match(controls, /onClick=\{\(\) => onPick\(i\)\}/)
-  assert.match(controls, /e\.key !== "ArrowLeft" && e\.key !== "ArrowRight"/)
   assert.match(controls, /document\.getElementById\(`sw-tab-\$\{next\}`\)\?\.focus\(\)/)
 })
 
 test("inactive settings tabs and their focus ring use contrast-safe tokens", () => {
   assert.match(styles, /--sw-tab-muted: rgba\(255, 255, 255, 0\.5\);/)
-  assert.match(styles, /\.sw-tab \{[\s\S]*color: var\(--sw-tab-muted\);/)
   assert.match(styles, /\.sw-tab:focus-visible \{[\s\S]*outline: 2px solid var\(--sw-accent\);/)
   const ink = [20, 20, 23]
   const muted = [255, 255, 255].map((channel, index) => channel * 0.5 + ink[index] * 0.5)

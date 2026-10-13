@@ -8,7 +8,7 @@ import assert from "node:assert/strict"
 import type { SessionsSnapshot, TranscriptPage } from "@clawdline/contract"
 import { documentIdentityForSession } from "../legacy/js/net/document-links.js"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
-import { RelayReader, headerReadDiagnostics, TRANSCRIPT_LINE_REREAD_MS, TRANSCRIPT_MAX_REUSE_MS, type CloudEvent, type CloudIdentity, type CloudReadClient, type CloudRow, type CloudSchedules, type CloudSnippets } from "./relay-reader.ts"
+import { RelayReader, headerReadDiagnostics, ROW_RESTATE_MS, TRANSCRIPT_LINE_REREAD_MS, TRANSCRIPT_MAX_REUSE_MS, type CloudEvent, type CloudIdentity, type CloudReadClient, type CloudRow, type CloudSchedules, type CloudSnippets } from "./relay-reader.ts"
 import { failureFromMac } from "../legacy/js/net/cloud-failure.js"
 import { CatalogCloudClient } from "./refusal-client.js"
 import japanese from "../../public/catalogs/ja.json" with { type: "json" }
@@ -62,12 +62,23 @@ test("Session header trail distinguishes started, observed, canceled, unavailabl
 
 class FakeClient implements CloudReadClient {
   ready = true
+  viewerEvents?: { record(event: string, data: Record<string, unknown>, key?: string): void }
+  statusSnapshots?: ReadonlyMap<string, unknown>
   sessionInventoryByMachine = new Map<string, unknown>()
   machineRows: { id: string; freshness: "current" | "stale" | "unknown" }[] = [
     { id: "mac-a", freshness: "current" },
   ]
   rows: CloudRow[] = []
   recovering: string[] = []
+  /** Set by the tests that need the one retained ss/ row a read is pinned to. */
+  recoverStatusRow?: (machineID: string, sessionID: string, snapshotGeneration: string) => Promise<boolean>
+  /** The pinned read a classic page makes; the destination it was given. */
+  pinnedReads: { machineID: string; sessionID: string; executionGeneration: string }[] = []
+  transcriptForGeneration?: (destination: { machineID: string; sessionID: string; executionGeneration: string }) => Promise<unknown> =
+    async (destination) => {
+      this.pinnedReads.push(destination)
+      return this.answer()
+    }
   asks = 0
   answer: () => Promise<unknown> = async () => ({ id: "s1", entries: [{ role: "user", text: "hi" }], signature: "1-1", evidence: "transcript" })
   private listeners = new Set<(event: CloudEvent) => void>()
@@ -88,17 +99,24 @@ class FakeClient implements CloudReadClient {
     this.asks += 1
     return this.answer()
   }
+  olderAsks: number[] = []
+  sessionPageReads: { identity: CloudIdentity; word: string; body: Record<string, unknown>; answer: string }[] = []
+  _read = async (identity: CloudIdentity, word: string, reqBody: Record<string, unknown>, answer: string) => {
+    this.sessionPageReads.push({ identity, word, body: reqBody, answer })
+    this.olderAsks.push(reqBody.before as number)
+    return { id: "s1", entries: [{ role: "user", text: "earlier" }], signature: "1-1", evidence: "transcript" }
+  }
   pushKeyAsks = 0
   pushKey?: () => Promise<unknown> = async () => {
     this.pushKeyAsks += 1
     return { key: "BPk" }
   }
   /** Every reading of the schedule list, with the options it was asked under. */
-  scheduleAsks: ({ fresh?: boolean } | undefined)[] = []
-  scheduleAnswer: () => Promise<CloudSchedules> = async () => ({ schedules: [], at: 0 })
-  schedules?: (options?: { fresh?: boolean }) => Promise<CloudSchedules> = (options) => {
+  scheduleAsks: ({ fresh?: boolean; machine?: string } | undefined)[] = []
+  scheduleAnswer: (options?: { fresh?: boolean; machine?: string }) => Promise<CloudSchedules> = async () => ({ schedules: [], at: 0 })
+  schedules?: (options?: { fresh?: boolean; machine?: string }) => Promise<CloudSchedules> = (options) => {
     this.scheduleAsks.push(options)
-    return this.scheduleAnswer()
+    return this.scheduleAnswer(options)
   }
   /** Every reading of the snippet list: the identity it named and the options. */
   snippetAsks: { identity: CloudIdentity; options?: { fresh?: boolean } }[] = []
@@ -139,6 +157,21 @@ class FakeClient implements CloudReadClient {
   }
 }
 
+test("older transcript reads name their cursor and do not replace the newest cache", async () => {
+  const client = new FakeClient()
+  const r = reader(client, { t: 10_000 })
+  const older = await body<TranscriptPage>(await r.fetch("/v1/transcript?session=s1&limit=200&before=123"))
+  assert.equal(older.entries[0].text, "earlier")
+  assert.deepEqual(client.olderAsks, [123])
+  assert.deepEqual(client.sessionPageReads, [{
+    identity: { machine: "mac-a", session: "s1" }, word: "transcript",
+    body: { limit: 200, before: 123, priority: "foreground" }, answer: "transcript.before.123",
+  }])
+  const latest = await body<TranscriptPage>(await r.fetch("/v1/transcript?session=s1&limit=200"))
+  assert.equal(latest.entries[0].text, "hi")
+  assert.equal(client.asks, 1)
+})
+
 /** A snippet row as the copied client tags it, with nothing of anybody's in it. */
 function snippet(machine: string, id: string, extra: Record<string, unknown> = {}) {
   return { id, machine, title: "a title", body: "a body", scope: "global", position: 0, ...extra }
@@ -176,6 +209,586 @@ test("the list keeps each selected row's document identity", async () => {
   assert.equal((snap.sessions[0] as unknown as { machine: string }).machine, "mac-a")
   assert.deepEqual(snap.sessions[0].identity, { machine: "mac-a", session: "s1" })
   assert.deepEqual(documentIdentityForSession(snap.sessions, "s1", "cloud"), { machine: "mac-a", session: "s1" })
+})
+
+test("the original page keeps rich titles only for current executions named by ss", async () => {
+  const client = new FakeClient()
+  const generation = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  client.rows = [row("mac-a", "s1", { label: "Project title", execution_generation: generation }),
+    row("mac-a", "s2", { label: "Old execution", execution_generation: generation }),
+    row("mac-b", "s1", { label: "Other machine", execution_generation: generation })]
+  client.statusSnapshots = new Map([
+    [JSON.stringify(["mac-a", "__clawdline_inventory_v1__"]), { payload: {
+      complete: true, inventory: { version: 1, sessions: ["s1", "s2"] },
+    } }],
+    [JSON.stringify(["mac-a", "s1"]), { payload: { execution_generation: generation } }],
+    [JSON.stringify(["mac-a", "s2"]), { payload: { execution_generation: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" } }],
+  ])
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000 })
+  r.attach(client)
+  const snap = await r.snapshot()
+  assert.deepEqual(snap.sessions.map((session) => session.label), ["Project title"])
+  assert.equal(snap.scan.complete, false)
+  assert.equal(snap.scan.emptyAuthoritative, false)
+})
+
+/** The ss/ pass as a machine publishes it: the marker, then one row per Session. */
+function statusPass(machine: string, generation: string, ...sessions: string[]) {
+  return new Map<string, unknown>([
+    [JSON.stringify([machine, "__clawdline_inventory_v1__"]),
+      { payload: { complete: true, inventory: { version: 1, sessions } } }],
+    ...sessions.map((session) => [JSON.stringify([machine, session]),
+      { payload: { execution_generation: generation } }] as [string, unknown]),
+  ])
+}
+
+const settled = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+test("the row under an opened Session is asked for, not waited for", async () => {
+  const client = new FakeClient()
+  const generation = "a".repeat(32)
+  // The machine's pass names both Sessions; only one rich row is held, and the
+  // one a person has open is the other.
+  client.rows = [row("mac-a", "s1", { execution_generation: generation })]
+  client.statusSnapshots = statusPass("mac-a", generation, "s1", "s2")
+  const clock = { t: 1000 }
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => clock.t,
+    fleetTarget: () => ({ machineID: "mac-a", sessionID: "s2", executionGeneration: generation }) })
+  r.attach(client)
+  await r.snapshot()
+  await settled()
+  assert.deepEqual(client.reads, [{ machine: "mac-a", word: "sessions.snapshot", body: {} }],
+    "the opened Session's row is asked for")
+
+  await r.snapshot()
+  await settled()
+  assert.equal(client.reads.length, 1, "and not asked for again within ROW_RESTATE_MS")
+
+  clock.t += ROW_RESTATE_MS
+  await r.snapshot()
+  await settled()
+  assert.equal(client.reads.length, 2, "and asked again once that has passed")
+
+  client.rows = [...client.rows, row("mac-a", "s2", { execution_generation: generation })]
+  clock.t += ROW_RESTATE_MS
+  const snap = await r.snapshot()
+  await settled()
+  assert.deepEqual(snap.sessions.map((session) => session.id), ["s1", "s2"])
+  assert.equal(client.reads.length, 2, "a row that is here is not asked for")
+})
+
+test("an authorized fleet presentation opens a conversation when rich replay is missing", async () => {
+  const client = new FakeClient()
+  const generation = "a".repeat(32)
+  const pass = "b".repeat(32)
+  const target = { machineID: "mac-a", sessionID: "s2", executionGeneration: generation }
+  client.statusSnapshots = new Map([
+    [JSON.stringify(["mac-a", "__clawdline_inventory_v1__"]), { payload: {
+      complete: true, snapshot_generation: pass, inventory: { version: 1, sessions: ["s2"] },
+    } }],
+    [JSON.stringify(["mac-a", "s2"]), { payload: {
+      machine_id: "mac-a", session_id: "s2", snapshot_generation: pass,
+      execution_generation: generation, state: "idle", assistant: "claude", backend: "tmux",
+      source: { freshness: "current", observed_at: 1 },
+    } }],
+  ])
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    fleetTarget: () => target,
+    fleetPresentation: () => ({ title: "Opened on Linux" }),
+  })
+  r.attach(client)
+  const snapshot = await r.snapshot()
+  await settled()
+  assert.deepEqual(snapshot.sessions.map((session) => [session.id, session.label, session.execution_generation]),
+    [["s2", "Opened on Linux", generation]])
+  assert.deepEqual(client.reads, [], "the already authorized list does not request a second rich list")
+
+  const changed = new Map(client.statusSnapshots)
+  changed.set(JSON.stringify(["mac-a", "s2"]), { payload: {
+    machine_id: "mac-a", session_id: "s2", snapshot_generation: pass,
+    execution_generation: "c".repeat(32), state: "idle", source: { freshness: "current", observed_at: 1 },
+  } })
+  client.statusSnapshots = changed
+  assert.deepEqual((await r.snapshot()).sessions, [], "a later execution never inherits the opened row")
+})
+
+test("a single-machine page fills missing rich rows from one pinned list read", async () => {
+  const client = new FakeClient()
+  const generation = "a".repeat(32)
+  const pass = "b".repeat(32)
+  client.statusSnapshots = new Map([
+    [JSON.stringify(["mac-a", "__clawdline_inventory_v1__"]), { payload: {
+      complete: true, snapshot_generation: pass, inventory: { version: 1, sessions: ["s1", "s2"] },
+    } }],
+    ...["s1", "s2"].map((session) => [JSON.stringify(["mac-a", session]), { payload: {
+      machine_id: "mac-a", session_id: session, snapshot_generation: pass,
+      execution_generation: generation, state: "idle", assistant: "claude", backend: "tmux",
+      source: { freshness: "current", observed_at: 1 },
+    } }] as [string, unknown]),
+  ])
+  let reads = 0
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    listPresentations: async () => {
+      reads++
+      return ["s1", "s2"].map((session) => ({
+        destination: { machineID: "mac-a", sessionID: session, executionGeneration: generation },
+        title: "Title " + session,
+      }))
+    },
+  })
+  r.attach(client)
+  const first = await r.snapshot()
+  const second = await r.snapshot()
+  assert.deepEqual(first.sessions.map((session) => session.label), ["Title s1", "Title s2"])
+  assert.equal(first.scan.complete, true)
+  assert.deepEqual(second.sessions.map((session) => session.label), ["Title s1", "Title s2"])
+  assert.equal(reads, 1)
+})
+
+test("a signed marker accepts missing rows from the same pinned direct-list generation", async () => {
+  const client = new FakeClient()
+  const execution = "a".repeat(32), pass = "b".repeat(32)
+  client.statusSnapshots = markerOnly("mac-a", pass, 1, "s1", "s2", "s3")
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    listPresentations: async () => ["s1", "s2", "s3"].map((session) => ({
+      destination: { machineID: "mac-a", sessionID: session, executionGeneration: execution },
+      title: "Title " + session, status: { state: "idle" },
+      projection: { destination: { machineID: "mac-a", sessionID: session, executionGeneration: execution },
+        state: "idle", freshness: "current", observedAt: 1000, snapshotGeneration: "direct:1000" },
+    })),
+  })
+  r.attach(client)
+  const result = await r.snapshot()
+  assert.deepEqual(result.sessions.map((row) => row.id), ["s1", "s2", "s3"])
+  assert.equal(result.scan.complete, true)
+})
+
+test("a waiting single-machine list asks again after a failed pinned read without a new marker event", async () => {
+  const client = new FakeClient()
+  client.statusSnapshots = new Map()
+  let reads = 0
+  const destination = { machineID: "mac-a", sessionID: "s1", executionGeneration: "a".repeat(32) }
+  const r = new RelayReader("mac-a", { classicStatus: true,
+    listPresentations: async () => ++reads === 1 ? null : [{ destination, title: "Recovered",
+      status: { state: "idle" } }],
+  })
+  r.attach(client)
+  const answer = await r.fetch("/v1/sessions", { signal: new AbortController().signal,
+    headers: { "X-Clawdline-Initial-Read": "1" } })
+  const snapshot = await answer.json() as SessionsSnapshot
+  assert.deepEqual(snapshot.sessions.map((row) => row.label), ["Recovered"])
+  assert.equal(reads, 2)
+})
+
+test("a single-machine list with no marker does not cache its first partial batch as complete", async () => {
+  const client = new FakeClient()
+  client.statusSnapshots = new Map()
+  let now = 1000, reads = 0
+  const counts: (number | null)[] = []
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+    listPresentations: async (_machine, expectedCount) => {
+      counts.push(expectedCount)
+      reads++
+      return Array.from({ length: reads === 1 ? 3 : 11 }, (_, index) => ({
+        destination: { machineID: "mac-a", sessionID: "s" + index, executionGeneration: "a".repeat(32) },
+        title: "Session " + index, status: { state: "idle" },
+      }))
+    },
+  })
+  r.attach(client)
+  const first = await r.snapshot()
+  assert.equal(first.sessions.length, 3)
+  assert.equal(first.scan.complete, false)
+  assert.equal((await r.snapshot()).sessions.length, 3)
+  assert.equal(reads, 1, "a second render shares the bounded read")
+  now += 5_001
+  const refreshed = await r.snapshot()
+  assert.equal(refreshed.sessions.length, 11)
+  assert.equal(refreshed.scan.complete, false, "eleven rows without a signed marker still prove no absence")
+  assert.deepEqual(counts, [null, null])
+})
+
+test("a cross-machine conversation uses a verified list when its retained status marker is missing", async () => {
+  const client = new FakeClient()
+  const timings: { event: string; data: Record<string, unknown> }[] = []
+  client.viewerEvents = { record: (event, data) => { timings.push({ event, data }) } }
+  const generation = "a".repeat(32)
+  const target = { machineID: "mac-a", sessionID: "s1", executionGeneration: generation }
+  client.statusSnapshots = new Map()
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    fleetTarget: () => target,
+    listPresentations: async () => [{ destination: target, title: "Remote Session", status: { state: "idle" } }],
+    resolveSession: async () => target,
+  })
+  r.attach(client)
+  const snapshot = await r.snapshot()
+  assert.deepEqual(snapshot.sessions.map((session) => session.label), ["Remote Session"])
+  assert.equal(snapshot.scan.complete, false, "a display read is not a signed deletion barrier")
+  const transcript = await r.fetch("/v1/transcript?session=s1&limit=200")
+  assert.equal(transcript.status, 200)
+  assert.deepEqual(client.pinnedReads, [target])
+  assert.equal(timings.length, 1)
+  assert.equal(timings[0].event, "cloud.transcript.first_read")
+  assert.equal(timings[0].data.outcome, "ready")
+  for (const field of ["total_ms", "sessions_ms", "words_ms", "pin_ms", "wire_ms"]) {
+    assert.equal(typeof timings[0].data[field], "number", field)
+  }
+  assert.equal(JSON.stringify(timings).includes("Remote Session"), false)
+  await r.fetch("/v1/transcript?session=s1&limit=200")
+  assert.equal(timings.length, 1, "cached rereads do not spend another diagnostic event")
+})
+
+test("a verified list cannot open a different execution under an old fleet target", async () => {
+  const client = new FakeClient()
+  const current = { machineID: "mac-a", sessionID: "s1", executionGeneration: "a".repeat(32) }
+  client.statusSnapshots = new Map()
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    fleetTarget: () => ({ ...current, executionGeneration: "b".repeat(32) }),
+    resolveSession: async () => current,
+  })
+  r.attach(client)
+  const transcript = await r.fetch("/v1/transcript?session=s1&limit=200")
+  assert.equal(transcript.status, 409)
+  assert.deepEqual(client.pinnedReads, [])
+})
+
+test("a selected verified fleet row reads without waiting for a cut word list or missing status replay", async () => {
+  const client = new FakeClient()
+  const target = { machineID: "mac-a", sessionID: "s1", executionGeneration: "a".repeat(32) }
+  client.statusSnapshots = new Map()
+  ;(client as FakeClient & { machineDescriptors: Map<string, unknown> }).machineDescriptors = new Map([
+    ["mac-a", { machine: { commands: Array.from({ length: 64 }, (_, n) => `other.${n}`) } }],
+  ])
+  ;(client as FakeClient & { orchestratorSnapshots: Map<string, unknown> }).orchestratorSnapshots = new Map()
+  ;(client as FakeClient & { machineLacks: Map<string, Set<string>> }).machineLacks = new Map()
+  client.events = () => { throw new Error("a pinned read must not wait for a descriptor or retained marker") }
+  let resolved = 0
+  const r = new RelayReader("mac-a", { classicStatus: true,
+    fleetTarget: () => target,
+    fleetPresentation: () => ({ title: "Verified Session" }),
+    resolveSession: async () => { resolved++; return null },
+  })
+  r.attach(client)
+  assert.equal((await r.fetch("/v1/transcript?session=s1&limit=200")).status, 200)
+  assert.deepEqual(client.pinnedReads, [target])
+  assert.equal(resolved, 0, "the exact selected row already supplies the pinned target")
+
+  const changed = new FakeClient()
+  changed.statusSnapshots = new Map([[JSON.stringify(["mac-a", "s1"]),
+    { payload: { execution_generation: "b".repeat(32) } }]])
+  const refused = new RelayReader("mac-a", { classicStatus: true,
+    fleetTarget: () => target,
+    fleetPresentation: () => ({ title: "Old Session" }),
+    resolveSession: async () => null,
+  })
+  refused.attach(changed)
+  assert.equal((await refused.fetch("/v1/transcript?session=s1&limit=200")).status, 409)
+  assert.deepEqual(changed.pinnedReads, [], "newer status cannot be bypassed by an old card")
+})
+
+/** One machine's pass with the marker only: every row is still on its way. */
+function markerOnly(machine: string, pass: string, at: number, ...sessions: string[]) {
+  return new Map<string, unknown>([
+    [JSON.stringify([machine, "__clawdline_inventory_v1__"]), { payload: {
+      complete: true, inventory: { version: 1, sessions }, at, snapshot_generation: pass } }],
+  ])
+}
+
+/** The row the machine publishes for one Session of that pass. */
+function statusRow(pass: string, generation: string, at: number) {
+  return { payload: { snapshot_generation: pass, execution_generation: generation, projected_at: at,
+    source: { freshness: "current", observed_at: at } } }
+}
+
+test("a verified pinned batch fills a single-machine list while one signed row is missing", async () => {
+  const client = new FakeClient()
+  const pass = "c".repeat(32)
+  const generation = "a".repeat(32)
+  const destination = { machineID: "mac-a", sessionID: "s1", executionGeneration: generation }
+  client.statusSnapshots = markerOnly("mac-a", pass, 1, "s1")
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    listPresentations: async () => [{ destination, title: "Verified Session",
+      status: { state: "idle", work_state: "unknown" },
+      projection: { destination, state: "idle", freshness: "current", observedAt: 1000,
+        snapshotGeneration: "direct:1000" } }],
+  })
+  r.attach(client)
+  const snapshot = await r.snapshot()
+  assert.deepEqual(snapshot.sessions.map((row) => row.label), ["Verified Session"])
+  assert.equal(snapshot.scan.complete, true)
+})
+
+test("a newer fleet batch prevents an older signed marker from declaring a shorter list complete", async () => {
+  const client = new FakeClient()
+  const pass = "c".repeat(32), execution = "a".repeat(32)
+  client.statusSnapshots = markerOnly("mac-a", pass, 1, "s1")
+  ;(client.statusSnapshots as Map<string, unknown>).set(JSON.stringify(["mac-a", "s1"]),
+    statusRow(pass, execution, 1))
+  client.rows = [row("mac-a", "s1", { execution_generation: execution })]
+  const batch = ["s1", "s2", "s3"].map((session) => {
+    const destination = { machineID: "mac-a", sessionID: session, executionGeneration: execution }
+    return { destination, title: "Title " + session, status: { state: "idle" as const },
+      projection: { destination, state: "idle", freshness: "current" as const,
+        observedAt: 2000, snapshotGeneration: "direct:2000" } }
+  })
+  let reads = 0
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 2000,
+    fleetPresentations: () => batch,
+    listPresentations: async () => { reads++; return batch },
+  })
+  r.attach(client)
+  const pending = await r.snapshot()
+  assert.deepEqual(pending.sessions.map((session) => session.id), ["s1", "s2", "s3"])
+  assert.equal(pending.scan.complete, false)
+  assert.equal(reads, 1)
+
+  client.statusSnapshots = markerOnly("mac-a", "d".repeat(32), 2, "s1", "s2", "s3")
+  const settled = await r.snapshot()
+  assert.deepEqual(settled.sessions.map((session) => session.id), ["s1", "s2", "s3"])
+  assert.equal(settled.scan.complete, true)
+})
+
+test("an older retained direct row cannot satisfy a newer signed marker", async () => {
+  const client = new FakeClient()
+  const destination = { machineID: "mac-a", sessionID: "s1", executionGeneration: "a".repeat(32) }
+  client.statusSnapshots = markerOnly("mac-a", "c".repeat(32), 3, "s1")
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 3000,
+    listPresentations: async () => [{ destination, title: "Old title", status: { state: "idle" },
+      projection: { destination, state: "idle", freshness: "current", observedAt: 2000,
+        snapshotGeneration: "direct:2000" } }],
+  })
+  r.attach(client)
+  const snapshot = await r.snapshot()
+  assert.equal(snapshot.sessions.length, 0)
+  assert.equal(snapshot.scan.complete, false)
+})
+
+test("a signed unverified Session stays visible with its honest source state", async () => {
+  const client = new FakeClient()
+  const pass = "c".repeat(32), execution = "a".repeat(32)
+  const destination = { machineID: "mac-a", sessionID: "s1", executionGeneration: execution }
+  client.statusSnapshots = markerOnly("mac-a", pass, 1, "s1")
+  ;(client.statusSnapshots as Map<string, unknown>).set(JSON.stringify(["mac-a", "s1"]),
+    { payload: { machine_id: "mac-a", session_id: "s1", execution_generation: execution,
+      snapshot_generation: pass, state: "idle", source: { freshness: "unverified", observed_at: 1 } } })
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    listPresentations: async () => [{ destination, title: "Retained Session", status: { state: "idle" },
+      projection: { destination, state: "idle", freshness: "stale", observedAt: 1000,
+        snapshotGeneration: pass } }],
+  })
+  r.attach(client)
+  const snapshot = await r.snapshot()
+  assert.deepEqual(snapshot.sessions.map((session) => session.label), ["Retained Session"])
+  assert.equal(snapshot.sessions[0].source?.freshness, "unverified")
+})
+
+test("the single-machine page uses the fleet projection before a blocked rich snapshot", async () => {
+  const client = new FakeClient()
+  client.sessions = async () => { throw new Error("the rich snapshot must not gate the list") }
+  const execution = "a".repeat(32)
+  const rows = ["s1", "s2", "s3"].map((sessionID) => ({
+    destination: { machineID: "mac-a", sessionID, executionGeneration: execution },
+    state: "idle", freshness: "current" as const, observedAt: 1000,
+  }))
+  let titles = 3, now = 1000
+  let presentationGeneration = "a"
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: now,
+      snapshotGeneration: "a".repeat(32), presentationGeneration, rows }),
+    listPresentations: async () => rows.slice(0, titles).map((row) => ({
+      destination: row.destination, title: "Title " + row.destination.sessionID,
+      status: { state: "idle" }, projection: row,
+    })),
+  })
+  r.attach(client)
+  const first = await r.snapshot()
+  assert.deepEqual(first.sessions.map((row) => row.label), ["Title s1", "Title s2", "Title s3"])
+  assert.equal(first.scan.complete, true)
+  titles = 1
+  presentationGeneration = "b"
+  const partial = await r.snapshot()
+  assert.deepEqual(partial.sessions.map((row) => row.id), ["s1", "s2", "s3"])
+  assert.equal(partial.scan.complete, false)
+  titles = 3
+  now += 5_001
+  const restored = await r.snapshot()
+  assert.deepEqual(restored.sessions.map((row) => row.label), ["Title s1", "Title s2", "Title s3"])
+  assert.equal(restored.scan.complete, true)
+})
+
+// On 2026-10-12 a Session stopped on a menu was open on app.clawdline.com and
+// its rich s/ row was arriving, yet the waiting card said Clawdline could not
+// read the choices: the row drawn was put together from the status and the
+// display list, and neither carries the question.
+test("the opened waiting Session draws the question its current rich row carries", async () => {
+  const client = new FakeClient()
+  client.sessions = async () => { throw new Error("the rich snapshot must not gate the list") }
+  const execution = "a".repeat(32)
+  const now = 1_000_000
+  const rows = ["s1", "s2"].map((sessionID) => ({
+    destination: { machineID: "mac-a", sessionID, executionGeneration: execution },
+    state: "waiting", freshness: "current" as const, observedAt: now,
+  }))
+  const menu = { question: "Tea or coffee?", options: [{ n: 1, label: "Tea", can: true }, { n: 2, label: "Coffee", can: true }] }
+  const rich = (over: Record<string, unknown> = {}) => ({ machine: "mac-a", session: "s1", execution_generation: execution,
+    state: "waiting", menu, screen_reading: "read", source: { freshness: "current", observed_at: now / 1000 }, ...over })
+  const details = new Map<string, unknown>([["mac-a\u0000s1", rich()], ["mac-a\u0000s2", rich({ session: "s2" })]])
+  ;(client as unknown as { detailSnapshots: Map<string, unknown> }).detailSnapshots = details
+  let target = { machineID: "mac-a", sessionID: "s1", executionGeneration: execution }
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now, fleetTarget: () => target,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: now,
+      snapshotGeneration: "a".repeat(32), presentationGeneration: "a", rows }),
+    listPresentations: async () => rows.map((row) => ({
+      destination: row.destination, title: "Title " + row.destination.sessionID,
+      status: { state: "waiting" }, projection: row,
+    })),
+  })
+  r.attach(client)
+  const opened = await r.snapshot()
+  const row = (snapshot: SessionsSnapshot, id: string) => snapshot.sessions.find((s) => s.id === id) as
+    { menu?: { question?: string }; screen_reading?: string } | undefined
+  assert.equal(row(opened, "s1")?.menu?.question, "Tea or coffee?")
+  assert.equal(row(opened, "s1")?.screen_reading, "read")
+  assert.equal(row(opened, "s2")?.menu, undefined,
+    "a detail's own copy is read only for the detail that is open")
+  details.set("mac-a\u0000s1", rich({ execution_generation: "b".repeat(32) }))
+  assert.equal(row(await r.snapshot(), "s1")?.menu, undefined, "a rich row of another execution is not this question")
+  details.set("mac-a\u0000s1", rich({ source: { freshness: "current", observed_at: (now - 600_000) / 1000 } }))
+  assert.equal(row(await r.snapshot(), "s1")?.menu, undefined, "a stale rich row is not drawn as the question now")
+  target = { machineID: "mac-a", sessionID: "s2", executionGeneration: execution }
+  assert.equal(row(await r.snapshot(), "s2")?.menu?.question, "Tea or coffee?")
+  // Opening a detail empties its own copy, and a Session waiting on a question
+  // sends no new row: the row the client already holds is the question.
+  details.delete("mac-a\u0000s2")
+  ;(client as unknown as { sessionSnapshots: Map<string, unknown> }).sessionSnapshots =
+    new Map([["mac-a\u0000s2", rich({ session: "s2" })]])
+  assert.equal(row(await r.snapshot(), "s2")?.menu?.question, "Tea or coffee?",
+    "the held row stands in for a detail copy that was emptied on open")
+})
+
+// The machine sends a rich row only when the row changes, and a Session
+// stopped on a question does not: on 2026-10-12 a page that opened it later
+// waited twenty minutes for a row the machine never sent again.
+test("an opened waiting Session with no question in hand asks the machine to restate, once per window", async () => {
+  const client = new FakeClient()
+  client.sessions = async () => { throw new Error("the rich snapshot must not gate the list") }
+  const execution = "a".repeat(32)
+  let now = 1_000_000
+  const rows = [{ destination: { machineID: "mac-a", sessionID: "s1", executionGeneration: execution },
+    state: "waiting", freshness: "current" as const, observedAt: now }]
+  ;(client as unknown as { detailSnapshots: Map<string, unknown> }).detailSnapshots = new Map()
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+    fleetTarget: () => rows[0].destination,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: now,
+      snapshotGeneration: "a".repeat(32), presentationGeneration: "a", rows }),
+    listPresentations: async () => rows.map((row) => ({
+      destination: row.destination, title: "Title", status: { state: "waiting" }, projection: row })),
+  })
+  const recorded: { event: string; data: Record<string, unknown> }[] = []
+  ;(client as unknown as { viewerEvents: unknown }).viewerEvents = {
+    record: (event: string, data: Record<string, unknown>) => { recorded.push({ event, data }) } }
+  r.attach(client)
+  await r.snapshot()
+  await r.snapshot()
+  const asked = () => client.reads.filter((read) => read.word === "sessions.snapshot").length
+  assert.equal(asked(), 1, "asked once, not on every redraw")
+  assert.deepEqual(recorded.map((row) => [row.event, row.data.session, row.data.rich]),
+    [["cloud.opened_question.missing", "s1", false]], "the machine's log hears what the page held, once per ask")
+  now += 6_001
+  await r.snapshot()
+  assert.equal(asked(), 2, "asked again once the window passed")
+  ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements =
+    (_machine, word) => word === "sessions.snapshot.initial" ? "yes" : "unknown"
+  now += 6_001
+  await r.snapshot()
+  assert.equal(client.reads.at(-1)?.word, "sessions.snapshot.initial",
+    "a machine that lists the immediate word is asked with it, not left to its next pass")
+  ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements =
+    (_machine, word) => word === "sessions.row" || word === "sessions.snapshot.initial" ? "yes" : "unknown"
+  now += 6_001
+  const asking = await r.snapshot()
+  assert.deepEqual(client.reads.at(-1), { machine: "mac-a", word: "sessions.row", body: { row: "s1" } },
+    "a machine that can state one row is asked for just that row")
+  assert.equal((asking.sessions[0] as { menu_arriving?: boolean }).menu_arriving, true,
+    "the card says the question is on its way while it is asked for")
+})
+
+// The one-machine page names no fleet target. On 2026-10-12 a phone on it drew
+// "could not read its choices" for a Session whose rich row, options and all,
+// the page held.
+test("a waiting row on the one-machine page draws the question its held rich row carries", async () => {
+  const client = new FakeClient()
+  client.sessions = async () => { throw new Error("the rich snapshot must not gate the list") }
+  const execution = "a".repeat(32)
+  const now = 1_000_000
+  const rows = [{ destination: { machineID: "mac-a", sessionID: "s1", executionGeneration: execution },
+    state: "waiting", freshness: "current" as const, observedAt: now }]
+  const menu = { question: "Tea or coffee?", options: [{ n: 1, label: "Tea", can: true }] }
+  ;(client as unknown as { sessionSnapshots: Map<string, unknown> }).sessionSnapshots = new Map([["mac-a\u0000s1",
+    { machine: "mac-a", session: "s1", execution_generation: execution, state: "waiting", menu,
+      screen_reading: "read", source: { freshness: "current", observed_at: now / 1000 } }]])
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: now,
+      snapshotGeneration: "a".repeat(32), presentationGeneration: "a", rows }),
+    listPresentations: async () => rows.map((row) => ({
+      destination: row.destination, title: "Title", status: { state: "waiting" }, projection: row })),
+  })
+  r.attach(client)
+  const snapshot = await r.snapshot()
+  const drawn = snapshot.sessions[0] as { menu?: { question?: string }; menu_arriving?: boolean }
+  assert.equal(drawn.menu?.question, "Tea or coffee?")
+  assert.equal(client.reads.filter((read) => read.word.startsWith("sessions.")).length, 0,
+    "a row nobody has open asks the machine for nothing")
+})
+
+test("a Session whose status row has not come is asked for, not called a changed execution", async () => {
+  const client = new FakeClient()
+  const pass = "c".repeat(32)
+  const generation = "a".repeat(32)
+  const now = 1_000_000
+  client.statusSnapshots = markerOnly("mac-a", pass, now / 1000, "s1")
+  const asked: string[] = []
+  client.recoverStatusRow = async (machine, session, wanted) => {
+    asked.push(machine + "/" + session + "/" + wanted)
+    ;(client.statusSnapshots as Map<string, unknown>)
+      .set(JSON.stringify([machine, session]), statusRow(wanted, generation, now / 1000))
+    return true
+  }
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now })
+  r.attach(client)
+  const answer = await r.fetch("/v1/transcript?session=s1&limit=200")
+  assert.equal(answer.status, 200, "the read goes through once the row is here")
+  assert.deepEqual(asked, ["mac-a/s1/" + pass], "the row of this pass is the one asked for")
+  assert.deepEqual(client.pinnedReads, [{ machineID: "mac-a", sessionID: "s1", executionGeneration: generation }],
+    "and it is pinned to the execution that row names")
+})
+
+test("a status row that still does not come is the refusal it always was", async () => {
+  const client = new FakeClient()
+  const now = 1_000_000
+  client.statusSnapshots = markerOnly("mac-a", "c".repeat(32), now / 1000, "s1")
+  let asks = 0
+  client.recoverStatusRow = async () => { asks += 1; return false }
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now })
+  r.attach(client)
+  const answer = await r.fetch("/v1/transcript?session=s1&limit=200")
+  assert.equal(answer.status, 409)
+  assert.equal(((await answer.json()) as { error?: string }).error, "execution_generation_changed")
+  assert.equal(asks, 1, "asked once; the page refuses rather than asking again inside one read")
+})
+
+test("a replaced execution is not asked for again: the page is told it changed", async () => {
+  const client = new FakeClient()
+  const running = "b".repeat(32)
+  client.rows = [row("mac-a", "s1", { execution_generation: running })]
+  client.statusSnapshots = statusPass("mac-a", running, "s1", "s2")
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000,
+    // What a person opened before the assistant restarted.
+    fleetTarget: () => ({ machineID: "mac-a", sessionID: "s2", executionGeneration: "c".repeat(32) }) })
+  r.attach(client)
+  await r.snapshot()
+  await settled()
+  assert.deepEqual(client.reads, [], "the machine says a different execution is running; asking cannot produce this one")
 })
 
 test("refresh asks the machine to restate quiet Sessions after the first list", async () => {
@@ -677,6 +1290,17 @@ test("the schedule list is every machine's rows, each with its machine", async (
   const last = r.log[r.log.length - 1]
   assert.equal(last.answer, "relay")
   assert.equal(last.word, "schedules")
+})
+
+test("a machine-scoped schedule read can finish without another machine's answer", async () => {
+  const client = new FakeClient()
+  client.scheduleAnswer = async (options) => ({
+    schedules: [schedule(options?.machine || "mac-a", "own"), schedule("mac-b", "other")], at: 1_700,
+  })
+  const res = await reader(client, { t: 1000 }).fetch("/v1/orchestrator/schedules?machine=mac-a")
+  assert.equal(res.status, 200)
+  assert.deepEqual((await body<{ schedules: { id: string }[] }>(res)).schedules.map((row) => row.id), ["own"])
+  assert.deepEqual(client.scheduleAsks, [{ fresh: true, machine: "mac-a" }])
 })
 
 test("one schedule is asked of the chosen machine so its history and webhook panel can open", async () => {

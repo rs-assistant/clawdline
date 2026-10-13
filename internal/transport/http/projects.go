@@ -63,6 +63,9 @@ func (s *Server) projectReaders() *projectReaders {
 	places := projects.NewPlaces(s.icons.Label, managed)
 	places.MachineStateDir = s.cfg.Dir
 	places.Registered = registry.List
+	if s.cfg.Dir != "" {
+		places.Hidden = registry.Hidden
+	}
 	r := &projectReaders{
 		places:   places,
 		registry: registry,
@@ -185,6 +188,10 @@ func installedAssistants() []contract.StartAssistant {
 }
 
 func (s *Server) placesRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost || r.Method == http.MethodDelete || r.URL.Query().Get("registered") == "1" {
+		s.registeredPlacesRoute(w, r)
+		return
+	}
 	if r.Method != http.MethodGet {
 		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "GET only")
 		return
@@ -207,6 +214,48 @@ func (s *Server) placesRoute(w http.ResponseWriter, r *http.Request) {
 			Setup: projectSetup(p.Path, repo, iconSource)})
 	}
 	writeJSON(w, out)
+}
+
+// registeredPlacesRoute keeps the CLI's explicit list in the same daemon
+// whose start sheet reads GET /v1/places. A write never silently falls back to
+// a second state directory when the daemon cannot be reached.
+func (s *Server) registeredPlacesRoute(w http.ResponseWriter, r *http.Request) {
+	if !machineAuthed(r) && !((r.Method == http.MethodDelete || r.Method == http.MethodPost) && maySend(r)) {
+		writeRefusal(w, http.StatusForbidden, "machine_required", "Only this machine may change its registered Projects.")
+		return
+	}
+	registry := s.projectReaders().registry
+	var rows []projects.RegisteredPlace
+	var err error
+	switch r.Method {
+	case http.MethodGet:
+		rows, err = registry.List()
+	case http.MethodPost, http.MethodDelete:
+		var body struct {
+			Paths []string `json:"paths"`
+		}
+		dec := json.NewDecoder(r.Body)
+		if dec.Decode(&body) != nil || dec.Decode(new(any)) != io.EOF || len(body.Paths) == 0 {
+			writeRefusal(w, http.StatusBadRequest, "invalid_project_paths", "Supply one JSON object with paths to existing directories.")
+			return
+		}
+		if r.Method == http.MethodPost {
+			rows, err = registry.Add(body.Paths, time.Now())
+		} else {
+			rows, err = registry.Remove(body.Paths)
+		}
+	default:
+		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "GET, POST or DELETE only")
+		return
+	}
+	if err != nil {
+		writeRefusal(w, http.StatusUnprocessableEntity, "project_registry_failed", err.Error())
+		return
+	}
+	writeJSON(w, struct {
+		Registered bool                       `json:"registered"`
+		Places     []projects.RegisteredPlace `json:"places"`
+	}{true, rows})
 }
 
 func summarizeProjectWork(row contract.CatalogProject, projectPath string,
@@ -353,10 +402,6 @@ func (s *Server) projectsRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "unify" {
 		s.projectUnifyRoute(w, r, parts[0])
-		return
-	}
-	if len(parts) == 2 && parts[0] != "" && parts[1] == "icon" {
-		s.projectIconRoute(w, r, parts[0])
 		return
 	}
 	if len(parts) < 2 || parts[0] == "" || parts[1] != "worktrees" || len(parts) > 3 ||

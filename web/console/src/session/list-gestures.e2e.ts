@@ -67,6 +67,7 @@ type ReadingScenario =
   | "session-gap"
   | "callback-owner"
 let readingScenario: ReadingScenario = "normal"
+let callbackDone = false
 let inlineDecisionFixture = false
 let inlineDecisionAnswers = 0
 let sessionGap = false
@@ -158,6 +159,12 @@ let spareMoved = MOVED.spare
 
 function rows(): Row[] {
   if (readingScenario === "expired") return []
+  if (readingScenario === "callback-owner") return [
+    row(SAFE, "示範：Go 測試", safeCloseability(), Date.now() / 1000,
+      { heavy_work: callbackDone ? undefined : { task_id: "callback-heavy", reason: "Go tests" } }),
+    row(BLOCKED, "Wait callback running", blockedCloseability(), 200),
+    row(UNKNOWN, "Heavy callback queued", unknownCloseability(), 100),
+  ]
   if (readingScenario === "unstarted-codex") return [
     row(SAFE, "Codex has not started", safeCloseability(), 300,
       { assistant: "codex", isClaude: false, sessionId: "", identity: "no_record" }),
@@ -317,13 +324,14 @@ let sessionWorkReads = 0
 let machineStarts: { path: string; key: string }[] = []
 /** Explicit reminder presses received from an assigned Board item detail. */
 let workReminders = 0
+let delaySessionWork = false
 /** Every stream this daemon is holding open, so a new list can be pushed down one. */
 const streams = new Set<ServerResponse>()
 
 function snapshot() {
   generation++
   const age = readingScenario === "five" ? 5 : readingScenario === "ninety" ? 90 : 0
-  const source = readingScenario === "normal" || readingScenario === "worst" || readingScenario === "live-crowded" || readingScenario === "epic" || readingScenario === "unstarted-codex" || (readingScenario === "session-gap" && (!sessionGap || sessionGapComplete))
+  const source = readingScenario === "normal" || readingScenario === "worst" || readingScenario === "live-crowded" || readingScenario === "epic" || readingScenario === "unstarted-codex" || readingScenario === "callback-owner" || (readingScenario === "session-gap" && (!sessionGap || sessionGapComplete))
     ? { freshness: "current", observed_at: Date.now() / 1000, provenance: "fixture" }
     : readingScenario === "expired"
       ? { freshness: "missing", observed_at: Date.now() / 1000 - 121, provenance: "iterm" }
@@ -575,7 +583,7 @@ function daemon(): Server {
         return res.end(JSON.stringify({ error: "session_unavailable" }))
       }
       const sessionID = decodeURIComponent(sessionWork[1])
-      const ownsSafe = sessionID === SAFE || (inlineDecisionFixture && sessionID === "conversation:conversation-" + SAFE)
+      const ownsSafe = sessionID === SAFE || sessionID === "conversation:conversation-" + SAFE
       const assigned = ownsSafe && readingScenario !== "safe-cleared"
         ? [{
             id: "work-fixture",
@@ -659,16 +667,27 @@ function daemon(): Server {
           question: "Should the release proceed?", options: [{ id: "yes", label: "Proceed" }, { id: "later", label: "Later" }],
           default: "later", blocking: true, state: "open", created_at: 1, due_at: 9999999999 }]
         : []
-      return json(res, 200, { ok: true, assigned_items: assigned, recent_items: recent, direct_todos: direct,
-        open_decisions: openDecisions, decisions_error: null, truncated: false })
+      const answer = { ok: true, assigned_items: assigned, recent_items: recent, direct_todos: direct,
+        open_decisions: openDecisions, decisions_error: null, truncated: false }
+      if (delaySessionWork && !url.searchParams.has("summary")) {
+        setTimeout(() => json(res, 200, answer), 900)
+        return
+      }
+      return json(res, 200, answer)
     }
     if (path === "/v1/orchestrator/tasks") {
       const tasks = readingScenario === "session-gap"
         ? [{ id: "task-gap-fixture", state: "briefed", created: 1,
             root: { terminalId: SAFE, sessionId: "conversation-" + SAFE }, child: { terminalId: BLOCKED } }]
-        : readingScenario === "callback-owner"
-        ? ["a", "b"].map((suffix) => ({ id: "callback-" + suffix, kind: "callback", state: "briefed", created: 1,
-            title: "Heavy work " + suffix, root: { terminalId: SAFE, sessionId: "conversation-" + SAFE } }))
+        : readingScenario === "callback-owner" && !callbackDone
+        ? [
+            { id: "callback-heavy", kind: "callback", callback_intent: "heavy", state: "briefed", created: 1,
+              title: "Go tests", root: { terminalId: SAFE, sessionId: "conversation-" + SAFE } },
+            { id: "callback-wait", kind: "callback", callback_intent: "wait", state: "briefed", created: 1,
+              title: "Wait for CI", root: { terminalId: BLOCKED, sessionId: "conversation-" + BLOCKED } },
+            { id: "callback-queued", kind: "callback", callback_intent: "heavy", state: "briefed", created: 1,
+              title: "Go build", root: { terminalId: UNKNOWN, sessionId: "conversation-" + UNKNOWN } },
+          ]
         : readingScenario === "worst"
         ? [{
             id: "task-fixture",
@@ -721,7 +740,12 @@ function daemon(): Server {
       return
     }
     if (path === "/v1/transcript") {
-      return json(res, 200, { entries: [], evidence: "process", id: url.searchParams.get("session"), signature: "fixture" })
+      const entries = readingScenario === "callback-owner" ? [
+        { role: "assistant", text: "🏗️ Go 測試已交給 Callback，完成通知會叫我回來。", at: 1 },
+        ...(callbackDone ? [{ role: "notice", text: "callback finished: success", at: 2,
+          notice: { kind: "task_finished", state: "success", task: { id: "callback-demo", title: "Go 測試完成" }, outstanding: 0 } }] : []),
+      ] : []
+      return json(res, 200, { entries, evidence: "process", id: url.searchParams.get("session"), signature: "fixture" })
     }
     if (path.startsWith("/v1/")) return json(res, 404, { error: { code: "not_found", message: path } })
     if (path === "/") {
@@ -1052,6 +1076,22 @@ class Tab {
     const { data } = await this.b.send("Page.captureScreenshot", { format: "png" }, this.session)
     writeFileSync(join(shots, name + ".png"), Buffer.from(data, "base64"))
   }
+
+  async shotArea(name: string, selector: string): Promise<void> {
+    if (!shots) return
+    const clip = await this.run(`(() => {
+      const nodes = [...document.querySelectorAll(${JSON.stringify(selector)})]
+      if (!nodes.length) throw new Error("nothing to capture at " + ${JSON.stringify(selector)})
+      const boxes = nodes.map((node) => node.getBoundingClientRect())
+      const x = Math.max(0, Math.floor(Math.min(...boxes.map((box) => box.left)) - 12))
+      const y = Math.max(0, Math.floor(Math.min(...boxes.map((box) => box.top)) - 12))
+      const right = Math.min(innerWidth, Math.ceil(Math.max(...boxes.map((box) => box.right)) + 12))
+      const bottom = Math.min(innerHeight, Math.ceil(Math.max(...boxes.map((box) => box.bottom)) + 12))
+      return { x, y, width: right - x, height: bottom - y, scale: 1 }
+    })()`)
+    const { data } = await this.b.send("Page.captureScreenshot", { format: "png", clip }, this.session)
+    writeFileSync(join(shots, name + ".png"), Buffer.from(data, "base64"))
+  }
 }
 
 // ---- the run
@@ -1090,7 +1130,10 @@ before(async () => {
   ])
   const endpoint = await new Promise<string>((ok, fail) => {
     let said = ""
-    const timer = setTimeout(() => fail(new Error("Chrome did not start: " + said)), 20_000)
+    const timer = setTimeout(() => {
+      browserProcess.kill()
+      fail(new Error("Chrome did not start: " + said))
+    }, 20_000)
     browserProcess.stderr?.on("data", (chunk) => {
       said += String(chunk)
       const found = /DevTools listening on (ws:\/\/\S+)/.exec(said)
@@ -1147,27 +1190,74 @@ test("an incomplete session reading keeps a confirmed root and its child togethe
     }
   }))
 
-test("a phone identifies the Session that started two live callbacks", () =>
+test("a phone marks only the Session whose heavy callback is running", () =>
   inTab(async (tab) => {
     readingScenario = "callback-owner"
+    callbackDone = false
     try {
-      await list(tab)
+      await tab.go("/")
       await tab.until("the callback owner is marked", (seen) => seen.callbackRows.join() === SAFE)
       const badge = await tab.run(`(() => {
         const row = document.querySelector("#rows > li.row[data-id='${SAFE}']")
         const mark = row?.querySelector(".session-callback-active")
-        return { text: mark?.textContent, verified: mark?.dataset.verified,
+        const spinner = mark?.querySelector("canvas.spin")
+        return { text: mark?.textContent, label: mark?.getAttribute("aria-label"), title: mark?.getAttribute("title"),
+          spinnerWidth: spinner?.getBoundingClientRect().width, spinnerHidden: spinner?.getAttribute("aria-hidden"),
           visible: !!mark && mark.getBoundingClientRect().width > 0,
           clipped: !!mark && mark.scrollWidth > mark.clientWidth + 1,
           listWidth: document.querySelector("#list-scroll")?.scrollWidth,
           viewportWidth: window.innerWidth }
       })()`)
-      assert.equal(badge.text, "重工作業進行中 · 2 項")
-      assert.equal(badge.verified, "1")
+      assert.equal(badge.text, "🏗️")
+      assert.equal(badge.label, "重工作業進行中 · Go tests")
+      assert.ok(badge.title?.includes("Go tests"), JSON.stringify(badge))
       assert.equal(badge.visible, true)
+      assert.ok(badge.spinnerWidth > 0, JSON.stringify(badge))
+      assert.equal(badge.spinnerHidden, "true")
       assert.equal(badge.clipped, false)
       assert.ok(badge.listWidth <= badge.viewportWidth, JSON.stringify(badge))
+      await tab.shotArea("callback-waiting-zh-TW", `#rows > li.row[data-id="${SAFE}"]`)
+      await tab.press(`#rows > li.row[data-id="${SAFE}"]`)
+      const inside = await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 8000
+        const read = () => {
+          const mark = document.querySelector("#tx .tx-heavy")
+          const spin = mark?.querySelector("canvas.spin")
+          if (mark && spin?.width) return resolve({ text: mark.textContent, width: spin.getBoundingClientRect().width,
+            nativeWorking: !!document.querySelector("#tx .tx-working:not(.tx-heavy)") })
+          if (Date.now() >= deadline) return reject(new Error("heavy work did not appear inside the idle Session"))
+          setTimeout(read, 25)
+        }
+        read()
+      })`)
+      assert.equal(inside.text, "🏗️重工作業進行中 · Go tests")
+      assert.ok(inside.width > 0)
+      assert.equal(inside.nativeWorking, false)
+      callbackDone = true
+      pushSessions()
+      await tab.until("the finished heavy callback loses its marker", (seen) => seen.callbackRows.length === 0)
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 8000
+        const read = () => {
+          if (!document.querySelector("#tx .tx-heavy")) return resolve(true)
+          if (Date.now() >= deadline) return reject(new Error("finished heavy work remains inside the Session"))
+          setTimeout(read, 25)
+        }
+        read()
+      })`)
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 8000
+        const read = () => {
+          const card = document.querySelector(".entry.clawdline-notice .notice-card")
+          if (card?.textContent?.includes("Go 測試完成")) return resolve(true)
+          if (Date.now() >= deadline) return reject(new Error("callback completion notice did not appear"))
+          setTimeout(read, 25)
+        }
+        read()
+      })`)
+      await tab.shotArea("callback-finished-zh-TW", ".tx-scroll .entry")
     } finally {
+      callbackDone = false
       readingScenario = "normal"
     }
   }))
@@ -1906,6 +1996,47 @@ test("a phone answers the question directly on its Session todo card with a visi
     } finally {
       inlineDecisionFixture = false
       inlineDecisionAnswers = 0
+    }
+  }))
+
+test("the Session to-do fold shows loading until its Board items arrive on a phone", () =>
+  inTab(async (tab) => {
+    delaySessionWork = true
+    try {
+      await tab.go("/#session=" + encodeURIComponent(SAFE))
+      const pending = await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 8000
+        const read = () => {
+          const fold = document.querySelector('.session-todos')
+          if (fold && !fold.open) fold.querySelector('summary')?.click()
+          const loading = fold?.querySelector('.session-todos-loading[role="status"]')
+          if (loading) return resolve({ text: loading.textContent,
+            items: fold.querySelectorAll('.session-owned-item').length,
+            animation: getComputedStyle(loading.querySelector('.work-assignment-spinner')).animationName })
+          if (Date.now() >= deadline) return reject(new Error('the Session to-do loading state did not appear'))
+          setTimeout(read, 25)
+        }
+        read()
+      })`)
+      assert.match(pending.text, /載入/)
+      assert.equal(pending.items, 0)
+      assert.equal(pending.animation, "work-assignment-spin")
+      const loaded = await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 8000
+        const read = () => {
+          const fold = document.querySelector('.session-todos')
+          const item = fold?.querySelector('.session-owned-item b')
+          if (item?.textContent.includes('Finish the release receipt') && !fold.querySelector('.session-todos-loading')) {
+            return resolve(item.textContent)
+          }
+          if (Date.now() >= deadline) return reject(new Error('the Session Board item did not replace loading'))
+          setTimeout(read, 25)
+        }
+        read()
+      })`)
+      assert.match(loaded, /Finish the release receipt/)
+    } finally {
+      delaySessionWork = false
     }
   }))
 

@@ -33,6 +33,8 @@
 import type { CarriedWord } from "./carry.js"
 import type { CloudIdentity, CloudReadClient, CloudRow, SeamRow } from "./relay-reader.js"
 import { authenticatedRefusalKey } from "./refusal-client.js"
+// @ts-expect-error -- Node's strip-types runner loads this source in its test suite.
+import { machineCommands } from "./machine-commands.ts"
 
 // One admitted request may wait behind one turn, and each turn may try two
 // 30-second CLIs. Ten seconds leaves the relay enough room to deliver either
@@ -105,6 +107,12 @@ export interface CloudWriteClient extends CloudReadClient {
    */
   info(identity: CloudIdentity): Promise<unknown>
   infoSummary(identity: CloudIdentity): Promise<unknown>
+  infoForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, signal?: AbortSignal): Promise<unknown>
+  skillsForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, signal?: AbortSignal): Promise<unknown>
+  imageForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, id: string, signal?: AbortSignal): Promise<unknown>
+  readForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string },
+    word: string, fields: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>
+  skills?(identity: CloudIdentity): Promise<unknown>
   /**
    * The Git panel's read. The copied client has had it since the Swift
    * console and nothing here asked for it, so 「Git 變更」 said "無法讀取 Git
@@ -201,6 +209,8 @@ export interface CloudWriteClient extends CloudReadClient {
 /** What the seam around this writer gives it. */
 export interface WriteHost {
   readonly machine: string
+  exactTarget?(): { machineID: string; sessionID: string; executionGeneration: string } | null
+  admitExactTarget?(target: { machineID: string; sessionID: string; executionGeneration: string }): Promise<void>
   /** The client, or a throw coded `offline` when the line is not up. */
   connected(): CloudWriteClient
   /**
@@ -210,11 +220,15 @@ export interface WriteHost {
    * fires first, so the caller's own deadline still ends the wait.
    */
   connectedFor(signal: AbortSignal | null | undefined, word: string): Promise<CloudWriteClient | null>
+  /** Wait for the full live descriptor when the saved 64-word prefix cannot decide a write. */
+  settledWords?(word: string, machine: string): Promise<void>
   /** Something was just done to this session: its transcript is about to change. */
   wrote(session: string, outcome: "done" | "unknown" | "refused"): void
   /** The machine's terminal backend confirmed that this session was closed. */
   closed(session: string): void
   note(row: Omit<SeamRow, "at">): void
+  reportWriteFailure?(row: { word: string; code: string; layer: string; status: number; outcome: string | null;
+    stage: string; ms: number; session: string | null }): void
 }
 
 /**
@@ -225,15 +239,18 @@ export interface WriteHost {
  * report name.
  */
 export type WriteRoute =
- | { op: "squad-write"; word: Carried<"squad.settings.update" | "squad.motion.update" | "squad.catalog.update"> }
+ | { op: "squad-write"; word: Carried<"squad.settings.update" | "squad.motion.update" | "squad.catalog.update" | "squad.role-draft"> }
   | { op: "squad-package"; word: Carried<"squad.packages.preview" | "squad.packages.adopt" | "squad.packages.export"> }
- | { op: "project-icon-copy"; word: Carried<"project-icon-copy">; id: string }
+  | { op: "project-hide"; word: Carried<"project-hide"> }
+  | { op: "project-add"; word: Carried<"project-add"> }
   | { op: "project-file-save"; word: Carried<"project-file-save">; project: string; file: string }
   | { op: "project-unify-apply"; word: Carried<"project-unify-apply">; project: string }
   | { op: "project-mirror-apply"; word: Carried<"project-mirror-apply"> }
   | { op: "project-mirror-detach"; word: Carried<"project-mirror-detach"> }
   | { op: "send"; word: Carried<"send">; session: string }
+  | { op: "session-receipt"; word: Carried<"session-receipt">; session: string; request: string }
   | { op: "info"; word: Carried<"info">; session: string }
+  | { op: "skills"; word: Carried<"skills">; session: string }
   | { op: "git"; word: Carried<"git">; session: string }
   | { op: "git-diff"; word: Carried<"git-diff">; session: string }
   | { op: "screen"; word: Carried<"screen">; session: string }
@@ -264,6 +281,7 @@ export type WriteRoute =
   | { op: "board-command"; word: Carried<"board-command"> }
   | { op: "machine-usage"; word: Carried<"machine-usage"> }
   | { op: "update"; word: Carried<"update"> }
+  | { op: "update-fresh"; word: Carried<"update-fresh"> }
   | { op: "update-apply"; word: Carried<"update-apply"> }
   // The sessions a reboot took away: one machine read and two machine
   // commands, none of them a session's — the rows are conversations the
@@ -315,7 +333,7 @@ export type WriteRoute =
   | { op: "work-v2-proposal-resolve"; word: Carried<"work.v2.proposal-resolve">; id: string; decision: "accept" | "reject" }
   | { op: "work-v2-todo-create"; word: Carried<"work.v2.todo-create">; terminal: string }
   | { op: "work-v2-todo-image-create"; word: Carried<"work.v2.todo-image-create">; terminal: string; id: string }
-  | { op: "work-v2-todo-action"; word: Carried<"work.v2.todo-action">; terminal: string; id: string; action: "send" | "complete" | "reopen" | "delete" }
+  | { op: "work-v2-todo-action"; word: Carried<"work.v2.todo-action">; terminal: string; id: string; action: "send" | "complete" | "reopen" | "delete" | "edit" }
   | { op: "work-v2-human-intervention-action"; word: Carried<"work.v2.human-intervention-action">; terminal: string; id: string; action: "read" | "resolve" | "reopen" }
   // Manual `title` is not a Cloud word at all — not here and not in the Swift
   // app's vocabulary — so this one is a plain string.
@@ -361,6 +379,9 @@ const SENT_UNANSWERED = new Set([
   "receipt_expired",
   "ready_expired",
   "peer_rejected",
+  "receipt_outcome_unknown",
+  "receipt_pending",
+  "receipt_unavailable",
 ])
 
 /**
@@ -432,16 +453,19 @@ export const CARRIED_READS: ReadonlySet<WriteRoute["op"]> = new Set<WriteRoute["
   "archived",
   "machine-usage",
   "update",
+  "update-fresh",
   "verification-read",
   "places",
   "past",
   "image",
   "info",
+  "skills",
   "git",
   "git-diff",
   "screen",
   "documents",
   "document",
+  "session-receipt",
 ])
 
 /** Parse a console route into the command it stands for, or null for one this file does not carry. */
@@ -456,6 +480,9 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   }
   const [head, a, b, c, d] = segments
   if (method === "GET") {
+    if (head === "sessions" && a && b === "cloud-receipts" && c && segments.length === 4) {
+      return { op: "session-receipt", word: "session-receipt", session: a, request: c }
+    }
     if (head === "work" && a === "v2" && b === "images" && c && segments.length === 4) {
       return { op: "work-v2-image", word: "work.v2.image", artifact: c }
     }
@@ -505,6 +532,9 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
     if (head === "update" && segments.length === 1) {
       return { op: "update", word: "update" }
     }
+    if (head === "update" && a === "fresh" && segments.length === 2) {
+      return { op: "update-fresh", word: "update-fresh" }
+    }
     if (head === "verifications" && segments.length === 1) {
       return { op: "verification-read", word: "verification.list", id: "" }
     }
@@ -523,6 +553,9 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
     // be parsed into two words.
     if (head === "sessions" && a && b === "info" && segments.length === 3) {
       return { op: "info", word: "info", session: a }
+    }
+    if (head === "sessions" && a && b === "skills" && segments.length === 3) {
+      return { op: "skills", word: "skills", session: a }
     }
     // The second read parsed here rather than in `relay-reader.ts`, and for
     // the same reason `info` is: it is a session's read, so it has to be asked
@@ -572,7 +605,8 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   if (head === "work" && a === "v2" && b === "items" && c && segments.length === 4 && method === "PATCH") {
     return { op: "work-v2-edit", word: "work.v2.edit", id: c }
   }
-  if (head === "projects" && a && b === "icon" && segments.length === 3 && method === "PUT") return { op: "project-icon-copy", word: "project-icon-copy", id: a }
+  if (head === "places" && segments.length === 1 && method === "DELETE") return { op: "project-hide", word: "project-hide" }
+  if (head === "places" && segments.length === 1 && method === "POST") return { op: "project-add", word: "project-add" }
   if (head === "projects" && a && b === "files" && c && segments.length === 4 && method === "PUT" && /^[0-9a-f]{32}$/.test(c)) {
     return { op: "project-file-save", word: "project-file-save", project: a, file: c }
   }
@@ -592,6 +626,7 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   }
   if (method !== "POST") return null
   if (head === "squad" && a === "catalog" && segments.length === 2) return { op: "squad-write", word: "squad.catalog.update" }
+  if (head === "squad" && a === "role-draft" && segments.length === 2) return { op: "squad-write", word: "squad.role-draft" }
   if (head === "squad-packages" && segments.length === 2) {
     if (a === "preview") return { op: "squad-package", word: "squad.packages.preview" }
     if (a === "adopt") return { op: "squad-package", word: "squad.packages.adopt" }
@@ -662,7 +697,7 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
     if (b === "session-todos" && c && todoID && action === "images" && segments.length === 6) {
       return { op: "work-v2-todo-image-create", word: "work.v2.todo-image-create", terminal: c, id: todoID }
     }
-    if (b === "session-todos" && c && todoID && (action === "send" || action === "complete" || action === "reopen" || action === "delete") && segments.length === 6) {
+    if (b === "session-todos" && c && todoID && (action === "send" || action === "complete" || action === "reopen" || action === "delete" || action === "edit") && segments.length === 6) {
       return { op: "work-v2-todo-action", word: "work.v2.todo-action", terminal: c, id: todoID, action }
     }
     if (b === "human-interventions" && c && todoID && (action === "read" || action === "resolve" || action === "reopen") && segments.length === 6) {
@@ -787,6 +822,7 @@ function spellingOf(route: WriteRoute): Spelling {
     case "smart-title":
     case "interrupt":
     case "info":
+    case "skills":
     case "git":
     case "git-diff":
     case "screen":
@@ -828,7 +864,8 @@ function spellingOf(route: WriteRoute): Spelling {
     case "squad-write":
     case "squad-package":
     case "board-command":
-    case "project-icon-copy":
+    case "project-hide":
+    case "project-add":
     case "project-file-save":
     case "project-unify-apply":
     case "project-mirror-apply":
@@ -1012,42 +1049,38 @@ export class RelayWriter {
         const body = await bodyOf(init)
         const text = typeof body.text === "string" ? body.text : ""
         const images = Array.isArray(body.images) ? body.images.filter((x): x is string => typeof x === "string") : []
-        const identity = await this.identity(client, route.session)
+        const { identity, generation, client: current } = await this.mutationTarget(client, route.session, route.word)
         // F2: use the card's current request, so an unanswered attempt keeps
         // its receipt. A confirmed terminal failure may use a new request
         // after the person checks for a turn and accepts duplicate risk.
         // The copied `send` mints a new id per call, so the same read it makes
         // is made here with the card's.
         const request = headerOf(init, "idempotency-key")
-        if (request && typeof client._read === "function") {
-          return client._read(identity, "send", { request, text, images }, "action:" + request)
-        }
-        return client.send(identity, text, images)
+        if (!request.trim()) throw failure("idempotency_key_required", "This action needs an Idempotency-Key.", 400)
+        return current._read!(identity, "send", { request, execution_generation: generation, text, images }, "action:" + request)
       }
       case "answer": {
         const body = await bodyOf(init)
         const expect = typeof body.expect === "string" ? body.expect : ""
         const typed = typeof body.typed === "string" ? body.typed : undefined
-        const identity = await this.identity(client, route.session)
-        return this.press(client, identity, String(body.key ?? ""), expect, headerOf(init, "idempotency-key"), typed)
+        const { identity, generation, client: current } = await this.mutationTarget(client, route.session, route.word)
+        return this.press(current, identity, String(body.key ?? ""), expect, headerOf(init, "idempotency-key"), generation, typed)
       }
       case "end": {
         const body = await bodyOf(init)
-        const identity = await this.identity(client, route.session)
+        const { identity, generation, client: current } = await this.mutationTarget(client, route.session, route.word)
         // What the page last read of this session's close gates. The Go daemon
         // carries it and does not compare it yet (cloudops `Divergences`); a
         // Swift Mac refuses a close against a reading that has moved.
-        const row = await this.row(client, route.session)
+        const row = await this.row(current, route.session)
         const closeability = row?.closeability as { version?: unknown } | undefined
         const version = typeof body.expected_closeability_version === "string" && body.expected_closeability_version
           ? body.expected_closeability_version : typeof closeability?.version === "string" ? closeability.version : ""
         const request = headerOf(init, "idempotency-key")
-        if (request && typeof client._read === "function") {
-          return client._read(identity, "end", {
-            request, accept_loss: body.force === true, expected_closeability_version: version,
-          }, "action:" + request)
-        }
-        return client.end(identity, body.force === true, version)
+        if (!request.trim()) throw failure("idempotency_key_required", "This action needs an Idempotency-Key.", 400)
+        return current._read!(identity, "end", {
+          request, execution_generation: generation, accept_loss: body.force === true, expected_closeability_version: version,
+        }, "action:" + request)
       }
       case "archive": {
         // The close's own decision key is the command's request, as `end`
@@ -1058,16 +1091,23 @@ export class RelayWriter {
         if (!request) throw failure("bad_request", `${route.word} needs an Idempotency-Key`, 400)
         if (typeof client._read !== "function") throw failure("cloud_not_carried", route.word, 501)
         const body = await bodyOf(init)
-        const identity = await this.identity(client, route.session)
-        const row = await this.row(client, route.session)
+        const { identity, generation, client: current } = await this.mutationTarget(client, route.session, route.word)
+        const row = await this.row(current, route.session)
         const closeability = row?.closeability as { version?: unknown } | undefined
         const version = typeof body.expected_closeability_version === "string" && body.expected_closeability_version
           ? body.expected_closeability_version : typeof closeability?.version === "string" ? closeability.version : ""
-        return client._read(identity, route.word, {
-          request, force: body.force === true, expected_closeability_version: version,
+        return current._read!(identity, route.word, {
+          request, execution_generation: generation, force: body.force === true, expected_closeability_version: version,
         }, "action:" + request)
       }
       case "focus":
+        if (this.host.exactTarget?.()) {
+          const { identity, generation, client: current } = await this.mutationTarget(client, route.session, route.word)
+          const request = headerOf(init, "idempotency-key") || this.requestID()
+          return current._read!(identity, "focus", {
+            request, execution_generation: generation,
+          }, "action:" + request)
+        }
         return client.focus(await this.identity(client, route.session))
       case "smart-title":
       case "interrupt": {
@@ -1078,12 +1118,32 @@ export class RelayWriter {
         if (typeof client._read !== "function") {
           throw failure("cloud_not_carried", route.word, 501)
         }
-        return client._read(
-          await this.identity(client, route.session),
+        const target = route.op === "interrupt" || this.host.exactTarget?.()
+          ? await this.mutationTarget(client, route.session, route.word) : null
+        return (target?.client ?? client)._read!(
+          target?.identity ?? await this.identity(client, route.session),
           route.word,
-          { request },
+          { request, ...(target ? { execution_generation: target.generation } : {}) },
           "action:" + request,
         )
+      }
+      case "session-receipt": {
+        const action = url.searchParams.get("action") ?? ""
+        const generation = url.searchParams.get("execution_generation") ?? ""
+        if (!new Set(["send", "answer", "key", "interrupt", "end", "archive-session"]).has(action) || !/^[0-9a-f]{32}$/.test(generation)) {
+          throw failure("bad_request", "A receipt lookup needs its action and execution generation.", 400)
+        }
+        await this.host.settledWords?.("session-receipt", this.host.machine)
+        const current = await this.host.connectedFor(init?.signal, route.word)
+        if (!current || machineCommands(current, this.host.machine).incomplete) {
+          throw failure("cloud_reconnecting", "The machine's complete command list has not arrived yet.", 503)
+        }
+        if (!machineCommands(current, this.host.machine).commands?.includes("session-receipt") || typeof current._read !== "function") {
+          throw failure("cloud_machine_unsupported", "This machine cannot look up session receipts.", 501)
+        }
+        const query = this.requestID()
+        return current._read({ machine: this.host.machine, session: route.session }, "session-receipt",
+          { request: query, target_request: route.request, execution_generation: generation, action }, "read:" + query)
       }
       case "info": {
         // The two halves are two reads on the wire, answered on two channels
@@ -1092,15 +1152,28 @@ export class RelayWriter {
         // leaves out (`cloudops` `info`). This daemon answers the same body for
         // both — its own divergence — and the page still asks for the half it
         // wants, so a machine that does tell them apart is asked correctly.
+        const exact = this.fleetTarget(route.session)
+        if (exact) {
+          if (!client.infoForGeneration) throw failure("cloud_not_carried", "Pinned Session info is unavailable.", 501)
+          return client.infoForGeneration(exact, init?.signal ?? undefined)
+        }
         const identity = await this.identity(client, route.session)
         return url.searchParams.get("parts") === "summary" ? client.infoSummary(identity) : client.info(identity)
       }
+      case "skills":
+        if (this.fleetTarget(route.session)) {
+          if (!client.skillsForGeneration) throw failure("cloud_not_carried", "Pinned Session skills are unavailable.", 501)
+          return client.skillsForGeneration(this.fleetTarget(route.session)!, init?.signal ?? undefined)
+        }
+        if (!client.skills) throw failure("cloud_not_carried", "This Cloud client cannot read Session skills.", 501)
+        return client.skills(await this.identity(client, route.session))
       case "git":
         // A read, so nothing is marked written and `sessionOf` leaves it out:
         // asking what a repository has changed changes nothing. The machine's own
         // refusal crosses as its code — `not_a_repo` is the one the panel
         // branches on — because `git-bridge.ts` reads the code and not the
         // sentence (`session/GitPanel.tsx`).
+        if (this.fleetTarget(route.session)) return this.pinnedRead(client, route.session, "git", {}, init?.signal)
         return client.git(await this.identity(client, route.session))
       case "screen":
         // A read, and the lease on the machine's capture: asking is how the
@@ -1108,6 +1181,7 @@ export class RelayWriter {
         // wrote it — a first read is `pending` with no `text` — except that
         // the copied client names a tmux screen `on-demand`, which is what
         // keeps the panel asking at the machine's floor (`screen`).
+        if (this.fleetTarget(route.session)) return this.pinnedRead(client, route.session, "screen", {}, init?.signal)
         return client.screen(await this.identity(client, route.session))
       case "git-diff": {
         const path = url.searchParams.get("path") ?? ""
@@ -1115,6 +1189,7 @@ export class RelayWriter {
           throw failure("malformed_read", "a Git diff is read with its changed path", 400)
         }
         const request = this.requestID()
+        if (this.fleetTarget(route.session)) return this.pinnedRead(client, route.session, "git-diff", { request, path }, init?.signal)
         return client._read(
           await this.identity(client, route.session),
           "git-diff",
@@ -1179,6 +1254,20 @@ export class RelayWriter {
       }
       case "image": {
         const session = url.searchParams.get("session") ?? ""
+        const exact = this.fleetTarget(session)
+        if (exact) {
+          if (!client.imageForGeneration) throw failure("cloud_not_carried", "Pinned Session images are unavailable.", 501)
+          const answer = await client.imageForGeneration(exact, route.artifact, init?.signal ?? undefined) as
+            { id?: unknown; media_type?: unknown; byte_count?: unknown; data?: unknown } | null
+          if (answer?.id !== route.artifact || typeof answer.media_type !== "string" ||
+            typeof answer.data !== "string" || !Number.isSafeInteger(answer.byte_count) ||
+            !["image/png", "image/jpeg"].includes(answer.media_type)) {
+            throw failure("malformed_reply", "The Session image reply was malformed.", 502)
+          }
+          const bytes = Uint8Array.from(atob(answer.data), (character) => character.charCodeAt(0))
+          if (bytes.length !== answer.byte_count) throw failure("malformed_reply", "The Session image bytes were incomplete.", 502)
+          return { media_type: answer.media_type, bytes }
+        }
         if (!session || typeof client.image !== "function") {
           throw failure("malformed_read", "a picture is read with the session it belongs to", 400)
         }
@@ -1191,6 +1280,7 @@ export class RelayWriter {
           throw failure("document_machine_mismatch", "The document link does not name this machine.", 400)
         }
         if (route.op === "documents") {
+          if (this.fleetTarget(route.session)) return this.pinnedRead(client, route.session, "documents", {}, init?.signal)
           // The listing keeps its legacy `documents` answer name on the
           // Session channel; it has no request-id answer on the machine one.
           if (typeof client._read !== "function") throw failure("cloud_not_carried", route.word, 501)
@@ -1200,10 +1290,11 @@ export class RelayWriter {
         // A machine-scoped waiter would listen on __clawdline_machine__ and time out.
         if (typeof client._read !== "function") throw failure("cloud_not_carried", route.word, 501)
         const request = this.requestID()
-        const answer = await client._read(
-          { machine: this.host.machine, session: route.session }, "document",
-          { request, scope: route.scope, task: route.task, path: route.path }, "read:" + request,
-        ) as { media_type?: unknown; byte_count?: unknown; data?: unknown }
+        const fields = { request, scope: route.scope, task: route.task, path: route.path }
+        const answer = await (this.fleetTarget(route.session)
+          ? this.pinnedRead(client, route.session, "document", fields, init?.signal)
+          : client._read({ machine: this.host.machine, session: route.session }, "document",
+            fields, "read:" + request)) as { media_type?: unknown; byte_count?: unknown; data?: unknown }
         if ((answer.media_type !== "text/markdown; charset=utf-8" && answer.media_type !== "text/plain; charset=utf-8") ||
           typeof answer.data !== "string" || !Number.isSafeInteger(answer.byte_count) || Number(answer.byte_count) < 0) {
           throw failure("malformed_answer", "The document answer is invalid.", 502)
@@ -1230,7 +1321,8 @@ export class RelayWriter {
       case "default-models":
       case "work-gate-settings":
       case "machine-usage":
-      case "update": {
+      case "update":
+      case "update-fresh": {
         if (typeof client._machineRequest !== "function") {
           throw failure("cloud_not_carried", route.word, 501)
         }
@@ -1563,11 +1655,28 @@ export class RelayWriter {
         if (!request) throw failure("bad_request", "a Board command needs a requestId", 400)
         return this.machineWorkV2(client, route.word, { command }, request)
       }
-      case "project-icon-copy": {
+      case "project-hide": {
         if (typeof client._place !== "function") throw failure("cloud_not_carried", route.word, 501)
-        const place = client._place(route.id)
-        if (place.machine !== this.host.machine) throw failure("cloud_project_machine_mismatch", "this Project belongs to another machine", 409)
-        return this.machineWorkV2(client, route.word, { id: place.id, item: await bodyOf(init) }, headerOf(init, "idempotency-key"))
+        const body = await bodyOf(init)
+        const id = typeof body.place === "string" ? body.place : ""
+        if (!id) throw failure("bad_request", "a Project must be selected", 400)
+        const place = client._place(id)
+        if (!Array.isArray(body.paths) || body.paths.length !== 1 || body.paths[0] !== place.path) {
+          throw failure("bad_request", "the Project path changed", 400)
+        }
+        const request = headerOf(init, "idempotency-key")
+        if (!request) throw failure("idempotency_key_required", "Removing a Project needs an Idempotency-Key.", 400)
+        return this.machineWorkV2(client, route.word, { path: place.path }, request, place.machine)
+      }
+      case "project-add": {
+        for (const [key] of url.searchParams) if (key !== "machine") throw failure("bad_request", "Only machine is accepted.", 400)
+        const body = await bodyOf(init)
+        if (!Array.isArray(body.paths) || body.paths.length !== 1 || typeof body.paths[0] !== "string" || !body.paths[0]) {
+          throw failure("bad_request", "Choose one absolute directory on the selected machine.", 400)
+        }
+        const request = headerOf(init, "idempotency-key")
+        if (!request) throw failure("idempotency_key_required", "Adding a Project needs an Idempotency-Key.", 400)
+        return this.machineWorkV2(client, route.word, { path: body.paths[0] }, request, url.searchParams.get("machine") || this.host.machine)
       }
       case "project-file-save": {
         if (typeof client._place !== "function" || typeof client._machineRequestAs !== "function") throw failure("cloud_not_carried", route.word, 501)
@@ -1665,14 +1774,14 @@ export class RelayWriter {
     }
   }
 
-  private machineWorkV2(client: CloudWriteClient, word: CarriedWord, body: Record<string, unknown>, request: string): Promise<unknown> {
+  private machineWorkV2(client: CloudWriteClient, word: CarriedWord, body: Record<string, unknown>, request: string, machine = this.host.machine): Promise<unknown> {
     if (request && typeof client._machineRequestAs === "function") {
-      return client._machineRequestAs(request, this.host.machine, word, body, "action")
+      return client._machineRequestAs(request, machine, word, body, "action")
     }
     if (typeof client._machineRequest !== "function") {
       return Promise.reject(failure("cloud_not_carried", word, 501))
     }
-    return client._machineRequest(this.host.machine, word, body, "action")
+    return client._machineRequest(machine, word, body, "action")
   }
 
   /**
@@ -1703,16 +1812,17 @@ export class RelayWriter {
    * the machine checks are still in the input line before it presses
    * (`app.SubmitTyped`). It goes only where that check happens, too.
    */
-  private press(client: CloudWriteClient, identity: CloudIdentity, key: string, expect: string, request: string, typed?: string): Promise<unknown> {
+  private press(client: CloudWriteClient, identity: CloudIdentity, key: string, expect: string, request: string, generation: string, typed?: string): Promise<unknown> {
     const listed = declaredCommands(client, identity.machine)
     const checks = !client.macCapabilities?.has(identity.machine) && !!listed?.includes("answer") && typeof client._read === "function"
     const names = key === "enter" ? typed !== undefined && !expect : !!expect
     if (!names || !checks) {
       return Promise.reject(failure("menu_unverified", "this press cannot be checked against the machine's screen", 428))
     }
-    const id = request || this.requestID()
+    if (!request.trim()) return Promise.reject(failure("idempotency_key_required", "This action needs an Idempotency-Key.", 400))
+    const id = request
     const named = key === "enter" ? { typed } : { expect }
-    return client._read!(identity, "answer", { request: id, answer: key, ...named }, "action:" + id, undefined, { retireUncertain: true })
+    return client._read!(identity, "answer", { request: id, execution_generation: generation, answer: key, ...named }, "action:" + id, undefined, { retireUncertain: true })
   }
 
   /**
@@ -1746,10 +1856,75 @@ export class RelayWriter {
    */
   private async identity(client: CloudWriteClient, session: string): Promise<CloudIdentity> {
     const row = await this.row(client, session)
-    if (!row) throw failure("session_not_found", "this page holds no row for that session", 404)
+    if (!row) throw failure("session_unknown", "This page cannot verify that Session yet.", 409)
+    this.requireFleetRow(row, session)
     const identity = row.identity
     if (identity && typeof identity.machine === "string" && typeof identity.session === "string") return identity
     return { machine: this.host.machine, session: typeof row.session === "string" ? row.session : session }
+  }
+
+  private async mutationTarget(client: CloudWriteClient, session: string, word: string): Promise<{ identity: CloudIdentity; generation: string; client: CloudWriteClient }> {
+    const exact = this.fleetTarget(session)
+    // The opened fleet detail is pinned to an exact execution. Its current
+    // status projection is checked below. The legacy rich-row replay is a
+    // separate stream and can temporarily omit that Session during recovery;
+    // its absence is not evidence that the execution has gone away.
+    let identity: CloudIdentity
+    let generation: string
+    if (exact) {
+      if (!this.host.admitExactTarget) throw failure("execution_check_unavailable", "The selected Session cannot be checked now.", 503)
+      await this.host.admitExactTarget(exact)
+      identity = { machine: exact.machineID, session: exact.sessionID }
+      generation = exact.executionGeneration
+    } else {
+      const row = await this.row(client, session)
+      if (!row) throw failure("session_unknown", "This page cannot verify that Session yet.", 409)
+      generation = String(row.execution_generation ?? "")
+      identity = row.identity && typeof row.identity.machine === "string" && typeof row.identity.session === "string"
+        ? row.identity : { machine: this.host.machine, session: typeof row.session === "string" ? row.session : session }
+      if (identity.machine !== this.host.machine || identity.session !== session || !/^[0-9a-f]{32}$/.test(generation)) {
+        throw failure("execution_generation_required", "This session's current execution generation is unavailable.", 409)
+      }
+    }
+    await this.host.settledWords?.(word, identity.machine)
+    await this.host.settledWords?.("session-receipt", identity.machine)
+    const current = await this.host.connectedFor(undefined, word)
+    if (!current || machineCommands(current, identity.machine).incomplete) {
+      throw Object.assign(failure("cloud_reconnecting", "The machine's complete command list has not arrived yet.", 503), {
+        diagnosticStage: current ? "command_list_incomplete" : "connection_unavailable",
+      })
+    }
+    const commands = declaredCommands(current, identity.machine)
+    if (!commands?.includes(word) || !commands.includes("session-receipt") || typeof current._read !== "function") {
+      throw failure("cloud_machine_unsupported", "This machine cannot provide durable session receipts.", 501)
+    }
+    return { identity, generation, client: current }
+  }
+
+  private fleetTarget(session: string): { machineID: string; sessionID: string; executionGeneration: string } | null {
+    const target = this.host.exactTarget?.() ?? null
+    if (!target) return null
+    if (target.machineID !== this.host.machine || target.sessionID !== session ||
+      !/^[0-9a-f]{32}$/.test(target.executionGeneration)) {
+      throw failure("execution_generation_changed", "The opened Session destination has changed.", 409)
+    }
+    return target
+  }
+
+  private pinnedRead(client: CloudWriteClient, session: string, word: string,
+    fields: Record<string, unknown>, signal?: AbortSignal | null): Promise<unknown> {
+    const target = this.fleetTarget(session)
+    if (!target || !client.readForGeneration) {
+      throw failure("cloud_not_carried", "This machine cannot read the selected Session content.", 501)
+    }
+    return client.readForGeneration(target, word, fields, signal ?? undefined)
+  }
+
+  private requireFleetRow(row: CloudRow, session: string): void {
+    const target = this.fleetTarget(session)
+    if (target && row.execution_generation !== target.executionGeneration) {
+      throw failure("execution_generation_changed", "The Session row belongs to another execution.", 409)
+    }
   }
 
   /**
@@ -1819,6 +1994,15 @@ export class RelayWriter {
       ms: this.now() - started,
       ...(ref ? { ref } : {}),
     })
+    if (method !== "GET") this.host.reportWriteFailure?.({
+      word: route.word, code,
+      layer: typeof error?.layer === "string" ? error.layer : "browser",
+      status, outcome: outcome ?? null,
+      stage: typeof (error as CloudFailureLike & { diagnosticStage?: unknown })?.diagnosticStage === "string"
+        ? String((error as CloudFailureLike & { diagnosticStage?: string }).diagnosticStage)
+        : ref ? "published_or_answered" : "before_publish",
+      ms: Math.max(0, this.now() - started), session,
+    })
     const fields: Record<string, unknown> = {
       layer: typeof error?.layer === "string" ? error.layer : "browser",
       ...(ref ? { ref } : {}),
@@ -1845,8 +2029,7 @@ export class RelayWriter {
 
 /** The words the machine's descriptor lists, or null when it lists none. */
 function declaredCommands(client: CloudWriteClient, machine: string): string[] | null {
-  const commands = client.machineDescriptor?.(machine)?.machine?.commands
-  return Array.isArray(commands) ? commands.filter((x): x is string => typeof x === "string") : null
+  return machineCommands(client, machine).commands
 }
 
 function sessionOf(route: WriteRoute): string | null {

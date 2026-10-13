@@ -9,7 +9,8 @@
  * Holes are `{name}`, as the catalog's are.
  */
 
-import { catalogWord, currentCatalogTag, type CatalogTag } from "../../catalog.js"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { catalogWord, currentCatalogTag, type CatalogTag } from "../../catalog.ts"
 
 const words = {
   en: {
@@ -21,7 +22,7 @@ const words = {
       "count as it holding, and the data it is judged by, read now.",
     refresh: "Read again",
     unreadable: "The verifications could not be read.",
-    listNone: "Nothing is waiting to be verified.",
+    listNone: "No items awaiting verification.",
     closedShow: "Closed ({n})",
     closedHide: "Hide closed",
     dueIn: "due in {left}",
@@ -97,7 +98,7 @@ const words = {
     lede: "改過、並約好日期回頭檢查的事。每一項寫著為什麼、怎樣算成立，以及拿來判斷的資料（打開時現讀）。",
     refresh: "重新讀取",
     unreadable: "讀不到驗收清單。",
-    listNone: "沒有等待驗收的項目。",
+    listNone: "目前沒有待驗收項目。",
     closedShow: "已結案（{n}）",
     closedHide: "收起已結案",
     dueIn: "還有 {left}到期",

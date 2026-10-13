@@ -2,6 +2,7 @@ package cloudops
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -418,12 +419,59 @@ func init() {
 
 		// The Projects page's catalog and worktree lifecycle. `places` above is
 		// carried separately.
-		op{name: "project-icon-copy",
-			decode: decodeWorkV2NamedDocument("id", "item"),
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "PUT", Path: "/v1/projects/" + segment(p.id) + "/icon", Body: p.document, Header: asDevice()}
+		op{name: "project-folders", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.hasOneOf([]string{"type", "session", "request"}, []string{"type", "session", "request", "path"}) {
+					return plan{}, false
+				}
+				p, ok := machinePlan(b)
+				if !ok {
+					return plan{}, false
+				}
+				path, ok := b.str("path")
+				if _, present := b["path"]; present && (!ok || len(path) > 4096) {
+					return plan{}, false
+				}
+				p.path = path
+				return p, true
 			},
-		},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "GET", Path: "/v1/project-folders", Query: map[string]string{"path": p.path}}
+			}},
+		op{name: "project-add",
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "path") {
+					return plan{}, false
+				}
+				p, ok := actionPlan(b, false)
+				path, valid := b.nonEmpty("path")
+				if !ok || !valid || !printable(path) || len(path) > 4096 || !filepath.IsAbs(path) {
+					return plan{}, false
+				}
+				p.path = path
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				payload, _ := json.Marshal(map[string][]string{"paths": {p.path}})
+				return LocalRequest{Method: "POST", Path: "/v1/places", Body: payload, Header: asDevice()}
+			}},
+		op{name: "project-hide",
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "path") {
+					return plan{}, false
+				}
+				p, ok := actionPlan(b, false)
+				path, valid := b.nonEmpty("path")
+				if !ok || !valid || !printable(path) || len(path) > 4096 || !filepath.IsAbs(path) {
+					return plan{}, false
+				}
+				p.path = path
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				payload, _ := json.Marshal(map[string][]string{"paths": {p.path}})
+				return LocalRequest{Method: "DELETE", Path: "/v1/places", Body: payload, Header: asDevice()}
+			}},
 		op{name: "projects", read: true,
 			decode: func(b body) (plan, bool) {
 				if !b.has("type", "session", "request") {
@@ -751,6 +799,18 @@ func init() {
 			route: func(p plan) LocalRequest {
 				return LocalRequest{Method: "GET", Path: "/v1/update"}
 			}},
+		// A foreground return requires a fresh signed manifest. A distinct word
+		// keeps older machines' update read wire shape unchanged.
+		op{name: "update-fresh", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request") {
+					return plan{}, false
+				}
+				return machinePlan(b)
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "GET", Path: "/v1/update/fresh"}
+			}},
 
 		// The Settings page's 「立即更新」 (docs/updates.md): install the newest
 		// release of this machine's channel. A command, so it needs the
@@ -774,7 +834,10 @@ func init() {
 
 		op{name: "agent", read: true,
 			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "agent", "limit") {
+				if !b.hasOneOf([]string{"type", "session", "agent", "limit"},
+					[]string{"type", "session", "agent", "limit", "before"},
+					[]string{"type", "session", "agent", "limit", "expected_generation"},
+					[]string{"type", "session", "agent", "limit", "before", "expected_generation"}) {
 					return plan{}, false
 				}
 				agent, ok := b.nonEmpty("agent")
@@ -789,21 +852,34 @@ func init() {
 				// agents and one answer channel between them, so a reader who
 				// opens two would have the first settled by the second's
 				// conversation.
-				p, ok := sessionPlan(b, "agent:"+agent)
+				p, ok := pinnedSessionPlan(b, "agent:"+agent)
 				if !ok {
 					return plan{}, false
 				}
 				p.id, p.limit = agent, limit
+				if _, named := b["before"]; named {
+					before, ok := b.integer("before")
+					if !ok || before < 1 {
+						return plan{}, false
+					}
+					p.before = before
+					p.name += ".before." + strconv.FormatInt(before, 10)
+				}
 				return p, true
 			},
 			route: func(p plan) LocalRequest {
+				query := map[string]string{"limit": strconv.FormatInt(p.limit, 10)}
+				if p.before > 0 {
+					query["before"] = strconv.FormatInt(p.before, 10)
+				}
 				return LocalRequest{Method: "GET", Path: "/v1/sessions/" + segment(p.session) + "/agents/" + segment(p.id),
-					Query: map[string]string{"limit": strconv.FormatInt(p.limit, 10)}}
+					Query: query}
 			}},
 
 		op{name: "shell", read: true,
 			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "shell", "bytes") {
+				if !b.hasOneOf([]string{"type", "session", "shell", "bytes"},
+					[]string{"type", "session", "shell", "bytes", "expected_generation"}) {
 					return plan{}, false
 				}
 				shell, ok := b.nonEmpty("shell")
@@ -816,7 +892,7 @@ func init() {
 				if !ok || window < 1<<10 || window > 1<<20 {
 					return plan{}, false
 				}
-				p, ok := sessionPlan(b, "shell:"+shell)
+				p, ok := pinnedSessionPlan(b, "shell:"+shell)
 				if !ok {
 					return plan{}, false
 				}

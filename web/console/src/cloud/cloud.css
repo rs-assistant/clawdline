@@ -15,6 +15,16 @@
 .cloud-machine-name { font-size: 14px; font-weight: 600; }
 .cloud-machine-identity { font-size: 11px; color: var(--faint); font-family: var(--mono); }
 .cloud-machine-facts { font-size: 12px; color: var(--dim); }
+.cloud-machines li > button:first-child span { overflow-wrap: anywhere; }
+.door[data-cloud-screen="machines"] .fine { overflow-wrap: anywhere; }
+/* A long machine roster must scroll inside the picker. Centering an oversized
+   door card clips its first rows above the viewport on a narrow phone. */
+.door[data-cloud-screen="machines"] .door-card {
+    box-sizing: border-box;
+    max-height: calc(100dvh - 48px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
 
 /* In the header, shaped like the connection light it replaces (`legacy/header.css` `.conn`)
    and carrying that light's dot before the machine's name. The list opens here
@@ -25,6 +35,7 @@
    dot, a few letters and the chevron. */
 .cloud-switcher {
     position: relative; flex: 0 1000 auto; min-width: 84px; max-width: 34vw;
+    margin-left: auto;
 }
 @media (max-width: 390px) {
     /* Keep the request for attention legible in the narrow Cloud header. */
@@ -68,6 +79,11 @@
 }
 .cloud-switch[aria-expanded="true"] { color: var(--ink); background: var(--card-hi); border-color: var(--accent-ed); }
 .cloud-switch[aria-expanded="true"] .cloud-switch-chevron { transform: rotate(180deg); }
+/* The header carries the machine menu, so it stacks above the pages under it
+   (`.page` is z-index 35): at 20 the menu opened behind every page but
+   Sessions and the switch looked dead. Below the phone's full-screen Session
+   (40), the drawer (45) and the sheets (60). */
+.top:has(.cloud-switcher) { z-index: 36; }
 .cloud-switch-menu {
     position: absolute; top: calc(100% + 10px); right: 0; z-index: 30;
     box-sizing: border-box; width: min(300px, calc(100vw - 24px)); padding: 8px;
@@ -120,6 +136,46 @@
 .cloud-switch-manage:hover,
 .cloud-switch-manage:focus-visible { color: var(--ink); }
 
+/* The fleet list is the original Sessions pane with grouped status rows. */
+.cloud-all-machine-dialog { width: min(440px, calc(100vw - 24px)); color: var(--ink); background: var(--card);
+    border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.cloud-all-machine-dialog::backdrop { background: rgba(0, 0, 0, .72); }
+.cloud-all-machine-dialog h2 { margin: 0 0 12px; font-size: 16px; }
+.cloud-all-machine-dialog button { display: block; width: 100%; min-height: 44px; margin: 4px 0; padding: 8px 10px;
+    border: 1px solid var(--line); border-radius: 8px; text-align: left; color: var(--ink); }
+.cloud-all-machine-dialog button:hover { background: var(--card-hi); }
+.cloud-all-list-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 12px 24px; }
+.cloud-all-groups { display: grid; gap: 16px; }
+.cloud-all-group { min-width: 0; }
+.cloud-all-status-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 10px; }
+.cloud-all-status-filter { padding: 5px 10px; border: 1px solid var(--line);
+    border-radius: 999px; color: var(--dim); font-size: 12px; }
+.cloud-all-status-filter[aria-pressed="true"] { color: var(--accent); background: var(--card-hi); border-color: var(--accent-ed); }
+.cloud-all-group-heading { margin: 0; }
+.cloud-all-group-heading button { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    box-sizing: border-box; width: 100%; min-height: 44px; padding: 0; appearance: none;
+    border: 0; background: transparent; color: var(--dim); font: inherit; text-align: left; cursor: pointer; }
+.cloud-all-group-heading button:hover { color: var(--ink); }
+.cloud-all-group-name { min-width: 0; margin: 6px 0; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.cloud-all-group-name small { font-size: 11px; font-weight: normal; color: var(--faint); }
+.cloud-all-group-count { display: inline-block; min-width: 16px; margin-left: 8px; padding: 1px 5px;
+    border: 1px solid var(--line); border-radius: 999px; color: var(--dim); font-size: 11px;
+    font-weight: normal; line-height: 16px; text-align: center; vertical-align: middle; }
+/* The machine's carrier: filled is the direct channel, hollow is the relay,
+   faint is a machine this browser has not read yet. A dot and no word, so a
+   list of machines stays a list of machines. */
+.cloud-carrier-dot { display: inline-block; flex: 0 0 auto; width: 7px; height: 7px; margin-right: 7px;
+    border-radius: 50%; box-sizing: border-box; vertical-align: 1px;
+    background: transparent; border: 1.5px solid var(--faint); }
+.cloud-carrier-dot[data-carrier="direct"] { background: var(--ok); border-color: var(--ok); }
+.cloud-carrier-dot[data-carrier="relay"] { background: transparent; border-color: var(--ok); }
+.cloud-all-group-heading svg { flex: 0 0 auto; width: 18px; height: 18px; fill: none;
+    stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.cloud-all-group-heading button[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.cloud-all-group p { margin: 6px 0; color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
+.cloud-all-transcript { max-width: 760px; }
+.cloud-all-list-scroll :is(button, select, a, .row):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 @media (max-width: 899px) {
     .cloud-switcher { max-width: 42vw; }
     .cloud-switch-menu { position: fixed; top: calc(var(--head-h) + 8px); right: 8px; }
@@ -131,22 +187,36 @@
    this page. Nothing in `legacy/` is touched — it is byte-for-byte copied
    (`tools/check-legacy-css.sh`), which is why the red `.confirm-go` is spelled
    here rather than added to that file's list of `data-kind`s. */
-/* The row is the card; its action group sits inside its bounds. They are
-   siblings in the markup because a button cannot be nested in a button, so
-   the list item is the positioned box and the row fills it. The row keeps
-   enough padding on the right that its facts never run under the controls. */
+/* The row and its action group are siblings because buttons cannot nest.
+   Desktop positions the controls over reserved space in the row. On narrow
+   screens the list item becomes the card and contains both parts. */
 .cloud-machines li { position: relative; }
-.cloud-machines li > button:first-child { padding-right: 70px; }
-.cloud-machines li[data-pairable] > button:first-child { padding-right: 126px; }
+.cloud-machines li > button:first-child { padding-right: 110px; }
+.cloud-machines li[data-pairable] > button:first-child { padding-right: 190px; }
 .cloud-machine-actions {
     position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
     display: flex; align-items: center; gap: 2px;
+}
+@media (max-width: 600px) {
+    .cloud-machines li {
+        background: #101014; border: 1px solid var(--line); border-radius: 10px;
+        overflow: hidden;
+    }
+    .cloud-machines li > button:first-child,
+    .cloud-machines li[data-pairable] > button:first-child {
+        padding: 11px 12px 4px;
+        background: transparent; border: 0; border-radius: 0;
+    }
+    .cloud-machine-actions {
+        position: static; transform: none; justify-content: flex-end;
+        padding: 0 6px 5px;
+    }
 }
 /* `.cloud-machines button` above styles every button in the list and is more
    specific, so every action states its compact shape in full. */
 .cloud-machines .cloud-forget,
 .cloud-machines .cloud-rename {
-    width: 26px; height: 26px; padding: 0;
+    width: 44px; height: 44px; padding: 0;
     flex-direction: row; align-items: center; justify-content: center;
     background: transparent; border: 1px solid transparent; border-radius: 7px;
     color: var(--dim); line-height: 1; text-align: center;
@@ -198,7 +268,7 @@
    is the next step the person is looking for. */
 .cloud-machines .cloud-pair,
 .cloud-switch-pair {
-    display: flex; width: auto; height: 26px; padding: 0 7px;
+    display: flex; width: auto; min-height: 44px; padding: 0 9px;
     flex-direction: row; align-items: center; justify-content: center;
     background: var(--card-hi); border: 1px solid var(--accent-ed); border-radius: 7px;
     color: var(--ink); font-size: 11px; font-weight: 600; line-height: 1; text-align: center;
@@ -321,3 +391,14 @@
 .cloud-device-ask .confirm-go { border-color: #57362e; color: #e09985; }
 .cloud-device-ask .confirm-go:hover:not(:disabled) { background: #2f2322; color: #f0b6a2; }
 .cloud-device-limit .go { margin-top: 14px; }
+.cloud-detail-problem { margin: 24px; color: var(--dim); line-height: 1.5; }
+.cloud-detail-problem p { margin: 0; }
+/* The sentence used to be the whole screen. The press that answers it stands
+   under the sentence, at the touch size the rest of the console uses. */
+.cloud-detail-act {
+    min-height: 44px; margin-top: 14px; padding: 10px 14px;
+    background: #101014; border: 1px solid var(--line); border-radius: 10px;
+    color: var(--ink);
+}
+.cloud-detail-act:hover { border-color: var(--accent-ed); }
+.cloud-detail-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

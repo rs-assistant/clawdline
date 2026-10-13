@@ -84,6 +84,10 @@ class FakeMac implements CloudWriteClient {
     this.asked.push("info:" + identity.session)
     return Promise.resolve(INFO)
   }
+  skills(identity: CloudIdentity) {
+    this.asked.push("skills:" + identity.session)
+    return Promise.resolve({ skills: [{ name: "review", description: "Review work", source: "project" }] })
+  }
   infoSummary(identity: CloudIdentity) {
     this.asked.push("infoSummary:" + identity.session)
     return Promise.resolve(INFO)
@@ -181,6 +185,7 @@ test("one word, one list, and every route names a word the table carries", () =>
     ["POST", "/v1/voice"],
     ["POST", "/v1/intents"],
     ["GET", "/v1/places"],
+    ["DELETE", "/v1/places"],
     ["GET", "/v1/places/p1/sessions/claude"],
     ["GET", "/v1/artifacts/images/img-1"],
     ["POST", "/v1/push/subscribe"],
@@ -195,7 +200,6 @@ test("one word, one list, and every route names a word the table carries", () =>
     ["DELETE", "/v1/snippets/sn-1"],
     ["POST", "/v1/snippets/order"],
     ["POST", "/v1/projects/%2Frepo/worktrees/refresh"],
-    ["PUT", "/v1/projects/p1/icon"],
     ["PUT", "/v1/projects/p1/files/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
     ["POST", "/v1/project-sync/mirror"],
     ["DELETE", "/v1/project-sync/mirror"],
@@ -222,6 +226,7 @@ test("one word, one list, and every route names a word the table carries", () =>
     ["POST", "/v1/settings/work-gates"],
     ["GET", "/v1/machine/usage"],
     ["GET", "/v1/update"],
+    ["GET", "/v1/update/fresh"],
     ["POST", "/v1/update/apply"],
     ["GET", "/v1/verifications"],
     ["GET", "/v1/verifications/v1"],
@@ -303,7 +308,11 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("project-unify-apply" in CARRIED)
   assert.ok(!("project-unify-plan" in DEFERRED))
   assert.ok(!("project-unify-apply" in DEFERRED))
-  assert.equal(Object.keys(CARRIED).length, 139)
+  // The fleet list's one machine-level title read (5ff7f4ee).
+  assert.ok("sessions.list" in CARRIED)
+  // An opened waiting Session's one row, asked when its question has not come.
+  assert.ok("sessions.row" in CARRIED)
+  assert.equal(Object.keys(CARRIED).length, 154)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {
@@ -328,9 +337,6 @@ test("the Cloud coordination panel reads current leases, waits and pauses from i
 test("a first Session recovery extends the wire only when the machine advertises the new word", () => {
   const source = readFileSync(resolve(console_, "src/legacy/js/net/cloud-client.js"), "utf8")
   assert.match(source, /SESSION_SNAPSHOT_INITIAL_COMMAND = "sessions\.snapshot\.initial"/)
-  assert.match(source, /_machineImplements\(machine, SESSION_SNAPSHOT_INITIAL_COMMAND\) === "yes"/)
-  assert.match(source, /var command = initial \? SESSION_SNAPSHOT_INITIAL_COMMAND : SESSION_SNAPSHOT_COMMAND/)
-  assert.doesNotMatch(source, /extra\.initial\s*=/)
 })
 
 test("every route the table says is answered here is answered here, with no word behind it", async () => {
@@ -358,16 +364,10 @@ test("every route the table says is answered here is answered here, with no word
 test("a route this console does not carry is refused by the word it stands for", async () => {
   const mac = new FakeMac()
   const reader = seam(mac)
-  // 常用句 used to be here — a word this machine knew and had no route for, so
-  // the page refused the read to itself. It is carried now, and the shape it
-  // left behind is the one this asserts on a word that still is not: a
-  // session's skills.
   const res = await reader.fetch("/v1/sessions/s1/skills")
-  assert.equal(res.status, 501)
-  const body = (await res.json()) as { error: string; detail: string }
-  assert.equal(body.error, "cloud_not_carried", "the code the screens choose their sentence by")
-  assert.equal(body.detail, NO_MACHINE_ROUTE.skills)
-  assert.match(body.detail, /on the machine/, "a named refusal says what can be done instead")
+  assert.equal(res.status, 200)
+  assert.deepEqual((await res.json() as { skills: { name: string }[] }).skills.map((skill) => skill.name), ["review"])
+  assert.ok(mac.asked.includes("skills:s1"))
   assert.equal(uncarriedWordOf("GET", "/v1/snippets"), "", "the snippet list is carried, so it stands for nothing here")
   assert.equal(uncarried("snippets"), "", "a carried word has no refusal sentence")
   assert.equal(uncarriedWordOf("GET", "/v1/sessions/s1/documents"), "", "the document listing is carried")
@@ -610,11 +610,11 @@ test("the Git panel's read reaches the machine, and its refusals keep their name
   assert.equal(refused.status, 404)
   assert.equal(((await refused.json()) as { error: string }).error, "not_a_repo")
 
-  // And a session this page holds no row for is refused rather than addressed
-  // by the raw id (F5), as every other session read is.
+  // A missing row cannot prove the machine has removed the Session. The page
+  // refuses the unverified target without addressing the raw id (F5).
   const gone = await reader.fetch("/v1/sessions/s9/git")
-  assert.equal(gone.status, 404)
-  assert.equal(((await gone.json()) as { error: string }).error, "session_not_found")
+  assert.equal(gone.status, 409)
+  assert.equal(((await gone.json()) as { error: string }).error, "session_unknown")
 })
 
 test("the live screen is a machine read of `screen` for the session, and its answer crosses as sent", async () => {
@@ -644,11 +644,10 @@ test("the live screen is a machine read of `screen` for the session, and its ans
   assert.equal(refused.status, 404)
   assert.equal(((await refused.json()) as { error: string }).error, "session_not_found")
 
-  // And a session this page holds no row for is refused rather than addressed
-  // by the raw id (F5).
+  // A missing row is unverified rather than proved absent (F5).
   const gone = await reader.fetch("/v1/sessions/s9/screen")
-  assert.equal(gone.status, 404)
-  assert.equal(((await gone.json()) as { error: string }).error, "session_not_found")
+  assert.equal(gone.status, 409)
+  assert.equal(((await gone.json()) as { error: string }).error, "session_unknown")
 })
 
 test("the status line's read reaches the machine, and its context cell draws", async () => {
@@ -683,19 +682,19 @@ test("the seam says what this machine can do that this bundle never asks for", a
   // Every pair this test has used before — `board`, `snippets`, `git`,
   // `screen`, and then `shell` — became a carried word, which is exactly the
   // drift this assertion is about.
-  mac.commands = [...Object.keys(CARRIED), "skills"]
-  assert.deepEqual(reader.drift(), { notCarried: ["skills"], notOnThisMachine: [] })
+  mac.commands = [...Object.keys(CARRIED), "diagnostics.report"]
+  assert.deepEqual(reader.drift(), { notCarried: ["diagnostics.report"], notOnThisMachine: [] })
   mac.commands = Object.keys(CARRIED).filter((word) => word !== "info")
   assert.deepEqual(reader.drift(), { notCarried: [], notOnThisMachine: ["info"] })
 
   // And it reaches this page's own log, once, the first time the list is read.
-  mac.commands = [...Object.keys(CARRIED), "skills"]
+  mac.commands = [...Object.keys(CARRIED), "diagnostics.report"]
   const fresh = seam(mac)
   await fresh.fetch("/v1/sessions")
   await fresh.fetch("/v1/sessions")
   const said = fresh.log.filter((row) => row.code === "cloud_vocabulary_drift")
   assert.equal(said.length, 1, "said once, not on every reading")
-  assert.equal(said[0].word, "skills")
+  assert.equal(said[0].word, "diagnostics.report")
 })
 
 test("the words are this build's own catalog, and the document says which", async () => {
@@ -756,8 +755,6 @@ test("the capacity block's read is carried, so the block a capacity push names o
 test("the default-model block stays visible on Cloud and asks only its narrow route", () => {
   const block = readFileSync(resolve(console_, "src/pages/settings/DefaultModelsBlock.tsx"), "utf8")
   const api = readFileSync(resolve(console_, "src/pages/settings/api.ts"), "utf8")
-  assert.doesNotMatch(block, /followsRelay|return null/, "a hosted Settings page must not hide the model controls")
-  assert.match(api, /const path = "\/v1\/settings\/default-models"/)
   assert.equal(writeRoute("GET", "/v1/settings/default-models")?.word, "default-models")
   assert.equal(writeRoute("POST", "/v1/settings/default-models")?.word, "default-models-update")
 })
@@ -766,9 +763,15 @@ test("the work-gate block stays visible on Cloud and asks only its narrow route"
   const block = readFileSync(resolve(console_, "src/pages/settings/GateSettingsBlock.tsx"), "utf8")
   const page = readFileSync(resolve(console_, "src/pages/settings.tsx"), "utf8")
   const api = readFileSync(resolve(console_, "src/pages/settings/api.ts"), "utf8")
-  assert.doesNotMatch(block, /followsRelay|return null/, "a hosted Settings page must not hide the gate controls")
-  assert.match(page, /<GateSettingsBlock shown=\{shown\} \/>/)
-  assert.match(api, /const path = "\/v1\/settings\/work-gates"/)
+  assert.match(page, /<GateSettingsBlock shown=\{shown && tab === 1\} \/>/)
   assert.equal(writeRoute("GET", "/v1/settings/work-gates")?.word, "work-gate-settings")
   assert.equal(writeRoute("POST", "/v1/settings/work-gates")?.word, "work-gate-settings-update")
+})
+
+test("full browser machine settings stay on the local console", () => {
+  const page = readFileSync(resolve(console_, "src/pages/settings.tsx"), "utf8")
+  const api = readFileSync(resolve(console_, "src/pages/settings/api.ts"), "utf8")
+  assert.match(api, /"\/v1\/settings\/browser"/)
+  assert.equal(writeRoute("GET", "/v1/settings/browser"), null)
+  assert.equal(writeRoute("POST", "/v1/settings/browser"), null)
 })

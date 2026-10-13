@@ -2,10 +2,11 @@ import { catalogWord } from "./catalog.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import type { SessionRow } from "@clawdline/contract"
 import { ClawdlineClient } from "@clawdline/core"
-import { client } from "./client.js"
+import { client, followsRelay } from "./client.js"
 import { BRAND_MARK } from "./brand-mark.js"
 import { connectionLightState, connectionLightWords, type ConnectionLight } from "./connection-state.js"
 import { useFleet, usePoll } from "./useFleet.js"
+import { healthPace, publishHealth } from "./health-feed.js"
 import { SessionsPage } from "./Sessions.js"
 import { toggleOrder } from "./session/Transcript.js"
 import { conversationNotStarted } from "./session/readiness.js"
@@ -20,12 +21,13 @@ import { verifyWord } from "./pages/verify/words.js"
 import { nextWord } from "./next-strings.js"
 import { bootLocalCatalog } from "./catalog.js"
 import { namesSession, sessionFragment, sessionsInFragment } from "./session/address.js"
+import { destinationFragment, destinationFromFragment, destinationKey, type FleetDetailProblem, type SessionDestination } from "./cloud/all-machine-sessions.js"
 import { hasDocumentIntent } from "./legacy/documents-bridge.js"
 import { NewBuild } from "./NewBuild.js"
 import { MachineDashboard } from "./machine/MachineDashboard.js"
 import { Start } from "./session/Start.js"
 import { SidebarIcon, type SidebarIconName } from "./SidebarIcon.js"
-import { sessionCountState, sessionReadingChinese, totalSessionWords } from "./session-reading.js"
+import { scanRecovering, sessionCountState, sessionReadingChinese, totalSessionWords } from "./session-reading.js"
 import {
   ActionConfirm,
   BEFORE_PAGE_CHANGE,
@@ -40,6 +42,7 @@ import {
   getClosingId,
   hostConfirm,
   hostInfo,
+  requestConfirm,
   shown,
   toast,
   toggleKeys,
@@ -55,7 +58,7 @@ import {
  * stylesheet is that app's. The drawer is `input/sidebar.js` and the page
  * switch is `core/pages.js`, rule for rule.
  */
-type Page = "sessions" | "devices" | "projects" | "timeline" | "plan" | "settings" | "work" | "verify" | "archive" | "squad" | "documents"
+type Page = "sessions" | "devices" | "projects" | "timeline" | "plan" | "settings" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
 
 /** What became of a session the address asked for: see `openAsked`. */
 type Asked = "none" | "waiting" | "opened" | "gone"
@@ -192,14 +195,35 @@ function rowNode(id: string): HTMLElement | null {
  * light and draws both in one control (`cloud/CloudGate.tsx`) — on a phone two
  * pills beside each other left the counts no room to be read.
  */
-export default function App({ aside }: { aside?: ReactNode | ((light: ConnectionLight) => ReactNode) } = {}) {
+export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
+  fleetReaderMachine = null,
+  fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetCloseIntent = null, onFleetCloseIntentHandled,
+  hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions }: {
+  aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
+  cloudSessions?: ReactNode
+  cloudPeerAccess?: ReactNode | ((active: boolean) => ReactNode)
+  fleetList?: (filter: string, onFilter: (value: string) => void) => ReactNode
+  fleetTarget?: SessionDestination | null
+  fleetTargetRow?: SessionRow | null
+  fleetReaderMachine?: string | null
+  fleetDetailProblem?: FleetDetailProblem | null
+  /** Whether the opened fleet Session's own row is still missing from this machine's rows. */
+  onFleetDetailPending?: (pending: boolean) => void
+  onFleetClose?: () => void
+  fleetCloseIntent?: { target: SessionDestination; title: string } | null
+  onFleetCloseIntentHandled?: () => void
+  hideSessionCounts?: boolean
+  focusCloudSessions?: boolean
+  onLeaveCloudSessions?: () => void
+} = {}) {
   const fleet = useFleet(client)
   const light = useConnectionLight(fleet.live, fleet.refresh)
   const machineVersion = useMachineVersion()
   // A page this machine reports too low a route level for is offered disabled
   // and says why, rather than missing (pages/registry.ts `pageNeedsUpdate`).
   const tooOld = (id: string) => pageNeedsUpdate(id, PAGE_MODULES, machineVersion.apiLevel)
-  const offered = (id: string) => ready(id) && !tooOld(id)
+  const offered = (id: string) => (id === "peer-access" ? !!cloudPeerAccess : ready(id) && !tooOld(id))
+  const knowsHere = (name: string): name is Page => name === "peer-access" ? !!cloudPeerAccess : knows(name)
   const tooOldTitle = (id: string) => tooOld(id) ? nextWord("machineNeedsUpdate") : undefined
   const tooOldMark = (id: string) => tooOld(id) ? <small className="sidebar-needs-update"> · {nextWord("machineNeedsUpdateShort")}</small> : null
   const [page, setPage] = useState<Page>(() => location.pathname === "/billing/done"
@@ -302,10 +326,11 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
   // hidden, not taken down: `main#app` keeps its scroll and its open session —
   // so coming back to it writes that session's address, not the page's.
   const go = (to: Page, options?: { hash?: boolean }) => {
-    if (!knows(to) || to === pageRef.current) return false
+    if (!knowsHere(to) || to === pageRef.current) return false
     if (!document.dispatchEvent(new CustomEvent(BEFORE_PAGE_CHANGE, { cancelable: true, detail: { from: pageRef.current, to } }))) return false
     pageRef.current = to
     setPage(to)
+    if (focusCloudSessions && to !== "sessions") onLeaveCloudSessions?.()
     if (document.documentElement.classList.contains("booting")) landOnBrand.current = true
     else brandRef.current?.focus({ preventScroll: true })
     if (options?.hash !== false) {
@@ -314,6 +339,13 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
     closeMenu()
     return true
   }
+
+  useEffect(() => {
+    if (!focusCloudSessions || pageRef.current === "sessions") return
+    pageRef.current = "sessions"
+    setPage("sessions")
+    closeMenu()
+  }, [focusCloudSessions])
 
   // `Pages.bind` writes the answer on the root element, and `routeTo`
   // (`input/route.js`) follows the address: once on arrival and on every
@@ -331,21 +363,42 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
   useEffect(() => {
     const routeTo = () => {
       const documentLink = hasDocumentIntent(location.hash)
-      const target = documentLink ? "documents" : pageFromHash(location.hash, knows)
+      const target = documentLink ? "documents" :
+        fleetList && destinationFromFragment(location.hash) ? "sessions" : pageFromHash(location.hash, knowsHere)
       const from = pageRef.current
       if (!goRef.current(target, { hash: false }) && target !== from) {
         writeHash("#page=" + encodeURIComponent(from))
         return
       }
-      askedRef.current = documentLink ? null : sessionsInFragment(location.hash)
+      askedRef.current = documentLink || ((cloudSessions || fleetList) && destinationFromFragment(location.hash))
+        ? null : sessionsInFragment(location.hash)
       if (askedRef.current) openAskedRef.current()
     }
     routeTo()
     window.addEventListener("hashchange", routeTo)
     return () => window.removeEventListener("hashchange", routeTo)
-  }, [])
+  }, [!!cloudSessions, !!fleetList])
 
-  const rows = fleet.snapshot?.sessions ?? []
+  const receivedRows = fleet.snapshot?.sessions ?? []
+  // The fleet already holds a pinned, execution-matched display row. Its
+  // conversation may arrive before the old one-machine rich-row stream; the
+  // opened pane can use that same row while the stream catches up.
+  const rows = useMemo(() => fleetTarget && fleetReaderMachine === fleetTarget.machineID && fleetTargetRow &&
+    fleetTargetRow.id === fleetTarget.sessionID &&
+    fleetTargetRow.execution_generation === fleetTarget.executionGeneration &&
+    !receivedRows.some((row) => row.id === fleetTarget.sessionID &&
+      row.execution_generation === fleetTarget.executionGeneration)
+    ? [...receivedRows, fleetTargetRow] : receivedRows,
+  [receivedRows, fleetTarget && destinationKey(fleetTarget), fleetReaderMachine, fleetTargetRow])
+  // The opened fleet Session, waiting for its own row. The pane has nothing to
+  // draw until the row is here, and the cloud layer decides how long that may
+  // go on without being said (`cloud/opened-row.ts`).
+  const fleetDetailPending = !!fleetList && !!fleetTarget &&
+    (fleetReaderMachine !== fleetTarget.machineID || !rows.some((row) =>
+      row.id === fleetTarget.sessionID && row.execution_generation === fleetTarget.executionGeneration))
+  useEffect(() => {
+    onFleetDetailPending?.(fleetDetailPending)
+  }, [fleetDetailPending, onFleetDetailPending])
   const rowsRef = useRef(rows)
   rowsRef.current = rows
   const snapshotRef = useRef(fleet.snapshot)
@@ -398,10 +451,11 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
     if (phone()) {
       if (viewRef.current !== "detail") releaseKeyboardFocus()
       setView("detail")
-      stepIntoDetail(id, listAddress() + sessionFragment(id), arrived)
+      stepIntoDetail(id, fleetList && fleetTarget ? listAddress() + destinationFragment(fleetTarget) :
+        listAddress() + sessionFragment(id), arrived)
     } else {
       if (!paneRef.current) setPane(true)
-      writeHash(sessionFragment(id))
+      writeHash(fleetList && fleetTarget ? destinationFragment(fleetTarget) : sessionFragment(id))
     }
     if (!keepFocus && !phone()) rowNode(id)?.focus({ preventScroll: true })
   }
@@ -432,6 +486,44 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
   }
   openAskedRef.current = openAsked
 
+  // The fleet list names a fixed machine, terminal and execution. The reader
+  // underneath this one original detail must have that same machine and rich
+  // row before it may open; an equal terminal ID on another machine is ignored.
+  const openedFleetKey = useRef<string | null>(null)
+  useEffect(() => {
+    if (!fleetList || !fleetTarget) return
+    go("sessions", { hash: false })
+    if (phone()) {
+      setView("detail")
+      stepIntoDetail(fleetTarget.sessionID, listAddress() + destinationFragment(fleetTarget), true)
+    } else if (!paneRef.current) setPane(true)
+  }, [fleetList && fleetTarget ? destinationKey(fleetTarget) : null])
+  useEffect(() => {
+    if (!fleetList || !fleetTarget) { openedFleetKey.current = null; return }
+    if (fleetReaderMachine !== fleetTarget.machineID) return
+    const row = rows.find((candidate) => candidate.id === fleetTarget.sessionID &&
+      candidate.execution_generation === fleetTarget.executionGeneration)
+    const key = destinationKey(fleetTarget)
+    if (row && openedFleetKey.current !== key) {
+      openedFleetKey.current = key
+      openSession(row.id, true, true)
+    }
+  }, [fleetList, fleetReaderMachine, fleetTarget?.machineID, fleetTarget?.sessionID,
+    fleetTarget?.executionGeneration, rows])
+
+  // A fleet swipe names an exact execution. Wait until its machine's rich
+  // session row has arrived before opening the ordinary close confirmation.
+  useEffect(() => {
+    if (!fleetList || !fleetCloseIntent || !fleetTarget ||
+      destinationKey(fleetCloseIntent.target) !== destinationKey(fleetTarget) ||
+      fleetReaderMachine !== fleetCloseIntent.target.machineID) return
+    const row = rows.find((candidate) => candidate.id === fleetCloseIntent.target.sessionID &&
+      candidate.execution_generation === fleetCloseIntent.target.executionGeneration)
+    if (!row) return
+    onFleetCloseIntentHandled?.()
+    requestConfirm({ kind: "end", id: row.id, subject: fleetCloseIntent.title, focus: "cancel" })
+  }, [fleetList, fleetCloseIntent, fleetTarget, fleetReaderMachine, rows])
+
   // `closeDetail`: the session goes, the highlight stays. On a phone the list
   // comes back and a `#session=…` or `#page=…` address goes with the detail,
   // replaced rather than pushed so it adds no Back step. On a desk the list
@@ -442,6 +534,12 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
   const closeDetail = (settled = false) => {
     if (!settled && openRef.current && closing()) return
     setOpen(null)
+    if (fleetList) {
+      setView("list")
+      writeHash("#all-machines")
+      onFleetClose?.()
+      return
+    }
     if (phone()) {
       setView("list")
       leaveAddress({ view: "list" })
@@ -466,11 +564,14 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
     // (`SessionActions.gone`), and it settles before the detail is given back.
     endedIfGone(new Set(rows.map((r) => r.id)))
     if (selectedRef.current && !rows.some((r) => r.id === selectedRef.current)) setSelected(null)
-    if (openRef.current && !rows.some((r) => r.id === openRef.current)) closeDetail()
+    if (openRef.current && !rows.some((r) => r.id === openRef.current)) {
+      if (fleetList && fleetTarget) setOpen(null)
+      else closeDetail()
+    }
     const asked = openAsked()
     if (firstList.current && (rows.length || asked === "gone")) {
       firstList.current = false
-      if (pageRef.current === "sessions" && asked !== "opened") {
+      if (pageRef.current === "sessions" && asked !== "opened" && !fleetList) {
         const ordered = L.orderedRows()
         const top = ordered[0]
         if (top) {
@@ -584,6 +685,13 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
         ev.preventDefault()
         ActionConfirm.close(true)
       }
+      return
+    }
+
+    // Cloud's status list has its own rows, search and pinned destination in
+    // both scopes. The original list's shortcuts must not move a hidden row.
+    if (cloudSessions && pageRef.current === "sessions") {
+      if (key === "Escape" && menuRef.current) { ev.preventDefault(); closeMenu() }
       return
     }
 
@@ -743,11 +851,13 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
           <canvas id="brand-mark" width={0} height={0} ref={markRef} />
           <b>clawdline</b>
         </button>
-        <Counts
+        {!hideSessionCounts && <Counts
           reading={sessionCountState(fleet)}
-          recovering={!!fleet.snapshot && !fleet.snapshot.scan.complete}
+          recovering={!!fleet.snapshot && scanRecovering(fleet.snapshot.scan)}
+          partialCloudList={fleet.snapshot?.scan.provenance === "cloud" && !fleet.snapshot.scan.complete &&
+            fleet.snapshot.sessions.length > 0}
           onOpen={() => setMachine(true)}
-        />
+        />}
         {typeof aside === "function" ? aside(light) : (
           <>
             {aside}
@@ -794,6 +904,11 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
               {tooOldMark(p.id)}
             </button>
           ))}
+          {cloudPeerAccess && <button className="sidebar-item" id="nav-peer-access" type="button"
+            data-page-to="peer-access" aria-current={page === "peer-access" ? "page" : undefined}
+            onClick={() => go("peer-access")}>
+            <SidebarIcon name="devices" />{nextWord("cloudPeerAccessNav")}
+          </button>}
           {/* The work system (design-decisions T6): not one of the retired app's
               pages, so it remains a row of its own at the end. */}
           <button
@@ -859,7 +974,7 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
         </div>
       </nav>
 
-      <SessionsPage
+      {cloudSessions ? (page === "sessions" ? cloudSessions : null) : <SessionsPage
         rows={rows}
         loaded={fleet.loaded}
         arrived={fleet.snapshot !== null}
@@ -878,7 +993,16 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
         onOpen={(id) => openSession(id)}
         onBack={() => closeDetail()}
         onDid={fleet.refresh}
-      />
+        streamTasks={fleet.tasksLive ? fleet.tasks : null}
+        fleetList={fleetList?.(filter, setFilter)}
+        fleetDetailKey={fleetList && fleetTarget ? destinationKey(fleetTarget) : undefined}
+        fleetDetailPending={fleetDetailPending}
+        fleetDetailProblem={fleetList && fleetTarget ? fleetDetailProblem : null}
+      />}
+      {cloudPeerAccess && <section id="peer-access" className="page cloud-peer-access-page"
+        data-page-view="peer-access" hidden={page !== "peer-access"} aria-labelledby="peer-access-title">
+        {typeof cloudPeerAccess === "function" ? cloudPeerAccess(page === "peer-access") : cloudPeerAccess}
+      </section>}
       {Object.values(PAGE_MODULES).map(({ id, Component }) => (
         // Mounted once opened and kept, as the original keeps its sections in
         // the document and only hides them.
@@ -921,10 +1045,12 @@ export default function App({ aside }: { aside?: ReactNode | ((light: Connection
 function Counts({
   reading,
   recovering,
+  partialCloudList,
   onOpen,
 }: {
   reading: ReturnType<typeof sessionCountState>
   recovering: boolean
+  partialCloudList: boolean
   onOpen: () => void
 }) {
   const T = L.strings
@@ -964,7 +1090,10 @@ function Counts({
   // The line is up — this band is drawn from a snapshot that arrived — so the
   // sentence is about the list, not about the app (`Sessions.tsx`'s empty
   // state, and `next-strings.ts` on why these are two words and not one).
-  if (recovering && reading.phase === "ready") bits.push({ cls: "part quiet", text: nextWord("sessionsListWaitTitle") })
+  if (partialCloudList && reading.phase === "ready")
+    bits.push({ cls: "part quiet", text: nextWord("sessionsListIncompleteTitle") })
+  else if (recovering && reading.phase === "ready")
+    bits.push({ cls: "part quiet", text: nextWord("sessionsListWaitTitle") })
   if (rows.length > 0 && !working && !waiting && !unknown && !shells && !recovering) {
     bits.push({ cls: "part quiet", text: catalogWord("literal", "1b40e6344265") })
   }
@@ -1004,7 +1133,13 @@ function Counts({
  */
 function useConnectionLight(live: boolean, onRetry: () => void): ConnectionLight {
   const read = useMemo(() => () => client.health(), [])
-  const { data, error: healthError } = usePoll(read, 15000)
+  // Slow while this machine's own stream is up and health has answered once
+  // (health-feed.ts, HEALTH_LIVE_MS); the pace moves back when the stream
+  // drops. A pace read before the first answer is the fifteen seconds.
+  const [answered, setAnswered] = useState(false)
+  const relayed = followsRelay() || !!import.meta.env.VITE_HOSTED_CONSOLE
+  const { data, error: healthError } = usePoll(read, healthPace({ live, answered, relayed }))
+  useEffect(() => { if (data !== null) setAnswered(true) }, [data])
   // The stream says the browser's line is open; health says the selected host
   // answered. In Cloud those are different subjects, so the relay opening
   // must not paint "connected" before the chosen machine's health arrives.
@@ -1014,7 +1149,10 @@ function useConnectionLight(live: boolean, onRetry: () => void): ConnectionLight
   // (machine/NeedsUpdate.tsx): one health read, not a second poll. A failed
   // read keeps the last reading, as the light keeps its last state.
   useEffect(() => {
-    if (data) publishMachineVersion(machineVersionFromHealth(data))
+    if (!data) return
+    publishMachineVersion(machineVersionFromHealth(data))
+    // The door listens to this reading instead of polling health itself.
+    publishHealth(data)
   }, [data])
   return { state, ...connectionLightWords(state, L.strings, version), onRetry }
 }

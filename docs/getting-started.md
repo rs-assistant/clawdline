@@ -1,4 +1,6 @@
-# Getting started
+# Getting started from source
+
+For the installed release and your first Session, start with the [user walkthrough](user/first-session.md). This page is for developers building from a clone.
 
 From a fresh clone to the console in your browser, a session in the list, and, if you want it,
 Clawdline Cloud. Every step ends with a way to check that it worked.
@@ -112,7 +114,7 @@ nothing.)
 has been used.
 
 **Check:** the console loads and shows the session list. The interface text is Traditional
-Chinese; it is the only catalog the console ships so far.
+Chinese in these examples; the console offers multiple interface languages.
 
 ## 4. Put a session in the list
 
@@ -260,8 +262,8 @@ themselves, and delete it afterwards. `--clone` is optional; without it a reposi
 does not have is reported as missing.
 
 **Check:** on the receiving machine, **Projects** shows each project with the source's name and
-icon, and a mirrored skill is in that checkout's `.claude/skills/`. Changing the icon there is
-refused (`project_mirrored`): the source owns it.
+icon, and a mirrored skill is in that checkout's `.claude/skills/`. The source
+owns later changes to those settings.
 
 Some things are deliberately not copied: `.claude/settings.local.json` (it holds the source's
 permission grants), dot files such as `.env` and build caches inside those directories, and your
@@ -280,7 +282,6 @@ personal `~/.claude/skills`.
 | A session is missing from the list | It is not running inside tmux (or iTerm2 on a Mac), or tmux is not on `PATH` nor in `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin` or `/opt/local/bin` |
 | The Cloud line stays off | `./bin/clawdline cloud status` gives the reason. A broken Cloud setting never stops the daemon, it only keeps the line down |
 | `mirror_source_mismatch` when syncing a project | Another machine already owns that project's settings here. Choose that machine as the source, or run `project import --replace-source` to hand it over |
-| `project_mirrored` when changing an icon | The project is mirrored from another machine. Change it there, or press 改回本機設定 on its row first |
 | A clone reports `clone_failed` | The receiving machine could not reach the remote with its own credentials; git's own last line is shown. Clone it by hand into the named directory, then sync again |
 
 Everything the daemon does is in `logs/daemon.log` in the state directory.

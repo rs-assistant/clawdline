@@ -91,9 +91,19 @@ function query(params: Record<string, string | undefined>): string {
 export const readDecisions = () => call<DecisionPage>("/v1/work/decisions")
 export const readDecision = (id: string) => call<{ decision: Decision }>(`/v1/work/decisions/${encodeURIComponent(id)}`)
 /** The machine's real project directory: existing places it recognizes, newest first (at most forty). */
-export const copyProjectIcon = (id: string, icon: unknown, expected: unknown) =>
-  mutate<{ ok: boolean; icon: unknown }>(`/v1/projects/${encodeURIComponent(id)}/icon`, { icon, expected }, "PUT")
 export const readProjectPlaces = (machine?: string) => call<ProjectPlacePage>("/v1/places" + query({ machine }))
+export interface ProjectFolderPage {
+  path: string
+  parent?: string
+  folders: { name: string; path: string }[]
+  truncated: boolean
+}
+export const readProjectFolders = (path?: string, machine?: string) =>
+  call<ProjectFolderPage>("/v1/project-folders" + query({ path, machine }))
+export const addProjectPlace = (path: string, machine?: string) =>
+  mutate<{ registered: boolean }>("/v1/places" + query({ machine }), { paths: [path] })
+export const removeProjectPlace = (place: ProjectPlace) =>
+  mutate<{ registered: boolean }>("/v1/places", { place: place.id, paths: [place.path] }, "DELETE")
 /** Project settings sync (docs/project-sync.md), as internal/domain/projectsync spells it. */
 export interface SyncFile { path: string; sha256: string; size: number; content?: string }
 export interface SyncEntry { repo: string; clone_url: string; label: string; icon: unknown; files: SyncFile[]; withheld?: string[]; revision: string }
@@ -504,6 +514,12 @@ export const directTodoActionV2 = (terminalID: string, todoID: string, action: "
   mutate<{ todo?: DirectTodoV2; deleted?: string }>(
     `/v1/work/v2/session-todos/${encodeURIComponent(terminalID)}/${todoID}/${action}`,
     {},
+  )
+
+export const editDirectTodoV2 = (terminalID: string, todoID: string, text: string, expectedVersion: number) =>
+  mutate<{ todo: DirectTodoV2 }>(
+    `/v1/work/v2/session-todos/${encodeURIComponent(terminalID)}/${todoID}/edit`,
+    { text, expected_version: expectedVersion },
   )
 
 export const answerDecision = (id: string, option: string) =>

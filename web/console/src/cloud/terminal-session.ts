@@ -17,6 +17,8 @@ export interface TerminalWire {
   /** The direct carrier; a wire without these keeps every connection on the relay. */
   directSupported?(): boolean
   prepareDirect?(connection: string, onDown: (code: string) => void): Promise<TerminalDirectOffer>
+  /** Whether the open channel's machine offered everyday receipts on it. */
+  directReceipts?(): boolean
   setCarrier?(connection: string, carrier: TerminalCarrier): void
 }
 
@@ -46,6 +48,8 @@ export interface CloudTerminalSnapshot {
 }
 type Pending = { operation: string; connection: string; terminal: string | null; resolve: (receipt: Receipt) => void; reject: (error: Error) => void;
   timer: ReturnType<typeof setTimeout> }
+type QueuedInput = ({ operation: "input"; data: Uint8Array } | { operation: "paste"; text: string }) &
+  { size: number; settle: (error?: unknown) => void }
 type EarlyFrame = { value: Frame; envelope: TerminalEnvelope }
 /** No verified frame has arrived for this long, by this browser's own clock: the screen is stale. */
 const STALE_MS = 6_000
@@ -87,6 +91,8 @@ export class CloudTerminalSession {
   private openingNew = false
   private rotationAttempted = false
   private rotationRetryAt = 0
+  private recovering = false
+  private recoverRetryAt = 0
   private retiringConnection = ""
   private rotationReady = false
   private activating = false
@@ -105,7 +111,8 @@ export class CloudTerminalSession {
   /** The machine offered, in its direct answer, to send everyday receipts on the DC. */
   private directReceipts = false
   private readonly directRetryAt = new Map<string, number>()
-  private sendQueue: Promise<void> = Promise.resolve()
+  private inputQueue: QueuedInput[] = []
+  private drainingInput = false
   private inFlightInput: Promise<void>[] = []
   private queuedBytes = 0
   private pending = new Map<string, Pending>()
@@ -254,6 +261,22 @@ export class CloudTerminalSession {
     }
   }
 
+  /** Restore a displayed terminal after its relay connection disappeared, without resending input. */
+  async reconnect(displayedTerminal = this.terminal): Promise<void> {
+    if (this.recovering) return
+    this.recovering = true
+    try {
+      try { await this.start() }
+      catch (error) {
+        const refusal = error as { code?: string; receiptStatus?: string }
+        if (refusal.receiptStatus !== "refused" ||
+          (refusal.code !== "terminal_invalid" && refusal.code !== "terminal_old_connection")) throw error
+        await this.start({ abandon: true })
+      }
+      if (displayedTerminal && displayedTerminal === this.terminal) await this.attach(displayedTerminal, false)
+    } finally { this.recovering = false }
+  }
+
   /**
    * Upgrades the current relay connection to a direct one when nothing else is in motion. Only a tab
    * holding the terminal's lease upgrades: a watching tab has no keys for a direct path to speed up.
@@ -276,11 +299,18 @@ export class CloudTerminalSession {
     try {
       offer = await this.transport.prepareDirect!(connection, (code) => this.directDown(attempt, code))
       if (this.directAttempt !== attempt || connection !== this.connection || !this.active) throw fail("terminal_direct_stale")
-      const answer = await this.request("direct_offer", { body: { sealed: offer.sealed } })
-      const sdp = answer.result?.sdp
-      if (typeof sdp !== "string" || !sdp) throw fail("terminal_bad_receipt")
-      this.directReceipts = answer.result?.direct_receipts === true
-      await offer.answer(sdp)
+      if (offer.borrowed) {
+        // The page's channel to this machine is already open, so this terminal has nothing to
+        // offer and nothing to wait for: it rekeys straight onto it. What the machine said about
+        // receipts when that channel was opened is what holds here (`cloud/direct-carrier.ts`).
+        this.directReceipts = this.transport.directReceipts?.() === true
+      } else {
+        const answer = await this.request("direct_offer", { body: { sealed: offer.sealed } })
+        const sdp = answer.result?.sdp
+        if (typeof sdp !== "string" || !sdp) throw fail("terminal_bad_receipt")
+        this.directReceipts = answer.result?.direct_receipts === true
+        await offer.answer(sdp)
+      }
       if (this.directAttempt !== attempt || connection !== this.connection || this.openingNew || this.retiringConnection || !this.active)
         throw fail("terminal_direct_stale")
       this.direct = offer
@@ -476,50 +506,94 @@ export class CloudTerminalSession {
   input(data: Uint8Array): Promise<void> {
     if (data.length > 4096 || this.queuedBytes + data.length > 65536) return Promise.reject(fail("input_too_large"))
     this.queuedBytes += data.length
-    return this.queueInput("input", { data: bytesBase64(data) }, data.length)
+    return this.queueInput({ operation: "input", data: new Uint8Array(data), size: data.length })
   }
   paste(text: string): Promise<void> {
     const size = new TextEncoder().encode(text).length
     if (size > 65536 || this.queuedBytes + size > 65536) return Promise.reject(fail("input_too_large"))
     this.queuedBytes += size
-    return this.queueInput("paste", { text }, size)
+    return this.queueInput({ operation: "paste", text, size })
   }
-  private queueInput(operation: "input" | "paste", body: Record<string, unknown>, size: number): Promise<void> {
+  private queueInput(item: { operation: "input"; data: Uint8Array; size: number } | { operation: "paste"; text: string; size: number }): Promise<void> {
     let settle!: (error?: unknown) => void
     const result = new Promise<void>((resolve, reject) => { settle = (error) => error ? reject(error) : resolve() })
-    const send = this.sendQueue.then(async () => {
-      // Bound unacknowledged inputs while allowing several keystrokes to cross
-      // a high-latency link without a full receipt round trip between them.
-      if (this.inFlightInput.length >= 4) await this.inFlightInput[0]!.catch(() => undefined)
-      for (;;) {
-        await this.untilTypeable()
-        if (!this.s.canType || this.epoch === null) throw this.paused()
-        const seq = this.nextSeq++
-        let issued: { sent: Promise<void>; receipt: Promise<Receipt> }
-        try {
-          issued = this.issueRequest(operation, { terminal_id: this.terminal, client: this.client, epoch: this.epoch, seq, body })
-          await issued.sent
-        } catch (error) {
-          // Never published (see issueRequest): the same numbered key waits for the relay connection.
-          // Were it somehow applied, the machine's high-water mark for this epoch and seq absorbs it.
-          if ((error as { code?: string })?.code !== "terminal_direct_closed") throw error
-          if (this.nextSeq === seq + 1) this.nextSeq = seq
-          continue
+    this.inputQueue.push({ ...item, settle })
+    if (!this.drainingInput) {
+      this.drainingInput = true
+      void this.drainInput()
+    }
+    return result.finally(() => { this.queuedBytes -= item.size })
+  }
+  private async drainInput(): Promise<void> {
+    try {
+      while (this.inputQueue.length) {
+        const batch = [this.inputQueue.shift()!]
+        // Keys typed while the last receipt was pending can share one numbered request. Paste is
+        // a separate operation, and the existing 4096-byte input limit still bounds each batch.
+        if (batch[0]!.operation === "input") {
+          let bytes = batch[0]!.size
+          while (this.inputQueue[0]?.operation === "input" && bytes + this.inputQueue[0].size <= 4096) {
+            const next = this.inputQueue.shift()!
+            batch.push(next)
+            bytes += next.size
+          }
         }
-        const settled = issued.receipt.then((receipt) => {
-          try { this.applied(receipt, seq); settle() } catch (error) { settle(error) }
-        }, settle)
-        this.inFlightInput.push(settled)
-        void settled.finally(() => {
-          const at = this.inFlightInput.indexOf(settled)
-          if (at >= 0) this.inFlightInput.splice(at, 1)
-        })
-        return
+        try {
+          await this.sendInputBatch(batch)
+          for (const item of batch) item.settle()
+        } catch (error) {
+          for (const item of batch) item.settle(error)
+        }
       }
-    })
-    this.sendQueue = send.catch(() => undefined)
-    void send.catch(settle)
-    return result.finally(() => { this.queuedBytes -= size })
+    } finally {
+      this.drainingInput = false
+      if (this.inputQueue.length) {
+        this.drainingInput = true
+        void this.drainInput()
+      }
+    }
+  }
+  private async sendInputBatch(batch: QueuedInput[]): Promise<void> {
+    const first = batch[0]!
+    let body: Record<string, unknown>
+    if (first.operation === "paste") body = { text: first.text }
+    else {
+      const data = new Uint8Array(batch.reduce((size, item) => size + item.size, 0))
+      let offset = 0
+      for (const item of batch) {
+        if (item.operation !== "input") throw new Error("mixed_input_batch")
+        data.set(item.data, offset)
+        offset += item.size
+      }
+      body = { data: bytesBase64(data) }
+    }
+    // Relay budget retries can let a later numbered key reach the machine first. Wait for the
+    // prior receipt before numbering this batch, so a delayed one cannot be skipped.
+    for (;;) {
+      await this.untilTypeable()
+      if (!this.s.canType || this.epoch === null) throw this.paused()
+      const seq = this.nextSeq++
+      let issued: { sent: Promise<void>; receipt: Promise<Receipt> }
+      try {
+        issued = this.issueRequest(first.operation, { terminal_id: this.terminal, client: this.client, epoch: this.epoch, seq, body })
+        await issued.sent
+      } catch (error) {
+        // Never published (see issueRequest): the same numbered key waits for the relay connection.
+        // Were it somehow applied, the machine's high-water mark for this epoch and seq absorbs it.
+        if ((error as { code?: string })?.code !== "terminal_direct_closed") throw error
+        if (this.nextSeq === seq + 1) this.nextSeq = seq
+        continue
+      }
+      const settled = issued.receipt.then((receipt) => this.applied(receipt, seq))
+      this.inFlightInput.push(settled)
+      try {
+        await settled
+      } finally {
+        const at = this.inFlightInput.indexOf(settled)
+        if (at >= 0) this.inFlightInput.splice(at, 1)
+      }
+      return
+    }
   }
   /** Waits out a brief pause (`typeAhead`); a key typed then was never sent, so sending it later replays nothing. */
   private untilTypeable(): Promise<void> {
@@ -558,9 +632,8 @@ export class CloudTerminalSession {
       this.set({ state: "unknown", reason: "terminal_input_state_unknown" })
       throw fail("terminal_input_state_unknown")
     }
-    // Keys after this one may already be numbered and in flight: the next number only moves forward.
-    // Resetting it to seq + 1 here handed a later key the number of one still in flight, which the
-    // machine then answered as a duplicate and never typed (a burst lost its fifth key and more).
+    // A rekey can reconcile a higher applied number while this receipt is on its way.
+    // The next number only moves forward.
     this.confirmed = Math.max(this.confirmed, seq)
     this.nextSeq = Math.max(this.nextSeq, seq + 1)
   }
@@ -743,6 +816,10 @@ export class CloudTerminalSession {
    */
   private async reopen(terminal: string): Promise<void> {
     try {
+      // Releasing this connection first makes the machine refuse a key already accepted by the
+      // relay as terminal_forbidden, which the page would mistake for revoked device pairing.
+      await Promise.allSettled([...this.inFlightInput])
+      if ((this.s.state as CloudTerminalState) === "revoked") return
       // The machine counts two connections per viewer: the discarded one is given back first, or
       // the new one is refused as busy while it lingers (2026-10-06, 20:41:04). Receipts of keys
       // sent before it still arrive ahead of this one, on the connection still subscribed.
@@ -840,6 +917,14 @@ export class CloudTerminalSession {
     }
     if (Date.now() >= this.expiresAt || (this.s.frame && Date.now() - this.frameSeenAt > STALE_MS)) {
       this.set({ state: "stale", reason: "terminal_stale" })
+    }
+    // One late heartbeat is normal. After the type-ahead window, a still stale screen needs a
+    // read-only reconnection; the old connection may have been retired while the relay was away.
+    if (this.terminal && this.s.frame && Date.now() - this.frameSeenAt >= TYPE_AHEAD_MS &&
+      this.s.state === "stale" && !this.recovering && !this.openingNew &&
+      Date.now() >= this.recoverRetryAt) {
+      this.recoverRetryAt = Date.now() + ROTATION_RETRY_MS
+      void this.reconnect().catch(() => { this.recoverRetryAt = Date.now() + ROTATION_RETRY_MS })
     }
     this.maybeUpgrade()
   }

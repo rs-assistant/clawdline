@@ -51,6 +51,8 @@ Swift app 已於 2026-09-19 退役：它被停掉、取消了登入時啟動，p
 
 ## 2. 連上 daemon
 
+需要探索此 build 已註冊的路由時，先讀 `clawdline guide routes`，確認目標機器的 API 等級與能力。路由列在表中不等於取得授權：請讀它對應的指南部分，核對具體動作、輸入、前置狀態、上限、具型別拒絕、重試規則及收據。能力、版本、身分或完成證據缺失時停止；不得改用舊 helper、另一台機器或限制較少的路徑。已接受、已執行、已送達、已觀察與已確認是不同狀態，只能宣稱收據實際證明的狀態。路由旁也列出服務的使用者目標；共用名詞見 `docs/contract-model.md`。
+
 **有指令可以用，就用指令，不要自己組 curl。** 指令在自己的 process 裡讀憑證，所以憑證不會出現在命令列、
 `ps`、指令輸出，也不會出現在你的 transcript 裡。自己組的 curl 沒帶這份憑證，會回 `401 unauthorized`
 （"No valid credential came with this request …"）：缺的是憑證，不是權限。改用指令。
@@ -58,6 +60,7 @@ Swift app 已於 2026-09-19 退役：它被停掉、取消了登入時啟動，p
 | 指令 | 做什麼 |
 |---|---|
 | `clawdline guide [lang]` | 這份指南。不需要 daemon |
+| `clawdline guide routes` | 此 build 的路由、API 等級、對應指南部分與使用者目標；不需要 daemon |
 | `clawdline session report --summary "…"` | 記錄你已經完成的 turn（§7） |
 | `clawdline session close [--dry-run] [--terminal id]` | 稽核並關閉已完成的 Session，絕不強制（§2a） |
 | `clawdline dispatch --title "…" --claims a,b < brief.md` | 派出一個 owned child（§4） |
@@ -73,6 +76,8 @@ Swift app 已於 2026-09-19 退役：它被停掉、取消了登入時啟動，p
 | `clawdline sessions [--json]` | 傳訊、等待或交接可以指名的 Session，附狀態與 task |
 | `clawdline usage [--session <c> \| --task <id> \| --item <id>]` | 一個 session、child task 或 Board item 花了多少 token，依類別分；預設是你自己 |
 | `clawdline cloud pair [--offer <code>]` | 把一個 Cloud 瀏覽器與這台機器配對 |
+| `clawdline cloud viewer login\|status\|machines\|pair` | 授權並配對獨立的本機 Cloud 檢視端 |
+| `clawdline cloud viewer sessions\|read\|send\|answer\|interrupt\|end\|receipt` | 透過本機 daemon 使用明確的機器、工作階段與執行世代 |
 | `clawdline task show [--json] <task id>` | 精簡地看一個 child task：狀態、verdict、summary、leftover 標題、驗證、landing、checkout（§5） |
 | `clawdline task wait <task id>… [--timeout 9m] [--any]` | 等 child 結束（全部，或 `--any` 一個），每個都照 `task show` 印出並關掉它的通知。exit 0 全部成功、1 有一個失敗、5 有一個被取消且沒有其他失敗、3 逾時、4 有 task 讀不到；優先順序 4、3、1、5（§5） |
 | `clawdline task cancel <task id> --reason "…"` | 停掉派錯的 child：關掉它的分頁、釋放它的寫入範圍與名額，有 commit 的 branch 會留給你（§5） |
@@ -111,6 +116,16 @@ token 讀。帳本還沒讀到、或已經讀不到的 session 會回它的原�
 中的 `heavy` 上。
 若先前的 `task wait` 已印出終止結果並關閉通知，之後才到的同一任務通知不需再執行 `task show`，也不需
 再次整合。
+
+**呼叫時宣告 callback 意圖。** `clawdline callback` 預設為 `--intent wait`，適用於等待部署或外部結果。
+命令會透過 `clawdline heavy` 執行時，使用 `--intent heavy`；自動的 `heavy --handoff` 會自行指定。
+任務紀錄和 `task show` 都會顯示意圖。Session 清單只在 heavy callback 實際取得重工作業租約並執行時
+顯示 🏗️；排隊中的 callback 和等待結果的 callback 都不顯示重工圖示。
+
+**在對話裡標出重工作業。** 執行 `clawdline heavy` 前，對人的最後一句話以 `🏗️` 開頭，簡短說明即將
+開始的工作。若交接成 callback（回傳 76），結束這輪時用一句 `🏗️` 說明排隊中的工作與完成通知。
+一般等待 callback 則說明正在等什麼，不使用重工圖示。等待期間不要反覆回報進度。若交接遭拒或
+`heavy` 回 75，直接說明指令尚未執行。
 
 **同一個 turn 內的短暫等待。** 只有目前工作必須立即取得結果，且預期很快完成時才使用。用一個工具呼叫
 設定足夠的 timeout；工具回傳 session ID 時，在同一個 cell 內收取結果，仍算同一次呼叫。等待逾時後
@@ -179,6 +194,53 @@ roster 與本機信任狀態；配對後要唯讀複查，也用這條。
 
 這些指令都透過本機正在執行的 daemon。失敗時回報 stderr 原文。除非使用者另外要求，否則不要順手
 開啟 Cloud、登入、開啟 commands、rotate key，也不要替換使用者給的 offer。
+
+**讓兩台機器互通以處理 Agent 工作。** 瀏覽器配對本身不會授予機器間權限。在 Cloud
+側邊欄的「跨機器權限」頁，打開兩台在線且已由瀏覽器驗證的機器之間的開關。頁面會經由
+各機器已驗證的通道讀取指紋、自動建立雙向簽章配對，並在兩端都回報有效配對後顯示已開啟。
+這讓兩台機器目前的 Session 可互傳 Agent 訊息與交接工作；關閉開關會撤銷雙向配對，
+不需要逐一建立 Session 授權。若只用 CLI 建立單向配對，先在兩台機器各執行
+`clawdline cloud peer fingerprint`，由當事人在各自機器上核對簽章指紋。來源機器執行
+`clawdline cloud peer start <target-machine-id> <target-fingerprint>` 開始配對；目標機器執行
+`clawdline cloud peer accept <pair-id> <source-fingerprint>` 接受；來源機器執行
+`clawdline cloud peer sync <pair-id> <target-fingerprint>` 固定配對；要雙向互通則反向再做一次。
+`clawdline cloud peer revoke-pair` 先在本機拒絕，再要求 Cloud 撤銷。舊的 Session 授權
+仍可供既有請求使用。同帳號與 viewer key 都不能取代機器簽章或目前的執行世代。
+
+本機路由為 `POST /v1/cloud/peer/control`（`action`、配對或授權 ID、核對過的指紋、指定
+Session ID 與世代、範圍）、`POST /v1/cloud/peer/send`（`request` 內含兩端機器／Session／
+世代、類型、以配對 ID 填入 wire `grant_id` 欄位、內容摘要，另附 `body`）、`GET /v1/cloud/peer/outbox/<request-id>`
+（來源 Relay 證據），以及
+`GET /v1/cloud/peer/inbox?machine_id=&session_id=&execution_generation=&before=`（單筆目標工作與持久收據；before 可省略）。
+收件正文是 `body_base64`，`next_before` 可讀取較早項目，其他執行的游標不能共用。
+CLI 用 `clawdline cloud peer outbox <request-id>` 讀取來源證據。
+已配對的 viewer 要有 send 權限才能變更；Cloud 收件匣內容另外需要 `read_content_v1`、
+`read_transcript` 和 `r/` 獨立通道上的固定執行世代。拒絕碼包括 `peer_control_refused`、
+`peer_send_unavailable`、`execution_generation_changed`、`read_transcript_required` 與
+`read_only_channel`。寫入 WebSocket 後，Relay 接受仍未知，直到收到 `peer_ack`；Relay 的
+`delivered` 只證明 socket 交付。來源端仍將目標執行與 Agent
+觀察標為未知；目標收據可證明機器執行及 Session 交付，Agent 觀察與確認須有另外的證據。
+
+**在本機跨機使用 Cloud 檢視端。**
+
+使用者授權本機檢視端後，執行 `clawdline cloud viewer login`，並請使用者核准畫面列出的裝置與確切權限。
+`clawdline cloud viewer machines` 列出帳號機器；仍須在目標機器獨立核對指紋，才能執行
+`clawdline cloud viewer pair --machine MACHINE_ID --fingerprint FINGERPRINT`。在目標機器執行印出的
+一次性 `clawdline cloud pair --offer` 指令，不要把 offer 放進報告。
+`clawdline cloud viewer sessions [--machine MACHINE_ID]` 會回報每台機器已驗證的狀態投影；
+無法取得或不完整的投影不等於空工作階段清單。
+
+`read`、`send`、`answer`、`interrupt`、`end`、`receipt` 都要從同一筆目前資料列取得
+`--machine MACHINE_ID`、`--session SESSION_ID`、`--generation GENERATION` 三個值；
+`GENERATION` 是 32 位小寫十六進位字串。`read` 先回傳最新逐字紀錄頁；若有 `next_before`，
+以相同三元目標加上 `--before NEXT_BEFORE` 按需讀取一頁較早訊息，直到回覆不再提供游標。
+每頁都重新檢查目前執行世代；不得猜測游標，也不可把最新 200 筆當成完整對話。
+`send` 需要 `--text`；`answer` 需要畫面上選項的
+`--answer` 代碼與問題 `--expect` 指紋，Agent 不得猜測。變更操作會先印請求 ID；結果不確定時，
+用相同三元目標、`--action ACTION`、`--request REQUEST_ID` 執行 `clawdline cloud viewer receipt`。
+查收據不會重送操作。配對遭撤銷、狀態過期、執行世代改變、缺少權限或機器離線時就停止。
+本機 `/v1/cloud/viewer/` 路由只接受這台 daemon 自己的本機 token，已配對的遠端裝置不能使用。
+路由索引只供發現；操作契約以上述 CLI 為準。
 
 **東西在哪裡。**
 
@@ -846,6 +908,19 @@ curl -sS -X POST "http://127.0.0.1:$PORT/v1/orchestrator/tasks/$TASK_ID/verifica
 
 只寫得進 `schedule_id` 正是啟動這個 task 的排程的那筆紀錄（否則回 `schedule_mismatch`），署名為
 `task:<task id>`；不是排程啟動的 task 會被拒絕為 `not_scheduled`。紀錄 id 用 `clawdline verify list` 查。
+
+**驗收紀錄上的讀數、紀錄與結案理由，是寫給使用者看的，不是寫給另一個 agent。** 不管是排程 task、用
+`clawdline verify note` 的 session，還是用 `clawdline verify done` 結案的 session，使用者都是在手機上讀
+它、靠它做決定：
+
+- 第一句用白話講答案：這個改動站不站得住，你建議怎麼做（接受、不接受、還看不出來）。
+- 接著每條條件一行，照原本的順序：建議狀態（通過、未通過、無法判定），加上決定它的一兩個數字，寫成
+  「之前 → 之後」。
+- 但書用日常的話講（「降幅大半是因為 task 本身變小」），不要寫成統計。除非使用者要，不放表格、百分位數、
+  檢定值或一串 task id；但書最多三條。
+- 結案理由一句話。
+
+一句話要懂這個程式碼的內部才看得懂，就改寫。
 
 ## 7. 回報你自己完成的 turn
 

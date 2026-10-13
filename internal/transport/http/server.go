@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/artifacts"
+	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
 	"github.com/sainteye/clawdline/internal/adapters/logs"
 	"github.com/sainteye/clawdline/internal/adapters/machineusage"
 	"github.com/sainteye/clawdline/internal/adapters/planner"
@@ -54,12 +55,21 @@ import (
 
 type Server struct {
 	cfg config.Config
+	// routeStats counts every API call by route and caller (route_stats.go).
+	routeStats      *routeStats
+	routeStatsOnce  sync.Once
+	viewerMu        sync.Mutex
+	viewer          *adaptercloud.ViewerClient
+	viewerSignature string
+	viewerCancel    context.CancelFunc
 	// version is this build as `clawdline version` prints it, for /v1/health
 	// (SetVersion). Empty leaves `version` out of the answer.
 	version   string
 	proxy     *httputil.ReverseProxy
 	inventory app.Inventory
 	store     *store.Store
+	// Tests can supply a machine identity without starting a Cloud link.
+	executionMachineID string
 	// replaceMachineItemReceipt is a test seam for a failed post-create
 	// receipt refinement. Nil uses the durable store implementation.
 	replaceMachineItemReceipt func(context.Context, store.ReceiptKey, store.ReceiptAnswer) error
@@ -120,6 +130,17 @@ type Server struct {
 	// their memory back, and resumable again (session_archive.go,
 	// docs/session-archive.md).
 	archive *app.SessionArchive
+	// listsProducer builds the session list and the first task page once per
+	// tick for every stream, the route and the Cloud publisher (producer.go).
+	// Made on first use by lists().
+	listsOnce     sync.Once
+	listsProducer *listProducer
+	// executions remembers what observeExecutions last committed, so an
+	// unchanged scan does not open a write transaction (execution_memo.go).
+	executions executionMemo
+	// turns keeps each working session's turn start steady across readings,
+	// so `working_since` is a change only when a new turn starts (sessions.go).
+	turns workingClock
 	// screenBus carries a moved screen's revision to every open event stream.
 	screenBus *screenBus
 	// broker is the loop from a root asking for work to a child reporting that
@@ -137,8 +158,11 @@ type Server struct {
 	// releaseUpdate is set, on the same first use, when this daemon runs
 	// from a release install: it then answers GET /v1/update instead of
 	// update, and POST /v1/update/apply installs releases (update.go).
-	releaseUpdate *updater.Daemon
-	usage         *machineusage.Sampler
+	releaseUpdate    *updater.Daemon
+	usage            *machineusage.Sampler
+	reclaimSummaryMu sync.Mutex
+	reclaimSummaryAt time.Time
+	reclaimSummary   contract.MachineReclaimSummary
 	// beat is the broker's account of its last pass, read by /v1/diagnostics.
 	beat atomic.Pointer[orchestrator.Pulse]
 	// pulse is the scheduler's own account of its last pass, read by
@@ -158,6 +182,7 @@ type Server struct {
 	// suggestPersona is the paid model seam behind the explicit Board button.
 	// Tests replace it, so verification never consumes an assistant account.
 	suggestPersona      func(context.Context, planner.PersonaRequest, string) (planner.PersonaSuggestion, error)
+	draftRole           func(context.Context, string, string) (planner.RoleDraft, error)
 	firstSessionRequest func(session.Session) (string, error)
 	sessionTailRead     func(session.Session) (transcript.Page, error)
 	intentContext       func(context.Context) ([]planner.Place, []string)
@@ -257,6 +282,7 @@ func New(cfg config.Config) (*Server, error) {
 	localPlanner.Timeout = time.Duration(CapacityLimit(capacity.IntentPlannerSeconds)) * time.Second
 	srv.planIntent = localPlanner.Draft
 	srv.nameSession = localPlanner.Name
+	srv.draftRole = localPlanner.DraftRole
 	// One producer in front of it, so three loops are one scan.
 	srv.readings = app.NewInventoryReading(srv.inventory.Read, 0)
 	srv.readings.SetRetentionAge(CapacityLimit(capacity.CacheSessionInventory))
@@ -279,6 +305,13 @@ func New(cfg config.Config) (*Server, error) {
 		SectionBytes: int(CapacityLimit(capacity.ITermStallSectionBytes)),
 		Step:         time.Duration(CapacityLimit(capacity.ITermStallStepSeconds)) * time.Second,
 	})
+	// The iTerm2 scan switch follows the settings file from the first
+	// reading on; a write that names it moves it again (settings.go).
+	if v, err := srv.settingsFile().Read(); err == nil {
+		applyITermScan(v)
+	} else {
+		log.Printf("settings: could not read iterm_scan, iTerm2 scanning stays on: %v", err)
+	}
 	srv.restore = srv.newSessionRestore()
 	srv.archive = srv.newSessionArchive()
 	srv.readings.Observe(srv.restore.Observe)
@@ -341,6 +374,9 @@ func (s *Server) reading(ctx context.Context) session.Inventory {
 	if s.readings == nil {
 		return s.inventory.Read(ctx)
 	}
+	if t, ok := app.ReadingSince(ctx); ok {
+		return s.readings.Since(ctx, t)
+	}
 	return s.readings.Fast(ctx)
 }
 
@@ -360,8 +396,13 @@ func (s *Server) freshReading(ctx context.Context) session.Inventory {
 
 func (s *Server) Handler() http.Handler {
 	// Every route is behind the gate, with no exception for loopback: see gate.go.
+	// Outside it, every call is counted by route and caller (route_stats.go).
 	gate := s.gate()
 	mux := http.NewServeMux()
+	stats := s.routeStatsTable()
+	wrap := func() http.Handler {
+		return stats.countRoutes(mux, gate.wrap(noteCaller(s.withDocuments(boundBodies(mux)))))
+	}
 	for _, rt := range s.routeTable() {
 		mux.HandleFunc(rt.Pattern, rt.handle)
 	}
@@ -376,16 +417,16 @@ func (s *Server) Handler() http.Handler {
 			// launch images are drawn, and everything else there is a file in
 			// the bundle that `page` already serves.
 			mux.Handle("/", s.withPWA(&fallback{page: newPage(root), miss: s.notImplemented}))
-			return gate.wrap(s.withDocuments(boundBodies(mux)))
+			return wrap()
 		}
 		// No web root is not a route this daemon has yet to write: `/` is its
 		// own, and it was not told where the files are. The page says that by
 		// name (no_web_root); an unowned /v1 route still says not_implemented.
 		mux.Handle("/", &fallback{page: newPage(""), miss: s.notImplemented})
-		return gate.wrap(s.withDocuments(boundBodies(mux)))
+		return wrap()
 	}
 	mux.Handle("/", s.proxy)
-	return gate.wrap(s.withDocuments(boundBodies(mux)))
+	return wrap()
 }
 
 // routeTable is every pattern this daemon registers for its API, in the order
@@ -405,12 +446,24 @@ func (s *Server) routeTable() []route {
 		// Whether this machine trails the cloud's latest build (update.go). Any
 		// paired device, as /v1/capacity.
 		{Route{"*", "/v1/update"}, s.updateRoute},
+		{Route{"*", "/v1/update/fresh"}, s.updateRoute},
 		// Installing a newer release on a release install (update.go). This
 		// machine's token, or a device that may send.
 		{Route{"*", "/v1/update/apply"}, s.updateApplyRoute},
 		// What the line to app.clawdline.com is doing (cloud.go). This machine's
 		// own token only.
 		{Route{"*", "/v1/cloud/status"}, s.cloudStatusRoute},
+		{Route{"*", "/v1/cloud/peer/send"}, s.cloudPeerSendRoute},
+		{Route{"*", "/v1/cloud/peer/control"}, s.cloudPeerControlRoute},
+		{Route{"*", "/v1/cloud/peer/inbox"}, s.cloudPeerInboxRoute},
+		{Route{"*", "/v1/cloud/peer/outbox/"}, s.cloudPeerOutboxRoute},
+		{Route{"*", "/v1/cloud/viewer/status"}, s.cloudViewerRoute},
+		{Route{"*", "/v1/cloud/viewer/machines"}, s.cloudViewerRoute},
+		{Route{"*", "/v1/cloud/viewer/sessions"}, s.cloudViewerRoute},
+		{Route{"*", "/v1/cloud/viewer/detail"}, s.cloudViewerRoute},
+		{Route{"*", "/v1/cloud/viewer/skills"}, s.cloudViewerRoute},
+		{Route{"*", "/v1/cloud/viewer/actions"}, s.cloudViewerRoute},
+		{Route{"*", "/v1/cloud/viewer/receipts"}, s.cloudViewerRoute},
 		// Pairing a browser with this Mac, and throwing one out again. Same rule:
 		// this machine's own token, because the first of them answers a link that
 		// hands over the account key.
@@ -430,6 +483,12 @@ func (s *Server) routeTable() []route {
 		// each, because the id is a path segment and Go's mux matches prefixes,
 		// not patterns.
 		{Route{"*", "/v1/sessions/"}, func(w http.ResponseWriter, r *http.Request) {
+			// A new Cloud caller may pin every per-session read and write to
+			// the exact execution it selected. The gate has authenticated it
+			// before this handler; legacy callers carry no pin.
+			if !s.admitPinnedSessionRequest(w, r) {
+				return
+			}
 			// The sessions a reboot took away: three fixed paths, asked before
 			// anything reads the next segment as a session id.
 			if s.restorableRoute(w, r) {
@@ -587,9 +646,11 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/orchestrator/reclaim"}, s.reclaimRoute},
 		{Route{"*", "/v1/strings"}, s.strings},
 		{Route{"*", "/v1/settings"}, s.settingsRoute},
+		{Route{"*", "/v1/settings/browser"}, s.settingsRoute},
 		{Route{"*", "/v1/settings/default-models"}, s.defaultModelsRoute},
 		{Route{"*", "/v1/settings/work-gates"}, s.workGateSettingsRoute},
 		{Route{"*", "/v1/places"}, s.placesRoute},
+		{Route{"GET", "/v1/project-folders"}, s.projectFoldersRoute},
 		// The input bar's server list (devstacks.go): what the projects' own
 		// `.devstack.json` files declare, and which declared ports answer.
 		{Route{"*", "/v1/devstacks"}, s.devStacksRoute},
@@ -686,6 +747,7 @@ func (s *Server) diagnostics(w http.ResponseWriter, r *http.Request) {
 		Console:   consoleReading(WebRoot()),
 		Platform:  s.platformDiagnostics(r.Context()),
 		Proposals: s.proposalDiagnostics(r.Context()),
+		Routes:    s.routeStatsTable().reading(),
 		Scheduler: s.schedulerPulse(),
 		Terminals: s.terminalDiagnostics(),
 		ServedBy:  servedBy,
@@ -714,6 +776,9 @@ func (s *Server) StartScheduler(ctx context.Context) {
 	// Whether this machine trails the cloud's latest build: read now and on
 	// its own clock, so GET /v1/update never waits on the network.
 	go s.runUpdateCheck(ctx)
+	// One daemon.log line an hour counting the osascript runs behind it, so
+	// a week with iTerm2 scanning off can be compared with one with it on.
+	go runOsascriptReport(ctx, osascriptReportPeriod)
 }
 
 // schedulerTick is the clock's period: a minute, or CLAWDLINE_NEXT_TICK. The

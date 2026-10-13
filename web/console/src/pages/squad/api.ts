@@ -1,5 +1,7 @@
-import { catalogRefusalDetail, catalogWord } from "../../catalog.js"
-import { closingMark, fullStop } from "../../punctuation.js"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { catalogRefusalDetail, catalogWord } from "../../catalog.ts"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { closingMark, fullStop } from "../../punctuation.ts"
 import { client, mayWriteThroughCurrentTransport } from "../../client.js"
 import type { SquadReceipt, SquadSession, SquadView } from "./model.js"
 import { squadView, type WireCatalog, type WireSettings } from "./wire.js"
@@ -17,6 +19,21 @@ export interface NewSquadSkill {
   folder?: boolean
   files?: { path: string; content_base64: string }[]
 }
+
+export interface NewSquadPersona {
+  definition_id: string
+  version: string
+  source: string
+  license: string
+  name: { en: string; "zh-Hant": string }
+  summary: { en: string; "zh-Hant": string }
+  body: string
+  icon: Icon
+  teams: { id: string; version: string }[]
+  skills: []
+}
+
+export interface RoleDraft { name: string; summary: string; body: string }
 
 export interface SkillSourceRow { id: string; name: string; purpose: string; location: string }
 export interface SkillSourceDetail { name: string; purpose: string; content: string; files: { path: string; content_base64: string }[]; folder_error?: string }
@@ -43,6 +60,8 @@ export interface SquadAPI {
   skillSources(scopeId: string, provider: "project" | "claude-code" | "codex"): Promise<SkillSourceRow[]>
   skillSource(scopeId: string, provider: "project" | "claude-code" | "codex", id: string, folder: boolean): Promise<SkillSourceDetail>
   createSkill(skill: NewSquadSkill, expectedVersion: number, key: string): Promise<void>
+  createPersona(persona: NewSquadPersona, expectedVersion: number, key: string): Promise<void>
+  draftRole(description: string, key: string): Promise<RoleDraft>
   boundSessions(): Promise<SquadSession[]>
   saveHandbook(scopeId: string, personaId: string, value: string, expectedVersion: number): Promise<void>
   restoreHandbook(scopeId: string, personaId: string, expectedVersion: number): Promise<void>
@@ -70,7 +89,7 @@ class SquadError extends Error {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), init.method ? 30_000 : 10_000)
+  const timer = setTimeout(() => controller.abort(), path === "/v1/squad/role-draft" ? 130_000 : init.method ? 30_000 : 10_000)
   let response: Response
   try { response = await fetch(client.url(path), { ...init, signal: controller.signal }) }
   catch (error) {
@@ -167,6 +186,14 @@ class HttpSquadAPI implements SquadAPI {
 
   async createSkill(skill: NewSquadSkill, expectedVersion: number, key: string): Promise<void> {
     await request("/v1/squad/catalog", post({ kind: "skill", expected_version: expectedVersion, entity: { skill } }, key))
+  }
+
+  async createPersona(definition: NewSquadPersona, expectedVersion: number, key: string): Promise<void> {
+    await request("/v1/squad/catalog", post({ kind: "definition", expected_version: expectedVersion, entity: { definition } }, key))
+  }
+
+  draftRole(description: string, key: string): Promise<RoleDraft> {
+    return request<RoleDraft>("/v1/squad/role-draft", post({ description }, key))
   }
 
   async boundSessions(): Promise<SquadSession[]> {

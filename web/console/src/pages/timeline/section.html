@@ -1,8 +1,13 @@
 
-    <header class="timeline-head">
-        <button id="timeline-back" type="button">Back</button>
-        <button id="timeline-board-tab" type="button">Board</button>
-        <button id="timeline-refresh" type="button">Refresh</button>
+    <header class="timeline-head page-bar">
+        <div class="page-bar-start">
+            <button id="timeline-back" type="button">Back</button>
+            <button id="timeline-board-tab" type="button">Board</button>
+            <button id="timeline-refresh" type="button" hidden>Refresh</button>
+        </div>
+        <div class="page-bar-end">
+            <button id="timeline-reload" class="page-bar-refresh" type="button"><svg class="page-bar-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12a7 7 0 1 1-2.05-4.95" /><path d="M19 4.5V9h-4.5" /></svg></button>
+        </div>
     </header>
     <div class="timeline-intro">
         <canvas id="timeline-project-mark" hidden aria-hidden="true"></canvas>

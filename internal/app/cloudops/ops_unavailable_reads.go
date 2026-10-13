@@ -8,14 +8,6 @@ func init() {
 	register(
 		// MARK: reads this daemon has no local capability for
 
-		op{name: "skills", read: true,
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session") {
-					return plan{}, false
-				}
-				return sessionPlan(b, "skills")
-			}},
-
 		// The rows again, for a page that has just (re)connected.
 		//
 		// The relay replays each channel's last envelope from memory, that
@@ -52,9 +44,35 @@ func init() {
 		// A first recovery is a separate word so a console deployed before its
 		// daemon never adds a field to sessions.snapshot that the older exact-key
 		// decoder must refuse. Only a machine advertising this word is asked it.
+		// The page sends it with the same `orchestrator: true` sessions.snapshot
+		// carries when it holds no `orch/` snapshot (`_askSessionSnapshot` in
+		// net/cloud-client.js builds `extra` the same way for both words), so
+		// the exact three keys alone refused every first recovery of a page
+		// that had not yet heard the task list.
 		op{name: sessionsSnapshotInitialWord, read: true, sessions: true,
 			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request") {
+				if !b.hasOneOf([]string{"type", "session", "request"},
+					[]string{"type", "session", "request", "orchestrator"}) {
+					return plan{}, false
+				}
+				if value, present := b["orchestrator"]; present {
+					if asked, ok := value.(bool); !ok || !asked {
+						return plan{}, false
+					}
+				}
+				return machinePlan(b)
+			}},
+
+		// One Session's row, now (`Bridge.SessionRow`). `row` names it; the
+		// envelope's own `session` is the machine's, as for the two words above.
+		// Only a machine advertising this word is asked it.
+		op{name: sessionsRowWord, read: true, sessions: true,
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "row") {
+					return plan{}, false
+				}
+				row, ok := b.str("row")
+				if !ok || row == "" || len(row) > SessionRowIDBytesLimit {
 					return plan{}, false
 				}
 				return machinePlan(b)
@@ -381,3 +399,8 @@ func init() {
 			}},
 	)
 }
+
+// SessionRowIDBytesLimit is the longest Session id a `sessions.row` read may
+// name. A tmux pane id or an iTerm2 GUID is a few dozen bytes; anything past
+// this is not an id this machine issued, and is refused before it is looked up.
+const SessionRowIDBytesLimit = 256

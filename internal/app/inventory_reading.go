@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -132,6 +133,9 @@ type InventoryReading struct {
 	// answersExpired counts drawings in which a source's complete answer was
 	// too old to vouch for its rows (SourceAnswerAgeLimit).
 	answersExpired int64
+	// pinnedHeld and pinnedScanned are how the pinned reads' checks were
+	// answered (ScannedWithin): from the held reading, or by a scan.
+	pinnedHeld, pinnedScanned int64
 	// observers are shown every scan's raw reading after its readers have
 	// been answered (Observe).
 	observers []func(context.Context, session.Inventory)
@@ -449,6 +453,62 @@ func (r *InventoryReading) Within(ctx context.Context, age time.Duration) sessio
 	return r.take(ctx, false)
 }
 
+// PinnedReadAgeLimit is how long after a scan finished it may still answer a
+// pinned read's execution check (ScannedWithin).
+//
+// A Cloud read names the execution it selected and is refused when that is no
+// longer the one running. Before this, every such read waited for a scan of
+// its own, and a scan waits for iTerm2's list Apple Event: over 113.9 hours of
+// one daemon's log the slow pinned reads took 13.0 s (info) and 8.9 s
+// (transcript) at the median. A scan that finished three seconds ago is the
+// answer a new one would give a read to within those three seconds, since a
+// scan started now returns rows observed when it started. Writes never use it.
+const PinnedReadAgeLimit = 3 * time.Second
+
+// ScannedWithin is the held reading while the scan behind it finished less
+// than age ago, and otherwise a reading taken for this call, exactly as Fresh.
+//
+// It is for a read-only check of what is running — a pinned read's admission
+// — and never for an action. The held reading is the drawing form: a source
+// that did not answer its scan has its retained rows marked unverified and its
+// Sources entry false, so it proves nothing it would not prove fresh.
+func (r *InventoryReading) ScannedWithin(ctx context.Context, age time.Duration) session.Inventory {
+	r.mu.Lock()
+	if r.holds && !r.finishedAt.IsZero() {
+		if since := r.now().Sub(r.finishedAt); since >= 0 && since < age {
+			inv := r.held
+			r.counts.Held++
+			r.pinnedHeld++
+			r.mu.Unlock()
+			return inv
+		}
+	}
+	r.pinnedScanned++
+	r.mu.Unlock()
+	return r.take(ctx, true)
+}
+
+// PinnedReading is the capacity row for PinnedReadAgeLimit at age. Used is how
+// long ago the held reading's scan finished; Expired counts the checks that
+// found it too old and took a scan of their own.
+func (r *InventoryReading) PinnedReading(age time.Duration) capacity.Reading {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	reading := capacity.Reading{
+		Known: true, WindowSeconds: int64(age / time.Second),
+		Counters: capacity.Counters{Expired: r.pinnedScanned},
+		Note:     fmt.Sprintf("%d pinned checks answered from a recent scan", r.pinnedHeld),
+	}
+	if r.finishedAt.IsZero() {
+		return reading
+	}
+	if since := r.now().Sub(r.finishedAt); since > 0 {
+		reading.Used = int64(since / time.Second)
+	}
+	reading.OldestAt = r.finishedAt
+	return reading
+}
+
 // Fresh is a reading taken for this call: the broker's beat, which decides from
 // it whether a child's tab is still there.
 //
@@ -457,6 +517,76 @@ func (r *InventoryReading) Within(ctx context.Context, age time.Duration) sessio
 // itself. It never accepts a reading that had already finished.
 func (r *InventoryReading) Fresh(ctx context.Context) session.Inventory {
 	return r.take(ctx, true)
+}
+
+// Since is a reading from a scan that began at or after t. A scan in flight
+// that began earlier is waited out, not joined: it read the terminals before t.
+// It is the session list built right after a press (WithReadingSince), and it
+// answers the display reading Fast would, only never one from before t.
+func (r *InventoryReading) Since(ctx context.Context, t time.Time) session.Inventory {
+	for {
+		r.mu.Lock()
+		flight := r.flight
+		if flight == nil || !flight.started.Before(t) {
+			r.mu.Unlock()
+			return r.take(ctx, false)
+		}
+		r.mu.Unlock()
+		select {
+		case <-flight.done:
+		case <-ctx.Done():
+			return r.Fast(ctx)
+		}
+	}
+}
+
+type readingSinceKey struct{}
+
+// WithReadingSince asks every reading taken under ctx to come from a scan
+// begun at or after t (Since). Nothing else reads it.
+func WithReadingSince(ctx context.Context, t time.Time) context.Context {
+	return context.WithValue(ctx, readingSinceKey{}, t)
+}
+
+// ReadingSince is the moment WithReadingSince put on ctx, if any.
+func ReadingSince(ctx context.Context) (time.Time, bool) {
+	t, ok := ctx.Value(readingSinceKey{}).(time.Time)
+	return t, ok
+}
+
+// takenReading is a Fresh reading one request has already taken, for the
+// first action under that request to use instead of scanning again.
+type takenReading struct {
+	mu   sync.Mutex
+	inv  session.Inventory
+	at   time.Time
+	used bool
+}
+
+type takenReadingKey struct{}
+
+// WithTakenReading hands inv, a reading taken for this request (Fresh), to the
+// first Actions.Find under ctx. A pinned write checks its target against a
+// fresh scan and then resolves the same target to act on it; that was two
+// scans one after the other, each waiting on iTerm2. The reading is used once,
+// and only within InventoryTTL of being taken, so an action carried out later
+// under the same context still scans for itself.
+func WithTakenReading(ctx context.Context, inv session.Inventory) context.Context {
+	return context.WithValue(ctx, takenReadingKey{}, &takenReading{inv: inv, at: time.Now()})
+}
+
+func useTakenReading(ctx context.Context) (session.Inventory, bool) {
+	taken, ok := ctx.Value(takenReadingKey{}).(*takenReading)
+	if !ok {
+		return session.Inventory{}, false
+	}
+	taken.mu.Lock()
+	defer taken.mu.Unlock()
+	if taken.used || time.Since(taken.at) >= InventoryTTL {
+		return session.Inventory{}, false
+	}
+	taken.used = true
+	return taken.inv, true
 }
 
 // Counts is how the readers have been answered so far.
@@ -557,7 +687,7 @@ func (r *InventoryReading) retainLocked(raw session.Inventory) session.Inventory
 		ObservedAt: observed, Provenance: raw.Provenance, Freshness: session.FreshnessCurrent,
 	}
 	for n := range display.Sessions {
-		source := session.SourceFor(display.Sessions[n].Backend)
+		source := rowSource(display.Sessions[n])
 		freshness := session.FreshnessCurrent
 		if !rowAnswered(raw, display.Sessions[n]) {
 			freshness = session.FreshnessMissing
@@ -636,6 +766,9 @@ const processSource = "ps"
 // rowSource is the source that answers for one row: its terminal backend's,
 // or the process table's for a row only the process table saw.
 func rowSource(row session.Session) string {
+	if session.SourceForID(row.ID) == processSource {
+		return processSource
+	}
 	if source := session.SourceFor(row.Backend); source != "" {
 		return source
 	}
@@ -673,7 +806,7 @@ func (r *InventoryReading) withoutForgottenLocked(raw session.Inventory, observe
 			continue
 		}
 		later := observed.After(gone.at)
-		proves, _ := raw.ProvesAbsence(session.SourceFor(gone.row.Backend))
+		proves, _ := raw.ProvesAbsence(rowSource(gone.row))
 		present := hasSession(raw.Sessions, gone.row)
 		if later && proves {
 			// This source has now answered for itself. Whether it confirmed the
@@ -718,7 +851,7 @@ func sameTerminalSession(a, b session.Session) bool {
 func rowsFromSource(rows []session.Session, source string) []session.Session {
 	out := make([]session.Session, 0, len(rows))
 	for _, row := range rows {
-		if session.SourceFor(row.Backend) == source {
+		if rowSource(row) == source {
 			out = append(out, row)
 		}
 	}
@@ -728,7 +861,7 @@ func rowsFromSource(rows []session.Session, source string) []session.Session {
 func withoutSource(rows []session.Session, source string) []session.Session {
 	out := rows[:0]
 	for _, row := range rows {
-		if session.SourceFor(row.Backend) != source {
+		if rowSource(row) != source {
 			out = append(out, row)
 		}
 	}

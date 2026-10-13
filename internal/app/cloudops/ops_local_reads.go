@@ -7,13 +7,52 @@ import (
 func init() {
 	register(
 		// MARK: reads with a local capability
+		op{name: "sessions.list", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request") {
+					return plan{}, false
+				}
+				return machinePlan(b)
+			},
+			route: func(plan) LocalRequest {
+				return LocalRequest{Method: "GET", Path: "/v1/sessions", Query: map[string]string{"parts": "list"}}
+			}},
+
+		op{name: "skills", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.hasOneOf([]string{"type", "session"},
+					[]string{"type", "session", "expected_generation"}) {
+					return plan{}, false
+				}
+				p, ok := sessionPlan(b, "skills")
+				if !ok {
+					return plan{}, false
+				}
+				if raw, named := b["expected_generation"]; named {
+					generation, valid := raw.(string)
+					if !valid || !executionGenerationValid(generation) {
+						return plan{}, false
+					}
+					p.executionGeneration = generation
+				}
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "GET", Path: "/v1/sessions/" + segment(p.target) + "/skills"}
+			}},
 
 		op{name: "transcript", read: true,
 			divergence: "`priority` is accepted and dropped: this daemon reads a transcript on " +
 				"one lane, so a foreground read is not overtaken by a background one",
 			decode: func(b body) (plan, bool) {
 				if !b.hasOneOf([]string{"type", "session", "limit"},
-					[]string{"type", "session", "limit", "priority"}) {
+					[]string{"type", "session", "limit", "priority"},
+					[]string{"type", "session", "limit", "before"},
+					[]string{"type", "session", "limit", "priority", "before"},
+					[]string{"type", "session", "limit", "expected_generation"},
+					[]string{"type", "session", "limit", "priority", "expected_generation"},
+					[]string{"type", "session", "limit", "before", "expected_generation"},
+					[]string{"type", "session", "limit", "priority", "before", "expected_generation"}) {
 					return plan{}, false
 				}
 				p, ok := sessionPlan(b, "transcript")
@@ -25,6 +64,21 @@ func init() {
 					return plan{}, false
 				}
 				p.limit = limit
+				if raw, named := b["expected_generation"]; named {
+					value, ok := raw.(string)
+					if !ok || !executionGenerationValid(value) {
+						return plan{}, false
+					}
+					p.executionGeneration = value
+				}
+				if _, named := b["before"]; named {
+					before, ok := b.integer("before")
+					if !ok || before < 1 {
+						return plan{}, false
+					}
+					p.before = before
+					p.name = "transcript.before." + itoa(before)
+				}
 				p.priority = "foreground"
 				if raw, named := b["priority"]; named {
 					// A stale hosted tab can only be a person-driven reader:
@@ -41,19 +95,26 @@ func init() {
 			route: func(p plan) LocalRequest {
 				// This daemon's transcript is a route of its own with the
 				// session in the query, not a segment under /v1/sessions.
-				return LocalRequest{Method: "GET", Path: "/v1/transcript",
-					Query: map[string]string{"session": p.target, "limit": itoa(p.limit)}}
+				query := map[string]string{"session": p.target, "limit": itoa(p.limit)}
+				if p.before > 0 {
+					query["before"] = itoa(p.before)
+				}
+				if p.executionGeneration != "" {
+					query["expected_generation"] = p.executionGeneration
+				}
+				return LocalRequest{Method: "GET", Path: "/v1/transcript", Query: query}
 			}},
 
 		op{name: "info", read: true,
-			divergence: "`parts` travels as a query and this daemon's info route answers the " +
-				"same body for both halves, so a summary is a full answer here",
+			divergence: "`parts` travels as a query; the pinned list part returns only a display title",
 			decode: func(b body) (plan, bool) {
 				if !b.has("type", "session", "parts") {
-					return plan{}, false
+					if !b.has("type", "session", "parts", "expected_generation") {
+						return plan{}, false
+					}
 				}
 				parts, ok := b.str("parts")
-				if !ok || (parts != "full" && parts != "summary") {
+				if !ok || (parts != "full" && parts != "summary" && parts != "list") {
 					return plan{}, false
 				}
 				// The two halves are separate names because they are separate
@@ -64,22 +125,29 @@ func init() {
 					return plan{}, false
 				}
 				p.parts = parts
+				if raw, named := b["expected_generation"]; named {
+					value, ok := raw.(string)
+					if !ok || !executionGenerationValid(value) {
+						return plan{}, false
+					}
+					p.executionGeneration = value
+				}
 				return p, true
 			},
 			route: func(p plan) LocalRequest {
 				req := LocalRequest{Method: "GET", Path: "/v1/sessions/" + segment(p.target) + "/info"}
-				if p.parts == "summary" {
-					req.Query = map[string]string{"parts": "summary"}
+				if p.parts == "summary" || p.parts == "list" {
+					req.Query = map[string]string{"parts": p.parts}
 				}
 				return req
 			}},
 
 		op{name: "git", read: true,
 			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session") {
+				if !b.hasOneOf([]string{"type", "session"}, []string{"type", "session", "expected_generation"}) {
 					return plan{}, false
 				}
-				return sessionPlan(b, "git")
+				return pinnedSessionPlan(b, "git")
 			},
 			route: func(p plan) LocalRequest {
 				return LocalRequest{Method: "GET", Path: "/v1/sessions/" + segment(p.target) + "/git"}
@@ -87,10 +155,11 @@ func init() {
 
 		op{name: "git-diff", read: true,
 			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "path") {
+				if !b.hasOneOf([]string{"type", "session", "request", "path"},
+					[]string{"type", "session", "request", "path", "expected_generation"}) {
 					return plan{}, false
 				}
-				p, ok := sessionPlan(b, "")
+				p, ok := pinnedSessionPlan(b, "")
 				if !ok {
 					return plan{}, false
 				}
@@ -112,10 +181,10 @@ func init() {
 
 		op{name: "screen", read: true,
 			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session") {
+				if !b.hasOneOf([]string{"type", "session"}, []string{"type", "session", "expected_generation"}) {
 					return plan{}, false
 				}
-				return sessionPlan(b, "screen")
+				return pinnedSessionPlan(b, "screen")
 			},
 			route: func(p plan) LocalRequest {
 				return LocalRequest{Method: "GET", Path: "/v1/sessions/" + segment(p.target) + "/screen"}
@@ -123,7 +192,8 @@ func init() {
 
 		op{name: "image", read: true, shape: shapeImage,
 			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "id") {
+				if !b.hasOneOf([]string{"type", "session", "id"},
+					[]string{"type", "session", "id", "expected_generation"}) {
 					return plan{}, false
 				}
 				// The id is the opaque one the transcript already published,
@@ -142,18 +212,26 @@ func init() {
 					return plan{}, false
 				}
 				p.id = id
+				if raw, named := b["expected_generation"]; named {
+					generation, valid := raw.(string)
+					if !valid || !executionGenerationValid(generation) {
+						return plan{}, false
+					}
+					p.executionGeneration = generation
+				}
 				return p, true
 			},
 			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "GET", Path: "/v1/artifacts/images/" + segment(p.id)}
+				return LocalRequest{Method: "GET", Path: "/v1/artifacts/images/" + segment(p.id),
+					Query: map[string]string{"session": p.target}}
 			}},
 
 		op{name: "documents", read: true, shape: shapeDocuments,
 			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session") {
+				if !b.hasOneOf([]string{"type", "session"}, []string{"type", "session", "expected_generation"}) {
 					return plan{}, false
 				}
-				return sessionPlan(b, "documents")
+				return pinnedSessionPlan(b, "documents")
 			},
 			route: func(p plan) LocalRequest {
 				return LocalRequest{Method: "GET", Path: "/v1/sessions/" + segment(p.target) + "/documents"}
@@ -161,7 +239,8 @@ func init() {
 
 		op{name: "document", read: true, shape: shapeDocument,
 			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "scope", "task", "path") {
+				if !b.hasOneOf([]string{"type", "session", "request", "scope", "task", "path"},
+					[]string{"type", "session", "request", "scope", "task", "path", "expected_generation"}) {
 					return plan{}, false
 				}
 				id, ok := b.nonEmpty("session")
@@ -184,8 +263,12 @@ func init() {
 				default:
 					return plan{}, false
 				}
-				return plan{session: id, target: id, request: request, name: "read:" + request,
-					scope: scope, task: task, path: path}, true
+				p, valid := pinnedSessionPlan(b, "read:"+request)
+				if !valid || p.session != id {
+					return plan{}, false
+				}
+				p.request, p.scope, p.task, p.path = request, scope, task, path
+				return p, true
 			},
 			route: func(p plan) LocalRequest {
 				route := "/v1/sessions/" + segment(p.target) + "/documents/" + p.scope
@@ -339,6 +422,12 @@ func init() {
 			decode: squadCloudWritePlan("changes"),
 			route: func(p plan) LocalRequest {
 				return LocalRequest{Method: "POST", Path: "/v1/squad/catalog",
+					Body: p.document, Header: asDevice()}
+			}},
+		op{name: "squad.role-draft",
+			decode: squadCloudWritePlan("changes"),
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "POST", Path: "/v1/squad/role-draft",
 					Body: p.document, Header: asDevice()}
 			}},
 

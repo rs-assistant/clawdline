@@ -21,6 +21,12 @@
   max-width: 100%;
 }
 
+/* Keep the third grid row when a session has no status to display. */
+.row .state:empty {
+  display: flex;
+  min-height: 18px;
+}
+
 .row .state > .session-live-line {
   flex: 1 1 12ch;
   min-width: 0;
@@ -49,6 +55,18 @@
 
 .row .meta .tty {
   flex: 1 8 6ch;
+}
+
+/* A fleet row must identify its machine even after the group heading scrolls
+ * away. The pane address is only an internal terminal locator. */
+.projected-row .meta .machine {
+  max-width: 70%;
+}
+
+@media (max-width: 600px) {
+  .projected-row .meta .machine {
+    max-width: 100%;
+  }
 }
 
 .row .meta .session-activity {
@@ -86,21 +104,17 @@
   background: currentColor;
 }
 
-/* The callback belongs to this Session even while its heavy slot is queued.
- * Keep the owner visible beside any ordinary idle or waiting state. */
+/* A running heavy callback's owner stays visible beside the ordinary state. */
 .row .state > .session-callback-active {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--warn);
-  font: 600 11.5px/1.2 var(--mono);
+  font: 16px/1.2 sans-serif;
 }
 
-.row .state > .session-callback-active[data-verified="0"] {
-  color: var(--dim);
-}
+.row .session-callback-active > canvas.spin { flex: 0 0 auto; }
 
 .row .state > .session-work-completion,
 .row .state > .session-closeability,

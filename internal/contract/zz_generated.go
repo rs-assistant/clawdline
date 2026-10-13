@@ -1319,18 +1319,20 @@ type BrokerRoot struct {
 // it. `brief_attempted_at` is durable before the keystroke, so the brief is
 // typed at most once.
 type BrokerRootAssignment struct {
-	Assignment       BrokerAssignment     `json:"assignment"`
-	Assistant        string               `json:"assistant"`
-	BriefAttemptedAt int64                `json:"brief_attempted_at,omitempty"`
-	BriefPath        string               `json:"brief_path"`
-	BriefedAt        int64                `json:"briefed_at,omitempty"`
-	CreatedAt        int64                `json:"created_at"`
-	Executor         *BrokerOpenedSession `json:"executor,omitempty"`
-	Failure          string               `json:"failure,omitempty"`
-	ID               string               `json:"id"`
-	Label            string               `json:"label"`
-	Model            string               `json:"model"`
-	Ownership        string               `json:"ownership"`
+	Assignment       BrokerAssignment              `json:"assignment"`
+	Assistant        string                        `json:"assistant"`
+	BriefAttemptedAt int64                         `json:"brief_attempted_at,omitempty"`
+	BriefPath        string                        `json:"brief_path"`
+	BriefedAt        int64                         `json:"briefed_at,omitempty"`
+	Cleanup          *BrokerRootCleanupEligibility `json:"cleanup,omitempty"`
+	Closure          *BrokerRootAssignmentClosure  `json:"closure,omitempty"`
+	CreatedAt        int64                         `json:"created_at"`
+	Executor         *BrokerOpenedSession          `json:"executor,omitempty"`
+	Failure          string                        `json:"failure,omitempty"`
+	ID               string                        `json:"id"`
+	Label            string                        `json:"label"`
+	Model            string                        `json:"model"`
+	Ownership        string                        `json:"ownership"`
 
 	// The built-in persona the Feature Root was launched as; absent for none.
 	// ASSIGNMENT.md then carries a PERSONA section naming it and its file.
@@ -1338,6 +1340,17 @@ type BrokerRootAssignment struct {
 	ProjectDir string                    `json:"project_dir"`
 	RequestID  string                    `json:"request_id"`
 	State      BrokerRootAssignmentState `json:"state"`
+}
+
+// A durable close of the exact executor. Only safe, unforced closure is
+// completion evidence; the assignment remains briefed as its launch state.
+type BrokerRootAssignmentClosure struct {
+	ClosedAt       int64  `json:"closed_at"`
+	ConversationID string `json:"conversation_id,omitempty"`
+	Forced         bool   `json:"forced"`
+	Method         string `json:"method"`
+	Safe           bool   `json:"safe"`
+	TerminalID     string `json:"terminal_id"`
 }
 
 type BrokerRootAssignmentEnvelope struct {
@@ -1387,6 +1400,18 @@ const (
 
 // BrokerRootAssignmentStateValues is every value the contract allows, in contract order.
 var BrokerRootAssignmentStateValues = []BrokerRootAssignmentState{BrokerRootAssignmentStateAccepted, BrokerRootAssignmentStateTerminalOpened, BrokerRootAssignmentStateBriefed, BrokerRootAssignmentStateFailed}
+
+// Fresh conservative cleanup gates. No Root scratch is registered yet, so
+// eligible is false and no Root path is deleted.
+type BrokerRootCleanupEligibility struct {
+	Completion   bool   `json:"completion"`
+	Eligible     bool   `json:"eligible"`
+	NextOwner    string `json:"next_owner"`
+	Owner        string `json:"owner"`
+	Preservation string `json:"preservation"`
+	Reason       string `json:"reason"`
+	Scratch      string `json:"scratch"`
+}
 
 // A root's own receipt: one sentence saying this turn delivered something. It
 // produces the check that means `delivered, awaiting approval`, and can never
@@ -1528,9 +1553,13 @@ type BrokerTask struct {
 	// `auto_compact_window` when it named one, the machine's
 	// `claude_auto_compact_window` otherwise — and 0 when none was applied. Null for
 	// a Codex task, which is never given one, and for a task not launched yet.
-	AutoCompactWindow *int64       `json:"auto_compact_window"`
-	Child             *BrokerChild `json:"child,omitempty"`
-	Claims            []string     `json:"claims"`
+	AutoCompactWindow *int64 `json:"auto_compact_window"`
+
+	// A callback's declared purpose: wait or heavy. Absent for children and callbacks
+	// made before intent was recorded.
+	CallbackIntent string       `json:"callback_intent,omitempty"`
+	Child          *BrokerChild `json:"child,omitempty"`
+	Claims         []string     `json:"claims"`
 
 	// Whether the dispatch said anything about claims at all. `I declared none` and `I
 	// did not say` are different requests, and only one of them can be arbitrated.
@@ -2598,6 +2627,7 @@ type Diagnostics struct {
 	Platform  PlatformDiagnostics  `json:"platform"`
 	Port      int64                `json:"port"`
 	Proposals *ProposalDiagnostics `json:"proposals,omitempty"`
+	Routes    *RouteStats          `json:"routes,omitempty"`
 	Scheduler SchedulerPulse       `json:"scheduler"`
 	ServedBy  string               `json:"served_by"`
 	Terminals *TerminalDiagnostics `json:"terminals,omitempty"`
@@ -3107,11 +3137,14 @@ type KeyRequest struct {
 }
 
 type LeaseHolder struct {
-	AcquiredAt  int64         `json:"acquired_at"`
-	HeldSeconds int64         `json:"held_seconds"`
-	Holder      string        `json:"holder"`
-	LeaseID     string        `json:"lease_id"`
-	Liveness    LeaseLiveness `json:"liveness"`
+	AcquiredAt int64 `json:"acquired_at"`
+
+	// The callback whose command holds this lease, when one did.
+	CallbackTaskID string        `json:"callback_task_id,omitempty"`
+	HeldSeconds    int64         `json:"held_seconds"`
+	Holder         string        `json:"holder"`
+	LeaseID        string        `json:"lease_id"`
+	Liveness       LeaseLiveness `json:"liveness"`
 
 	// proving, process_running, session_live, heartbeat_lapsed, owner_gone or
 	// evidence_unknown.
@@ -3173,6 +3206,10 @@ type LeaseReply struct {
 // renewal every 20 seconds, `pid` (with `process_start`, epoch seconds),
 // `session_id` (a conversation id), or any of them.
 type LeaseRequest struct {
+	// The callback command that asked for heavy_compile, when one did. Absent for a
+	// direct heavy command and for other resources.
+	CallbackTaskID string `json:"callback_task_id,omitempty"`
+
 	// landing only: the absolute path of the checkout being landed into.
 	Checkout     string        `json:"checkout,omitempty"`
 	Holder       string        `json:"holder"`
@@ -3225,6 +3262,14 @@ const (
 // LivenessValues is every value the contract allows, in contract order.
 var LivenessValues = []Liveness{LivenessOnline, LivenessOffline, LivenessUnknown}
 
+// The last capacity pass's free space on the daemon state volume. Unknown
+// includes a missing or stalled pass.
+type MachineDiskSummary struct {
+	At        int64 `json:"at"`
+	FreeBytes int64 `json:"free_bytes"`
+	Known     bool  `json:"known"`
+}
+
 // Percent of the last ten seconds in which some task (or, for `memory_full`,
 // every task) waited on the resource.
 type MachinePressure struct {
@@ -3234,23 +3279,60 @@ type MachinePressure struct {
 	MemorySome float64 `json:"memory_some"`
 }
 
-// GET /v1/machine/usage, for any paired device: this machine's CPU and memory
-// now, and each session's share of them — the dashboard opened from the
-// session counts beside the wordmark. Clawdline Cloud carries it as the
-// `machine-usage` word. The CPU figures are shares over `interval_ms`, the time
-// between two readings, because a process's CPU time is a counter: a share
-// needs two. Every percentage is of the whole machine, all cores together,
-// 0-100. A session's figures are its whole process tree: the assistant, the
-// shells it opened and what they started, each process given to the nearest
-// session above it. A process that ended inside the interval is in the
-// machine's figures and in no row. On a platform without a reader the route
-// answers 501 `machine_usage_unsupported` rather than an idle machine.
+// One allowlisted reason, without the task or file it concerns.
+type MachineReclaimReason struct {
+	Code  MachineReclaimReasonCode `json:"code"`
+	Count int64                    `json:"count"`
+}
+
+type MachineReclaimReasonCode string
+
+const (
+	MachineReclaimReasonCodeWithinGrace        MachineReclaimReasonCode = "within_grace"
+	MachineReclaimReasonCodeOwnerPresent       MachineReclaimReasonCode = "owner_present"
+	MachineReclaimReasonCodeOwnerUnknown       MachineReclaimReasonCode = "owner_unknown"
+	MachineReclaimReasonCodePathNotOwned       MachineReclaimReasonCode = "path_not_owned"
+	MachineReclaimReasonCodeUnreadable         MachineReclaimReasonCode = "unreadable"
+	MachineReclaimReasonCodeNestedRepository   MachineReclaimReasonCode = "nested_repository"
+	MachineReclaimReasonCodeFiltersPresent     MachineReclaimReasonCode = "filters_present"
+	MachineReclaimReasonCodePreserveFailed     MachineReclaimReasonCode = "preserve_failed"
+	MachineReclaimReasonCodeChangedDuringSweep MachineReclaimReasonCode = "changed_during_sweep"
+	MachineReclaimReasonCodeIntentNotRecorded  MachineReclaimReasonCode = "intent_not_recorded"
+	MachineReclaimReasonCodeRemoveFailed       MachineReclaimReasonCode = "remove_failed"
+)
+
+// MachineReclaimReasonCodeValues is every value the contract allows, in contract order.
+var MachineReclaimReasonCodeValues = []MachineReclaimReasonCode{MachineReclaimReasonCodeWithinGrace, MachineReclaimReasonCodeOwnerPresent, MachineReclaimReasonCodeOwnerUnknown, MachineReclaimReasonCodePathNotOwned, MachineReclaimReasonCodeUnreadable, MachineReclaimReasonCodeNestedRepository, MachineReclaimReasonCodeFiltersPresent, MachineReclaimReasonCodePreserveFailed, MachineReclaimReasonCodeChangedDuringSweep, MachineReclaimReasonCodeIntentNotRecorded, MachineReclaimReasonCodeRemoveFailed}
+
+// Grouped standing decisions, refreshed at most once per registered cache
+// interval. A failed read is unknown, never an empty backlog.
+type MachineReclaimSummary struct {
+	At       int64 `json:"at"`
+	Deferred int64 `json:"deferred"`
+
+	// Kept decisions with one of the fixed unreadable, preserve_failed,
+	// intent_not_recorded or remove_failed reasons.
+	Failures    int64                  `json:"failures"`
+	Kept        int64                  `json:"kept"`
+	Known       bool                   `json:"known"`
+	LastSweepAt int64                  `json:"last_sweep_at,omitempty"`
+	Reasons     []MachineReclaimReason `json:"reasons"`
+	Removing    int64                  `json:"removing"`
+}
+
+// GET /v1/machine/usage, for any paired device: CPU, memory, cached free disk
+// space and grouped reclaim backlog. Clawdline Cloud carries this as the
+// `machine-usage` word. The CPU figures are shares over `interval_ms`. Disk and
+// reclaim readings say whether they are known; no task identifiers, paths or
+// raw evidence are sent. On a platform without a CPU reader the route answers
+// 501 `machine_usage_unsupported`.
 type MachineUsage struct {
 	At int64 `json:"at"`
 
 	// The cores the kernel counts.
-	Cores      int64   `json:"cores"`
-	CpuPercent float64 `json:"cpu_percent"`
+	Cores      int64               `json:"cores"`
+	CpuPercent float64             `json:"cpu_percent"`
+	Disk       *MachineDiskSummary `json:"disk,omitempty"`
 
 	// One row per session whose process is alive, and one for this daemon.
 	Groups     []MachineUsageGroup `json:"groups"`
@@ -3271,9 +3353,10 @@ type MachineUsage struct {
 
 	// The kernel's pressure-stall averages over ten seconds. Absent where the kernel
 	// keeps none, which is not the same as none.
-	Pressure       *MachinePressure `json:"pressure,omitempty"`
-	SwapTotalBytes int64            `json:"swap_total_bytes"`
-	SwapUsedBytes  int64            `json:"swap_used_bytes"`
+	Pressure       *MachinePressure       `json:"pressure,omitempty"`
+	Reclaim        *MachineReclaimSummary `json:"reclaim,omitempty"`
+	SwapTotalBytes int64                  `json:"swap_total_bytes"`
+	SwapUsedBytes  int64                  `json:"swap_used_bytes"`
 }
 
 // What one tree of processes used.
@@ -3376,6 +3459,48 @@ type ObligationList struct {
 
 	// How many rows are past their overdue threshold. A count, not a verdict.
 	Stuck int64 `json:"stuck"`
+}
+
+// Every iTerm2 osascript run this daemon started, counted by kind: since it
+// started, and since the last hourly `osascript: hour` line in daemon.log,
+// which writes the same counts. It is how a week with `iterm_scan` off is
+// compared with a week with it on (docs/interface.md `Turning iTerm2 scanning
+// off`). The pasteboard reader's osascript is not an iTerm2 Apple Event and is
+// not counted.
+type OsascriptDiagnostics struct {
+	// Each kind since `hour_since`: what the next hourly line will say so far.
+	HourKinds []OsascriptKind `json:"hour_kinds"`
+
+	// When the current hourly window started, Unix seconds.
+	HourSince int64 `json:"hour_since"`
+
+	// The `iterm_scan` switch now.
+	ItermScan bool `json:"iterm_scan"`
+
+	// Each kind since `since`, ordered by kind. At most 32 kinds; any past that are
+	// counted as `other`.
+	Kinds []OsascriptKind `json:"kinds"`
+
+	// When these counts started: the daemon's start, Unix seconds.
+	Since int64 `json:"since"`
+}
+
+// One kind of osascript run: `list` (the inventory), `capture` (a screen read),
+// `send`, `type`, `key`, `close`, `find`, `open` (a new tab), `reveal`,
+// `reveal-<what>`, `probe` (a stall diagnosis), or `other`.
+type OsascriptKind struct {
+	// Runs that exited non-zero or were killed at their limit.
+	Failures int64  `json:"failures"`
+	Kind     string `json:"kind"`
+
+	// The longest one, milliseconds.
+	MaxMs int64 `json:"max_ms"`
+
+	// Runs that finished, failed or not.
+	Runs int64 `json:"runs"`
+
+	// Their summed wall time, milliseconds.
+	TotalMs int64 `json:"total_ms"`
 }
 
 // POST /v1/auth/pair/confirm. A wrong code is 403 wrong_code with tries_left.
@@ -4604,6 +4729,79 @@ type RootAssignmentRecord struct {
 	State       string `json:"state"`
 }
 
+// Who made the calls: `device` a paired browser or phone, `local` this
+// machine's own token (the CLI, scripts, the orchestrator), `cloud` a Cloud
+// viewer answered in process, `task` a child let in by its task secret,
+// `anonymous` nobody the gate let in (open paths and refusals).
+type RouteCallers struct {
+	Anonymous int64 `json:"anonymous"`
+	Cloud     int64 `json:"cloud"`
+	Device    int64 `json:"device"`
+	Local     int64 `json:"local"`
+	Task      int64 `json:"task"`
+}
+
+// Time to answer over the last `samples` calls, in milliseconds; `max` is since
+// the daemon started.
+type RouteLatency struct {
+	Max     float64 `json:"max"`
+	P50     float64 `json:"p50"`
+	P90     float64 `json:"p90"`
+	Samples int64   `json:"samples"`
+}
+
+// One route shape's counts. A long-lived event stream counts `opens` and `open`
+// and has no latency.
+type RouteStat struct {
+	Callers RouteCallers `json:"callers"`
+
+	// Calls answered; a stream is counted when it ends.
+	Count     int64         `json:"count"`
+	LatencyMs *RouteLatency `json:"latency_ms,omitempty"`
+
+	// The HTTP method, or OTHER.
+	Method string `json:"method"`
+
+	// Streams open now.
+	Open int64 `json:"open,omitempty"`
+
+	// Streams opened since the daemon started.
+	Opens int64 `json:"opens,omitempty"`
+
+	// The route shape, e.g. `/v1/sessions/:id/info`.
+	Route     string `json:"route"`
+	Status2xx int64  `json:"status_2xx"`
+	Status3xx int64  `json:"status_3xx"`
+	Status4xx int64  `json:"status_4xx"`
+	Status5xx int64  `json:"status_5xx"`
+
+	// This route answered as an event stream.
+	Stream bool `json:"stream"`
+}
+
+// /v1/diagnostics.routes: every API call this daemon answered since it started,
+// by route shape and caller. A key is the method and the pattern the mux
+// matched; below a prefix pattern only fixed route words are spelled out and
+// every other segment is `:id`, and the query is never read, so no session id,
+// name or text appears. Counters are never reset: compare two readings by
+// subtracting them. Absent from a daemon without the counter.
+type RouteStats struct {
+	// How many distinct route shapes are counted (capacity
+	// `diagnostics.route_stat_keys`).
+	KeyLimit int64 `json:"key_limit"`
+
+	// How many recent durations each route keeps for its percentiles (capacity
+	// `diagnostics.route_latency_samples`).
+	LatencySamples int64 `json:"latency_samples"`
+
+	// Calls not counted under a route of their own because the table was full.
+	Overflow int64       `json:"overflow"`
+	Routes   []RouteStat `json:"routes"`
+
+	// When counting started: the daemon's start, Unix seconds.
+	Since int64 `json:"since"`
+}
+
 // What the reading behind this snapshot knows about itself. Without it an empty
 // list cannot be told apart from a failed scan.
 type Scan struct {
@@ -4677,7 +4875,8 @@ type ScanGap struct {
 // reader that must decide whether a session it remembers is really absent asks
 // the source that would have seen it.
 type ScanSource struct {
-	Complete bool `json:"complete"`
+	Complete bool               `json:"complete"`
+	Disabled ScanSourceDisabled `json:"disabled,omitempty"`
 
 	// The regions of this source that could not be read, each one either sealed by
 	// another source or still open. Optional: a source that read everything omits it.
@@ -4687,6 +4886,20 @@ type ScanSource struct {
 	// The source's provenance, as the adapter names it: `ps`, `tmux`, `iterm`.
 	Source string `json:"source"`
 }
+
+// Why a source was not asked at all. `setting`: the person turned it off
+// (iTerm2's `iterm_scan`). Such a source is `complete: false` and lists no
+// rows, and it is neither a failure nor an empty answer: a row of that source
+// is not gone, it is not being looked at. A client says so in one line instead
+// of drawing those tabs as nothing. Absent on every source that was asked.
+type ScanSourceDisabled string
+
+const (
+	ScanSourceDisabledSetting ScanSourceDisabled = "setting"
+)
+
+// ScanSourceDisabledValues is every value the contract allows, in contract order.
+var ScanSourceDisabledValues = []ScanSourceDisabled{ScanSourceDisabledSetting}
 
 type ScheduleDeleted struct {
 	Deleted string `json:"deleted"`
@@ -5211,6 +5424,12 @@ type SessionCoordinatorCommand struct {
 	Why              string `json:"why,omitempty"`
 }
 
+type SessionHeavyWork struct {
+	// The heavy command's declared reason, for the icon's title and accessible name.
+	Reason string `json:"reason"`
+	TaskID string `json:"task_id"`
+}
+
 // The facts behind the status line under an open session. This daemon serves
 // the transcript-derived part the Swift app calls the summary, the context
 // reading, the plan windows and the project's addresses; the working tree,
@@ -5285,6 +5504,7 @@ type SessionInfoReply struct {
 type SessionInfoSession struct {
 	Assistant Assistant `json:"assistant,omitempty"`
 	CWD       string    `json:"cwd,omitempty"`
+	Icon      *Icon     `json:"icon,omitempty"`
 	ID        string    `json:"id"`
 
 	// The model the session is on, as its record last named it: the newest assistant
@@ -5516,10 +5736,20 @@ type SessionRow struct {
 	Disposition    *WorkDisposition     `json:"disposition,omitempty"`
 	EpicParent     *EpicSessionParent   `json:"epic_parent,omitempty"`
 	Evidence       Evidence             `json:"evidence"`
-	Icon           *Icon                `json:"icon,omitempty"`
-	ID             string               `json:"id"`
-	Identity       IdentityBinding      `json:"identity,omitempty"`
-	IsClaude       bool                 `json:"isClaude"`
+
+	// Machine-issued durable identity of this terminal execution. Absent when the
+	// source or process start cannot be verified, the machine has no Cloud identity,
+	// or the identity store could not be written. This is not scan.generation.
+	ExecutionGeneration string `json:"execution_generation,omitempty"`
+
+	// Only the Session that started the declared-heavy callback currently holding and
+	// running in the machine's heavy_compile slot. Absent for queued work, wait
+	// callbacks, direct heavy commands and unreadable evidence.
+	HeavyWork *SessionHeavyWork `json:"heavy_work,omitempty"`
+	Icon      *Icon             `json:"icon,omitempty"`
+	ID        string            `json:"id"`
+	Identity  IdentityBinding   `json:"identity,omitempty"`
+	IsClaude  bool              `json:"isClaude"`
 
 	// What the session is called, by the Swift app's rungs (ITerm.swift
 	// preferredDisplayLabel): a name typed in Clawdline (the Swift store's config.json
@@ -5583,6 +5813,13 @@ type SessionRow struct {
 	// Unix seconds: when that declaration was made.
 	WorkSince int64     `json:"work_since,omitempty"`
 	WorkState WorkState `json:"work_state"`
+
+	// When the turn a working session's `line` reports began, in unix seconds: when
+	// the line was read, less the assistant's own clock in it. Present only beside a
+	// `line` that carries that clock. A page that has it draws the clock itself from
+	// this instant, so `line` is republished only when something other than the clock
+	// moved; a page without it draws `line` as sent.
+	WorkingSince int64 `json:"working_since,omitempty"`
 }
 
 // Whether this reading had the waiting session's screen to look at. Present
@@ -5634,6 +5871,101 @@ const (
 
 // SessionStateValues is every value the contract allows, in contract order.
 var SessionStateValues = []SessionState{SessionStateWorking, SessionStateWaiting, SessionStateIdle, SessionStateUnknown}
+
+type SessionStatus struct {
+	Assistant string `json:"assistant,omitempty"`
+
+	// True only when a person-needed declaration or a positive attention count is
+	// known.
+	AttentionRequired bool   `json:"attention_required,omitempty"`
+	Backend           string `json:"backend,omitempty"`
+
+	// Measured only when closeability has a current source and a known state. True
+	// means closing is blocked, false means it is not; absent is unknown. It does not
+	// mean the whole Session or its work is blocked.
+	CloseBlocked bool `json:"close_blocked,omitempty"`
+
+	// True only for an unviewed Board delivery in phase done. A deploying item is not
+	// called complete.
+	CompletedUnconfirmed bool `json:"completed_unconfirmed,omitempty"`
+
+	// Random 128-bit machine-issued execution identity, absent unless this row's
+	// source is current and its process is pinned by PID and kernel start time.
+	ExecutionGeneration string `json:"execution_generation,omitempty"`
+
+	// Count of provider-native background agents in failed state when their reading is
+	// complete and untruncated. Zero is measured; absent is unknown. It does not mean
+	// the Session failed.
+	FailedAgentCount int64 `json:"failed_agent_count,omitempty"`
+
+	// Whether the whole local scan was complete. False does not by itself revoke a
+	// currently observed row.
+	InventoryComplete bool `json:"inventory_complete"`
+
+	// Unix seconds when the assistant's own record last grew; this is activity, not a
+	// claim of task progress.
+	LastMovementAt int64  `json:"last_movement_at,omitempty"`
+	MachineID      string `json:"machine_id"`
+
+	// True for the machine workspace Session, which sorts before ordinary Sessions.
+	MachineScope bool `json:"machine_scope,omitempty"`
+
+	// Absent when activity or current source evidence is unknown; false is a measured
+	// answer.
+	NoMovement bool `json:"no_movement,omitempty"`
+
+	// Machine policy threshold in milliseconds for classifying no recent record
+	// movement.
+	NoProgressAfterMs int64 `json:"no_progress_after_ms"`
+
+	// Terminal id of a currently listed parent Session, derived from the signed task
+	// or Epic owner relationship. No task text is copied.
+	ParentSessionID string `json:"parent_session_id,omitempty"`
+
+	// Unix seconds when this status was projected.
+	ProjectedAt int64  `json:"projected_at"`
+	SessionID   string `json:"session_id"`
+
+	// Pass id shared by every status row and the inventory marker of one set: which
+	// Sessions are listed and which execution each row speaks for. A viewer discards
+	// rows with a different value. It is stable while the set is, so an unchanged row
+	// is not re-sent and the one the relay retains remains the newest.
+	SnapshotGeneration string              `json:"snapshot_generation"`
+	Source             SessionStatusSource `json:"source"`
+	State              string              `json:"state"`
+
+	// True only when a current waiting row has a nonempty menu corroborated by a
+	// captured screen, or by a registry wait and an open single-question transcript
+	// menu while the screen is unavailable. No question or option text is copied.
+	// Absent means the reply signal is unavailable, not that no reply is needed.
+	WaitingForReply bool `json:"waiting_for_reply,omitempty"`
+}
+
+type SessionStatusInventory struct {
+	// Unix seconds of this inventory reading.
+	At        int64                      `json:"at"`
+	Complete  bool                       `json:"complete"`
+	Inventory SessionStatusInventoryList `json:"inventory"`
+
+	// Id of the machine's display facts, which carry no content here: a viewer
+	// re-reads the pinned machine list when it changes. Absent on an older machine,
+	// whose snapshot_generation moves with every display change instead.
+	PresentationGeneration string `json:"presentation_generation,omitempty"`
+	SnapshotGeneration     string `json:"snapshot_generation"`
+}
+
+type SessionStatusInventoryList struct {
+	Sessions []string `json:"sessions"`
+	Version  int64    `json:"version"`
+}
+
+type SessionStatusSource struct {
+	Freshness string `json:"freshness"`
+
+	// Unix seconds; zero when no observation time is known.
+	ObservedAt int64  `json:"observed_at"`
+	Provenance string `json:"provenance"`
+}
 
 // The durable local result of naming a session. This daemon keeps the display
 // name in its own config and does not mutate the assistant's conversation
@@ -5701,6 +6033,14 @@ type SettingsRequest struct {
 
 	// A combination the shell can register (`cmd+shift+k`), or empty for none.
 	Hotkey *string `json:"hotkey"`
+
+	// Whether this daemon asks iTerm2 for its sessions, their screens and their input
+	// over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
+	// setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
+	// sessions are refused before any Apple Event; opening a viewer tab for a tmux
+	// session, Reveal and closing a child tab this daemon opened still send their one
+	// Apple Event each. It takes effect on the next reading, without a restart.
+	ItermScan *bool `json:"iterm_scan"`
 
 	// Existing agent and Board authoring language and voice auto fallback.
 	Language *string `json:"language"`
@@ -5852,6 +6192,14 @@ type SettingsSnapshot struct {
 	// means the default, option+space, which the Swift app used to own and no longer
 	// does; an empty string means the person asked for none, and registers nothing.
 	Hotkey *string `json:"hotkey"`
+
+	// Whether this daemon asks iTerm2 for its sessions, their screens and their input
+	// over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
+	// setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
+	// sessions are refused before any Apple Event; opening a viewer tab for a tmux
+	// session, Reveal and closing a child tab this daemon opened still send their one
+	// Apple Event each. It takes effect on the next reading, without a restart.
+	ItermScan *bool `json:"iterm_scan"`
 
 	// Existing agent and Board authoring language and voice auto fallback. Its stored
 	// value and behavior are preserved independently of product language.
@@ -6467,11 +6815,15 @@ type TaskRoot struct {
 // landing_paths, terminal_intervention, released_claims, respawn_of,
 // waiting_on.
 type TaskRow struct {
-	Artifacts      []string   `json:"artifacts,omitempty"`
-	Assistant      Assistant  `json:"assistant"`
-	AttachSession  string     `json:"attachSession,omitempty"`
-	Attached       bool       `json:"attached,omitempty"`
-	BriefedAt      int64      `json:"briefedAt,omitempty"`
+	Artifacts     []string  `json:"artifacts,omitempty"`
+	Assistant     Assistant `json:"assistant"`
+	AttachSession string    `json:"attachSession,omitempty"`
+	Attached      bool      `json:"attached,omitempty"`
+	BriefedAt     int64     `json:"briefedAt,omitempty"`
+
+	// A callback's declared purpose: wait or heavy. Absent for children and callbacks
+	// made before intent was recorded.
+	CallbackIntent string     `json:"callback_intent,omitempty"`
 	Child          *TaskChild `json:"child,omitempty"`
 	Claims         []string   `json:"claims"`
 	ClaimsDeclared bool       `json:"claims_declared"`
@@ -6664,7 +7016,8 @@ type TerminalDiagnostics struct {
 	GrantsOK bool `json:"grants_ok"`
 
 	// Control leases held now.
-	Leases int64 `json:"leases"`
+	Leases    int64                 `json:"leases"`
+	Osascript *OsascriptDiagnostics `json:"osascript,omitempty"`
 
 	// Terminal streams open now, of at most 16.
 	Streams int64 `json:"streams"`
@@ -7196,8 +7549,18 @@ type TranscriptPage struct {
 
 	// task_finished only: how many things the delivery said it left undone. Present
 	// only when above zero.
-	Leftovers int64  `json:"leftovers,omitempty"`
-	Note      string `json:"note,omitempty"`
+	Leftovers int64 `json:"leftovers,omitempty"`
+
+	// The byte offset just past the last complete row read: pass it as after= to read
+	// only what was appended since. Absent when nothing complete was read (no record
+	// yet, or an unreadable one), and from a daemon that does not take after=; a
+	// reader without it keeps reading the newest page whole.
+	NextAfter int64 `json:"nextAfter,omitempty"`
+
+	// Exclusive byte cursor for the next older page; absent at the beginning of the
+	// record, and on an after= page.
+	NextBefore int64  `json:"nextBefore,omitempty"`
+	Note       string `json:"note,omitempty"`
 
 	// Which file this was read from. A reading that cannot name its source is not
 	// evidence.

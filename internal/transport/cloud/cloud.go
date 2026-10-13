@@ -15,6 +15,7 @@ package cloud
 
 import (
 	"context"
+	"crypto/ed25519"
 	"log"
 	"time"
 
@@ -23,16 +24,22 @@ import (
 )
 
 // Inbound is one decrypted request, as the transport hands it over. It is the
-// envelope's identity fields and its plaintext, and deliberately not the
-// envelope: by this point the signature has been checked and the ciphertext
-// opened, and repeating either here would be a second opinion about a question
-// already answered.
+// envelope's identity fields, its plaintext and the exact key used to verify
+// it. The envelope itself is not repeated: the transport already checked its
+// signature and opened its ciphertext.
 type Inbound struct {
-	Channel   string
-	Class     string
-	Sender    string
-	Sequence  uint64
-	Plaintext []byte
+	Channel     string
+	Class       string
+	Sender      string
+	Sequence    uint64
+	Plaintext   []byte
+	VerifiedKey ed25519.PublicKey
+	// Direct marks a request that arrived on the sender's own direct carrier
+	// instead of the relay socket. Its answer goes back the same way, which is
+	// the whole of the routing rule: nothing else about the request differs,
+	// and a carrier that dies between the two is a request the page asks
+	// again on the relay (docs/cloud-terminal-wire.md, Session reads).
+	Direct bool
 }
 
 // Outbound is one answer, ready to seal: the channel it belongs on, the class
@@ -59,6 +66,13 @@ type Outbound struct {
 	// the machine-read reply channel, where every Board, to-do and
 	// reference-image read of this machine answers.
 	Headroom bool
+	// Direct asks for this answer to travel on `Reply.Sender`'s direct
+	// carrier rather than the relay. It is set only for the answer to a
+	// request that arrived there. A transport without a carrier for that
+	// viewer answers that it could not deliver it: the page is not subscribed
+	// to the relay channel for a direct read, so putting the answer there
+	// would spend a spool row on something nobody receives.
+	Direct bool
 }
 
 // Reply is who an answer is for, which the payload itself does not say.
@@ -106,6 +120,10 @@ type Service struct {
 	Log func(format string, args ...any)
 	// Now is the clock a read's answer is timed by. Nil is time.Now.
 	Now func() time.Time
+	// Acted is told when a command changed a Session and was answered: the
+	// publisher looks again now rather than on its next pass (Publisher.Settle),
+	// so the page sees the press land. Nil does nothing.
+	Acted func()
 }
 
 // slowReadAnswer is how long a read may take, from arrival to its answer
@@ -191,11 +209,12 @@ func (s Service) Run(ctx context.Context) error {
 func (s Service) Answer(ctx context.Context, request Inbound) cloudops.Answer {
 	started := s.now()
 	answer := s.Bridge.Handle(ctx, cloudops.Command{
-		Channel:   request.Channel,
-		Class:     cloudops.Class(request.Class),
-		Sender:    request.Sender,
-		Sequence:  request.Sequence,
-		Plaintext: request.Plaintext,
+		Channel:     request.Channel,
+		Class:       cloudops.Class(request.Class),
+		Sender:      request.Sender,
+		VerifiedKey: request.VerifiedKey,
+		Sequence:    request.Sequence,
+		Plaintext:   request.Plaintext,
 	})
 	if !answer.Published() {
 		s.logf("cloud: %s answered nobody: session=%s status=%d code=%s sender=%s seq=%d",
@@ -212,7 +231,7 @@ func (s Service) Answer(ctx context.Context, request Inbound) cloudops.Answer {
 		return answer
 	}
 	out := Outbound{Channel: channel, Class: string(cloud.ClassStream), Payload: answer.Payload,
-		Headroom: answer.Session == cloudops.MachineReplySession,
+		Headroom: answer.Session == cloudops.MachineReplySession, Direct: request.Direct,
 		Reply: Reply{Sender: request.Sender, Sequence: request.Sequence, Name: answer.Name,
 			Status: answer.Status, Code: answer.Code}}
 	if err := s.Transport.Publish(ctx, out); err != nil {
@@ -237,6 +256,9 @@ func (s Service) Answer(ctx context.Context, request Inbound) cloudops.Answer {
 	// to the request. Log only authenticated envelope metadata and the typed
 	// outcome; never the command body, message text, or credentials.
 	if answer.Mutating {
+		if s.Acted != nil && answer.OK() && answer.Subject != "" && answer.Subject != cloudops.MachineReplySession {
+			s.Acted()
+		}
 		s.logf("cloud: command answered: operation=%s session=%s status=%d code=%s sender=%s seq=%d",
 			operationOrUnknown(answer.Operation), subjectOrUnknown(answer.Subject), answer.Status,
 			codeOrOK(answer.Code), request.Sender, request.Sequence)
@@ -284,11 +306,12 @@ func codeOrOK(code string) string {
 // that will not fit is not evidence about it (Bridge.Undeliverable).
 func (s Service) tellChannelFull(ctx context.Context, request Inbound, answer cloudops.Answer, limit int, cause error) {
 	refusal := s.Bridge.Undeliverable(cloudops.Command{
-		Channel:   request.Channel,
-		Class:     cloudops.Class(request.Class),
-		Sender:    request.Sender,
-		Sequence:  request.Sequence,
-		Plaintext: request.Plaintext,
+		Channel:     request.Channel,
+		Class:       cloudops.Class(request.Class),
+		Sender:      request.Sender,
+		VerifiedKey: request.VerifiedKey,
+		Sequence:    request.Sequence,
+		Plaintext:   request.Plaintext,
 	}, limit)
 	if !refusal.Published() {
 		s.logf("cloud: %s (operation=%s) did not fit its channel and its sender could not be told: the request names no waiter (%s): %v",
@@ -339,11 +362,12 @@ func (s Service) refuse(ctx context.Context, r Refuser) {
 // told, or "" when the answer was handed to the transport.
 func (s Service) Busy(ctx context.Context, request Inbound, limit int) string {
 	answer := s.Bridge.Busy(cloudops.Command{
-		Channel:   request.Channel,
-		Class:     cloudops.Class(request.Class),
-		Sender:    request.Sender,
-		Sequence:  request.Sequence,
-		Plaintext: request.Plaintext,
+		Channel:     request.Channel,
+		Class:       cloudops.Class(request.Class),
+		Sender:      request.Sender,
+		VerifiedKey: request.VerifiedKey,
+		Sequence:    request.Sequence,
+		Plaintext:   request.Plaintext,
 	}, limit)
 	if !answer.Published() {
 		return "the request names no waiter a refusal may be published to (" + answer.Code + ")"
@@ -353,6 +377,7 @@ func (s Service) Busy(ctx context.Context, request Inbound, limit int) string {
 		return err.Error()
 	}
 	out := Outbound{Channel: channel, Class: string(cloud.ClassStream), Payload: answer.Payload,
+		Direct: request.Direct,
 		Reply: Reply{Sender: request.Sender, Sequence: request.Sequence, Name: answer.Name,
 			Status: answer.Status, Code: answer.Code}}
 	if err := s.Transport.Publish(ctx, out); err != nil {

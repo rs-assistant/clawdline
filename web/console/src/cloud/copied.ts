@@ -23,14 +23,21 @@ import {
 import type { CloudReadClient } from "./relay-reader.js"
 import type { OpenedPairing, PendingOffer } from "./pair.js"
 import type { RecoverySession } from "./device-limit.js"
-import { CatalogCloudClient } from "./refusal-client.js"
+import { StatusCloudClient } from "./status-client.js"
+// @ts-expect-error -- a `.ts` path, so Node's strip-types runner can load this file in its suite.
+import { directCarriers, type CarrierClient } from "./direct-carrier.ts"
 
 // The archived bootstrap derives allowWrites from a device capability that
 // older Cloud tokens can omit. The current contract makes every signed-in
 // viewer writable; the target machine still checks its own pairing and switch.
-class PairedCloudClient extends CatalogCloudClient {
+class PairedCloudClient extends StatusCloudClient {
   constructor(options: Record<string, unknown>) {
     super({ ...options, allowWrites: true })
+    // The one direct channel this page may have to each machine. The reader above knows nothing
+    // of WebRTC; it is given the carrier here, and a build or a test without one reads over the
+    // relay exactly as before (`cloud/direct-carrier.ts`).
+    // `StatusCloudClient` is the untyped copied reader, so the shape it satisfies is named here.
+    this.useDirectCarriers(directCarriers(this as unknown as CarrierClient))
   }
 }
 
@@ -62,6 +69,8 @@ export interface CloudMachine {
 
 /** The connected client, as the gate and the seam use it. */
 export interface CloudClientHandle extends CloudReadClient {
+  enableClassicSessionView?(machine: string, session?: string | null): void
+  disableClassicSessionView?(): void
   account: string | null
   deviceID: string | null
   /** The bounded receive log; an error receipt points to the row that names its machine. */
@@ -84,6 +93,11 @@ export interface CloudClientHandle extends CloudReadClient {
    * paired with (`cloud-client.js`).
    */
   machineDescriptor?(machine: string): { machine?: { name?: string; platform?: string; commands?: string[] } } | null
+  /**
+   * What this page's own direct carrier to that machine is doing, for the dot
+   * the machine's row draws (`carrier-state.ts`). It opens nothing.
+   */
+  carrierFacts?(machine: string): { known: boolean; supported: boolean; open: boolean }
   /** A request with a stable id, answered on the encrypted machine channel. */
   _machineRequestAs?(
     request: string, machine: string, word: string, body: Record<string, unknown>, kind: "read" | "action", timeoutMs?: number,

@@ -1527,6 +1527,8 @@ export interface BrokerRootAssignment {
   brief_attempted_at?: number
   brief_path: string
   briefed_at?: number
+  cleanup?: BrokerRootCleanupEligibility
+  closure?: BrokerRootAssignmentClosure
   created_at: number
   executor?: BrokerOpenedSession
   failure?: string
@@ -1543,6 +1545,19 @@ export interface BrokerRootAssignment {
   project_dir: string
   request_id: string
   state: BrokerRootAssignmentState
+}
+
+/**
+ * A durable close of the exact executor. Only safe, unforced closure is completion
+ * evidence; the assignment remains briefed as its launch state.
+ */
+export interface BrokerRootAssignmentClosure {
+  closed_at: number
+  conversation_id?: string
+  forced: boolean
+  method: string
+  safe: boolean
+  terminal_id: string
 }
 
 export interface BrokerRootAssignmentEnvelope {
@@ -1593,6 +1608,20 @@ export type BrokerRootAssignmentState =
   | "failed"
 
 export const BrokerRootAssignmentStateValues: readonly BrokerRootAssignmentState[] = ["accepted", "terminal_opened", "briefed", "failed"] as const
+
+/**
+ * Fresh conservative cleanup gates. No Root scratch is registered yet, so eligible
+ * is false and no Root path is deleted.
+ */
+export interface BrokerRootCleanupEligibility {
+  completion: boolean
+  eligible: boolean
+  next_owner: string
+  owner: string
+  preservation: string
+  reason: string
+  scratch: string
+}
 
 /**
  * A root's own receipt: one sentence saying this turn delivered something. It
@@ -1763,6 +1792,12 @@ export interface BrokerTask {
    * for a Codex task, which is never given one, and for a task not launched yet.
    */
   auto_compact_window: number | null
+
+  /**
+   * A callback's declared purpose: wait or heavy. Absent for children and callbacks
+   * made before intent was recorded.
+   */
+  callback_intent?: string
   child?: BrokerChild
   claims: string[]
 
@@ -3030,6 +3065,7 @@ export interface Diagnostics {
   platform: PlatformDiagnostics
   port: number
   proposals?: ProposalDiagnostics
+  routes?: RouteStats
   scheduler: SchedulerPulse
   served_by: string
   terminals?: TerminalDiagnostics
@@ -3631,6 +3667,11 @@ export interface KeyRequest {
 
 export interface LeaseHolder {
   acquired_at: number
+
+  /**
+   * The callback whose command holds this lease, when one did.
+   */
+  callback_task_id?: string
   held_seconds: number
   holder: string
   lease_id: string
@@ -3701,6 +3742,12 @@ export interface LeaseReply {
  */
 export interface LeaseRequest {
   /**
+   * The callback command that asked for heavy_compile, when one did. Absent for a
+   * direct heavy command and for other resources.
+   */
+  callback_task_id?: string
+
+  /**
    * landing only: the absolute path of the checkout being landed into.
    */
   checkout?: string
@@ -3750,6 +3797,16 @@ export type Liveness =
 export const LivenessValues: readonly Liveness[] = ["online", "offline", "unknown"] as const
 
 /**
+ * The last capacity pass's free space on the daemon state volume. Unknown includes
+ * a missing or stalled pass.
+ */
+export interface MachineDiskSummary {
+  at: number
+  free_bytes: number
+  known: boolean
+}
+
+/**
  * Percent of the last ten seconds in which some task (or, for `memory_full`, every
  * task) waited on the resource.
  */
@@ -3761,17 +3818,55 @@ export interface MachinePressure {
 }
 
 /**
- * GET /v1/machine/usage, for any paired device: this machine's CPU and memory now,
- * and each session's share of them — the dashboard opened from the session counts
- * beside the wordmark. Clawdline Cloud carries it as the `machine-usage` word. The
- * CPU figures are shares over `interval_ms`, the time between two readings, because
- * a process's CPU time is a counter: a share needs two. Every percentage is of the
- * whole machine, all cores together, 0-100. A session's figures are its whole
- * process tree: the assistant, the shells it opened and what they started, each
- * process given to the nearest session above it. A process that ended inside the
- * interval is in the machine's figures and in no row. On a platform without a
- * reader the route answers 501 `machine_usage_unsupported` rather than an idle
- * machine.
+ * One allowlisted reason, without the task or file it concerns.
+ */
+export interface MachineReclaimReason {
+  code: MachineReclaimReasonCode
+  count: number
+}
+
+export type MachineReclaimReasonCode =
+    "within_grace"
+  | "owner_present"
+  | "owner_unknown"
+  | "path_not_owned"
+  | "unreadable"
+  | "nested_repository"
+  | "filters_present"
+  | "preserve_failed"
+  | "changed_during_sweep"
+  | "intent_not_recorded"
+  | "remove_failed"
+
+export const MachineReclaimReasonCodeValues: readonly MachineReclaimReasonCode[] = ["within_grace", "owner_present", "owner_unknown", "path_not_owned", "unreadable", "nested_repository", "filters_present", "preserve_failed", "changed_during_sweep", "intent_not_recorded", "remove_failed"] as const
+
+/**
+ * Grouped standing decisions, refreshed at most once per registered cache interval.
+ * A failed read is unknown, never an empty backlog.
+ */
+export interface MachineReclaimSummary {
+  at: number
+  deferred: number
+
+  /**
+   * Kept decisions with one of the fixed unreadable, preserve_failed,
+   * intent_not_recorded or remove_failed reasons.
+   */
+  failures: number
+  kept: number
+  known: boolean
+  last_sweep_at?: number
+  reasons: MachineReclaimReason[]
+  removing: number
+}
+
+/**
+ * GET /v1/machine/usage, for any paired device: CPU, memory, cached free disk space
+ * and grouped reclaim backlog. Clawdline Cloud carries this as the `machine-usage`
+ * word. The CPU figures are shares over `interval_ms`. Disk and reclaim readings
+ * say whether they are known; no task identifiers, paths or raw evidence are sent.
+ * On a platform without a CPU reader the route answers 501
+ * `machine_usage_unsupported`.
  */
 export interface MachineUsage {
   at: number
@@ -3781,6 +3876,7 @@ export interface MachineUsage {
    */
   cores: number
   cpu_percent: number
+  disk?: MachineDiskSummary
 
   /**
    * One row per session whose process is alive, and one for this daemon.
@@ -3812,6 +3908,7 @@ export interface MachineUsage {
    * keeps none, which is not the same as none.
    */
   pressure?: MachinePressure
+  reclaim?: MachineReclaimSummary
   swap_total_bytes: number
   swap_used_bytes: number
 }
@@ -3924,6 +4021,69 @@ export interface ObligationList {
    * How many rows are past their overdue threshold. A count, not a verdict.
    */
   stuck: number
+}
+
+/**
+ * Every iTerm2 osascript run this daemon started, counted by kind: since it
+ * started, and since the last hourly `osascript: hour` line in daemon.log, which
+ * writes the same counts. It is how a week with `iterm_scan` off is compared with a
+ * week with it on (docs/interface.md `Turning iTerm2 scanning off`). The pasteboard
+ * reader's osascript is not an iTerm2 Apple Event and is not counted.
+ */
+export interface OsascriptDiagnostics {
+  /**
+   * Each kind since `hour_since`: what the next hourly line will say so far.
+   */
+  hour_kinds: OsascriptKind[]
+
+  /**
+   * When the current hourly window started, Unix seconds.
+   */
+  hour_since: number
+
+  /**
+   * The `iterm_scan` switch now.
+   */
+  iterm_scan: boolean
+
+  /**
+   * Each kind since `since`, ordered by kind. At most 32 kinds; any past that are
+   * counted as `other`.
+   */
+  kinds: OsascriptKind[]
+
+  /**
+   * When these counts started: the daemon's start, Unix seconds.
+   */
+  since: number
+}
+
+/**
+ * One kind of osascript run: `list` (the inventory), `capture` (a screen read),
+ * `send`, `type`, `key`, `close`, `find`, `open` (a new tab), `reveal`,
+ * `reveal-<what>`, `probe` (a stall diagnosis), or `other`.
+ */
+export interface OsascriptKind {
+  /**
+   * Runs that exited non-zero or were killed at their limit.
+   */
+  failures: number
+  kind: string
+
+  /**
+   * The longest one, milliseconds.
+   */
+  max_ms: number
+
+  /**
+   * Runs that finished, failed or not.
+   */
+  runs: number
+
+  /**
+   * Their summed wall time, milliseconds.
+   */
+  total_ms: number
 }
 
 /**
@@ -5375,6 +5535,107 @@ export interface RootAssignmentRecord {
 }
 
 /**
+ * Who made the calls: `device` a paired browser or phone, `local` this machine's
+ * own token (the CLI, scripts, the orchestrator), `cloud` a Cloud viewer answered
+ * in process, `task` a child let in by its task secret, `anonymous` nobody the gate
+ * let in (open paths and refusals).
+ */
+export interface RouteCallers {
+  anonymous: number
+  cloud: number
+  device: number
+  local: number
+  task: number
+}
+
+/**
+ * Time to answer over the last `samples` calls, in milliseconds; `max` is since the
+ * daemon started.
+ */
+export interface RouteLatency {
+  max: number
+  p50: number
+  p90: number
+  samples: number
+}
+
+/**
+ * One route shape's counts. A long-lived event stream counts `opens` and `open` and
+ * has no latency.
+ */
+export interface RouteStat {
+  callers: RouteCallers
+
+  /**
+   * Calls answered; a stream is counted when it ends.
+   */
+  count: number
+  latency_ms?: RouteLatency
+
+  /**
+   * The HTTP method, or OTHER.
+   */
+  method: string
+
+  /**
+   * Streams open now.
+   */
+  open?: number
+
+  /**
+   * Streams opened since the daemon started.
+   */
+  opens?: number
+
+  /**
+   * The route shape, e.g. `/v1/sessions/:id/info`.
+   */
+  route: string
+  status_2xx: number
+  status_3xx: number
+  status_4xx: number
+  status_5xx: number
+
+  /**
+   * This route answered as an event stream.
+   */
+  stream: boolean
+}
+
+/**
+ * /v1/diagnostics.routes: every API call this daemon answered since it started, by
+ * route shape and caller. A key is the method and the pattern the mux matched;
+ * below a prefix pattern only fixed route words are spelled out and every other
+ * segment is `:id`, and the query is never read, so no session id, name or text
+ * appears. Counters are never reset: compare two readings by subtracting them.
+ * Absent from a daemon without the counter.
+ */
+export interface RouteStats {
+  /**
+   * How many distinct route shapes are counted (capacity
+   * `diagnostics.route_stat_keys`).
+   */
+  key_limit: number
+
+  /**
+   * How many recent durations each route keeps for its percentiles (capacity
+   * `diagnostics.route_latency_samples`).
+   */
+  latency_samples: number
+
+  /**
+   * Calls not counted under a route of their own because the table was full.
+   */
+  overflow: number
+  routes: RouteStat[]
+
+  /**
+   * When counting started: the daemon's start, Unix seconds.
+   */
+  since: number
+}
+
+/**
  * What the reading behind this snapshot knows about itself. Without it an empty
  * list cannot be told apart from a failed scan.
  */
@@ -5474,6 +5735,7 @@ export interface ScanGap {
  */
 export interface ScanSource {
   complete: boolean
+  disabled?: ScanSourceDisabled
 
   /**
    * The regions of this source that could not be read, each one either sealed by
@@ -5488,6 +5750,18 @@ export interface ScanSource {
    */
   source: string
 }
+
+/**
+ * Why a source was not asked at all. `setting`: the person turned it off (iTerm2's
+ * `iterm_scan`). Such a source is `complete: false` and lists no rows, and it is
+ * neither a failure nor an empty answer: a row of that source is not gone, it is
+ * not being looked at. A client says so in one line instead of drawing those tabs
+ * as nothing. Absent on every source that was asked.
+ */
+export type ScanSourceDisabled =
+    "setting"
+
+export const ScanSourceDisabledValues: readonly ScanSourceDisabled[] = ["setting"] as const
 
 export interface ScheduleDeleted {
   deleted: string
@@ -6117,6 +6391,14 @@ export interface SessionCoordinatorCommand {
   why?: string
 }
 
+export interface SessionHeavyWork {
+  /**
+   * The heavy command's declared reason, for the icon's title and accessible name.
+   */
+  reason: string
+  task_id: string
+}
+
 /**
  * The facts behind the status line under an open session. This daemon serves the
  * transcript-derived part the Swift app calls the summary, the context reading, the
@@ -6213,6 +6495,7 @@ export interface SessionInfoReply {
 export interface SessionInfoSession {
   assistant?: Assistant
   cwd?: string
+  icon?: Icon
   id: string
 
   /**
@@ -6522,6 +6805,20 @@ export interface SessionRow {
   disposition?: WorkDisposition
   epic_parent?: EpicSessionParent
   evidence: Evidence
+
+  /**
+   * Machine-issued durable identity of this terminal execution. Absent when the
+   * source or process start cannot be verified, the machine has no Cloud identity,
+   * or the identity store could not be written. This is not scan.generation.
+   */
+  execution_generation?: string
+
+  /**
+   * Only the Session that started the declared-heavy callback currently holding and
+   * running in the machine's heavy_compile slot. Absent for queued work, wait
+   * callbacks, direct heavy commands and unreadable evidence.
+   */
+  heavy_work?: SessionHeavyWork
   icon?: Icon
   id: string
   identity?: IdentityBinding
@@ -6611,6 +6908,15 @@ export interface SessionRow {
    */
   work_since?: number
   work_state: WorkState
+
+  /**
+   * When the turn a working session's `line` reports began, in unix seconds: when
+   * the line was read, less the assistant's own clock in it. Present only beside a
+   * `line` that carries that clock. A page that has it draws the clock itself from
+   * this instant, so `line` is republished only when something other than the clock
+   * moved; a page without it draws `line` as sent.
+   */
+  working_since?: number
 }
 
 /**
@@ -6670,6 +6976,135 @@ export type SessionState =
   | "unknown"
 
 export const SessionStateValues: readonly SessionState[] = ["working", "waiting", "idle", "unknown"] as const
+
+export interface SessionStatus {
+  assistant?: string
+
+  /**
+   * True only when a person-needed declaration or a positive attention count is
+   * known.
+   */
+  attention_required?: boolean
+  backend?: string
+
+  /**
+   * Measured only when closeability has a current source and a known state. True
+   * means closing is blocked, false means it is not; absent is unknown. It does not
+   * mean the whole Session or its work is blocked.
+   */
+  close_blocked?: boolean
+
+  /**
+   * True only for an unviewed Board delivery in phase done. A deploying item is not
+   * called complete.
+   */
+  completed_unconfirmed?: boolean
+
+  /**
+   * Random 128-bit machine-issued execution identity, absent unless this row's
+   * source is current and its process is pinned by PID and kernel start time.
+   */
+  execution_generation?: string
+
+  /**
+   * Count of provider-native background agents in failed state when their reading
+   * is complete and untruncated. Zero is measured; absent is unknown. It does not
+   * mean the Session failed.
+   */
+  failed_agent_count?: number
+
+  /**
+   * Whether the whole local scan was complete. False does not by itself revoke a
+   * currently observed row.
+   */
+  inventory_complete: boolean
+
+  /**
+   * Unix seconds when the assistant's own record last grew; this is activity, not a
+   * claim of task progress.
+   */
+  last_movement_at?: number
+  machine_id: string
+
+  /**
+   * True for the machine workspace Session, which sorts before ordinary Sessions.
+   */
+  machine_scope?: boolean
+
+  /**
+   * Absent when activity or current source evidence is unknown; false is a measured
+   * answer.
+   */
+  no_movement?: boolean
+
+  /**
+   * Machine policy threshold in milliseconds for classifying no recent record
+   * movement.
+   */
+  no_progress_after_ms: number
+
+  /**
+   * Terminal id of a currently listed parent Session, derived from the signed task
+   * or Epic owner relationship. No task text is copied.
+   */
+  parent_session_id?: string
+
+  /**
+   * Unix seconds when this status was projected.
+   */
+  projected_at: number
+  session_id: string
+
+  /**
+   * Pass id shared by every status row and the inventory marker of one set: which
+   * Sessions are listed and which execution each row speaks for. A viewer discards
+   * rows with a different value. It is stable while the set is, so an unchanged row
+   * is not re-sent and the one the relay retains remains the newest.
+   */
+  snapshot_generation: string
+  source: SessionStatusSource
+  state: string
+
+  /**
+   * True only when a current waiting row has a nonempty menu corroborated by a
+   * captured screen, or by a registry wait and an open single-question transcript
+   * menu while the screen is unavailable. No question or option text is copied.
+   * Absent means the reply signal is unavailable, not that no reply is needed.
+   */
+  waiting_for_reply?: boolean
+}
+
+export interface SessionStatusInventory {
+  /**
+   * Unix seconds of this inventory reading.
+   */
+  at: number
+  complete: boolean
+  inventory: SessionStatusInventoryList
+
+  /**
+   * Id of the machine's display facts, which carry no content here: a viewer
+   * re-reads the pinned machine list when it changes. Absent on an older machine,
+   * whose snapshot_generation moves with every display change instead.
+   */
+  presentation_generation?: string
+  snapshot_generation: string
+}
+
+export interface SessionStatusInventoryList {
+  sessions: string[]
+  version: number
+}
+
+export interface SessionStatusSource {
+  freshness: string
+
+  /**
+   * Unix seconds; zero when no observation time is known.
+   */
+  observed_at: number
+  provenance: string
+}
 
 /**
  * The durable local result of naming a session. This daemon keeps the display name
@@ -6770,6 +7205,16 @@ export interface SettingsRequest {
    * A combination the shell can register (`cmd+shift+k`), or empty for none.
    */
   hotkey: string | null
+
+  /**
+   * Whether this daemon asks iTerm2 for its sessions, their screens and their input
+   * over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
+   * setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
+   * sessions are refused before any Apple Event; opening a viewer tab for a tmux
+   * session, Reveal and closing a child tab this daemon opened still send their one
+   * Apple Event each. It takes effect on the next reading, without a restart.
+   */
+  iterm_scan: boolean | null
 
   /**
    * Existing agent and Board authoring language and voice auto fallback.
@@ -7011,6 +7456,16 @@ export interface SettingsSnapshot {
    * does; an empty string means the person asked for none, and registers nothing.
    */
   hotkey: string | null
+
+  /**
+   * Whether this daemon asks iTerm2 for its sessions, their screens and their input
+   * over Apple Events. Absent means true. Off, the iTerm2 source answers `disabled:
+   * setting` instead of a list, and typing, keys, screen reads and closes on iTerm2
+   * sessions are refused before any Apple Event; opening a viewer tab for a tmux
+   * session, Reveal and closing a child tab this daemon opened still send their one
+   * Apple Event each. It takes effect on the next reading, without a restart.
+   */
+  iterm_scan: boolean | null
 
   /**
    * Existing agent and Board authoring language and voice auto fallback. Its stored
@@ -7739,6 +8194,12 @@ export interface TaskRow {
   attachSession?: string
   attached?: boolean
   briefedAt?: number
+
+  /**
+   * A callback's declared purpose: wait or heavy. Absent for children and callbacks
+   * made before intent was recorded.
+   */
+  callback_intent?: string
   child?: TaskChild
   claims: string[]
   claims_declared: boolean
@@ -7972,6 +8433,7 @@ export interface TerminalDiagnostics {
    * Control leases held now.
    */
   leases: number
+  osascript?: OsascriptDiagnostics
 
   /**
    * Terminal streams open now, of at most 16.
@@ -8641,6 +9103,20 @@ export interface TranscriptPage {
    * only when above zero.
    */
   leftovers?: number
+
+  /**
+   * The byte offset just past the last complete row read: pass it as after= to read
+   * only what was appended since. Absent when nothing complete was read (no record
+   * yet, or an unreadable one), and from a daemon that does not take after=; a
+   * reader without it keeps reading the newest page whole.
+   */
+  nextAfter?: number
+
+  /**
+   * Exclusive byte cursor for the next older page; absent at the beginning of the
+   * record, and on an after= page.
+   */
+  nextBefore?: number
   note?: string
 
   /**

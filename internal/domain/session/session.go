@@ -162,13 +162,15 @@ func StateFromAssistantStatus(status string) State {
 }
 
 type Session struct {
-	ID        string    `json:"id"`
-	Backend   Backend   `json:"backend"`
-	TTY       string    `json:"tty,omitempty"`
-	PID       int       `json:"pid,omitempty"`
-	Assistant Assistant `json:"assistant,omitempty"`
-	CWD       string    `json:"cwd,omitempty"`
-	Label     string    `json:"label,omitempty"`
+	ID      string  `json:"id"`
+	Backend Backend `json:"backend"`
+	TTY     string  `json:"tty,omitempty"`
+	PID     int     `json:"pid,omitempty"`
+	// ExpectedStart pins a recovery close to the process the person saw.
+	ExpectedStart time.Time `json:"-"`
+	Assistant     Assistant `json:"assistant,omitempty"`
+	CWD           string    `json:"cwd,omitempty"`
+	Label         string    `json:"label,omitempty"`
 	// Line is what a working assistant says it is doing — the spinner line,
 	// with its own clock in it. Empty unless the session is working.
 	Line     string   `json:"line,omitempty"`
@@ -277,6 +279,16 @@ type Inventory struct {
 	// their own because a merged reading may contain current tmux rows beside
 	// retained iTerm2 rows.
 	Observation Observation `json:"-"`
+	// Disabled, on one source's reading, is why that source was not asked at
+	// all: "setting" when the person turned it off (iTerm2's `iterm_scan`).
+	// Such a reading is incomplete and lists nothing, and it is neither a
+	// failure to age into `missing` nor an empty answer. Not on the wire.
+	Disabled string `json:"-"`
+	// DisabledSources is the same, on a merged reading, by provenance. A
+	// disabled source is not in Sources: it gave no answer to retain or
+	// expire, and ProvesAbsence refuses it by name. Not on the wire in this
+	// shape; the transport puts it beside the source it belongs to.
+	DisabledSources map[string]string `json:"-"`
 }
 
 func (i Inventory) Assistants() []Session {

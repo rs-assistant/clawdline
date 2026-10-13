@@ -18,6 +18,10 @@ daemon and return when it finishes; an Agent can leave a concrete request for yo
 attention panel; and you can save future work as a Session to-do without interrupting its current
 turn.
 
+New here? Follow [your first Session](docs/user/first-session.md), or choose a job in the
+[user guide](docs/user/README.md). Agents should read the
+[guide compiled into the current machine](docs/agent-contract.md).
+
 ## What it does
 
 **Basics — every day**
@@ -75,7 +79,8 @@ The screenshots below show the current console with sample data.
 
 - **A Board that follows delivery.** Assign a Feature, Issue or Epic to a session and follow it
   through implementation, verification, merge and deployment, each phase with evidence. Planning
-  is on by default: Features and Epics need a plan and an independent review before work starts.
+  is on by default: Features need observable acceptance criteria. A plan and independent review
+  are required when you turn on **Needs independent review**. Epics require a reviewed plan.
   Questions for you appear on the card. The Board itself is off until you turn it on in Settings.
   [Board](docs/user/board.md)
 
@@ -94,6 +99,11 @@ The screenshots below show the current console with sample data.
 
 **Projects and machines**
 
+- **Add a local project by hand.** On the machine that holds an existing directory, run
+  `clawdline project add` from that directory, or pass a relative or absolute path, while its daemon is running. The command
+  succeeds only after that daemon registers the directory. `clawdline project list` reads the same
+  list; the open session start sheet refreshes automatically, and **Projects** can be reopened to see it. The console has
+  no Add Project button. Each Project row has **Remove from list**, which keeps its directory and sessions. [Add a project](docs/user/projects.md#add-a-project)
 - **Projects across machines.** Give a second machine the same project names, icons and untracked
   skills, matched by git origin, with or without Cloud. [Projects](docs/user/projects.md)
 - **One set of rules and skills for Claude and Codex.** `clawdline project unify` shows how to give
@@ -104,7 +114,8 @@ The screenshots below show the current console with sample data.
 
 ## Install
 
-On macOS 13+ or Linux, with tmux and Claude Code or Codex:
+On macOS 13+ or Linux, with Claude Code or Codex (each release carries its own tmux, used when you
+have none):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
@@ -112,8 +123,9 @@ curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh 
 
 It installs the latest signed release for your system as a per-user service that starts at login
 (no `sudo`, no Go or Node.js), adds the menu-bar app on a Mac, and opens the console in your
-browser. On a server, add `-s -- --headless` after `sh`. Run `claude` or `codex` inside tmux, and
-the session appears in the list.
+browser. On a server, add `-s -- --headless` after `sh`. Run `claude` or `codex` inside tmux
+(`clawdline tmux new -s work` when setup said it uses the carried one), and the session appears in
+the list.
 
 Each step with a check that it worked, every option, removal, and building from source are in
 [Install and first run](docs/user/install.md). A release updates itself from the console's Settings

@@ -34,13 +34,16 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/app/cloudops"
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
+	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
 // The inventory marker's literal session id and the bound on how many ids it
@@ -61,7 +64,7 @@ const SnapshotInterval = 5 * time.Second
 // FeatureWords is `CloudAppBridge.swift:1436`'s `cloudFeatures`: the words a
 // newer machine answers that an older one does not. A page sends such a word only
 // to a machine that listed it.
-var FeatureWords = []string{"sessions.snapshot", "sessions.snapshot.initial", "board.items"}
+var FeatureWords = []string{"sessions.snapshot", "sessions.snapshot.initial", "sessions.row", "board.items"}
 
 // Features is the subset of those this daemon can actually answer.
 //
@@ -102,10 +105,33 @@ type Publisher struct {
 	// answers, so a newer console can say a feature needs an update before it
 	// asks for it. Zero leaves the key out, as a daemon before it had none.
 	APILevel int
+	// ReadContentV1 is true only when this machine has the pinned r/ read
+	// bridge wired. A status publisher alone must not claim it can answer r/.
+	ReadContentV1 bool
+	// SessionCarrierV1 is true only when this machine opens a shared direct
+	// carrier for a viewer's Session reads (carrier.go). A page reads it
+	// before offering one: an older daemon says nothing here, so no offer is
+	// ever sent to one and every read of it stays on the relay.
+	SessionCarrierV1 bool
 	// Router is this daemon's own routes — the same in-process dispatch a Cloud
 	// read goes through, so the rows a viewer sees are the rows the local
 	// console sees.
 	Router cloudops.LocalRouter
+	// Sessions is this daemon's own session list as `GET /v1/sessions`
+	// answers it, read from the one producer every event stream reads
+	// (internal/transport/http producer.go), so this publisher no longer builds
+	// a list of its own. Nil, or false, reads the route through Router.
+	Sessions func(context.Context) ([]byte, bool)
+	// Fresh is the same list built now rather than taken from the shared
+	// product, which may be a tick old (producer.go). Settle's passes read it,
+	// because they run right after a press changed a screen and a tick-old list
+	// is the screen before the press. Nil reads Sessions.
+	Fresh func(context.Context) ([]byte, bool)
+	// TaskListMoved answers whether this machine has written a task row since
+	// it was last asked, and clears the fact (link.go, takeTaskListMoved).
+	// Nil answers no, which leaves the list to be read on the first pass, on
+	// every re-statement and on the heartbeat (tasklist.go).
+	TaskListMoved func() bool
 	// Publish is where a snapshot goes. It is the Relay in production.
 	Publish func(context.Context, Outbound) error
 	// Every is the poll interval; zero is SnapshotInterval.
@@ -114,6 +140,11 @@ type Publisher struct {
 	// Now exists so a test can drive the clock the heartbeat is measured on.
 	// Nil is time.Now.
 	Now func() time.Time
+	// VolatileEvery is how often a row whose only change is a volatile field
+	// may go out; zero is SessionRowVolatileSecondsLimit. A negative value
+	// sends every change at once, which is how a test measures what the
+	// coalescing saves.
+	VolatileEvery time.Duration
 
 	// published is each row's identity bytes as last sent, so an unchanged row
 	// is skipped. Keyed by session id; the inventory and the descriptor have
@@ -124,6 +155,15 @@ type Publisher struct {
 	// is older than five minutes as stale and will not auto-select it
 	// (`cloud-client.js`'s MACHINE_INVENTORY_FRESH_MS), so silence is not free.
 	sent map[string]time.Time
+	// steady is each key's identity without its volatile fields as last sent
+	// (volatileFree), so a change in those fields alone waits for the row's
+	// window while any other change goes at once.
+	steady map[string][32]byte
+	// statusRows is the ids the status channel (ss/) has a remembered row for,
+	// so the row of an id that leaves the set is forgotten rather than left to
+	// be skipped against whatever the relay still retains under it. It is the
+	// inventory's own set and so bounded by InventoryLimit.
+	statusRows map[string]bool
 
 	// listed is the sessions a viewer holds rows for, which decides whether a
 	// finished task is still reachable (tasklist.go).
@@ -131,6 +171,28 @@ type Publisher struct {
 	// tasks is the task list as last projected, carried on the descriptor.
 	// Nil or empty is no `tasks` key at all.
 	tasks []map[string]any
+	// taskRows is the machine's own task list as the last read answered it,
+	// before the projection. It is kept so that a pass nobody told about a
+	// task change can project the same rows over a changed set of listed
+	// sessions without reading the route again (tasklist.go).
+	taskRows []map[string]any
+	// taskReadAt is when that read happened, and taskRowsStale whether
+	// something has happened since that the rows do not account for. Both are
+	// the publisher goroutine's.
+	taskReadAt    time.Time
+	taskRowsStale bool
+	// taskListed is the set the kept rows were last projected over, so a pass
+	// whose listed sessions are unchanged does not reproject them either.
+	taskListed map[string]bool
+	// What the task list's reads have cost, for the capacity register's
+	// `cloud.task_list_reread_seconds` row: when the route was last asked
+	// (Unix seconds; zero is never), how many times it has been asked and how
+	// many passes have been made. The diagnostics route reads them from its
+	// own goroutine while a pass is running, so they are atomics rather than
+	// the pass's own fields above.
+	taskReadUnix atomic.Int64
+	taskReads    atomic.Int64
+	taskPasses   atomic.Int64
 	// omitted is how many reachable records the last projection's bounds left
 	// out, so the log says it when it changes rather than every pass.
 	omitted int
@@ -176,12 +238,31 @@ type Publisher struct {
 	urgent        bool
 	stating       bool
 	firstBySender map[string]time.Time
+	// settle wakes Run for Settle's passes; fresh is set by Run, around such a
+	// pass, so readProduct builds the list now.
+	settle chan struct{}
+	fresh  bool
+	// pressedAt is when the last Settle came, and rowsSent counts Session
+	// rows handed over, for the line each of Settle's passes leaves.
+	pressedAt time.Time
+	rowsSent  int
+	// rows carries StateRow's asks to Run, which owns the skip memory;
+	// rowAsked is when each sender last asked for each row (StateRow).
+	rows     chan rowAsk
+	rowAsked map[string]time.Time
+}
+
+// rowAsk is one StateRow waiting for Run.
+type rowAsk struct {
+	id     string
+	answer chan snapshotResult
 }
 
 // heldRow is one published row: the identity it was compared by and the bytes
 // that went out.
 type heldRow struct {
 	identity []byte
+	steady   []byte
 	body     []byte
 }
 
@@ -246,10 +327,25 @@ func (p *Publisher) Run(ctx context.Context) error {
 	}
 	p.published = map[string][32]byte{}
 	p.sent = map[string]time.Time{}
+	p.steady = map[string][32]byte{}
 	p.inventoried = map[string]inventoriedRow{}
 	p.held = map[string]heldRow{}
 	wake := p.open()
 	defer p.close()
+	p.mu.Lock()
+	settle, rows := p.settle, p.rows
+	p.mu.Unlock()
+	// Settle's passes: each press restarts the sequence, so a burst of presses
+	// is one sequence after the last of them.
+	due := make(chan struct{}, 1)
+	var settling []*time.Timer
+	stopSettling := func() {
+		for _, t := range settling {
+			t.Stop()
+		}
+		settling = nil
+	}
+	defer stopSettling()
 	// A new socket is a new audience. Nothing this publisher said on the last
 	// one was heard on this one — the relay holds each connection's realign
 	// snapshots, not this machine's — so the first pass below states
@@ -275,6 +371,29 @@ func (p *Publisher) Run(ctx context.Context) error {
 				continue
 			}
 			p.pass(ctx)
+		case <-settle:
+			p.pressedAt = p.now()
+			stopSettling()
+			for _, d := range SettleDelays {
+				settling = append(settling, time.AfterFunc(d, func() {
+					select {
+					case due <- struct{}{}:
+					default:
+					}
+				}))
+			}
+		case <-due:
+			// One line per look, because the whole point of these passes is a
+			// time, and on 2026-10-12 a press still waited nine seconds to be
+			// seen with nothing on this machine saying whether a look ran.
+			sent := p.rowsSent
+			p.fresh = true
+			p.pass(ctx)
+			p.fresh = false
+			p.logf("cloud: looked again %dms after a press: %d Session row(s) sent",
+				p.now().Sub(p.pressedAt).Milliseconds(), p.rowsSent-sent)
+		case ask := <-rows:
+			p.stateRow(ctx, ask)
 		case <-wake:
 			if !p.asked() {
 				continue
@@ -379,6 +498,7 @@ func (p *Publisher) restatePass(ctx context.Context) {
 	p.mu.Unlock()
 	p.published = map[string][32]byte{}
 	p.sent = map[string]time.Time{}
+	p.steady = map[string][32]byte{}
 	p.unsent = 0
 	inventory, reading, ok := p.pass(ctx)
 	result := snapshotResult{stated: cloudops.SessionsStated{IDs: inventory, Complete: ok && reading.whole()}}
@@ -404,6 +524,9 @@ func (p *Publisher) open() <-chan struct{} {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.wake = make(chan struct{}, 1)
+	p.settle = make(chan struct{}, 1)
+	p.rows = make(chan rowAsk, SessionRowAsksLimit)
+	p.rowAsked = map[string]time.Time{}
 	p.running = true
 	p.stated = time.Time{}
 	p.firstBySender = map[string]time.Time{}
@@ -422,6 +545,113 @@ func (p *Publisher) close() {
 		answer <- snapshotResult{refusal: &cloudops.Refusal{Status: 503, Code: "cloud_reconnecting",
 			Message: "This machine's Cloud line went down before its Sessions were stated."}}
 	}
+}
+
+// SettleDelays are when, after a person acted on a Session from a page, the
+// publisher looks again instead of waiting for its next pass. The first catches
+// the screen the press left; the second the one the session drew after it — an
+// answered question's next question, a ticked box. Measured on 2026-10-12: a
+// press was answered on the machine in well under a second, and the row that
+// showed its effect then waited up to SnapshotInterval (five seconds) for the
+// next pass, which is the wait a phone saw after every tap.
+var SettleDelays = []time.Duration{200 * time.Millisecond, 1200 * time.Millisecond}
+
+// Settle asks for SettleDelays' passes, with the session list built fresh for
+// each. It never waits, and presses that come while a sequence is pending start
+// it again rather than adding passes.
+func (p *Publisher) Settle() {
+	p.mu.Lock()
+	settle := p.settle
+	p.mu.Unlock()
+	if settle == nil {
+		return
+	}
+	select {
+	case settle <- struct{}{}:
+	default:
+	}
+}
+
+// SessionRowAsksLimit is how many `sessions.row` asks may wait for Run. Past
+// it the sender is answered 429 cloud_read_busy; each ask is one fresh pass,
+// answered in order, so the lane drains as fast as the machine can read.
+const SessionRowAsksLimit = 64
+
+// SessionRowEvery is how often one viewer may ask for one row (StateRow).
+// A page asks once per six seconds while it waits (`relay-reader.ts`
+// QUESTION_RESTATE_MS); this only stops a page that misbehaves from buying a
+// fresh session build on every envelope.
+const SessionRowEvery = time.Second
+
+// StateRow is `sessions.row`: one Session's row back on its channel now, built
+// fresh, whether or not it changed. A page with a Session open and waiting asks
+// it when the question has not come, because the machine sends a row only when
+// it changes and a Session stopped on a question does not change — and the
+// whole restatement it asked before waited for this machine's next pass, five
+// seconds at worst, measured on 2026-10-12 as four seconds of "could not read
+// the choices" between opening the Session and its options.
+func (p *Publisher) StateRow(ctx context.Context, sender, id string) (cloudops.SessionsStated, *cloudops.Refusal) {
+	answer := make(chan snapshotResult, 1)
+	p.mu.Lock()
+	if !p.running {
+		p.mu.Unlock()
+		return cloudops.SessionsStated{}, &cloudops.Refusal{Status: 503, Code: "cloud_starting",
+			Message: "This machine has not started publishing its Sessions yet; try again shortly."}
+	}
+	key := sender + "\x00" + id
+	if last, ok := p.rowAsked[key]; ok && p.now().Sub(last) < SessionRowEvery {
+		p.mu.Unlock()
+		return cloudops.SessionsStated{}, &cloudops.Refusal{Status: 429, Code: "cloud_read_busy",
+			Message: "This Session's row was asked for a moment ago; try again shortly.",
+			Detail:  map[string]any{"retry_after": 1}}
+	}
+	for asked, last := range p.rowAsked {
+		if p.now().Sub(last) >= SessionRowEvery {
+			delete(p.rowAsked, asked)
+		}
+	}
+	p.rowAsked[key] = p.now()
+	rows := p.rows
+	p.mu.Unlock()
+	select {
+	case rows <- rowAsk{id: id, answer: answer}:
+	default:
+		return cloudops.SessionsStated{}, &cloudops.Refusal{Status: 429, Code: "cloud_read_busy",
+			Message: "This machine is already stating its Sessions to many viewers; try again shortly.",
+			Detail:  map[string]any{"limit": SessionRowAsksLimit, "retry_after": 1}}
+	}
+	select {
+	case result := <-answer:
+		return result.stated, result.refusal
+	case <-ctx.Done():
+		return cloudops.SessionsStated{}, &cloudops.Refusal{Status: 503, Code: "cloud_reconnecting",
+			Message: "This machine's Cloud line went down before the Session was stated."}
+	}
+}
+
+// stateRow forgets that one row was sent, so the fresh pass sends it again,
+// and answers with it named only if the reading had it.
+func (p *Publisher) stateRow(ctx context.Context, ask rowAsk) {
+	delete(p.published, ask.id)
+	delete(p.sent, ask.id)
+	delete(p.steady, ask.id)
+	p.unsent = 0
+	p.fresh = true
+	_, reading, ok := p.pass(ctx)
+	p.fresh = false
+	if !ok {
+		ask.answer <- snapshotResult{refusal: &cloudops.Refusal{Status: 503, Code: "reading_busy",
+			Message: "This machine could not read its own Session list; try again shortly."}}
+		return
+	}
+	stated := cloudops.SessionsStated{IDs: []string{}, Complete: true}
+	for _, id := range reading.ids {
+		if id == ask.id {
+			stated.IDs = []string{id}
+			break
+		}
+	}
+	ask.answer <- snapshotResult{stated: stated}
 }
 
 // nudge wakes Run without waiting for it.
@@ -493,6 +723,7 @@ func (p *Publisher) pass(ctx context.Context) ([]string, sessionReading, bool) {
 		// them.
 		p.published = map[string][32]byte{}
 		p.sent = map[string]time.Time{}
+		p.steady = map[string][32]byte{}
 	}
 	reading, ok := p.readSessions(ctx)
 	var inventory []string
@@ -525,14 +756,21 @@ func (p *Publisher) publishDescriptor(ctx context.Context) {
 	if p.APILevel > 0 {
 		appStamp["api_level"] = p.APILevel
 	}
+	machine := map[string]any{
+		"name":     p.MachineName,
+		"platform": p.platform(),
+		"commands": cloudops.Implemented(),
+	}
+	if p.ReadContentV1 {
+		machine["read_content_v1"] = true
+	}
+	if p.SessionCarrierV1 {
+		machine["session_carrier_v1"] = true
+	}
 	snapshot := map[string]any{
-		"at":  time.Now().Unix(),
-		"app": appStamp,
-		"machine": map[string]any{
-			"name":     p.MachineName,
-			"platform": p.platform(),
-			"commands": cloudops.Implemented(),
-		},
+		"at":      time.Now().Unix(),
+		"app":     appStamp,
+		"machine": machine,
 	}
 	// A machine with no task a viewer can reach publishes the descriptor it
 	// always did. The hosted console replaces a machine's whole snapshot with
@@ -575,14 +813,28 @@ type sessionReading struct {
 	// can prove an absence. The merged complete above is their AND and so
 	// proves nothing about any one of them.
 	sources map[string]bool
+	// onlyTurnedOff is a reading whose every incomplete source was turned off
+	// by the person (the iTerm2 scan switch), not one that failed to answer.
+	// The rows the remaining sources list are then the whole set the person
+	// asked for: an iTerm2 left unread on purpose is not a partial scan.
+	onlyTurnedOff bool
 }
 
-// whole is whether this reading is the whole set by its own account.
-func (r sessionReading) whole() bool { return r.complete || r.emptyAuthoritative }
+// whole is whether this reading is the whole set by its own account. A source
+// the person turned off does not make it partial; without this, turning the
+// iTerm2 scan off left every reading incomplete, so the status set (ss/) was
+// never published again and the Cloud list waited for this machine forever.
+func (r sessionReading) whole() bool { return r.complete || r.emptyAuthoritative || r.onlyTurnedOff }
 
 // readSessions reads this machine's sessions, or answers false.
 func (p *Publisher) readSessions(ctx context.Context) (sessionReading, bool) {
-	res, err := p.Router.Do(ctx, cloudops.LocalRequest{Method: http.MethodGet, Path: "/v1/sessions"})
+	var res cloudops.LocalResponse
+	var err error
+	if body, ok := p.readProduct(ctx); ok {
+		res = cloudops.LocalResponse{Status: http.StatusOK, Body: body}
+	} else {
+		res, err = p.Router.Do(ctx, cloudops.LocalRequest{Method: http.MethodGet, Path: "/v1/sessions"})
+	}
 	if err != nil || res.Status != http.StatusOK {
 		// A machine that cannot read its own sessions publishes nothing rather
 		// than an empty list: an empty inventory is a claim, and the claim
@@ -601,6 +853,7 @@ func (p *Publisher) readSessions(ctx context.Context) (sessionReading, bool) {
 		Sources            []struct {
 			Source   string `json:"source"`
 			Complete bool   `json:"complete"`
+			Disabled string `json:"disabled"`
 		} `json:"sources"`
 	}
 	if err := json.Unmarshal(res.Body, &root); err != nil {
@@ -615,12 +868,21 @@ func (p *Publisher) readSessions(ctx context.Context) (sessionReading, bool) {
 	// said it is complete" — so nothing can be disproved and nothing is
 	// dropped. That is the safe direction for a reading from a daemon older
 	// than this field.
+	turnedOff, failed := 0, 0
 	for _, source := range scan.Sources {
 		if source.Source == "" {
 			continue
 		}
 		reading.sources[source.Source] = source.Complete
+		switch {
+		case source.Complete:
+		case source.Disabled != "":
+			turnedOff++
+		default:
+			failed++
+		}
 	}
+	reading.onlyTurnedOff = turnedOff > 0 && failed == 0
 	for _, session := range root.Sessions {
 		id, _ := session["id"].(string)
 		if id == "" || id == InventorySessionID {
@@ -635,6 +897,17 @@ func (p *Publisher) readSessions(ctx context.Context) (sessionReading, bool) {
 		}
 	}
 	return reading, true
+}
+
+// readProduct is the shared session list, when this publisher was given one.
+func (p *Publisher) readProduct(ctx context.Context) ([]byte, bool) {
+	if p.fresh && p.Fresh != nil {
+		return p.Fresh(ctx)
+	}
+	if p.Sessions == nil {
+		return nil, false
+	}
+	return p.Sessions(ctx)
 }
 
 // owningSource names the source that would have seen this row again, which is
@@ -670,12 +943,24 @@ func (p *Publisher) publishSessions(ctx context.Context, reading sessionReading,
 		}
 		// The comparison drops the fields that move with every reading of this
 		// machine and that no viewer reads; the row that goes out keeps them.
-		identity := mustJSON(withoutFreshness(session))
+		stripped := withoutFreshness(session)
+		identity := mustJSON(stripped)
+		steady := mustJSON(volatileFree(stripped))
 		if p.held == nil {
 			p.held = map[string]heldRow{}
 		}
-		p.held[id] = heldRow{identity: identity, body: row}
-		if !p.changed(id, identity) {
+		if prior, ok := p.held[id]; ok && unverified(session) {
+			// A row from a source whose refresh is still in progress is the
+			// last reading of that source, held (internal/app
+			// inventory_reading.go): it says nothing the published row did
+			// not, and it withholds what may only be stated of a current
+			// reading. Flipping to it and back is not a change. A viewer
+			// still ages the published reading by its own clock, and the
+			// heartbeat re-states the row as it now stands.
+			identity, steady = prior.identity, prior.steady
+		}
+		p.held[id] = heldRow{identity: identity, steady: steady, body: row}
+		if !p.changedCoalesced(id, identity, steady) {
 			continue
 		}
 		p.send(ctx, id, "s/"+cloudops.ChannelSegment(p.MachineID)+"/"+cloudops.ChannelSegment(id), row, "session "+id)
@@ -690,7 +975,7 @@ func (p *Publisher) publishSessions(ctx context.Context, reading sessionReading,
 			continue
 		}
 		held, ok := p.held[id]
-		if !ok || !p.changed(id, held.identity) {
+		if !ok || !p.changedCoalesced(id, held.identity, held.steady) {
 			continue
 		}
 		p.send(ctx, id, "s/"+cloudops.ChannelSegment(p.MachineID)+"/"+cloudops.ChannelSegment(id), held.body, "session "+id)
@@ -716,11 +1001,12 @@ func (p *Publisher) publishSessions(ctx context.Context, reading sessionReading,
 		// retries the forgotten publication and then states the marker.
 		return
 	}
+	p.publishStatuses(ctx, reading, ids)
 	// The set about to be stated is what a viewer will hold, so it is what the
 	// next partial reading has to be measured against — remembered here rather
 	// than after the send, because an unchanged marker is not re-sent and the
 	// viewer holds it just the same.
-	p.rememberInventory(reading, ids)
+	retained := p.rememberInventory(reading, ids)
 	marker := map[string]any{
 		// `inventory` must hold exactly `version` and `sessions`: the consumer
 		// compares the sorted key list literally and throws `bad_payload` on
@@ -738,6 +1024,11 @@ func (p *Publisher) publishSessions(ctx context.Context, reading sessionReading,
 	if !p.changed(InventorySessionID, inventory) {
 		return
 	}
+	// Said only of a marker that goes out. Logged before the comparison it
+	// claimed a publication every pass: over 113.9 hours, 75,127 lines for
+	// 8,978 markers sent.
+	p.logf("cloud: inventory published: complete=%v ids=%d unseen_kept=%d incomplete_sources=[%s]",
+		reading.whole(), len(ids), retained, strings.Join(incompleteSources(reading.sources), " "))
 	p.send(ctx, InventorySessionID, "s/"+cloudops.ChannelSegment(p.MachineID)+"/"+InventorySessionID, inventory, "inventory")
 }
 
@@ -788,22 +1079,21 @@ func (p *Publisher) inventoryIDs(reading sessionReading, seen []string) []string
 	return ids
 }
 
-// rememberInventory records what the marker is about to state, and says in one
-// line why.
+// rememberInventory records what the marker is about to state, and answers how
+// many of its ids this reading did not see, for the line that says it.
 //
 // The log line is not decoration. While a partial reading published nothing,
 // it also wrote nothing, so a machine that had silently stopped tombstoning
 // rows looked exactly like a machine with nothing to tombstone — which is how
-// this went unnoticed for the best part of two hours at a time.
-func (p *Publisher) rememberInventory(reading sessionReading, ids []string) {
+// this went unnoticed for the best part of two hours at a time. It is written
+// where the marker is sent (publishSessions), so it counts markers that left.
+func (p *Publisher) rememberInventory(reading sessionReading, ids []string) int {
 	retained := 0
 	for _, id := range ids {
 		if _, seen := reading.rows[id]; !seen {
 			retained++
 		}
 	}
-	p.logf("cloud: inventory published: complete=%v ids=%d unseen_kept=%d incomplete_sources=[%s]",
-		reading.whole(), len(ids), retained, strings.Join(incompleteSources(reading.sources), " "))
 
 	kept := make(map[string]inventoriedRow, len(ids))
 	for _, id := range ids {
@@ -822,6 +1112,7 @@ func (p *Publisher) rememberInventory(reading sessionReading, ids []string) {
 			delete(p.held, id)
 		}
 	}
+	return retained
 }
 
 // incompleteSources names the sources that could not answer for themselves,
@@ -840,16 +1131,97 @@ func incompleteSources(sources map[string]bool) []string {
 // changed reports whether this key is due to be published: because what a
 // viewer reads differs from last time, or because the heartbeat came due.
 func (p *Publisher) changed(key string, identity []byte) bool {
+	return p.changedCoalesced(key, identity, identity)
+}
+
+// changedCoalesced is changed for a value with volatile fields: steady is its
+// identity without them. A change that leaves steady as last sent goes out
+// only once the key's window (volatileEvery) has passed since it last went
+// out; the next pass after that carries the newest value. Any change to steady
+// goes at once, and every send starts the window again.
+func (p *Publisher) changedCoalesced(key string, identity, steady []byte) bool {
 	sum := sha256.Sum256(identity)
+	steadySum := sha256.Sum256(steady)
 	now := p.now()
-	if p.published[key] == sum && now.Sub(p.sent[key]) < Heartbeat {
+	last, sent := p.sent[key]
+	if p.published[key] == sum && now.Sub(last) < Heartbeat {
 		return false
 	}
-	p.published[key], p.sent[key] = sum, now
+	if sent && p.steady[key] == steadySum && now.Sub(last) < p.volatileEvery() {
+		return false
+	}
+	if p.steady == nil {
+		p.steady = map[string][32]byte{}
+	}
+	p.published[key], p.sent[key], p.steady[key] = sum, now, steadySum
 	return true
 }
 
-// withoutFreshness copies a row with the freshness-only paths removed.
+// forget drops what was recorded of a key that did not leave, so the next
+// pass sends it again.
+func (p *Publisher) forget(key string) {
+	delete(p.published, key)
+	delete(p.sent, key)
+	delete(p.steady, key)
+}
+
+func (p *Publisher) volatileEvery() time.Duration {
+	if p.VolatileEvery != 0 {
+		return p.VolatileEvery
+	}
+	return SessionRowVolatileSecondsLimit * time.Second
+}
+
+// SessionRowVolatileSecondsLimit is how often a row whose only change is in
+// its volatile fields (volatileFree) is re-sent to Cloud. While a Session
+// works its activity time, its sub-agents and the token count in its line move
+// on nearly every five-second pass; on the running daemon (2026-10-09) those
+// three made 268 of every 288 row changes once the clock was out. Any other
+// change — state, work state, title, the line's words, attention, a pending
+// question — goes out at once and starts the row's window again. The local
+// event stream is not coalesced: a screen on this machine stays live.
+const SessionRowVolatileSecondsLimit = 15
+
+// volatileSessionRowFields are the row paths volatileFree removes.
+var volatileSessionRowFields = [][]string{
+	{"activity", "at"},
+	{"agents"},
+}
+
+// tokenCount is the provider's running token count in a working line
+// ("↓ 757 tokens", "↑ 3.2k tokens"): it moves with every chunk the assistant
+// streams.
+var tokenCount = regexp.MustCompile(`[↑↓]?\s*\d[\d.,]*\s*[kKmM]?\s+tokens`)
+
+// volatileFree is an identity without the fields that move while a Session
+// works and say nothing a viewer must see at once: the activity time, the
+// sub-agent list and the line's token count. The row that goes out keeps
+// them; a change to them alone waits for the row's window
+// (changedCoalesced).
+func volatileFree(row map[string]any) map[string]any {
+	out := make(map[string]any, len(row))
+	for key, value := range row {
+		out[key] = value
+	}
+	for _, path := range volatileSessionRowFields {
+		removePath(out, path)
+	}
+	if line, ok := out["line"].(string); ok {
+		out["line"] = withoutTokenCount(line)
+	}
+	return out
+}
+
+// withoutTokenCount is a line with its token count cut out.
+func withoutTokenCount(line string) string {
+	return tokenCount.ReplaceAllString(line, "tokens")
+}
+
+// withoutFreshness copies a row with the freshness-only paths removed, and a
+// working line with its clock cut out: the clock moves every second a session
+// works, and a page that has `working_since` draws it from there
+// (session.WithoutElapsed). A page that has not gets the line again with the
+// next real change or the heartbeat.
 func withoutFreshness(row map[string]any) map[string]any {
 	out := make(map[string]any, len(row))
 	for key, value := range row {
@@ -858,7 +1230,17 @@ func withoutFreshness(row map[string]any) map[string]any {
 	for _, path := range freshnessOnlySessionRowFields {
 		removePath(out, path)
 	}
+	if line, ok := out["line"].(string); ok && out["state"] == "working" {
+		out["line"] = session.WithoutElapsed(line)
+	}
 	return out
+}
+
+// unverified is whether a row is its source's last reading, held while that
+// source's refresh is in progress.
+func unverified(row map[string]any) bool {
+	source, _ := row["source"].(map[string]any)
+	return source != nil && source["freshness"] == "unverified"
 }
 
 // removePath deletes one nested key, copying each object it descends into so
@@ -900,14 +1282,16 @@ func (p *Publisher) send(ctx context.Context, key, channel string, body []byte, 
 		return
 	}
 	out := Outbound{Channel: channel, Class: string(domaincloud.ClassStream), Payload: body}
+	if strings.HasPrefix(channel, "s/") && key != InventorySessionID {
+		p.rowsSent++
+	}
 	if err := p.Publish(ctx, out); err != nil {
 		p.logf("cloud: the %s snapshot was not published: %v", what, err)
 		// `changed` recorded it as sent before it was handed over. Forget
 		// that, so the next pass tries again instead of waiting for the
 		// heartbeat, and so a re-statement does not answer ids whose rows
 		// never left.
-		delete(p.published, key)
-		delete(p.sent, key)
+		p.forget(key)
 		p.unsent++
 	}
 }

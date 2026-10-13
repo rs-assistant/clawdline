@@ -55,10 +55,89 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 		s.forwardUpstream(w, r)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
-	defer cancel()
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(s.sessionsPayload(ctx))
+	// The product every stream reads, when it is not older than one tick
+	// (producer.go): a page's first read, the Cloud fleet's and the streams'
+	// are one build of the machine, not one each. The build keeps the eight
+	// seconds this route gave its own.
+	snapshot := s.lists().snapshot()
+	if r.URL.Query().Get("parts") == "list" {
+		// The Cloud fleet asks once per machine. Reuse the local single-machine
+		// snapshot, including the fields used by the original row status line.
+		// No transcript, menu or Git data leaves this route.
+		type status struct {
+			SessionID        string                        `json:"sessionId,omitempty"`
+			Persona          string                        `json:"persona,omitempty"`
+			State            contract.SessionState         `json:"state"`
+			WorkState        contract.WorkState            `json:"work_state"`
+			WorkNote         string                        `json:"work_note,omitempty"`
+			WorkProvenance   contract.WorkProvenance       `json:"work_provenance,omitempty"`
+			WorkMovedBy      string                        `json:"work_moved_by,omitempty"`
+			WorkPersonNeeded *bool                         `json:"work_person_needed,omitempty"`
+			Line             string                        `json:"line,omitempty"`
+			Shells           []contract.SessionShell       `json:"shells,omitempty"`
+			HeavyWork        *contract.SessionHeavyWork    `json:"heavy_work,omitempty"`
+			Source           *contract.BearingsSource      `json:"source,omitempty"`
+			Activity         *contract.SessionActivity     `json:"activity,omitempty"`
+			Identity         contract.IdentityBinding      `json:"identity,omitempty"`
+			AttentionCount   *int64                        `json:"attention_count,omitempty"`
+			Owed             *contract.WorkOwed            `json:"owed,omitempty"`
+			Acceptance       *contract.SessionAcceptance   `json:"acceptance,omitempty"`
+			Disposition      *contract.WorkDisposition     `json:"disposition,omitempty"`
+			Coordination     *contract.SessionCoordination `json:"coordination,omitempty"`
+		}
+		type presentation struct {
+			ID                  string         `json:"id"`
+			Title               string         `json:"title"`
+			CWD                 string         `json:"cwd,omitempty"`
+			Icon                *contract.Icon `json:"icon,omitempty"`
+			ExecutionGeneration string         `json:"execution_generation,omitempty"`
+			Status              status         `json:"status"`
+		}
+		rows := make([]presentation, 0, len(snapshot.Sessions))
+		for _, row := range snapshot.Sessions {
+			rows = append(rows, presentation{ID: row.ID, Title: row.Label, CWD: row.CWD,
+				Icon: row.Icon, ExecutionGeneration: row.ExecutionGeneration,
+				Status: status{SessionID: row.SessionID, Persona: row.Persona, State: row.State, WorkState: row.WorkState, WorkNote: row.WorkNote,
+					WorkProvenance: row.WorkProvenance, WorkMovedBy: row.WorkMovedBy,
+					WorkPersonNeeded: row.WorkPersonNeeded, Line: row.Line, Shells: row.Shells,
+					HeavyWork: row.HeavyWork, Source: row.Source, Activity: row.Activity,
+					Identity: row.Identity, AttentionCount: row.AttentionCount,
+					Owed: row.Owed, Acceptance: row.Acceptance,
+					Disposition: row.Disposition, Coordination: row.Coordination}})
+		}
+		_ = json.NewEncoder(w).Encode(struct {
+			At       int64          `json:"at"`
+			Complete bool           `json:"complete"`
+			Sessions []presentation `json:"sessions"`
+		}{At: snapshot.At, Complete: cloudListComplete(snapshot.Scan), Sessions: rows})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(snapshot)
+}
+
+// The compact Cloud list covers the sources this person enabled. The merged
+// local scan remains partial while a source is deliberately turned off, but
+// that source is outside the Cloud list's promised set. A failed enabled
+// source still makes the list partial. This matches the signed ss/ publisher.
+func cloudListComplete(scan contract.Scan) bool {
+	if scan.Complete || scan.EmptyAuthoritative {
+		return true
+	}
+	if len(scan.Sources) == 0 {
+		return false
+	}
+	disabled := false
+	for _, source := range scan.Sources {
+		if source.Complete {
+			continue
+		}
+		if source.Disabled == "" {
+			return false
+		}
+		disabled = true
+	}
+	return disabled
 }
 
 // sessionRowWire is a row as it is sent. It exists for one key the contract
@@ -68,6 +147,8 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 // outer field shadows the embedded one for encoding/json.
 type sessionRowWire struct {
 	contract.SessionRow
+	processPID   int
+	processStart time.Time
 	// A successful zero must survive omitempty on the generated integer.
 	AttentionCount   *int64 `json:"attention_count,omitempty"`
 	WorkPersonNeeded *bool  `json:"work_person_needed,omitempty"`
@@ -132,6 +213,10 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 	for i, item := range items {
 		lives[i] = liveOf(item)
 	}
+	// A generation belongs to a verified process, not to this list read. A
+	// failed source or database write leaves it absent rather than reusing the
+	// last value as authority for a new action.
+	executionGenerations := s.observeExecutions(records, inv, items, lives)
 	matches := identityMatchCounts(items)
 	conversationMatches := map[string]int{}
 	for _, item := range items {
@@ -139,6 +224,7 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 			conversationMatches[item.ConversationID]++
 		}
 	}
+	heavySession, heavyWork := s.runningHeavyCallback(records)
 	// One database read for the entire fleet. An error leaves the count
 	// unknown on every row, rather than turning it into zero.
 	attentionCounts, attentionErr := s.store.OpenHumanInterventionCounts(records)
@@ -216,24 +302,25 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 	rows := make([]sessionRowWire, 0, len(items))
 	for i, item := range items {
 		row := s.sessionRow(rowInput{
-			item:       item,
-			live:       lives[i],
-			label:      labels[item.ID],
-			labelOf:    labelOf,
-			matches:    matches[item.ID],
-			swift:      swift,
-			owed:       owed,
-			owedErr:    owedErr,
-			ownErr:     ownErr,
-			closure:    openBySession[item.ConversationID],
-			closureErr: responsibilityErr,
-			inv:        inv,
-			now:        now,
-			generation: gen,
-			role:       role,
-			ownRole:    ownRole,
-			epicParent: epicParents[string(item.Assistant)+"\x00"+item.ConversationID],
-			acceptance: rowAcceptance(item.ConversationID, pending, pendingErr),
+			item:                item,
+			live:                lives[i],
+			label:               labels[item.ID],
+			labelOf:             labelOf,
+			matches:             matches[item.ID],
+			swift:               swift,
+			owed:                owed,
+			owedErr:             owedErr,
+			ownErr:              ownErr,
+			closure:             openBySession[item.ConversationID],
+			closureErr:          responsibilityErr,
+			inv:                 inv,
+			now:                 now,
+			generation:          gen,
+			executionGeneration: executionGenerations[item.ID],
+			role:                role,
+			ownRole:             ownRole,
+			epicParent:          epicParents[string(item.Assistant)+"\x00"+item.ConversationID],
+			acceptance:          rowAcceptance(item.ConversationID, pending, pendingErr),
 		})
 		if attentionErr == nil && item.ConversationID != "" && conversationMatches[item.ConversationID] == 1 &&
 			row.Source != nil && row.Source.Freshness == contract.SourceFreshnessCurrent &&
@@ -242,8 +329,20 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 			count := attentionCounts[item.ConversationID]
 			row.AttentionCount = &count
 		}
+		if heavyWork != nil && item.ConversationID == heavySession && conversationMatches[heavySession] == 1 &&
+			row.Source != nil && row.Source.Freshness == contract.SourceFreshnessCurrent {
+			row.HeavyWork = heavyWork
+		}
+		if item.State == session.StateWorking && item.Line != "" {
+			at := item.Observation.ObservedAt
+			if at.IsZero() {
+				at = inv.ObservedAt
+			}
+			row.WorkingSince = s.turns.since(item.ID, item.Line, at)
+		}
 		rows = append(rows, row)
 	}
+	s.turns.keep(rows)
 
 	return sessionsSnapshotWire{
 		At:       now.Unix(),
@@ -257,7 +356,9 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 			// An empty list is only authoritative when the reading was
 			// complete. Saying so here is what stops a client from treating a
 			// failed scan as "every session went away".
-			EmptyAuthoritative: inv.Complete && len(rows) == 0,
+			// A source turned off was not looked at, so an empty list says
+			// nothing about it either.
+			EmptyAuthoritative: inv.Complete && len(inv.DisabledSources) == 0 && len(rows) == 0,
 			Completed: contract.ScanCompleted{
 				Sequence: gen,
 				Complete: inv.Complete,
@@ -268,8 +369,120 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 			// answer of the source that would have seen it: the AND is false
 			// whenever any source failed, so on its own it would make every
 			// absence unprovable and nothing could ever be tombstoned.
-			Sources: scanSources(inv.Sources, inv.Gaps),
+			Sources: scanSources(inv.Sources, inv.Gaps, inv.DisabledSources),
 		},
+	}
+}
+
+// changeIdentity is the part of a list that a reader would read differently,
+// which is what a stream compares before it sends a frame.
+//
+// Three things move on every build and say nothing new, and they are the
+// paths the Cloud publisher has always left out of its own comparison
+// (internal/transport/cloud freshnessOnlySessionRowFields). The working line's
+// own clock moves every second a session works ("Thinking… (1m 12s)"): a page
+// that has `working_since` draws that clock itself, and one that does not gets
+// the line again on the next real change. Each row's closeability names the
+// build it came from (`session_generation`), which nothing on a page reads.
+// And a current row's reading clock (`observed_at`) moves with every reading:
+// a page reads it only as the age of a row that is not current — the retained
+// reading's note — so on an unverified row it is still compared. Measured on
+// 2026-10-09 over five minutes, the reading clock alone made every one of 150
+// frames differ from the last; without it, 80 did.
+func changeIdentity(rows []sessionRowWire) ([]byte, error) {
+	copied := make([]sessionRowWire, len(rows))
+	for i, row := range rows {
+		if row.State == contract.SessionStateWorking && row.Line != "" {
+			row.Line = session.WithoutElapsed(row.Line)
+		}
+		row.Closeability.SessionGeneration = 0
+		if row.Source != nil && row.Source.Freshness == contract.SourceFreshnessCurrent {
+			source := *row.Source
+			source.ObservedAt = 0
+			row.Source = &source
+			row.Closeability.ObservedAt = 0
+			row.Closeability.Source.ObservedAt = 0
+		}
+		copied[i] = row
+	}
+	return json.Marshal(copied)
+}
+
+// workingClockDriftSeconds is how far one turn's start may wander between two
+// readings and still be the same turn. The start is worked out as the moment
+// the line was read less the clock drawn in it, and both are whole seconds
+// read at slightly different moments, so one turn's start reads a second or
+// two either way from one reading to the next. A new turn starts from zero,
+// which is further from the last one than this.
+const workingClockDriftSeconds = 5
+
+// workingClock keeps each working session's turn start steady, so that it
+// can be compared: a start that wandered by a second on every reading would be
+// a change on every reading, which is what it exists to stop.
+//
+// A turn is told from the next by its clock going back, not by its start
+// moving. The line is the screen as last drawn, and a provider stops redrawing
+// its clock while a tool runs: on the running daemon (2026-10-09) one line read
+// "12m 18s" for six readings over 30 seconds, so a start worked out from it
+// moved five seconds a reading and was a new `working_since` every other one —
+// 285 changes in 20 minutes, more row changes than the clock it replaced.
+type workingClock struct {
+	mu     sync.Mutex
+	starts map[string]turnStart
+}
+
+// turnStart is one working session's turn as last read: when it began, and
+// the clock its line showed then.
+type turnStart struct {
+	at, elapsed int64
+}
+
+// since is when the turn a working line reports began, in unix seconds, or 0
+// when the line carries no clock or was not read at a known moment.
+func (c *workingClock) since(id, line string, at time.Time) int64 {
+	_, _, elapsed, ok := session.ElapsedSpan(line)
+	if !ok || at.IsZero() {
+		return 0
+	}
+	start := at.Unix() - int64(elapsed)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.starts == nil {
+		c.starts = map[string]turnStart{}
+	}
+	held, ok := c.starts[id]
+	if !ok || int64(elapsed) < held.elapsed {
+		// The first reading of a turn, or a clock that went back: a new turn.
+		c.starts[id] = turnStart{at: start, elapsed: int64(elapsed)}
+		return start
+	}
+	// The same turn. A line whose clock stood still while it was read again
+	// puts the start later than it was, so a start only ever moves earlier,
+	// and then only by more than reading jitter.
+	if start < held.at-workingClockDriftSeconds {
+		held.at = start
+	}
+	held.elapsed = int64(elapsed)
+	c.starts[id] = held
+	return held.at
+}
+
+// keep forgets every session that is not working in this list. The map holds
+// at most one entry per row of the last list, and a session that stopped and
+// started again begins a new turn.
+func (c *workingClock) keep(rows []sessionRowWire) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	working := make(map[string]bool, len(rows))
+	for _, row := range rows {
+		if row.WorkingSince != 0 {
+			working[row.ID] = true
+		}
+	}
+	for id := range c.starts {
+		if !working[id] {
+			delete(c.starts, id)
+		}
 	}
 }
 
@@ -282,21 +495,50 @@ func sourceComplete(inv session.Inventory, backend session.Backend) bool {
 	return proves
 }
 
+// A tty-named assistant came only from ps, even if its provisional backend
+// is iTerm2. Its evidence must follow ps; an unrelated Apple Event failure
+// cannot make the process reading stale.
+func rowSource(item session.Session) string {
+	if session.SourceForID(item.ID) == "ps" {
+		return "ps"
+	}
+	return session.SourceFor(item.Backend)
+}
+
+func sourceCompleteRow(inv session.Inventory, item session.Session) bool {
+	proves, _ := inv.ProvesAbsence(rowSource(item))
+	return proves
+}
+
 // scanSources orders the per-source answers by name, because this snapshot is
 // compared byte for byte against the last one published (the Cloud publisher
 // skips a row nobody would read differently) and a map's order is not stable.
-func scanSources(sources map[string]bool, gaps []session.Gap) []contract.ScanSource {
-	if len(sources) == 0 {
+//
+// A source turned off (disabled) travels as one more entry, incomplete and
+// saying why, so a client can say "iTerm2 scanning is off" instead of drawing
+// those tabs as nothing.
+func scanSources(sources map[string]bool, gaps []session.Gap, disabled map[string]string) []contract.ScanSource {
+	if len(sources) == 0 && len(disabled) == 0 {
 		return nil
 	}
-	names := make([]string, 0, len(sources))
+	names := make([]string, 0, len(sources)+len(disabled))
 	for name := range sources {
 		names = append(names, name)
+	}
+	for name := range disabled {
+		if _, asked := sources[name]; !asked {
+			names = append(names, name)
+		}
 	}
 	sort.Strings(names)
 	out := make([]contract.ScanSource, 0, len(names))
 	for _, name := range names {
-		out = append(out, contract.ScanSource{Source: name, Complete: sources[name], Gaps: scanGaps(name, gaps)})
+		row := contract.ScanSource{Source: name, Complete: sources[name], Gaps: scanGaps(name, gaps)}
+		if why, off := disabled[name]; off {
+			row.Complete = false
+			row.Disabled = contract.ScanSourceDisabled(why)
+		}
+		out = append(out, row)
 	}
 	return out
 }
@@ -427,20 +669,21 @@ func rowLabel(item session.Session, titles swiftstore.Titles, project string) st
 }
 
 type rowInput struct {
-	item       session.Session
-	live       swiftstore.Live
-	label      string
-	labelOf    func(string) string
-	matches    int
-	swift      swiftstore.Snapshot
-	owed       []task.Obligation
-	owedErr    error
-	ownErr     error // this daemon's own records not all read (ownrecords.go)
-	closure    []store.SessionResponsibility
-	closureErr error
-	inv        session.Inventory
-	now        time.Time
-	generation int64
+	item                session.Session
+	live                swiftstore.Live
+	label               string
+	labelOf             func(string) string
+	matches             int
+	swift               swiftstore.Snapshot
+	owed                []task.Obligation
+	owedErr             error
+	ownErr              error // this daemon's own records not all read (ownrecords.go)
+	closure             []store.SessionResponsibility
+	closureErr          error
+	inv                 session.Inventory
+	now                 time.Time
+	generation          int64
+	executionGeneration string
 	// role is this daemon's own machine role, and ownRole whether it holds
 	// one; see sessionsPayload.
 	role       *coordinator.Record
@@ -486,14 +729,15 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		IsClaude: item.Assistant == session.AssistantClaude,
 		// Not in the Swift contract: how this row's state was learned. A
 		// registry reading and a screen guess are different kinds of fact.
-		Evidence:  contract.Evidence(item.Evidence),
-		TTY:       item.TTY,
-		Assistant: contract.Assistant(item.Assistant),
-		Label:     in.label,
-		Line:      item.Line,
-		Source:    wireSessionObservation(item, in.inv),
-		CWD:       item.CWD,
-		SessionID: item.ConversationID,
+		Evidence:            contract.Evidence(item.Evidence),
+		ExecutionGeneration: in.executionGeneration,
+		TTY:                 item.TTY,
+		Assistant:           contract.Assistant(item.Assistant),
+		Label:               in.label,
+		Line:                item.Line,
+		Source:              wireSessionObservation(item, in.inv),
+		CWD:                 item.CWD,
+		SessionID:           item.ConversationID,
 		// How that id was obtained, or which kind of nothing took its place.
 		// A row with no `sessionId` is three different situations, and only
 		// one of them — a session that has not written anything yet — is
@@ -509,7 +753,7 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		Persona:      item.Persona,
 		MachineScope: projects.IsMachineWorkspace(s.cfg.Dir, item.CWD),
 	}
-	out := sessionRowWire{Menu: wireMenu(item)}
+	out := sessionRowWire{Menu: wireMenu(item), processPID: item.PID, processStart: in.live.ProcessStart}
 	// Only a waiting row says whether its screen was read: it is what tells
 	// the card a terminal that is not answering from a dialog nothing
 	// recognised. Elsewhere it would flicker with the terminal's health and
@@ -608,7 +852,7 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		// with `session_inventory_stale` — including ten tmux panes iTerm2 has
 		// never listed and could not be hiding — and nothing on this Mac could
 		// be closed for as long as that window was open.
-		InventoryComplete:   sourceComplete(in.inv, item.Backend),
+		InventoryComplete:   sourceCompleteRow(in.inv, item),
 		InventoryObservedAt: in.inv.ObservedAt,
 		Now:                 in.now,
 		Generation:          in.generation,
@@ -641,9 +885,9 @@ func wireSessionObservation(item session.Session, inv session.Inventory) *contra
 	if obs.Freshness == "" {
 		obs = session.Observation{
 			ObservedAt: inv.ObservedAt,
-			Provenance: session.SourceFor(item.Backend),
+			Provenance: rowSource(item),
 		}
-		if sourceComplete(inv, item.Backend) {
+		if sourceCompleteRow(inv, item) {
 			obs.Freshness = session.FreshnessCurrent
 		} else {
 			obs.Freshness = session.FreshnessMissing

@@ -212,6 +212,9 @@ type plan struct {
 	// the same field as session: a machine-scoped request's session is the
 	// machine reply channel.
 	target string
+	// The selected execution remains pinned through the local route's final
+	// check. Empty is the older unpinned read shape.
+	executionGeneration string
 
 	id, scope, task, path             string
 	place, past, assistant, model     string
@@ -234,12 +237,12 @@ type plan struct {
 	images []string
 	// conversations is a restore's or a dismissal's list; allConversations
 	// is a dismissal that named none, which means every one on offer.
-	conversations                          []string
-	allConversations                       bool
-	upcoming, acceptLoss, force            bool
-	closeability                           string
-	rate, limit, byteWindow, offset, after int64
-	document                               []byte
+	conversations                                  []string
+	allConversations                               bool
+	upcoming, acceptLoss, force                    bool
+	closeability                                   string
+	rate, limit, byteWindow, offset, after, before int64
+	document                                       []byte
 }
 
 // op is one word of the vocabulary.
@@ -489,6 +492,35 @@ func sessionPlan(b body, name string) (plan, bool) {
 	return plan{session: id, target: id, name: name}, true
 }
 
+// pinnedSessionPlan retains the legacy read shape while carrying the optional
+// execution pin used by the read_transcript rail.
+func pinnedSessionPlan(b body, name string) (plan, bool) {
+	p, ok := sessionPlan(b, name)
+	if !ok {
+		return plan{}, false
+	}
+	if raw, named := b["expected_generation"]; named {
+		generation, valid := raw.(string)
+		if !valid || !executionGenerationValid(generation) {
+			return plan{}, false
+		}
+		p.executionGeneration = generation
+	}
+	return p, true
+}
+
+func executionGenerationValid(value string) bool {
+	if len(value) != 32 {
+		return false
+	}
+	for _, r := range value {
+		if !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 // machinePlan is the answer channel for a word about the machine rather than a
 // session. Every machine request is answered on the one machine reply channel,
 // so neither a malformed nor an unknown body can name a session.
@@ -622,6 +654,23 @@ func actionPlan(b body, sessionScoped bool) (plan, bool) {
 	return p, true
 }
 
+// pinnedActionPlan keeps legacy focus and smart naming requests unchanged,
+// while allowing a fleet viewer to bind them to the selected execution.
+func pinnedActionPlan(b body) (plan, bool) {
+	p, ok := actionPlan(b, true)
+	if !ok {
+		return plan{}, false
+	}
+	if raw, named := b["execution_generation"]; named {
+		generation, valid := executionGeneration(raw)
+		if !valid {
+			return plan{}, false
+		}
+		p.executionGeneration = generation
+	}
+	return p, true
+}
+
 // refusalReply names the answer channel for a refusal decided before the body
 // was decoded — only from a closed command vocabulary and the same lexical
 // identity fields a decoder would consume, so a malformed body cannot turn
@@ -672,7 +721,7 @@ func refusalReply(b body, word string, class Class) (string, string, bool) {
 		if !hasRequest {
 			return "", "", false
 		}
-		if word != "document" && session != MachineReplySession {
+		if word != "document" && word != "peer-inbox" && session != MachineReplySession {
 			return "", "", false
 		}
 		return session, "read:" + request, true
@@ -918,7 +967,7 @@ func decodeWorkV2TodoAction(b body) (plan, bool) {
 	action, actionOK := b.nonEmpty("action")
 	document, documentOK := b.object("item", workV2CloudBodyLimit)
 	if !ok || p.request == "" || !terminalOK || len(terminal) > 256 || !idOK || len(id) > 256 ||
-		!actionOK || !documentOK || (action != "send" && action != "complete" && action != "reopen" && action != "delete") {
+		!actionOK || !documentOK || (action != "send" && action != "complete" && action != "reopen" && action != "delete" && action != "edit") {
 		return plan{}, false
 	}
 	p.target, p.id, p.kind, p.document = terminal, id, action, document

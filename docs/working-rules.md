@@ -65,8 +65,12 @@ day have no such problem.
 After recording a landing, run `tools/check-worktrees.sh`. It is a dry run and has four answers:
 0 means nothing is owed, 1 means it found proved landed-and-clean residue, 2 means it could not
 check, and 3 means at least one checkout is unknown. Inspect the report before running
-`tools/check-worktrees.sh --apply`; apply removes only broker-owned, landed, clean checkouts and
-never deletes their branches. Dirty, live, unlanded and unknown checkouts stay.
+`tools/check-worktrees.sh --apply` for every proved `landed_clean` checkout; apply removes only
+broker-owned, landed, clean checkouts and never deletes their branches. Remove a root-owned task
+checkout after its commit is on `main`, Git says it is clean, and its owner has finished using it.
+Dirty, live, unlanded and unknown checkouts stay. A merge commit or an old modification time alone
+does not authorize deletion. Report the number actually removed and name any candidates kept with
+their reasons in the delivery to the person, including when the count is zero.
 
 For a root's own deployment snapshot, comparison tree or other read-only throwaway checkout, use
 `tools/check-worktrees.sh --ephemeral -- <command>` instead of a bare `git worktree add`. The
@@ -99,6 +103,56 @@ script once; a nested `heavy` runs directly.
 `heavy --handoff` gives a queued wait to a callback and exits 76 with its id; `tools/check.sh`
 enables it by default for roots. End that turn and wait for the notice. Children and failed
 handoffs keep the in-turn wait.
+
+## A push is not a background chore to run beside a build
+
+The pre-push hook reads the commits a push would add (`docs/privacy-guard.md`) and asks GitHub
+about main's latest CI run. It used to read the whole history twice instead, about five minutes a
+side. On 2026-10-11 a push started while the full check run and an app package build held the
+machine took **two and a half hours**: its TCP socket was `CLOSED` and git never noticed. Killing
+that git process and pushing again, alone, took 5m16s. The range scan took the same push to 12
+seconds, so the wait is no longer the problem — but the lesson stands for anything that holds a
+remote connection open: start it when nothing else is compiling, and confirm what landed with
+`git ls-remote` rather than by reading a hung command's output.
+
+## When main is red
+
+From 2026-10-07 04:12 to 2026-10-09, 160 of the last 200 CI runs on main failed. A red Go test
+skipped the console tests in the same job and the two failures took turns hiding each other; the
+local check ran a hand-picked 16 of the console's test files; the pre-push hook let every push land
+on the red; and nobody was told. Each of those now answers differently:
+
+- CI's checks are separate jobs, and inside a job every check runs after any earlier one fails. Read
+  every red job of a run, not the first.
+- `npm test` in `web/` (`tools/console-tests.mjs`) is the console suite in CI and in
+  `tools/check.sh`; `tools/check-console-tests.mjs` fails when a test file is run by neither it nor
+  `npm run check`.
+- The pre-push hook refuses a push to main while the latest completed CI run on main failed. A push
+  that is the repair carries `CI-Fix: <run id or URL>` as a trailer on one of its commits
+  (`git commit --trailer "CI-Fix: <run id>"`); `CLAWDLINE_PUSH_ON_RED=1` overrides and is printed.
+  When the hook cannot read CI (no `gh`, not logged in, offline) it refuses too.
+- The last CI job notifies once when main goes from green to red, through the repository secret
+  `CLAWDLINE_CI_NOTIFY_URL` (`tools/ci-notify-red.sh`); without it the job prints a notice.
+
+## Quarantining a flaky Go test
+
+A test that fails CI on some runs and not others, and whose fix is under way, may be quarantined
+rather than left to turn main red at random. Add one line to `tools/go-quarantine.txt`:
+
+```text
+internal/adapters/x/x_test.go | TestSomething | board item <id> | 2026-10-20 | fails one run in ten on Linux: races the watcher
+```
+
+- **The owner** is the board item or task fixing it, never a person's name (the repository is
+  public). The owner removes the line in the change that fixes the test.
+- **It expires.** `tools/test-go-ci.sh` prints every quarantined test on every run and fails the run
+  the day after its date, naming it and its owner; extend the date only with a reason in the commit.
+  Pick a date days away, not months.
+- An entry whose test no longer exists fails the run, as a stale host exclusion does; so does one
+  without an owner or a `YYYY-MM-DD` date. `tools/test-go-ci-quarantine.sh` proves all of this.
+
+A quarantine is not a host exclusion: those (in `tools/test-go-ci.sh` itself) are tests a hosted
+runner cannot run at all, and they do not expire.
 
 ## The public repository in full
 
@@ -140,3 +194,11 @@ intentional history rewrite. `docs/privacy-guard.md` is the whole of it.
   2026-09-21 two restarts were each confirmed with health while `/` answered 501 to everybody for
   seven and a half hours. The console is back when `GET /` answers 200, or when the line under
   `listening` in `logs/daemon.log` says `console: served from …`.
+- **Kills its own tmux server before removing the directory it lives in.** A drill that gives
+  tmux a private `TMUX_TMPDIR` (or `-S` socket) owns that server; deleting the directory removes
+  the socket and leaves the server and every assistant inside it running, unreachable. On
+  2026-10-07 an install drill removed its scratch home this way and left two real `claude`
+  processes running for two days; the person's fleet list showed them as dashed rows reading
+  "terminal unreachable" until they were closed by hand. In the drill's exit trap, run
+  `tmux -S <its socket> kill-server` (or `TMUX_TMPDIR=<dir> tmux kill-server`) first, then
+  remove the directory.

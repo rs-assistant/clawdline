@@ -1,5 +1,9 @@
 # Worktree lifecycle
 
+For task scratch, Root Assignment data, and Go build caches, see
+[disk lifecycle](disk-lifecycle.md). Their ownership rules differ from a
+worktree's.
+
 Worktrees are disposable only after the system can prove what they hold, who owns them, and where
 their delivery landed. Age, a UUID-shaped directory, a branch prefix, and a clean-looking path are
 not that proof. `git worktree prune` is also not a lifecycle: it removes stale metadata only after
@@ -46,8 +50,11 @@ removing a worktree leaves its branch and commits in the repository.
 
 Run the dry check after each landing is recorded. This timing matters: before the landing record,
 the system must say `unlanded`; after it, the broker can prove both the target and the absent child
-owner. The daemon's own periodic reclamation remains the backstop for broker-owned task trees. The
-repository guard is the visible receipt at the root's integration boundary.
+owner. Apply every proved `landed_clean` result after reading the dry run. Remove a root-owned task
+checkout when its commit is on `main`, it is clean, and its owner is done with it. Report the count
+removed and the reason for each candidate kept, even if no checkout was removed. The daemon's own
+periodic reclamation remains the backstop for broker-owned task trees. The repository guard is the
+visible receipt at the root's integration boundary.
 
 ## Root-owned temporary trees
 

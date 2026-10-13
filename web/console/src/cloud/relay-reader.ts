@@ -26,7 +26,9 @@ import type { CarriedWord, CarryTable } from "./carry.js"
 import type { Health, SessionRow, SessionsSnapshot, TaskList, TaskRow, TranscriptPage } from "@clawdline/contract"
 import type { StreamHandle, StreamHandlers, StreamTransport } from "@clawdline/core"
 import type { CloudWriteClient, WriteHost, WriteRoute } from "./relay-writer.js"
+import type { MachineListPresentation, MachineSessionProjection, SessionDestination, SessionListPresentation } from "./all-machine-sessions.js"
 import { authenticatedRefusalKey } from "./refusal-client.js"
+import { channelSegment } from "../legacy/js/net/client.js"
 
 /** One machine and one of its sessions, as the relay's channels name them. */
 export interface CloudIdentity {
@@ -136,6 +138,15 @@ export interface CloudReadClient {
   lifecycle?(reason: string): boolean
   /** machine → the last inventory marker it published; present once one arrived. */
   readonly sessionInventoryByMachine?: Map<string, unknown>
+  /** Content-free ss/ envelopes; the hosted Session list reads only these. */
+  readonly statusSnapshots?: ReadonlyMap<string, unknown>
+  /**
+   * Asks the relay to replay one retained ss/ row, the recovery the list uses
+   * for an event gap (`status-source.ts`). A read uses it for the one row it
+   * is pinned to (`coherentSession`); it resolves false when the row did not
+   * come, and never asks for a rich s/ row.
+   */
+  recoverStatusRow?(machineID: string, sessionID: string, snapshotGeneration: string): Promise<boolean>
   /**
    * machine → its last decrypted `orch/` snapshot. Read here only for
    * `snapshot.app`'s `version` and `api_level` (`publishDescriptor`,
@@ -144,6 +155,31 @@ export interface CloudReadClient {
    * says nothing, never zero.
    */
   readonly orchestratorSnapshots?: Map<string, unknown>
+  /**
+   * machine → the descriptor this browser remembered from an earlier
+   * connection, as `{ machine: { …, commands } }`
+   * (`machineDescriptors`/`_loadMachineDescriptors`, legacy/js/net/cloud-client.js).
+   * It is what decides a word before any snapshot has arrived, and its
+   * `commands` list was cut to the first 64 words on the way into storage, so
+   * it is read here for one thing only: to tell a word the machine does not
+   * answer from a word the cut never reached (`machineWordPending`).
+   *
+   * Duck-typed like `orchestratorSnapshots`: a copied client that keeps no
+   * such map says nothing, and nothing waits.
+   */
+  readonly machineDescriptors?: Map<string, unknown>
+  /**
+   * machine → the words it answered `unknown_command` to (`machineLacks`).
+   * One client's own memory, emptied when a descriptor arrives; a word in it
+   * is a machine that has itself said no, which is never waited for.
+   */
+  readonly machineLacks?: Map<string, unknown>
+  /**
+   * machine + NUL + session → the rich s/ row received while that detail is
+   * open (`status-client.js` `openDetail`), the only row here that carries a
+   * waiting question's options (`withOpenedMenu`).
+   */
+  readonly detailSnapshots?: ReadonlyMap<string, unknown>
   events(listener: (event: CloudEvent) => void): () => void
   /** The current account rows, used here only to answer health for the chosen machine. */
   machines?(): Promise<{
@@ -180,7 +216,7 @@ export interface CloudReadClient {
    * older than the word must be refused by name rather than throw where
    * nobody is catching.
    */
-  schedules?(options?: { fresh?: boolean }): Promise<CloudSchedules>
+  schedules?(options?: { fresh?: boolean; machine?: string }): Promise<CloudSchedules>
   /**
    * One machine's snippets. The identity names which — only its `machine` is
    * read (`_snippetRequest`), and the session travels so that what is asked
@@ -195,6 +231,10 @@ export interface CloudReadClient {
    */
   snippets?(identity: CloudIdentity, options?: { fresh?: boolean }): Promise<CloudSnippets>
   transcript(identity: CloudIdentity, phases?: unknown, demand?: { foreground?: boolean }): Promise<unknown>
+  transcriptForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, signal?: AbortSignal): Promise<unknown>
+  transcriptPageForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string }, before: number, signal?: AbortSignal): Promise<unknown>
+  readForGeneration?(destination: { machineID: string; sessionID: string; executionGeneration: string },
+    word: string, fields: Record<string, unknown>, signal?: AbortSignal): Promise<unknown>
   /**
    * One provider subagent's conversation, and one background command's
    * output: the session reads whose subject is a second id.
@@ -216,6 +256,8 @@ export interface CloudReadClient {
    */
   agent?(identity: CloudIdentity, agent: string): Promise<unknown>
   shell?(identity: CloudIdentity, shell: string): Promise<unknown>
+  /** The copied client's session reader, used for cursor pages without changing the pinned copy. */
+  _read?(identity: CloudIdentity, word: string, body: Record<string, unknown>, answer: string): Promise<unknown>
   /**
    * The application server key, as the machine's `push-key` read answers it.
    *
@@ -289,8 +331,79 @@ export function machineApp(client: CloudReadClient, machine: string): { version?
   }
 }
 
+/**
+ * How long a read waits for the chosen machine's own list of words before it
+ * is asked or refused (`machineWordPending`). Registered as
+ * `console.relay_feature_wait_seconds`.
+ *
+ * A page that has just opened holds the descriptor it remembered from last
+ * time, and the copied client cut that list to its first 64 words on the way
+ * into storage while this daemon publishes 151 (`cloudops.Implemented()`). So
+ * for the moment between the socket coming up and the first `orch/` envelope
+ * being opened, a read of a word past the cut was refused by the page itself,
+ * before anything was sent: measured from this machine's daemon log on
+ * 2026-10-10, 11 of 21 read failures between 11:30 and 14:22 were
+ * `cloud_feature_unavailable` with `stage=viewer_refused`, in bursts at 12:08,
+ * 12:41 and 13:29, every one of them for `transcript` or
+ * `work.v2.session-todos` — the two words the page reads first and the cut
+ * does not reach.
+ *
+ * Five seconds gives the live descriptor a chance to arrive. If it does not,
+ * a cut remembered list is still inconclusive: StatusCloudClient asks the
+ * named machine and lets its signed answer decide.
+ */
+export const FEATURE_WAIT_MS = 5_000
+
+/**
+ * The words a remembered descriptor can hold: `descriptorCommands` in the
+ * copied client keeps `value.slice(0, 64)`. A remembered list this long is one
+ * that was cut, so it says nothing about the words past it — and a shorter one
+ * is the whole truth, which is why a machine that really lacks a word is still
+ * refused at once.
+ */
+export const REMEMBERED_COMMANDS_CUT = 64
+
+/** An object that is not an array, which is what a descriptor is. */
+function descriptorObject(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null
+}
+
+/**
+ * Whether this page is about to refuse itself a word on evidence that was cut
+ * short, and the machine's own word list could still arrive.
+ *
+ * It mirrors the copied client's `_descriptorFor` and `_machineImplements`,
+ * because what it has to answer is what that pair is about to answer and why:
+ *
+ * - a live `orch/` snapshot's descriptor is the machine's current word list,
+ *   whole, so there is nothing to wait for — including when it carries no
+ *   `commands` at all, which is a machine the client judges by platform;
+ * - a word the machine itself answered `unknown_command` to is a fact, not a
+ *   cut, so it is refused now as it is today;
+ * - with nothing remembered the client answers "unknown", which it does not
+ *   refuse, so again nothing waits;
+ * - a remembered list that names the word answers "yes" — nothing waits;
+ * - what is left is a remembered list that does not name the word. If the
+ *   list is at the cut it is not evidence of anything and the live descriptor
+ *   is worth waiting for; shorter than the cut, it is the whole list and the
+ *   machine really does not answer the word.
+ */
+export function machineWordPending(client: CloudReadClient, machine: string, word: string): boolean {
+  if (!machine || !word) return false
+  const snapshot = descriptorObject(client.orchestratorSnapshots?.get?.(machine))
+  if (snapshot && descriptorObject(snapshot.machine)) return false
+  const lacks = client.machineLacks?.get?.(machine) as { has?(word: string): unknown } | undefined
+  if (typeof lacks?.has === "function" && lacks.has(word)) return false
+  const remembered = descriptorObject(descriptorObject(client.machineDescriptors?.get?.(machine))?.machine)
+  const commands = remembered?.commands
+  if (!Array.isArray(commands) || commands.includes(word)) return false
+  return commands.length >= REMEMBERED_COMMANDS_CUT
+}
+
 /** The copied client's `AGENT_LIMIT`: the entries one subagent read carries. */
 export const CLOUD_AGENT_LIMIT = 200
+/** The copied client's `TRANSCRIPT_LIMIT`: the entries one session read carries. */
+export const CLOUD_TRANSCRIPT_LIMIT = 200
 /** The copied client's `SHELL_BYTES`: the tail one background-command read carries. */
 export const CLOUD_SHELL_BYTES = 64 * 1024
 
@@ -304,6 +417,40 @@ export const CLOUD_SHELL_BYTES = 64 * 1024
 export const TRANSCRIPT_MAX_REUSE_MS = 30_000
 
 /**
+ * How long a pinned read waits for the rest of a pass when the page holds a
+ * Session row newer than its marker (`coherentSession`). A pass is ten-odd
+ * envelopes sent back to back, so its marker follows within milliseconds; a
+ * pass the machine stopped sending is still refused after this.
+ */
+export const PASS_SETTLE_MS = 2_000
+
+/**
+ * How often, at most, a reader asks the machine to restate its rows because the
+ * Session a person has open is not among them.
+ *
+ * A row is published when the machine has something to say about that Session
+ * and restated on its Cloud status cadence; an idle Session's row is therefore
+ * minutes old and arrives again only when that cadence comes round. A page that
+ * does not hold it has nothing to draw the opened Session with, and used to
+ * wait: measured on 2026-10-11, re-reading one from the relay's retained
+ * channel took 19.6 seconds, with the pane saying "Reading this Session's
+ * conversation" for all of it, while the conversation itself answered in 131 ms.
+ * Asking the machine for its list instead put the row back in one second.
+ */
+export const ROW_RESTATE_MS = 5_000
+
+/** How old a rich row's question may be and still be drawn: the status freshness window (`status-projection.ts`). */
+const RICH_MENU_FRESH_MS = 300_000
+
+/**
+ * How often an opened waiting Session with no question in hand asks the machine
+ * to restate its rows: a little over the machine's own pass (five seconds), so
+ * a restatement that arrived before the detail was open is asked for again
+ * at the next one rather than half a minute later.
+ */
+const QUESTION_RESTATE_MS = 6_000
+
+/**
  * How long, after this page did something to a session, every poll asks the
  * machine again until the transcript it answers has changed. A message just
  * typed is the turn the page is waiting to see (`session/pending.ts`); reusing
@@ -311,6 +458,16 @@ export const TRANSCRIPT_MAX_REUSE_MS = 30_000
  * `TRANSCRIPT_MAX_REUSE_MS` with the turn already written.
  */
 export const TRANSCRIPT_EXPECT_MS = 45_000
+
+/**
+ * Inside `TRANSCRIPT_EXPECT_MS`, the machine is asked again when the row moved,
+ * and otherwise at most this often. The page asks every two seconds while a
+ * card is on its way (`session/transcript-follow.ts`); every one of those used
+ * to be an envelope to the machine for 45 seconds after any write, whether or
+ * not anything had been written. This is the page's old pace, so the card is
+ * replaced no later than it was.
+ */
+export const TRANSCRIPT_EXPECT_REREAD_MS = 4_000
 
 /**
  * How long a machine read waits for this page's own Cloud connection when it
@@ -415,6 +572,26 @@ export interface RelayReaderOptions {
   carry?: CarryTable
   /** `RECONNECT_WAIT_MS`, for a test. */
   reconnectWaitMs?: number
+  /** `FEATURE_WAIT_MS`, for a test. */
+  featureWaitMs?: number
+  /** Hosted ss/ compatibility clock; no rich s/ snapshot is read when supplied. */
+  statusList?: () => { at: number; complete: boolean }
+  /** The original one-machine page reads exact rich rows named by ss/. */
+  classicStatus?: boolean
+  /** The fleet detail currently admitted for this reader; absent in single-machine mode. */
+  fleetTarget?: () => SessionDestination | null
+  /** Display facts from the already authorized per-machine list read. */
+  fleetPresentation?: (target: SessionDestination) => SessionListPresentation | null
+  /** A newer, authenticated fleet batch keeps an older ss/ replay from shrinking the list. */
+  fleetPresentations?: (machineID: string) => MachineListPresentation[]
+  /** The same bounded, pinned machine list used by the fleet when rich rows are missing. */
+  listPresentations?: (machineID: string, expectedCount: number | null) => Promise<MachineListPresentation[] | null>
+  /** The fleet's verified per-machine Session set; the classic list reads this first. */
+  machineProjection?: (machineID: string) => Promise<MachineSessionProjection>
+  /** Resolve an exact execution through the verified status source if ss/ replay is missing. */
+  resolveSession?: (machineID: string, sessionID: string) => Promise<SessionDestination | null>
+  /** Recheck one visible fleet mutation against the latest ss/ pass. */
+  admitFleetMutation?: (target: SessionDestination) => Promise<void>
 }
 
 interface HeldTranscript {
@@ -442,7 +619,6 @@ interface OpenStream {
   queued: boolean
 }
 
-/** The live row-channel keys an inventory marker says make up its pass. */
 function inventoryRowKeys(value: unknown): ReadonlySet<string> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null
   const ids = (value as { ids?: unknown }).ids
@@ -469,8 +645,17 @@ export class RelayReader {
   private writer: WriteSeam | null = null
   /** Machine reads waiting for a connected client (`connectedFor`). */
   private readonly awaitingClient = new Set<() => void>()
+  /** Descriptor waits that must follow a replacement Cloud client. */
+  private readonly awaitingWords = new Set<() => void>()
   /** Whether this page has already said what it and the machine disagree about (`drift`). */
   private saidDrift = false
+  /** The opened destination this reader last asked the machine to restate, and when. */
+  private rowAsked: { key: string; at: number } | null = null
+  /** The opened waiting Session whose question was last asked for (`withOpenedMenu`). */
+  private questionAsked: { key: string; at: number } | null = null
+  private presentationRead: { pass: string; until: number; promise: Promise<MachineListPresentation[] | null> } | null = null
+  private listRetryTimer: ReturnType<typeof setTimeout> | null = null
+  private listRetryMs = 5_000
   /** The one machine this reads. */
   readonly machine: string
 
@@ -499,6 +684,8 @@ export class RelayReader {
    */
   attach(client: CloudReadClient): void {
     this.client = client
+    this.presentationRead = null
+    for (const wake of [...this.awaitingWords]) wake()
     for (const stream of this.streams) {
       this.bind(stream)
       if (client.ready !== false) stream.handlers.onOpen?.()
@@ -514,15 +701,26 @@ export class RelayReader {
   get writeHost(): WriteHost {
     return {
       machine: this.machine,
+      exactTarget: this.options.fleetTarget,
+      admitExactTarget: this.options.admitFleetMutation,
       connected: () => this.connected() as CloudWriteClient,
       connectedFor: async (signal, word) => {
         const client = await this.connectedFor(signal)
         if (!client && signal?.aborted) throw new AbandonedRead(word)
         return client as CloudWriteClient | null
       },
+      settledWords: (word, machine) => this.settledWords(word, undefined, machine),
       wrote: (session, outcome) => this.wrote(session, outcome),
       closed: (session) => this.closed(session),
       note: (row) => this.note(row.method, row.path, row.answer, row.code, row),
+      reportWriteFailure: (row) => {
+        try {
+          const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } } | null)?.viewerEvents
+          log?.record?.("cloud.write.failed", { ...row, machine: this.machine,
+            connection: !this.client ? "none" : this.client.ready === false ? "not_ready" : "ready" },
+          ["cloud.write.failed", row.word, row.stage, row.code].join("|"))
+        } catch { /* diagnostics cannot fail the person's action */ }
+      },
     }
   }
 
@@ -609,8 +807,32 @@ export class RelayReader {
     for (const stream of this.streams) stream.handlers.onError?.(new Error("the relay connection is down"))
   }
 
-  /** `fetch`, for the console's own-origin `/v1/…` requests. */
+  /**
+   * `fetch`, for the console's own-origin `/v1/…` requests.
+   *
+   * A Session read that fails — the conversation, an older page of it, its
+   * to-dos, its info, the Session list — is also recorded in the copied
+   * client's own failure log (`cloud.read.failed`), which that client delivers
+   * to the paired machine's log by itself (`diagnostics.events`). On
+   * 2026-10-10 the hosted page said "could not read the conversation" several
+   * times an hour while the machine's log held no refused or slow read: the
+   * row says where it failed, so the machine's log can say which side it was.
+   */
   readonly fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const started = this.now()
+    const seen: { error?: unknown } = {}
+    const read = readFailureWord(input, init)
+    try {
+      const answer = await this.answerFetch(input, init, seen)
+      if (read && answer.status >= 400) this.reportReadFailure(read, started, seen.error, answer)
+      return answer
+    } catch (error) {
+      if (read) this.reportReadFailure(read, started, seen.error ?? error, null)
+      throw error
+    }
+  }
+
+  private readonly answerFetch = async (input: RequestInfo | URL, init: RequestInit | undefined, seen: { error?: unknown }): Promise<Response> => {
     const method = (init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET")).toUpperCase()
     const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
     const url = new URL(href, "http://relay.invalid/")
@@ -668,17 +890,25 @@ export class RelayReader {
       }
       const agent = sessionAgent(path)
       if (agent) {
-        const q = this.only(url, path, "limit")
+        const q = this.only(url, path, "limit", "before")
         this.window(path, "limit", q.limit, CLOUD_AGENT_LIMIT)
+        const before = historyCursor(q.before)
+        if (q.before !== undefined && !before) return this.refuse(method, path, 400, "invalid_cursor", "Invalid transcript cursor.")
         return await this.sessionRead(init?.signal, method, path, "agent", (client) =>
-          client.agent?.({ machine: this.machine, session: agent.session }, agent.agent))
+          this.options.fleetTarget?.() ? this.coherentSession(agent.session, init?.signal, "agent").then((target) => client.readForGeneration?.(target, "agent",
+            { agent: agent.agent, limit: CLOUD_AGENT_LIMIT, ...(before ? { before } : {}) }, init?.signal ?? undefined))
+            : before ? client._read?.({ machine: this.machine, session: agent.session }, "agent",
+            { agent: agent.agent, limit: CLOUD_AGENT_LIMIT, before }, `agent:${agent.agent}.before.${before}`)
+            : client.agent?.({ machine: this.machine, session: agent.session }, agent.agent))
       }
       const shell = sessionShell(path)
       if (shell) {
         const q = this.only(url, path, "bytes")
         this.window(path, "bytes", q.bytes, CLOUD_SHELL_BYTES)
         return await this.sessionRead(init?.signal, method, path, "shell", (client) =>
-          client.shell?.({ machine: this.machine, session: shell.session }, shell.shell))
+          this.options.fleetTarget?.() ? this.coherentSession(shell.session, init?.signal, "shell").then((target) => client.readForGeneration?.(target, "shell",
+            { shell: shell.shell, bytes: CLOUD_SHELL_BYTES }, init?.signal ?? undefined))
+            : client.shell?.({ machine: this.machine, session: shell.session }, shell.shell))
       }
       const workTerminal = workV2SessionTodosTerminal(path)
       if (workTerminal) {
@@ -807,13 +1037,13 @@ export class RelayReader {
           // and moved between them from this list (docs/schedules.md). A
           // person with a Mac and a Linux machine sees both machines'
           // schedules without switching the whole console.
-          this.only(url, path)
+          const query = this.only(url, path, "machine")
           const client = this.connected()
           if (typeof client.schedules !== "function") {
             return this.refuse(method, path, 501, "cloud_not_carried",
               "This console cannot read this machine's schedules.")
           }
-          const answer = await client.schedules({ fresh: true })
+          const answer = await client.schedules(query.machine ? { fresh: true, machine: query.machine } : { fresh: true })
           // **A resolved answer is not every machine's answer.** The read fans
           // out and settles as long as one machine replied, so a machine that
           // refused, timed out or was never asked would otherwise come back as
@@ -827,7 +1057,8 @@ export class RelayReader {
               : []),
             ...(answer.unconfirmed ?? []).map((machine) => ({ machine, label: machine, code: "cloud_read_unavailable" })),
           ]
-          const schedules = (answer.schedules ?? []).filter((row) => typeof row?.machine === "string" && row.machine)
+          const schedules = (answer.schedules ?? []).filter((row) => typeof row?.machine === "string" && row.machine &&
+            (!query.machine || row.machine === query.machine))
           // Typed against the table, as `transcript` below is: dropping it
           // from `CARRIED` is a compile error here rather than a silent
           // disagreement.
@@ -868,6 +1099,29 @@ export class RelayReader {
         case "/v1/transcript": {
           const session = url.searchParams.get("session")
           if (!session) return this.refuse(method, path, 400, "bad_request", "No session was named.")
+          // An appended read (`after=`) is the daemon's own: this seam answers
+          // from its held page, which is not "only what was appended", so it
+          // says no and the page reads whole. Pages from here never carry
+          // `nextAfter`, so a page only asks this of a daemon it reaches itself.
+          if (url.searchParams.has("after")) {
+            return this.refuse(method, path, 501, "cloud_not_carried", "Appended transcript reads are not carried over Clawdline Cloud.")
+          }
+          const beforeRaw = url.searchParams.get("before")
+          const before = historyCursor(beforeRaw)
+          if (beforeRaw !== null && !before) return this.refuse(method, path, 400, "invalid_cursor", "Invalid transcript cursor.")
+          if (before) {
+            const client = this.connected()
+            if (this.options.classicStatus ? !client.transcriptPageForGeneration : !client._read) {
+              return this.refuse(method, path, 501, "cloud_not_carried", "This console cannot read earlier messages.")
+            }
+            const body = this.options.classicStatus
+              ? await client.transcriptPageForGeneration!(await this.coherentSession(session, init?.signal), before, init?.signal ?? undefined)
+              : await client._read?.({ machine: this.machine, session }, "transcript",
+                { limit: CLOUD_TRANSCRIPT_LIMIT, before, priority: "foreground" }, `transcript.before.${before}`)
+            const page = transcriptPage(body, session)
+            this.note(method, path, "relay", undefined, { word: "transcript" })
+            return json(200, page)
+          }
           // `cache: "no-store"` is a caller that must see the machine's answer
           // now: a failed send's "try again" checks the words did not arrive
           // after all before it types them a second time (`session/send.ts`).
@@ -1008,15 +1262,25 @@ export class RelayReader {
           this.only(url, path)
           return await this.machineRead(init?.signal, method, path, "projects", {})
         }
-        case "/v1/personas":
+        case "/v1/project-folders": {
+          const q = this.only(url, path, "path", "machine")
+          return await this.machineRead(init?.signal, method, path, "project-folders", { path: q.path ?? "" }, q.machine || undefined)
+        }
+        case "/v1/personas": {
           // The built-in personas a start may name (docs/personas.md). A
           // machine whose descriptor does not list the word is a daemon from
           // before them, and the copied client refuses the read before it
           // leaves (`_unsupportedRefusal`: `cloud_machine_unsupported`, or
           // `cloud_feature_unavailable` from a Mac), so the start sheet hears
           // "none" now rather than at the read timeout.
-          this.only(url, path)
-          return await this.machineRead(init?.signal, method, path, "personas", {})
+          //
+          // `?machine=` is the start sheet's, for a Session being started on a
+          // machine other than the one this page reads: the roles offered have
+          // to be the roles the machine that will run it knows. It is the same
+          // naming `/v1/places` takes for that sheet's Projects.
+          const q = this.only(url, path, "machine")
+          return await this.machineRead(init?.signal, method, path, "personas", {}, q.machine || undefined)
+        }
         // Project settings sync (docs/project-sync.md): this machine's offer,
         // one offered project in full, and what this machine mirrors.
         case "/v1/project-sync/manifest":
@@ -1055,6 +1319,7 @@ export class RelayReader {
           return this.refuse(method, path, 501, "cloud_not_carried", this.notCarried(method, path))
       }
     } catch (error) {
+      seen.error = error
       if (error instanceof AbandonedRead) {
         // A fetch whose signal fired rejects; it does not answer.
         this.note(method, path, "unanswered", error.code, { word: error.word })
@@ -1122,6 +1387,7 @@ export class RelayReader {
    */
   private async initialSnapshot(signal?: AbortSignal | null, initial = false): Promise<SessionsSnapshot> {
     if (this.initialSnapshotDelivered) {
+      if (this.options.statusList) return this.snapshot()
       // Remounting the list is another view of the same relay reading. Only a
       // person's refresh asks the machine again, unless the held pass is
       // incomplete and a restatement could recover missing rows.
@@ -1208,24 +1474,243 @@ export class RelayReader {
     })
   }
 
+  private presentationsForPass(pass: string, expectedCount: number | null): Promise<MachineListPresentation[] | null> {
+    const now = this.now()
+    const held = this.presentationRead
+    if (held?.pass === pass && held.until > now) return held.promise
+    const promise = Promise.resolve().then(() => this.options.listPresentations?.(this.machine, expectedCount) ?? null)
+      .catch(() => null)
+    const reading = { pass, until: now + 60_000, promise }
+    this.presentationRead = reading
+    void promise.then((rows) => {
+      // Without a signed marker there is no count to certify a partial read.
+      // Keep checking while the person is on this machine; one row is not the
+      // whole list merely because it was the first row to arrive.
+      if (this.presentationRead === reading && (!rows || expectedCount === null || rows.length < expectedCount))
+        reading.until = this.now() + 5_000
+    })
+    return promise
+  }
+
+  private async projectedReading(client: CloudReadClient): Promise<{ snapshot: SessionsSnapshot; settled: boolean } | null> {
+    if (!this.options.classicStatus || !this.options.machineProjection) return null
+    let projection: MachineSessionProjection
+    try { projection = await this.options.machineProjection(this.machine) } catch { return null }
+    if (projection.kind !== "ready" && !projection.rows?.length) return null
+    const projectedRows = projection.rows ?? []
+    const pass = String(projection.snapshotGeneration ?? "") + ":" +
+      String(projection.kind === "ready" ? projection.presentationGeneration ?? "" : "")
+    const presentations = projectedRows.length && this.options.listPresentations
+      ? await this.presentationsForPass(pass, projectedRows.length) : null
+    const byExecution = new Map((presentations ?? []).map((row) =>
+      [this.machine + "\u0000" + row.destination.sessionID + "\u0000" + row.destination.executionGeneration, row]))
+    const missingTitles = projectedRows.some((row) => !byExecution.has(this.machine + "\u0000" +
+      row.destination.sessionID + "\u0000" + row.destination.executionGeneration))
+    const machineRows: CloudRow[] = projectedRows.map((row) => {
+      const presentation = byExecution.get(this.machine + "\u0000" + row.destination.sessionID + "\u0000" +
+        row.destination.executionGeneration)
+      const status = presentation?.status?.state === row.state ? presentation.status : undefined
+      const { identity: _displayIdentity, ...displayStatus } = status ?? {}
+      return { ...displayStatus, id: row.destination.sessionID, session: row.destination.sessionID,
+        machine: this.machine, execution_generation: row.destination.executionGeneration,
+        label: presentation?.title ?? row.destination.sessionID, cwd: presentation?.cwd,
+        icon: presentation?.icon, assistant: row.assistant, backend: row.backend, state: row.state,
+        source: { freshness: row.freshness === "current" ? "current" : "unverified",
+          observed_at: row.observedAt / 1000 } }
+    })
+    const whole = projection.kind === "ready" && projection.complete && !missingTitles
+    const sessions = machineRows.filter((row) => {
+      const id = String(row.session ?? row.id ?? "")
+      const closedAt = this.closedAt.get(id)
+      if (closedAt === undefined) return true
+      const source = row.source as { freshness: string; observed_at: number }
+      if (source.freshness === "current" && source.observed_at > closedAt) {
+        this.closedAt.delete(id)
+        return true
+      }
+      return false
+    }).map((row) => consoleRow(this.withOpenedMenu(client, row)))
+    if (whole) {
+      const present = new Set(machineRows.map((row) => String(row.session ?? row.id ?? "")))
+      for (const id of this.closedAt.keys()) if (!present.has(id)) this.closedAt.delete(id)
+    }
+    this.generation += 1
+    const snapshot: SessionsSnapshot = {
+      at: Math.floor((projection.observedAt ?? this.now()) / 1000),
+      scan: { complete: whole, completed: { complete: whole, sequence: this.generation },
+        emptyAuthoritative: whole, epoch: this.epoch, generation: this.generation, provenance: "cloud" },
+      sessions,
+    }
+    if (whole) {
+      if (this.listRetryTimer) clearTimeout(this.listRetryTimer)
+      this.listRetryTimer = null
+      this.listRetryMs = 5_000
+    } else if (!this.listRetryTimer && this.streams.size) {
+      this.listRetryTimer = setTimeout(() => {
+        this.listRetryTimer = null
+        this.listRetryMs = Math.min(this.listRetryMs * 2, 60_000)
+        for (const stream of this.streams) this.queueFrame(stream)
+      }, this.listRetryMs)
+    }
+    return { snapshot, settled: sessions.length > 0 || whole }
+  }
+
   private async snapshotReading(): Promise<{ snapshot: SessionsSnapshot; settled: boolean }> {
+    if (this.options.statusList) {
+      const status = this.options.statusList()
+      this.generation += 1
+      return {
+        snapshot: {
+          at: Math.floor(status.at / 1000),
+          scan: {
+            complete: status.complete,
+            completed: { complete: status.complete, sequence: this.generation },
+            emptyAuthoritative: false,
+            epoch: this.epoch,
+            generation: this.generation,
+            provenance: "cloud",
+          },
+          sessions: [],
+        },
+        settled: true,
+      }
+    }
     const client = this.connected()
+    const projected = await this.projectedReading(client)
+    if (projected) return projected
     const all = await client.sessions()
     this.sayDrift()
     const recovering = (all.scan.recovering ?? []).includes(this.machine)
     const failed = (all.scan.failures ?? []).some((f) => f.machine === this.machine)
-    const machineRows = all.sessions.filter((row) => row.machine === this.machine)
+    const statusMarker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+      | { payload?: { at?: unknown; complete?: unknown; snapshot_generation?: unknown;
+        inventory?: { version?: unknown; sessions?: unknown } } } | undefined
+    const statusIDs = statusMarker?.payload?.complete === true && statusMarker.payload.inventory?.version === 1 &&
+      Array.isArray(statusMarker.payload.inventory.sessions)
+      ? statusMarker.payload.inventory.sessions.filter((id): id is string => typeof id === "string" && !!id) : null
     const inventory = client.sessionInventoryByMachine?.get(this.machine)
-    const expected = inventoryRowKeys(inventory)
+    const inventoryKeys = inventoryRowKeys(inventory)
+    let expected: Set<string> | null = this.options.classicStatus
+      ? statusIDs === null ? null : new Set(statusIDs.map((id) => this.machine + "\u0000" + id))
+      : inventoryKeys ? new Set(inventoryKeys) : null
+    const hasInventory = this.options.classicStatus ? expected !== null : inventory !== undefined
+    let newerFleetRows = false
+    const newerFleetExecutions = new Map<string, string>()
+    if (this.options.classicStatus && expected && typeof statusMarker?.payload?.at === "number" &&
+      Number.isFinite(statusMarker.payload.at)) {
+      const markerAt = Number(statusMarker!.payload!.at) * 1000
+      for (const row of this.options.fleetPresentations?.(this.machine) ?? []) {
+        const projection = row.projection
+        if (projection?.freshness !== "current" || projection.observedAt <= markerAt ||
+          projection.destination.machineID !== this.machine ||
+          projection.destination.sessionID !== row.destination.sessionID ||
+          projection.destination.executionGeneration !== row.destination.executionGeneration) continue
+        const key = this.machine + "\u0000" + row.destination.sessionID
+        newerFleetExecutions.set(row.destination.sessionID, row.destination.executionGeneration)
+        if (!expected.has(key)) {
+          expected.add(key)
+          newerFleetRows = true
+        }
+      }
+    }
+    const machineRows = all.sessions.filter((row) => {
+      if (row.machine !== this.machine) return false
+      if (!this.options.classicStatus) return true
+      const id = typeof row.session === "string" ? row.session : row.id
+      if (typeof id !== "string" || !expected?.has(this.machine + "\u0000" + id)) return false
+      const status = client.statusSnapshots?.get(JSON.stringify([this.machine, id])) as
+        | { payload?: { execution_generation?: unknown } } | undefined
+      return typeof status?.payload?.execution_generation === "string" &&
+        row.execution_generation === status.payload.execution_generation
+    })
+    for (let index = machineRows.length - 1; index >= 0; index--) {
+      const row = machineRows[index]
+      const id = typeof row.session === "string" ? row.session : row.id
+      const newer = typeof id === "string" ? newerFleetExecutions.get(id) : undefined
+      if (newer && row.execution_generation !== newer) {
+        machineRows.splice(index, 1)
+        newerFleetRows = true
+      }
+    }
+    let recoveredFromList = false
+    if (this.options.classicStatus && this.options.listPresentations &&
+      (!expected || machineRows.length < expected.size)) {
+      const pass = String(statusMarker?.payload?.snapshot_generation ?? "") + ":" +
+        String((statusMarker?.payload as { presentation_generation?: unknown } | undefined)?.presentation_generation ?? "")
+      const presentations = await this.presentationsForPass(pass, expected?.size ?? null)
+      if (!expected && presentations?.length) {
+        expected = new Set(presentations.map((row) => this.machine + "\u0000" + row.destination.sessionID))
+      }
+      recoveredFromList = !!presentations?.length
+      const held = new Set(machineRows.map((row) => this.machine + "\u0000" + (row.session ?? row.id)))
+      for (const presentation of presentations ?? []) {
+        const target = presentation.destination
+        const key = this.machine + "\u0000" + target.sessionID
+        if (target.machineID !== this.machine || !expected?.has(key) || held.has(key)) continue
+        const status = client.statusSnapshots?.get(JSON.stringify([this.machine, target.sessionID])) as
+          | { payload?: { snapshot_generation?: unknown; execution_generation?: unknown;
+            machine_id?: unknown; session_id?: unknown; state?: unknown; assistant?: unknown; backend?: unknown;
+            source?: { freshness?: unknown; observed_at?: unknown } } } | undefined
+        const data = status?.payload
+        const signedRow = data?.machine_id === this.machine && data.session_id === target.sessionID &&
+          data.execution_generation === target.executionGeneration &&
+          data.snapshot_generation === statusMarker?.payload?.snapshot_generation &&
+          ["current", "unverified", "missing"].includes(String(data.source?.freshness))
+        const pinnedRow = presentation.projection?.freshness === "current" &&
+          presentation.projection.destination.machineID === this.machine &&
+          presentation.projection.destination.sessionID === target.sessionID &&
+          presentation.projection.destination.executionGeneration === target.executionGeneration &&
+          presentation.projection.state === presentation.status?.state &&
+          (presentation.projection.snapshotGeneration?.startsWith("direct:") &&
+            (typeof statusMarker?.payload?.at !== "number" ||
+              presentation.projection.observedAt >= statusMarker.payload.at * 1000) ||
+            presentation.projection.snapshotGeneration === statusMarker?.payload?.snapshot_generation)
+        if (hasInventory && !signedRow && !pinnedRow) continue
+        const { identity: _displayIdentity, ...displayStatus } = presentation.status ?? {}
+        machineRows.push({ ...displayStatus, id: target.sessionID, session: target.sessionID,
+          machine: this.machine, execution_generation: target.executionGeneration, label: presentation.title,
+          cwd: presentation.cwd, icon: presentation.icon,
+          assistant: signedRow ? data?.assistant : presentation.projection?.assistant,
+          backend: signedRow ? data?.backend : presentation.projection?.backend,
+          state: signedRow ? data?.state : presentation.status?.state ?? "unknown",
+          source: signedRow ? data?.source : { freshness: presentation.projection?.freshness === "current" ? "current" : "unverified",
+            observed_at: (presentation.projection?.observedAt ?? this.now()) / 1000 } })
+        held.add(key)
+      }
+    }
+    const target = this.options.classicStatus ? this.options.fleetTarget?.() : null
+    if (target?.machineID === this.machine && expected?.has(this.machine + "\u0000" + target.sessionID) &&
+      !machineRows.some((row) => (row.session ?? row.id) === target.sessionID &&
+        row.execution_generation === target.executionGeneration)) {
+      const presentation = this.options.fleetPresentation?.(target)
+      const status = client.statusSnapshots?.get(JSON.stringify([this.machine, target.sessionID])) as
+        | { payload?: { snapshot_generation?: unknown; execution_generation?: unknown;
+          machine_id?: unknown; session_id?: unknown; state?: unknown; assistant?: unknown; backend?: unknown;
+          source?: { freshness?: unknown; observed_at?: unknown } } } | undefined
+      const data = status?.payload
+      if (presentation?.title && data?.machine_id === this.machine && data.session_id === target.sessionID &&
+        data.execution_generation === target.executionGeneration &&
+        data.snapshot_generation === statusMarker?.payload?.snapshot_generation &&
+        data.source?.freshness === "current") {
+        // The fleet has already paid for an authorized display read and a
+        // signed ss/ pass. The old Session pane still needs a row to open its
+        // transcript; a missing rich s/ replay must not hide that answer.
+        const { identity: _displayIdentity, ...displayStatus } = presentation.status ?? {}
+        machineRows.push({ ...displayStatus, id: target.sessionID, session: target.sessionID,
+          machine: this.machine, execution_generation: target.executionGeneration,
+          label: presentation.title, cwd: presentation.cwd, icon: presentation.icon,
+          assistant: data.assistant, backend: data.backend, state: data.state, source: data.source })
+      }
+    }
+    this.askForOpenedRow(client, machineRows)
     // The marker can arrive before another retained channel. Its id set is the
     // receipt: a marker alone is not yet the whole list it describes.
-    const hasInventory = inventory !== undefined
     const heldKeys = new Set(machineRows.map((row) => {
       const id = typeof row.session === "string" ? row.session : typeof row.id === "string" ? row.id : ""
       return this.machine + "\u0000" + id
     }))
-    const hasEveryRow = expected === null || [...expected].every((key) => heldKeys.has(key))
-    const whole = hasInventory && hasEveryRow && !recovering && !failed
+    const hasEveryRow = expected === null ? !this.options.classicStatus : [...expected].every((key) => heldKeys.has(key))
+    const whole = hasInventory && hasEveryRow && !newerFleetRows && !recovering && !failed
     const sessions = machineRows.filter((row) => {
       const id = typeof row.session === "string" ? row.session : typeof row.id === "string" ? row.id : ""
       const closedAt = this.closedAt.get(id)
@@ -1240,7 +1725,7 @@ export class RelayReader {
         return true
       }
       return false
-    }).map(consoleRow)
+    }).map((row) => consoleRow(this.withOpenedMenu(client, row)))
     if (whole) {
       const present = new Set(machineRows.map((row) => typeof row.session === "string" ? row.session : row.id))
       for (const id of this.closedAt.keys()) {
@@ -1260,7 +1745,24 @@ export class RelayReader {
       },
       sessions,
     }
-    return { snapshot, settled: whole || failed }
+    // The original page can show verified rich rows as they arrive. The ss/
+    // marker remains the deletion barrier; a gap never claims an empty list.
+    const settled = whole || failed || (this.options.classicStatus === true &&
+      (hasInventory || recoveredFromList) && machineRows.length > 0)
+    if (whole) {
+      if (this.listRetryTimer) clearTimeout(this.listRetryTimer)
+      this.listRetryTimer = null
+      this.listRetryMs = 5_000
+    } else if (this.options.classicStatus && !this.listRetryTimer && this.streams.size) {
+      // A missing ss/ marker emits no event. Retry the still-open page with
+      // backoff so a failed carrier does not leave it waiting forever.
+      this.listRetryTimer = setTimeout(() => {
+        this.listRetryTimer = null
+        this.listRetryMs = Math.min(this.listRetryMs * 2, 60_000)
+        for (const stream of this.streams) this.queueFrame(stream)
+      }, this.listRetryMs)
+    }
+    return { snapshot, settled }
   }
 
   /**
@@ -1279,8 +1781,10 @@ export class RelayReader {
    * a `fresh` caller is never handed an answer asked before it.
    */
   async transcript(session: string, fresh = false): Promise<{ page: TranscriptPage; reused: boolean }> {
+    const started = Date.now()
     const client = this.connected()
     const all = await client.sessions()
+    const sessionsMs = Date.now() - started
     const row = all.sessions.find((r) => r.machine === this.machine && (r.session ?? r.id) === session)
     const rowKey = row ? keyOf(row) : ""
     const line = row && typeof row.line === "string" ? row.line : ""
@@ -1302,6 +1806,10 @@ export class RelayReader {
       if (held?.inflight && held.inflight !== before) return { page: await held.inflight, reused: true }
     }
     const expecting = !!held && held.expectUntil > now && (held.answer?.signature ?? null) === held.expectFrom
+    if (expecting && held?.answer && !fresh && !held.stale && rowKey === held.rowKey &&
+      now - held.at < TRANSCRIPT_EXPECT_REREAD_MS) {
+      return { page: held.answer, reused: true }
+    }
     if (held?.answer && !fresh && !held.stale && !expecting) {
       const age = now - held.at
       const moved = rowKey !== held.rowKey
@@ -1311,25 +1819,73 @@ export class RelayReader {
       }
     }
     const entry: HeldTranscript = held ?? this.hold(session)
-    const asked = client
-      .transcript({ machine: this.machine, session }, undefined, { foreground: true })
-      .then((body) => transcriptPage(body, session))
-    entry.inflight = asked
-    this.transcripts.set(session, entry)
+    const firstRead = !held?.answer
+    let wordsMs: number | null = null
+    let pinMs: number | null = null
+    let wireMs: number | null = null
+    let outcome = "unknown"
+    const report = () => {
+      if (!firstRead) return
+      try {
+        const log = (client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } }).viewerEvents
+        log?.record?.("cloud.transcript.first_read", {
+          machine: this.machine, outcome, total_ms: Date.now() - started,
+          sessions_ms: sessionsMs, words_ms: wordsMs, pin_ms: pinMs, wire_ms: wireMs,
+        }, "cloud.transcript.first_read|" + this.machine)
+      } catch { /* diagnostics cannot fail a read */ }
+    }
+    // `transcript` is past the remembered descriptor's cut too, and this read
+    // does not go through `machineRead` (`client.transcript`).
     try {
-      const page = await asked
-      entry.answer = page
-      entry.at = this.now()
-      entry.rowKey = rowKey
-      entry.line = line
-      entry.stale = false
-      // The awaited change has arrived; from here the ordinary rules apply.
-      if (entry.expectUntil && page.signature !== entry.expectFrom) entry.expectUntil = 0
-      return { page, reused: false }
+      const wordsStarted = Date.now()
+      // A generation-pinned read names its machine. The copied client's
+      // truncated remembered word list is not a refusal; its current client
+      // sends the named read and the machine answers authoritatively. Waiting
+      // five seconds for orch/ here only delays a cold conversation.
+      if (!this.options.classicStatus) await this.settledWords("transcript")
+      wordsMs = Date.now() - wordsStarted
+      if (this.options.classicStatus && !client.transcriptForGeneration) {
+        throw Object.assign(new Error("Pinned Session reading is unavailable"), { code: "cloud_not_carried" })
+      }
+      const asked = (async () => {
+        let body: unknown
+        if (this.options.classicStatus) {
+          const pinStarted = Date.now()
+          const target = await this.coherentSession(session)
+          pinMs = Date.now() - pinStarted
+          const wireStarted = Date.now()
+          body = await client.transcriptForGeneration!(target)
+          wireMs = Date.now() - wireStarted
+        } else {
+          const wireStarted = Date.now()
+          body = await client.transcript({ machine: this.machine, session }, undefined, { foreground: true })
+          wireMs = Date.now() - wireStarted
+        }
+        return transcriptPage(body, session)
+      })()
+      entry.inflight = asked
+      this.transcripts.set(session, entry)
+      try {
+        const page = await asked
+        entry.answer = page
+        entry.at = this.now()
+        entry.rowKey = rowKey
+        entry.line = line
+        entry.stale = false
+        // The awaited change has arrived; from here the ordinary rules apply.
+        if (entry.expectUntil && page.signature !== entry.expectFrom) entry.expectUntil = 0
+        outcome = "ready"
+        return { page, reused: false }
+      } finally {
+        // A failed ask keeps the last good answer and its age, so the next poll
+        // asks again rather than reusing it as though nothing had happened.
+        entry.inflight = null
+      }
+    } catch (error) {
+      outcome = failureCode(error)
+      throw error
     } finally {
-      // A failed ask keeps the last good answer and its age, so the next poll
-      // asks again rather than reusing it as though nothing had happened.
-      entry.inflight = null
+      report()
     }
   }
 
@@ -1381,6 +1937,14 @@ export class RelayReader {
     // fifteen-second bound (`pages/work/api.ts`) silently became the copied
     // client's sixty-second read timeout plus its ten-second status probe:
     // a Session's to-do fold said "loading" for over a minute per try.
+    if (signal?.aborted) {
+      mark("caller_canceled", "cloud_read_abandoned")
+      throw new AbandonedRead(word)
+    }
+    // The reads a page fires the moment it opens are the ones that used to be
+    // refused here for a word the remembered descriptor's cut list did not
+    // reach. Nothing else waits, and a caller that gave up is not kept.
+    await this.settledWords(word, signal, machine)
     if (signal?.aborted) {
       mark("caller_canceled", "cloud_read_abandoned")
       throw new AbandonedRead(word)
@@ -1502,6 +2066,354 @@ export class RelayReader {
     return this.client
   }
 
+  /**
+   * `pinnedSession`, after the pass it is reading has finished arriving.
+   *
+   * The machine sends a pass as every Session's ss/ row and then the marker,
+   * all with one new pass id (`internal/transport/cloud/session_status.go`).
+   * A page opens them one at a time, so for the few milliseconds the rest of
+   * a pass is on its way it holds a row from the new pass beside the marker
+   * of the old one, and a read asked then was refused here as
+   * `pass_mismatch` — on the page, before anything was sent, so the machine
+   * never saw it. A replay of an hour of 15-second passes refused 2 to 7
+   * polls of the open Session this way (`read-replay.test.ts`).
+   *
+   * Only that condition waits, and only for the marker: the next envelope of
+   * this machine's marker, or `PASS_SETTLE_MS`, whichever comes first. Then
+   * the same checks decide, so a pass that never completes is still refused.
+   */
+  private async coherentSession(session: string, signal?: AbortSignal | null, word = "transcript"): Promise<{ machineID: string; sessionID: string; executionGeneration: string }> {
+    try {
+      return this.pinnedSession(session)
+    } catch (error) {
+      const condition = (error as { condition?: unknown })?.condition
+      // The fleet already read this exact display row through the paired
+      // machine. If the retained status marker is late, its separate recovery
+      // can take many seconds. Ask the pinned machine now; it rechecks the
+      // generation and permission before returning any content. A newer
+      // status row naming another execution is an explicit contradiction.
+      if (["no_marker", "no_row", "marker_stale", "row_stale", "observed_stale"].includes(String(condition))) {
+        const target = this.options.fleetTarget?.()
+        const displayed = target?.machineID === this.machine && target.sessionID === session
+          ? this.options.fleetPresentation?.(target) : null
+        const status = this.client?.statusSnapshots?.get(JSON.stringify([this.machine, session])) as
+          | { payload?: { execution_generation?: unknown } } | undefined
+        const known = status?.payload?.execution_generation
+        if (displayed && (!known || known === target!.executionGeneration) && !signal?.aborted) return target!
+      }
+      // The marker lists this Session and its row is not here. That is a row
+      // to ask for, not an execution that changed: the relay retains it, the
+      // list already recovers it this way for a gap in its own pass, and
+      // saying "this execution is no longer current" of a page that simply
+      // has not been sent the row names the wrong thing to a person. Measured
+      // on this machine's log for 2026-10-11, it was the commonest read
+      // refusal of the day: 23 of them, every one `no_row`.
+      if (condition === "no_row") {
+        if (await this.askForStatusRow(session, signal)) return this.pinnedSession(session)
+      }
+      if (condition !== "pass_mismatch") {
+        if (["no_marker", "no_row", "marker_stale", "row_stale", "observed_stale"].includes(String(condition))) {
+          const resolved = await this.options.resolveSession?.(this.machine, session)
+          if (resolved && !signal?.aborted) {
+            const intended = this.options.fleetTarget?.()
+            if (!intended || intended.machineID === resolved.machineID && intended.sessionID === resolved.sessionID &&
+              intended.executionGeneration === resolved.executionGeneration) return resolved
+          }
+        }
+        throw error
+      }
+    }
+    const client = this.connected()
+    await new Promise<void>((resolve) => {
+      let off: (() => void) | null = null
+      const done = () => {
+        clearTimeout(timer)
+        off?.()
+        signal?.removeEventListener("abort", done)
+        resolve()
+      }
+      const timer = setTimeout(done, PASS_SETTLE_MS)
+      signal?.addEventListener("abort", done)
+      off = client.events((event) => {
+        if (event.type === "session_status" && event.identity?.machine === this.machine &&
+          event.identity?.session === "__clawdline_inventory_v1__") done()
+      }) as (() => void) | null
+    })
+    if (signal?.aborted) throw new AbandonedRead(word)
+    try { return this.pinnedSession(session) }
+    catch (error) {
+      const resolved = await this.options.resolveSession?.(this.machine, session)
+      const intended = this.options.fleetTarget?.()
+      if (resolved && !signal?.aborted && (!intended || intended.machineID === resolved.machineID &&
+        intended.sessionID === resolved.sessionID && intended.executionGeneration === resolved.executionGeneration)) return resolved
+      throw error
+    }
+  }
+
+  /**
+   * Hold a read until the chosen machine's own word list has arrived, when the
+   * page would otherwise refuse it on a word list that was cut short
+   * (`machineWordPending`). A cut remembered list alone cannot refuse the
+   * read when this wait ends; the named machine answers it instead.
+   *
+   * Only that condition waits, and only for the descriptor: the next `orch/`
+   * envelope of this machine that carries one, or `FEATURE_WAIT_MS`, whichever
+   * comes first. A live descriptor or a machine's signed refusal remains
+   * authoritative. The stored 64-word prefix is not.
+   */
+  private async settledWords(word: string, signal?: AbortSignal | null, machine: string = this.machine): Promise<void> {
+    if (!this.client || signal?.aborted || !machineWordPending(this.client, machine, word)) return
+    const bound = this.options.featureWaitMs ?? FEATURE_WAIT_MS
+    await new Promise<void>((resolve) => {
+      let off: (() => void) | null = null
+      let listening: CloudReadClient | null = null
+      const done = () => {
+        clearTimeout(timer)
+        off?.()
+        this.awaitingWords.delete(check)
+        signal?.removeEventListener("abort", done)
+        resolve()
+      }
+      const timer = setTimeout(done, bound)
+      signal?.addEventListener("abort", done)
+      const check = () => {
+        const current = this.client
+        if (!current || !machineWordPending(current, machine, word)) { done(); return }
+        if (current === listening) return
+        off?.()
+        listening = current
+        // A status-only notice has no descriptor. A replacement client must
+        // get its own listener, so the retired one's five-second wait cannot
+        // hold a read or send after the new descriptor has arrived.
+        off = current.events((event) => {
+          if (event.type === "orchestrator" && event.machine === machine) check()
+        }) as (() => void) | null
+      }
+      this.awaitingWords.add(check)
+      check()
+    })
+  }
+
+  /**
+   * One retained ss/ row, asked for because the read is pinned to it.
+   *
+   * Answers whether the row this read needs is here now. It asks only when
+   * the marker names the pass it belongs to, so the recovery can tell the row
+   * it wants from an older one, and it asks once: a row that does not come is
+   * a refusal the caller still makes.
+   */
+  private async askForStatusRow(session: string, signal?: AbortSignal | null): Promise<boolean> {
+    if (signal?.aborted) return false
+    const client = this.connected()
+    if (typeof client.recoverStatusRow !== "function") return false
+    const marker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+      | { payload?: { snapshot_generation?: unknown } } | undefined
+    const pass = marker?.payload?.snapshot_generation
+    if (typeof pass !== "string" || !/^[0-9a-f]{32}$/u.test(pass)) return false
+    return await client.recoverStatusRow(this.machine, session, pass).catch(() => false)
+  }
+
+  private pinnedSession(session: string): { machineID: string; sessionID: string; executionGeneration: string } {
+    const held = this.connected().statusSnapshots
+    const marker = held?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+      | { payload?: { complete?: unknown; inventory?: { sessions?: unknown }; snapshot_generation?: unknown; at?: unknown } } | undefined
+    const row = held?.get(JSON.stringify([this.machine, session])) as
+      | { payload?: { snapshot_generation?: unknown; execution_generation?: unknown; projected_at?: unknown;
+        source?: { freshness?: unknown; observed_at?: unknown } } } | undefined
+    const meta = marker?.payload
+    const data = row?.payload
+    const now = this.now() / 1000
+    const fresh = (value: unknown) => typeof value === "number" && Math.abs(now - value) <= 300
+    // The first condition that fails names the refusal, so a page's report can
+    // say which one it was (`reportReadFailure`). The refusal is unchanged.
+    const condition = !marker ? "no_marker"
+      : meta?.complete !== true || !Array.isArray(meta.inventory?.sessions) ? "marker_incomplete"
+      : !meta.inventory.sessions.includes(session) ? "not_listed"
+      : !data ? "no_row"
+      : data.snapshot_generation !== meta.snapshot_generation ? "pass_mismatch"
+      : typeof data.execution_generation !== "string" || !/^[0-9a-f]{32}$/u.test(data.execution_generation) ? "no_execution"
+      : data.source?.freshness !== "current" ? "not_current"
+      : !fresh(meta.at) ? "marker_stale"
+      : !fresh(data.projected_at) ? "row_stale"
+      : !fresh(data.source?.observed_at) ? "observed_stale"
+      : null
+    if (condition !== null || !data) throw Object.assign(new Error("The Session execution is no longer current"), {
+      code: "execution_generation_changed", status: 409, condition: condition ?? "no_row",
+    })
+    const target = { machineID: this.machine, sessionID: session, executionGeneration: data.execution_generation as string }
+    const intended = this.options.fleetTarget?.()
+    if (intended && (intended.machineID !== target.machineID || intended.sessionID !== target.sessionID ||
+      intended.executionGeneration !== target.executionGeneration)) {
+      throw Object.assign(new Error("The opened Session execution has changed"), {
+        code: "execution_generation_changed", status: 409, condition: "target_changed",
+      })
+    }
+    return target
+  }
+
+  /**
+   * The opened Session's row, with the question its rich row carries.
+   *
+   * Every row here is put together from the content-free status and the
+   * authorized display list, and neither carries a question's words. On
+   * 2026-10-12 a Session stopped on a menu its machine had read whole was open
+   * on app.clawdline.com, its rich s/ row arriving (`ch=s/<machine>/<session>
+   * fanout=1`), and the waiting card said Clawdline "could not read its
+   * choices from the screen": the row it drew had no `menu`, because the rich
+   * row went only to `detailSnapshots`. Only that open, exact execution's
+   * row, and only while its rich row is current and names the same state.
+   */
+  private withOpenedMenu(client: CloudReadClient, row: CloudRow): CloudRow {
+    const id = typeof row.session === "string" ? row.session : row.id
+    if (typeof id !== "string" || !id || row.state !== "waiting" ||
+      typeof row.execution_generation !== "string") return row
+    // Every waiting row takes the question its held rich row carries, not only
+    // the opened one: the one-machine page has no fleet target at all, and on
+    // 2026-10-12 a phone on it drew "could not read its choices" for a Session
+    // whose rich row it held. Asking the machine, and reporting a question that
+    // did not come, stay with the opened Session.
+    const target = this.options.fleetTarget?.()
+    const opened = !!target && target.machineID === this.machine && id === target.sessionID &&
+      row.execution_generation === target.executionGeneration ? target : null
+    // The detail's own copy is emptied each time the detail is opened and
+    // filled only by a row that arrives afterwards; a Session stopped on a
+    // question sends none, so the row this client already holds stands in.
+    // On 2026-10-12 the page's report read `rich=false snapshot=true
+    // snapshot_options=5` while the options came and went with the moment the
+    // detail was opened. Either way the machine checks the question's
+    // fingerprint before a press is typed (`menuFingerprint`).
+    const key = this.machine + "\u0000" + id
+    const rich = ((opened ? client.detailSnapshots?.get(key) : undefined) ??
+      (client as { sessionSnapshots?: ReadonlyMap<string, unknown> }).sessionSnapshots?.get(key)) as
+      | { machine?: unknown; session?: unknown; execution_generation?: unknown; state?: unknown;
+        menu?: { options?: unknown }; screen_reading?: unknown;
+        source?: { freshness?: unknown; observed_at?: unknown } } | undefined
+    const observedAt = Number(rich?.source?.observed_at) * 1000
+    if (!rich || rich.machine !== this.machine || rich.session !== id ||
+      rich.execution_generation !== row.execution_generation || rich.state !== "waiting" ||
+      rich.source?.freshness !== "current" || !Number.isFinite(observedAt) ||
+      Math.abs(this.now() - observedAt) > RICH_MENU_FRESH_MS ||
+      !Array.isArray(rich.menu?.options) || !rich.menu.options.length) {
+      if (!opened) return row
+      if (this.askForOpenedQuestion(opened)) this.reportMissingQuestion(client, opened, rich, observedAt)
+      // Asked for and on its way: the card says so rather than that the
+      // machine could not read a question it has not been asked to send yet.
+      return { ...row, menu_arriving: true }
+    }
+    return { ...row, menu: rich.menu, ...(typeof rich.screen_reading === "string" ? { screen_reading: rich.screen_reading } : {}) }
+  }
+
+  /**
+   * Ask the machine to state its rows again when the opened Session is
+   * waiting and no current question has come with it.
+   *
+   * The machine sends a rich row when the row changes, and a Session stopped
+   * on a question does not change: a page that opened it afterwards waited for
+   * a row that was never coming (the 2026-10-12 log for that Session shows one
+   * rich row in twenty minutes, delivered to nobody). `sessions.snapshot`
+   * restates every row on its own channel, which the opened detail holds
+   * (`status-client.js` `openDetail`). Once per execution per
+   * `QUESTION_RESTATE_MS`, so a machine that answers with no question is not
+   * asked in a loop.
+   */
+  private askForOpenedQuestion(target: SessionDestination): boolean {
+    const key = target.sessionID + "\u0000" + target.executionGeneration
+    const now = this.now()
+    if (this.questionAsked?.key === key && now - this.questionAsked.at < QUESTION_RESTATE_MS) return false
+    this.questionAsked = { key, at: now }
+    // `.initial` is stated at once rather than at the machine's next pass, once
+    // per viewer per pass (publish.go SnapshotFrom); a machine that does not
+    // list the word is asked the plain way.
+    const implements_ = (word: string) => (this.client as { _machineImplements?(machine: string, word: string): string } | null)
+      ?._machineImplements?.(this.machine, word) === "yes"
+    // `sessions.row` states just this row, now (publish.go StateRow); the
+    // whole restatement is for a machine from before that word.
+    const ask = implements_("sessions.row")
+      ? this.machineRead(null, "GET", "/v1/sessions", "sessions.row", { row: target.sessionID })
+      : this.machineRead(null, "GET", "/v1/sessions",
+        implements_("sessions.snapshot.initial") ? "sessions.snapshot.initial" : "sessions.snapshot", {})
+    void ask.catch(() => undefined)
+    return true
+  }
+
+  /**
+   * What this page held when it drew the opened waiting Session without its
+   * question, sent to the machine's log as `cloud.opened_question.missing`.
+   *
+   * On 2026-10-12 the same deploy drew the question in a desktop browser and
+   * not on a phone, and the machine's log could not say which step the phone
+   * stopped at: the rich row may reach a page on the direct carrier, which the
+   * relay's fanout does not count. Each field is one step of the way: the
+   * detail opened and its channel subscribed and held, a rich row in hand, and
+   * whether that row names this execution, is waiting, is current and carries
+   * options. No question words are sent. Once per ask (`askForOpenedQuestion`).
+   */
+  private reportMissingQuestion(client: CloudReadClient, target: SessionDestination,
+    rich: { execution_generation?: unknown; state?: unknown; menu?: { options?: unknown };
+      source?: { freshness?: unknown } } | undefined, observedAt: number): void {
+    try {
+      const log = (client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } }).viewerEvents
+      if (typeof log?.record !== "function") return
+      const inner = client as unknown as { openedDetails?: Set<string>; socketSubscriptions?: Map<string, unknown>;
+        subscriptionHolds?: Map<string, unknown>; sessionSnapshots?: Map<string, unknown>; carrierMachines?: Set<string> }
+      const channel = "s/" + channelSegment(this.machine) + "/" + channelSegment(target.sessionID)
+      const held = inner.sessionSnapshots?.get(this.machine + "\u0000" + target.sessionID) as
+        | { execution_generation?: unknown; state?: unknown; menu?: { options?: unknown } } | undefined
+      log.record("cloud.opened_question.missing", {
+        machine: this.machine, session: target.sessionID,
+        opened: inner.openedDetails ? inner.openedDetails.has(channel) : null,
+        subscribed: inner.socketSubscriptions ? inner.socketSubscriptions.has(channel) : null,
+        held: inner.subscriptionHolds ? inner.subscriptionHolds.has(channel) : null,
+        carrier: inner.carrierMachines ? inner.carrierMachines.has(this.machine) : null,
+        rich: !!rich,
+        rich_same_execution: rich ? rich.execution_generation === target.executionGeneration : null,
+        rich_state: rich && typeof rich.state === "string" ? rich.state : null,
+        rich_freshness: rich && typeof rich.source?.freshness === "string" ? rich.source.freshness : null,
+        rich_age_s: rich && Number.isFinite(observedAt) ? Math.round((this.now() - observedAt) / 1000) : null,
+        rich_options: rich ? Array.isArray(rich.menu?.options) ? rich.menu.options.length : 0 : null,
+        snapshot: !!held,
+        snapshot_same_execution: held ? held.execution_generation === target.executionGeneration : null,
+        snapshot_state: held && typeof held.state === "string" ? held.state : null,
+        snapshot_options: held ? Array.isArray(held.menu?.options) ? held.menu.options.length : 0 : null,
+      }, "cloud.opened_question.missing|" + target.sessionID + "|" + target.executionGeneration)
+    } catch { /* diagnostics cannot fail a Session read */ }
+  }
+
+  /**
+   * The row under the Session a person has open, asked for rather than waited for.
+   *
+   * The machine's ss/ pass says this execution is the one running, and the page
+   * has no rich row for it: that is the one case where asking the machine for
+   * its list answers a question nobody else will. The reply arrives on the
+   * direct carrier when there is one, so the row is back within a second
+   * instead of on the next status pass (`ROW_RESTATE_MS`).
+   *
+   * Only when the two agree about the execution. A ss/ row naming a different
+   * one is a replaced execution, which `readDetail` already refuses as
+   * `changed` and offers the running Session for; asking again would not
+   * produce the row a person is looking at.
+   */
+  private askForOpenedRow(client: CloudReadClient, rows: readonly CloudRow[]): void {
+    const target = this.options.fleetTarget?.()
+    if (!this.options.classicStatus || !target || target.machineID !== this.machine) return
+    const held = rows.some((row) => {
+      const id = typeof row.session === "string" ? row.session : row.id
+      return id === target.sessionID && row.execution_generation === target.executionGeneration
+    })
+    if (held) {
+      this.rowAsked = null
+      return
+    }
+    const status = client.statusSnapshots?.get(JSON.stringify([this.machine, target.sessionID])) as
+      | { payload?: { execution_generation?: unknown } } | undefined
+    if (status?.payload?.execution_generation !== target.executionGeneration) return
+    const key = target.sessionID + "\u0000" + target.executionGeneration
+    const now = this.now()
+    if (this.rowAsked?.key === key && now - this.rowAsked.at < ROW_RESTATE_MS) return
+    this.rowAsked = { key, at: now }
+    void this.machineRead(null, "GET", "/v1/sessions", "sessions.snapshot", {}).catch(() => undefined)
+  }
+
   private bind(stream: OpenStream): void {
     stream.off?.()
     stream.off = this.client
@@ -1512,7 +2424,8 @@ export class RelayReader {
             return
           }
           const machine = event.type === "orchestrator" ? event.machine : event.identity?.machine
-          if ((event.type === "sessions" || event.type === "orchestrator") && machine === this.machine) {
+          if (((event.type === "session_status" || event.type === "sessions") ||
+            event.type === "orchestrator") && machine === this.machine) {
             this.queueFrame(stream)
           }
         })
@@ -1558,6 +2471,55 @@ export class RelayReader {
   private refuse(method: string, path: string, status: number, code: string, detail: string, detailKey: string | null = null, version?: string): Response {
     this.note(method, path, "refused", code)
     return json(status, { error: code, detail, route: path, ...(detailKey ? { detail_key: detailKey } : {}), ...(version ? { version } : {}) })
+  }
+
+  /**
+   * One `cloud.read.failed` row in the copied client's failure log: which read,
+   * where it stopped, and what this page held when it did. Content-free: no
+   * message text, no title, no line — the terminal id is the only id.
+   *
+   * `stage` is the side of the wire it stopped on, read from the failure the
+   * copied client settled it with: a failure carrying no envelope sequence was
+   * never sent (`viewer_refused`), `cloud_read_timeout` is `timeout`, the
+   * relay's own layer is `relay_refused`, and a machine's is `answered`. A read
+   * the page itself stopped waiting for is not a failure and is not recorded.
+   */
+  private reportReadFailure(read: { word: string; session: string | null }, started: number, error: unknown, answer: Response | null): void {
+    try {
+      const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } } | null)?.viewerEvents
+      if (typeof log?.record !== "function") return
+      const failure = (error ?? null) as { code?: unknown; layer?: unknown; status?: unknown; condition?: unknown;
+        ref?: { seq?: unknown } | null; name?: unknown } | null
+      if (error instanceof AbandonedRead || failure?.code === "cloud_read_abandoned" || failure?.name === "AbortError") return
+      const code = typeof failure?.code === "string" ? failure.code : error instanceof NotConnected ? "offline"
+        : answer ? "http_" + answer.status : "cloud_failed"
+      const layer = typeof failure?.layer === "string" ? failure.layer : null
+      const sent = Number.isSafeInteger(failure?.ref?.seq)
+      const stage = code === "cloud_read_timeout" ? "timeout"
+        : !sent ? "viewer_refused"
+        : layer === "relay" ? "relay_refused"
+        : "answered"
+      const client = this.client
+      const held = client?.statusSnapshots
+      const marker = held?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as { payload?: { at?: unknown } } | undefined
+      const row = read.session ? held?.get(JSON.stringify([this.machine, read.session])) as { payload?: { projected_at?: unknown } } | undefined : undefined
+      const nowS = this.now() / 1000
+      const age = (at: unknown) => typeof at === "number" && Number.isFinite(at) ? Math.round(nowS - at) : null
+      const offline = (client as { machineOffline?: ReadonlyMap<string, { until?: unknown }> } | null)?.machineOffline?.get(this.machine)
+      const data: Record<string, unknown> = {
+        word: read.word, stage, code,
+        cond: typeof failure?.condition === "string" ? failure.condition : null,
+        status: answer?.status ?? (typeof failure?.status === "number" ? failure.status : null),
+        layer, ms: Math.max(0, Math.round(this.now() - started)),
+        connection: !client ? "none" : client.ready === false ? "not_ready" : "ready",
+        marker_age_s: age(marker?.payload?.at), row_age_s: age(row?.payload?.projected_at),
+        offline_hold_ms: offline && typeof offline.until === "number" ? Math.max(0, Math.round(offline.until - this.now())) : null,
+        machine: this.machine, session: read.session,
+      }
+      log.record("cloud.read.failed", data, ["cloud.read.failed", read.word, stage, code].join("|"))
+    } catch {
+      // A recorder cannot fail the read it is recording.
+    }
   }
 
   private note(method: string, path: string, answer: SeamRow["answer"], code?: string, extra?: Partial<SeamRow>): void {
@@ -1660,6 +2622,31 @@ function sessionAgent(path: string): { session: string; agent: string } | null {
 }
 
 /** A typed failure's code, as a machine that did not answer the list is named by. */
+/**
+ * The Session reads a failure of which is reported to the machine
+ * (`reportReadFailure`), by the route the page asked for, or null.
+ */
+function readFailureWord(input: RequestInfo | URL, init?: RequestInit): { word: string; session: string | null } | null {
+  try {
+    const method = (init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET")).toUpperCase()
+    if (method !== "GET") return null
+    const href = typeof input === "string" ? input : input instanceof URL ? input.href : input.url
+    const url = new URL(href, "http://relay.invalid/")
+    const path = url.pathname
+    if (path === "/v1/transcript") {
+      return { word: url.searchParams.has("before") ? "transcript_page" : "transcript", session: url.searchParams.get("session") }
+    }
+    if (path === "/v1/sessions") return { word: "session_list", session: null }
+    const todos = workV2SessionTodosTerminal(path)
+    if (todos) return { word: "session_todos", session: todos }
+    const info = /^\/v1\/sessions\/([^/]+)\/info$/u.exec(path)
+    if (info) return { word: "info", session: decodeURIComponent(info[1]!) }
+    return null
+  } catch {
+    return null
+  }
+}
+
 function failureCode(error: unknown): string {
   const code = error && typeof error === "object" ? (error as { code?: unknown }).code : undefined
   return typeof code === "string" && code ? code : "unanswered"
@@ -1821,7 +2808,10 @@ function transcriptPage(body: unknown, session: string): TranscriptPage {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw Object.assign(new Error("the machine's transcript answer is not an object"), { code: "bad_payload" })
   }
-  const { optimisticIdentity: _identity, ...page } = body as Record<string, unknown>
+  // `nextAfter` is a byte cursor into the machine's own record, for a page that
+  // reads the daemon directly; over the relay the transcript is this seam's
+  // held answer, so the cursor is not passed on (see the `after=` refusal).
+  const { optimisticIdentity: _identity, nextAfter: _after, ...page } = body as Record<string, unknown>
   return {
     ...page,
     id: typeof page.id === "string" && page.id ? page.id : session,
@@ -1829,6 +2819,12 @@ function transcriptPage(body: unknown, session: string): TranscriptPage {
     signature: typeof page.signature === "string" ? page.signature : "",
     evidence: typeof page.evidence === "string" ? page.evidence : "transcript",
   } as TranscriptPage
+}
+
+function historyCursor(value: string | null | undefined): number {
+  if (!value || !/^[1-9][0-9]*$/.test(value)) return 0
+  const cursor = Number(value)
+  return Number.isSafeInteger(cursor) ? cursor : 0
 }
 
 /** A row with the fields that move on every reading taken out, as one comparable string. */

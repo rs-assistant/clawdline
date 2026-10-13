@@ -22,6 +22,19 @@ import { RefusalError, TransportError } from "@clawdline/core/refusal"
 export const TODO_REFRESH_MS = 15_000
 
 /**
+ * The open Session page's own pace for its to-dos, and for its attention notes
+ * while their panel is open. It asks at once when the page is seen again,
+ * focused, or a Board item changed through it; between those, this is the
+ * safety read. A closed attention panel has no pace of its own: the row's
+ * `attention_count` says whether there is anything to read and a move in it
+ * asks again (`session/attention-reads.ts`), and a row with no count — an
+ * older daemon — keeps `TODO_REFRESH_MS` for its notes. On a phone the two
+ * reads at fifteen seconds were 24 of a detail page's 59 requests in three
+ * minutes.
+ */
+export const TODO_SAFETY_MS = 60_000
+
+/**
  * What the fold's header shows.
  *
  * `loading` only while the first read has no answer at all; `failed` when
@@ -116,13 +129,13 @@ export function browserRefreshEnvironment(onWorkChanged: RefreshEnvironment["onW
 }
 
 /**
- * Ask `refresh` every `TODO_REFRESH_MS` while the page is visible, and at once
+ * Ask `refresh` every `every` (`TODO_REFRESH_MS` unless given) while the page is visible, and at once
  * when it becomes visible again, its window is focused, or a Board item
  * changed through this page. A hidden page's ticks are skipped rather than
  * queued. Returns the stop.
  */
-export function watchTodoRefresh(refresh: () => void, env: RefreshEnvironment): () => void {
-  const tick = env.setInterval(() => { if (env.visible()) refresh() }, TODO_REFRESH_MS)
+export function watchTodoRefresh(refresh: () => void, env: RefreshEnvironment, every = TODO_REFRESH_MS): () => void {
+  const tick = env.setInterval(() => { if (env.visible()) refresh() }, every)
   const offVisible = env.onVisible(refresh)
   const offFocus = env.onFocus(refresh)
   const offChanged = env.onWorkChanged(refresh)

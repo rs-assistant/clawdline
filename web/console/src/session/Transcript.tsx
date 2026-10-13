@@ -21,9 +21,24 @@ import type {
   TranscriptPlanStep,
 } from "@clawdline/contract"
 import { client } from "../client.js"
+import { RefusalError } from "@clawdline/core"
 import { usePoll } from "../useFleet.js"
+import type { ReadReason } from "../poll.js"
+import {
+  appendedReadFrom,
+  BACKOFF,
+  BLIND_MS,
+  FOLLOW_FAST_MS,
+  FOLLOW_WINDOW_MS,
+  followingNow,
+  joinAppended,
+  SAFETY_MS,
+  TRAIL_MS,
+  transcriptPace,
+} from "./transcript-follow.js"
+import { sharedTranscripts } from "./transcript-share.js"
 import * as L from "../legacy/bridge.js"
-import { ArtifactTiles, artifactTilesHTML, artifactsKey } from "../legacy/images-bridge.js"
+import { ArtifactTiles, artifactTilesHTML, artifactsKey, type PictureSource } from "../legacy/images-bridge.js"
 import { byteWords, nextWord } from "../next-strings.js"
 import type { PendingSend } from "./pending.js"
 import { pendingFailureCanRetry, pendingFailureSentence } from "./pending-copy.js"
@@ -39,7 +54,9 @@ import { agentReportIdentity } from "./agent-report.js"
 import "./agent-report.css"
 import "./transcript-error.css"
 import { atNewest, jumpOffered } from "./jump.js"
+import { joinTranscript } from "./history.js"
 import "./jump.css"
+import "./history.css"
 
 /*
  * The transcript pane, drawn as `view/transcript.js` draws it.
@@ -67,12 +84,14 @@ import "./jump.css"
 
 /** Same as the original's `limit=200`, so both panes are reading the same stretch. */
 const LIMIT = 200
-const POLL_MS = 4000
 /**
- * While a message is on its way the next read is the one that replaces its
- * card, so it comes sooner (`followPendingTranscript` in the original).
+ * A provider subagent's page is read by its own entry in the row's `agents`:
+ * its `at` is when that agent's record last grew, so it is read when that or
+ * its state moves and on the safety pace otherwise (`transcript-follow.ts`).
+ * An agent the row does not list, or lists with no time, is read on the old
+ * pace.
  */
-const FOLLOW_MS = 1000
+const AGENT_POLL_MS = BLIND_MS
 
 /** The mark an `AskUserQuestion` call's text starts with. */
 const ASK_MARK = "\u0001ask\u0001"
@@ -95,6 +114,12 @@ type Block =
 
 type Toggle = (key: string, defaultOpen?: boolean) => void
 
+interface EarlierPages {
+  base: TranscriptPage
+  // Newest older page first; rendering reverses this order.
+  pages: TranscriptPage[]
+}
+
 export function Transcript({
   id,
   agentId,
@@ -110,15 +135,78 @@ export function Transcript({
 }
 
 function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; onAgent?: (id: string) => void }) {
+  // The page last read, and whether the pane is on its fast pace: the read
+  // asks only for what was appended to it unless this is the safety read of
+  // the whole page (`transcript-follow.ts`).
+  const heldPage = useRef<TranscriptPage | null>(null)
+  const fast = useRef(false)
   const read = useMemo(
-    () => () => agentId ? client.agentTranscript(id, agentId, LIMIT) : client.transcript(id, LIMIT),
+    () => async (why: ReadReason): Promise<TranscriptPage> => {
+      if (agentId) return client.agentTranscript(id, agentId, LIMIT)
+      const was = heldPage.current
+      const from = appendedReadFrom(was, why, fast.current)
+      if (was && from !== null) {
+        try {
+          const joined = joinAppended(was, await client.transcriptAfter(id, LIMIT, from))
+          if (joined) return (heldPage.current = joined)
+        } catch (err) {
+          // A cursor the daemon would not read from is answered by reading the
+          // page whole; a read nobody answered is a failed read like any other.
+          if (!(err instanceof RefusalError)) throw err
+        }
+      }
+      const page = await client.transcript(id, LIMIT)
+      heldPage.current = page
+      return page
+    },
     [id, agentId],
   )
-  useSyncExternalStore(pendingSends.subscribe, pendingSends.getVersion)
+  const pendingVersion = useSyncExternalStore(pendingSends.subscribe, pendingSends.getVersion)
   const cards = agentId ? [] : pendingSends.of(id)
   const following = cards.some((card) => card.state !== "failed")
-  const poll = usePoll<TranscriptPage>(read, following ? FOLLOW_MS : POLL_MS)
+  const newestSendAt = cards.reduce((at, card) => (card.state !== "failed" && card.sentAt > at ? card.sentAt : at), 0)
+  const session = useSession(id)
+  // The fast pace ends FOLLOW_WINDOW_MS after the newest send; this draw is
+  // what moves the pace back when it does.
+  const [, setPaceClock] = useState(0)
+  useEffect(() => {
+    if (!following) return
+    // Each change of pace — the first stretch ending, then the window — is a
+    // draw of its own.
+    const timers = [FOLLOW_FAST_MS, FOLLOW_WINDOW_MS]
+      .map((end) => newestSendAt + end - Date.now())
+      .filter((left) => left > 0)
+      .map((left) => setTimeout(() => setPaceClock((n) => n + 1), left + 50))
+    return () => timers.forEach(clearTimeout)
+  }, [following, newestSendAt])
+  const agentRow = agentId ? session?.agents?.find((agent) => agent.id === agentId) : undefined
+  const agentTimed = !!agentRow && agentRow.at > 0
+  const pace = agentId ? (agentTimed ? SAFETY_MS : AGENT_POLL_MS)
+    : transcriptPace({ following, newestSendAt, now: Date.now(), rowTimed: typeof session?.activity?.at === "number" })
+  fast.current = !agentId && followingNow({ following, newestSendAt, now: Date.now() })
+  const poll = usePoll<TranscriptPage>(read, pace, agentId ? {} : { backoff: BACKOFF })
   const { data, error } = poll
+  // The row says the record grew, or the session changed what it is doing:
+  // read what was appended now, and once more a little after the last such
+  // change, because the row's time is in whole seconds.
+  const rowMoved = agentId
+    ? agentRow && agentTimed ? `${agentRow.at}:${agentRow.state}` : ""
+    : `${session?.activity?.at ?? ""}:${session?.state ?? ""}`
+  const rowSeen = useRef(rowMoved)
+  const { poke } = poll
+  useEffect(() => {
+    if (rowMoved === rowSeen.current) return
+    rowSeen.current = rowMoved
+    poke()
+    const trail = setTimeout(poke, TRAIL_MS)
+    return () => clearTimeout(trail)
+  }, [rowMoved, poke])
+  // The "my messages" sheet reads these same entries instead of its own poll.
+  useEffect(() => {
+    if (agentId || !data) return
+    sharedTranscripts.publish(id, data)
+  }, [agentId, id, data])
+  useEffect(() => () => sharedTranscripts.forget(id), [id])
   // A read nobody answered waits out its quiet stretch before it is news
   // (`transcript-trouble.ts`); until then the skeleton, or the entries already
   // read, stay as they are.
@@ -134,21 +222,94 @@ function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; 
   useLayoutEffect(() => {
     if (data && !agentId) pendingSends.reconcile(id, data.entries, Date.now())
   }, [data, id, agentId])
+  useLayoutEffect(() => {
+    if (!agentId && session?.assistant === "codex" && session.state === "waiting") {
+      pendingSends.settleModelPicker(id, session.menu?.question ?? "")
+    }
+  }, [agentId, id, pendingVersion, session?.assistant, session?.state, session?.menu?.question])
   // The cards' spinners turn on the page's one clock, drawn once now so they
   // have their size before the clock's next tick.
   useLayoutEffect(turnPendingSpinners)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
-  const session = useSession(id)
+  const [earlier, setEarlier] = useState<EarlierPages | null>(null)
+  const [olderLoading, setOlderLoading] = useState(false)
+  const [olderError, setOlderError] = useState<string | null>(null)
+  const olderBusy = useRef(false)
+  const olderAnchor = useRef<{ top: number; height: number } | null>(null)
   // The list row's spinner and live line, repeated under the conversation's
   // newest end, where the reader's eye already is. Only the session's own
   // transcript: a provider subagent's page is not what the row's state is about.
   const working = !agentId && !!session && L.workState(session).state === "working"
-  const entries = useMemo<Entry[]>(() => (data ? data.entries.map((e) => ({ ...e })) : []), [data])
+  const heavyWork = !agentId ? session?.heavy_work : null
+  const entries = useMemo<Entry[]>(() => {
+    if (!data) return []
+    if (!earlier) return data.entries.map((e) => ({ ...e }))
+    const retained = [...earlier.pages].reverse().flatMap((page) => page.entries).concat(earlier.base.entries)
+    return joinTranscript(retained, data.entries).map((e) => ({ ...e }))
+  }, [data, earlier])
   const skeleton = useWait(show === "loading")
   // `S.newestFirst` and `S.assistantIcons`, read on every draw as the original
   // reads them, and a draw of their own when either changes.
   const newestFirst = useSyncExternalStore(L.subscribeSettings, L.settingsNewestFirst)
   const icons = useSyncExternalStore(L.subscribeSettings, L.settingsAssistantIcons)
+  const olderCursor = earlier
+    ? earlier.pages.length ? earlier.pages[earlier.pages.length - 1].nextBefore : earlier.base.nextBefore
+    : data?.nextBefore
+  const loadOlder = useCallback(async () => {
+    if (!olderCursor || olderBusy.current || !data) return
+    olderBusy.current = true
+    setOlderLoading(true)
+    setOlderError(null)
+    const scroll = document.getElementById("tx-scroll")
+    try {
+      const page = agentId
+        ? await client.agentTranscript(id, agentId, LIMIT, olderCursor)
+        : await client.transcript(id, LIMIT, olderCursor)
+      if (page.evidence !== "transcript") throw new Error(page.note || "Earlier conversation could not be read")
+      if (scroll) olderAnchor.current = { top: scroll.scrollTop, height: scroll.scrollHeight }
+      setEarlier((was) => ({ base: was?.base ?? data, pages: [...(was?.pages ?? []), page] }))
+    } catch (error) {
+      setOlderError(L.failureSentence(error, nextWord("transcriptEarlierFailed")))
+    } finally {
+      olderBusy.current = false
+      setOlderLoading(false)
+    }
+  }, [agentId, data, id, olderCursor])
+  useLayoutEffect(() => {
+    const anchor = olderAnchor.current
+    if (!anchor) return
+    olderAnchor.current = null
+    const scroll = document.getElementById("tx-scroll")
+    if (scroll) scroll.scrollTop = anchor.top + (newestFirst ? 0 : scroll.scrollHeight - anchor.height)
+  }, [earlier, newestFirst])
+  useEffect(() => {
+    const scroll = document.getElementById("tx-scroll")
+    if (!scroll || !olderCursor) return
+    let touched = false
+    const gesture = () => { touched = true }
+    const approach = () => {
+      if (!touched || olderBusy.current || olderError) return
+      const distance = newestFirst
+        ? scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop
+        : scroll.scrollTop
+      if (distance < scroll.clientHeight * 0.75) {
+        touched = false
+        void loadOlder()
+      }
+    }
+    scroll.addEventListener("wheel", gesture, { passive: true })
+    scroll.addEventListener("touchstart", gesture, { passive: true })
+    scroll.addEventListener("pointerdown", gesture, { passive: true })
+    scroll.addEventListener("keydown", gesture)
+    scroll.addEventListener("scroll", approach, { passive: true })
+    return () => {
+      scroll.removeEventListener("wheel", gesture)
+      scroll.removeEventListener("touchstart", gesture)
+      scroll.removeEventListener("pointerdown", gesture)
+      scroll.removeEventListener("keydown", gesture)
+      scroll.removeEventListener("scroll", approach)
+    }
+  }, [loadOlder, newestFirst, olderCursor, olderError])
 
   // `artifactRenderQueue`: every picture this draw shows, in the order it is
   // drawn, rebuilt on every draw. The tiles are connected after the draw.
@@ -287,14 +448,23 @@ function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; 
   })
 
   const T = L.strings
+  const olderControl = olderCursor ? (
+    <div className="tx-older" key="tx-older" aria-live="polite">
+      <button type="button" className="go" disabled={olderLoading} onClick={() => void loadOlder()}>
+        {nextWord(olderLoading ? "transcriptLoadingEarlier" : olderError ? "transcriptRetryEarlier" : "transcriptLoadEarlier")}
+      </button>
+      {olderError && <span role="alert">{olderError}</span>}
+    </div>
+  ) : null
   if (skeleton) return <Skeleton />
   // Newest end: the bottom, or the top when the transcript reads newest first.
   const cardsDrawn = (newestFirst ? [...cards].reverse() : cards).map(pendingHTML)
   const live = working ? <WorkingLine key="working" line={session?.line ?? ""} /> : null
+  const heavy = heavyWork ? <HeavyWorkLine key="heavy" reason={heavyWork.reason} /> : null
   // The working line is newer than any card: the turn it stands for is the
   // one answering them.
-  const pending = newestFirst ? [live, ...cardsDrawn] : [...cardsDrawn, live]
-  if (show === "loading") return cardsDrawn.length || live ? <>{pending}</> : null
+  const pending = newestFirst ? [heavy, live, ...cardsDrawn] : [...cardsDrawn, live, heavy]
+  if (show === "loading") return cardsDrawn.length || live || heavy ? <>{pending}</> : null
   // The daemon's note is diagnostic English. It is useful evidence in the
   // disclosure below, but never the main sentence in a translated interface.
   // `no_record` is not a failure at all: the provider has not created its
@@ -331,8 +501,8 @@ function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; 
     // conversation with nothing in it.
     return (
       <>
-        {cutNote(data)}
-        <div className="tx-note">{agentId ? T.agentEmpty : T.noOutput}</div>
+        {olderControl ?? (!earlier && cutNote(data))}
+        {!olderCursor && <div className="tx-note">{agentId ? T.agentEmpty : T.noOutput}</div>}
         {pending}
       </>
     )
@@ -357,16 +527,6 @@ function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; 
       else next[key] = !open
       return next
     })
-  const blocks = blocksOf(entries.filter(worthDrawing), session?.state === "working")
-  // Slots are handed out in the order the blocks are drawn, which is the
-  // original's: it reverses the blocks before rendering them.
-  const slots = new Map<Entry, number>()
-  for (const block of newestFirst ? [...blocks].reverse() : blocks) {
-    const e = block.rows[0]
-    if (block.kind !== "entry" || !showsPictures(who, e)) continue
-    slots.set(e, queue.current.length)
-    queue.current.push(...(e.artifacts ?? []))
-  }
   const view: View = {
     who,
     expanded,
@@ -375,27 +535,12 @@ function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; 
     agents: session?.agents ?? [],
     onAgent,
     icons,
-    slots,
+    slots: new Map(),
   }
-
-  let at = 0
-  const drawn = blocks.map((block) => {
-    const start = at
-    at += block.rows.length
-    if (block.kind === "run") return runHTML(view, block.rows, block.live, start)
-    if (block.kind === "explored") return exploredRunHTML(view, block.rows, start)
-    if (block.kind === "ask") return [askHTML(view, block.rows[0], start)]
-    return [entryHTML(view, block.rows[0], start)]
-  })
-  // Reversed a block at a time, so a run of calls stays one thing in its own
-  // order whichever way round the transcript is read. Keys are counted from
-  // the oldest entry either way, so turning it over moves rows, not rebuilds them.
-  if (newestFirst) drawn.reverse()
-  // The oldest end says when there is more before it (limits N17). The Swift
-  // app's page draws nothing here and reads as if the conversation began at
-  // its first entry; this is a deliberate difference, in the copied note's
-  // class, at whichever end is the oldest.
-  const cut = cutNote(data)
+  const drawn = drawTranscriptEntries(entries, session?.state === "working", newestFirst, view, queue.current)
+  // The oldest end offers another page when the daemon names a cursor. Older
+  // daemons still show the diagnostic cut note rather than a dead control.
+  const cut = olderControl ?? (!earlier && cutNote(data))
   const jumpDrawn = <JumpToLatest key="jump" {...jump} newestFirst={newestFirst} onJump={jumpToNewest} />
   return (
     <>
@@ -409,6 +554,73 @@ function TranscriptOf({ id, agentId, onAgent }: { id: string; agentId?: string; 
       {!newestFirst && jumpDrawn}
     </>
   )
+}
+
+/** The original conversation renderer, shared by local and pinned Cloud reads. */
+function drawTranscriptEntries(entries: readonly TranscriptEntry[], working: boolean, newestFirst: boolean,
+  view: View, pictures?: NonNullable<TranscriptEntry["artifacts"]>): ReactElement[] {
+  const blocks = blocksOf(entries.map((entry) => ({ ...entry })).filter(worthDrawing), working)
+  // Both local and pinned Cloud readers resolve the same artifact slots through
+  // their respective picture source after the shared entry markup is drawn.
+  if (pictures) {
+    for (const block of newestFirst ? [...blocks].reverse() : blocks) {
+      const entry = block.rows[0]
+      if (block.kind !== "entry" || !showsPictures(view.who, entry)) continue
+      view.slots.set(entry, pictures.length)
+      pictures.push(...(entry.artifacts ?? []))
+    }
+  }
+  let at = 0
+  const drawn = blocks.map((block) => {
+    const start = at
+    at += block.rows.length
+    if (block.kind === "run") return runHTML(view, block.rows, block.live, start)
+    if (block.kind === "explored") return exploredRunHTML(view, block.rows, start)
+    if (block.kind === "ask") return [askHTML(view, block.rows[0], start)]
+    return [entryHTML(view, block.rows[0], start)]
+  })
+  if (newestFirst) drawn.reverse()
+  return drawn.flat()
+}
+
+/** Render a pinned machine's transcript with the same blocks as the local Session. */
+export function TranscriptEntries({ entries, assistant, working = false, pictureSource, sessionID }: {
+  entries: readonly TranscriptEntry[]
+  assistant?: string
+  working?: boolean
+  pictureSource?: PictureSource
+  sessionID?: string
+}) {
+  const tiles = useRef<ArtifactTiles | null>(null)
+  const box = useRef<HTMLDivElement | null>(null)
+  const latestPictureSource = useRef(pictureSource)
+  latestPictureSource.current = pictureSource
+  const queue = useRef<NonNullable<TranscriptEntry["artifacts"]>>([])
+  tiles.current ??= new ArtifactTiles((artifact, session) => latestPictureSource.current
+    ? latestPictureSource.current(artifact, session)
+    : Promise.reject(Object.assign(new Error("No image reader"), { code: "read_failed" })))
+  queue.current = []
+  useLayoutEffect(() => { tiles.current?.settle(box.current, queue.current, sessionID) })
+  useEffect(() => () => tiles.current?.release(), [])
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const newestFirst = useSyncExternalStore(L.subscribeSettings, L.settingsNewestFirst)
+  const icons = useSyncExternalStore(L.subscribeSettings, L.settingsAssistantIcons)
+  const T = L.strings
+  const toggle: Toggle = (key, defaultOpen = false) => setExpanded((was) => {
+    const open = defaultOpen ? was[key] !== false : !!was[key]
+    const next = { ...was }
+    if (!defaultOpen && open) delete next[key]
+    else next[key] = !open
+    return next
+  })
+  const view: View = {
+    who: { user: T.webWhoYou, assistant: L.assistantDisplayName(assistant), error: L.assistantDisplayName(assistant),
+      agent: T.webAgents, peer: "Claude ↔", message: "Clawdline ↔", notice: "Clawdline", tool: T.webWhoTool },
+    expanded, toggle, assistant, agents: [], onAgent: undefined, icons, slots: new Map(),
+  }
+  return <div className="tx cloud-all-transcript" ref={box}>
+    {drawTranscriptEntries(entries, working, newestFirst, view, queue.current)}
+  </div>
 }
 
 /**
@@ -468,6 +680,17 @@ function WorkingLine({ line }: { line: string }) {
     <div className="tx-working" role="status">
       <canvas className="spin"></canvas>
       <span className="line">{line || L.strings.webStateWorking}</span>
+    </div>
+  )
+}
+
+/** The callback can still be running after the provider's turn becomes idle. */
+function HeavyWorkLine({ reason }: { reason: string }) {
+  return (
+    <div className="tx-working tx-heavy" role="status">
+      <span aria-hidden="true">🏗️</span>
+      <canvas className="spin" aria-hidden="true"></canvas>
+      <span className="line">{[nextWord("sessionCallbackActive"), reason].filter(Boolean).join(" · ")}</span>
     </div>
   )
 }
@@ -626,16 +849,19 @@ function pendingHTML(card: PendingSend): ReactElement {
       esc(card.state === "accepted" ? T.webPromptAccepted : T.webSending) +
       "</span></div>"
   }
-  const at = Math.floor(card.sentAt / 1000)
-  return (
-    <div className="entry pending" data-role="user" data-send={card.state} key={"pending:" + card.token}>
-      <div className="who">
-        <span className="speaker">{T.webWhoYou}</span>
-        <time data-at={at}>{L.clock(at)}</time>
-      </div>
-      <div className="body" onClick={pendingAction} dangerouslySetInnerHTML={{ __html: body }} />
-    </div>
-  )
+  return <PendingTurnFrame state={card.state} sentAt={card.sentAt} bodyHTML={body} onClick={pendingAction}
+    key={"pending:" + card.token} />
+}
+
+/** The same user-turn frame for local pending sends and pinned Cloud receipts. */
+export function PendingTurnFrame({ state, sentAt, bodyHTML, onClick }: {
+  state: string; sentAt: number; bodyHTML: string; onClick?: (event: MouseEvent<HTMLElement>) => void
+}) {
+  const at = Math.floor(sentAt / 1000)
+  return <div className="entry pending" data-role="user" data-send={state}>
+    <div className="who"><span className="speaker">{L.strings.webWhoYou}</span><time data-at={at}>{L.clock(at)}</time></div>
+    <div className="body" onClick={onClick} dangerouslySetInnerHTML={{ __html: bodyHTML }} />
+  </div>
 }
 
 /** Why the last Enter on an unsubmitted card did not go, or may not have. */

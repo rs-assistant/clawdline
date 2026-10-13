@@ -25,7 +25,10 @@ package cloudops
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
+	"errors"
+	"github.com/sainteye/clawdline/internal/adapters/store"
 	"strings"
 )
 
@@ -59,6 +62,10 @@ type Command struct {
 	Class   Class
 	// Sender is the viewer device id the envelope was signed by.
 	Sender string
+	// VerifiedKey is the exact sender key used by the transport for both
+	// signature verification and decryption. The machine compares it with the
+	// current roster again before an effect.
+	VerifiedKey ed25519.PublicKey
 	// Sequence is the envelope's `seq`, carried into every refusal as `seq` so
 	// a browser can tie a notice to the request it wrote.
 	Sequence uint64
@@ -166,6 +173,9 @@ type Authority struct {
 	// WriteGateAllows is the machine's own switch: may a remote device cause
 	// an effect here at all. False by default, everywhere.
 	WriteGateAllows bool
+	// ReadTranscriptAllows is set only after the machine rechecks the viewer's
+	// current roster capability and signing key for the separate r/ rail.
+	ReadTranscriptAllows bool
 }
 
 // Bridge answers Cloud requests out of this machine's local routes.
@@ -179,6 +189,15 @@ type Bridge struct {
 	// listens on the channel it addressed and an answer on ours reaches
 	// nobody.
 	MachineID string
+	// Receipts is the durable machine admission store. A nil store refuses
+	// session mutations; a missing disk is never an invitation to run them.
+	Receipts *store.Store
+	// EnforceSessionReceipts is set by the running Cloud link. Older bridge
+	// fixtures can still exercise the historical vocabulary without a store.
+	EnforceSessionReceipts bool
+	// AdmitExecution is the execution feature's authoritative, fresh check.
+	// It must reject an unprovable or stale generation. Nil refuses writes.
+	AdmitExecution func(context.Context, string, string, string) error
 	// Router is this daemon's own routes. Nil answers every routed operation
 	// with `router_unavailable` rather than pretending it succeeded.
 	Router LocalRouter
@@ -189,7 +208,10 @@ type Bridge struct {
 	// return. Nil trusts the transport's own admission for the roster and the
 	// clock — which is what the Swift app's default does — and still consults
 	// AllowCommands for the write gate.
-	Authority func(ctx context.Context, sender string, requiresWriteGate bool) Authority
+	Authority func(ctx context.Context, sender string, verifiedKey ed25519.PublicKey, requiresWriteGate bool) Authority
+	// TranscriptAuthority refreshes the roster for each r/ admission and once
+	// more before sealing its answer. Nil fails closed on that rail.
+	TranscriptAuthority func(ctx context.Context, sender string, verifiedKey ed25519.PublicKey) Authority
 	// Sessions puts every Session row of this machine back on its own channel,
 	// then its inventory, and answers the ids it stated (`sessions.snapshot`).
 	// Nil answers that word `unknown_command`, which the hosted console
@@ -198,6 +220,15 @@ type Bridge struct {
 	// SessionsFor carries the authenticated sender and first-attempt bit to
 	// the publisher. Sessions remains for callers using the older bridge seam.
 	SessionsFor func(ctx context.Context, sender string, first bool) (SessionsStated, *Refusal)
+	// SessionRow puts one Session's row back on its channel now
+	// (`sessions.row`): what a page that has a Session open and waiting asks
+	// for when its question has not come, instead of a whole restatement that
+	// waits for the machine's next pass. Nil answers that word `unknown_command`.
+	SessionRow func(ctx context.Context, sender, session string) (SessionsStated, *Refusal)
+	// ViewerEvents writes the failures a hosted page reports about itself
+	// (`diagnostics.events`) to this daemon's log. Nil answers that word
+	// `unknown_command`, which the page holds its rows on and does not retry.
+	ViewerEvents *ViewerEventLog
 }
 
 // AsksForSessions reports whether this plaintext is a `sessions.snapshot`
@@ -205,7 +236,7 @@ type Bridge struct {
 // waits for a publication pass. A body too malformed to say is not one; the
 // bridge refuses it like any other.
 func AsksForSessions(plaintext []byte) bool {
-	if !bytes.Contains(plaintext, []byte(sessionsSnapshotWord)) {
+	if !bytes.Contains(plaintext, []byte(sessionsSnapshotWord)) && !bytes.Contains(plaintext, []byte(sessionsRowWord)) {
 		return false
 	}
 	parsed, err := decodeBody(plaintext)
@@ -213,12 +244,13 @@ func AsksForSessions(plaintext []byte) bool {
 		return false
 	}
 	word, _ := parsed.str("type")
-	return word == sessionsSnapshotWord || word == sessionsSnapshotInitialWord
+	return word == sessionsSnapshotWord || word == sessionsSnapshotInitialWord || word == sessionsRowWord
 }
 
 const (
 	sessionsSnapshotWord        = "sessions.snapshot"
 	sessionsSnapshotInitialWord = "sessions.snapshot.initial"
+	sessionsRowWord             = "sessions.row"
 )
 
 // IsRead reports whether this plaintext asks for an effect-free word, for a
@@ -255,7 +287,9 @@ func Vocabulary() []string { return opNames(func(o op) bool { return true }) }
 // the hosted console learns from: it stops asking this machine for that word
 // (`machineLacks` in `net/cloud-client.js`).
 func Implemented() []string {
-	return opNames(func(o op) bool { return o.route != nil || o.sessions })
+	return opNames(func(o op) bool {
+		return o.route != nil || o.sessions || o.name == "session-receipt" || o.name == viewerEventsWord
+	})
 }
 
 // Divergences names every routed word whose answer is not the one the hosted
@@ -282,7 +316,8 @@ func (b Bridge) Handle(ctx context.Context, cmd Command) (answer Answer) {
 	// Before anything about the request: is it even ours. The viewer listens
 	// on the channel it addressed, which is not one this machine publishes, so
 	// an answer of ours would be read by nobody. The notice is the reply.
-	if b.MachineID != "" && cmd.Channel != "ctl/"+ChannelSegment(b.MachineID) {
+	if b.MachineID != "" && cmd.Channel != "ctl/"+ChannelSegment(b.MachineID) &&
+		cmd.Channel != "r/"+ChannelSegment(b.MachineID) {
 		return b.notice(cmd, Refusal{Status: 409, Code: "wrong_machine",
 			Message: "This Cloud request addresses another machine.", fixedCopy: true})
 	}
@@ -290,16 +325,125 @@ func (b Bridge) Handle(ctx context.Context, cmd Command) (answer Answer) {
 		return b.refuse(cmd, parsed, "", Refusal{Status: 400, Code: "malformed_command",
 			Message: "This Cloud command is malformed.", fixedCopy: true})
 	}
+	if b.contentReadChannel(cmd) && !contentReadWord(word) {
+		return b.refuse(cmd, parsed, word, Refusal{Status: 403, Code: "read_only_channel",
+			Message: "This Cloud channel accepts only pinned Session content reads.", fixedCopy: true})
+	}
 	o, known := catalog[word]
 	if !known {
 		return b.refuse(cmd, parsed, word, Refusal{Status: 400, Code: "unknown_command",
 			Message: "This machine does not know that Cloud command.", fixedCopy: true})
 	}
 	mutating = !o.read
+	if (word == "peer-inbox" || word == "sessions.list") && !b.contentReadChannel(cmd) {
+		return b.refuse(cmd, parsed, word, Refusal{Status: 403, Code: "read_only_channel",
+			Message: "This Cloud channel accepts only pinned Session content reads.", fixedCopy: true})
+	}
+	if b.contentReadChannel(cmd) {
+		return b.serveContentRead(ctx, cmd, parsed, o)
+	}
+	if word == "session-receipt" {
+		return b.sessionReceipt(ctx, cmd, parsed)
+	}
 	if o.read {
 		return b.serveRead(ctx, cmd, parsed, o)
 	}
 	return b.serveCommand(ctx, cmd, parsed, o)
+}
+
+func (b Bridge) contentReadChannel(cmd Command) bool {
+	return b.MachineID != "" && cmd.Channel == "r/"+ChannelSegment(b.MachineID)
+}
+
+func contentReadWord(word string) bool {
+	switch word {
+	case "info", "transcript", "skills", "image", "git", "git-diff", "screen", "agent", "shell", "documents", "document", "peer-inbox", "sessions.list":
+		return true
+	default:
+		return false
+	}
+}
+
+// serveContentRead is the only machine-side entrance from the read_transcript
+// rail. The exact decoded operation, fixed execution and current viewer cap
+// must all be established before the local router sees anything.
+func (b Bridge) serveContentRead(ctx context.Context, cmd Command, parsed body, o op) Answer {
+	if cmd.Class != ClassCtl || !o.read || !contentReadWord(o.name) {
+		return b.refuse(cmd, parsed, o.name, Refusal{Status: 403, Code: "read_only_channel",
+			Message: "This Cloud channel accepts only pinned Session content reads.", fixedCopy: true})
+	}
+	if machine, ok := parsed.nonEmpty("machine_id"); !ok || machine != b.MachineID {
+		return b.refuse(cmd, parsed, o.name, Refusal{Status: 409, Code: "wrong_machine",
+			Message: "This Cloud request addresses another machine.", fixedCopy: true})
+	}
+	// The r/ body repeats the machine id for a fixed three-part destination.
+	// The existing ctl/ decoders do not accept that field and keep their wire
+	// shape unchanged; only this rail removes it after checking the channel.
+	local := make(body, len(parsed)-1)
+	for key, value := range parsed {
+		if key != "machine_id" {
+			local[key] = value
+		}
+	}
+	p, ok := o.decode(local)
+	if !ok {
+		return b.refuse(cmd, parsed, o.name, Refusal{Status: 400, Code: "malformed_read",
+			Message: "This Cloud read is malformed.", fixedCopy: true})
+	}
+	if o.name == "info" && p.parts != "full" && p.parts != "list" {
+		return b.contentReadAnswer(cmd, p, b.publish(cmd, p, Refusal{Status: 403, Code: "read_only_channel",
+			Message: "This Cloud channel accepts only pinned Session content reads.", fixedCopy: true}, nil))
+	}
+	if o.name == "peer-inbox" {
+		p.id = b.MachineID
+	}
+	if o.name == "sessions.list" {
+		p.target = MachineReplySession
+		if refusal, denied := b.authorizeTranscript(ctx, cmd.Sender, cmd.VerifiedKey); denied {
+			return b.contentReadAnswer(cmd, p, b.publish(cmd, p, refusal, nil))
+		}
+		answer := b.route(ctx, cmd, p, o)
+		// A roster revocation during the list read wins before the encrypted
+		// presentation leaves this machine, just as for pinned Session content.
+		if refusal, denied := b.authorizeTranscript(ctx, cmd.Sender, cmd.VerifiedKey); denied {
+			answer = b.publish(cmd, p, refusal, nil)
+		}
+		return b.contentReadAnswer(cmd, p, answer)
+	}
+	if p.executionGeneration == "" {
+		return b.contentReadAnswer(cmd, p, b.publish(cmd, p, Refusal{Status: 400, Code: "execution_target_required",
+			Message: "This content read needs the selected Session execution.", fixedCopy: true}, nil))
+	}
+	if refusal, denied := b.authorizeTranscript(ctx, cmd.Sender, cmd.VerifiedKey); denied {
+		return b.contentReadAnswer(cmd, p, b.publish(cmd, p, refusal, nil))
+	}
+	return b.contentReadAnswer(cmd, p, b.route(ctx, cmd, p, o))
+}
+
+// contentReadAnswer binds a t/ answer to the request that produced it. A
+// viewer may have two reads with the same `read` name in flight across a
+// restarted Session; the channel and name alone cannot distinguish them.
+// These fields are inside the machine-signed ciphertext, not relay metadata.
+func (b Bridge) contentReadAnswer(cmd Command, p plan, answer Answer) Answer {
+	if !answer.Published() {
+		return answer
+	}
+	var body map[string]any
+	if err := json.Unmarshal(answer.Payload, &body); err != nil || body == nil {
+		return Answer{Status: 502, Code: "read_failed", Subject: p.target}
+	}
+	body["machine_id"] = b.MachineID
+	body["session_id"] = p.target
+	body["seq"] = cmd.Sequence
+	if p.executionGeneration != "" {
+		body["expected_generation"] = p.executionGeneration
+	}
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return Answer{Status: 502, Code: "read_failed", Subject: p.target}
+	}
+	answer.Payload = encoded
+	return answer
 }
 
 // serveRead answers one of the effect-free words.
@@ -349,6 +493,18 @@ func (b Bridge) stateSessions(ctx context.Context, cmd Command, parsed body, p p
 			Message: "This machine does not know that Cloud command.", fixedCopy: true}, nil)
 	}
 	word, _ := parsed.str("type")
+	if word == sessionsRowWord {
+		row, _ := parsed.str("row")
+		if b.SessionRow == nil {
+			return b.publish(cmd, p, Refusal{Status: 400, Code: "unknown_command",
+				Message: "This machine does not know that Cloud command.", fixedCopy: true}, nil)
+		}
+		stated, refusal := b.SessionRow(ctx, cmd.Sender, row)
+		if refusal != nil {
+			return b.publish(cmd, p, *refusal, nil)
+		}
+		return b.statedAnswer(cmd, p, stated)
+	}
 	first := word == sessionsSnapshotInitialWord
 	if word == sessionsSnapshotWord {
 		first = true // An older viewer sends no attempt bit.
@@ -366,6 +522,11 @@ func (b Bridge) stateSessions(ctx context.Context, cmd Command, parsed body, p p
 	if refusal != nil {
 		return b.publish(cmd, p, *refusal, nil)
 	}
+	return b.statedAnswer(cmd, p, stated)
+}
+
+// statedAnswer is `{"sessions":[ids],"complete":bool}`, after the rows went out.
+func (b Bridge) statedAnswer(cmd Command, p plan, stated SessionsStated) Answer {
 	ids := stated.IDs
 	if ids == nil {
 		ids = []string{}
@@ -396,15 +557,35 @@ func (b Bridge) serveCommand(ctx context.Context, cmd Command, parsed body, o op
 		return b.refuse(cmd, parsed, o.name, Refusal{Status: 400, Code: "malformed_command",
 			Message: "This Cloud command is malformed.", fixedCopy: true})
 	}
-	plan, ok := o.decode(parsed)
+	decode := parsed
+	var generation string
+	if b.EnforceSessionReceipts && sessionMutation(o.name) {
+		var valid bool
+		generation, valid = executionGeneration(parsed["execution_generation"])
+		if !valid {
+			return b.refuse(cmd, parsed, o.name, Refusal{Status: 400, Code: "execution_generation_required",
+				Message: "This action needs the session's current execution generation."})
+		}
+		decode = make(body, len(parsed)-1)
+		for k, v := range parsed {
+			if k != "execution_generation" {
+				decode[k] = v
+			}
+		}
+	}
+	plan, ok := o.decode(decode)
 	if !ok {
 		return b.refuse(cmd, parsed, o.name, Refusal{Status: 400, Code: "malformed_command",
 			Message: "This Cloud command is malformed.", fixedCopy: true})
 	}
+	if b.EnforceSessionReceipts && sessionMutation(o.name) && plan.request == "" {
+		return b.refuse(cmd, parsed, o.name, Refusal{Status: 400, Code: "idempotency_key_required",
+			Message: "This action needs an Idempotency-Key."})
+	}
 	// Admission may have waited. Re-read every revocable authority here, at
 	// the point of no return, instead of reusing what was true when this
 	// arrived.
-	if refusal, denied := b.authorize(ctx, cmd.Sender, !o.readLevel); denied {
+	if refusal, denied := b.authorize(ctx, cmd.Sender, cmd.VerifiedKey, !o.readLevel); denied {
 		return b.publish(cmd, plan, refusal, nil)
 	}
 	if o.refusal != nil {
@@ -415,9 +596,15 @@ func (b Bridge) serveCommand(ctx context.Context, cmd Command, parsed body, o op
 			return b.publish(cmd, plan, *refusal, nil)
 		}
 	}
+	if o.name == viewerEventsWord {
+		return b.viewerEvents(cmd, plan)
+	}
 	if o.route == nil {
 		return b.publish(cmd, plan, Refusal{Status: 400, Code: "unknown_command",
 			Message: "This machine does not know that Cloud command.", fixedCopy: true}, nil)
+	}
+	if b.EnforceSessionReceipts && sessionMutation(o.name) {
+		return b.sessionCommand(ctx, cmd, parsed, plan, o, generation)
 	}
 	return b.route(ctx, cmd, plan, o)
 }
@@ -433,6 +620,10 @@ func (b Bridge) route(ctx context.Context, cmd Command, plan plan, o op) Answer 
 	if req.Header == nil {
 		req.Header = map[string]string{}
 	}
+	if plan.executionGeneration != "" {
+		req.Header["X-Clawdline-Target-Machine"] = b.MachineID
+		req.Header["X-Clawdline-Execution-Generation"] = plan.executionGeneration
+	}
 	// A retried request is not a second effect. The viewer's own request id is
 	// the key when it named one, because that is the identity it will retry
 	// under; without one, the envelope's sender and sequence are, which are
@@ -444,6 +635,29 @@ func (b Bridge) route(ctx context.Context, cmd Command, plan plan, o op) Answer 
 	if err != nil {
 		return b.publish(cmd, plan, Refusal{Status: 502, Code: "route_failed",
 			Message: "This machine could not answer that.", fixedCopy: true, Layer: layerRoute}, nil)
+	}
+	if plan.executionGeneration != "" && o.read {
+		// The local route checked the target before reading. Recheck after the
+		// read as well: a terminal can restart under the same ID while Git,
+		// screen, agent, or document content is being collected.
+		if b.AdmitExecution == nil {
+			return b.publish(cmd, plan, executionRefusal(errors.New("execution_check_unavailable")), nil)
+		}
+		if err := b.AdmitExecution(ctx, b.MachineID, plan.target, plan.executionGeneration); err != nil {
+			return b.publish(cmd, plan, executionRefusal(err), nil)
+		}
+		// A revocation while the local route was reading content must win
+		// before that content is sealed for the viewer.
+		var refusal Refusal
+		var denied bool
+		if b.contentReadChannel(cmd) {
+			refusal, denied = b.authorizeTranscript(ctx, cmd.Sender, cmd.VerifiedKey)
+		} else {
+			refusal, denied = b.authorize(ctx, cmd.Sender, cmd.VerifiedKey, false)
+		}
+		if denied {
+			return b.publish(cmd, plan, refusal, nil)
+		}
 	}
 	return b.answer(cmd, plan, o, res)
 }
@@ -461,12 +675,32 @@ func (b Bridge) allowCommands() bool {
 // clock, then whether the roster could be read at all, then whether it holds
 // this sender, then the switch. Each is a different sentence because each
 // sends the person somewhere different.
-func (b Bridge) authorize(ctx context.Context, sender string, requiresWriteGate bool) (Refusal, bool) {
+func (b Bridge) authorize(ctx context.Context, sender string, verifiedKey ed25519.PublicKey, requiresWriteGate bool) (Refusal, bool) {
 	a := Authority{ClockReady: true, RosterReadable: true, RosterAllowsSender: true,
 		WriteGateAllows: !requiresWriteGate || b.allowCommands()}
 	if b.Authority != nil {
-		a = b.Authority(ctx, sender, requiresWriteGate)
+		a = b.Authority(ctx, sender, verifiedKey, requiresWriteGate)
 	}
+	return authorityRefusal(a)
+}
+
+func (b Bridge) authorizeTranscript(ctx context.Context, sender string, verifiedKey ed25519.PublicKey) (Refusal, bool) {
+	if b.TranscriptAuthority == nil {
+		return Refusal{Status: 503, Code: "read_transcript_unavailable",
+			Message: "This machine cannot check transcript permissions now.", fixedCopy: true}, true
+	}
+	a := b.TranscriptAuthority(ctx, sender, verifiedKey)
+	if refusal, denied := authorityRefusal(a); denied {
+		return refusal, true
+	}
+	if !a.ReadTranscriptAllows {
+		return Refusal{Status: 403, Code: "read_transcript_required",
+			Message: "This device cannot read Session content.", fixedCopy: true}, true
+	}
+	return Refusal{}, false
+}
+
+func authorityRefusal(a Authority) (Refusal, bool) {
 	switch {
 	case !a.ClockReady:
 		detail := map[string]any{}

@@ -12,6 +12,136 @@ import type { NextWord, nextWord } from "../next-strings.js"
 /** No more often than this does an open console ask again while nothing is happening. */
 export const UPDATE_READ_EVERY_MS = 10 * 60 * 1000
 
+/** Browser lifecycle and time supplied to the shared update reading. */
+export interface UpdateReadEnvironment {
+  now(): number
+  visible(): boolean
+  onVisibilityChange(listener: () => void): () => void
+  onFocus(listener: () => void): () => void
+  /** A restored page may skip visibilitychange and focus (back-forward cache). */
+  onPageShow?(listener: () => void): () => void
+  /** Optional for adapters that cannot report a window leaving focus. */
+  onBlur?(listener: () => void): () => void
+  onOnline(listener: () => void): () => void
+  setInterval(listener: () => void, ms: number): ReturnType<typeof setInterval>
+  clearInterval(timer: ReturnType<typeof setInterval>): void
+}
+
+/** One reading for all mounted update views, including their resume checks. */
+export function createUpdateReadStore(read: (fresh: boolean) => Promise<UpdateRead>, env: UpdateReadEnvironment) {
+  let reading: UpdateRead | null = null
+  let readAt: number | null = null
+  let inFlight: Promise<UpdateRead> | null = null
+  let generation = 0
+  let timer: ReturnType<typeof setInterval> | null = null
+  let wasVisible = env.visible()
+  let lostFocus = false
+  const listeners = new Set<() => void>()
+  let unlisten: Array<() => void> = []
+
+  const publish = (next: UpdateRead) => {
+    reading = next
+    readAt = env.now()
+    for (const listener of listeners) listener()
+  }
+
+  const readNow = (fresh = false): Promise<UpdateRead> => {
+    if (inFlight) return inFlight
+    const requested = generation
+    inFlight = read(fresh).then((next) => {
+      if (requested === generation) publish(next)
+      return next
+    }).finally(() => { if (requested === generation) inFlight = null })
+    return inFlight
+  }
+
+  const recheck = () => {
+    // A request started before the page slept cannot prove the current
+    // version. It may finish after this one, so ignore its late answer.
+    generation++
+    lostFocus = false
+    inFlight = null
+    publish({ kind: "checking" })
+    void readNow(true)
+  }
+
+  // The Settings panel also has a timer while an update moves. A browser
+  // backgrounding that panel must not keep polling through this entry point.
+  const refresh = (): Promise<UpdateRead | null> => env.visible() ? readNow() : Promise.resolve(reading)
+
+  const stale = () => readAt === null || env.now() < readAt || env.now() - readAt >= UPDATE_READ_EVERY_MS
+  const refreshIfStale = () => {
+    if (env.visible() && stale()) void readNow(true)
+  }
+  const stopTimer = () => {
+    if (timer !== null) env.clearInterval(timer)
+    timer = null
+  }
+  const visibilityChanged = () => {
+    if (!env.visible()) {
+      wasVisible = false
+      lostFocus = false
+      generation++
+      inFlight = null
+      stopTimer()
+      return
+    }
+    const resumed = !wasVisible
+    wasVisible = true
+    lostFocus = false
+    if (timer === null) timer = env.setInterval(refreshIfStale, UPDATE_READ_EVERY_MS)
+    if (resumed) recheck()
+    else refreshIfStale()
+  }
+  const focused = () => {
+    if (!env.visible()) return
+    // Some browsers send focus before visibilitychange on the same return.
+    // Recording the visible transition here makes its later event harmless.
+    if (!wasVisible) { visibilityChanged(); return }
+    if (lostFocus) {
+      lostFocus = false
+      recheck()
+    } else refreshIfStale()
+  }
+  const online = () => {
+    if (!env.visible()) return
+    // A failed read may be recent; the online transition is new evidence that
+    // the next attempt can answer. Focus and visibility still obey freshness.
+    if (reading?.kind === "unreachable" || reading?.kind === "refused") void readNow()
+    else refreshIfStale()
+  }
+
+  const subscribe = (listener: () => void): (() => void) => {
+    listeners.add(listener)
+    if (listeners.size === 1) {
+      wasVisible = env.visible()
+      lostFocus = false
+      unlisten = [
+        env.onVisibilityChange(visibilityChanged),
+        env.onFocus(focused),
+        ...(env.onPageShow ? [env.onPageShow(() => {
+          if (!env.visible()) return
+          if (!wasVisible) visibilityChanged()
+          else if (reading?.kind !== "checking") recheck()
+        })] : []),
+        ...(env.onBlur ? [env.onBlur(() => { if (env.visible()) lostFocus = true })] : []),
+        env.onOnline(online),
+      ]
+      visibilityChanged()
+    }
+    return () => {
+      listeners.delete(listener)
+      if (listeners.size === 0) {
+        stopTimer()
+        for (const remove of unlisten) remove()
+        unlisten = []
+      }
+    }
+  }
+
+  return { refresh, publish, subscribe, current: () => reading }
+}
+
 /**
  * While an update is under way, or the daemon is restarting into one, the
  * panel asks this often: the steps take seconds to minutes, and the restart's
@@ -37,6 +167,7 @@ const OLDER_CODES = new Set(["not_implemented", "not_found", "unknown_command"])
  */
 export type UpdateRead =
   | { kind: "status"; status: UpdateStatus }
+  | { kind: "checking" }
   | { kind: "older" }
   | { kind: "unreachable" }
   | { kind: "refused" }
@@ -294,7 +425,7 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
     restarting: false,
   }
   const read = input.read
-  const status = read?.kind === "status" ? read.status : input.last
+  const status = read?.kind === "status" ? read.status : read?.kind === "checking" ? null : input.last
   const silent = read?.kind === "unreachable"
   // The restart: the page was following an update, or the last status said one
   // was moving, and now nothing answers. That is the update, not a failure.
@@ -446,13 +577,16 @@ export const UPDATE_BANNER_DISMISSED_KEY = "clawdline.update-banner.dismissed"
 
 /**
  * The version the session list's banner announces, or null. Only a release
- * install with a newer release and no update already moving, and only until
- * that version has been dismissed in this browser.
+ * install with a newer release and no update already moving or rolled back,
+ * and only until that version has been dismissed in this browser.
  */
 export function updateBannerVersion(status: UpdateStatus | null, dismissed: string | null): string | null {
   if (!status || status.install_kind !== "release" || status.state !== "update_available") return null
   if (applyMoving(status)) return null
   const version = buildName(status.latest)
   if (!version || version === dismissed) return null
+  // A rollback leaves the failed release in the manifest. The Settings panel
+  // offers an explicit retry; the session list must not keep advertising it.
+  if (status.apply?.state === "rolled_back" && status.apply.to === version) return null
   return version
 }

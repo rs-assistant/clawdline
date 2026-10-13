@@ -4,24 +4,40 @@ After this page you can make a directory appear as a project to start sessions i
 worktrees and undelivered work, and give a second machine the same project names, icons and
 untracked skills as the first.
 
-The console's interface is in Traditional Chinese, the only language it ships so far. Labels below
-are given as they appear, with their meaning in parentheses.
+Labels below use Traditional Chinese examples with their English meaning; the console supports other interface languages.
 
 ## Add a project
 
-A project is a directory an assistant has run in. Clawdline finds them by itself from Claude Code's
-and Codex's own records and from live sessions. To add a directory before any agent has run there:
+A project is an existing directory on a machine. Clawdline finds directories from Claude Code's
+and Codex's own records and from live sessions. If a directory is missing from **專案** (Projects),
+run this on the machine that holds it, from inside that directory:
 
 ```sh
-./bin/clawdline project add ~/code/my-app ~/code/another-app
-./bin/clawdline project list
-./bin/clawdline project remove ~/code/another-app
+clawdline project add
+clawdline project list
 ```
 
-These write the state directory directly and work without the daemon. There is no button for this
-in the console.
+The first command asks the running daemon to add the directory to its durable Project list; the
+second reads the explicit registrations from that same daemon. Run `./bin/clawdline`
+instead if you built Clawdline from source and did not install its CLI. The directory must already
+exist. `clawdline project add .`, `clawdline project add ../my-app`, and an absolute path also work.
+In the console, press **+ Add Project** on the Projects page or in the new Session
+sheet, browse folders on the selected machine, then add the current folder.
+You can enter an absolute path on that machine when a folder is not listed.
+The new Session sheet also has **Edit projects** to remove entries from its list.
 
-**Check:** the directory is offered when you start a session ([sessions.md](sessions.md)).
+**Check:** refresh **Projects** on the same machine in the local console, or select that machine in
+the paired Cloud console and refresh **Projects** there. The directory is also offered when you
+start a session ([sessions.md](sessions.md)); an already open start sheet refreshes automatically.
+`project list` shows manual registrations on the selected machine. Projects found from assistant history or live Sessions may appear in
+the console without it.
+
+To remove the Project from both **Projects** and the session start list, use its row's
+**Remove from list** action, use **Edit projects** in the new Session sheet, or run
+`clawdline project remove /absolute/path/to/my-app`.
+The directory, sessions and project settings remain on the machine. Assistant history and live Sessions cannot
+restore a removed Project. **Projects** refreshes when removal succeeds, and an open
+session start sheet refreshes automatically; `clawdline project add` from its directory restores it.
 
 ## The Projects page
 
@@ -78,6 +94,10 @@ commands and agents you keep untracked under `.claude/`, and `CLAUDE.local.md`. 
 those settings; the others mirror them read-only. Projects are matched by their git `origin`, so
 the checkouts may sit at different paths.
 
+A machine that has none of this yet — no git, no credentials, no checkouts — can be set up by
+an Agent instead of by hand: [Set up another machine with an Agent](new-machine.md) is the prompt
+for it.
+
 ### Before you start
 
 - Both machines run this version. An older one is listed with **需要更新 Clawdline** (needs a newer
@@ -118,8 +138,7 @@ already mirrors here.
 ### Check
 
 On the receiving machine, **專案** shows each project with the source's name and icon, and a
-mirrored skill is in that checkout's `.claude/skills/`. Changing the icon there is refused
-(`project_mirrored`): the source owns it.
+mirrored skill is in that checkout's `.claude/skills/`. The source owns its icon.
 
 ### What is never copied
 
@@ -130,8 +149,9 @@ and build caches inside those directories, and your personal `~/.claude/skills`.
 
 | You see | Do this |
 | --- | --- |
+| `project add` cannot connect or authenticate | Start or update the daemon on the machine that holds the directory. Run `clawdline doctor` to check the CLI's port and state directory against that daemon, then retry. The command leaves the Project list unchanged when it cannot reach the daemon. |
+| `project add` succeeded, but the Project is absent from Cloud | Select the machine that holds the directory; the open start sheet refreshes automatically, while **Projects** refreshes when reopened. If it is still absent, report a product defect with the command response and selected machine; success means the serving daemon accepted the registration. |
 | `mirror_source_mismatch` | Another machine already owns that project's settings here. Choose that one as the source, or import with `--replace-source` |
-| `project_mirrored` | Change it on the source, or press **改回本機設定** first |
 | `clone_failed` | The receiving machine could not reach the remote with its own credentials. Clone it by hand into the named directory, then sync again |
 
 ## Deeper

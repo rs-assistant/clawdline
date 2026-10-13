@@ -4,6 +4,7 @@ import type { UpdateApply, UpdateState, UpdateStatus } from "@clawdline/contract
 import {
   asksForUpdatePanel,
   classifyApplyAnswer,
+  createUpdateReadStore,
   detailsText,
   INSTALL_COMMAND,
   classifyUpdateRead,
@@ -16,6 +17,8 @@ import {
   UPDATE_FOLLOW_EVERY_MS,
   UPDATE_READ_EVERY_MS,
   type UpdatePanelInput,
+  type UpdateRead,
+  type UpdateReadEnvironment,
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 } from "./update-model.ts"
 // @ts-expect-error -- a `.ts` path for node's type-stripping test runner.
@@ -90,6 +93,141 @@ function input(over: Partial<UpdatePanelInput> = {}): UpdatePanelInput {
 const iso = (s: string) => "at " + s
 const panel = (over: Partial<UpdatePanelInput>) => updatePanel(input(over), nextWord, iso)
 const answered = (s: UpdateStatus) => ({ kind: "status" as const, status: s })
+
+function updateStoreHarness() {
+  type Event = "visibility" | "focus" | "blur" | "online"
+  const events = new Map<Event, () => void>()
+  const pending: Array<(read: UpdateRead) => void> = []
+  let now = 1_000
+  let visible = true
+  let tick: (() => void) | null = null
+  let requests = 0
+  const listen = (event: Event, listener: () => void) => {
+    events.set(event, listener)
+    return () => { events.delete(event) }
+  }
+  const env: UpdateReadEnvironment = {
+    now: () => now,
+    visible: () => visible,
+    onVisibilityChange: (listener) => listen("visibility", listener),
+    onFocus: (listener) => listen("focus", listener),
+    onBlur: (listener) => listen("blur", listener),
+    onOnline: (listener) => listen("online", listener),
+    setInterval: (listener, ms) => {
+      assert.equal(ms, UPDATE_READ_EVERY_MS)
+      tick = listener
+      return 1 as unknown as ReturnType<typeof setInterval>
+    },
+    clearInterval: () => { tick = null },
+  }
+  const store = createUpdateReadStore(() => {
+    requests++
+    return new Promise<UpdateRead>((resolve) => { pending.push(resolve) })
+  }, env)
+  return {
+    store,
+    requests: () => requests,
+    setVisible: (next: boolean) => { visible = next },
+    advance: (ms: number) => { now += ms },
+    emit: (event: Event) => { events.get(event)?.() },
+    tick: () => { tick?.() },
+    settle: async (read: UpdateRead) => {
+      const resolve = pending.shift()
+      assert.ok(resolve, "a read must be on the wire")
+      resolve(read)
+      await Promise.resolve()
+      await Promise.resolve()
+    },
+  }
+}
+
+test("a short background return replaces an available update with its withdrawn or completed status", async () => {
+  for (const current of [release("current"), release("current", { state: "healthy", from: "v0.10.0", to: "v0.11.0" })]) {
+    const h = updateStoreHarness()
+    const unsubscribe = h.store.subscribe(() => {})
+    assert.equal(h.requests(), 1)
+    const available = release("update_available")
+    await h.settle(answered(available))
+    const before = h.store.current()
+    assert.equal(updateBannerVersion(before?.kind === "status" ? before.status : null, null), "v0.11.0")
+
+    h.setVisible(false)
+    h.emit("visibility")
+    h.advance(1_000)
+    h.setVisible(true)
+    h.emit("visibility")
+    assert.equal(h.requests(), 2, "returning before ten minutes still reads")
+    await h.settle(answered(current))
+    const read = h.store.current()
+    assert.equal(read?.kind, "status")
+    assert.equal(updateBannerVersion(read?.kind === "status" ? read.status : null, null), null)
+    const view = panel({ read, last: available })
+    assert.equal(view.press.shown, false, "the panel drops the old update action")
+    assert.ok(view.stateLine, "the panel reflects the current release")
+    unsubscribe()
+  }
+})
+
+test("visibility and focus events for one return share the in-flight read in either order", async () => {
+  for (const order of ["visibility-first", "focus-first"] as const) {
+    const h = updateStoreHarness()
+    const unsubscribe = h.store.subscribe(() => {})
+    await h.settle(answered(release("update_available")))
+    h.emit("blur")
+    h.setVisible(false)
+    h.emit("visibility")
+    h.setVisible(true)
+    if (order === "visibility-first") {
+      h.emit("visibility")
+      h.emit("focus")
+    } else {
+      h.emit("focus")
+      h.emit("visibility")
+    }
+    assert.equal(h.requests(), 2, order)
+    await h.settle(answered(release("current")))
+    h.emit("focus")
+    h.emit("focus")
+    assert.equal(h.requests(), 2, "repeated focus did not create another read")
+    unsubscribe()
+  }
+})
+
+test("a visible window rereads on blur and focus, while ordinary focus obeys freshness", async () => {
+  const h = updateStoreHarness()
+  const unsubscribe = h.store.subscribe(() => {})
+  await h.settle(answered(release("update_available")))
+  h.emit("focus")
+  assert.equal(h.requests(), 1)
+  h.emit("blur")
+  h.emit("focus")
+  assert.equal(h.requests(), 2)
+  h.emit("focus")
+  assert.equal(h.requests(), 2, "the in-flight request and repeated focus are coalesced")
+  await h.settle(answered(release("current")))
+  h.emit("focus")
+  assert.equal(h.requests(), 2)
+  h.advance(UPDATE_READ_EVERY_MS)
+  h.tick()
+  assert.equal(h.requests(), 3, "the visible ten-minute poll remains")
+  unsubscribe()
+})
+
+test("a return supersedes a read started before the page slept", async () => {
+  const h = updateStoreHarness()
+  const unsubscribe = h.store.subscribe(() => {})
+  h.setVisible(false)
+  h.emit("visibility")
+  h.setVisible(true)
+  h.emit("visibility")
+  h.emit("focus")
+  assert.equal(h.requests(), 2)
+  await h.settle(answered(release("update_available")))
+  assert.equal(h.store.current()?.kind, "checking")
+  await h.settle(answered(release("current")))
+  assert.equal(h.store.current()?.kind, "status")
+  unsubscribe()
+})
 
 test("a release install shows its version, the latest, the notes, the check and the channel", () => {
   const view = panel({ read: answered(release("update_available")) })
@@ -348,4 +486,24 @@ test("the banner names a newer release until that version is dismissed", () => {
   assert.equal(updateBannerVersion(release("update_available", { state: "downloading" }), null), null)
   assert.equal(updateBannerVersion(release("update_available", undefined, { install_kind: "source_deploy" }), null), null)
   assert.equal(updateBannerVersion(null, null), null)
+})
+
+test("a resumed phone does not offer an old release while checking", () => {
+  const view = panel({ read: { kind: "checking" }, last: release("update_available") })
+  assert.equal(view.press.shown, false)
+  assert.equal(view.stateLine, null)
+  assert.equal(view.kind, "nothing")
+})
+
+test("a rolled-back release stops nagging in the session list while a newer one can appear", () => {
+  const rolledBack = release("update_available", { state: "rolled_back", from: "v0.10.0", to: "v0.11.0" })
+  assert.equal(updateBannerVersion(rolledBack, null), null)
+  const retry = panel({ read: answered(rolledBack) })
+  assert.equal(retry.press.shown, true)
+  assert.equal(retry.press.label, nextWord("updateRetry"))
+
+  const newer = release("update_available", { state: "rolled_back", from: "v0.10.0", to: "v0.11.0" }, {
+    latest: { stamp: "5c8d4e9f0a1b2c3d4e5f", version: "v0.12.0" },
+  })
+  assert.equal(updateBannerVersion(newer, null), "v0.12.0")
 })

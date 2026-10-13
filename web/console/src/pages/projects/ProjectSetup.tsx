@@ -18,7 +18,7 @@ import {
   projectSetupProgress,
   type SetupTone,
 } from "./project-setup.js"
-import "./icon-copy.css"
+import "./project-setup.css"
 
 const toneWords: Record<SetupTone, string> = localizedLiteralMap({
   ready: "83799bb51f05",

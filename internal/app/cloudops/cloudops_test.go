@@ -78,7 +78,8 @@ func (r *router) last() LocalRequest {
 // open is a bridge with the write switch on, which is not the default anywhere
 // else in this package: every test that wants an effect has to say so.
 func open(r LocalRouter) Bridge {
-	return Bridge{MachineID: "mac-01", Router: r, AllowCommands: func() bool { return true }}
+	return Bridge{MachineID: "mac-01", Router: r, AllowCommands: func() bool { return true },
+		AdmitExecution: func(context.Context, string, string, string) error { return nil }}
 }
 
 func request(t *testing.T, class Class, object map[string]any) Command {
@@ -177,6 +178,7 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		body:    map[string]any{"type": "image", "session": pane, "id": "img_7f3a"},
 		session: pane, name: "image.img_7f3a",
 		method: "GET", path: "/v1/artifacts/images/img_7f3a",
+		query:   map[string]string{"session": pane},
 		answers: &router{body: "\x89PNG", media: "image/png"},
 	}, {
 		word:    "documents",
@@ -204,10 +206,44 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: machine, name: "read:req-pair-status",
 		method: "GET", path: "/v1/cloud/pairing/agent/" + taskID,
 	}, {
+		word: "peer-control",
+		body: map[string]any{"type": "peer-control", "session": machine, "request": "req-peer-control",
+			"control": map[string]any{"action": "status"}},
+		session: machine, name: "action:req-peer-control",
+		method: "POST", path: "/v1/cloud/peer/control",
+	}, {
+		word: "peer-send",
+		body: map[string]any{"type": "peer-send", "session": machine, "request": "req-peer-send",
+			"header": map[string]any{"request_id": "req-peer-send", "kind": "message",
+				"source": map[string]any{"machine_id": "mac-01", "session_id": "source",
+					"execution_generation": "11111111111111111111111111111111"},
+				"target": map[string]any{"machine_id": "mac-02", "session_id": "target",
+					"execution_generation": "22222222222222222222222222222222"},
+				"grant_id": "grant-1", "body_digest": strings.Repeat("0", 64)},
+			"body": "fixture"},
+		session: machine, name: "action:req-peer-send",
+		method: "POST", path: "/v1/cloud/peer/send",
+	}, {
+		word: "peer-outbox",
+		body: map[string]any{"type": "peer-outbox", "session": machine, "request": "req-peer-outbox",
+			"target_request": "req-peer-send"},
+		session: machine, name: "read:req-peer-outbox",
+		method: "GET", path: "/v1/cloud/peer/outbox/req-peer-send",
+	}, {
+		word: "peer-inbox",
+		body: map[string]any{"type": "peer-inbox", "session": pane, "request": "req-peer-inbox",
+			"machine_id": "mac-01", "expected_generation": "22222222222222222222222222222222"},
+		session: pane, name: "read:req-peer-inbox", code: "read_only_channel", status: 403,
+	}, {
 		word:    "places",
 		body:    map[string]any{"type": "places", "session": machine, "request": "req-places"},
 		session: machine, name: "read:req-places",
 		method: "GET", path: "/v1/places",
+	}, {
+		word:    "project-hide",
+		body:    map[string]any{"type": "project-hide", "session": machine, "request": "req-hide", "path": "/projects/example"},
+		session: machine, name: "action:req-hide",
+		method: "DELETE", path: "/v1/places", body2: `{"paths":["/projects/example"]}`,
 	}, {
 		word:    "squad.catalog",
 		body:    map[string]any{"type": "squad.catalog", "session": machine, "request": "req-squad-catalog"},
@@ -243,6 +279,12 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 			"request": "req-squad-catalog-write", "changes": map[string]any{"expected_version": 0}},
 		session: machine, name: "action:req-squad-catalog-write",
 		method: "POST", path: "/v1/squad/catalog", body2: `{"expected_version":0}`,
+	}, {
+		word: "squad.role-draft",
+		body: map[string]any{"type": "squad.role-draft", "session": machine,
+			"request": "req-squad-role-draft", "changes": map[string]any{"description": "Review release notes"}},
+		session: machine, name: "action:req-squad-role-draft",
+		method: "POST", path: "/v1/squad/role-draft", body2: `{"description":"Review release notes"}`,
 	}, {
 		word: "squad.settings.update",
 		body: map[string]any{"type": "squad.settings.update", "session": machine,
@@ -641,9 +683,10 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		body2: `{"data_url":"data:image/png;base64,cG5n","expected_version":1,"title":"screen.png"}`,
 	}, {
 		word: "work.v2.todo-action",
-		body: map[string]any{"type": "work.v2.todo-action", "session": machine, "request": "req-work-v2-todo-action",
-			"terminal": pane, "id": "td1", "action": "send", "item": map[string]any{}},
-		session: machine, name: "action:req-work-v2-todo-action", method: "POST", path: "/v1/work/v2/session-todos/%2519/td1/send", body2: `{}`,
+		body: map[string]any{"type": "work.v2.todo-action", "session": machine, "request": "req-work-v2-todo-edit",
+			"terminal": pane, "id": "td1", "action": "edit", "item": map[string]any{"text": "Revised", "expected_version": 2}},
+		session: machine, name: "action:req-work-v2-todo-edit", method: "POST", path: "/v1/work/v2/session-todos/%2519/td1/edit",
+		body2: `{"expected_version":2,"text":"Revised"}`,
 	}, {
 		word: "work.v2.human-intervention-action",
 		body: map[string]any{"type": "work.v2.human-intervention-action", "session": machine,
@@ -653,9 +696,13 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		path:  "/v1/work/v2/human-interventions/conversation%3A10000000-0000-4000-8000-000000000002/10000000-0000-4000-8000-000000000003/read",
 		body2: `{"expected_version":1}`,
 	}, {
-		word:    "project-icon-copy",
-		body:    map[string]any{"type": "project-icon-copy", "session": machine, "request": "req-icon", "id": "p1", "item": map[string]any{}},
-		session: machine, name: "action:req-icon", method: "PUT", path: "/v1/projects/p1/icon", body2: `{}`,
+		word:    "project-folders",
+		body:    map[string]any{"type": "project-folders", "session": machine, "request": "req-folders", "path": "/projects"},
+		session: machine, name: "read:req-folders", method: "GET", path: "/v1/project-folders", query: map[string]string{"path": "/projects"},
+	}, {
+		word:    "project-add",
+		body:    map[string]any{"type": "project-add", "session": machine, "request": "req-add", "path": "/projects/example"},
+		session: machine, name: "action:req-add", method: "POST", path: "/v1/places", body2: `{"paths":["/projects/example"]}`,
 	}, {
 		word:    "project-manifest",
 		body:    map[string]any{"type": "project-manifest", "session": machine, "request": "req-manifest"},
@@ -784,6 +831,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		body:    map[string]any{"type": "update", "session": machine, "request": "req-update"},
 		session: machine, name: "read:req-update",
 		method: "GET", path: "/v1/update",
+	}, {
+		word:    "update-fresh",
+		body:    map[string]any{"type": "update-fresh", "session": machine, "request": "req-update-fresh"},
+		session: machine, name: "read:req-update-fresh",
+		method: "GET", path: "/v1/update/fresh",
 	}, {
 		// The Settings page's 「立即更新」: a machine command with no parameter.
 		word:    "update-apply",
@@ -1032,13 +1084,18 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: pane, name: "shell:b0aau3e6s", method: "GET",
 		path: "/v1/sessions/%2519/shells/b0aau3e6s", query: map[string]string{"bytes": "65536"},
 	}, {
-		// The words this daemon knows and cannot answer. `unknown_command` is
-		// not a guess at a code: it is the one the hosted console learns from
-		// (`machineLacks` in net/cloud-client.js), so a machine that says it stops
-		// being asked.
+		word: "session-receipt",
+		body: map[string]any{"type": "session-receipt", "session": pane, "request": "lookup-1",
+			"target_request": "press-1", "execution_generation": testExecution, "action": "send"},
+		session: pane, name: "read:lookup-1", code: "receipt_unavailable", status: 503,
+	}, {
 		word:    "skills",
 		body:    map[string]any{"type": "skills", "session": pane},
-		session: pane, name: "skills", code: "unknown_command", status: 400,
+		session: pane, name: "skills", method: "GET", path: "/v1/sessions/" + segment(pane) + "/skills",
+	}, {
+		word:    "sessions.list",
+		body:    map[string]any{"type": "sessions.list", "session": machine, "request": "req-list"},
+		session: machine, name: "read:req-list", code: "read_only_channel", status: 403,
 	}, {
 		// Answered by the Session publisher, not by a route; a bridge with no
 		// publisher behind it says it does not know the word, which is what
@@ -1052,6 +1109,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		body: map[string]any{"type": "sessions.snapshot.initial", "session": machine,
 			"request": "req-initial-rows"},
 		session: machine, name: "read:req-initial-rows", code: "unknown_command", status: 400,
+	}, {
+		word: "sessions.row",
+		body: map[string]any{"type": "sessions.row", "session": machine,
+			"request": "req-one-row", "row": "%7"},
+		session: machine, name: "read:req-one-row", code: "unknown_command", status: 400,
 	}, {
 		word: "schedule",
 		body: map[string]any{"type": "schedule", "session": machine, "request": "req-schedule",

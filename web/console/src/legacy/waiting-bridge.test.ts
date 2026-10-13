@@ -78,3 +78,15 @@ test("choices taken from the conversation record say so above their buttons", ()
   assert.match(inferred, /data-source="transcript"/)
   assert.doesNotMatch(seen, /data-source/)
 })
+
+// On 2026-10-12 a Session open through Cloud sat on a question its machine had
+// read whole, while the page held only the machine list's row for it. The card
+// said Clawdline "could not read its choices from the screen".
+test("a waiting row that has not brought its menu yet says the choices are on their way", () => {
+  const said = (html: string) => [...html.matchAll(/<div class="say">(.*?)<\/div>/g)].map((m) => m[1]).join(" ")
+  const arriving = waitingHTML({ ...unread, arriving: true })
+  assert.ok(said(arriving).includes(nextWord("menuArrivingSay")))
+  assert.ok(!said(arriving).includes(nextWord("menuUnreadSay")))
+  assert.match(arriving, /data-cancel="1">/)
+  assert.match(arriving, /data-screen="1">/)
+})

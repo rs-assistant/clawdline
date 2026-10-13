@@ -34,13 +34,17 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
 	"github.com/sainteye/clawdline/internal/adapters/cloudkeys"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
+	"github.com/sainteye/clawdline/internal/adapters/store"
+	peerapp "github.com/sainteye/clawdline/internal/app/agenthandoff"
 	"github.com/sainteye/clawdline/internal/app/cloudops"
 	"github.com/sainteye/clawdline/internal/app/terminals"
+	peercontract "github.com/sainteye/clawdline/internal/domain/agenthandoff"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
 	"github.com/sainteye/clawdline/internal/domain/schedulewebhook"
@@ -164,12 +168,26 @@ type LinkOptions struct {
 	// Handler is the daemon's own routes, gate and all. A Cloud request is
 	// answered by exactly the handler a paired browser on this machine's own
 	// network reaches.
-	Handler http.Handler
+	Handler        http.Handler
+	Receipts       *store.Store
+	AdmitExecution func(context.Context, string, string, string) error
+	// Sessions is the daemon's shared session list, encoded as
+	// `GET /v1/sessions` answers it; the publisher reads it instead of building
+	// its own through Handler. Nil reads the route.
+	Sessions func(context.Context) ([]byte, bool)
+	// SessionsFresh is Sessions built now, for the passes right after a press
+	// (Publisher.Fresh). Nil reads Sessions.
+	SessionsFresh func(context.Context) ([]byte, bool)
 	// TerminalService is the only ingress to the local terminal service from
 	// signed Cloud envelopes. The regular Router remains forbidden.
 	TerminalService   func() (*terminals.Service, error)
 	TerminalProject   func(context.Context, string) (string, bool)
 	DropTerminalGrant func(string) error
+	// PeerReceipts and PeerExecute are the daemon's durable peer inbox seam.
+	// Without all three hooks, peer ingress is refused.
+	PeerReceipts    peerapp.Receipts
+	PeerAdmitTarget func(context.Context, string, string, string) error
+	PeerExecute     func(context.Context, peercontract.Request, []byte) error
 	// Authorize stamps the credential the gate judges an in-process request by.
 	Authorize func(*http.Request)
 	// Version is this build, for the machine registration record.
@@ -228,30 +246,47 @@ type Link struct {
 	// at most CloudReadConcurrencyLimit.
 	reading     int
 	fingerprint string
+	// taskListMoved is set when this machine has written a task row and
+	// cleared by the publisher pass that reads the list because of it
+	// (TaskListChanged, tasklist.go). It is on the Link rather than on the
+	// publisher because the broker calls in from its own goroutine at any
+	// moment, including while a key rotation is building a new publisher, and
+	// a flag that outlives both of them needs no lock and loses no signal.
+	taskListMoved atomic.Bool
+
 	// stopRun cancels the socket currently up, and rotated says the next
 	// `Run` iteration should rebuild rather than return. They are one pair:
 	// a cancel with no flag is a shutdown, a cancel with it is a rotation.
 	stopRun context.CancelFunc
 	rotated bool
 
-	terminalRosterMu   sync.Mutex
-	terminalRosterAt   time.Time
-	terminalRosterErr  error
-	terminalRosterWait chan struct{}
-	// terminalRosterFailures counts consecutive failed terminal roster reads,
-	// so a failure streak is logged once.
-	terminalRosterFailures int
+	// One roster read serves both lanes that need a fresh one: terminal
+	// authority and a Session content read. They used to be separate — a read
+	// refetched the roster on every request while a terminal frame reused a
+	// read up to CloudTerminalRosterRefreshLimit old — which cost a read the
+	// whole round trip to the control plane even when a terminal had just
+	// fetched the same answer a frame ago.
+	rosterReadMu   sync.Mutex
+	rosterReadAt   time.Time
+	rosterReadErr  error
+	rosterReadWait chan struct{}
+	// rosterReadFailures counts consecutive failed roster reads, so a failure
+	// streak is logged once.
+	rosterReadFailures int
 
 	// The direct carrier (direct.go). directMu is never held while
 	// terminalMu is taken, nor the other way round.
-	directMu                   sync.Mutex
-	directPeers                map[string]*directPeer
-	directOffers               map[string][]time.Time
-	directWebRTC               *webrtc.API
-	directLoopback             bool // tests only: two peers on one host
-	directNoSTUN               bool // tests only: no network beyond this host
-	terminalMu                 sync.Mutex
-	terminalConnections        map[string]*terminalConnection
+	directMu            sync.Mutex
+	directPeers         map[string]*directPeer
+	directOffers        map[string][]time.Time
+	directWebRTC        *webrtc.API
+	directLoopback      bool // tests only: two peers on one host
+	directNoSTUN        bool // tests only: no network beyond this host
+	terminalMu          sync.Mutex
+	terminalConnections map[string]*terminalConnection
+	// Only a terminal envelope that passed signature verification and decryption
+	// may establish the legacy sender key used by terminalAccess after receipt.
+	terminalAuthenticated      map[string]ed25519.PublicKey
 	terminalRetireAfterReceipt map[string]*terminalConnection
 	// terminalReceiptsEvicted counts the receipts let go early because their
 	// connection held CloudTerminalReceiptsLimit, since this process began;
@@ -263,6 +298,8 @@ type Link struct {
 	terminalAfter      func(d time.Duration, f func())
 	machineIncarnation string
 	terminalRequests   chan Inbound
+	peerRequests       chan []byte
+	peerAcks           chan []byte
 	terminalLists      chan Inbound
 	terminalRefusals   chan Inbound
 }
@@ -303,9 +340,9 @@ const (
 	TerminalDenied
 )
 
-// errTerminalRosterWait is the answer of a check that waited the whole
+// errRosterReadWait is the answer of a check that waited the whole
 // deadline for another check's roster read.
-var errTerminalRosterWait = errors.New("the device roster read did not finish within its deadline")
+var errRosterReadWait = errors.New("the device roster read did not finish within its deadline")
 
 // PinnedTerminalViewer names a locally pinned, unrevoked Cloud viewer for the
 // local-only grant page. An account roster row alone never creates a grantable
@@ -352,10 +389,11 @@ func (l *Link) TerminalViewerAllowed(device string) bool {
 
 // terminalAuthority is the three-way terminal answer. With withKey false it
 // is only the Cloud-side prerequisite for a relay connection registration:
-// local pin and grant are checked again after that registration, so a
-// locally refused viewer can receive a keyed refusal. With withKey it uses the
-// same locally revoked, pin-first sender key as Cloud commands, plus a fresh
-// roster with the matching key.
+// the grant is checked again after that registration, so a locally refused
+// viewer can receive a keyed refusal. With withKey it uses the same locally
+// revoked, pin-first sender key as Cloud commands, plus a fresh roster. A
+// viewer without a local pin must have reached this point through an
+// authenticated, decrypted terminal envelope carrying this machine's content key.
 func (l *Link) terminalAuthority(device string, withKey bool) (TerminalVerdict, string) {
 	if !l.settings.Enabled {
 		return TerminalDenied, "Cloud is off on this machine"
@@ -371,6 +409,7 @@ func (l *Link) terminalAuthority(device string, withKey bool) (TerminalVerdict, 
 	// unreadable roster must not turn "this machine threw it out" into
 	// "try again".
 	var pinnedKey ed25519.PublicKey
+	var authenticatedKey ed25519.PublicKey
 	if withKey && l.pinned != nil {
 		refused, err := l.pinned.Refused(device)
 		if err != nil {
@@ -388,12 +427,17 @@ func (l *Link) terminalAuthority(device string, withKey bool) (TerminalVerdict, 
 		}
 	}
 	if withKey && pinnedKey == nil {
-		return TerminalDenied, "this device is not paired with this machine"
+		l.terminalMu.Lock()
+		authenticatedKey = l.terminalAuthenticated[device]
+		l.terminalMu.Unlock()
+		if authenticatedKey == nil {
+			return TerminalDenied, "this device has not authenticated a terminal envelope for this machine"
+		}
 	}
 	if l.roster == nil {
 		return TerminalUnverified, "this machine holds no credential to read the device roster"
 	}
-	if err := l.terminalRosterRead(); err != nil {
+	if err := l.rosterRead(); err != nil {
 		return TerminalUnverified, "the device roster could not be read"
 	}
 	for _, row := range l.roster.Devices() {
@@ -410,7 +454,8 @@ func (l *Link) terminalAuthority(device string, withKey bool) (TerminalVerdict, 
 		if err != nil || len(rosterKey) != ed25519.PublicKeySize {
 			return TerminalDenied, "the account's key for the device is unreadable"
 		}
-		if !bytes.Equal(rosterKey, pinnedKey) {
+		if (pinnedKey != nil && !bytes.Equal(rosterKey, pinnedKey)) ||
+			(authenticatedKey != nil && !bytes.Equal(rosterKey, authenticatedKey)) {
 			return TerminalDenied, "the account's key for the device is not the paired one"
 		}
 		return TerminalAllowed, ""
@@ -418,48 +463,51 @@ func (l *Link) terminalAuthority(device string, withKey bool) (TerminalVerdict, 
 	return TerminalDenied, "the account has no such device"
 }
 
-// terminalRosterFresh is terminalRosterRead as a yes or no.
-func (l *Link) terminalRosterFresh() bool { return l.terminalRosterRead() == nil }
+// rosterFresh is rosterRead as a yes or no.
+func (l *Link) rosterFresh() bool { return l.rosterRead() == nil }
 
-// terminalRosterRead singleflights the active terminal roster read and says
-// whether a read that succeeded within CloudTerminalRosterRefreshLimit stands
-// behind the answer. A failed or timed-out read expires terminal authority
-// only; the normal Cloud command path keeps its own roster policy and never
-// waits for this one.
-func (l *Link) terminalRosterRead() error {
+// rosterRead singleflights the active roster read and says whether a read
+// that succeeded within CloudTerminalRosterRefreshLimit stands behind the
+// answer. Terminal authority and Session content reads both ask it, so two
+// lanes a frame apart cost one GET /v1/devices and a revocation reaches both
+// within that window. A failed or timed-out read expires only what asked for
+// it; the ordinary Cloud command path keeps its own roster policy (the 60 s
+// adaptercloud.RosterRefresh and the background ticker) and never waits for
+// this one.
+func (l *Link) rosterRead() error {
 	now := l.opts.Now()
-	l.terminalRosterMu.Lock()
-	if !l.terminalRosterAt.IsZero() {
-		age := now.Sub(l.terminalRosterAt)
-		if l.terminalRosterErr == nil && age < CloudTerminalRosterRefreshLimit*time.Second {
-			l.terminalRosterMu.Unlock()
+	l.rosterReadMu.Lock()
+	if !l.rosterReadAt.IsZero() {
+		age := now.Sub(l.rosterReadAt)
+		if l.rosterReadErr == nil && age < CloudTerminalRosterRefreshLimit*time.Second {
+			l.rosterReadMu.Unlock()
 			return nil
 		}
-		if err := l.terminalRosterErr; err != nil && age < CloudTerminalRosterRetrySecondsLimit*time.Second {
-			l.terminalRosterMu.Unlock()
+		if err := l.rosterReadErr; err != nil && age < CloudTerminalRosterRetrySecondsLimit*time.Second {
+			l.rosterReadMu.Unlock()
 			return err
 		}
 	}
-	if wait := l.terminalRosterWait; wait != nil {
-		l.terminalRosterMu.Unlock()
+	if wait := l.rosterReadWait; wait != nil {
+		l.rosterReadMu.Unlock()
 		select {
 		case <-wait:
 		case <-time.After(CloudTerminalRosterDeadlineLimit * time.Second):
-			return errTerminalRosterWait
+			return errRosterReadWait
 		}
-		l.terminalRosterMu.Lock()
-		defer l.terminalRosterMu.Unlock()
-		if l.terminalRosterErr != nil {
-			return l.terminalRosterErr
+		l.rosterReadMu.Lock()
+		defer l.rosterReadMu.Unlock()
+		if l.rosterReadErr != nil {
+			return l.rosterReadErr
 		}
-		if now.Sub(l.terminalRosterAt) >= CloudTerminalRosterRefreshLimit*time.Second {
-			return errTerminalRosterWait
+		if now.Sub(l.rosterReadAt) >= CloudTerminalRosterRefreshLimit*time.Second {
+			return errRosterReadWait
 		}
 		return nil
 	}
 	wait := make(chan struct{})
-	l.terminalRosterWait = wait
-	l.terminalRosterMu.Unlock()
+	l.rosterReadWait = wait
+	l.rosterReadMu.Unlock()
 	// A successful read is as fresh as the moment it began, which is all it
 	// can prove about a revocation, so a revocation still reaches frames
 	// within four seconds and an idle connection's notice within five
@@ -470,28 +518,28 @@ func (l *Link) terminalRosterRead() error {
 	ctx, cancel := context.WithTimeout(context.Background(), CloudTerminalRosterDeadlineLimit*time.Second)
 	err := l.roster.Refresh(ctx)
 	cancel()
-	l.terminalRosterMu.Lock()
-	l.terminalRosterAt, l.terminalRosterErr = started, err
+	l.rosterReadMu.Lock()
+	l.rosterReadAt, l.rosterReadErr = started, err
 	if err != nil {
-		l.terminalRosterAt = l.opts.Now()
+		l.rosterReadAt = l.opts.Now()
 	}
 	// One line per failure streak, and one when it ends, so daemon.log shows
 	// why terminals paused without a line per frame.
-	startedFailing := err != nil && l.terminalRosterFailures == 0
-	recovered := err == nil && l.terminalRosterFailures > 0
-	failures := l.terminalRosterFailures
+	startedFailing := err != nil && l.rosterReadFailures == 0
+	recovered := err == nil && l.rosterReadFailures > 0
+	failures := l.rosterReadFailures
 	if err != nil {
-		l.terminalRosterFailures++
+		l.rosterReadFailures++
 	} else {
-		l.terminalRosterFailures = 0
+		l.rosterReadFailures = 0
 	}
-	l.terminalRosterWait = nil
+	l.rosterReadWait = nil
 	close(wait)
-	l.terminalRosterMu.Unlock()
+	l.rosterReadMu.Unlock()
 	if startedFailing {
-		l.logf("cloud terminal: the device roster could not be read, so Cloud terminals pause (refused as terminal_busy, not revoked) until it can: %v", err)
+		l.logf("cloud: the device roster could not be read, so Cloud terminals pause (refused as terminal_busy, not revoked) and Session reads are refused until it can: %v", err)
 	} else if recovered {
-		l.logf("cloud terminal: the device roster is readable again after %d failed reads", failures)
+		l.logf("cloud: the device roster is readable again after %d failed reads", failures)
 	}
 	return err
 }
@@ -647,18 +695,21 @@ func (l *Link) wire() error {
 			Client:     adaptercloud.NewAccountClient(settings.APIBase),
 			Credential: identity.MachineCredential,
 		},
-		Identity:     identity,
-		Signer:       key,
-		Spool:        spool,
-		Status:       status,
-		Replay:       domaincloud.NewReplayWindow(0),
-		Inbound:      l.relay.Deliver,
-		OnDisconnect: l.closeAllTerminalConnections,
-		OnSettled:    l.terminalReceiptSettled,
-		PublicKeyFor: l.publicKeyFor,
-		ContentKey:   secret,
-		Log:          func(line string) { l.logf("%s", line) },
-		Now:          opts.Now,
+		Identity:      identity,
+		Signer:        key,
+		Spool:         spool,
+		Status:        status,
+		Replay:        domaincloud.NewReplayWindow(0),
+		Inbound:       l.relay.Deliver,
+		DirectInbound: l.relay.DeliverDirect,
+		PeerInbound:   l.enqueuePeer,
+		PeerAck:       l.enqueuePeerAck,
+		OnDisconnect:  l.closeAllTerminalConnections,
+		OnSettled:     l.terminalReceiptSettled,
+		PublicKeyFor:  l.publicKeyFor,
+		ContentKey:    secret,
+		Log:           func(line string) { l.logf("%s", line) },
+		Now:           opts.Now,
 	})
 	if err != nil {
 		return err
@@ -668,35 +719,61 @@ func (l *Link) wire() error {
 	l.service = Service{
 		MachineID: identity.MachineID,
 		Bridge: cloudops.Bridge{
-			MachineID: identity.MachineID,
+			MachineID:              identity.MachineID,
+			Receipts:               opts.Receipts,
+			EnforceSessionReceipts: true,
+			AdmitExecution:         opts.AdmitExecution,
 			Router: Router{Handler: opts.Handler, Authorize: opts.Authorize,
 				AppOrigin: settings.AppOrigin},
-			AllowCommands: l.allowCommands,
-			Authority:     l.authority,
+			AllowCommands:       l.allowCommands,
+			Authority:           l.authority,
+			TranscriptAuthority: l.transcriptAuthority,
+			ViewerEvents:        &cloudops.ViewerEventLog{Log: l.logf, Now: opts.Now},
 		},
 		Transport: l.relay,
 		Log:       opts.Log,
 	}
 	l.publisher = &Publisher{
-		MachineID:   identity.MachineID,
-		MachineName: machineName(identity, settings, HostName(), runtime.GOOS),
-		Platform:    runtime.GOOS,
-		Version:     opts.Version,
-		APILevel:    opts.APILevel,
+		MachineID:     identity.MachineID,
+		MachineName:   machineName(identity, settings, HostName(), runtime.GOOS),
+		Platform:      runtime.GOOS,
+		Version:       opts.Version,
+		APILevel:      opts.APILevel,
+		ReadContentV1: l.service.Bridge.TranscriptAuthority != nil,
+		// A carrier is offered on the same switch the terminal's direct path
+		// is, because it is the same channel and the same authority.
+		SessionCarrierV1: settings.TerminalDirect,
 		Router: Router{Handler: opts.Handler, Authorize: opts.Authorize,
 			AppOrigin: settings.AppOrigin},
-		Publish: l.relay.Publish,
-		Log:     opts.Log,
+		Sessions: opts.Sessions,
+		Fresh:    opts.SessionsFresh,
+		// Whether a task row was written since the last pass asked. Without
+		// it the publisher cannot tell a list that moved from one that did
+		// not, and read it on every pass to find out (tasklist.go).
+		TaskListMoved: l.takeTaskListMoved,
+		Publish:       l.relay.Publish,
+		Log:           opts.Log,
 	}
 	// The publisher hears every viewer the relay hears from, which is how a
 	// viewer that arrived after this machine's last change gets the current
 	// state instead of waiting for the heartbeat (`Publisher.Seen`).
 	l.relay.Audience = l.publisher.Seen
 	l.relay.Terminal = l.deliverTerminal
+	// A read that arrived on a viewer's carrier is answered there. The relay
+	// holds the hook rather than the carrier holding the relay, because what
+	// decides the route is the request, and only the relay sees both.
+	l.relay.Direct = l.sendCarrierEnvelope
+	// A Session row goes to the relay as it always did and to every open
+	// carrier at the same time, so a page reads a row it would otherwise
+	// spend a subscription and a round trip asking for.
+	l.relay.MirrorStatus = l.mirrorStatusRow
 	// `sessions.snapshot` is answered by the publisher, which is the only
 	// thing that can put the rows back on their channels.
 	l.service.Bridge.Sessions = l.publisher.Snapshot
 	l.service.Bridge.SessionsFor = l.publisher.SnapshotFrom
+	l.service.Bridge.SessionRow = l.publisher.StateRow
+	// A press from a page is shown landing at the next look, not the next pass.
+	l.service.Acted = l.publisher.Settle
 	return nil
 }
 
@@ -711,6 +788,27 @@ func (l *Link) wire() error {
 // login registers (name.go).
 func machineName(identity adaptercloud.Identity, settings adaptercloud.Settings, host, goos string) string {
 	return MachineName(host, goos, settings.MachineName, identity.Name)
+}
+
+// TaskListChanged is `http.CloudTaskLine`: this machine has written a task
+// row, so the list a viewer reads off the machine descriptor is not what the
+// publisher last projected. It records the fact and returns — the publisher's
+// own pass is what reads and publishes, at the cadence it always had.
+func (l *Link) TaskListChanged() { l.taskListMoved.Store(true) }
+
+// takeTaskListMoved answers whether a task row was written since it was last
+// asked, and clears the fact. Only the publisher's pass asks.
+func (l *Link) takeTaskListMoved() bool { return l.taskListMoved.Swap(false) }
+
+// TaskListReading is the `cloud.task_list_reread_seconds` row: how long ago
+// the publisher last asked this machine for its own task list, and what the
+// asking has cost. ok is false when this link has no publisher, which is a
+// line that was never built.
+func (l *Link) TaskListReading() (capacity.Reading, bool) {
+	if l.publisher == nil {
+		return capacity.Reading{}, false
+	}
+	return l.publisher.TaskListReading(), true
 }
 
 // Enabled reports whether the switch was on when this link was opened.
@@ -778,6 +876,14 @@ func (l *Link) Run(ctx context.Context) error {
 
 // runOnce holds one socket up until its context is done.
 func (l *Link) runOnce(ctx context.Context) error {
+	l.mu.Lock()
+	l.peerRequests = make(chan []byte, PeerIngressLimit)
+	l.peerAcks = make(chan []byte, PeerAckIngressLimit)
+	l.mu.Unlock()
+	peerCtx, stopPeer := context.WithCancel(ctx)
+	peerDone := make(chan struct{})
+	go func() { defer close(peerDone); l.runPeer(peerCtx) }()
+	defer func() { stopPeer(); <-peerDone }()
 	l.terminalRequests = make(chan Inbound, CloudTerminalIngressLimit)
 	l.terminalLists = make(chan Inbound, CloudTerminalListIngressLimit)
 	l.terminalRefusals = make(chan Inbound, CloudTerminalRefusalsLimit)
@@ -1082,9 +1188,11 @@ func (l *Link) pairingKeys() (domaincloud.DeviceKey, domaincloud.ContentKey, err
 //
 // The roster is the account's, not this machine's: a device the person removed
 // in the hosted console stops being able to act here at the next refresh.
-// Every active viewer paired to this machine may send while Cloud commands
-// are enabled on this machine.
-func (l *Link) authority(ctx context.Context, sender string, requiresWriteGate bool) cloudops.Authority {
+// Every active viewer that can authenticate and decrypt this machine's
+// envelope may send while Cloud commands are enabled. The transport already
+// verified both before calling the bridge. A local pin, when present, still
+// overrides the roster key; a local revocation always denies the viewer.
+func (l *Link) authority(ctx context.Context, sender string, verifiedKey ed25519.PublicKey, requiresWriteGate bool) cloudops.Authority {
 	readable, _ := l.roster.Readable()
 	var pairedKey ed25519.PublicKey
 	if l.pinned != nil {
@@ -1118,7 +1226,9 @@ func (l *Link) authority(ctx context.Context, sender string, requiresWriteGate b
 		}
 		if requiresWriteGate {
 			rosterKey, err := base64.StdEncoding.DecodeString(device.PublicKey)
-			if err != nil || len(rosterKey) != ed25519.PublicKeySize || !bytes.Equal(rosterKey, pairedKey) {
+			if err != nil || len(rosterKey) != ed25519.PublicKeySize ||
+				!bytes.Equal(rosterKey, verifiedKey) ||
+				(pairedKey != nil && !bytes.Equal(rosterKey, pairedKey)) {
 				return a
 			}
 		}
@@ -1130,6 +1240,56 @@ func (l *Link) authority(ctx context.Context, sender string, requiresWriteGate b
 		a.WriteGateAllows = l.allowCommands()
 		return a
 	}
+	return a
+}
+
+// transcriptAuthority never relies on the relay's earlier capability check.
+// A viewer can lose its key, pairing or read_transcript cap while a local
+// transcript route is running, so the bridge calls this before and after it.
+//
+// It asks rosterRead rather than refetching: a read used to carry one
+// GET /v1/devices of its own, which was the largest part of what a Session
+// read cost once the request itself took the direct carrier — 570 ms of a
+// 580 ms read, measured 2026-10-11. The person chose the terminal lane's rule
+// for reads too (2026-10-11): a roster read that succeeded within
+// CloudTerminalRosterRefreshLimit stands behind the answer, so a revocation
+// takes effect up to that long after the account records it. Longer than that
+// cannot happen here; a shorter window is what the direct carrier cannot buy
+// back.
+func (l *Link) transcriptAuthority(ctx context.Context, sender string, verifiedKey ed25519.PublicKey) cloudops.Authority {
+	a := cloudops.Authority{ClockReady: true}
+	if l.roster == nil || l.rosterRead() != nil {
+		return a // A roster this machine could not read cannot authorize old content.
+	}
+	a = l.authority(ctx, sender, verifiedKey, false)
+	if !a.RosterAllowsSender {
+		return a
+	}
+	for _, device := range l.roster.Devices() {
+		if device.ID != sender {
+			continue
+		}
+		key, err := base64.StdEncoding.DecodeString(device.PublicKey)
+		if err != nil || len(key) != ed25519.PublicKeySize || !bytes.Equal(key, verifiedKey) {
+			a.RosterAllowsSender = false
+			return a
+		}
+		if l.pinned != nil {
+			pinned, ok, err := l.pinned.PublicKeyFor(sender)
+			if err != nil || ok && !bytes.Equal(pinned, key) {
+				a.RosterAllowsSender = false
+				return a
+			}
+		}
+		for _, cap := range device.Caps {
+			if cap == "read_transcript" {
+				a.ReadTranscriptAllows = true
+				break
+			}
+		}
+		return a
+	}
+	a.RosterAllowsSender = false
 	return a
 }
 

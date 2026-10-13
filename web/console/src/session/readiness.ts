@@ -22,5 +22,10 @@ export function conversationNotStarted(row: SessionRow | null | undefined): bool
  * an actual identity-reading failure keep the terminal-compatible path.
  */
 export function sessionTodosReady(row: SessionRow | null | undefined): boolean {
-  return !!row?.id && !conversationNotStarted(row)
+  if (!row?.id || conversationNotStarted(row)) return false
+  // A newly listed terminal can lack a conversation id before the provider
+  // writes its first record. Preserve the terminal lookup for an actual
+  // identity-reading failure: a later scan may still find its conversation.
+  if (!row.sessionId && row.identity !== "unreadable" && row.activity?.unknown_reason !== "unreadable") return false
+  return true
 }

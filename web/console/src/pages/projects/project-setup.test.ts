@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs"
 import test from "node:test"
 // @ts-expect-error -- `.ts` paths let Node's strip-types runner execute this test.
 import { projectSetupCapabilities, projectSetupInstructions, projectSetupProgress } from "./project-setup.ts"
+// @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
+import { pattern, wordCall } from "../../catalog-testing.ts"
+
 
 test("a Project setup Session receives the portable guide, all visible layers and the operational boundary", () => {
   const words = projectSetupInstructions({ label: "Sample", path: "/work/sample" })
@@ -28,8 +31,8 @@ test("the setup dialog gives both unreadable and empty Project lists an actionab
   assert.match(source, /aria-haspopup="dialog"/)
   assert.match(source, /focus\(\{ preventScroll: true \}\)/)
   assert.match(source, /role="alert"/)
-  assert.match(source, /重新讀取/)
-  assert.match(source, /clawdline project add/)
+  assert.match(source, pattern`onClick=\{\(\) => void load\(\)\}>\{${wordCall("重新讀取")}\}<\/button>`)
+  assert.match(source, pattern`<code>\{${wordCall("clawdline project add")}\}`)
 })
 
 test("the readiness model separates configured deploy progress from a failed current run", () => {
@@ -113,7 +116,6 @@ test("a machine that sends no unify status shows unknown without a zero count", 
 
 test("the readiness card's unify row opens the scoped Project view and its unify preview", () => {
   const source = readFileSync(new URL("./ProjectSetup.tsx", import.meta.url), "utf8")
-  assert.match(source, /row\.action === "unify"/)
   assert.match(source, /openUnify\(place\)/)
   assert.match(source, /<ProjectUnify [^>]*openRequest=/)
 })

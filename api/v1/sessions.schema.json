@@ -115,6 +115,7 @@
         "backend": { "$ref": "common.schema.json#/$defs/Backend" },
         "closeability": { "$ref": "#/$defs/Closeability" },
         "coordination": { "$ref": "#/$defs/SessionCoordination" },
+		"heavy_work": { "description": "Only the Session that started the declared-heavy callback currently holding and running in the machine's heavy_compile slot. Absent for queued work, wait callbacks, direct heavy commands and unreadable evidence.", "$ref": "#/$defs/SessionHeavyWork" },
         "coordinator": { "$ref": "#/$defs/SessionCoordinator" },
         "machine_scope": { "description": "This Session is in the daemon's machine workspace. It may still need role registration; the coordinator field is the registration receipt.", "type": "boolean" },
         "cwd": { "type": "string" },
@@ -123,6 +124,7 @@
         "icon": { "$ref": "common.schema.json#/$defs/Icon" },
         "identity": { "$ref": "#/$defs/IdentityBinding" },
         "id": { "type": "string" },
+		"execution_generation": { "description": "Machine-issued durable identity of this terminal execution. Absent when the source or process start cannot be verified, the machine has no Cloud identity, or the identity store could not be written. This is not scan.generation.", "type": "string", "pattern": "^[0-9a-f]{32}$" },
         "isClaude": { "type": "boolean" },
         "label": { "description": "What the session is called, by the Swift app's rungs (ITerm.swift preferredDisplayLabel): a name typed in Clawdline (the Swift store's config.json `session_titles`), the title of the task, handoff or Feature Root Clawdline opened the tab for (orchestrator.json), the conversation's own title (`/rename`, else `aiTitle`), Codex's thread name or an automatic title, Claude Code's registry handle — the first that has something. Never a terminal title. Absent when nothing names the session.", "type": "string" },
         "line": { "description": "What a working session says it is doing, read from its screen with the assistant's own clock in it. Present while working; on a waiting session with a menu it is instead that menu's revision (the Swift app's menuRevision), which no row draws and which changes whenever the question does. The Swift app sends it under this name and the row's height depends on it.", "type": "string" },
@@ -139,6 +141,7 @@
         "shells": { "description": "The commands this session left running in the background, newest first, at most six. Absent rather than empty when there are none, as the Swift app sends it; always absent for Codex, which keeps no record of them.", "type": "array", "items": { "$ref": "#/$defs/SessionShell" } },
         "state": { "$ref": "common.schema.json#/$defs/SessionState" },
         "tty": { "type": "string" },
+        "working_since": { "description": "When the turn a working session's `line` reports began, in unix seconds: when the line was read, less the assistant's own clock in it. Present only beside a `line` that carries that clock. A page that has it draws the clock itself from this instant, so `line` is republished only when something other than the clock moved; a page without it draws `line` as sent.", "type": "integer" },
         "work_moved_by": { "description": "Who the declaring session said will move it — a session id, or a person.", "type": "string" },
         "work_note": { "description": "The session's own words for its state, present only when its declaration decided `work_state` (then `work_provenance` is `self`).", "type": "string" },
         "work_person_needed": { "type": "boolean", "description": "Whether that mover is a person. Absent unless the declaration decided the state; present and false is a real answer." },
@@ -147,6 +150,15 @@
         "work_state": { "$ref": "#/$defs/WorkState" }
       }
     },
+	"SessionHeavyWork": {
+	  "type": "object",
+	  "additionalProperties": false,
+	  "required": ["task_id", "reason"],
+	  "properties": {
+	    "task_id": { "type": "string" },
+	    "reason": { "description": "The heavy command's declared reason, for the icon's title and accessible name.", "type": "string" }
+	  }
+	},
 	"EpicSessionParent": {
 	  "description": "Presentation ancestry of an independent Root opened when an Epic owner assigned a child Board item. The owner is the conversation that made that assignment, even if the Epic is later reassigned. This does not transfer task, landing, or close ownership.",
 	  "type": "object",
@@ -288,6 +300,7 @@
       "properties": {
         "assistant": { "$ref": "common.schema.json#/$defs/Assistant" },
         "cwd": { "type": "string" },
+        "icon": { "$ref": "common.schema.json#/$defs/Icon" },
         "id": { "type": "string" },
         "model": { "description": "The model the session is on, as its record last named it: the newest assistant turn's model, or a `/model` switch made after it. Absent when the record says nothing.", "type": "string" },
         "namingAssistant": { "description": "The assistant selected in Settings for one-turn session naming. The confirmation shows it before spending that assistant's quota. `auto` asks Claude Code first and Codex only when Claude Code has no usage left or is not installed.", "type": "string", "enum": ["claude", "codex", "auto"] },
@@ -448,8 +461,14 @@
       "properties": {
         "complete": { "type": "boolean" },
         "source": { "description": "The source's provenance, as the adapter names it: `ps`, `tmux`, `iterm`.", "type": "string" },
+        "disabled": { "$ref": "#/$defs/ScanSourceDisabled" },
         "gaps": { "description": "The regions of this source that could not be read, each one either sealed by another source or still open. Optional: a source that read everything omits it. A person whose machine has gone quiet reads this to find out what is in the way.", "type": "array", "items": { "$ref": "#/$defs/ScanGap" } }
       }
+    },
+    "ScanSourceDisabled": {
+      "description": "Why a source was not asked at all. `setting`: the person turned it off (iTerm2's `iterm_scan`). Such a source is `complete: false` and lists no rows, and it is neither a failure nor an empty answer: a row of that source is not gone, it is not being looked at. A client says so in one line instead of drawing those tabs as nothing. Absent on every source that was asked.",
+      "type": "string",
+      "enum": ["setting"]
     },
     "Scan": {
       "description": "What the reading behind this snapshot knows about itself. Without it an empty list cannot be told apart from a failed scan.",

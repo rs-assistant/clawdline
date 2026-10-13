@@ -5,12 +5,14 @@
   "callback.clawdline_callback_the_daemon_answe.9136210b": "clawdline callback：daemon 已回覆，但內容沒有它啟動的任務",
   "callback.command_required": "請在 -- 後指定命令：clawdline callback --title \"…\" -- <command> [args…]",
   "callback.end_turn": "現在請結束這一輪：命令結束時會收到通知，`clawdline task show %s` 也會顯示結果。\n",
+  "callback.intent_invalid": "--intent 必須是 wait 或 heavy",
   "callback.no_conversation": "沒有對話 ID",
   "callback.replayed": " （此 ID 的工作先前已啟動；本次未再次啟動）",
   "callback.task_id_invalid": "--task-id %q 不是小寫 UUID",
   "callback.timeout_invalid": "--timeout 必須介於 1m 至 4h",
   "callback.title_required": "必須提供 --title",
   "callback.usage_clawdline_callback_title_time.ed8f80b7": "用法：clawdline callback --title \"…\" [--timeout 30m] [--work-id <item>] [--dir D] [--task-id uuid] [--json] -- <command> [args…]",
+  "callback.usage_intent": "用法：clawdline callback --title \"…\" [--intent wait|heavy] [--timeout 30m] [--work-id <item>] [--dir D] [--task-id uuid] [--json] -- <command> [args…]",
   "callback.warning.47578bd3": "警告：",
   "callback.work_id_invalid": "--work-id %q 不是小寫 UUID",
   "coordinator.clawdline_coordinator_bind.261adc78": "clawdline coordinator bind:",
@@ -117,14 +119,15 @@
   "portheld.stop_pid_d_by_its_pid_if_it_should.38d5484a": " 若 PID %d 不應在此執行，請依 PID 停止它；或透過 CLAWDLINE_NEXT_PORT 為此 daemon 指定其他連接埠。",
   "portheld.this_daemon_has_started_nothing_and.42f3a707": " 此 daemon 尚未啟動任何服務，現在將結束。",
   "portheld.where": "連接埠 %d（%s）",
-  "project.add_directory_keep_existing_directo.69166d26": "  add <directory…>      將現有目錄加入 Session 啟動清單",
+  "project.add_directory_keep_existing_directo.69166d26": "  add [directory…]      加入目錄；留白則加入目前目錄",
+  "project.daemon_answer_invalid": "daemon 未回傳專案清單；請更新執行中的 daemon",
   "project.clawdline_project_export_out_file_n.08105c5e": "       clawdline project export [--out file] [--name source]",
   "project.clawdline_project_import_clone_repl.fcdc6204": "       clawdline project import [--clone] [--replace-source] <file>",
   "project.clawdline_project_unify_apply_check.4c4400ff": "       clawdline project unify [--apply | --check] [--json] [directory]",
   "project.export_this_machine_s_project_setti.62f59b09": "  export                將此機器的專案設定（圖示、名稱、未追蹤的技能）匯出成檔案",
   "project.import_file_mirror_another_machine.f1f762b0": "  import <file>         將另一部機器的專案設定鏡像至此；之後由該來源管理",
   "project.list_show_explicitly_registered_dir.233ccc16": "  list                  顯示明確登錄的目錄",
-  "project.remove_directory_forget_directories.79c5aae6": "  remove <directory…>   忘記目錄，但不刪除目錄",
+  "project.remove_directory_forget_directories.79c5aae6": "  remove <directory…>   從專案清單隱藏目錄，不刪除目錄內容",
   "project.unexpected_argument": "非預期參數 %q",
   "project.unify_directory_show_how_claude_and.9b3b6da2": "  unify [directory]     顯示 Claude 與 Codex 如何共用此專案的規則和技能；--apply 會執行",
   "project.usage_clawdline_project_add_remove.7aad3274": "用法：clawdline project <add|remove|list> [--json] [directory…]",
@@ -228,9 +231,11 @@
   "coordination.usage": "用法：clawdline coordination <status|pause|observed|safe|wake|resumed|retry> [選項] [指令 ID 或目標 Session ID]",
   "coordination.unreadable": "無法讀取協調狀態。",
   "coordination.header": "目標\t狀態\t原因\t喚醒條件\t錯誤",
-  "coordination.identity": "此指令需要從目前 Session 環境取得呼叫者的對話 ID。"
-  ,"coordination.run_usage": "用法：clawdline coordination run --resource landing --checkout /repo [--handoff] -- <指令> [參數…]；或 --resource daemon_restart"
-  ,"coordination.waiting": "等待 %s，目前候位第 %d 位。\n"
-  ,"coordination.timed_out": "等候租約期間未取得授權；指令沒有執行。"
-  ,"coordination.release_failed": "無法確認租約已釋放；執行下一個獨占操作前，請檢查持有者。"
+  "coordination.identity": "此指令需要從目前 Session 環境取得呼叫者的對話 ID。",
+  "coordination.run_usage": "用法：clawdline coordination run --resource landing --checkout /repo [--handoff] -- <指令> [參數…]；或 --resource daemon_restart",
+  "coordination.waiting": "等待 %s，目前候位第 %d 位。\n",
+  "coordination.timed_out": "等候租約期間未取得授權；指令沒有執行。",
+  "coordination.release_failed": "無法確認租約已釋放；執行下一個獨占操作前，請檢查持有者。",
+  "tmux.passed": "  （%s）\n",
+  "tmux.none": "clawdline tmux：這台機器沒有 tmux，這個版本也沒有內附"
 }

@@ -268,6 +268,25 @@ func TestCodexPickerIsStillRead(t *testing.T) {
 	}
 }
 
+func TestCodexModelPickerNamesItsQuestion(t *testing.T) {
+	screen := "  Select Model and Effort\n\n\n  1. GPT-6.1-Sol (default)\n› 2. GPT-6-Sol (current)\n  3. GPT-6-Luna\n\n  enter select · esc back\n"
+	m, ok := ReadMenu(screen, AssistantCodex, false)
+	if !ok || m.Question != "Select Model and Effort" || len(m.Options) != 3 {
+		t.Fatalf("model picker = %+v, found %v", m, ok)
+	}
+}
+
+func TestCodexReasoningPickerAfterModelSelection(t *testing.T) {
+	screen := "  Model changed to gpt-6.1-sol low\n\n\n  Select Reasoning Level for GPT-6.1-Sol\n\n\n› 1. Low (default) (current)    Fast responses with lighter reasoning\n  2. Medium    Balances speed and reasoning depth for everyday tasks\n  3. High    Greater reasoning depth for complex problems\n  4. Extra high    Extra high reasoning depth for complex problems\n  5. More reasoning…    Max and Ultra consume usage limits faster\n\n  enter default · s session · esc back\n"
+	m, ok := ReadMenu(screen, AssistantCodex, false)
+	if !ok || m.Question != "Select Reasoning Level for GPT-6.1-Sol" || len(m.Options) != 5 {
+		t.Fatalf("reasoning picker = %+v, found %v", m, ok)
+	}
+	if m.Selected == nil || *m.Selected != 1 || m.Options[4].Number != 5 || !m.Numbered {
+		t.Fatalf("reasoning choices = %+v", m)
+	}
+}
+
 // Codex's update picker on an 80-column pane wraps its first row, the one
 // that spells out the install command, onto a second line indented under the
 // label (2026-09-28, codex-cli 0.154.0). The wrapped line is part of that row,

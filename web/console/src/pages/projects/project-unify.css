@@ -1,5 +1,5 @@
 /* The 「Claude 與 Codex 共用」 block and its preview. Follows project-files.css
-   and the setup dialog in icon-copy.css; colour always sits beside a word or a
+   and the setup dialog in project-setup.css; colour always sits beside a word or a
    sign, never alone. `--bad` is too dark for small text on `--bg`, so text that
    names a gap mixes it towards `--ink`. */
 .project-unify { --gap-ink: color-mix(in srgb, var(--bad) 55%, var(--ink)); margin-top: 20px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }

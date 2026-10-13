@@ -55,6 +55,8 @@ item to `done`, and it names the part to print for anything rarer.
 
 ## 2. Reaching the daemon
 
+Read `clawdline guide routes` when you need to discover this build's registered route and the part that owns it. Compare the target machine's API level and available capability first. A listed route is not permission: read its owning part for the exact action, input, precondition, bound, typed refusal, retry rule, and receipt. Stop when the capability, version, identity, or completion evidence is missing. Do not use a retired helper, another machine, or a looser route as a fallback. Accepted, executed, delivered, observed, and acknowledged are different states; claim only the state the receipt proves. The human goal for each route is indexed beside it, and `docs/contract-model.md` defines the shared terms.
+
 **Use the commands, not hand-built curl, where one exists.** They read the credential inside their
 own process, so it never appears in a command line, in `ps`, in their output or in your
 transcript. A hand-built curl without that credential answers `401 unauthorized` ("No valid
@@ -64,6 +66,7 @@ the command instead.
 | Command | What it does |
 |---|---|
 | `clawdline guide [lang]` | This guide. No daemon needed |
+| `clawdline guide routes` | Registered route inventory for this build, API levels, owning parts, and human goals; no daemon needed |
 | `clawdline session report --summary "…"` | Records your finished turn (§7) |
 | `clawdline session close [--dry-run] [--terminal id]` | Audits and closes a finished Session, never by force (§2a) |
 | `clawdline dispatch --title "…" --claims a,b < brief.md` | Dispatches an owned child (§4) |
@@ -79,6 +82,8 @@ the command instead.
 | `clawdline sessions [--json]` | The Sessions a send, a wait or a handoff can name, with their state and task |
 | `clawdline usage [--session <c> \| --task <id> \| --item <id>]` | What a session, child task or Board item spent, by category; yours by default |
 | `clawdline cloud pair [--offer <code>]` | Pairs one Cloud browser with this machine |
+| `clawdline cloud viewer login\|status\|machines\|pair` | Authorizes and pairs a separate local Cloud viewer |
+| `clawdline cloud viewer sessions\|read\|send\|answer\|interrupt\|end\|receipt` | Uses an exact machine, Session, and execution generation through the local daemon |
 | `clawdline task show [--json] <task id>` | One child task compactly: state, verdict, summary, leftover titles, verification, landing, checkout (§5) |
 | `clawdline task wait <task id>… [--timeout 9m] [--any]` | Waits until the children finish (all, or `--any` one), shows each as `task show` does and closes its notice. Exit 0 all succeeded, 1 one failed, 5 one was cancelled and none failed, 3 timed out, 4 a task could not be read; 4 over 3 over 1 over 5 (§5) |
 | `clawdline callback --title "…" [--timeout 30m] [--work-id <item>] -- <command…>` | Runs a long command — a deploy and its check, a wait on CI — under the daemon and returns at once; end your turn, and its exit types the same `<clawdline-notice>` a finished child's does (§5a, `clawdline guide callback`) |
@@ -123,6 +128,19 @@ including with `clawdline leases`. A token review counted 520 wait-only turns (7
 ten items, mostly on queued `heavy` runs.
 If an earlier `task wait` already printed the terminal result and closed the notice, a late notice
 for that same task does not require another `task show` or another integration.
+
+**Declare the callback's purpose.** `clawdline callback` defaults to `--intent wait` for a deploy
+or an external result. Use `--intent heavy` when its command will run through `clawdline heavy`;
+automatic `heavy --handoff` does this itself. The task record and `task show` expose the intent.
+The Session list draws 🏗️ only while that heavy callback actually owns and runs in the compile
+slot. A queued callback or one waiting for a result has no heavy marker.
+
+**Show heavy work in the conversation.** Before starting `clawdline heavy`, make your last
+person-facing sentence start with `🏗️` and name the work being started. If it hands off to a
+callback (exit 76), end the turn with a short `🏗️` sentence saying what is queued and that the
+completion notice will bring you back. For a wait callback, say what is awaited without that
+heavy-work icon. Give no repeated waiting updates. If the handoff is refused or `heavy` exits 75,
+say that the command did not start.
 
 **A short wait inside the current turn.** Use this only when the result is needed to finish work
 already in this turn and it is expected soon. Make one tool call with a long enough timeout; a
@@ -200,6 +218,63 @@ local trust status; it is also the read-only check to use after pairing.
 These commands go through the running local daemon. If one fails, report its exact stderr. Do not
 turn Cloud on, log in, enable commands, rotate keys, or replace the supplied offer unless the
 person separately asked for that change.
+
+**Connect machines for Agent work.** Browser pairing alone never grants machine-to-machine authority.
+In the hosted Console's Cross-machine access page, turn on the switch between two online, viewer-verified
+machines. The page reads both machine fingerprints through their verified viewer channels, creates
+signed pairs in both directions, and confirms both local pins before showing the switch on. A pair
+permits both Agent messages and handoffs among current Sessions on its named machines. Turning the
+switch off revokes both directions locally and in Cloud. No Session grant is needed in this flow.
+For a CLI-only directed pair, read `clawdline cloud peer fingerprint` on each machine and compare
+the signing fingerprints on their respective machines. A source starts a pair with
+`clawdline cloud peer start <target-machine-id> <target-fingerprint>`; the target accepts with
+`clawdline cloud peer accept <pair-id> <source-fingerprint>`; the source pins it with
+`clawdline cloud peer sync <pair-id> <target-fingerprint>`. Repeat in reverse for two-way access.
+`clawdline cloud peer revoke-pair` denies locally before asking Cloud to revoke. Legacy
+Session-specific grants remain readable for old requests. A shared account and viewer key never
+stand in for the peer machine signature or a current execution generation.
+
+The local routes are `POST /v1/cloud/peer/control` (`action`, pair/grant id, compared fingerprint,
+exact Session ids and generations, scopes), `POST /v1/cloud/peer/send` (`request` with both
+machine/Session/generation endpoints, kind, pair id in the wire `grant_id` field and body digest, plus `body`),
+`GET /v1/cloud/peer/outbox/<request-id>` (source relay evidence), and
+`GET /v1/cloud/peer/inbox?machine_id=&session_id=&execution_generation=&before=` (one target item and durable
+target receipt). The inbox body is `body_base64`; `next_before` pages older items without
+reusing a cursor from another execution. The CLI reads source evidence with
+`clawdline cloud peer outbox <request-id>`.
+A paired viewer needs send permission for changes; Cloud inbox content also
+requires `read_content_v1`, `read_transcript` and the pinned execution on the separate `r/`
+rail. Refusals include `peer_control_refused`, `peer_send_unavailable`,
+`execution_generation_changed`, `read_transcript_required` and `read_only_channel`.
+Writing the WebSocket leaves relay acceptance unknown until `peer_ack`; relay `delivered`
+proves only socket delivery. The source leaves target execution and Agent
+observation unknown; the target receipt proves machine execution and Session delivery, while
+Agent observation and acknowledgement remain unknown until independently evidenced.
+
+**Use a local Cloud viewer across machines.**
+
+Only when the person has authorized a local Cloud viewer, use `clawdline cloud viewer login` and
+have them approve the displayed device and capabilities. `clawdline cloud viewer machines` lists
+the account roster; pairing still requires the target machine's independently checked fingerprint.
+Run `clawdline cloud viewer pair --machine MACHINE_ID --fingerprint FINGERPRINT`, then run the
+printed one-time `clawdline cloud pair --offer` line on that target machine. Never put the offer in
+a report. `clawdline cloud viewer sessions [--machine MACHINE_ID]` returns each machine's verified
+status projection; an unavailable or incomplete projection is not an empty Session list.
+
+For `read`, `send`, `answer`, `interrupt`, `end`, and `receipt`, pass all of `--machine MACHINE_ID`,
+`--session SESSION_ID`, and `--generation GENERATION` from one current row. `GENERATION` is 32
+lowercase hexadecimal characters. `read` returns the newest transcript page and `next_before`
+when older messages remain. Fetch
+one older page with the same three values and `--before NEXT_BEFORE`, repeating only while the
+reply supplies another cursor. Every page rechecks the current execution; do not invent a cursor
+or treat the first 200 entries as the complete conversation. `send` needs `--text`; `answer` needs a displayed option's
+`--answer` key and `--expect` question fingerprint. An Agent may not invent either. A mutation
+prints its request ID before sending. Keep that ID; after an uncertain result use
+`clawdline cloud viewer receipt` with the same three target values, `--action ACTION`, and
+`--request REQUEST_ID`. A receipt lookup never resends the action. Revoked pairing, stale status,
+changed generation, missing capability, and offline machines stop the operation. The local
+`/v1/cloud/viewer/` routes require this daemon's own local token; a paired remote device cannot
+use them. Treat the route inventory as discovery and prefer the CLI contract above.
 
 **Where things are.**
 
@@ -975,6 +1050,21 @@ curl -sS -X POST "http://127.0.0.1:$PORT/v1/orchestrator/tasks/$TASK_ID/verifica
 It lands only on a record whose `schedule_id` is the schedule that started this task
 (`schedule_mismatch` otherwise), is signed `task:<task id>`, and is refused as `not_scheduled` for a
 task no schedule started. Find the record id with `clawdline verify list`.
+
+**Write every readout, note and verdict reason on a record for the person, not for another agent.**
+Whoever writes it — a scheduled task, a session using `clawdline verify note`, or a session closing
+the record with `clawdline verify done` — the person reads it on a phone and decides from it:
+
+- Open with the answer in one plain sentence: does the change hold, and what do you suggest
+  (accept, reject, or cannot tell yet).
+- Then one short line per criterion, in its order: the suggested state (passed, failed, cannot
+  tell) and the one or two numbers that decide it, as "before → after".
+- Say a caveat in everyday words ("most of the drop is because the tasks themselves got smaller"),
+  not as statistics. No tables, percentiles, test statistics or lists of task ids unless the person
+  asked; at most three caveats.
+- A verdict reason is one sentence.
+
+If a sentence needs the reader to know this codebase's internals to follow it, rewrite it.
 
 ## 7. Report your own finished turn
 

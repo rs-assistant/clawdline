@@ -84,7 +84,7 @@ var Order = []string{
 // team switcher lists them. The console names them; the catalog only says
 // which. A persona may belong to several: the same role is at home in more
 // than one team.
-var Teams = []string{"engineering", "marketing", "product", "quality", "operations", "design", "business"}
+var Teams = []string{"engineering", "marketing", "product", "quality", "operations", "design", "business", "custom"}
 
 func knownTeam(team string) bool {
 	for _, t := range Teams {

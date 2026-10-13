@@ -1,7 +1,9 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -12,6 +14,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/config"
+	"github.com/sainteye/clawdline/internal/domain/auth"
 	"github.com/sainteye/clawdline/internal/domain/icon"
 )
 
@@ -69,6 +72,68 @@ func TestExplicitPlaceIsListedWithoutAssistantHistory(t *testing.T) {
 	}
 	if _, err := s.projectReaders().lifecycle.Resolve(answer.Places[0].ProjectID); err != nil {
 		t.Fatalf("registered Project cannot open repository detail: %v", err)
+	}
+}
+
+func TestRegisterProjectIsImmediatelyInServingDaemonsPlaces(t *testing.T) {
+	home := placesHome(t)
+	state := filepath.Join(home, ".config", "clawdline-next")
+	dir := filepath.Join(home, "projects", "new-app")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{cfg: config.Config{Dir: state}, icons: &icon.Registry{}}
+	post := httptest.NewRequest(http.MethodPost, "/v1/places", strings.NewReader(`{"paths":["`+dir+`"]}`))
+	post = post.WithContext(context.WithValue(post.Context(), accessKey{}, access{machine: true}))
+	response := httptest.NewRecorder()
+	s.placesRoute(response, post)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), dir) {
+		t.Fatalf("registration = %d %s", response.Code, response.Body.String())
+	}
+	visible := httptest.NewRecorder()
+	s.placesRoute(visible, httptest.NewRequest(http.MethodGet, "/v1/places", nil))
+	if visible.Code != http.StatusOK || !strings.Contains(visible.Body.String(), dir) {
+		t.Fatalf("start places after registration = %d %s", visible.Code, visible.Body.String())
+	}
+	blocked := httptest.NewRecorder()
+	s.placesRoute(blocked, httptest.NewRequest(http.MethodDelete, "/v1/places", strings.NewReader(`{"paths":["`+dir+`"]}`)))
+	if blocked.Code != http.StatusForbidden {
+		t.Fatalf("unprivileged removal = %d", blocked.Code)
+	}
+	rows, err := s.projectReaders().registry.List()
+	if err != nil || len(rows) != 1 || rows[0].Path != dir {
+		t.Fatalf("registry after blocked removal = %#v, %v", rows, err)
+	}
+}
+
+func TestRemoveProjectHidesRecordedAndLivePlaceUntilReadded(t *testing.T) {
+	home := placesHome(t)
+	state := filepath.Join(home, ".config", "clawdline-next")
+	dir := filepath.Join(home, "projects", "recorded")
+	recordPlace(t, home, dir)
+	s := &Server{cfg: config.Config{Dir: state}, icons: &icon.Registry{}}
+	read := func() []projects.Place { return s.projectReaders().places.List([]string{dir}, 40) }
+	if len(read()) != 1 {
+		t.Fatalf("recorded place absent before remove: %#v", read())
+	}
+	request := httptest.NewRequest(http.MethodDelete, "/v1/places", strings.NewReader(`{"paths":["`+dir+`"]}`))
+	request = request.WithContext(context.WithValue(request.Context(), accessKey{}, access{verdict: auth.Verdict{Allowed: true, Caps: auth.NewCaps(auth.Read, auth.Send)}}))
+	response := httptest.NewRecorder()
+	s.placesRoute(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("remove = %d %s", response.Code, response.Body.String())
+	}
+	if len(read()) != 0 {
+		t.Fatalf("removed place restored by history or live session: %#v", read())
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("directory removed: %v", err)
+	}
+	if _, err := s.projectReaders().registry.Add([]string{dir}, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if len(read()) != 1 {
+		t.Fatalf("place absent after add: %#v", read())
 	}
 }
 

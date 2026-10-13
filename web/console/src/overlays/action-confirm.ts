@@ -14,9 +14,10 @@ import {
   type Closeable,
 } from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
+import { pressKey } from "../press-key.js"
 import { readSessionWorkV2, type DirectTodoV2, type WorkV2Item } from "../pages/work/api.js"
 import { toast, toastFailure } from "./toast.js"
-import { refusedReasons, releasableItems } from "./close-release.js"
+import { processRecovery, refusedReasons, releasableItems } from "./close-release.js"
 
 /**
  * The second press before a session-changing action reaches the daemon —
@@ -86,6 +87,9 @@ interface Pending {
   release: string[]
   /** True only after the daemon disclosed the obligations this decision overrides. */
   force: boolean
+  processOnly: boolean
+  /** A process no terminal reaches (`processRecovery`): one warning, one forced press. */
+  recovery: boolean
   /** The decision's own id, which is the close's `Idempotency-Key`. */
   request: string
 }
@@ -243,13 +247,17 @@ export const ActionConfirm = {
     const release = closes(kind) && pinned
       ? releasableItems((row as { closeability?: Parameters<typeof releasableItems>[0] } | null)?.closeability)
       : []
+    // A process no terminal reaches: this sheet's warning is the whole
+    // question, so its press goes forced and there is no work to look up.
+    const recovery = closes(kind) && processRecovery(id, (row as { closeability?: Parameters<typeof processRecovery>[1] } | null)?.closeability)
     this.pending = {
       id, kind, action, opener: returnFocus, ask: ask || null, lost, why,
       closeNotes: closes(kind) ? closeabilityPlainReasons(row) : [],
       closeability: closeable && closeable.state, help, work: [], recentWork: [], directTodos: [],
       closeabilityVersion: pinned,
-      workState: closes(kind) && !unstartedCodex ? "loading" : "ready", workTruncated: false,
-      release, force: release.length > 0, request: mintRequest(),
+      workState: closes(kind) && !unstartedCodex && !recovery ? "loading" : "ready", workTruncated: false,
+      release, force: release.length > 0 || recovery, processOnly: /^(tty|pts\/)/.test(id), recovery,
+      request: mintRequest(),
     }
     this.busy = false
     sheet.dataset.kind = kind
@@ -275,7 +283,7 @@ export const ActionConfirm = {
     const cancel = node<HTMLButtonElement>("action-confirm-cancel")
     const first = ((asked && asked.focus === "cancel") || this.pending.workState === "loading") && cancel ? cancel : go
     first.focus({ preventScroll: true })
-    if (closes(kind) && !unstartedCodex) void this.loadOpenWork(this.pending)
+    if (closes(kind) && !unstartedCodex && !recovery) void this.loadOpenWork(this.pending)
   },
 
   async loadOpenWork(pending: Pending): Promise<void> {
@@ -313,6 +321,15 @@ export const ActionConfirm = {
     lede.className = "end-work-lede"
     lede.textContent = pending.kind === "archive" ? nextWord("archiveSay") : T.webConfirmEndSay
     say.appendChild(lede)
+
+    if (pending.recovery) {
+      const status = document.createElement("p")
+      status.className = "end-work-status is-warning"
+      status.textContent = nextWord("endProcessRecoveryWarning")
+      say.appendChild(status)
+      this.renderTechnical(pending.why, pending.help?.detailsLabel)
+      return
+    }
 
     if (lost && lost.length) {
       const section = document.createElement("section")
@@ -400,6 +417,9 @@ export const ActionConfirm = {
     } else if (help && recordedWorkClear) {
       statusClass = "is-ready"
       statusCopy = nextWord("endWorkReadyToClose")
+    } else if (pending.processOnly && (closeability === "unknown" || pending.force)) {
+      statusClass = "is-warning"
+      statusCopy = nextWord("endProcessRecoveryWarning")
     } else if (closeNotes.length && !release.length) {
       statusClass = "is-warning"
       const notes = closeNotes.map((note) => note.count > 1 ? `${note.text} (${note.count})` : note.text)
@@ -631,6 +651,8 @@ export const ActionConfirm = {
         ? archiving
           ? recordedWorkClear ? nextWord("archiveGo") : nextWord("archiveAnyway")
           : recordedWorkClear ? nextWord("endWorkConfirmClose") : help.confirmLabel
+        : this.pending?.force && this.pending.processOnly
+          ? nextWord("endProcessRecoveryGo")
         : this.pending?.force
           ? archiving ? nextWord("archiveAnyway") : T.webConfirmEndAnyway
           : this.pending?.kind === "end"
@@ -669,27 +691,9 @@ let endWasOpen = false
 /** Which close is in flight: the words of its ending and where a refusal reopens. */
 let endKind: CloseKind = "end"
 
-/**
- * A fresh request id for one decision.
- *
- * `crypto.randomUUID` only exists in a secure context, and this console is
- * served over plain http on a LAN, so the fallback is the one `press-holds.ts`
- * uses: it has to be unrepeated, not unguessable.
- */
-let minted = 0
+/** A fresh request id for one decision; the console's own (`press-key.ts`). */
 function mintRequest(): string {
-  const c = globalThis.crypto
-  if (typeof c?.randomUUID === "function") {
-    try {
-      return c.randomUUID()
-    } catch {
-      /* below */
-    }
-  }
-  minted += 1
-  const bytes = new Uint8Array(8)
-  c.getRandomValues(bytes)
-  return "close-" + minted + "-" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")
+  return pressKey("close")
 }
 
 /** `false` is the only answer that tells the sheet nothing is coming back. */
@@ -749,10 +753,14 @@ export function endedIfGone(ids: ReadonlySet<string>): void {
   if (id && !ids.has(id) && endKind !== "archive") finishEnd(id, endTicket, true)
 }
 
-/** `SessionActions.prompt`: one command typed into the session, acknowledged with a toast. */
+/**
+ * `SessionActions.prompt`: one command typed into the session, acknowledged
+ * with a toast, under the press's own key — a machine read through Clawdline
+ * Cloud refuses a `send` that names no request.
+ */
 function prompt(action: string, id: string): void {
   if (!id || !host.writable()) return
-  client.send(id, action).then(
+  client.send(id, action, pressKey("command")).then(
     () => toast(action + " ✓"),
     (e) => toastFailure(e, T.webRequestFailed),
   )

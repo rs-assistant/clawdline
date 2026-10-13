@@ -2,6 +2,7 @@ package cloudops
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
 	"reflect"
@@ -168,6 +169,24 @@ func TestAReadDoesNotNeedTheWriteSwitch(t *testing.T) {
 		"type": "transcript", "session": pane, "limit": 200}))
 	if answer.Status != 200 || len(r.seen) != 1 {
 		t.Fatalf("a read was refused with the switch off: %+v", answer)
+	}
+}
+
+func TestTranscriptHistoryReadCarriesCursorAndDistinctAnswer(t *testing.T) {
+	r := &router{}
+	bridge := Bridge{MachineID: "mac-01", Router: r}
+	answer := bridge.Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "transcript", "session": pane, "limit": 200, "before": 12345}))
+	if answer.Status != 200 || answer.Name != "transcript.before.12345" || len(r.seen) != 1 {
+		t.Fatalf("paged read: %+v, routes %+v", answer, r.seen)
+	}
+	if got := r.last().Query["before"]; got != "12345" {
+		t.Fatalf("local query before = %q", got)
+	}
+	bad := bridge.Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "transcript", "session": pane, "limit": 200, "before": -1}))
+	if bad.Code != "malformed_read" || len(r.seen) != 1 {
+		t.Fatalf("invalid cursor reached route: %+v, routes %+v", bad, r.seen)
 	}
 }
 
@@ -529,7 +548,7 @@ func TestTheAuthorityIsRereadAtThePointOfNoReturn(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			r := &router{}
 			b := open(r)
-			b.Authority = func(context.Context, string, bool) Authority { return c.say }
+			b.Authority = func(context.Context, string, ed25519.PublicKey, bool) Authority { return c.say }
 			answer := b.Handle(context.Background(), request(t, ClassCtl, map[string]any{
 				"type": "focus", "session": pane, "request": "req"}))
 			if answer.Code != c.code || answer.Status != c.status {
@@ -549,7 +568,7 @@ func TestTheAuthorityIsRereadAtThePointOfNoReturn(t *testing.T) {
 	// And with every permission in hand it routes.
 	r := &router{}
 	b := open(r)
-	b.Authority = func(context.Context, string, bool) Authority { return ready }
+	b.Authority = func(context.Context, string, ed25519.PublicKey, bool) Authority { return ready }
 	if answer := b.Handle(context.Background(), request(t, ClassCtl, map[string]any{
 		"type": "focus", "session": pane, "request": "req"})); answer.Status != 200 {
 		t.Fatalf("a permitted command was refused: %+v", answer)
@@ -562,7 +581,7 @@ func TestTheAuthorityIsRereadAtThePointOfNoReturn(t *testing.T) {
 func TestOnlyTheWriteWordsAskForTheWriteGate(t *testing.T) {
 	var asked []bool
 	b := Bridge{MachineID: "mac-01", Router: &router{}}
-	b.Authority = func(_ context.Context, _ string, requiresWriteGate bool) Authority {
+	b.Authority = func(_ context.Context, _ string, _ ed25519.PublicKey, requiresWriteGate bool) Authority {
 		asked = append(asked, requiresWriteGate)
 		return Authority{ClockReady: true, RosterReadable: true, RosterAllowsSender: true,
 			WriteGateAllows: !requiresWriteGate}
@@ -727,17 +746,16 @@ func TestTheVocabularyAndTheImplementedListAgreeWithTheCatalog(t *testing.T) {
 		}
 	}
 	// The daemon's published list must not promise what it refuses.
-	for _, word := range []string{"skills",
-		"diagnostics.report", "diagnostics.events", "dispatch"} {
+	for _, word := range []string{"diagnostics.report", "dispatch"} {
 		if implemented[word] {
 			t.Fatalf("%s is advertised and has no local capability", word)
 		}
 	}
 	for _, word := range []string{"send", "answer", "end", "focus", "interrupt", "smart-title", "start", "resume", "voice", "intents", "agent", "shell",
-		"transcript", "info", "git", "git-diff", "screen", "image", "documents", "document", "places",
+		"transcript", "info", "skills", "git", "git-diff", "screen", "image", "documents", "document", "places",
 		"past-sessions", "schedules", "coordination.leases", "coordination.waits", "coordination.pauses", "schedule", "schedule-create", "schedule-update", "schedule-delete",
 		"schedule-run", "schedule-webhook-bind-v1", "snippets", "snippet-create", "snippet-update", "snippet-delete",
-		"snippet-order", "push-key", "push-subscribe", "push-unsubscribe", "push-test",
+		"snippet-order", "push-key", "push-subscribe", "push-unsubscribe", "push-test", "diagnostics.events",
 		"board", "board-command", "board.items", "timeline", "projects", "project-file-list", "project-file-read", "project-file-save", "project-tree-list", "project-tree-read", "project-unify-plan", "project-unify-apply", "project-worktree-lifecycle",
 		"project-worktree-lifecycle-refresh", "capacity", "default-models", "default-models-update", "work-gate-settings", "work-gate-settings-update", "machine-usage", "update", "update-apply", "personas",
 		"work.proposals", "work.decisions", "work.decision", "work.digests",
@@ -1129,6 +1147,11 @@ func TestSessionsSnapshotAnswersTheIdsThePublisherStated(t *testing.T) {
 		{"type": "sessions.snapshot", "session": MachineReplySession, "request": "req-1", "orchestrator": true},
 		{"type": "sessions.snapshot", "session": MachineReplySession, "request": "req-1", "initial": false},
 		{"type": "sessions.snapshot.initial", "session": MachineReplySession, "request": "req-1"},
+		// The page's own first recovery when it holds no `orch/` snapshot:
+		// `_askSessionSnapshot` in web/console/src/legacy/js/net/cloud-client.js
+		// sends `Object.assign({request}, {orchestrator: true})` under the
+		// initial word (refused as malformed_read before 2026-10-09).
+		{"type": "sessions.snapshot.initial", "session": MachineReplySession, "request": "req-1", "orchestrator": true},
 	} {
 		answer := bridge.Handle(context.Background(), request(t, ClassCtl, body))
 		if answer.Session != MachineReplySession || answer.Name != "read:req-1" || !answer.OK() {
@@ -1140,7 +1163,7 @@ func TestSessionsSnapshotAnswersTheIdsThePublisherStated(t *testing.T) {
 			t.Fatalf("the answer said %s", got)
 		}
 	}
-	if !reflect.DeepEqual(firsts, []bool{true, true, false, true}) {
+	if !reflect.DeepEqual(firsts, []bool{true, true, false, true, true}) {
 		t.Fatalf("the publisher saw first attempts %v", firsts)
 	}
 
@@ -1150,13 +1173,15 @@ func TestSessionsSnapshotAnswersTheIdsThePublisherStated(t *testing.T) {
 		{"type": "sessions.snapshot", "session": MachineReplySession, "request": "req-1", "orchestrator": false},
 		{"type": "sessions.snapshot", "session": MachineReplySession, "request": "req-1", "extra": 1},
 		{"type": "sessions.snapshot", "session": "%19", "request": "req-1"},
+		{"type": "sessions.snapshot.initial", "session": MachineReplySession, "request": "req-1", "orchestrator": false},
+		{"type": "sessions.snapshot.initial", "session": MachineReplySession, "request": "req-1", "initial": true},
 	} {
 		answer := bridge.Handle(context.Background(), request(t, ClassCtl, body))
 		if answer.Code != "malformed_read" {
 			t.Fatalf("%v answered %q, wanted malformed_read", body, answer.Code)
 		}
 	}
-	if len(firsts) != 4 {
+	if len(firsts) != 5 {
 		t.Fatalf("a malformed request asked the publisher (%d)", len(firsts))
 	}
 
@@ -1844,7 +1869,7 @@ func TestLocalRefusalDetailKeyCrossesCloudOnlyWhenTheWriterProvidedIt(t *testing
 func TestBridgeFixedClockRefusalCarriesKeyButDynamicCopyDoesNot(t *testing.T) {
 	r := &router{}
 	b := open(r)
-	b.Authority = func(context.Context, string, bool) Authority {
+	b.Authority = func(context.Context, string, ed25519.PublicKey, bool) Authority {
 		return Authority{RosterReadable: true, RosterAllowsSender: true, WriteGateAllows: true}
 	}
 	answer := b.Handle(context.Background(), request(t, ClassCtl, map[string]any{

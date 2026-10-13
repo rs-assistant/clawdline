@@ -69,7 +69,7 @@ func newDirectFixture(t *testing.T) *directFixture {
 		PublicKeyFor: func(sender string) (ed25519.PublicKey, bool) {
 			return f.viewer.PublicKey(), sender == "viewer"
 		},
-		Inbound: func(_ domaincloud.Envelope, plain []byte) { f.inbound <- plain },
+		Inbound: func(_ domaincloud.Envelope, plain []byte, _ ed25519.PublicKey) { f.inbound <- plain },
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -674,14 +674,14 @@ func TestTerminalRosterReadIsDatedFromItsStart(t *testing.T) {
 	}))
 	defer server.Close()
 	l := &Link{opts: LinkOptions{Now: clock}, roster: adaptercloud.NewRoster(server.URL, "credential", clock)}
-	if !l.terminalRosterFresh() {
+	if !l.rosterFresh() {
 		t.Fatal("first read failed")
 	}
 	// 1.5 s into the cache's life by the read's end; 2.1 s since it began.
 	mu.Lock()
 	now = now.Add(600 * time.Millisecond)
 	mu.Unlock()
-	l.terminalRosterFresh()
+	l.rosterFresh()
 	if reads.Load() != 2 {
 		t.Fatalf("a read that began %v ago was still trusted", CloudTerminalRosterRefreshLimit*time.Second+100*time.Millisecond)
 	}

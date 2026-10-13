@@ -384,7 +384,7 @@ func machineScoped(p string) bool {
 		// Storing a session's pictures is the orchestrator's (images.go); the
 		// handler refuses a device, as the Swift app does.
 		return true
-	case "/v1/update", "/v1/update/apply":
+	case "/v1/update", "/v1/update/fresh", "/v1/update/apply":
 		// `clawdline update` on this machine reads its own daemon's answer,
 		// and `--apply` asks it to install a release and follows the update
 		// (update.go); a device needs send to apply.
@@ -441,6 +441,10 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 	}
 	send := v.Allowed && v.Caps.Has(auth.Send)
 	switch {
+	case strings.HasPrefix(p, "/v1/cloud/peer/"):
+		if !send {
+			return http.StatusForbidden, "forbidden", "This device may read, and not send peer work."
+		}
 	case p == "/v1/orchestrator/schedules" || strings.HasPrefix(p, "/v1/orchestrator/schedules/"):
 		// Two doors, as in the Swift app: a device that may send, or this
 		// machine's orchestrator.
@@ -481,6 +485,12 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 		// machine's own token changes them.
 		if !(v.Allowed && v.Local) {
 			return http.StatusForbidden, "forbidden", "Only this machine's own token may change its settings."
+		}
+	case p == "/v1/settings/browser":
+		// The handler limits this route to controls shown by the local browser.
+		// Cloud's carry table deliberately has no entry for it.
+		if !(v.Allowed && (v.Local || send)) {
+			return http.StatusForbidden, "forbidden", "This device may read, and not change machine settings."
 		}
 	case p == "/v1/settings/default-models":
 		// This narrow route is the Settings surface carried to a paired phone.

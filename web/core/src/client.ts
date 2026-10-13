@@ -73,12 +73,21 @@ export class ClawdlineClient {
   coordinator(): Promise<CoordinatorSnapshot> {
     return this.get(routes.coordinator)
   }
-  transcript(id: string, limit = 40): Promise<TranscriptPage> {
-    return this.get(`${routes.transcript}?session=${encodeURIComponent(id)}&limit=${limit}`)
+  transcript(id: string, limit = 40, before?: number): Promise<TranscriptPage> {
+    return this.get(`${routes.transcript}?session=${encodeURIComponent(id)}&limit=${limit}${before ? `&before=${before}` : ""}`)
   }
 
-  agentTranscript(id: string, agent: string, limit = 40): Promise<TranscriptPage> {
-    return this.get(`${sessionRoutes.agent(id, agent)}?limit=${limit}`)
+  /**
+   * Only what was appended to a session's record since `after`, a page's
+   * `nextAfter`. The daemon refuses a cursor it cannot read from
+   * (`transcript_cursor_stale`), and the newest page is then read whole.
+   */
+  transcriptAfter(id: string, limit: number, after: number): Promise<TranscriptPage> {
+    return this.get(`${routes.transcript}?session=${encodeURIComponent(id)}&limit=${limit}&after=${after}`)
+  }
+
+  agentTranscript(id: string, agent: string, limit = 40, before?: number): Promise<TranscriptPage> {
+    return this.get(`${sessionRoutes.agent(id, agent)}?limit=${limit}${before ? `&before=${before}` : ""}`)
   }
 
   strings(): Promise<Record<string, string>> {
@@ -91,9 +100,24 @@ export class ClawdlineClient {
    * A resolved promise means the bytes reached the tty. It does not mean the
    * assistant read them — that is a separate fact, and the fleet list is where
    * it is answered. Nothing built on this may report it as delivery.
+   *
+   * `request` is the sender's own id, and it becomes the `Idempotency-Key`, as
+   * it is for `close`: the daemon answers a retry under it with the first
+   * answer instead of typing the line a second time (`sessionWrite`,
+   * internal/transport/http/actions.go). The composer sends its card's own
+   * durable request (`session/sender.ts`); a one-line press mints one per
+   * press (`console/src/press-key.ts`).
+   *
+   * It is required rather than optional because a machine read through
+   * Clawdline Cloud refuses a `send` that names no request
+   * (`cloud/relay-writer.ts`), so a caller that passes nothing does not reach
+   * that machine at all: from 20f03679, which made the key compulsory there,
+   * until this parameter existed, the model switch on a Session card read
+   * through Cloud answered `idempotency_key_required` and changed nothing.
+   * The compiler is the guard — there is no unkeyed send to write.
    */
-  send(id: string, text: string): Promise<ActionResult> {
-    return this.post(sessionRoutes.send(id), { text })
+  send(id: string, text: string, request: string): Promise<ActionResult> {
+    return this.post(sessionRoutes.send(id), { text }, { "Idempotency-Key": request })
   }
 
   interrupt(id: string): Promise<ActionResult> {

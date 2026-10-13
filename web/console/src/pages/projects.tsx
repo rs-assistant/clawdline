@@ -1,6 +1,7 @@
 import { catalogFormat, catalogWord, catalogWordLanguage, currentCatalogTag } from "../catalog.js"
 import { createPortal } from "react-dom"
 import { ProjectTools } from "./projects/ProjectTools.js"
+import { ProjectFolderPicker } from "./projects/ProjectFolderPicker.js"
 import type { ProjectSetupHandle } from "./projects/ProjectSetup.js"
 import { localizePinnedProjectStatus, projectOpenLabel } from "./projects/project-list.js"
 import { decoratePinnedWorktree } from "./projects/pinned-worktree-copy.js"
@@ -14,11 +15,22 @@ import { nextWord, type NextWord } from "../next-strings.js"
 import { workPageHash } from "../page-route.js"
 import { openTerminalPage } from "./terminal/navigate.js"
 import { showProjectRefusalDetail } from "./projects/refusal-detail.js"
+import { removeProjectPlace } from "./work/api.js"
+import { failureSentence } from "../legacy/bridge.js"
+import { arriveAtDetail, detailInHash, enterDetail, leaveDetail } from "../page-detail.js"
+import "../page-bar.css"
+
+/** An opened Project is `#page=projects&id=<place id>` (page-detail.ts). */
+const PROJECTS_ADDRESS = {
+  enter: (id: string) => enterDetail("projects", id),
+  leave: () => leaveDetail("projects"),
+}
 
 type ProjectTarget = {
   id: string
   label?: string
   path?: string
+  activeItemCount?: number
 }
 type BoundProjects = ProjectsPage & {
   state: ProjectsPage["state"] & { places?: ProjectTarget[] | null; place?: ProjectTarget | null }
@@ -47,12 +59,49 @@ type BoundProjects = ProjectsPage & {
  * close first is open.
  */
 function ProjectsPageView({ shown }: { shown: boolean }) {
-  const [iconHost, setIconHost] = useState<HTMLElement | null>(null)
-  useLayoutEffect(() => { setIconHost(document.getElementById("project-icon-copy-host")) }, [])
+  const [toolsHost, setToolsHost] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => { setToolsHost(document.getElementById("project-tools-host")) }, [])
   const page = useRef<BoundProjects | null>(null)
   const setup = useRef<ProjectSetupHandle>(null)
   const was = useRef(false)
   const painted = useRef(false)
+  const [removeTarget, setRemoveTarget] = useState<ProjectTarget | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
+  const [removeBusy, setRemoveBusy] = useState(false)
+  const [removeError, setRemoveError] = useState("")
+  const removeDialog = useRef<HTMLDialogElement>(null)
+
+  useLayoutEffect(() => {
+    const button = document.getElementById("projects-add")
+    if (!button) return
+    button.textContent = catalogWord("projects", "addButton")
+    const open = () => setAddOpen(true)
+    button.addEventListener("click", open)
+    return () => button.removeEventListener("click", open)
+  }, [])
+
+  useLayoutEffect(() => {
+    const dialog = removeDialog.current
+    if (!dialog) return
+    if (removeTarget && !dialog.open) dialog.showModal()
+    if (!removeTarget && dialog.open) dialog.close()
+  }, [removeTarget])
+
+  async function confirmRemove() {
+    if (!removeTarget?.path || removeBusy) return
+    setRemoveBusy(true)
+    setRemoveError("")
+    try {
+      await removeProjectPlace({ id: removeTarget.id, label: removeTarget.label || removeTarget.path,
+        path: removeTarget.path })
+      setRemoveTarget(null)
+      void page.current?.enter()
+    } catch (error) {
+      setRemoveError(failureSentence(error, nextWord("projectsRemoveFailed")))
+    } finally {
+      setRemoveBusy(false)
+    }
+  }
 
   useLayoutEffect(() => {
     const root = document.getElementById("project-worktree-lifecycle")
@@ -73,7 +122,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   }, [])
 
   useLayoutEffect(() => {
-    const bound = page.current ?? (bindProjects(document, navigate) as BoundProjects)
+    const bound = page.current ?? (bindProjects(document, navigate, PROJECTS_ADDRESS) as BoundProjects)
     page.current = bound
     const openWork = (project: ProjectTarget) => {
       const path = typeof project.path === "string" ? project.path.trim() : ""
@@ -133,6 +182,9 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       for (const button of rows.querySelectorAll<HTMLButtonElement>("button.project-row[data-place-id]")) {
         const place = page.current?.state.places?.find((candidate) => candidate.id === button.dataset.placeId)
         if (!place) continue
+        if (!Number.isSafeInteger(place.activeItemCount) || (place.activeItemCount ?? -1) < 0) {
+          button.querySelector(".project-row-activity")?.remove()
+        }
         const name = place.label || place.path || ""
         const label = projectOpenLabel(name, null, false)
         if (button.getAttribute("aria-label") !== label) button.setAttribute("aria-label", label)
@@ -175,6 +227,16 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
         </svg>`
         wrapper.classList.add("has-terminal")
         wrapper.appendChild(terminal)
+        const remove = document.createElement("button")
+        remove.type = "button"
+        remove.className = "project-row-remove"
+        remove.dataset.placeId = project.dataset.placeId
+        remove.title = nextWord("projectsRemove")
+        remove.setAttribute("aria-label", nextWord("projectsRemoveFor", { project: name }))
+        remove.setAttribute("aria-haspopup", "dialog")
+        remove.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5"/></svg>`
+        wrapper.classList.add("has-remove")
+        wrapper.appendChild(remove)
       }
       const localizedStatus = localizePinnedProjectStatus(status.textContent ?? "")
       if (localizedStatus !== status.textContent) status.textContent = localizedStatus
@@ -194,8 +256,15 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       const project = page.current?.state.places?.find((place) => place.id === button.dataset.placeId)
       if (project?.path) openTerminalPage(project.path)
     }
+    const onRemove = (ev: Event) => {
+      const button = (ev.target as Element | null)?.closest<HTMLButtonElement>("button.project-row-remove[data-place-id]")
+      if (!button || !rows.contains(button)) return
+      const project = page.current?.state.places?.find(place => place.id === button.dataset.placeId)
+      if (project?.path) { setRemoveError(""); setRemoveTarget(project) }
+    }
     rows.addEventListener("click", onSettings)
     rows.addEventListener("click", onTerminal)
+    rows.addEventListener("click", onRemove)
     const observer = new MutationObserver(decorate)
     observer.observe(rows, { childList: true, subtree: true })
     observer.observe(status, { childList: true })
@@ -204,6 +273,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       observer.disconnect()
       rows.removeEventListener("click", onSettings)
       rows.removeEventListener("click", onTerminal)
+      rows.removeEventListener("click", onRemove)
     }
   }, [])
 
@@ -224,7 +294,13 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
         painted.current = true
         paintNextWords(document.getElementById("projects"))
       }
-      void page.current?.enter()
+      const add = document.getElementById("projects-add")
+      if (add) add.textContent = catalogWord("projects", "addButton")
+      // An address that names a Project (a reload, a link) opens it once the
+      // list is read, with the list put under it as one Back step.
+      const wanted = detailInHash("projects", location.hash)
+      if (wanted) arriveAtDetail("projects", wanted)
+      void page.current?.enter(wanted)
       document.getElementById("projects-title")?.focus({ preventScroll: true })
     }
     const root = document.documentElement
@@ -239,6 +315,22 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
     })
     watch.observe(root, { attributes: true, attributeFilter: ["class"] })
     return () => watch.disconnect()
+  }, [shown])
+
+  // Back, Forward and a typed address move the open Project the way the
+  // page's own back control does.
+  useLayoutEffect(() => {
+    if (!shown) return
+    const follow = () => {
+      if (!/(?:^|[#&])page=projects(?:&|$)/.test(location.hash)) return
+      void page.current?.follow(detailInHash("projects", location.hash))
+    }
+    window.addEventListener("popstate", follow)
+    window.addEventListener("hashchange", follow)
+    return () => {
+      window.removeEventListener("popstate", follow)
+      window.removeEventListener("hashchange", follow)
+    }
   }, [shown])
 
   useLayoutEffect(() => {
@@ -267,9 +359,21 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       hidden={!shown}
       dangerouslySetInnerHTML={{ __html: sectionMarkup }}
     />
-    {iconHost && createPortal(<>
+    {toolsHost && createPortal(<>
       <ProjectTools shown={shown} changed={() => { void page.current?.enter() }} setupRef={setup} />
-    </>, iconHost)}
+    </>, toolsHost)}
+    <ProjectFolderPicker open={addOpen} onClose={() => setAddOpen(false)} onAdded={() => { void page.current?.enter() }} />
+    <dialog className="project-remove-dialog" ref={removeDialog}
+      onCancel={(event) => { if (removeBusy) event.preventDefault() }}
+      onClose={() => { if (!removeBusy) setRemoveTarget(null) }}>
+      <h2>{nextWord("projectsRemoveTitle")}</h2>
+      <p>{nextWord("projectsRemoveDescription", { project: removeTarget?.label || removeTarget?.path || "" })}</p>
+      {removeError && <p className="project-remove-error" role="alert">{removeError}</p>}
+      <div className="project-remove-actions">
+        <button type="button" disabled={removeBusy} onClick={() => setRemoveTarget(null)}>{nextWord("projectsRemoveCancel")}</button>
+        <button type="button" disabled={removeBusy} onClick={() => void confirmRemove()}>{removeBusy ? nextWord("projectsRemoveBusy") : nextWord("projectsRemoveConfirm")}</button>
+      </div>
+    </dialog>
     </>
   )
 }

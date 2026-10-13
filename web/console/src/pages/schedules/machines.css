@@ -9,7 +9,8 @@
   overflow-wrap: anywhere;
 }
 
-.schedule-machine[data-state="unanswered"] {
+.schedule-machine[data-state="unanswered"],
+.schedule-machine[data-state="loading"] {
   padding-bottom: 10px;
   font-weight: 400;
 }
@@ -18,3 +19,4 @@
 .schedule-row + .schedule-machine { border-top: 1px solid var(--line); }
 
 #schedule-machine-block[hidden] { display: none; }
+.schedules > #schedules-state { margin: 6px 12px; color: var(--dim); font-size: 12px; }

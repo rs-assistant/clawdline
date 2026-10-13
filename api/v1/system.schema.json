@@ -125,6 +125,7 @@
         "console": { "$ref": "#/$defs/ConsoleDiagnostics" },
         "platform": { "$ref": "#/$defs/PlatformDiagnostics" },
         "proposals": { "$ref": "#/$defs/ProposalDiagnostics" },
+        "routes": { "$ref": "#/$defs/RouteStats" },
         "dir": { "type": "string" },
         "ok": { "type": "boolean" },
         "port": { "type": "integer" },
@@ -199,6 +200,64 @@
         "matched": { "type": "boolean" },
         "oldest_pending_at": { "type": "integer", "description": "When the proposal waiting longest was made. Absent when none waits." },
         "error": { "type": "string", "description": "The counts could not be read; every number beside it is zero and means nothing." }
+      }
+    },
+    "RouteStats": {
+      "description": "/v1/diagnostics.routes: every API call this daemon answered since it started, by route shape and caller. A key is the method and the pattern the mux matched; below a prefix pattern only fixed route words are spelled out and every other segment is `:id`, and the query is never read, so no session id, name or text appears. Counters are never reset: compare two readings by subtracting them. Absent from a daemon without the counter.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["since", "key_limit", "latency_samples", "overflow", "routes"],
+      "properties": {
+        "since": { "description": "When counting started: the daemon's start, Unix seconds.", "type": "integer" },
+        "key_limit": { "description": "How many distinct route shapes are counted (capacity `diagnostics.route_stat_keys`).", "type": "integer" },
+        "latency_samples": { "description": "How many recent durations each route keeps for its percentiles (capacity `diagnostics.route_latency_samples`).", "type": "integer" },
+        "overflow": { "description": "Calls not counted under a route of their own because the table was full.", "type": "integer" },
+        "routes": { "type": "array", "items": { "$ref": "#/$defs/RouteStat" } }
+      }
+    },
+    "RouteStat": {
+      "description": "One route shape's counts. A long-lived event stream counts `opens` and `open` and has no latency.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "route", "count", "status_2xx", "status_3xx", "status_4xx", "status_5xx", "callers", "stream"],
+      "properties": {
+        "method": { "description": "The HTTP method, or OTHER.", "type": "string" },
+        "route": { "description": "The route shape, e.g. `/v1/sessions/:id/info`.", "type": "string" },
+        "count": { "description": "Calls answered; a stream is counted when it ends.", "type": "integer" },
+        "status_2xx": { "type": "integer" },
+        "status_3xx": { "type": "integer" },
+        "status_4xx": { "type": "integer" },
+        "status_5xx": { "type": "integer" },
+        "callers": { "$ref": "#/$defs/RouteCallers" },
+        "stream": { "description": "This route answered as an event stream.", "type": "boolean" },
+        "opens": { "description": "Streams opened since the daemon started.", "type": "integer" },
+        "open": { "description": "Streams open now.", "type": "integer" },
+        "latency_ms": { "$ref": "#/$defs/RouteLatency" }
+      }
+    },
+    "RouteCallers": {
+      "description": "Who made the calls: `device` a paired browser or phone, `local` this machine's own token (the CLI, scripts, the orchestrator), `cloud` a Cloud viewer answered in process, `task` a child let in by its task secret, `anonymous` nobody the gate let in (open paths and refusals).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device", "local", "cloud", "task", "anonymous"],
+      "properties": {
+        "device": { "type": "integer" },
+        "local": { "type": "integer" },
+        "cloud": { "type": "integer" },
+        "task": { "type": "integer" },
+        "anonymous": { "type": "integer" }
+      }
+    },
+    "RouteLatency": {
+      "description": "Time to answer over the last `samples` calls, in milliseconds; `max` is since the daemon started.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["p50", "p90", "max", "samples"],
+      "properties": {
+        "p50": { "type": "number" },
+        "p90": { "type": "number" },
+        "max": { "type": "number" },
+        "samples": { "type": "integer" }
       }
     },
     "HealthReason": {
@@ -378,7 +437,7 @@
       }
     },
     "MachineUsage": {
-      "description": "GET /v1/machine/usage, for any paired device: this machine's CPU and memory now, and each session's share of them — the dashboard opened from the session counts beside the wordmark. Clawdline Cloud carries it as the `machine-usage` word. The CPU figures are shares over `interval_ms`, the time between two readings, because a process's CPU time is a counter: a share needs two. Every percentage is of the whole machine, all cores together, 0-100. A session's figures are its whole process tree: the assistant, the shells it opened and what they started, each process given to the nearest session above it. A process that ended inside the interval is in the machine's figures and in no row. On a platform without a reader the route answers 501 `machine_usage_unsupported` rather than an idle machine.",
+      "description": "GET /v1/machine/usage, for any paired device: CPU, memory, cached free disk space and grouped reclaim backlog. Clawdline Cloud carries this as the `machine-usage` word. The CPU figures are shares over `interval_ms`. Disk and reclaim readings say whether they are known; no task identifiers, paths or raw evidence are sent. On a platform without a CPU reader the route answers 501 `machine_usage_unsupported`.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -449,7 +508,46 @@
           "items": {
             "$ref": "#/$defs/MachineUsageOther"
           }
-        }
+        },
+        "disk": { "$ref": "#/$defs/MachineDiskSummary" },
+        "reclaim": { "$ref": "#/$defs/MachineReclaimSummary" }
+      }
+    },
+    "MachineDiskSummary": {
+      "description": "The last capacity pass's free space on the daemon state volume. Unknown includes a missing or stalled pass.",
+      "type": "object", "additionalProperties": false,
+      "required": ["known", "at", "free_bytes"],
+      "properties": {
+        "known": { "type": "boolean" },
+        "at": { "type": "integer" },
+        "free_bytes": { "type": "integer" }
+      }
+    },
+    "MachineReclaimReason": {
+      "description": "One allowlisted reason, without the task or file it concerns.",
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "count"],
+      "properties": {
+        "code": { "$ref": "#/$defs/MachineReclaimReasonCode" },
+        "count": { "type": "integer" }
+      }
+    },
+    "MachineReclaimReasonCode": {
+      "type": "string", "enum": ["within_grace", "owner_present", "owner_unknown", "path_not_owned", "unreadable", "nested_repository", "filters_present", "preserve_failed", "changed_during_sweep", "intent_not_recorded", "remove_failed"]
+    },
+    "MachineReclaimSummary": {
+      "description": "Grouped standing decisions, refreshed at most once per registered cache interval. A failed read is unknown, never an empty backlog.",
+      "type": "object", "additionalProperties": false,
+      "required": ["known", "at", "kept", "failures", "removing", "deferred", "reasons"],
+      "properties": {
+        "known": { "type": "boolean" },
+        "at": { "type": "integer" },
+        "kept": { "type": "integer" },
+        "failures": { "description": "Kept decisions with one of the fixed unreadable, preserve_failed, intent_not_recorded or remove_failed reasons.", "type": "integer" },
+        "removing": { "type": "integer" },
+        "reasons": { "type": "array", "items": { "$ref": "#/$defs/MachineReclaimReason" } },
+        "last_sweep_at": { "type": "integer" },
+        "deferred": { "type": "integer" }
       }
     },
     "MachinePressure": {

@@ -309,6 +309,9 @@ func (b *Broker) Reclaim(ctx context.Context, dryRun bool) (ReclaimReport, error
 			d := b.reclaimTaskDir(ctx, rd, r, rep.At, dryRun)
 			touched = touched || (d.Subject != "" && d.Reason != WhyLive)
 			b.decide(ctx, &rep, d, dryRun)
+			if !dryRun {
+				b.recordTaskGoCacheDecision(ctx, r, d, rep.At)
+			}
 		}
 		if r.Callback != nil {
 			d := b.reclaimCallback(ctx, r, rep.At, dryRun)
@@ -452,15 +455,22 @@ func (b *Broker) occupied(ctx context.Context, paths ...string) (string, error) 
 	if err != nil {
 		return "", err
 	}
+	return occupiedFromCWDs(cwds, targets...), nil
+}
+
+// occupiedFromCWDs compares one process-table reading against a set of
+// already folded target paths. A list projection can reuse the same reading
+// instead of invoking lsof for every assignment.
+func occupiedFromCWDs(cwds []string, targets ...string) string {
 	for _, cwd := range cwds {
 		folded := foldPath(cwd)
 		for _, t := range targets {
 			if folded == t || strings.HasPrefix(folded, t+"/") {
-				return cwd, nil
+				return cwd
 			}
 		}
 	}
-	return "", nil
+	return ""
 }
 
 // foldPath is a path as this Mac's file system compares it: links resolved
@@ -903,6 +913,19 @@ func (b *Broker) reclaimTaskDir(ctx context.Context, rd reading, r Record, now t
 	if !gone {
 		return kept(r, ReclaimTaskDir, scratch, why, map[string]any{"owner": owner})
 	}
+	gateCacheRegistered := false
+	if r.Gate != nil {
+		registered, err := b.Store.GoCachesByOwner(ctx, "task", r.ID)
+		if err != nil {
+			return kept(r, ReclaimTaskDir, scratch, WhyUnreadable, map[string]any{"owner": owner})
+		}
+		if len(registered) > 0 {
+			if len(registered) != 1 || registered[0].Path != b.gateScratch(r.ID).Cache || !registered[0].Rebuildable {
+				return kept(r, ReclaimTaskDir, scratch, WhyUnrecorded, map[string]any{"owner": owner})
+			}
+			gateCacheRegistered = true
+		}
+	}
 	bytes, _ := dirBytes(scratch)
 	d := ReclaimDecision{Task: r.ID, Subject: ReclaimTaskDir, Path: scratch, Reason: WhyWorkScratch, Bytes: bytes,
 		Evidence: map[string]any{"owner": owner}}
@@ -916,7 +939,18 @@ func (b *Broker) reclaimTaskDir(ctx context.Context, rd reading, r Record, now t
 		d.Evidence["intent"] = err.Error()
 		return kept(r, ReclaimTaskDir, scratch, WhyUnrecorded, d.Evidence)
 	}
-	if err := removeOwned(r.Dir, scratch, "work"); err != nil {
+	if gateCacheRegistered {
+		if err := b.Store.MarkGoCacheCleanup(ctx, b.gateScratch(r.ID).Cache, "task", r.ID,
+			reclaimRemoving, WhyWorkScratch, b.now()); err != nil {
+			d.Evidence["intent"] = err.Error()
+			return kept(r, ReclaimTaskDir, scratch, WhyUnrecorded, d.Evidence)
+		}
+	}
+	remove := b.removeTaskScratch
+	if remove == nil {
+		remove = removeOwned
+	}
+	if err := remove(r.Dir, scratch, "work"); err != nil {
 		d.Evidence["remove"] = err.Error()
 		return kept(r, ReclaimTaskDir, scratch, WhyRemoveFailed, d.Evidence)
 	}
@@ -937,6 +971,31 @@ func removeOwned(root, path, name string) error {
 	}
 	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
 		return errors.New("refusing to remove something that is not a directory: " + path)
+	}
+	// Go's module cache makes downloaded directories read-only. RemoveAll can
+	// unlink read-only files, but it cannot descend through a read-only parent
+	// to unlink them. Change only directories below this already-proved scratch
+	// path; files and symlinks need no chmod, and no shared module cache is in
+	// the path we walk. WalkDir never follows a symlink inside the scratch tree.
+	if err := filepath.WalkDir(path, func(child string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if !entry.IsDir() {
+			return nil
+		}
+		mode, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		return os.Chmod(child, mode.Mode().Perm()|0o700)
+	}); err != nil {
+		return err
+	}
+	// A directory could have changed while it was walked. Keep the same
+	// ownership check immediately before the destructive operation.
+	if !ownedPath(root, path, name) {
+		return errors.New("refusing to remove a path that changed while being prepared: " + path)
 	}
 	return os.RemoveAll(path)
 }

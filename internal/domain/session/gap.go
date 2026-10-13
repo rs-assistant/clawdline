@@ -112,6 +112,12 @@ func SourceForID(id string) string {
 // once every one of them is sealed — by another source, in the same reading,
 // and never by how long the gap has been there.
 func (i Inventory) ProvesAbsence(source string) (bool, string) {
+	// A source the person turned off was not asked. Whatever the rest of the
+	// reading says, it cannot say a session of that source is gone
+	// (docs/design-decisions.md D56).
+	if why, off := i.DisabledSources[source]; off {
+		return false, source + " was not read: turned off by " + why
+	}
 	complete, known := i.Sources[source]
 	if source == "" || !known {
 		// Either the id is of no shape a source here issues, or no source in
@@ -132,6 +138,40 @@ func (i Inventory) ProvesAbsence(source string) (bool, string) {
 		return false, open[0].Detail
 	}
 	return false, source + " did not finish its reading"
+}
+
+// CompleteApartFromDisabled says every source this reading asked answered in
+// full: the reading is Complete, or the only sources missing from it are ones
+// the person turned off (DisabledSources, iTerm2's `iterm_scan`), and every
+// source that was asked — at least one — answered completely with no row left
+// unverified.
+//
+// It is the answer to "did the machine answer everything I asked it", for a
+// feature that has nothing to do with the turned-off source and must not wait
+// on it for ever (docs/design-decisions.md D71). It does NOT prove that a
+// session whose backend is a disabled source is gone: that source was not
+// asked, so a session it would have listed is unknown, not absent. A caller
+// concluding that one session is gone asks ProvesAbsence for that session's
+// source; a caller holding a presence map that cannot tell a row's backend
+// stays with Complete.
+func (i Inventory) CompleteApartFromDisabled() bool {
+	if i.Complete {
+		return true
+	}
+	if len(i.DisabledSources) == 0 || len(i.Sources) == 0 {
+		return false
+	}
+	for _, complete := range i.Sources {
+		if !complete {
+			return false
+		}
+	}
+	for _, s := range i.Sessions {
+		if s.Observation.Freshness == FreshnessUnverified {
+			return false
+		}
+	}
+	return true
 }
 
 // OpenGaps are the unsealed gaps of one source, or of every source when the

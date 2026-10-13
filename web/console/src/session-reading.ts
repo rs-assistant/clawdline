@@ -1,7 +1,11 @@
-import { catalogFormat } from "./catalog.js"
-import { catalogWord } from "./catalog.js"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { catalogFormat } from "./catalog.ts"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { catalogWord } from "./catalog.ts"
 import type { BearingsSource, ScanSource, SessionRow } from "@clawdline/contract"
 import type { ReadState } from "./read-state.js"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { nextWord } from "./next-strings.ts"
 
 function ageWords(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds))
@@ -98,17 +102,32 @@ export function scanFailureWords(
     return catalogWord("literal", "2811b1d9d660")
   }
   if (inventoryRefreshInProgress(notes)) return null
-  const incomplete = (sources ?? []).find((source) => !source.complete)
+  // A source the person turned off in Settings is not a failure, and the list
+  // does not repeat their own setting back at them: it says nothing about it.
+  const incomplete = (sources ?? []).find((source) => !source.complete && !source.disabled)
   if (incomplete) {
     return catalogFormat("template", "cdf164a88db5", [incomplete.source])
   }
   return null
 }
 
+/**
+ * Whether a reading is still settling. A source turned off by a setting is
+ * incomplete for good, on purpose, and is not something the list is
+ * recovering from; every other incomplete source is.
+ */
+export function scanRecovering(scan: { complete: boolean; sources?: readonly ScanSource[] }): boolean {
+  if (scan.complete) return false
+  const sources = scan.sources ?? []
+  return sources.length === 0 || sources.some((source) => !source.complete && !source.disabled)
+}
+
 /** The header's first number is always the list's total, never one state. */
 export function totalSessionWords(total: number, chinese = sessionReadingChinese()): string {
   void chinese
   if (total === 0) return catalogWord("literal", "dee6ddd8236d")
+  // The catalog format has no plural rule, so one Session has its own entry.
+  if (total === 1) return nextWord("sessionCountOne", { count: total })
   return catalogFormat("template", "df6b2970b6cb", [total])
 }
 

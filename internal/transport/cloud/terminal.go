@@ -7,6 +7,7 @@ package cloud
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -507,6 +508,29 @@ func (l *Link) revokeRegisteredTerminal(ctx context.Context, c *terminalConnecti
 func terminalConnectionID(viewer, connection string) string { return viewer + "/" + connection }
 
 func (l *Link) deliverTerminal(in Inbound) {
+	// Only the transport calls this after verifying the viewer's signature and
+	// opening its envelope with this machine's content key. Keep that proof for
+	// the terminal service's later per-frame authorization checks.
+	if len(in.VerifiedKey) == ed25519.PublicKeySize {
+		l.terminalMu.Lock()
+		if l.terminalAuthenticated == nil {
+			l.terminalAuthenticated = make(map[string]ed25519.PublicKey)
+		}
+		// Keep proofs only for viewers with a live connection and the one
+		// envelope being admitted. The existing connection capacity bounds this
+		// map without accumulating every viewer that ever sent a request.
+		active := make(map[string]bool, len(l.terminalConnections))
+		for _, connection := range l.terminalConnections {
+			active[connection.viewer] = true
+		}
+		for viewer := range l.terminalAuthenticated {
+			if viewer != in.Sender && !active[viewer] {
+				delete(l.terminalAuthenticated, viewer)
+			}
+		}
+		l.terminalAuthenticated[in.Sender] = append(ed25519.PublicKey(nil), in.VerifiedKey...)
+		l.terminalMu.Unlock()
+	}
 	lane := l.terminalRequests
 	if in.Channel == "termi/"+l.identity.MachineID+"/"+in.Sender && in.Class == string(domaincloud.ClassCtl) {
 		if req, err := decodeTerminalRequest(in.Plaintext); err == nil && req.Operation == "list" {
@@ -538,6 +562,7 @@ func (l *Link) runTerminal(ctx context.Context) {
 				return
 			case <-ticker.C:
 				l.sweepTerminalConnections()
+				l.sweepDirectCarriers()
 			}
 		}
 	}()
@@ -657,6 +682,7 @@ func (l *Link) refuseTerminalBusy(ctx context.Context, in Inbound) {
 
 func (l *Link) closeAllTerminalConnections() {
 	l.terminalMu.Lock()
+	l.terminalAuthenticated = nil
 	retired := make([]*terminalConnection, 0, len(l.terminalConnections))
 	for id, c := range l.terminalConnections {
 		c.frameBase = nil
@@ -765,6 +791,12 @@ func (l *Link) handleTerminal(ctx context.Context, in Inbound) {
 	p := terminals.Principal{Device: in.Sender, Name: name, Cloud: true}
 	if req.Operation == "open_connection" || req.Operation == "rekey_connection" {
 		l.openTerminalConnection(ctx, svc, p, req)
+		return
+	}
+	// A carrier offer names no connection of its own: it opens the one data
+	// channel this viewer gets, which a terminal then borrows (carrier.go).
+	if req.Operation == carrierOfferOperation {
+		l.handleCarrierOffer(ctx, svc, p, req)
 		return
 	}
 	c := l.getTerminalConnection(in.Sender, req.Connection)

@@ -137,11 +137,13 @@ type Checker struct {
 	// Jitter is the random part of the wait; nil uses math/rand.
 	Jitter func() time.Duration
 
-	mu        sync.Mutex
-	latest    *release.Manifest
-	base      string
-	checkedAt time.Time
-	lastErr   error
+	mu              sync.Mutex
+	refreshMu       sync.Mutex
+	lastRefreshDone time.Time
+	latest          *release.Manifest
+	base            string
+	checkedAt       time.Time
+	lastErr         error
 }
 
 // Check is one reading of the checker.
@@ -155,6 +157,12 @@ type Check struct {
 // Refresh reads the channel's manifest once. A failure keeps the last good
 // manifest and records the error beside it.
 func (c *Checker) Refresh(ctx context.Context) Check {
+	started := time.Now()
+	c.refreshMu.Lock()
+	defer func() { c.lastRefreshDone = time.Now(); c.refreshMu.Unlock() }()
+	if c.lastRefreshDone.After(started) {
+		return c.Last() // an overlapping check already read the source
+	}
 	base, err := c.Env.Base(ctx, c.Channel, "")
 	var m release.Manifest
 	if err == nil {

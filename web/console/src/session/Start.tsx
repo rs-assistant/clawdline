@@ -1,15 +1,20 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
 import { loadPersonas, personaById, personasNow, rememberPersona, rememberTeam, rememberedPersona, rememberedTeam, switchTeam } from "../personas.js"
 import { drawRoleRow } from "./RoleRow.js"
 import "./persona.css"
 import "./machine-start.css"
+import "./start-loading.css"
+import "./start-projects.css"
 import { hostedConsole, listTerminals, openTerminal, readTerminalMachine, TerminalRequestError } from "../pages/terminal/api.js"
 import { firstSize } from "../pages/terminal/TerminalProjectList.js"
 import { openNewTerminal, openTerminalPage } from "../pages/terminal/navigate.js"
 import { TAB } from "../pages/terminal/tab.js"
 import { terminalRefusalWords, unavailableWords } from "../pages/terminal/words.js"
+import { ProjectFolderPicker } from "../pages/projects/ProjectFolderPicker.js"
+import { removeProjectPlace } from "../pages/work/api.js"
+import { catalogWord } from "../catalog.js"
 
 /**
  * Starting a session, and picking one back up — `input/start.js`, function for
@@ -67,6 +72,7 @@ interface StartHost {
 
 const HOLD = 15000 // how long the band waits before it admits it has stopped waiting
 const MANY = 8 // places, past which a box to filter them earns its row
+const PLACES_REFRESH_MS = 3000 // an open start sheet sees registrations made in another terminal
 const MACHINE_PLACE = "@machine"
 
 const api = L.startApi
@@ -102,8 +108,20 @@ let placesGeneration = 0
 let landed: string | null = null
 let opener: HTMLElement | null = null
 let machineOnly = false
+/**
+ * The machine this sheet starts on, when it is not the one the console reads.
+ *
+ * The hosted fleet shows every machine's Sessions at once, so "new Session"
+ * there is a question about where, not an instruction to go somewhere: the
+ * console stays on every machine and this sheet reads the named machine's
+ * Projects and roles. The place ids that come back carry their own machine, so
+ * the start, the resume and the past list that follow need nothing from here.
+ */
+let onMachine: { id: string; name: string } | null = null
 type StartMode = "session" | "terminal"
 let mode: StartMode = "session"
+let editingProjects = false
+let requestRemoveProject: (place: Place) => void = () => {}
 let terminalAccess: { state: "loading" | "ready" | "blocked"; reason: string } = { state: "loading", reason: "" }
 let terminalGeneration = 0
 
@@ -287,13 +305,13 @@ function drawWith(): void {
 /** The chosen persona, when the catalog still names it; "" for none. */
 function chosenPersona(): string {
   const id = at ? resumeAs : persona
-  return personaById(personasNow(), id) ? id : ""
+  return personaById(personasNow(onMachine?.id ?? null), id) ? id : ""
 }
 
 /** The role chips; see the header. */
 function drawPersona(): void {
   const row = el("start-persona")
-  const catalog = personasNow() ?? []
+  const catalog = personasNow(onMachine?.id ?? null) ?? []
   // Every draw rebuilds the chips; the sideways scroll is kept across it, so a
   // press on a chip the person scrolled to does not throw the row back.
   const scrolled = row.scrollLeft
@@ -336,11 +354,23 @@ function drawPersona(): void {
   }
 }
 
-/** `drawMachines`: this transport has no machine read, so the row is hidden. */
+/**
+ * `drawMachines`: which machine this start will run on.
+ *
+ * Hidden on a console that reads one machine, as it is on the Mac's own page:
+ * there is only one answer and the header already gives it. Shown when the
+ * fleet opened this sheet for a machine other than the one underneath, because
+ * then the Projects below are not the ones the header names.
+ */
 function drawMachines(): void {
   const row = el("start-machine")
-  row.hidden = true
   row.innerHTML = ""
+  row.hidden = !onMachine
+  if (!onMachine) return
+  const said = document.createElement("span")
+  said.className = "start-on-machine"
+  said.textContent = nextWord("cloudStartOn", { machine: onMachine.name })
+  row.appendChild(said)
 }
 
 function drawResume(): void {
@@ -401,9 +431,18 @@ function edge(): void {
 function draw(): void {
   L.setStartSpin(null)
   if (sheetHidden()) return
+  el("start-say").classList.remove("loading")
   const list = el("start-list")
+  list.dataset.editing = editingProjects ? "1" : "0"
   const box = el<HTMLInputElement>("start-filter")
   const machineAction = el<HTMLButtonElement>("start-machine-action")
+  const projectActions = el("start-project-actions")
+  projectActions.hidden = machineOnly || mode !== "session" || !!at || !write
+  const editProjects = el<HTMLButtonElement>("start-edit-projects")
+  const editLabel = catalogWord("projects", editingProjects ? "editDone" : "editList")
+  editProjects.setAttribute("aria-label", editLabel)
+  editProjects.title = editLabel
+  editProjects.setAttribute("aria-pressed", editingProjects ? "true" : "false")
   el("start-title").textContent = machineOnly ? "Clawdfather" : mode === "terminal" ? nextWord("terminalStartTitle") : T().webStart
   machineAction.hidden = !machineOnly
   machineAction.disabled = !!pressing || !!wait || !with_ || !write
@@ -468,8 +507,8 @@ function draw(): void {
       : loading && !places
         ? T().webLoading
         : places && !places.length
-          ? T().webStartEmpty
-          : T().webStartPick,
+          ? catalogWord("projects", "emptyAdd")
+          : "",
   )
 
   box.hidden = terminalAccess.state !== "ready" && mode === "terminal" || !(places && places.length > MANY)
@@ -485,7 +524,7 @@ function draw(): void {
     row.type = "button"
     row.className = "place"
     row.dataset.id = p.id
-    row.disabled = !!pressing || !!wait
+    row.disabled = !!pressing || !!wait || editingProjects
     if (pressing === p.id) row.dataset.busy = "1"
     row.innerHTML = '<canvas></canvas><span class="name"></span><span class="where"></span>'
 
@@ -506,6 +545,16 @@ function draw(): void {
     }
 
     li.appendChild(row)
+    if (editingProjects) {
+      const remove = document.createElement("button")
+      remove.type = "button"
+      remove.className = "start-project-remove"
+      remove.dataset.id = p.id
+      remove.setAttribute("aria-label", nextWord("projectsRemoveFor", { project: p.label || p.path || "" }))
+      remove.disabled = !p.path
+      remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6 6 18" /></svg>'
+      li.appendChild(remove)
+    }
     list.appendChild(li)
   })
   edge()
@@ -526,6 +575,8 @@ function drawPast(list: HTMLElement, box: HTMLInputElement): void {
             ? T().webResumeEmpty
             : T().webResumePick,
   )
+  const loadingPast = reading && !pasts
+  el("start-say").classList.toggle("loading", loadingPast)
 
   box.hidden = !(pasts && pasts.length > 1)
   if (box.hidden && box.value) {
@@ -534,6 +585,17 @@ function drawPast(list: HTMLElement, box: HTMLInputElement): void {
   }
 
   list.innerHTML = ""
+  if (loadingPast) {
+    for (let i = 0; i < 3; i += 1) {
+      const row = document.createElement("li")
+      row.className = "start-past-skeleton"
+      row.setAttribute("aria-hidden", "true")
+      row.innerHTML = '<span class="title"></span><span class="time"></span>'
+      list.appendChild(row)
+    }
+    edge()
+    return
+  }
   const all = matchingPast()
   all.forEach((r) => {
     const li = document.createElement("li")
@@ -576,12 +638,12 @@ function drawPast(list: HTMLElement, box: HTMLInputElement): void {
   edge()
 }
 
-function load(): void {
+function load(background = false): void {
   if (loading || typeof api.places !== "function") return
   const generation = ++placesGeneration
   loading = true
-  draw()
-  asked(() => api.places())
+  if (!background) draw()
+  asked(() => api.places(onMachine?.id))
     .then((d) => {
       if (generation !== placesGeneration) return
       places = (d && d.places) || []
@@ -593,7 +655,7 @@ function load(): void {
     .catch((e: Failure) => {
       if (generation !== placesGeneration) return
       places = places || []
-      said(why(e), e)
+      if (!background) said(why(e), e)
     })
     .then(() => {
       if (generation !== placesGeneration) return
@@ -786,18 +848,20 @@ function hideBand(): void {
   L.setBandSpin(null)
 }
 
-function openMode(machine: boolean, requested: StartMode = "session"): void {
+function openMode(machine: boolean, requested: StartMode = "session", on: { id: string; name: string } | null = null): void {
+  onMachine = on
   const active = document.activeElement
   opener = machine ? el("counts") : active instanceof HTMLElement && active !== document.body ? active : el("start-go")
   machineOnly = machine
   mode = machine ? "session" : requested
+  editingProjects = false
   el("start-title").textContent = machine ? "Clawdfather" : T().webStart
   el("start").hidden = false
   said("")
   leave()
   persona = rememberedPersona()
   team = rememberedTeam()
-  if (mode === "session") void loadPersonas().then(() => draw())
+  if (mode === "session") void loadPersonas(undefined, onMachine?.id ?? null).then(() => draw())
   if (!wait) load()
   if (mode === "terminal") checkTerminalAccess()
   draw()
@@ -806,8 +870,12 @@ function openMode(machine: boolean, requested: StartMode = "session"): void {
 
 function open(): void { openMode(false) }
 
+/** Open the sheet to start on `machine`, leaving the console where it is. */
+function openOn(machine: { id: string; name: string }): void { openMode(false, "session", machine) }
+
 function close(): void {
   if (pressing) return
+  onMachine = null
   placesGeneration += 1
   loading = false
   el("start").hidden = true
@@ -826,6 +894,7 @@ function arrived(id: string) {
 
 export const Start = {
   open,
+  openOn,
   openTerminal: () => openMode(false, "terminal"),
   openMachine: () => openMode(true),
   close,
@@ -912,6 +981,28 @@ export const Start = {
 export function StartSheet() {
   const T = L.strings
   const bound = useRef(false)
+  const [folderOpen, setFolderOpen] = useState(false)
+  const [removeTarget, setRemoveTarget] = useState<Place | null>(null)
+  const [removeBusy, setRemoveBusy] = useState(false)
+  const [removeError, setRemoveError] = useState("")
+  const removeDialog = useRef<HTMLDialogElement>(null)
+  requestRemoveProject = (place) => { setRemoveError(""); setRemoveTarget(place) }
+  useEffect(() => {
+    const dialog = removeDialog.current
+    if (!dialog) return
+    if (removeTarget && !dialog.open) dialog.showModal()
+    if (!removeTarget && dialog.open) dialog.close()
+  }, [removeTarget])
+  async function confirmRemoveProject() {
+    if (!removeTarget?.path || removeBusy) return
+    setRemoveBusy(true); setRemoveError("")
+    try {
+      await removeProjectPlace({ id: removeTarget.id, label: removeTarget.label || removeTarget.path, path: removeTarget.path })
+      setRemoveTarget(null)
+      load(true)
+    } catch (cause) { setRemoveError(L.failureSentence(cause)) }
+    finally { setRemoveBusy(false) }
+  }
   useEffect(() => {
     if (bound.current) return
     bound.current = true
@@ -925,7 +1016,15 @@ export function StartSheet() {
     const onMachine = () => press(MACHINE_PLACE)
     const onInput = () => Start.typed(filter.value)
     const onScroll = () => Start.scrolled()
+    const onAddProject = () => setFolderOpen(true)
+    const onEditProjects = () => { editingProjects = !editingProjects; draw() }
     const onList = (ev: Event) => {
+      const remove = (ev.target as Element).closest?.<HTMLButtonElement>(".start-project-remove")
+      if (remove?.dataset.id) {
+        const place = (places || []).find(p => p.id === remove.dataset.id)
+        if (place) requestRemoveProject(place)
+        return
+      }
       const row = (ev.target as Element).closest ? (ev.target as Element).closest<HTMLButtonElement>(".place") : null
       if (!row || row.disabled) return
       if (row.dataset.session) pick(row.dataset.session)
@@ -937,6 +1036,7 @@ export function StartSheet() {
     // not reached for a press this sheet has answered.
     const onKey = (ev: KeyboardEvent) => {
       if (sheetHidden()) return
+      if (document.querySelector(".project-folder-picker[open], .project-remove-dialog[open]")) return
       if (document.getElementById("action-confirm")?.hidden === false) return
       if (document.getElementById("info")?.hidden === false) return
       const meta = ev.metaKey || ev.ctrlKey
@@ -975,16 +1075,24 @@ export function StartSheet() {
     sheet.addEventListener("click", onSheet)
     el("start-close").addEventListener("click", onClose)
     el("start-machine-action").addEventListener("click", onMachine)
+    el("start-add-project").addEventListener("click", onAddProject)
+    el("start-edit-projects").addEventListener("click", onEditProjects)
     filter.addEventListener("input", onInput)
     list.addEventListener("scroll", onScroll, { passive: true })
     list.addEventListener("click", onList)
     document.addEventListener("keydown", onKey, true)
+    const placesRefresh = window.setInterval(() => {
+      if (!sheetHidden() && document.visibilityState === "visible" && mode === "session" && !at && !machineOnly) load(true)
+    }, PLACES_REFRESH_MS)
     return () => {
+      window.clearInterval(placesRefresh)
       bound.current = false
       start.removeEventListener("click", onOverlay)
       sheet.removeEventListener("click", onSheet)
       el("start-close")?.removeEventListener("click", onClose)
       el("start-machine-action")?.removeEventListener("click", onMachine)
+      el("start-add-project")?.removeEventListener("click", onAddProject)
+      el("start-edit-projects")?.removeEventListener("click", onEditProjects)
       filter.removeEventListener("input", onInput)
       list.removeEventListener("scroll", onScroll)
       list.removeEventListener("click", onList)
@@ -993,6 +1101,7 @@ export function StartSheet() {
   }, [])
 
   return (
+    <>
     <div className="overlay" id="start" hidden>
       <div className="sheet" role="dialog" aria-modal="true" id="start-sheet" aria-labelledby="start-title">
         <h2 id="start-title" tabIndex={-1}>{T.webStart}</h2>
@@ -1006,23 +1115,38 @@ export function StartSheet() {
             <span className="clawdfather-crown" aria-hidden="true" />
             <span className="label">{nextWord("machineSessionStart")}</span>
           </button>
-          <input
-            className="find"
-            id="start-filter"
-            type="search"
-            name="p2k"
-            placeholder={T.webStartFilter}
-            hidden
-            autoComplete="off"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-            data-1p-ignore=""
-            data-lpignore="true"
-            data-bwignore=""
-            data-form-type="other"
-            aria-label={T.webStartFilter}
-          />
+          <div className="start-project-filter-row">
+            <input
+              className="find"
+              id="start-filter"
+              type="search"
+              name="p2k"
+              placeholder={T.webStartFilter}
+              hidden
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              data-1p-ignore=""
+              data-lpignore="true"
+              data-bwignore=""
+              data-form-type="other"
+              aria-label={T.webStartFilter}
+            />
+            <div className="start-project-actions" id="start-project-actions" hidden>
+              <button id="start-add-project" type="button" aria-label={catalogWord("projects", "addButton")}
+                title={catalogWord("projects", "addButton")}>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" /></svg>
+              </button>
+              <button id="start-edit-projects" type="button" aria-label={catalogWord("projects", "editList")}
+                title={catalogWord("projects", "editList")} aria-pressed="false">
+                <svg className="start-edit-pencil" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z" /><path d="m14 7 3 3" />
+                </svg>
+                <svg className="start-edit-done" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 12 4 4L19 6" /></svg>
+              </button>
+            </div>
+          </div>
           <ul className="places" id="start-list"></ul>
           <p className="said" id="start-said" role="status" aria-live="polite"></p>
         </div>
@@ -1032,6 +1156,19 @@ export function StartSheet() {
         </button>
       </div>
     </div>
+    <ProjectFolderPicker open={folderOpen} machine={onMachine?.id} onClose={() => setFolderOpen(false)} onAdded={() => load(true)} />
+      <dialog ref={removeDialog} className="project-remove-dialog"
+        onCancel={event => { if (removeBusy) event.preventDefault(); else setRemoveTarget(null) }}
+        onClose={() => { if (!removeBusy) setRemoveTarget(null) }}>
+        <h2>{nextWord("projectsRemoveTitle")}</h2>
+        <p>{nextWord("projectsRemoveDescription", { project: removeTarget?.label || removeTarget?.path || "" })}</p>
+        {removeError && <p role="alert">{removeError}</p>}
+        <div className="project-remove-actions">
+          <button type="button" disabled={removeBusy} onClick={() => setRemoveTarget(null)}>{nextWord("projectsRemoveCancel")}</button>
+          <button type="button" disabled={removeBusy} onClick={() => void confirmRemoveProject()}>{removeBusy ? nextWord("projectsRemoveBusy") : nextWord("projectsRemoveConfirm")}</button>
+        </div>
+    </dialog>
+    </>
   )
 }
 

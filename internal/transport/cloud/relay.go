@@ -27,6 +27,7 @@ package cloud
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"errors"
 	"strings"
@@ -76,6 +77,19 @@ type Relay struct {
 	// Terminal receives signed, decrypted termi envelopes on its own lane.
 	// Terminal traffic never consumes the ordinary Cloud request queue.
 	Terminal func(Inbound)
+	// Direct writes one sealed answer to a viewer's direct carrier. It is set
+	// when this machine has carriers at all; a nil one, or one that answers an
+	// error, sends the answer nowhere, which is the honest outcome — a direct
+	// read's page is not subscribed to the relay channel, so an answer put
+	// there would spend a spool row and reach nobody. The page asks again on
+	// the relay when its carrier goes (docs/cloud-terminal-wire.md).
+	Direct func(viewer, channel string, class domaincloud.Class, payload []byte) error
+
+	// MirrorStatus puts one sealed Session row on every open carrier as well.
+	// It is set by the link, and it is not a route: the row goes to the relay
+	// exactly as it always did, and this is a second road for the same
+	// envelope. A nil hook means this machine has no carriers.
+	MirrorStatus func(channel string, sealed []byte)
 
 	once     sync.Once
 	requests chan Inbound
@@ -100,6 +114,12 @@ const refusalLane = 16
 // ErrRelayNotReady is what Publish answers before Start has run.
 var ErrRelayNotReady = errors.New("this relay has no queue yet")
 
+// ErrNoDirectCarrier is what Publish answers for an answer owed to a carrier
+// this machine no longer has. Nothing is retried onto the relay: the page that
+// asked over its carrier is not subscribed to the answer's relay channel, and
+// it asks again there itself when the carrier goes.
+var ErrNoDirectCarrier = errors.New("this viewer has no direct carrier for its answer")
+
 func (r *Relay) start() {
 	r.once.Do(func() {
 		r.requests = make(chan Inbound, r.depth())
@@ -121,14 +141,27 @@ func (r *Relay) Requests() <-chan Inbound {
 }
 
 // Deliver is what the transport's Inbound callback calls. It never blocks.
-func (r *Relay) Deliver(envelope domaincloud.Envelope, plaintext []byte) {
+func (r *Relay) Deliver(envelope domaincloud.Envelope, plaintext []byte, verifiedKey ed25519.PublicKey) {
+	r.deliver(envelope, plaintext, verifiedKey, false)
+}
+
+// DeliverDirect is Deliver for an envelope that came off the sender's own
+// direct carrier. The request takes the same queue, the same bridge and the
+// same authorization; only where its answer goes differs.
+func (r *Relay) DeliverDirect(envelope domaincloud.Envelope, plaintext []byte, verifiedKey ed25519.PublicKey) {
+	r.deliver(envelope, plaintext, verifiedKey, true)
+}
+
+func (r *Relay) deliver(envelope domaincloud.Envelope, plaintext []byte, verifiedKey ed25519.PublicKey, direct bool) {
 	r.start()
 	in := Inbound{
-		Channel:   envelope.Ch,
-		Class:     string(envelope.Class),
-		Sender:    envelope.Sender,
-		Sequence:  envelope.Seq,
-		Plaintext: plaintext,
+		Channel:     envelope.Ch,
+		Class:       string(envelope.Class),
+		Sender:      envelope.Sender,
+		Sequence:    envelope.Seq,
+		Plaintext:   plaintext,
+		VerifiedKey: verifiedKey,
+		Direct:      direct,
 	}
 	if r.Audience != nil {
 		r.Audience(envelope.Sender)
@@ -239,6 +272,16 @@ func (r *Relay) PublishTracked(ctx context.Context, out Outbound) (uint64, error
 	if out.Class == "" {
 		class = classes[0]
 	}
+	// An answer to a request that arrived on a carrier is sealed by the
+	// carrier, against the carrier's own envelope sequence, and never enters
+	// the spool: the spool exists to re-send what the relay did not
+	// acknowledge, and a data channel either delivers an answer or is gone.
+	if out.Direct {
+		if r.Direct == nil || out.Reply.Sender == "" {
+			return 0, ErrNoDirectCarrier
+		}
+		return 0, r.Direct(out.Reply.Sender, out.Channel, class, out.Payload)
+	}
 	key, keyID := r.Secret, r.keyID()
 	if strings.HasPrefix(out.Channel, "term/") || strings.HasPrefix(out.Channel, "termd/") || strings.HasPrefix(out.Channel, "termr/") {
 		if !out.Key.Valid() || !strings.HasPrefix(out.KeyID, "rk-") {
@@ -294,7 +337,30 @@ func (r *Relay) PublishTracked(ctx context.Context, out Outbound) (uint64, error
 	if err := r.Spool.Seal(seq, sealed, now); err != nil {
 		return 0, err
 	}
+	// A Session row the relay is about to deliver also goes straight to every
+	// viewer whose carrier is open. It is the same envelope under the same
+	// number, so a page may read it from either road and the row is ordered
+	// against this machine's others either way (`mirrorStatusRow`).
+	if r.MirrorStatus != nil && mirroredStatusChannel(out.Channel) {
+		r.MirrorStatus(out.Channel, sealed)
+	}
 	return seq, nil
+}
+
+// mirroredStatusChannel is one Session's row, the only channel a carrier
+// carries besides a read's answer.
+//
+// The content-free `ss/` feed is deliberately not one: it reaches every device
+// of the account without a subscription, so a copy on the carrier would
+// duplicate every row to save one relay hop. Neither is the `s/` inventory,
+// which drives the older whole-list recovery the hosted list does not use.
+func mirroredStatusChannel(channel string) bool {
+	rest, ok := strings.CutPrefix(channel, "s/")
+	if !ok {
+		return false
+	}
+	_, session, ok := strings.Cut(rest, "/")
+	return ok && session != "" && session != InventorySessionID && !strings.Contains(session, "/")
 }
 
 // ChannelFull reports whether this error is one channel at its cap.

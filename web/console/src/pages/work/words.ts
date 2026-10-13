@@ -14,7 +14,8 @@
  * which is the regression the rule is about. Inline it again and the rule goes
  * red on the one catalog that is right.
  */
-import { catalogWord, currentCatalogTag, type CatalogTag } from "../../catalog.js"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { catalogWord, currentCatalogTag, type CatalogTag } from "../../catalog.ts"
 
 const englishBacklog = "Backlog"
 
@@ -49,7 +50,7 @@ const words = {
     sectionActive: "In progress",
     sectionScheduled: "Scheduled this week",
     sectionDone: "Recently finished",
-    sectionEmpty: "Nothing here right now.",
+    sectionEmpty: "No items in this section right now.",
     decideLede: "Work already on this board whose delivery needs closing, and questions a session asked you.",
 
     toConfirm: "To confirm",
@@ -74,7 +75,7 @@ const words = {
 
     digestTitle: "Daily digest",
     digestFor: "{date}",
-    digestNone: "No digest yet. The first sweep of each day writes one for the day before.",
+    digestNone: "No daily digest yet. The first daily check summarizes the previous day.",
     digestCompleted: "{n} finished, {landed} of them landed",
     digestStalled: "{n} went quiet and back to the Backlog",
     digestFromBacklog: "{n} came onto the board from the Backlog",
@@ -141,12 +142,16 @@ const words = {
     failedNetwork: "The daemon did not answer; nothing is known to have been done.",
 
     todosTitle: "Session to-dos",
+    todoEdit: "Edit to-do",
+    todoEditHint: "The Session will see the new wording when it next reads to-dos. You can also send it now.",
+    todoSave: "Save changes",
+    todoCancel: "Cancel",
     todoAddedBySession: "Added by Session",
     todoAddedBySessionLabel: "Added by this Session at your request; you did not send it",
     todosOpen: "{n} open",
     todosLede: "Made and closed by the broker's facts. Nothing here needs tending.",
-    todosNone: "This session owes nothing.",
-    todosUnknown: "This session's conversation is not known yet, so its to-dos cannot be named.",
+    todosNone: "No to-dos for this Session right now.",
+    todosUnknown: "This Session’s conversation is not identified yet, so its to-dos cannot be shown.",
     todosUnreadable: "This session's to-dos could not be read.",
     todosShowClosed: "Show closed",
     todosHideClosed: "Hide closed",
@@ -217,7 +222,7 @@ const words = {
     usageReasonNotYetRead: "not read yet",
     usageReasonTranscriptMissing: "its transcript is gone",
     usageReasonTranscriptUnreadable: "its transcript could not be read",
-    usageSessionNotYetRead: "This session has not been read yet, so there is no bill to show.",
+    usageSessionNotYetRead: "Usage data for this Session has not been read yet.",
     usageSessionTranscriptMissing: "This session's transcript is gone; the figures are from its last reading.",
     usageSessionTranscriptUnreadable: "This session's transcript could not be read; any figures are from an earlier reading.",
     usageBase: "Base context — paid again by every call",
@@ -261,7 +266,7 @@ const words = {
     sectionActive: "進行中",
     sectionScheduled: "本週排入",
     sectionDone: "最近完成",
-    sectionEmpty: "這一區目前沒有東西。",
+    sectionEmpty: "這個區塊目前沒有項目。",
     decideLede: "已在看板上的工作所留下、等著收尾的交付，以及 session 問你的事。",
 
     toConfirm: "待確認",
@@ -284,7 +289,7 @@ const words = {
 
     digestTitle: "每日摘要",
     digestFor: "{date}",
-    digestNone: "還沒有摘要。每天第一次巡檢時，會寫一份前一天的。",
+    digestNone: "還沒有每日摘要。每天首次檢查時，系統會整理前一天的工作。",
     digestCompleted: "完成 {n} 件，其中 {landed} 件已落地",
     digestStalled: "{n} 件停擺，回到後續工作",
     digestFromBacklog: "{n} 件從後續工作移上看板",
@@ -351,12 +356,16 @@ const words = {
     failedNetwork: "daemon 沒有回應；不知道有沒有做成。",
 
     todosTitle: "Session 待辦",
+    todoEdit: "編輯待辦",
+    todoEditHint: "儲存後，Session 下次讀取待辦就會看到新內容；也可以立即送出。",
+    todoSave: "儲存變更",
+    todoCancel: "取消",
     todoAddedBySession: "Session 建立",
     todoAddedBySessionLabel: "這個 Session 依你的要求自己建立，不是你傳送的",
     todosOpen: "{n} 項未完成",
     todosLede: "由 broker 的事實自動建立、自動結束。你不需要整理它。",
-    todosNone: "這個 session 沒有欠任何事。",
-    todosUnknown: "還不知道這個 session 的對話是哪一個，所以說不出它的待辦。",
+    todosNone: "這個 Session 目前沒有待辦事項。",
+    todosUnknown: "尚未辨識出這個 Session 的對話，暫時無法顯示待辦事項。",
     todosUnreadable: "讀不到這個 session 的待辦。",
     todosShowClosed: "看已結束的",
     todosHideClosed: "收起已結束的",
@@ -427,7 +436,7 @@ const words = {
     usageReasonNotYetRead: "還沒讀到",
     usageReasonTranscriptMissing: "對話紀錄已經不在",
     usageReasonTranscriptUnreadable: "對話紀錄讀不了",
-    usageSessionNotYetRead: "這個 Session 還沒被讀過，所以還沒有帳單。",
+    usageSessionNotYetRead: "尚未讀取這個 Session 的用量資料。",
     usageSessionTranscriptMissing: "這個 Session 的對話紀錄已經不在；數字是最後一次讀到的。",
     usageSessionTranscriptUnreadable: "這個 Session 的對話紀錄讀不了；若有數字，是先前讀到的。",
     usageBase: "基底 context——每次呼叫都會再付一次",

@@ -81,11 +81,37 @@ func (s *Server) transcriptRoute(w http.ResponseWriter, r *http.Request) {
 		writeRefusal(w, http.StatusBadRequest, "bad_request", "name a session")
 		return
 	}
+	if !s.admitPinnedTarget(w, r, id) {
+		return
+	}
 	// The Swift app's bounds: 200 unless asked, never fewer than 1 or more
 	// than 1,000.
 	limit := 200
 	if n, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil {
 		limit = min(max(n, 1), 1000)
+	}
+	before := int64(0)
+	if r.URL.Query().Has("before") {
+		raw := r.URL.Query().Get("before")
+		var err error
+		before, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || before < 1 {
+			writeRefusal(w, http.StatusBadRequest, "invalid_cursor", "before must be a positive byte cursor")
+			return
+		}
+	}
+	// after=nextAfter asks only for what was appended since the page's last
+	// read. A reader that never saw nextAfter never sends it, so a page served
+	// by an older daemon keeps reading the newest page whole.
+	after := int64(-1)
+	if r.URL.Query().Has("after") {
+		raw := r.URL.Query().Get("after")
+		var err error
+		after, err = strconv.ParseInt(raw, 10, 64)
+		if err != nil || after < 0 || r.URL.Query().Has("before") {
+			writeRefusal(w, http.StatusBadRequest, "invalid_cursor", "after must be a nonnegative byte cursor, and not beside before")
+			return
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
@@ -95,14 +121,40 @@ func (s *Server) transcriptRoute(w http.ResponseWriter, r *http.Request) {
 		writeActionRefusal(w, err)
 		return
 	}
-	writeJSON(w, s.transcriptPage(id, item, limit))
+	var page contract.TranscriptPage
+	if after >= 0 {
+		var stale bool
+		page, stale = s.transcriptPageAfter(id, item, limit, after)
+		if stale {
+			writeRefusal(w, http.StatusConflict, "transcript_cursor_stale",
+				"the transcript changed in a way this cursor cannot follow; read the newest page")
+			return
+		}
+	} else {
+		page = s.transcriptPageBefore(id, item, limit, before)
+	}
+	if !s.admitPinnedTarget(w, r, id) {
+		return
+	}
+	writeJSON(w, page)
 }
 
 // transcriptPage is the newest `limit` entries of one session's own record.
 func (s *Server) transcriptPage(id string, item session.Session, limit int) contract.TranscriptPage {
+	return s.transcriptPageBefore(id, item, limit, 0)
+}
+
+func (s *Server) transcriptPageBefore(id string, item session.Session, limit int, before int64) contract.TranscriptPage {
 	page := contract.TranscriptPage{ID: id, Entries: []contract.TranscriptEntry{}}
 	path := recordPath(item)
 	if path == "" {
+		if item.Binding == session.BindingNoRecord {
+			// A new assistant has not written its first conversation yet.
+			// This is an empty transcript even when the list row that says
+			// no_record has not reached the browser.
+			page.Evidence = contract.EvidenceTranscript
+			return page
+		}
 		page.Evidence = contract.EvidenceNone
 		page.Note = unlocatedNote(item)
 		return page
@@ -112,9 +164,9 @@ func (s *Server) transcriptPage(id string, item session.Session, limit int) cont
 	var read transcript.Page
 	var err error
 	if item.Assistant == session.AssistantCodex {
-		read, err = transcript.ReadCodex(path, limit)
+		read, err = transcript.ReadCodexBefore(path, limit, before)
 	} else {
-		read, err = transcript.ReadClaude(path, limit)
+		read, err = transcript.ReadClaudeBefore(path, limit, before)
 	}
 	if errors.Is(err, transcript.ErrNoRecord) {
 		// A session that has just started has not written its record yet.
@@ -138,8 +190,13 @@ func (s *Server) transcriptPage(id string, item session.Session, limit int) cont
 		row.Artifacts = s.pictures.wireArtifacts(e, now)
 		entries = append(entries, row)
 	}
-	kept, omitted := boundedTranscript(entries)
+	kept, omitted := boundedTranscriptRows(entries, read.Entries)
 	page.Entries = kept
+	page.NextBefore = read.NextBefore
+	page.NextAfter = read.NextAfter
+	if omitted > 0 {
+		page.NextBefore = read.Entries[omitted].Before
+	}
 	if omitted > 0 {
 		page.Truncation = &contract.TranscriptTruncation{
 			Reason:              "transcript_byte_budget",
@@ -161,6 +218,48 @@ func (s *Server) transcriptPage(id string, item session.Session, limit int) cont
 	return page
 }
 
+// transcriptPageAfter is the rows appended at or after the byte cursor
+// `after`, oldest first, for a page that already holds everything before it.
+// It answers stale, and the route refuses the cursor, whenever merging these
+// rows could show something a whole read would not: a cursor that no longer
+// meets the record, more new rows than one page, rows the byte budget would
+// cut, or a record that could not be read at all. NextBefore is left out: the
+// page keeps the one its whole read gave it.
+func (s *Server) transcriptPageAfter(id string, item session.Session, limit int, after int64) (contract.TranscriptPage, bool) {
+	page := contract.TranscriptPage{ID: id, Entries: []contract.TranscriptEntry{}}
+	path := recordPath(item)
+	if path == "" {
+		return page, true
+	}
+	var read transcript.Page
+	var err error
+	if item.Assistant == session.AssistantCodex {
+		read, err = transcript.ReadCodexAfter(path, limit, after)
+	} else {
+		read, err = transcript.ReadClaudeAfter(path, limit, after)
+	}
+	if err != nil {
+		return page, true
+	}
+	page.Path = path
+	page.Evidence = contract.EvidenceTranscript
+	page.Signature = read.Signature
+	entries := make([]contract.TranscriptEntry, 0, len(read.Entries))
+	now := time.Now()
+	for _, e := range read.Entries {
+		row := transcriptEntry(e)
+		row.Artifacts = s.pictures.wireArtifacts(e, now)
+		entries = append(entries, row)
+	}
+	kept, omitted := boundedTranscriptRows(entries, read.Entries)
+	if omitted > 0 {
+		return page, true
+	}
+	page.Entries = kept
+	page.NextAfter = read.NextAfter
+	return page, false
+}
+
 // transcriptBudget is what one transcript read may carry: the first-paint
 // budget, which the Swift app applies to the same rows. `limit` counts rows,
 // and one row can be a whole tool output.
@@ -179,6 +278,22 @@ func boundedTranscript(entries []contract.TranscriptEntry) ([]contract.Transcrip
 	for first > 0 {
 		size := legacyRowBytes(entries[first-1])
 		if first < len(entries) && used+size > transcriptBudget {
+			break
+		}
+		used += size
+		first--
+	}
+	return entries[first:], first
+}
+
+// A JSONL row can produce several entries. Keep that row together so the
+// byte cursor never passes over an entry omitted from this page.
+func boundedTranscriptRows(entries []contract.TranscriptEntry, source []transcript.Entry) ([]contract.TranscriptEntry, int) {
+	used := 0
+	first := len(entries)
+	for first > 0 {
+		size := legacyRowBytes(entries[first-1])
+		if first < len(entries) && used+size > transcriptBudget && source[first-1].Before != source[first].Before {
 			break
 		}
 		used += size
@@ -314,6 +429,22 @@ func (s *Server) sessionInfoRoute(w http.ResponseWriter, r *http.Request, id str
 		writeActionRefusal(w, err)
 		return
 	}
+	// The list form contains only the display name for this pinned execution.
+	// It does not walk transcript, repository or shell state for every row.
+	if r.URL.Query().Get("parts") == "list" {
+		info := contract.SessionInfo{Session: contract.SessionInfoSession{
+			ID: item.ID, Title: s.sessionDisplayLabel(ctx, item), Assistant: contract.Assistant(item.Assistant),
+			CWD: item.CWD,
+		}, Models: []contract.SessionModel{}}
+		if s.icons != nil {
+			info.Session.Icon = wireIcon(s.icons.For(item.CWD))
+		}
+		if !s.admitPinnedTarget(w, r, id) {
+			return
+		}
+		writeJSON(w, contract.SessionInfoReply{Info: info})
+		return
+	}
 	home, _ := os.UserHomeDir()
 	info := contract.SessionInfo{
 		Session: contract.SessionInfoSession{
@@ -364,6 +495,9 @@ func (s *Server) sessionInfoRoute(w http.ResponseWriter, r *http.Request, id str
 		info.Repository = contract.ProjectRepository(reading.Repo)
 		info.RepositoryUnreadable = contract.ProjectGitFailure(reading.Unreadable)
 		info.DeployQuiet = wireDeployQuiet(reading.DeployQuiet)
+	}
+	if !s.admitPinnedTarget(w, r, id) {
+		return
 	}
 	writeJSON(w, contract.SessionInfoReply{Info: info})
 }

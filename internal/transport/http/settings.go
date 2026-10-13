@@ -14,6 +14,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
 	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
 	"github.com/sainteye/clawdline/internal/contract"
 )
@@ -22,6 +23,21 @@ import (
 // for the same file waits on the same lock. A test server with a directory of
 // its own gets a file of its own.
 var settingsFiles sync.Map // dir -> *nextconfig.File
+
+// A paired browser may change these machine settings through the daemon's own
+// console. Native-only input bar controls and the global keyboard grab stay on
+// the shell's local-token route.
+var browserSettings = map[string]bool{
+	"language": true, "terminal": true,
+	"codex_auto_name": true, "auto_name_assistant": true,
+	"remote": true, "remote_tunnel": true, "remote_hostname": true,
+	"push_on_delivery": true, "push_on_fanout": true,
+	"smart_notifications": true, "push_on_deploy": true,
+	"orchestrator_agent_notify": true, "orchestrator_enabled": true,
+	"orchestrator_max_children": true, "orchestrator_permission": true,
+	"orchestrator_notify_root": true, "orchestrator_child_linger": true,
+	"claude_auto_compact_window": true, "iterm_scan": true,
+}
 
 // settingsRequestBodyLimit bounds both the full local settings write and the
 // two-key route carried to Cloud. The latter has the same bound before and
@@ -58,6 +74,7 @@ func (s *Server) settingsFile() *nextconfig.File {
 // route is the same four lines however many rows the settings window grows.
 func (s *Server) settingsRoute(w http.ResponseWriter, r *http.Request) {
 	f := s.settingsFile()
+	browser := routePath(r) == "/v1/settings/browser"
 	switch r.Method {
 	case http.MethodGet, http.MethodHead:
 		v, err := f.Read()
@@ -82,6 +99,15 @@ func (s *Server) settingsRoute(w http.ResponseWriter, r *http.Request) {
 		if refusal != nil {
 			writeRawRefusal(w, http.StatusBadRequest, refusal.code, refusal.message)
 			return
+		}
+		if browser {
+			for name := range changes {
+				if !browserSettings[name] {
+					writeRawRefusal(w, http.StatusForbidden, "browser_setting_unavailable",
+						"This setting is not available in the browser: "+name)
+					return
+				}
+			}
 		}
 		// A key that turns on what this machine has no way to do is refused
 		// by name, not stored for nothing to act on (capabilities.go, W7).
@@ -108,6 +134,9 @@ func (s *Server) settingsRoute(w http.ResponseWriter, r *http.Request) {
 		// moment they are written, as the Swift app's did on its reload.
 		if tunnelSettingChanged(changes) {
 			s.applyTunnel()
+		}
+		if _, changed := changes["iterm_scan"]; changed {
+			applyITermScan(v)
 		}
 		writeJSON(w, settingsSnapshot(f, v))
 	default:
@@ -413,4 +442,12 @@ func writeSettingsFailure(w http.ResponseWriter, f *nextconfig.File, err error) 
 	default:
 		writeRawRefusal(w, http.StatusInternalServerError, "settings_unavailable", err.Error())
 	}
+}
+
+// applyITermScan sets the iTerm2 scan switch from the settings file: absent,
+// or anything but false, is on. It runs once when the server is built and
+// again on every write that names the key, so the next reading follows it.
+func applyITermScan(v nextconfig.Values) {
+	on, ok := v.Bool("iterm_scan")
+	terminal.SetITermScan(!ok || on)
 }

@@ -1,20 +1,73 @@
 import { catalogFormat } from "../catalog.js"
 import { catalogWord } from "../catalog.js"
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentPropsWithRef } from "react"
 import type { SessionRow } from "@clawdline/contract"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
-import { sessionMark, sessionName } from "../brand-mark.js"
+import { BRAND_MARK, sessionMark, sessionName } from "../brand-mark.js"
 import { requestConfirm } from "../overlays/events.js"
 import { ACTION_WIDTH, actionWidth, archivable, revealFor, swipes, type Reveal } from "./swipe.js"
 import { conversationNotStarted } from "./readiness.js"
 import { retainedStateWords, sessionReadingChinese } from "../session-reading.js"
 import { rowPersonaLine } from "../personas.js"
 import { usePersonas } from "./PersonaBot.js"
-import { activeCallbacksForSession } from "./callback-owner.js"
+import { runWorkingClock } from "./working-clock.js"
 import "./list-density.css"
 import "./list-tree.css"
 import "./swipe-archive.css"
+
+/** The same selectable list-row frame serves a local row and a light Cloud status row. */
+export function SessionRowLayout({ children, className, ...props }: ComponentPropsWithRef<"li">) {
+  return <li {...props} className={["row", className].filter(Boolean).join(" ")}>{children}</li>
+}
+
+/** Status-only rows keep the original list structure without inventing rich Session content. */
+export function ProjectedRow({ title, sessionID, machineID, machineName, assistant, state, stateLabel, icon, cwd,
+  freshness, lastMovementAt, attention, open, selectionKey, depth, branchThrough, ancestorThrough, status, swiped = false, onOpen, onClose, consumePress }: {
+  title: string; sessionID: string; machineID: string; machineName: string
+  assistant?: "claude" | "codex"
+  icon?: SessionRow["icon"]; cwd?: string
+  state: string; stateLabel: string; freshness: string; lastMovementAt?: number; attention: boolean; open: boolean
+  depth: number; branchThrough: boolean; ancestorThrough: boolean
+  status?: Partial<SessionRow>
+  selectionKey: string; onOpen: (element: HTMLLIElement) => void
+  swiped?: boolean; onClose?: (element: HTMLButtonElement) => void; consumePress?: () => boolean
+}) {
+  const ref = useRef<HTMLLIElement>(null)
+  const mark = icon ?? BRAND_MARK
+  const role = rowPersonaLine(usePersonas(machineID), status?.persona)
+  useLayoutEffect(() => { if (state === "working") L.paintSpinner(ref.current?.querySelector<HTMLCanvasElement>("canvas.spin") ?? null) }, [state])
+  useLayoutEffect(() => { if (ref.current) paintSwipe(ref.current, swiped ? "open" : "", swiped ? ACTION_WIDTH : 0) }, [swiped, selectionKey])
+  const activate = () => { if (!consumePress?.() && ref.current) onOpen(ref.current) }
+  return <SessionRowLayout ref={ref} role="option" tabIndex={0} data-id={selectionKey} data-swipe-width={ACTION_WIDTH} data-selection-key={selectionKey}
+    data-state={state} data-attention={attention ? "open" : undefined}
+    data-depth={depth ? String(depth) : undefined} data-tree-through={branchThrough ? "1" : undefined}
+    aria-selected={open ? "true" : "false"} aria-label={`${title}, ${machineName}, ${stateLabel}, ${freshness}`}
+    className={open ? "open projected-row" : "projected-row"}
+    onClick={activate} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault(); activate()
+    } }}>
+    <span className="kid" hidden={!depth} aria-hidden="true" />
+    {ancestorThrough && <span className="tree-ancestor" aria-hidden="true" />}
+    <Mark icon={mark} cellPx={4} />
+    <div className="title" style={{ color: L.accentTint(mark.accent) }}><span className="label">{title}</span>
+      {assistant && <span className="who" dangerouslySetInnerHTML={{ __html: L.whoHTML(assistant) }} />}</div>
+    <div className="meta"><span className="machine" title={machineName}>{machineName}</span>
+      {cwd && <span className="path">{L.path(cwd)}</span>}
+      {lastMovementAt && <span className="session-activity">{sessionActivityWord({ activity: { known: true, at: lastMovementAt / 1000 } })}</span>}</div>
+    {status ? <StateLine row={{ ...status, id: sessionID, state } as SessionRow}
+      role={role} useLocalTasks={false} suffix={freshness} />
+      : <div className="state">{state === "working" && <canvas className="spin" aria-hidden="true" />}
+        <span>{stateLabel}</span>{freshness && <span className="session-activity">{freshness}</span>}
+        {attention && <span className="session-attention"><span className="session-attention-dot" /></span>}</div>}
+    {onClose && <button className="swipe-end" type="button" hidden={!swiped}
+      aria-label={nextWord("swipeEndLabel", { session: title })}
+      title={nextWord("swipeEndLabel", { session: title })}
+      onClick={(event) => { event.stopPropagation(); onClose(event.currentTarget) }}>
+      <span className="word">{nextWord("swipeCloseAction")}</span>
+    </button>}
+  </SessionRowLayout>
+}
 
 export function Mark({ icon, cellPx, id }: { icon: SessionRow["icon"]; cellPx: number; id?: string }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -51,21 +104,16 @@ export function Mark({ icon, cellPx, id }: { icon: SessionRow["icon"]; cellPx: n
  * This console has no optimistic sends and no in-flight close, so `kind` is the
  * row's own state: the original's `closing` and `pending` branches never apply.
  */
-function stateLine(row: SessionRow): { html: string; shape: string } {
+function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape: string } {
   const T = L.strings
   const coordination = row.coordination
   const waitingOn = coordination?.waitingOn ?? []
   const waitedOnBy = coordination?.waitedOnBy ?? []
-  const roots = L.tasksOfRoot(row.id)
-  const callbacks = activeCallbacksForSession(row, roots)
-  const callbackKnown = L.taskListKnown()
-  const callbackLabel = !callbackKnown
-    ? nextWord("sessionCallbackUnverified")
-    : callbacks.length === 1
-      ? nextWord("sessionCallbackActive")
-      : nextWord("sessionCallbacksActive", { count: callbacks.length })
-  const callbackSaid = callbacks.length
-    ? `<span class="session-callback-active" data-verified="${callbackKnown ? "1" : "0"}" title="${L.escapeHTML(callbacks.map((task) => task.title || task.id).join("\n"))}">${L.escapeHTML(callbackLabel)}</span>`
+  const roots = useLocalTasks ? L.tasksOfRoot(row.id) : []
+  const callbackLabel = nextWord("sessionCallbackActive")
+  const callbackDetail = [callbackLabel, row.heavy_work?.reason].filter(Boolean).join(" · ")
+  const callbackSaid = row.heavy_work
+    ? `<span class="session-callback-active" role="img" aria-label="${L.escapeHTML(callbackDetail)}" title="${L.escapeHTML(callbackDetail)}">🏗️${L.workState(row).state === "working" ? "" : '<canvas class="spin" aria-hidden="true"></canvas>'}</span>`
     : ""
   const n = row.shells?.length ?? 0
   const shellsSaid = n
@@ -98,7 +146,10 @@ function stateLine(row: SessionRow): { html: string; shape: string } {
     ? `<span class="coordination-wait" title="${L.escapeHTML(peerTitle)}">${L.glyphHTML("⏳", peerText)}</span>`
     : ""
 
-  const work = L.workState(row)
+  // The pinned fleet list has the daemon's work state but does not load the
+  // local task collection used by projectSessionWorkState to prove a peer wait.
+  const work = !useLocalTasks && row.state === "idle" && row.work_state === "waiting_session"
+    ? { state: "waiting_session" } : L.workState(row)
   if (work.state === "waiting_session" && !peerSaid) {
     if (row.work_provenance === "self" && row.work_note && row.work_moved_by && row.work_person_needed === false) {
       const declaredTitle = row.work_moved_by + " · " + row.work_note
@@ -109,6 +160,10 @@ function stateLine(row: SessionRow): { html: string; shape: string } {
         const childWait = T.webTaskTasks + ": " + liveRoots.map((task) => task.title || task.id).join(" · ")
         peerSaid = `<span class="coordination-wait" title="${L.escapeHTML(childWait)}">${L.glyphHTML("⏳", childWait)}</span>`
       }
+    }
+    if (!peerSaid && !useLocalTasks) {
+      const waiting = nextWord("sessionWaitingOnSession")
+      peerSaid = `<span class="coordination-wait">${L.glyphHTML("⏳", waiting)}</span>`
     }
   }
 
@@ -155,7 +210,7 @@ function stateLine(row: SessionRow): { html: string; shape: string } {
     work.state +
     (n ? "+sh" + n : "") +
     (waitShape ? "+cw" + waitShape : "") +
-    (callbacks.length ? "+cb" + String(callbackKnown) + ":" + callbacks.map((task) => task.id + ":" + task.state).join(",") : "") +
+    (row.heavy_work ? "+heavy" + row.heavy_work.task_id + ":" + row.heavy_work.reason : "") +
     (row.source ? "+src" + row.source.freshness + ":" + row.source.observed_at : "")
     + (attentionSaid ? "+attention" + attention : "")
     + (work.state === "working" ? "+line" + (row.line || "") : "")
@@ -169,7 +224,8 @@ function stateLine(row: SessionRow): { html: string; shape: string } {
       : ""
     html = '<canvas class="spin"></canvas>' + line + callbackSaid + attentionSaid + peerSaid + workSaid + retainedSaid + shellsSaid
   } else if (notStarted) {
-    html = `<span class="unread">${L.escapeHTML(nextWord("sessionNotStartedShort"))}</span>` + callbackSaid + attentionSaid + peerSaid + workSaid + shellsSaid
+    const word = /^(tty|pts\/)/.test(row.id) ? nextWord("processOnlyShort") : nextWord("sessionNotStartedShort")
+    html = `<span class="unread">${L.escapeHTML(word)}</span>` + callbackSaid + attentionSaid + peerSaid + workSaid + shellsSaid
   } else if (work.state === "unknown" && row.state === "unknown") {
     // The label already says the state could not be read; the work copy
     // beside it would say so again.
@@ -192,9 +248,11 @@ function stateLine(row: SessionRow): { html: string; shape: string } {
  * one, and then `stateLine`'s words. The role is written into the same markup
  * as the words so that it swipes with them and adds no line of its own.
  */
-function StateLine({ row, role }: { row: SessionRow; role: ReturnType<typeof rowPersonaLine> }) {
+function StateLine({ row, role, useLocalTasks = true, suffix = "" }: { row: SessionRow; role: ReturnType<typeof rowPersonaLine>;
+  useLocalTasks?: boolean; suffix?: string }) {
   const ref = useRef<HTMLDivElement>(null)
-  const { html, shape } = stateLine(row)
+  const { html, shape } = stateLine(row, useLocalTasks)
+  const statusHTML = html + (suffix ? '<span class="session-activity">' + L.escapeHTML(suffix) + "</span>" : "")
   const roleHTML = role
     ? '<span class="persona-state" title="' + L.escapeHTML(role.title) + '">' +
       '<canvas class="persona-state-bot" width="0" height="0" aria-hidden="true"></canvas>' +
@@ -203,8 +261,18 @@ function StateLine({ row, role }: { row: SessionRow; role: ReturnType<typeof row
   useLayoutEffect(() => {
     L.paintSpinner(ref.current?.querySelector<HTMLCanvasElement>("canvas.spin") ?? null)
     if (role) L.paintIcon(ref.current?.querySelector<HTMLCanvasElement>("canvas.persona-state-bot") ?? null, role.persona.icon, 2)
-  }, [html, role?.persona])
-  return <div className="state" ref={ref} data-shape={shape} dangerouslySetInnerHTML={{ __html: roleHTML + html }} />
+  }, [statusHTML, role?.persona])
+  // A daemon that sends `working_since` sends the line again only when more
+  // than its clock moved, so the clock is drawn here (working-clock.ts). The
+  // markup stays as sent and only the line's text moves; without the field the
+  // line is drawn exactly as it arrives.
+  const since = row.working_since
+  useLayoutEffect(() => {
+    const live = ref.current?.querySelector<HTMLElement>(".session-live-line")
+    if (!live || !row.line || !since) return
+    return runWorkingClock(live, row.line, since)
+  }, [statusHTML, row.line, since])
+  return <div className="state" ref={ref} data-shape={shape} dangerouslySetInnerHTML={{ __html: roleHTML + statusHTML }} />
 }
 
 /**
@@ -344,9 +412,8 @@ export function Row({
   // draws nothing.
   const role = rowPersonaLine(usePersonas(), row.persona)
   return (
-    <li
+    <SessionRowLayout
       ref={ref}
-      className="row"
       role="option"
       tabIndex={-1}
       data-id={row.id}
@@ -447,7 +514,7 @@ export function Row({
       >
         <span className="word">{reveal.word}</span>
       </button>
-    </li>
+    </SessionRowLayout>
   )
 }
 

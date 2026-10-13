@@ -85,6 +85,11 @@ Clawdline Cloud 透過端對端加密的中繼，讓手機或其他機器連回�
 
 **專案與多台機器**
 
+- **手動加入本機專案。** 在存放既有資料夾的機器上，進入該目錄後執行
+  `clawdline project add`，或傳入相對／絕對路徑，並確保該機器的 daemon 正在執行。
+  指令只會在 daemon 登錄目錄後回報成功；`clawdline project list` 讀取同一份清單。
+  已開啟的 Session 啟動視窗會自動更新；重新開啟**專案**頁也會看到。主控台目前沒有「新增專案」按鈕；每個專案列都有「從列表移除」，會保留資料夾與 Session。
+  [加入專案](docs/user/projects.md#add-a-project)
 - **跨機器的專案。** 以 git origin 對應，讓第二台機器拿到相同的專案名稱、圖示和沒進
   git 的 skill，有沒有 Cloud 都可以。[專案](docs/user/projects.md)
 - **Claude 和 Codex 共用同一套規則與 skill。** `clawdline project unify` 會列出怎麼讓同一個
@@ -95,7 +100,7 @@ Clawdline Cloud 透過端對端加密的中繼，讓手機或其他機器連回�
 
 ## 安裝
 
-在 macOS 13 以上或 Linux，已經裝好 tmux 和 Claude Code 或 Codex：
+在 macOS 13 以上或 Linux，已經裝好 Claude Code 或 Codex（每個版本都內附 tmux，機器上沒有時就用它）：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
@@ -103,7 +108,8 @@ curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh 
 
 它會安裝簽章過的最新正式版，以使用者服務在登入時啟動（不需要 `sudo`、Go 或 Node.js），在 Mac
 上一併裝選單列 App，最後在瀏覽器打開主控台。伺服器上請在 `sh` 後面加 `-s -- --headless`。接著
-在 tmux 裡執行 `claude` 或 `codex`，Session 就會出現在清單裡。
+在 tmux 裡執行 `claude` 或 `codex`（安裝時若說用的是內附的 tmux，就用
+`clawdline tmux new -s work` 開），Session 就會出現在清單裡。
 
 每一步與確認方法、所有選項和移除方式，都在[安裝與第一次執行](docs/user/install.md)。正式版可以
 在主控台的設定頁或用 `clawdline update --apply` 更新；新版起不來時會自己退回原版本

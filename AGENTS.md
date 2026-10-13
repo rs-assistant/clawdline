@@ -24,7 +24,11 @@ git worktree add -f <scratch>/<name> HEAD
   landing as soon as it lands. A branch cut before 2026-09-22 can only be cherry-picked
   (`docs/working-rules.md`).
 - After recording a landing, run `tools/check-worktrees.sh` (a dry run: 0 nothing owed, 1 landed
-  residue, 2 could not check, 3 unknown) and inspect it before `--apply`. For a read-only
+  residue, 2 could not check, 3 unknown). Inspect it, then run `--apply` for every proved
+  `landed_clean` checkout. Remove a root-owned task worktree after its commit is on `main`, its
+  checkout is clean, and no owner is using it. Never use age or ancestry alone to delete an
+  unknown, active, dirty, or unlanded checkout. In every delivery, tell the person how many
+  worktrees were removed and which candidates were kept, with their reasons. For a read-only
   throwaway checkout use `tools/check-worktrees.sh --ephemeral -- <command>`. `docs/worktrees.md`.
 - A dispatched child's worktree path comes from the task record
   (`GET /v1/orchestrator/tasks/<id>` → `.task.worktree.path`), never composed.
@@ -33,7 +37,7 @@ git worktree add -f <scratch>/<name> HEAD
 ## Before anything is committed
 
 Every one of these, and every one green. **`tools/check.sh` runs them all**, once inside
-`tools/heavy.sh`, the web pair only when `web/` changed since `main` (or with `--web`), and ends
+`tools/heavy.sh`, the web checks only when `web/` changed since `main` (or with `--web`), and ends
 with one `PASS`/`FAIL` line per check and exit 0 only when every one passed. Run it rather than a
 loop of your own; when you add a check here, add it there too.
 
@@ -51,7 +55,9 @@ tools/check-machine-words.sh            # no shown sentence calls the machine a 
 tools/check-shell-expansions.sh         # no $name runs into a non-ASCII character
 tools/check-private.sh                  # nothing of the person's is in a public repo
 tools/check-private.sh -history -new    # no commit behind it added one either
-( cd web && npm run check && ../tools/heavy.sh npm run build )   # when anything under web/ changed
+node tools/check-console-tests.mjs      # every console test file is run by npm test or npm run check
+node tools/check-mirror-tests.mjs       # no console test asserts on the shape of the code
+( cd web && npm run check && ../tools/heavy.sh npm run build && ../tools/heavy.sh npm test )   # when anything under web/ changed
 ```
 
 - **Every compile, test suite or bundle build goes through `tools/heavy.sh`** (`clawdline heavy`).
@@ -149,6 +155,8 @@ goes before these two lines so the status pair always remains the final two line
   `CLAWDLINE_NEXT_DIR` of its own, never a copy of `~/.config/clawdline-next`.
 - Read `~/.config/clawdline` except where the code already does, or write it.
 - Stop a daemon by pattern: stop your own **by the PID** your `serve` printed.
+- Remove a private `TMUX_TMPDIR` or socket directory while its tmux server still runs: kill that
+  server first, or its assistants keep running where nothing can reach them.
 - Confirm a restart with `/v1/health` alone: the console is back when `GET /` answers 200.
 
 The incident behind each of these is in `docs/working-rules.md`.

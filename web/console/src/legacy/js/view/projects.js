@@ -735,11 +735,25 @@ export function bindProjectsPage(elements, environment) {
         });
     }
 
-    /** The lifecycle view is an explicit secondary action; the row's primary Board action stays. */
-    function openLifecycle(place) {
+    /* **A Project open on this page has an address** (`#page=projects&id=<place id>`,
+       `page-detail.ts`), so the browser's Back gives the list back as this page's own back control
+       does, and a reload or a link opens the same Project. `environment.address` moves the
+       history; a harness that has none opens and closes in place. The list's scroll position is
+       kept while a Project is open, and the Project opens at its top. */
+    var address = environment.address || null;
+    var scroller = elements["projects"] || null;
+    var listScroll = 0;
+
+    /** The lifecycle view is an explicit secondary action; the row's primary Board action stays.
+        `fromAddress` is true when the address already names this Project (a reload, Back, a link). */
+    function openLifecycle(place, fromAddress) {
         stopCatalogTimer();
+        if (state.view === "list" && scroller) listScroll = scroller.scrollTop;
         state.place = place;
+        state.wanted = null;
         showView("detail");
+        if (scroller) scroller.scrollTop = 0;
+        if (address && !fromAddress) address.enter(place.id);
         elements["project-name"].textContent = place.label || place.path;
         elements["project-path"].textContent = place.path || "";
         var mark = elements["project-mark"];
@@ -749,22 +763,51 @@ export function bindProjectsPage(elements, environment) {
         return lifecycle.enter(place);
     }
 
-    /** Arriving. The list, every time — the detail is a view rather than an address. */
-    function enter() {
+    /** The Project the address names, opened once the list that holds it has been read. */
+    function openNamed(id) {
+        var place = (state.places || []).find(function (candidate) { return candidate.id === id; });
+        if (!place) { state.wanted = id; return Promise.resolve(); }
+        if (state.view === "detail" && state.place && state.place.id === id) return Promise.resolve();
+        return openLifecycle(place, true);
+    }
+
+    /** The address changed under the page (Back, Forward, a typed address): follow it. */
+    function follow(id) {
+        if (!id) {
+            state.wanted = null;
+            if (state.view === "detail") closeDetail();
+            return Promise.resolve();
+        }
+        return openNamed(id);
+    }
+
+    /** Arriving. The list, or the Project the address names (`wanted`) once the list is read. */
+    function enter(wanted) {
         active = true;
         lifecycle.leave();
         showView("list");
         state.place = null;
-        return loadPlaces();
+        state.wanted = wanted || null;
+        return loadPlaces().then(function () {
+            if (active && state.wanted) return openNamed(state.wanted);
+        });
     }
 
     /** Nothing to put back: the page that follows draws itself. Kept as the seam a page has. */
     function leave() { active = false; ++state.loading; stopCatalogTimer(); lifecycle.leave(); }
 
+    /** Back over the history step the Project added, heard again as `follow("")`; or, with no
+        such step, closed here. */
     function backToList() {
+        if (address && address.leave()) return;
+        closeDetail();
+    }
+
+    function closeDetail() {
         lifecycle.leave();
         showView("list");
         state.place = null;
+        if (scroller) scroller.scrollTop = listScroll;
         // The keyboard goes back to the heading of the list it has returned to, not to a control
         // that is now hidden — `hidden` takes the focused node out of the document and the
         // browser drops focus on the body, from where nothing can be given back.
@@ -786,6 +829,6 @@ export function bindProjectsPage(elements, environment) {
 
     showView("list");
     return { enter: enter, leave: leave, loadPlaces: loadPlaces, openProject: openProject,
-             openLifecycle: openLifecycle,
+             openLifecycle: openLifecycle, follow: follow,
              escape: Projects.escape, state: state };
 }

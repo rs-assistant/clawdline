@@ -88,6 +88,11 @@ let currentClaudeModel = "claude-opus-5-5"
 let generation = 0
 let intentRequests = 0
 let placeRequests = 0
+let projectPickerEmpty = false
+let projectPickerNew = false
+let projectPickerMany = false
+let projectAdds = 0
+let projectRemoves = 0
 let projectFileText = "first instruction"
 let projectFileVersion = "version-one"
 let smartTitleRequests = 0
@@ -299,7 +304,17 @@ function daemon(): Server {
     })
     if (path === "/v1/projects" && req.method === "GET") return json(res, 503, { error: "board_unavailable" })
     if (path === "/__project_request_count") return json(res, 200, { count: placeRequests })
+    if (path === "/v1/project-folders" && req.method === "GET") {
+      const folder = url.searchParams.get("path") || "/tmp"
+      return json(res, 200, { path: folder, parent: folder === "/tmp" ? "/" : "/tmp",
+        folders: folder === "/tmp" ? [
+          { name: "fixture-" + "very-long-folder-name-".repeat(12), path: "/tmp/fixture-long" },
+          { name: "fixture-new", path: "/tmp/fixture-new" },
+        ] : [], truncated: false })
+    }
     if (path === "/v1/places") {
+      if (req.method === "POST") { projectAdds++; projectPickerEmpty = false; projectPickerNew = true; return json(res, 200, { registered: true, places: [] }) }
+      if (req.method === "DELETE") { projectRemoves++; projectPickerEmpty = true; projectPickerNew = false; return json(res, 200, { registered: true, places: [] }) }
       placeRequests++
       if (placeRequests === failPlacesOnRequest) {
         failPlacesOnRequest = 0
@@ -308,11 +323,14 @@ function daemon(): Server {
       return json(res, 200, {
         at: Date.now(),
         assistants: [{ id: "claude", label: "Claude Code", availability: "unknown" }],
-        places: [{
-          id: "fixture-place", label: "Example project", path: "/tmp/fixture", at: Date.now(), icon: PROJECT_ICON,
+        places: projectPickerEmpty ? [] : (projectPickerMany ? Array.from({ length: 9 }, (_, index) => ({
+          id: "fixture-place-" + index, label: "Example project " + index, path: "/tmp/fixture-" + index,
+          at: Date.now(), icon: PROJECT_ICON,
+        })) : [{
+          id: "fixture-place", label: "Example project", path: projectPickerNew ? "/tmp/fixture-new" : "/tmp/fixture", at: Date.now(), icon: PROJECT_ICON,
           repo: "github.com/example/project",
           setup: { icon: "generated", deploy: "ready", deploy_activity: "running", servers: "missing", server_count: 0, sync: "ready" },
-        }],
+        }]),
       })
     }
     if (path === "/v1/projects/fixture-place/tree" && req.method === "GET") {
@@ -607,6 +625,11 @@ class Tab {
     const event = { key, code, windowsVirtualKeyCode: virtual, nativeVirtualKeyCode: virtual }
     await this.b.send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...event }, this.session)
     await this.b.send("Input.dispatchKeyEvent", { type: "keyUp", ...event }, this.session)
+  }
+
+  async touch(x: number, y: number): Promise<void> {
+    await this.b.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] }, this.session)
+    await this.b.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }, this.session)
   }
 
   async screenshot(path: string): Promise<void> {
@@ -1088,6 +1111,16 @@ test("Settings selects provider model defaults, fits a phone, and restores a ref
     await tab.go("/#page=settings")
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 5000
+      const open = () => {
+        const button = document.getElementById("settings-tab-1")
+        if (button) { button.click(); return resolve(true) }
+        if (Date.now() > deadline) return reject(new Error("the Work settings tab did not appear"))
+        setTimeout(open, 25)
+      }
+      open()
+    })`)
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 5000
       const read = () => {
         const select = document.getElementById("settings-codex-default-model")
         if (select && !select.disabled) return resolve(true)
@@ -1168,7 +1201,7 @@ test("Settings selects provider model defaults, fits a phone, and restores a ref
       const read = () => {
         const select = document.getElementById("settings-codex-default-model")
         const said = document.querySelector("#settings-default-models .said")?.textContent || ""
-        if (select.value === "gpt-6-sol" && said.includes("失敗")) return resolve(true)
+        if (select.value === "gpt-6-sol" && said.includes("settings_unavailable")) return resolve(true)
         if (Date.now() > deadline) return reject(new Error("the refused value was not restored: " + select.value + " / " + said))
         setTimeout(read, 25)
       }
@@ -1179,6 +1212,16 @@ test("Settings selects provider model defaults, fits a phone, and restores a ref
 
   await inTab(DESK, async (tab) => {
     await tab.go("/#page=settings")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 5000
+      const open = () => {
+        const button = document.getElementById("settings-tab-1")
+        if (button) { button.click(); return resolve(true) }
+        if (Date.now() > deadline) return reject(new Error("the Work settings tab did not appear"))
+        setTimeout(open, 25)
+      }
+      open()
+    })`)
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 5000
       const read = () => {
@@ -1744,8 +1787,8 @@ test("phone: Projects opens a reviewable setup Session without using the intent 
         const managementWasClosed = !management.open
         management.open = true
         const launcherBox = launcher.getBoundingClientRect()
-        const groupedTools = management.querySelectorAll(":scope > .project-tools-body > .project-setup, :scope > .project-tools-body > .project-sync, :scope > .project-tools-body > .project-icon-copy").length
-        const topLevelGroups = document.querySelectorAll("#project-icon-copy-host > .project-tools").length
+        const groupedTools = management.querySelectorAll(":scope > .project-tools-body > .project-setup, :scope > .project-tools-body > .project-sync").length
+        const topLevelGroups = document.querySelectorAll("#project-tools-host > .project-tools").length
         const inlineCards = launcher.querySelectorAll(":scope > .project-readiness-list").length
         trigger.click()
         setTimeout(() => {
@@ -1813,8 +1856,8 @@ test("phone: Projects opens a reviewable setup Session without using the intent 
     assert.match(reviewed.instructions, /\.devstack\.json/)
     assert.equal(reviewed.managementWasClosed, true, "Project maintenance is secondary on arrival")
     assert.ok(reviewed.managementHeight <= 82, `the collapsed management group is ${reviewed.managementHeight}px tall`)
-    assert.equal(reviewed.topLevelGroups, 1, "the three maintenance tools have one top-level group")
-    assert.equal(reviewed.groupedTools, 3, "health, sync and icon tools stay together inside the group")
+    assert.equal(reviewed.topLevelGroups, 1, "the maintenance tools have one top-level group")
+    assert.equal(reviewed.groupedTools, 2, "health and sync stay together inside the group")
     assert.equal(reviewed.inlineCards, 0, "the Project page does not repeat the readiness list in its main flow")
     assert.ok(reviewed.launcherHeight <= 110, `the compact launcher is ${reviewed.launcherHeight}px tall`)
     assert.equal(reviewed.initialFocus, true, "opening the audit focuses its labelled dialog instead of outlining Close")
@@ -1823,7 +1866,7 @@ test("phone: Projects opens a reviewable setup Session without using the intent 
     assert.ok(reviewed.dialog.left <= 1 && reviewed.dialog.top <= 1, "the phone audit starts at the viewport edge")
     assert.ok(reviewed.dialog.right >= reviewed.viewport.width - 1, "the phone audit spans the viewport width")
     assert.ok(reviewed.dialog.bottom >= reviewed.viewport.height - 1, "the phone audit spans the viewport height")
-    assert.equal(reviewed.capabilities, 4, "the phone shows each configuration layer")
+    assert.equal(reviewed.capabilities, 5, "the phone shows each configuration layer")
     assert.ok(reviewed.buttonWidth >= reviewed.cardWidth - 30, "the primary phone action keeps the card width")
   }))
 
@@ -2235,4 +2278,163 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
       assignmentReply?.()
       assignmentReply = null
     }
+  }))
+
+test("phone: Projects offers a folder picker that can be cancelled", () =>
+  inTab(PHONE, async (tab) => {
+    const before = projectAdds
+    await tab.go("/#page=projects")
+    const state = await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 5000
+      let pressed = false
+      const wait = () => {
+        const add = document.getElementById("projects-add")
+        if (add && !document.getElementById("projects").hidden && add.textContent.includes("新增專案")) {
+          if (!pressed) { add.click(); pressed = true }
+          const dialog = document.querySelector(".project-folder-picker[open]")
+          if (dialog) {
+            const folder = dialog.querySelector(".project-folder-list button:nth-child(2)")
+            if (!folder) return setTimeout(wait, 25)
+            const dialogRect = dialog.getBoundingClientRect()
+            const folderRect = folder.getBoundingClientRect()
+            const fits = dialogRect.left >= 0 && dialogRect.right <= innerWidth &&
+              folderRect.left >= dialogRect.left && folderRect.right <= dialogRect.right &&
+              folder.scrollWidth <= folder.clientWidth + 1 &&
+              folder.scrollHeight > 38
+            const cancel = dialog.querySelector(".project-folder-actions button:first-child")
+            cancel.click()
+            const closed = () => {
+              if (!dialog.open) return resolve({ shown: !document.getElementById("projects").hidden, cancelled: true, fits })
+              if (Date.now() > deadline) return reject(new Error("Project picker did not close"))
+              setTimeout(closed, 25)
+            }
+            return closed()
+          }
+        }
+        if (Date.now() > deadline) return reject(new Error("Projects did not open its folder picker: " + add?.textContent + " / " + document.getElementById("projects")?.hidden + " / " + pressed))
+        setTimeout(wait, 25)
+      }
+      wait()
+    })`)
+    assert.deepEqual(state, { shown: true, cancelled: true, fits: true })
+    assert.equal(projectAdds, before)
+  }))
+
+test("phone: Session Project controls fit beside the search field", () =>
+  inTab(PHONE, async (tab) => {
+    projectPickerMany = true
+    try {
+      await tab.go("/")
+      await tab.until("the list arrives", (s) => s.rows === ROWS.length)
+      const layout = await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        document.getElementById("start-go").click()
+        const wait = () => {
+          const filter = document.getElementById("start-filter")
+          const add = document.getElementById("start-add-project")
+          const edit = document.getElementById("start-edit-projects")
+          if (filter && add && edit && !filter.hidden && !add.closest("[hidden]") &&
+            document.querySelectorAll("#start-list .place").length === 9) {
+            const search = filter.getBoundingClientRect()
+            const plus = add.getBoundingClientRect()
+            const pencil = edit.getBoundingClientRect()
+            return resolve({
+              sameRow: Math.abs(search.top - plus.top) <= 1 && Math.abs(search.top - pencil.top) <= 1,
+              order: search.right < plus.left && plus.right < pencil.left && pencil.right <= innerWidth,
+              compact: add.textContent.trim() === "" && edit.textContent.trim() === "",
+              accessible: !!add.getAttribute("aria-label") && !!edit.getAttribute("aria-label"),
+              quiet: document.getElementById("start-say").textContent === "" &&
+                getComputedStyle(add).borderTopWidth === "0px" && getComputedStyle(edit).borderTopWidth === "0px" &&
+                add.querySelector("svg").getBoundingClientRect().width <= 18,
+              editX: pencil.left + pencil.width / 2,
+              editY: pencil.top + pencil.height / 2,
+            })
+          }
+          if (Date.now() > deadline) return reject(new Error("Session Project search did not appear"))
+          setTimeout(wait, 25)
+        }
+        wait()
+      })`)
+      assert.deepEqual({ sameRow: layout.sameRow, order: layout.order, compact: layout.compact,
+        accessible: layout.accessible, quiet: layout.quiet },
+      { sameRow: true, order: true, compact: true, accessible: true, quiet: true })
+      await tab.touch(layout.editX, layout.editY)
+      const editing = await tab.run(`(() => {
+        const button = document.getElementById("start-edit-projects")
+        const remove = document.querySelector("#start-list .start-project-remove")
+        const list = document.getElementById("start-list").getBoundingClientRect()
+        const rect = remove?.getBoundingClientRect()
+        return { pressed: button.getAttribute("aria-pressed"), count: document.querySelectorAll("#start-list .start-project-remove").length,
+          removeVisible: !!rect && rect.left >= list.left && rect.right <= list.right,
+          iconOnly: !!remove?.querySelector("svg") && remove.textContent.trim() === "",
+          compact: !!rect && rect.width <= 44,
+          unboxed: !!remove && getComputedStyle(remove).borderTopWidth === "0px" &&
+            getComputedStyle(remove).backgroundColor === "rgba(0, 0, 0, 0)" }
+      })()`)
+      assert.deepEqual(editing, { pressed: "true", count: 9, removeVisible: true,
+        iconOnly: true, compact: true, unboxed: true })
+    } finally {
+      projectPickerMany = false
+    }
+  }))
+
+test("phone: an empty Session picker adds and removes a Project in edit mode", () =>
+  inTab(PHONE, async (tab) => {
+    projectPickerEmpty = true
+    projectPickerNew = false
+    const beforeAdds = projectAdds
+    const beforeRemoves = projectRemoves
+    await tab.go("/")
+    await tab.until("the list arrives", (s) => s.rows === ROWS.length)
+    const result = await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      document.getElementById("start-go").click()
+      let stage = "empty"
+      const wait = (test, next) => {
+        if (test()) return next()
+        if (Date.now() > deadline) return reject(new Error("Project picker did not advance at " + stage + ": " + document.getElementById("start-say").textContent))
+        setTimeout(() => wait(test, next), 25)
+      }
+      wait(() => document.getElementById("start-say").textContent.includes("目前沒有專案") &&
+        !document.getElementById("start-add-project").hidden &&
+        document.querySelectorAll("#start-list .place").length === 0, () => {
+        const empty = document.getElementById("start-say").textContent
+        document.getElementById("start-add-project").click()
+        stage = "folder"
+        wait(() => document.querySelector(".project-folder-picker[open] .project-folder-list button"), () => {
+          document.querySelector(".project-folder-picker .project-folder-list button:last-of-type").click()
+          stage = "child"
+          wait(() => document.querySelector(".project-folder-picker .project-folder-current")?.textContent === "/tmp/fixture-new", () => {
+            document.querySelector(".project-folder-picker .project-folder-actions button:last-child").click()
+            stage = "added"
+            wait(() => document.querySelectorAll("#start-list .place").length === 1, () => {
+              document.getElementById("start-edit-projects").click()
+              const remove = document.querySelector("#start-list .start-project-remove")
+              const rect = remove.getBoundingClientRect()
+              const listRect = document.getElementById("start-list").getBoundingClientRect()
+              const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+              if (rect.left < listRect.left || rect.right > listRect.right || !remove.contains(hit)) {
+                return reject(new Error("Project remove control is outside the visible list: " +
+                  JSON.stringify({ rect: rect.toJSON(), list: listRect.toJSON(), hit: hit?.tagName })))
+              }
+              remove.click()
+              stage = "confirm"
+              wait(() => document.querySelector(".project-remove-dialog[open]"), () => {
+                document.querySelector(".project-remove-dialog[open] .project-remove-actions button:last-child").click()
+                stage = "removed"
+                wait(() => document.querySelectorAll("#start-list .place").length === 0, () => resolve({
+                  empty, addVisible: !document.getElementById("start-add-project").hidden,
+                  editing: document.getElementById("start-list").dataset.editing,
+                }))
+              })
+            })
+          })
+        })
+      })
+    })`)
+    assert.match(String((result as { empty: string }).empty), /目前沒有專案.*新增/)
+    assert.deepEqual({ addVisible: (result as { addVisible: boolean }).addVisible, editing: (result as { editing: string }).editing },
+      { addVisible: true, editing: "1" })
+    assert.equal(projectAdds, beforeAdds + 1)
+    assert.equal(projectRemoves, beforeRemoves + 1)
   }))

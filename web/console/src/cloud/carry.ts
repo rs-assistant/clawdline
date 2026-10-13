@@ -64,12 +64,13 @@ export const CARRIED = {
   documents: "GET /v1/sessions/{id}/documents",
   "work-gate-settings": "GET /v1/settings/work-gates",
   "work-gate-settings-update": "POST /v1/settings/work-gates",
-  // The dashboard behind the session counts (`machine/`): this machine's CPU
-  // and memory and each session's share, a machine read with no parameter.
+  // The dashboard behind the session counts (`machine/`): CPU, memory, disk
+  // space and grouped reclaim backlog, a machine read with no parameter.
   "machine-usage": "GET /v1/machine/usage",
   // The Settings page's update panel and the list's banner (`machine/update.ts`):
   // whether this machine trails the latest build, a machine read with no parameter.
   update: "GET /v1/update",
+  "update-fresh": "GET /v1/update/fresh",
   // The Settings page's 「立即更新」 (`machine/UpdatePanel.tsx`): install the
   // newest release of the machine's channel, a machine command with no body.
   "update-apply": "POST /v1/update/apply",
@@ -80,10 +81,14 @@ export const CARRIED = {
   "git-diff": "GET /v1/sessions/{id}/git/diff?path=",
   image: "GET /v1/artifacts/images/{id}?session={id}",
   info: "GET /v1/sessions/{id}/info[?parts=summary]",
+  skills: "GET /v1/sessions/{id}/skills",
   interrupt: "POST /v1/sessions/{id}/interrupt",
   intents: "POST /v1/intents",
   "past-sessions": "GET /v1/places/{id}/sessions[/{assistant}]",
   places: "GET /v1/places",
+  "project-folders": "GET /v1/project-folders?path=&machine=",
+  "project-add": "POST /v1/places?machine=",
+  "project-hide": "DELETE /v1/places",
   // The built-in personas a start may name (docs/personas.md): a machine read
   // with no parameter. A machine that does not list it is refused by the copied
   // client before anything leaves (`_unsupportedRefusal`).
@@ -96,6 +101,7 @@ export const CARRIED = {
   "squad.settings.update": "PUT /v1/squad/settings",
   "squad.motion.update": "PUT /v1/squad/motion",
   "squad.catalog.update": "POST /v1/squad/catalog",
+  "squad.role-draft": "POST /v1/squad/role-draft",
   "squad-session-bindings": "GET /v1/squad/session-bindings",
   "squad-session-snapshot": "GET /v1/squad/session-snapshots/{conversation}",
   "squad-event-head": "GET /v1/squad/events/head",
@@ -115,7 +121,6 @@ export const CARRIED = {
   "project-unify-apply": "POST /v1/projects/{project}/unify",
   "project-tree-list": "GET /v1/projects/{project}/tree?directory=",
   "project-tree-read": "GET /v1/projects/{project}/tree/file?path=",
-  "project-icon-copy": "PUT /v1/projects/{id}/icon",
   // Project settings sync (docs/project-sync.md). The two source reads are
   // also asked of *another* paired machine by `cloud/project-sync.ts`, which
   // is how a mirror reads its source without either machine reaching the other.
@@ -128,6 +133,10 @@ export const CARRIED = {
   projects: "GET /v1/projects",
   "pair-agent-start": "POST /v1/cloud/pairing/agent",
   "pair-agent-status": "GET /v1/cloud/pairing/agent/{task}",
+  "peer-control": "POST /v1/cloud/peer/control",
+  "peer-send": "POST /v1/cloud/peer/send",
+  "peer-outbox": "GET /v1/cloud/peer/outbox/{request}",
+  "peer-inbox": "GET /v1/cloud/peer/inbox?machine_id=&session_id=&execution_generation=&before=",
   "push-key": "GET /v1/push/key",
   "push-subscribe": "POST /v1/push/subscribe",
   "push-test": "POST /v1/push/test",
@@ -162,15 +171,24 @@ export const CARRIED = {
   schedule: "GET /v1/orchestrator/schedules/{id}",
   schedules: "GET /v1/orchestrator/schedules",
   send: "POST /v1/sessions/{id}/send",
+  "session-receipt": "GET /v1/sessions/{id}/cloud-receipts/{request}?action=&execution_generation=",
   // The Shell panel (`session/ShellPanel.tsx`): the tail of one background
   // command's output, polled while the panel is open.
   shell: "GET /v1/sessions/{id}/shells/{shell}?bytes=",
+  "sessions.list": "GET /v1/sessions?parts=list (one machine-level display read)",
   // No console route asks this: the copied client does, on every connection
   // that did not take over a live socket (`_recoverSessions`), so a list
   // opened after a relay eviction is sent every row rather than whichever
   // changed.
   "sessions.snapshot": "cloud-client.js _recoverSessions (on connect)",
+  // A page's own failures, delivered by the copied client with nobody
+  // pressing anything once a row is recorded (`cloud-viewer-events.js`);
+  // a failed carried read is one (`cloud.read.failed`, `relay-reader.ts`).
+  "diagnostics.events": "cloud-client.js _deliverViewerEvents (after a recorded failure)",
   "sessions.snapshot.initial": "cloud-client.js first _recoverSessions attempt (when advertised)",
+  // An opened waiting Session whose question has not come asks for its one row
+  // (`relay-reader.ts` askForOpenedQuestion), when the machine advertises it.
+  "sessions.row": "relay-reader.ts askForOpenedQuestion (when advertised)",
   "smart-title": "POST /v1/sessions/{id}/smart-title",
   "snippet-create": "POST /v1/snippets",
   "snippet-delete": "DELETE /v1/snippets/{id}",
@@ -299,10 +317,8 @@ export const DEFERRED_ASKED: readonly (keyof typeof DEFERRED)[] = []
  * and not a comment.
  */
 export const NO_MACHINE_ROUTE = {
-  "diagnostics.events": "This machine does not take a page's diagnostic events over Clawdline Cloud.",
   "diagnostics.report": "This machine does not take a diagnostic report over Clawdline Cloud.",
   dispatch: "Dispatching a task over Clawdline Cloud has no pinned wire shape on this machine: dispatch it on the machine.",
-  skills: "A session's skills are not listed over Clawdline Cloud: read them on the machine.",
 } as const
 
 /**

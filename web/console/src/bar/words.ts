@@ -5,7 +5,8 @@
 // daemon's Agent and voice language setting.
 
 /** `Assistant.label`: what a person calls it. Product names, not translated. */
-import { catalogWord } from "../catalog.js"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { catalogWord } from "../catalog.ts"
 
 export const ASSISTANT_LABEL: Record<string, string> = {
   claude: "Claude Code",
@@ -44,9 +45,9 @@ const baseWords = {
   /** `scanning` */
   scanning: "掃描中⋯",
   /** `noSession` */
-  noSession: "找不到在跑 Claude Code 的分頁",
+  noSession: "目前沒有 Session",
   /** `nothingToSend` */
-  nothingToSend: "沒有可以送的分頁——先在終端機裡開一個 Claude Code",
+  nothingToSend: "沒有可傳送的 Session。請先在終端機啟動 Claude Code 或 Codex。",
   /** `sendFailed` */
   sendFailed: "送不出去",
 

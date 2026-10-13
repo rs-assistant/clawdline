@@ -5,12 +5,14 @@
   "callback.clawdline_callback_the_daemon_answe.9136210b": "clawdline callback: the daemon answered without the task it started",
   "callback.command_required": "name the command after --: clawdline callback --title \"…\" -- <command> [args…]",
   "callback.end_turn": "End your turn now: a notice arrives when the command exits, and `clawdline task show %s` prints how it ended.\n",
+  "callback.intent_invalid": "--intent must be wait or heavy",
   "callback.no_conversation": "no conversation id",
   "callback.replayed": " (already started under this id; nothing was started again)",
   "callback.task_id_invalid": "--task-id %q is not a lowercase UUID",
   "callback.timeout_invalid": "--timeout must be 1m to 4h",
   "callback.title_required": "--title is required",
   "callback.usage_clawdline_callback_title_time.ed8f80b7": "usage: clawdline callback --title \"…\" [--timeout 30m] [--work-id <item>] [--dir D] [--task-id uuid] [--json] -- <command> [args…]",
+  "callback.usage_intent": "usage: clawdline callback --title \"…\" [--intent wait|heavy] [--timeout 30m] [--work-id <item>] [--dir D] [--task-id uuid] [--json] -- <command> [args…]",
   "callback.warning.47578bd3": "warning:",
   "callback.work_id_invalid": "--work-id %q is not a lowercase UUID",
   "coordinator.clawdline_coordinator_bind.261adc78": "clawdline coordinator bind:",
@@ -117,14 +119,15 @@
   "portheld.stop_pid_d_by_its_pid_if_it_should.38d5484a": " Stop pid %d by its PID if it should not be there, or give this daemon another port with CLAWDLINE_NEXT_PORT.",
   "portheld.this_daemon_has_started_nothing_and.42f3a707": " This daemon has started nothing and is exiting.",
   "portheld.where": "port %d on %s",
-  "project.add_directory_keep_existing_directo.69166d26": "  add <directory…>      keep existing directories in the session-start list",
+  "project.add_directory_keep_existing_directo.69166d26": "  add [directory…]      add directories; with none, add the current directory",
+  "project.daemon_answer_invalid": "the daemon did not return a Project list; update the running daemon",
   "project.clawdline_project_export_out_file_n.08105c5e": "       clawdline project export [--out file] [--name source]",
   "project.clawdline_project_import_clone_repl.fcdc6204": "       clawdline project import [--clone] [--replace-source] <file>",
   "project.clawdline_project_unify_apply_check.4c4400ff": "       clawdline project unify [--apply | --check] [--json] [directory]",
   "project.export_this_machine_s_project_setti.62f59b09": "  export                this machine's project settings (icons, names, untracked skills), as a file",
   "project.import_file_mirror_another_machine.f1f762b0": "  import <file>         mirror another machine's project settings here; it owns them from then on",
   "project.list_show_explicitly_registered_dir.233ccc16": "  list                  show explicitly registered directories",
-  "project.remove_directory_forget_directories.79c5aae6": "  remove <directory…>   forget directories without deleting them",
+  "project.remove_directory_forget_directories.79c5aae6": "  remove <directory…>   hide directories from Project lists without deleting them",
   "project.unexpected_argument": "unexpected argument %q",
   "project.unify_directory_show_how_claude_and.9b3b6da2": "  unify [directory]     show how Claude and Codex can share this Project's rules and skills; --apply does it",
   "project.usage_clawdline_project_add_remove.7aad3274": "usage: clawdline project <add|remove|list> [--json] [directory…]",
@@ -228,9 +231,11 @@
   "coordination.usage": "usage: clawdline coordination <status|pause|observed|safe|wake|resumed|retry> [options] [id or target session ids]",
   "coordination.unreadable": "Coordination status was unreadable.",
   "coordination.header": "TARGET\tSTATE\tREASON\tWAKE CONDITION\tERROR",
-  "coordination.identity": "This command needs the caller's conversation ID from its Session environment."
-  ,"coordination.run_usage": "usage: clawdline coordination run --resource landing --checkout /repo [--handoff] -- <command> [args…]; or --resource daemon_restart"
-  ,"coordination.waiting": "Waiting for %s, position %d.\n"
-  ,"coordination.timed_out": "The lease wait ended before a grant; the command did not run."
-  ,"coordination.release_failed": "The lease release could not be confirmed; inspect the holder before another exclusive operation."
+  "coordination.identity": "This command needs the caller's conversation ID from its Session environment.",
+  "coordination.run_usage": "usage: clawdline coordination run --resource landing --checkout /repo [--handoff] -- <command> [args…]; or --resource daemon_restart",
+  "coordination.waiting": "Waiting for %s, position %d.\n",
+  "coordination.timed_out": "The lease wait ended before a grant; the command did not run.",
+  "coordination.release_failed": "The lease release could not be confirmed; inspect the holder before another exclusive operation.",
+  "tmux.passed": "  (%s)\n",
+  "tmux.none": "clawdline tmux: there is no tmux on this machine, and this build carries none"
 }
