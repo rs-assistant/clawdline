@@ -1592,6 +1592,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             onPresentations={noteFleetPresentations}
             onProjection={noteFleetProjection}
             onCloseRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title }) }}
+            onArchiveRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title, kind: "archive" }) }}
             onMachineAction={runMachineTool}
           /> : undefined} />
           <CloudSessionSheets machineID={reading ?? chosen.id}

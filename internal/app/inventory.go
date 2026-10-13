@@ -347,7 +347,9 @@ func (in Inventory) named(s session.Session) session.Session {
 // with no buttons, and every line sent from the phone was pasted into the
 // dialog, never reached the input line, and came back send_unsubmitted: three
 // in two minutes to one pane, and nothing on the phone could dismiss it. The
-// gate stays shut for it, and its idle is never overruled by ReadState.
+// gate stays shut for it. Its idle is not generally overruled by ReadState;
+// the one stronger screen fact is a current live line, handled after the menu
+// check so a dialog still wins.
 func (in Inventory) readScreen(ctx context.Context, s session.Session) session.Session {
 	// A tty id seen only by ps is not an iTerm2 session id. Asking iTerm2
 	// to capture it can only fail, and repeated failures can stall that
@@ -396,8 +398,19 @@ func (in Inventory) readScreen(ctx context.Context, s session.Session) session.S
 			s.Evidence = session.EvidenceScreen
 		}
 	}
+	// Codex keeps its composer usable while a background terminal runs. Its
+	// registry can therefore say idle while the screen's current status line
+	// says "Waiting for background terminal (…)". That live, clocked line is
+	// newer evidence than the registry word and is what the Session reader
+	// needs in order to know the check is still going. Menus returned above,
+	// so this cannot cover a question somebody needs to answer.
+	line := session.WorkingLine(screen, s.Assistant, 25)
+	if registry && s.State == session.StateIdle && line != "" {
+		s.State = session.StateWorking
+		s.Evidence = session.EvidenceScreen
+	}
 	if s.State == session.StateWorking {
-		s.Line = session.WorkingLine(screen, s.Assistant, 25)
+		s.Line = line
 	}
 	return s
 }

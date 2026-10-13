@@ -23,7 +23,7 @@ export function SessionRowLayout({ children, className, ...props }: ComponentPro
 
 /** Status-only rows keep the original list structure without inventing rich Session content. */
 export function ProjectedRow({ title, sessionID, machineID, machineName, assistant, state, stateLabel, icon, cwd,
-  freshness, lastMovementAt, attention, open, selectionKey, depth, branchThrough, ancestorThrough, status, swiped = false, onOpen, onClose, consumePress }: {
+  freshness, lastMovementAt, attention, open, selectionKey, depth, branchThrough, ancestorThrough, status, swiped = false, onOpen, onClose, onArchive, consumePress }: {
   title: string; sessionID: string; machineID: string; machineName: string
   assistant?: "claude" | "codex"
   icon?: SessionRow["icon"]; cwd?: string
@@ -31,15 +31,16 @@ export function ProjectedRow({ title, sessionID, machineID, machineName, assista
   depth: number; branchThrough: boolean; ancestorThrough: boolean
   status?: Partial<SessionRow>
   selectionKey: string; onOpen: (element: HTMLLIElement) => void
-  swiped?: boolean; onClose?: (element: HTMLButtonElement) => void; consumePress?: () => boolean
+  swiped?: boolean; onClose?: (element: HTMLButtonElement) => void; onArchive?: (element: HTMLButtonElement) => void; consumePress?: () => boolean
 }) {
   const ref = useRef<HTMLLIElement>(null)
   const mark = icon ?? BRAND_MARK
   const role = rowPersonaLine(usePersonas(machineID), status?.persona)
   useLayoutEffect(() => { if (state === "working") L.paintSpinner(ref.current?.querySelector<HTMLCanvasElement>("canvas.spin") ?? null) }, [state])
-  useLayoutEffect(() => { if (ref.current) paintSwipe(ref.current, swiped ? "open" : "", swiped ? ACTION_WIDTH : 0) }, [swiped, selectionKey])
+  const width = onArchive ? actionWidth(status?.sessionId) : ACTION_WIDTH
+  useLayoutEffect(() => { if (ref.current) paintSwipe(ref.current, swiped ? "open" : "", swiped ? width : 0) }, [swiped, selectionKey, width])
   const activate = () => { if (!consumePress?.() && ref.current) onOpen(ref.current) }
-  return <SessionRowLayout ref={ref} role="option" tabIndex={0} data-id={selectionKey} data-swipe-width={ACTION_WIDTH} data-selection-key={selectionKey}
+  return <SessionRowLayout ref={ref} role="option" tabIndex={0} data-id={selectionKey} data-swipe-width={width} data-selection-key={selectionKey}
     data-state={state} data-attention={attention ? "open" : undefined}
     data-depth={depth ? String(depth) : undefined} data-tree-through={branchThrough ? "1" : undefined}
     aria-selected={open ? "true" : "false"} aria-label={`${title}, ${machineName}, ${stateLabel}, ${freshness}`}
@@ -60,6 +61,12 @@ export function ProjectedRow({ title, sessionID, machineID, machineName, assista
       : <div className="state">{state === "working" && <canvas className="spin" aria-hidden="true" />}
         <span>{stateLabel}</span>{freshness && <span className="session-activity">{freshness}</span>}
         {attention && <span className="session-attention"><span className="session-attention-dot" /></span>}</div>}
+    {onArchive && <button className="swipe-archive" type="button" hidden={!swiped}
+      aria-label={nextWord("swipeArchiveLabel", { session: title })}
+      title={nextWord("swipeArchiveLabel", { session: title })}
+      onClick={(event) => { event.stopPropagation(); onArchive(event.currentTarget) }}>
+      <span className="word">{nextWord("swipeArchiveAction")}</span>
+    </button>}
     {onClose && <button className="swipe-end" type="button" hidden={!swiped}
       aria-label={nextWord("swipeEndLabel", { session: title })}
       title={nextWord("swipeEndLabel", { session: title })}

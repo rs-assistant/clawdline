@@ -26,10 +26,19 @@ the phone acceptance step remains open.
 
 The hosted console has typed older-machine handling (`machine/NeedsUpdate.tsx` and
 `machine/update-model.ts`), and fixture tests cover `not_implemented`, `unknown_command`, and
-older update routes. An isolated old daemon and a current Cloud console have not been paired and
-run through account login, machine pairing, connection, terminal rendering, and command receipts
-together. That acceptance step remains open; local fixtures do not prove the deployed relay or
-the person's account flow.
+older update routes. On 2026-10-13, the public v0.10.0 macOS App-bundled daemon ran with an
+isolated state root and connected to the production Cloud. Account approval returned a machine
+identity, its daemon logged `cloud ready`, and `clawdline cloud pair` completed with an iPhone
+viewer whose browser and machine key fingerprints matched. The daemon subsequently logged that
+the paired viewer had been heard from. Production served the `ab82bd6e` hosted console with
+CloudGate during this run. These observations establish account login, pairing, and a live relay
+connection, but not the phone's terminal rendering or a command receipt.
+
+The v0.10.0 terminal handler explicitly refuses its `/v1/terminals` route when reached through
+Cloud with `terminal_cloud_not_supported`. That source-level incompatibility is a reason to
+inspect the hosted console's actionable update prompt on the paired phone, not evidence that
+the phone showed it. The acceptance step remains open until the phone view and command receipts
+or the applicable incompatibility prompt have been observed end to end.
 
 ## Installation matrix
 
