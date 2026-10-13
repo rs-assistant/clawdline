@@ -50,6 +50,18 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   const presentationPasses = useRef(new Map<string, string>())
   const presentationFailures = useRef(new Map<string, string>())
   const [presentationRevision, refreshPresentation] = useState(0)
+  const [manualRefresh, setManualRefresh] = useState(0)
+  const previousTarget = useRef(target)
+  const refreshList = () => {
+    presentationPasses.current.clear()
+    presentationFailures.current.clear()
+    setManualRefresh((value) => value + 1)
+    refreshPresentation((value) => value + 1)
+  }
+  useEffect(() => {
+    if (previousTarget.current && !target) refreshList()
+    previousTarget.current = target
+  }, [target])
   const [, redraw] = useState(0)
   const [machineAction, setMachineAction] = useState<MachineToolbarAction | null>(null)
   const [statusFilter, setStatusFilter] = useState<FleetFilter>("all")
@@ -117,7 +129,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     })
     for (const machine of machines) read(machine.id)
     return () => { live = false; stop(); for (const abort of aborts.values()) abort.abort() }
-  }, [source, machines.map((machine) => machine.id + ":" + machine.freshness).join("\0")])
+  }, [source, manualRefresh, machines.map((machine) => machine.id + ":" + machine.freshness).join("\0")])
 
   useEffect(() => {
     if (!source) return
@@ -189,6 +201,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               machineID, sessionID: row.destination.sessionID, pass, title: row.title,
               icon: row.icon ?? previous?.icon, cwd: row.cwd ?? previous?.cwd,
               status: row.status ?? previous?.status,
+              observedAt: row.status ? row.observedAt : previous?.observedAt,
             })
           }
           const expected = readings[machineID]
@@ -305,6 +318,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
       onMouseEnter={freezeOrder} onMouseLeave={thawOrder} onTouchStart={freezeOrder}
       onTouchEnd={() => window.setTimeout(() => { if (swipe.openId() === null) thawOrder() }, 1200)}>
       <div className="cloud-all-status-filters" role="group" aria-label={nextWord("cloudAllState")}>
+        <button type="button" className="cloud-all-status-filter" onClick={refreshList}>{nextWord("cloudAllRefresh")}</button>
         <button type="button" className="cloud-all-status-filter" aria-pressed={statusFilter === "attention"}
           onClick={() => setStatusFilter((value) => value === "attention" ? "all" : "attention")}>{nextWord("cloudAllAttention")}</button>
         <button type="button" className="cloud-all-status-filter" aria-pressed={statusFilter === "working"}
