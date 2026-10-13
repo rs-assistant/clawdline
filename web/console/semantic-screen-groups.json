@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5101,
-  "riskKeys": 2239,
-  "nonRiskCount": 2862,
+  "englishContentKeys": 5106,
+  "riskKeys": 2241,
+  "nonRiskCount": 2865,
   "groups": [
     {
       "name": "bar / other",
@@ -1055,7 +1055,7 @@
     },
     {
       "name": "legacy / Fail",
-      "count": 11,
+      "count": 15,
       "sources": [
         "src/legacy/js/core/i18n.js"
       ],
@@ -1063,6 +1063,10 @@
         "legacy.webFailClock",
         "legacy.webFailClockIn",
         "legacy.webFailMacBusy",
+        "legacy.webFailOriginBrowser",
+        "legacy.webFailOriginCloud",
+        "legacy.webFailOriginMachine",
+        "legacy.webFailOriginMachineOffline",
         "legacy.webFailRateLimited",
         "legacy.webFailReceiptCapacity",
         "legacy.webFailReceiptPending",
@@ -1640,7 +1644,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 199,
+      "count": 198,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1648,7 +1652,6 @@
         "next.cloudActionAnswer",
         "next.cloudActionAnswerKey",
         "next.cloudActionCancel",
-        "next.cloudActionChanged",
         "next.cloudActionCheckReceipt",
         "next.cloudActionCheckRequired",
         "next.cloudActionClose",

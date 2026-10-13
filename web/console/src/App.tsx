@@ -22,6 +22,7 @@ import { nextWord } from "./next-strings.js"
 import { bootLocalCatalog } from "./catalog.js"
 import { namesSession, sessionFragment, sessionsInFragment } from "./session/address.js"
 import { destinationFragment, destinationFromFragment, destinationKey, type FleetDetailProblem, type SessionDestination } from "./cloud/all-machine-sessions.js"
+import { notificationAddress } from "./push/navigation.js"
 import { hasDocumentIntent } from "./legacy/documents-bridge.js"
 import { NewBuild } from "./NewBuild.js"
 import { MachineDashboard } from "./machine/MachineDashboard.js"
@@ -198,6 +199,7 @@ function rowNode(id: string): HTMLElement | null {
 export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
   fleetReaderMachine = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
+  fleetCloseIntent = null, onFleetCloseIntentHandled,
   hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions }: {
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
   cloudSessions?: ReactNode
@@ -212,6 +214,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   onFleetClose?: () => void
   fleetActionIntent?: { target: SessionDestination; title: string; kind: "end" | "archive" } | null
   onFleetActionIntentHandled?: () => void
+  fleetCloseIntent?: { target: SessionDestination; title: string; kind?: "end" | "archive"; recovered?: boolean } | null
+  onFleetCloseIntentHandled?: () => void
   hideSessionCounts?: boolean
   focusCloudSessions?: boolean
   onLeaveCloudSessions?: () => void
@@ -228,6 +232,17 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   const tooOldMark = (id: string) => tooOld(id) ? <small className="sidebar-needs-update"> · {nextWord("machineNeedsUpdateShort")}</small> : null
   const [page, setPage] = useState<Page>(() => location.pathname === "/billing/done"
     ? "plan" : hasDocumentIntent(location.hash) ? "documents" : "sessions")
+  useEffect(() => {
+    const worker = navigator.serviceWorker
+    if (!worker) return
+    const follow = (event: MessageEvent) => {
+      if (event.data?.type !== "navigate") return
+      const address = notificationAddress(event.data.url, location.href)
+      if (address) location.assign(address)
+    }
+    worker.addEventListener("message", follow)
+    return () => worker.removeEventListener("message", follow)
+  }, [])
   const [menu, setMenu] = useState(false)
   // The machine dashboard, opened from the counts (machine/MachineDashboard.tsx).
   const [machine, setMachine] = useState(false)
@@ -524,6 +539,17 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
     onFleetActionIntentHandled?.()
     requestConfirm({ kind: fleetActionIntent.kind, id: row.id, subject: fleetActionIntent.title, focus: "cancel" })
   }, [fleetList, fleetActionIntent, fleetTarget, fleetReaderMachine, rows])
+  useEffect(() => {
+    if (!fleetList || !fleetCloseIntent || !fleetTarget ||
+      destinationKey(fleetCloseIntent.target) !== destinationKey(fleetTarget) ||
+      fleetReaderMachine !== fleetCloseIntent.target.machineID) return
+    const row = rows.find((candidate) => candidate.id === fleetCloseIntent.target.sessionID &&
+      candidate.execution_generation === fleetCloseIntent.target.executionGeneration)
+    if (!row && !fleetCloseIntent.recovered) return
+    onFleetCloseIntentHandled?.()
+    requestConfirm({ kind: fleetCloseIntent.kind ?? "end", id: fleetCloseIntent.target.sessionID,
+      subject: fleetCloseIntent.title, focus: "cancel" })
+  }, [fleetList, fleetCloseIntent, fleetTarget, fleetReaderMachine, rows])
 
   // `closeDetail`: the session goes, the highlight stays. On a phone the list
   // comes back and a `#session=…` or `#page=…` address goes with the detail,

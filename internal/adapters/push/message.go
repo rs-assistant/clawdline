@@ -108,6 +108,17 @@ func SessionURL(id string) string {
 	return out.String()
 }
 
+// SessionDestinationURL keeps the single-machine session address while also
+// carrying the exact Cloud machine and execution. The local console reads the
+// session field; the Cloud fleet reads all three fields.
+func SessionDestinationURL(id, machine, generation string) string {
+	base := SessionURL(id)
+	if machine == "" || generation == "" {
+		return base
+	}
+	return base + "&machine=" + url.PathEscape(machine) + "&generation=" + url.PathEscape(generation)
+}
+
 // Build selects the envelope the receiving browser understands.
 //
 // Safari's Declarative Web Push lets the browser display and navigate without
