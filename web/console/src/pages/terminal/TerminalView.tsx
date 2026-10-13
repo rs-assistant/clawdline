@@ -22,6 +22,7 @@ import { TAB } from "./tab.js"
 import { firstSize } from "./TerminalProjectList.js"
 import { holderWords, terminalRefusalWords, terminalShortID } from "./words.js"
 import { followCursorLine } from "./cursor-line.js"
+import { PasteField } from "./PasteField.js"
 
 /**
  * One terminal: its screen, drawn by xterm.js from the daemon's frames, and
@@ -117,6 +118,7 @@ export function TerminalView({ id, shown, label, onBack, onOpenNew }: {
   const [ctrl, setCtrl] = useState(false)
   const pasteBusy = useRef(false)
   const [pasting, setPasting] = useState(false)
+  const [nativePaste, setNativePaste] = useState(false)
   const [reader, setReader] = useState(false)
   const [machine, setMachine] = useState("")
   const [opening, setOpening] = useState(false)
@@ -571,7 +573,8 @@ export function TerminalView({ id, shown, label, onBack, onOpenNew }: {
       }, text => {
         if (!input.current?.paste(text)) setSaid(nextWord("terminalPasteUnavailable"))
       })
-      if (outcome) setSaid(nextWord(outcome))
+      if (outcome === "terminalPasteReadFailed" || outcome === "terminalPasteEmpty") setNativePaste(true)
+      else if (outcome) setSaid(nextWord(outcome))
     } finally { pasteBusy.current = false; setPasting(false) }
   }
   const holderName = holderWords(holder)
@@ -725,6 +728,13 @@ export function TerminalView({ id, shown, label, onBack, onOpenNew }: {
           </button>
         ))}
       </div>
+      {nativePaste && history === null && <PasteField available={canType} close={() => setNativePaste(false)} send={text => {
+        if (!running || history !== null) { setSaid(nextWord("terminalPasteUnavailable")); return false }
+        const refused = pasteRefusal(input.current?.state ?? null)
+        if (refused) { setSaid(nextWord(refused)); return false }
+        if (!input.current?.paste(text)) { setSaid(nextWord("terminalPasteUnavailable")); return false }
+        return true
+      }} />}
     </div>
   )
 }

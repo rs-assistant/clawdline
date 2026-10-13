@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5107,
+  "englishContentKeys": 5110,
   "riskKeys": 2242,
-  "nonRiskCount": 2865,
+  "nonRiskCount": 2868,
   "groups": [
     {
       "name": "bar / other",
@@ -2179,7 +2179,7 @@
     },
     {
       "name": "next / terminal",
-      "count": 96,
+      "count": 99,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2252,6 +2252,9 @@
         "next.terminalNowNobody",
         "next.terminalOpening",
         "next.terminalPasteButton",
+        "next.terminalPasteCancel",
+        "next.terminalPasteFieldHelp",
+        "next.terminalPasteSend",
         "next.terminalPasteUnavailable",
         "next.terminalProjectsReconnecting",
         "next.terminalProjectsRetryIn",
