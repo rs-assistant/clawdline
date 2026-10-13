@@ -14,18 +14,17 @@ import {
   cloudOnboardingMode,
   cloudViewerDeviceMetadata,
   decodePairingInvitation,
-  keepConnected,
   newCloudSession,
   readCloudConfig,
   type PairingInvitation,
   type CloudClientHandle,
   type CloudConfig,
-  type CloudConnection,
   type CloudMachine,
   type CloudSession,
   type CloudUpdate,
   type RecoverableCloudSession,
 } from "./copied.js"
+import { keepConnectedRecovering, type RecoveringCloudConnection } from "./recovery-line.js"
 import { CARRY_TABLE } from "./carry.js"
 import { afterForget, forgetMachine, honestyIsOurs, type ForgetOutcome } from "./forget.js"
 import { NAME_MAX, renameMachine, type RenameOutcome } from "./rename.js"
@@ -46,7 +45,7 @@ import {
 import { PairPanel, type PairRequest } from "./PairPanel.js"
 import type { PairAgentProgress, PairAgentReply } from "./pair-agent.js"
 import { DeviceLimitPanel } from "./DeviceLimitPanel.js"
-import { readThroughRelay } from "./install.js"
+import { readThroughRelay, setCloudConnectionRetry } from "./install.js"
 import { setTerminalHost } from "./terminal-host.js"
 import { clearTerminalCloseStates } from "./terminal-close-state.js"
 import type { TerminalCloudClient } from "./terminal-transport.js"
@@ -397,7 +396,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   namesRef.current = names
 
   const session = useRef<RecoverableCloudSession | null>(null)
-  const line = useRef<CloudConnection | null>(null)
+  const line = useRef<RecoveringCloudConnection | null>(null)
   const client = useRef<CloudClientHandle | null>(null)
   const currentActionClient = useCallback(() => client.current, [])
   const [clientEpoch, setClientEpoch] = useState(0)
@@ -1027,7 +1026,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     }
     line.current?.stop()
     if (!reader.current) setScreen({ at: "checking" })
-    line.current = keepConnected(session.current, { onState: onUpdate })
+    line.current = keepConnectedRecovering(session.current, { onState: onUpdate })
+    setCloudConnectionRetry(() => line.current?.retry())
   }, [transport, onUpdate])
 
   useEffect(() => {
@@ -1035,6 +1035,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     return () => {
       line.current?.stop()
       line.current = null
+      setCloudConnectionRetry(null)
       setTerminalHost(null)
       unlisten.current?.()
       unlisten.current = null

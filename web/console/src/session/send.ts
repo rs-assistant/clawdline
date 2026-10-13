@@ -22,6 +22,7 @@ import { outcomeOf } from "./outcome.js"
 import { newRequestID, PendingSends, turnWords, type PendingSend } from "./pending.js"
 import { Cards, type CardStore } from "./persist.js"
 import { postCard, postEnter, readTranscript, Sender } from "./sender.js"
+import { retryCloudConnection } from "../cloud/install.js"
 
 /** The page's one set of cards: a card outlives the composer that made it and the session being switched away from. */
 export const pendingSends = new PendingSends()
@@ -87,6 +88,7 @@ const doFetch: typeof fetch = (input, init) => globalThis.fetch(input, init)
 const sender = new Sender({
   cards: pendingSends,
   now: () => Date.now(),
+  wakeConnection: retryCloudConnection,
   post: (card) => postCard(doFetch, url, card),
   enter: (card) => postEnter(doFetch, url, card, newRequestID()),
   readBack: (session) => readTranscript(doFetch, url, session),
