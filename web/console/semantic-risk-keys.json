@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5101,
+  "englishKeys": 5106,
   "counts": {
     "negation": 1470,
     "state": 701,
     "permission": 298,
     "deletion": 106,
-    "uncertainty": 147
+    "uncertainty": 148
   },
-  "unionCount": 2240,
+  "unionCount": 2241,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -2634,6 +2634,7 @@
       "legacy.webCoordUnknown",
       "legacy.webCountUnreadable",
       "legacy.webDevicePairingUnknown",
+      "legacy.webFailOriginUnknown",
       "legacy.webImageUnknown",
       "legacy.webInfoUnknown",
       "legacy.webInfoWhyUnknown",
@@ -3610,6 +3611,7 @@
     "legacy.webFailNoAnswer",
     "legacy.webFailNoMac",
     "legacy.webFailNotFound",
+    "legacy.webFailOriginUnknown",
     "legacy.webFailOtherTab",
     "legacy.webFailReadOnly",
     "legacy.webFailReceiptKeyRequired",
