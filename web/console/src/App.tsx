@@ -210,7 +210,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   /** Whether the opened fleet Session's own row is still missing from this machine's rows. */
   onFleetDetailPending?: (pending: boolean) => void
   onFleetClose?: () => void
-  fleetCloseIntent?: { target: SessionDestination; title: string } | null
+  fleetCloseIntent?: { target: SessionDestination; title: string; kind?: "end" | "archive"; recovered?: boolean } | null
   onFleetCloseIntentHandled?: () => void
   hideSessionCounts?: boolean
   focusCloudSessions?: boolean
@@ -519,9 +519,10 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
       fleetReaderMachine !== fleetCloseIntent.target.machineID) return
     const row = rows.find((candidate) => candidate.id === fleetCloseIntent.target.sessionID &&
       candidate.execution_generation === fleetCloseIntent.target.executionGeneration)
-    if (!row) return
+    if (!row && !fleetCloseIntent.recovered) return
     onFleetCloseIntentHandled?.()
-    requestConfirm({ kind: "end", id: row.id, subject: fleetCloseIntent.title, focus: "cancel" })
+    requestConfirm({ kind: fleetCloseIntent.kind ?? "end", id: fleetCloseIntent.target.sessionID,
+      subject: fleetCloseIntent.title, focus: "cancel" })
   }, [fleetList, fleetCloseIntent, fleetTarget, fleetReaderMachine, rows])
 
   // `closeDetail`: the session goes, the highlight stays. On a phone the list
