@@ -8,10 +8,12 @@
 .workflow-page .workflow-project-trigger, .workflow-project-menu button { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; }
 .workflow-project-trigger > span:nth-child(2), .workflow-project-menu button > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workflow-project-menu { position: absolute; z-index: 35; top: 100%; left: 0; right: 0; max-height: min(22rem, 50dvh); overflow: auto; padding: .35rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--card); box-shadow: 0 1rem 3rem #0008; }
+.workflow-global-mark { display: grid; place-items: center; flex: none; width: 1.1rem; height: 1.1rem; color: var(--accent); font-size: 1.2rem; font-weight: 700; }
 .workflow-project .mark, .workflow-scope .mark { flex: none; }
 .workflow-page select, .workflow-page input, .workflow-page textarea { width: 100%; min-width: 0; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: .6rem; padding: .72rem .85rem; }
 .workflow-page button { min-height: 2.75rem; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: .6rem; padding: .7rem 1rem; cursor: pointer; }
 .workflow-page .workflow-project-menu button { border: 0; background: transparent; }
+.workflow-page .workflow-project-menu button:first-child { margin-bottom: .25rem; border-bottom: 1px solid var(--line); border-radius: .4rem .4rem 0 0; }
 .workflow-page .workflow-project-menu button[aria-current="true"], .workflow-page .workflow-project-menu button:hover { background: color-mix(in srgb, var(--accent) 13%, var(--card)); }
 .workflow-page button:hover:not(:disabled), .workflow-page select:hover:not(:disabled) { border-color: var(--accent); }
 .workflow-page button:focus-visible, .workflow-page select:focus-visible, .workflow-page input:focus-visible, .workflow-page textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

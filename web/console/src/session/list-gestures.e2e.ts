@@ -74,6 +74,8 @@ let inlineDecisionFixture = false
 let inlineDecisionAnswers = 0
 const workflowID = "00000000-0000-4000-8000-000000000041"
 let workflowRecords: Row[] = []
+let workflowNoPlaces = false
+let workflowFilesUnavailable = false
 let workflowTodo: Row | null = null
 let workflowSends = 0
 let sessionGap = false
@@ -423,10 +425,11 @@ function daemon(): Server {
       }], others: [],
     })
     if (path === "/v1/places") return json(res, 200, {
-      places: [{ id: "project-fixture", label: "Clawdline", path: "/tmp/fixture",
+      places: workflowNoPlaces ? [] : [{ id: "project-fixture", label: "Clawdline", path: "/tmp/fixture",
         icon: { accent: "#e07a5f", cells: [["#e07a5f", "#e07a5f"], ["#e07a5f", "#141416"]] } }],
       assistants: [{ id: "codex", label: "Codex" }],
     })
+    if (path === "/v1/projects/project-fixture/files" && req.method === "GET" && workflowFilesUnavailable) return json(res, 503, { error: "unavailable" })
     if (path === "/v1/projects/project-fixture/files" && req.method === "GET") return json(res, 200, {
       files: [{ id: "global-skill-fixture", name: "SKILL.md", title: "Global Review", description: "Review the work with evidence.", location: "skills/global-review/SKILL.md",
         source: "global", assistant: "codex", kind: "skill", status: "ready", editable: true },
@@ -2035,7 +2038,7 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
     assert.equal(await tab.run(`document.querySelectorAll('.workflow-project-menu button .mark').length`), 1)
     assert.equal(await tab.run(`document.querySelector('.workflow-project-menu button .mark')?.classList.contains('none')`), false)
     assert.match(await tab.run(`document.querySelector('.workflow-project-trigger')?.getAttribute('aria-label')`), /Clawdline/)
-    await tab.press('.workflow-project-menu button')
+    await tab.press('.workflow-project-menu button:last-child')
     await tab.press('.workflow-empty .workflow-primary')
     assert.equal(await tab.run(`document.activeElement?.matches('.workflow-editor input')`), false)
     assert.equal(await tab.run(`(() => {
@@ -2045,18 +2048,23 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
     })()`), true)
     await tab.run(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))`)
     assert.equal(await tab.run(`document.activeElement?.matches('.workflow-editor .workflow-actions button:last-child')`), true)
-    assert.match(await tab.run(`document.querySelector('.workflow-scope label')?.textContent`), /Clawdline|clawdline/)
-    assert.equal(await tab.run(`document.querySelector('.workflow-scope label .mark') !== null`), true)
+    assert.match(await tab.run(`document.querySelector('.workflow-scope-hint')?.textContent`), /Clawdline|clawdline/)
     await tab.run(`document.querySelector('.workflow-editor').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`)
     assert.equal(await tab.run(`document.querySelector('.workflow-editor')`), null)
+    await tab.press('.workflow-project-trigger')
+    await tab.press('.workflow-project-menu button:first-child')
+    assert.match(await tab.run(`document.querySelector('.workflow-project-trigger')?.textContent`), /全域|Global/)
+    await tab.press('.workflow-skill-picker button')
+    assert.equal(await tab.run(`document.querySelectorAll('.workflow-skill-options button').length`), 1)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-options')?.textContent`), /Global Review/)
+    await tab.press('.workflow-skill-dialog footer button')
     await tab.press('.workflow-empty .workflow-primary')
     await tab.run(`(() => {
-      const fields = document.querySelectorAll('.workflow-editor input:not([type="radio"]), .workflow-editor textarea')
+      const fields = document.querySelectorAll('.workflow-editor input, .workflow-editor textarea')
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(fields[0], 'Daily release')
       fields[0].dispatchEvent(new Event('input', { bubbles: true }))
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(fields[1], 'Run the release checklist.')
       fields[1].dispatchEvent(new Event('input', { bubbles: true }))
-      document.querySelectorAll('.workflow-scope input')[1].click()
     })()`)
     await tab.press('.workflow-editor button[type="submit"]')
     await tab.run(`new Promise((resolve, reject) => {
@@ -2069,6 +2077,26 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
     })`)
     assert.equal(workflowRecords[0].scope, 'workflow')
     assert.equal(workflowRecords[0].project, undefined)
+    await tab.press('.workflow-project-trigger')
+    await tab.press('.workflow-project-menu button:last-child')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-empty') && !document.querySelector('.workflow-list-card')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('global Workflow leaked into Project list'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press('.workflow-project-trigger')
+    await tab.press('.workflow-project-menu button:first-child')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-list-card')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('global Workflow did not return in Global list'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
     await tab.run(`location.hash = ${JSON.stringify("session=" + encodeURIComponent(SAFE))}`)
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
@@ -2083,6 +2111,54 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
     assert.equal(await tab.run(`document.querySelector('.workflow-picker-toolbar, .workflow-reload')`), null)
     assert.match(await tab.run(`document.querySelector('.workflow-picker-row')?.textContent`), /Daily release/)
     assert.match(await tab.run(`document.querySelector('.workflow-picker-group .snippet-group-title')?.textContent`), /全域|Global/)
+  }))
+
+test("the Global Workflow list survives unavailable Project files and an empty Project inventory", () =>
+  inTab(async (tab) => {
+    workflowFilesUnavailable = true
+    workflowRecords = [{ id: workflowID, title: "Shared review", body: "Review all work.", scope: "workflow",
+      position: 100, created_at: 1, updated_at: 1 }]
+    try {
+      await tab.go("/#page=workflow")
+      await tab.press('.workflow-project-trigger')
+      await tab.press('.workflow-project-menu button:first-child')
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 8000
+        const look = () => {
+          if (document.querySelector('.workflow-list-main')?.textContent.includes('Shared review')) return resolve(true)
+          if (Date.now() > deadline) return reject(new Error('Global Workflow was hidden by unavailable Project files'))
+          setTimeout(look, 25)
+        }; look()
+      })`)
+    } finally { workflowFilesUnavailable = false }
+  }))
+
+test("a phone can create a Global Workflow before it has any Projects", () =>
+  inTab(async (tab) => {
+    workflowNoPlaces = true
+    workflowRecords = []
+    try {
+      await tab.go("/#page=workflow")
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 8000
+        const look = () => {
+          if (document.querySelector('.workflow-empty .workflow-primary')) return resolve(true)
+          if (Date.now() > deadline) return reject(new Error('Global empty state did not appear without Projects'))
+          setTimeout(look, 25)
+        }; look()
+      })`)
+      assert.match(await tab.run(`document.querySelector('.workflow-project-trigger')?.textContent`), /全域|Global/)
+      await tab.press('.workflow-empty .workflow-primary')
+      await tab.run(`(() => {
+        const fields = document.querySelectorAll('.workflow-editor input, .workflow-editor textarea')
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(fields[0], 'First Workflow')
+        fields[0].dispatchEvent(new Event('input', { bubbles: true }))
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(fields[1], 'Run the first workflow.')
+        fields[1].dispatchEvent(new Event('input', { bubbles: true }))
+      })()`)
+      await tab.press('.workflow-editor button[type="submit"]')
+      assert.equal(workflowRecords[0]?.project, undefined)
+    } finally { workflowNoPlaces = false }
   }))
 
 test("a phone starts the shipped global Workflow in its interface language", () =>

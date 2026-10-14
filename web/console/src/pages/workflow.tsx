@@ -11,7 +11,7 @@ import { Mark } from "../session/List.js"
 import type { SessionRow } from "@clawdline/contract"
 
 type Draft = { id: string; title: string; body: string; global: boolean; source: WorkflowSource | null }
-const blank = (): Draft => ({ id: "", title: "", body: "", global: false, source: null })
+const blank = (global: boolean): Draft => ({ id: "", title: "", body: "", global, source: null })
 const machineOf = (place: ProjectPlace): string => (place as ProjectPlace & { machine?: string }).machine ?? ""
 const availableSkills = (files: ProjectFile[]) => files.filter((file) => (file.kind === "skill" || file.kind === "command") && file.status === "ready")
 const skillTitle = workflowSourceTitle
@@ -22,8 +22,10 @@ const launchTextFor = (file: ProjectFile) => workflowSourceText(file,
 function WorkflowPage({ shown }: { shown: boolean }) {
   const [places, setPlaces] = useState<ProjectPlace[]>([])
   const [place, setPlace] = useState<ProjectPlace | null>(null)
+  const [globalView, setGlobalView] = useState(false)
   const [rows, setRows] = useState<Snippet[]>([])
   const [skills, setSkills] = useState<ProjectFile[]>([])
+  const [skillsUnavailable, setSkillsUnavailable] = useState(false)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
@@ -163,43 +165,52 @@ function WorkflowPage({ shown }: { shown: boolean }) {
       if (!live) return
       setPlaces(answer.places ?? [])
       setPlace((current) => answer.places.find((candidate) => candidate.id === current?.id) ?? answer.places[0] ?? null)
+      if (!answer.places.length) setGlobalView(true)
       setError("")
     }).catch(() => { if (live) setError(W("projectUnavailable")) })
       .finally(() => { if (live) setLoading(false) })
     return () => { live = false }
   }, [shown])
 
-  const refresh = async (selected: ProjectPlace) => {
+  const visibleRows = (items: Snippet[], selected: ProjectPlace | null, global: boolean) => items.filter((row) =>
+    row.scope === "workflow" && (global ? !row.project : row.project === selected?.path))
+  const visibleSkills = (files: ProjectFile[], global: boolean) => availableSkills(files).filter((file) => !global || file.source === "global")
+
+  const refresh = async (selected: ProjectPlace | null, global = globalView) => {
     try {
       const [answer, files] = await Promise.all([
-        readReusableTextForMachine(machineOf(selected)),
-        listProjectFiles(selected.id),
+        readReusableTextForMachine(selected ? machineOf(selected) : ""),
+        selected ? listProjectFiles(selected.id).then((files) => ({ files: files.files, unavailable: false })).catch(() => ({ files: [] as ProjectFile[], unavailable: true })) : Promise.resolve({ files: [] as ProjectFile[], unavailable: false }),
       ])
-      setRows((answer.snippets ?? []).filter((row) => row.scope === "workflow" && (!row.project || row.project === selected.path)))
-      setSkills(availableSkills(files.files))
+      setRows(visibleRows(answer.snippets ?? [], selected, global))
+      setSkills(visibleSkills(files.files, global))
+      setSkillsUnavailable(files.unavailable)
       setError("")
       return true
     } catch { setError(W("workflowUnavailable")); return false }
   }
 
   useEffect(() => {
-    if (!shown || !place) return
+    if (!shown || (!place && !globalView)) return
     let live = true
     setLoading(true)
+    setRows([])
     setSkills([])
-    Promise.all([readReusableTextForMachine(machineOf(place)), listProjectFiles(place.id)])
+    setSkillsUnavailable(false)
+    Promise.all([readReusableTextForMachine(place ? machineOf(place) : ""), place ? listProjectFiles(place.id).then((files) => ({ files: files.files, unavailable: false })).catch(() => ({ files: [] as ProjectFile[], unavailable: true })) : Promise.resolve({ files: [] as ProjectFile[], unavailable: false })])
       .then(([answer, files]) => {
         if (!live) return
-        setRows((answer.snippets ?? []).filter((row) => row.scope === "workflow" && (!row.project || row.project === place.path)))
-        setSkills(availableSkills(files.files))
+        setRows(visibleRows(answer.snippets ?? [], place, globalView))
+        setSkills(visibleSkills(files.files, globalView))
+        setSkillsUnavailable(files.unavailable)
         setError("")
       }).catch(() => { if (live) setError(W("workflowUnavailable")) })
       .finally(() => { if (live) setLoading(false) })
     return () => { live = false }
-  }, [shown, place])
+  }, [shown, place, globalView])
 
   const save = async () => {
-    if (!place || !draft || busy) return
+    if ((!place && !draft?.global) || !draft || busy) return
     if (draft.source && (sourceCheck !== "matched" || (draft.global && draft.source.scope === "project"))) {
       setError(W(draft.global && draft.source.scope === "project" ? "sourceScopeConflict" : "sourceNeedsSync")); return
     }
@@ -211,8 +222,8 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     }
     setBusy(true); setError("")
     try {
-      if (draft.id) await updateWorkflow(machineOf(place), draft.id, title, body, draft.source)
-      else await createWorkflow(machineOf(place), draft.global ? "" : place.path, title, body, draft.source ?? undefined)
+      if (draft.id) await updateWorkflow(place ? machineOf(place) : "", draft.id, title, body, draft.source)
+      else await createWorkflow(place ? machineOf(place) : "", draft.global ? "" : place!.path, title, body, draft.source ?? undefined)
       if (await refresh(place)) setDraft(null)
     } catch (cause) { setError(cause instanceof SnippetFailure && cause.code === "snippet_limit_reached" ? W("limitReached")
       : cause instanceof SnippetFailure && cause.status !== null && cause.status < 500 ? W("saveRefused") : W("saveUnknown")) }
@@ -220,10 +231,10 @@ function WorkflowPage({ shown }: { shown: boolean }) {
   }
 
   const remove = async () => {
-    if (!place || !draft?.id || busy) return
+    if ((!place && !draft?.global) || !draft?.id || busy) return
     if (!window.confirm(W("confirmDelete", { name: draft.title }))) return
     setBusy(true); setError("")
-    try { await deleteWorkflow(machineOf(place), draft.id); if (await refresh(place)) setDraft(null) }
+    try { await deleteWorkflow(place ? machineOf(place) : "", draft.id); if (await refresh(place)) setDraft(null) }
     catch (cause) { setError(cause instanceof SnippetFailure && cause.status !== null && cause.status < 500 ? W("deleteRefused") : W("deleteUnknown")) }
     finally { setBusy(false) }
   }
@@ -248,7 +259,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     const source: WorkflowSource = { kind: selectedSkill.kind as "skill" | "command", file_id: selectedSkill.id, place_id: place.id, scope: selectedSkill.source, name: text.title, version: skillVersion }
     closeSkill()
     if (linkingDraft && draft) setDraft({ ...draft, ...text, source })
-    else openDraft({ id: "", ...text, global: false, source })
+    else openDraft({ id: "", ...text, global: globalView, source })
     setLinkingDraft(false)
   }
 
@@ -257,41 +268,44 @@ function WorkflowPage({ shown }: { shown: boolean }) {
       skillReturnFocus.current = document.activeElement as HTMLElement | null
       setLinkingDraft(false); setSkillOpen(true)
     }}>{W("importSkill")}</button>
-    {!skills.length && !loading && <small>{W("noSkills")}</small>}
+    {!skills.length && !loading && <small>{W(skillsUnavailable ? "skillsUnavailable" : globalView ? "noGlobalSkills" : "noSkills")}</small>}
   </div>
 
   return <section className="page workflow-page" id="workflow" data-page-view="workflow" hidden={!shown}>
     <header className="workflow-head"><div><h1 tabIndex={-1}>Workflow</h1><p>{W("intro")}</p></div>
-      <div className="workflow-head-tools"><div className="workflow-project" ref={projectPicker}><span>{W("projectLabel")}</span>
-        <button type="button" className="workflow-project-trigger" aria-label={`${W("projectLabel")}: ${place?.label || place?.path || ""}`} aria-expanded={projectOpen}
-          onClick={() => setProjectOpen(!projectOpen)}>{place && <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} />}
-          <span>{place?.label || place?.path || W("projectLabel")}</span><span aria-hidden="true">⌄</span></button>
-        {projectOpen && <div className="workflow-project-menu">{places.map((row) => <button
-          type="button" aria-current={row.id === place?.id ? "true" : undefined} key={row.id} onClick={() => {
-            setDraft(null); setPlace(row); setProjectOpen(false)
+      <div className="workflow-head-tools"><div className="workflow-project" ref={projectPicker}><span>{W("scopeLabel")}</span>
+        <button type="button" className="workflow-project-trigger" aria-label={`${W("scopeLabel")}: ${globalView ? W("global") : place?.label || place?.path || ""}`} aria-expanded={projectOpen}
+          onClick={() => setProjectOpen(!projectOpen)}>{globalView ? <span className="workflow-global-mark" aria-hidden="true">◎</span> : place && <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} />}
+          <span>{globalView ? W("global") : place?.label || place?.path || W("projectLabel")}</span><span aria-hidden="true">⌄</span></button>
+        {projectOpen && <div className="workflow-project-menu"><button type="button" aria-current={globalView ? "true" : undefined} onClick={() => {
+          setDraft(null); setGlobalView(true); setProjectOpen(false)
+        }}><span className="workflow-global-mark" aria-hidden="true">◎</span><span>{W("global")}</span>{globalView && <span aria-hidden="true">✓</span>}</button>
+          {places.map((row) => <button
+          type="button" aria-current={!globalView && row.id === place?.id ? "true" : undefined} key={row.id} onClick={() => {
+            setDraft(null); setPlace(row); setGlobalView(false); setProjectOpen(false)
           }}><Mark icon={row.icon as SessionRow["icon"]} cellPx={3} /><span>{row.label || row.path}</span>
-          {row.id === place?.id && <span aria-hidden="true">✓</span>}</button>)}</div>}
+          {!globalView && row.id === place?.id && <span aria-hidden="true">✓</span>}</button>)}</div>}
       </div>
-        <button className="workflow-page-reload" type="button" onClick={() => place && void refresh(place)} disabled={!place || loading || busy}>{W("reload")}</button>
+        <button className="workflow-page-reload" type="button" onClick={() => void refresh(place)} disabled={(!place && !globalView) || loading || busy}>{W("reload")}</button>
       </div>
     </header>
     {loading && <p role="status">{W("loading")}</p>}
     {error && !draft && <p role="alert" className="workflow-error">{error}</p>}
-    {place && <>
+    {(place || globalView) && <>
       {!loading && rows.length > 0 && <div className="workflow-toolbar"><h2>{W("workflowCount")} <span>{rows.length}</span></h2>
-        <div className="workflow-actions"><button className="workflow-primary" type="button" onClick={() => openDraft(blank())}>{W("new")}</button>{skillPicker}</div>
+        <div className="workflow-actions"><button className="workflow-primary" type="button" onClick={() => openDraft(blank(globalView))}>{W("new")}</button>{skillPicker}</div>
       </div>}
       {!loading && rows.length === 0 && <div className="workflow-empty"><div className="workflow-empty-mark" aria-hidden="true">↗</div>
-        <h2>{W("emptyTitle")}</h2><p>{W("emptyDetail")}</p>
-        <div className="workflow-actions"><button className="workflow-primary" type="button" onClick={() => openDraft(blank())}>{W("new")}</button>{skillPicker}</div>
+        <h2>{W(globalView ? "emptyGlobalTitle" : "emptyTitle")}</h2><p>{W(globalView ? "emptyGlobalDetail" : "emptyDetail")}</p>
+        <div className="workflow-actions"><button className="workflow-primary" type="button" onClick={() => openDraft(blank(globalView))}>{W("new")}</button>{skillPicker}</div>
       </div>}
-      <div className="workflow-list">{rows.map((row) => <div className="workflow-list-card" key={row.id}>
+      {!loading && <div className="workflow-list">{rows.map((row) => <div className="workflow-list-card" key={row.id}>
         <button type="button" className="workflow-list-main"
           onClick={() => openDraft({ id: row.id, title: row.title, body: row.body, global: !row.project, source: row.source ?? null })}>
-          <span className="workflow-list-copy"><strong>{row.title} <small>{!row.project ? W("global") : W("projectOnly")}</small></strong><span>{row.body}</span></span><span className="workflow-edit-label">{W("editAction")} <span aria-hidden="true">→</span></span>
+          <span className="workflow-list-copy"><strong>{row.title}</strong><span>{row.body}</span></span><span className="workflow-edit-label">{W("editAction")} <span aria-hidden="true">→</span></span>
         </button>{row.source && <button type="button" className="workflow-list-source" onClick={() => void showSource(row.source!)}>
           <span aria-hidden="true">↗</span> {row.source.kind === "command" ? W("claudeCommand") : "Skill"} · {row.source.name}</button>}
-      </div>)}</div>
+      </div>)}</div>}
     </>}
     {draft && <div ref={editor} className="workflow-editor" role="dialog" aria-modal="true" aria-label={draft.id ? W("edit") : W("new")}
       onPointerDown={(event) => { if (event.target === event.currentTarget && !busy) setDraft(null) }}>
@@ -309,12 +323,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
         {draft.source && sourceCheck === "unavailable" && <p className="workflow-source-mismatch" role="status">{W("sourceUnavailable")}</p>}
         {draft.source && draft.global && draft.source.scope === "project" && <p className="workflow-source-mismatch" role="status">{W("sourceScopeConflict")}</p>}
         <label>{W("name")}<input value={draft.title} readOnly={!!draft.source} maxLength={200} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
-        {!draft.id && <fieldset className="workflow-scope"><legend>{W("availability")}</legend>
-          <label><input type="radio" name="workflow-scope" checked={!draft.global} onChange={() => setDraft({ ...draft, global: false })} />
-            {place && <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} />}<span>{place?.label || place?.path}</span></label>
-          <label><input type="radio" name="workflow-scope" checked={draft.global} onChange={() => setDraft({ ...draft, global: true })} />
-            <span>{W("global")}</span></label>
-        </fieldset>}
+        <p className="workflow-scope-hint">{W("availability")}: {draft.global ? W("global") : place?.label || place?.path}</p>
         {draft.global && <p className="workflow-scope-hint">{draft.source?.scope === "project" ? W("globalSourceHint") : W("globalHint")}</p>}
         <label>{W("message")}<textarea value={draft.body} readOnly={!!draft.source} rows={8} maxLength={4000} onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></label>
         {error && <p role="alert" className="workflow-error">{error}</p>}
