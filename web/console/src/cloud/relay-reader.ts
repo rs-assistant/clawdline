@@ -587,7 +587,7 @@ export interface RelayReaderOptions {
   /** The same bounded, pinned machine list used by the fleet when rich rows are missing. */
   listPresentations?: (machineID: string, expectedCount: number | null) => Promise<MachineListPresentation[] | null>
   /** The fleet's verified per-machine Session set; the classic list reads this first. */
-  machineProjection?: (machineID: string) => Promise<MachineSessionProjection>
+  machineProjection?: (machineID: string, fresh?: boolean) => Promise<MachineSessionProjection>
   /** Resolve an exact execution through the verified status source if ss/ replay is missing. */
   resolveSession?: (machineID: string, sessionID: string) => Promise<SessionDestination | null>
   /** Recheck one visible fleet mutation against the latest ss/ pass. */
@@ -1443,7 +1443,13 @@ export class RelayReader {
       // A person's refresh is a new question about the machine, not a read of
       // the relay's retained rows. Those rows may omit a quiet Session after
       // relay eviction. The connection's recovery asks once; ask again here.
-      await this.machineRead(signal, "GET", "/v1/sessions", "sessions.snapshot", {})
+      const previousGeneration = this.statusSnapshotGeneration()
+      const response = await this.machineRead(signal, "GET", "/v1/sessions", "sessions.snapshot", {})
+      const stated = await response.json().catch(() => null) as { sessions?: unknown; complete?: unknown } | null
+      if (this.options.classicStatus && signal && stated?.complete === true &&
+        Array.isArray(stated.sessions) && stated.sessions.every((id) => typeof id === "string")) {
+        return this.waitForStatedSessions(new Set(stated.sessions as string[]), signal, previousGeneration)
+      }
       return this.snapshot()
     }
     if (!signal) return this.snapshot()
@@ -1454,6 +1460,60 @@ export class RelayReader {
       })
     }
     return this.initialSnapshotFlight
+  }
+
+  private statusSnapshotGeneration(): string | null {
+    const marker = this.client?.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+      { payload?: { snapshot_generation?: unknown } } | undefined
+    return typeof marker?.payload?.snapshot_generation === "string" ? marker.payload.snapshot_generation : null
+  }
+
+  /** A snapshot command can answer before its ss/ envelopes reach this browser. */
+  private waitForStatedSessions(ids: Set<string>, signal: AbortSignal, previousGeneration: string | null): Promise<SessionsSnapshot> {
+    return new Promise((resolve, reject) => {
+      let finished = false
+      let checking = false
+      let again = false
+      const stream = this.stream().open("/v1/events", {
+        onFrame: (event) => { if (event === "sessions" || event === "message") void check() },
+      })
+      const finish = (answer: SessionsSnapshot) => {
+        if (finished) return
+        finished = true
+        signal.removeEventListener("abort", aborted)
+        stream.close()
+        resolve(answer)
+      }
+      const fail = (error: unknown) => {
+        if (finished) return
+        finished = true
+        signal.removeEventListener("abort", aborted)
+        stream.close()
+        reject(error)
+      }
+      const check = async () => {
+        if (finished) return
+        if (checking) { again = true; return }
+        checking = true
+        try {
+          do {
+            again = false
+            const reading = await this.snapshotReading(true)
+            if (reading.snapshot.scan.complete &&
+              (previousGeneration === null || this.statusSnapshotGeneration() !== previousGeneration) &&
+              reading.snapshot.sessions.length === ids.size &&
+              reading.snapshot.sessions.every((row) => ids.has(row.id))) {
+              finish(reading.snapshot)
+              return
+            }
+          } while (again && !finished)
+        } catch (error) { fail(error) }
+        finally { checking = false }
+      }
+      const aborted = () => { void this.snapshot().then(finish, fail) }
+      signal.addEventListener("abort", aborted, { once: true })
+      void check()
+    })
   }
 
   private waitForInitialSnapshot(signal: AbortSignal): Promise<SessionsSnapshot> {
@@ -1537,10 +1597,10 @@ export class RelayReader {
     return promise
   }
 
-  private async projectedReading(client: CloudReadClient): Promise<{ snapshot: SessionsSnapshot; settled: boolean } | null> {
+  private async projectedReading(client: CloudReadClient, fresh = false): Promise<{ snapshot: SessionsSnapshot; settled: boolean } | null> {
     if (!this.options.classicStatus || !this.options.machineProjection) return null
     let projection: MachineSessionProjection
-    try { projection = await this.options.machineProjection(this.machine) } catch { return null }
+    try { projection = await this.options.machineProjection(this.machine, fresh) } catch { return null }
     if (projection.kind !== "ready" && !projection.rows?.length) return null
     const projectedRows = projection.rows ?? []
     const pass = String(projection.snapshotGeneration ?? "") + ":" +
@@ -1607,7 +1667,7 @@ export class RelayReader {
     return { snapshot, settled: sessions.length > 0 || whole }
   }
 
-  private async snapshotReading(): Promise<{ snapshot: SessionsSnapshot; settled: boolean }> {
+  private async snapshotReading(fresh = false): Promise<{ snapshot: SessionsSnapshot; settled: boolean }> {
     if (this.options.statusList) {
       const status = this.options.statusList()
       this.generation += 1
@@ -1628,7 +1688,7 @@ export class RelayReader {
       }
     }
     const client = this.connected()
-    const projected = await this.projectedReading(client)
+    const projected = await this.projectedReading(client, fresh)
     if (projected) return projected
     const all = await client.sessions()
     this.sayDrift()
