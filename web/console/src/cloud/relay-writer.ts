@@ -211,6 +211,7 @@ export interface WriteHost {
   readonly machine: string
   exactTarget?(): { machineID: string; sessionID: string; executionGeneration: string } | null
   admitExactTarget?(target: { machineID: string; sessionID: string; executionGeneration: string }): Promise<void>
+  resolveSession?(machine: string, session: string): Promise<{ machineID: string; sessionID: string; executionGeneration: string } | null>
   /** The client, or a throw coded `offline` when the line is not up. */
   connected(): CloudWriteClient
   /**
@@ -1932,10 +1933,21 @@ export class RelayWriter {
       generation = exact.executionGeneration
     } else {
       const row = await this.row(client, session)
-      if (!row) throw failure("session_unknown", "This page cannot verify that Session yet.", 409)
-      generation = String(row.execution_generation ?? "")
-      identity = row.identity && typeof row.identity.machine === "string" && typeof row.identity.session === "string"
-        ? row.identity : { machine: this.host.machine, session: typeof row.session === "string" ? row.session : session }
+      if (!row) {
+        // A newly started Session can reach the verified status projection before
+        // the rich-row replay. Recheck that exact execution before addressing it.
+        const projected = await this.host.resolveSession?.(this.host.machine, session)
+        if (!projected || !this.host.admitExactTarget) {
+          throw failure("session_unknown", "This page cannot verify that Session yet.", 409)
+        }
+        await this.host.admitExactTarget(projected)
+        identity = { machine: projected.machineID, session: projected.sessionID }
+        generation = projected.executionGeneration
+      } else {
+        generation = String(row.execution_generation ?? "")
+        identity = row.identity && typeof row.identity.machine === "string" && typeof row.identity.session === "string"
+          ? row.identity : { machine: this.host.machine, session: typeof row.session === "string" ? row.session : session }
+      }
       if (identity.machine !== this.host.machine || identity.session !== session || !/^[0-9a-f]{32}$/.test(generation)) {
         throw failure("execution_generation_required", "This session's current execution generation is unavailable.", 409)
       }
