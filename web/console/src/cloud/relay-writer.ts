@@ -967,9 +967,9 @@ export class RelayWriter {
       })
     }
     let client: CloudWriteClient
-    if (method === "GET" && CARRIED_READS.has(route.op)) {
-      // A read waits out a renewal of this page's own connection, as the
-      // reader's machine reads do. Measured in a production browser: `GET
+    if (method === "GET" && CARRIED_READS.has(route.op) || route.op === "send") {
+      // A read, and a receipt-keyed message send, wait out a renewal of this
+      // page's own connection. Measured in a production browser: `GET
       // /v1/places` answered `offline` for minutes while the relay socket
       // renewed, with the machine online. An abandoned wait is thrown, not
       // refused: a fetch whose signal fired rejects.
@@ -985,8 +985,7 @@ export class RelayWriter {
       }
       client = next
     } else {
-      // A write is refused at once and never held for the next client: an
-      // envelope that was not sent now is not sent later by this seam.
+      // Other writes are refused at once and never held for the next client.
       try {
         client = this.host.connected()
       } catch (error) {
@@ -1941,19 +1940,24 @@ export class RelayWriter {
         throw failure("execution_generation_required", "This session's current execution generation is unavailable.", 409)
       }
     }
-    await this.host.settledWords?.(word, identity.machine)
-    await this.host.settledWords?.("session-receipt", identity.machine)
     const current = await this.host.connectedFor(undefined, word)
-    if (!current || machineCommands(current, identity.machine).incomplete) {
+    if (current) {
+      // A renewal can replace the client while connectedFor waits. Its word
+      // list arrives after the socket is ready, so wait on the new client.
+      await this.host.settledWords?.(word, identity.machine)
+      await this.host.settledWords?.("session-receipt", identity.machine)
+    }
+    const ready = await this.host.connectedFor(undefined, word)
+    if (!ready || machineCommands(ready, identity.machine).incomplete) {
       throw Object.assign(failure("cloud_reconnecting", "The machine's complete command list has not arrived yet.", 503), {
-        diagnosticStage: current ? "command_list_incomplete" : "connection_unavailable",
+        diagnosticStage: ready ? "command_list_incomplete" : "connection_unavailable",
       })
     }
-    const commands = declaredCommands(current, identity.machine)
-    if (!commands?.includes(word) || !commands.includes("session-receipt") || typeof current._read !== "function") {
+    const commands = declaredCommands(ready, identity.machine)
+    if (!commands?.includes(word) || !commands.includes("session-receipt") || typeof ready._read !== "function") {
       throw failure("cloud_machine_unsupported", "This machine cannot provide durable session receipts.", 501)
     }
-    return { identity, generation, client: current }
+    return { identity, generation, client: ready }
   }
 
   private fleetTarget(session: string): { machineID: string; sessionID: string; executionGeneration: string } | null {
