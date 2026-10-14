@@ -500,3 +500,21 @@ func TestCustomWaitingRuleChoosesMatchedSessionAndDeduplicates(t *testing.T) {
 		t.Fatalf("wrong custom destination: %+v, %v", effect, err)
 	}
 }
+
+func TestPlainLanguageImmediateRulePushesOnFirstObservedWait(t *testing.T) {
+	r := newWaitingRig(t)
+	r.w.Enabled = func() bool { return false }
+	rule, err := notificationrule.ParseSituation("當 Session 等我回答時通知我")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule.ID = "dddddddddddddddddddddddddddddddd"
+	r.w.Rules = func() ([]notificationrule.Rule, error) { return []notificationrule.Rule{rule}, nil }
+	s := asking("immediate")
+	if n := r.at(0, s); n != 1 {
+		t.Fatalf("first observation pushed %d", n)
+	}
+	if n := r.at(time.Minute, s); n != 0 || len(r.pushes(s)) != 1 {
+		t.Fatalf("same stop pushed again: %d", n)
+	}
+}

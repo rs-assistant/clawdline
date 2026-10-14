@@ -16,17 +16,24 @@ type Preference = keyof Pick<SettingsRequest,
 type Row = { key: Preference; en: string; zh: string; destination: "Session" | "list" | "optional-session"; hintEn: string; hintZh: string }
 
 type CustomRule = { id: string; enabled: boolean; after_minutes: number; label_contains: string }
-type NotificationSettings = { rules: CustomRule[]; preferences: Partial<SettingsSnapshot> }
+type NotificationSettings = { rules: CustomRule[]; preferences: Partial<SettingsSnapshot>; preview?: CustomRule }
 
-type RuleChange = { action: "create" | "update"; rule: CustomRule } | { action: "delete"; id: string } | { action: "preference"; key: Preference; value: boolean }
+type RuleChange = { action: "create" | "update"; rule: CustomRule } | { action: "delete"; id: string } | { action: "preview"; text: string }
 
 async function notificationRules(change?: RuleChange): Promise<NotificationSettings> {
   const response = await fetch(client.url("/v1/notification-rules"), change ? {
     method: "POST", headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify(change),
   } : undefined)
   const answer = await response.json() as NotificationSettings & { message?: string; error?: { message?: string; detail?: string } }
-  if (!response.ok) throw new Error(answer.error?.message || answer.error?.detail || answer.message || word("Could not save notification settings.", "無法儲存通知設定。"))
-  return { rules: answer.rules ?? [], preferences: answer.preferences ?? {} }
+  if (!response.ok) throw new Error(response.status === 422 ? word("This situation is not supported yet. Try one of the Session examples below.", "目前還無法依這個情境推播。請試試下方的 Session 範例。") : answer.error?.message || answer.error?.detail || answer.message || word("Could not save notification settings.", "無法儲存通知設定。"))
+  return { rules: answer.rules ?? [], preferences: answer.preferences ?? {}, preview: answer.preview }
+}
+
+function ruleSentence(rule: CustomRule): string {
+  const subject = rule.label_contains ? word(`a Session named "${rule.label_contains}"`, `名稱包含「${rule.label_contains}」的 Session`) : word("a Session", "Session")
+  return rule.after_minutes === 0
+    ? word(`Notify me when ${subject} needs my answer.`, `當${subject}等我回答時通知我。`)
+    : word(`Notify me when ${subject} needs my answer for ${rule.after_minutes} minutes.`, `當${subject}等我回答超過 ${rule.after_minutes} 分鐘時通知我。`)
 }
 
 const rows: Row[] = [
@@ -61,8 +68,10 @@ function NotificationsPage({ shown }: { shown: boolean }) {
   const [error, setError] = useState("")
   const [customRules, setCustomRules] = useState<CustomRule[]>([])
   const [ruleBusy, setRuleBusy] = useState(false)
-  const [ruleMinutes, setRuleMinutes] = useState(10)
-  const [ruleLabel, setRuleLabel] = useState("")
+  const [ruleError, setRuleError] = useState("")
+  const [ruleText, setRuleText] = useState("")
+  const [preview, setPreview] = useState<CustomRule | null>(null)
+  const [previewText, setPreviewText] = useState("")
 
   useEffect(() => {
     if (!shown) return
@@ -94,16 +103,33 @@ function NotificationsPage({ shown }: { shown: boolean }) {
   const saveRule = async (change: RuleChange): Promise<boolean> => {
     if (ruleBusy || pending) return false
     setRuleBusy(true)
-    setError("")
-    try { const answer = await notificationRules(change); setCustomRules(answer.rules); setSettings(answer.preferences); return true }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); return false }
+    setRuleError("")
+    try { const answer = await notificationRules(change); setCustomRules(answer.rules); return true }
+    catch (cause) { setRuleError(cause instanceof Error ? cause.message : String(cause)); return false }
     finally { setRuleBusy(false) }
   }
 
+  const interpret = async () => {
+    const text = ruleText.trim()
+    if (!text || ruleBusy || pending !== null) return
+    setRuleBusy(true)
+    setPreview(null)
+    setRuleError("")
+    try {
+      const answer = await notificationRules({ action: "preview", text })
+      if (!answer.preview) throw new Error(word("The situation could not be understood.", "無法理解這個情境。"))
+      setPreview({ ...answer.preview, id: crypto.randomUUID().replaceAll("-", "") })
+      setPreviewText(text)
+    } catch (cause) {
+      setRuleError(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setRuleBusy(false)
+    }
+  }
+
   const addRule = async () => {
-    const label = ruleLabel.trim()
-    if (!Number.isInteger(ruleMinutes) || ruleMinutes < 1 || ruleMinutes > 120 || [...label].length > 80) return
-    if (await saveRule({ action: "create", rule: { id: crypto.randomUUID().replaceAll("-", ""), enabled: true, after_minutes: ruleMinutes, label_contains: label } })) setRuleLabel("")
+    if (!preview || previewText !== ruleText.trim()) return
+    if (await saveRule({ action: "create", rule: preview })) { setRuleText(""); setPreview(null); setPreviewText("") }
   }
 
   return <section id="notifications" className="page notification-page" data-page-view="notifications" hidden={!shown}>
@@ -125,19 +151,24 @@ function NotificationsPage({ shown }: { shown: boolean }) {
         <input type="checkbox" checked={current(settings, row.key)} disabled={pending !== null || ruleBusy} onChange={() => void change(row.key)} />
       </label>)}</div>}
       <div className="notification-custom">
-        <h2>{word("Custom notification timing", "客製化通知時機")}</h2>
-        <p>{word("Add a rule for Sessions waiting for your answer. A matching rule replaces the standard ten-minute timing for that wait, even when the standard switch is off. The notification opens that Session.", "新增 Session 等你回答時的規則。符合名稱條件時，這條規則會取代該次等待的預設十分鐘通知；即使上方的預設開關關閉仍會生效。點擊通知會開啟該 Session。")}</p>
+        <h2>{word("Describe when to notify me", "用一句話設定通知")}</h2>
+        <p>{word("Write the situation in your own words. We will show exactly what can trigger before saving. Currently, custom rules can watch a Session waiting for your answer or permission; other events use the switches above.", "寫下你想收到通知的情境；儲存前會先顯示系統理解的條件。目前自訂規則能觀察 Session 等你回答或授權；其他事件請使用上方開關。")}</p>
+        {ruleError && <p className="notification-error" role="alert">{ruleError}</p>}
         {customRules.map((rule) => <div className="notification-custom-row" key={rule.id}>
           <label><input type="checkbox" checked={rule.enabled} disabled={ruleBusy || pending !== null} onChange={() => void saveRule({ action: "update", rule: { ...rule, enabled: !rule.enabled } })} />
-            <span>{word(`After ${rule.after_minutes} minute${rule.after_minutes === 1 ? "" : "s"} waiting`, `等待 ${rule.after_minutes} 分鐘`)}{rule.label_contains && ` · ${word("Session name contains", "Session 名稱包含")}「${rule.label_contains}」`}</span>
+            <span>{ruleSentence(rule)}</span>
           </label>
           <button type="button" disabled={ruleBusy || pending !== null} onClick={() => void saveRule({ action: "delete", id: rule.id })}>{word("Delete", "刪除")}</button>
         </div>)}
         <div className="notification-custom-form">
-          <label>{word("Minutes waiting", "等待分鐘數")}<input type="number" min="1" max="120" step="1" value={ruleMinutes} onChange={(event) => setRuleMinutes(Number(event.target.value))} /></label>
-          <label>{word("Session name contains (optional)", "Session 名稱包含（選填）")}<input type="text" maxLength={80} value={ruleLabel} onChange={(event) => setRuleLabel(event.target.value)} /></label>
-          <button type="button" disabled={ruleBusy || pending !== null || customRules.length >= 16 || !Number.isInteger(ruleMinutes) || ruleMinutes < 1 || ruleMinutes > 120} onClick={() => void addRule()}>{word("Add notification rule", "新增通知規則")}</button>
+          <label>{word("When should we notify you?", "你想在什麼情況收到通知？")}<textarea rows={3} value={ruleText} placeholder={word("Notify me when a Session needs my answer.", "當 Session 等我回答時通知我")} onChange={(event) => { setRuleText(event.target.value); setPreview(null); setRuleError("") }} /></label>
+          <button type="button" disabled={ruleBusy || pending !== null || customRules.length >= 16 || !ruleText.trim()} onClick={() => void interpret()}>{word("Check this situation", "理解這句話")}</button>
         </div>
+        <div className="notification-custom-examples">
+          <span>{word("Examples:", "例如：")}</span>
+          {[word("Notify me when a Session needs my answer.", "當 Session 等我回答時通知我"), word("Notify me when a Session needs my answer for 5 minutes.", "當 Session 等我回答超過 5 分鐘時通知我"), word('Notify me when a Session named "deploy" needs my answer.', "當名稱包含「部署」的 Session 等我回答時通知我")].map((example) => <button type="button" key={example} onClick={() => { setRuleText(example); setPreview(null); setRuleError("") }}>{example}</button>)}
+        </div>
+        {preview && previewText === ruleText.trim() && <div className="notification-custom-preview" role="status"><strong>{word("This will notify you when:", "系統理解為：")}</strong><p>{ruleSentence(preview)}</p><small>{word("Immediately when first observed if no wait was specified. The notification opens that Session.", "若未指定等待時間，首次觀察到符合情境就通知；點擊通知會開啟該 Session。")}</small><button type="button" disabled={ruleBusy || pending !== null || customRules.length >= 16} onClick={() => void addRule()}>{word("Save this rule", "儲存這條規則")}</button></div>}
         <small>{word("Up to 16 rules per machine. When several match, the shortest wait wins. Disabled rules leave the standard setting in place.", "每台機器最多 16 條；多條符合時採用最短等待時間。停用規則後沿用原本的通知設定。")}</small>
       </div>
       <div className="notification-unavailable">
