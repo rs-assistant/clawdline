@@ -73,7 +73,8 @@ atomically switches `~/.local/share/clawdline-next/current`, restarts only the d
 `GET /` and the authenticated `BUILD.json`, and restores the previous release if either check fails.
 Its build holds the compile slot and clears Go's caches when the build finishes,
 including when a check fails. Other Linux builds should use `tools/heavy.sh`
-for the same cleanup.
+for the same cleanup. The small Go command that reads the registered deployment
+health deadline also runs through that wrapper before the service is switched.
 The user unit uses `KillMode=process`, so restarting the daemon does not kill the tmux server or the
 assistants it opened. `loginctl enable-linger` keeps the user manager alive without an interactive
 login; that is why the bootstrap needs root exactly once.
