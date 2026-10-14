@@ -4,11 +4,11 @@ import test from "node:test"
 import { BRAND_MARK, detailSessionName, projectedSessionIdentity } from "./brand-mark.ts"
 import type { SessionRow } from "@clawdline/contract"
 
-test("a new conversation has a readable detail title before its list name arrives", () => {
+test("a pane keeps a readable title until its conversation name arrives", () => {
   const row = { id: "%" + 677, label: "%" + 677, assistant: "codex", identity: "no_record" } as SessionRow
   assert.equal(detailSessionName(row), "Codex Session")
   assert.equal(detailSessionName({ ...row, label: "A named task" }), "A named task")
-  assert.equal(detailSessionName({ ...row, identity: "registry" }), row.id)
+  assert.equal(detailSessionName({ ...row, identity: "registry" }), "Codex Session")
   assert.equal(detailSessionName({ ...row, machine_scope: true }), "Clawdfather")
 })
 

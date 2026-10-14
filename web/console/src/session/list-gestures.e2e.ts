@@ -64,6 +64,7 @@ type ReadingScenario =
   | "refresh"
   | "safe-cleared"
   | "unstarted-codex"
+  | "unnamed-bound-codex"
   | "unstarted-claude-refresh"
   | "session-gap"
   | "callback-owner"
@@ -173,6 +174,10 @@ function rows(): Row[] {
   if (readingScenario === "unstarted-codex") return [
     row(SAFE, SAFE, safeCloseability(), 300,
       { assistant: "codex", isClaude: false, sessionId: "", identity: "no_record" }),
+  ]
+  if (readingScenario === "unnamed-bound-codex") return [
+    row(SAFE, SAFE, safeCloseability(), 300,
+      { assistant: "codex", isClaude: false, sessionId: "conversation-bound", identity: "registry" }),
   ]
   if (readingScenario === "unstarted-claude-refresh") return [
     row(SAFE, "Claude has not started", unknownCloseability(), 300, {
@@ -336,7 +341,7 @@ const streams = new Set<ServerResponse>()
 function snapshot() {
   generation++
   const age = readingScenario === "five" ? 5 : readingScenario === "ninety" ? 90 : 0
-  const source = readingScenario === "normal" || readingScenario === "worst" || readingScenario === "live-crowded" || readingScenario === "epic" || readingScenario === "unstarted-codex" || readingScenario === "callback-owner" || (readingScenario === "session-gap" && (!sessionGap || sessionGapComplete))
+  const source = readingScenario === "normal" || readingScenario === "worst" || readingScenario === "live-crowded" || readingScenario === "epic" || readingScenario === "unstarted-codex" || readingScenario === "unnamed-bound-codex" || readingScenario === "callback-owner" || (readingScenario === "session-gap" && (!sessionGap || sessionGapComplete))
     ? { freshness: "current", observed_at: Date.now() / 1000, provenance: "fixture" }
     : readingScenario === "expired"
       ? { freshness: "missing", observed_at: Date.now() / 1000 - 121, provenance: "iterm" }
@@ -2741,6 +2746,20 @@ test("an unstarted Codex can be confirmed and closed without a conversation work
       await tab.until("the empty Codex close reaches the daemon", () => closes.length > 0)
       assert.equal(closes[0].id, SAFE)
       assert.equal(closes[0].force, false)
+    } finally {
+      readingScenario = "normal"
+    }
+  }))
+
+test("a bound Codex pane still shows a readable title while its name is pending", () =>
+  inTab(async (tab) => {
+    try {
+      await list(tab)
+      readingScenario = "unnamed-bound-codex"
+      pushSessions()
+      await tab.until("only the unnamed Codex row remains", (s) => s.order.join() === SAFE)
+      assert.equal(await tab.run(`document.querySelector('li.row[data-id="${SAFE}"] .title .label')?.textContent`),
+        "Codex Session")
     } finally {
       readingScenario = "normal"
     }
