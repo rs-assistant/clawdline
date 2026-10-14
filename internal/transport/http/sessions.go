@@ -733,8 +733,8 @@ type rowInput struct {
 }
 
 // receiptSuperseded compares durable events, not the terminal's current
-// activity. A run belongs to this exact conversation and assistant; a reused
-// terminal or a run for another assistant cannot retire its receipt.
+// activity. A run belongs to this conversation and assistant; a resumed
+// conversation may have used another terminal before its current receipt.
 func receiptSuperseded(in rowInput, receipt *contract.WorkDisposition) (bool, bool) {
 	if in.latestRunErr != nil || in.latestDeliveryErr != nil {
 		return false, false
@@ -744,12 +744,11 @@ func receiptSuperseded(in rowInput, receipt *contract.WorkDisposition) (bool, bo
 	}
 	var run struct {
 		Session   string `json:"session_id"`
-		Terminal  string `json:"terminal_id"`
 		Assistant string `json:"assistant"`
 		At        int64  `json:"at"`
 	}
 	if json.Unmarshal(in.latestRun.Payload, &run) != nil || run.Session != in.live.ConversationID ||
-		run.Terminal != in.live.TerminalID || run.Assistant != in.live.Assistant {
+		run.Assistant != in.live.Assistant {
 		return false, false
 	}
 	// The current daemon writes both facts into one event ledger. Its sequence

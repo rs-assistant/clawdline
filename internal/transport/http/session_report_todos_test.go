@@ -243,6 +243,18 @@ func TestNewMessageSupersedesOnlyTheEarlierSessionReceipt(t *testing.T) {
 	if got, receipt := state(); got != contract.WorkStateMilestoneComplete || receipt == nil {
 		t.Fatalf("new report after work: %s %+v", got, receipt)
 	}
+	resumed := p.s
+	resumed.ID = "previous-pane"
+	if _, err := s.runs().Issue(ctx, resumed, "local", "One more task after resuming"); err != nil {
+		t.Fatal(err)
+	}
+	if got, receipt := state(); got != contract.WorkStateReady || receipt != nil {
+		t.Fatalf("message from another terminal in the same conversation: %s %+v", got, receipt)
+	}
+	reportTurn(t, s, p.s.ID)
+	if got, receipt := state(); got != contract.WorkStateMilestoneComplete || receipt == nil {
+		t.Fatalf("resumed conversation reported again: %s %+v", got, receipt)
+	}
 }
 
 // A Board that cannot be read is unknown on the row, never none.
