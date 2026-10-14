@@ -1,4 +1,4 @@
-/** The copied Cloud client's localStorage cache keeps only 64 command words. */
+/** Older Cloud clients persisted only 64 command words. */
 const SAVED_COMMANDS_CUT = 64
 
 export interface CommandClient {
@@ -16,6 +16,6 @@ export function machineCommands(client: CommandClient, machine: string): { comma
   }
   const remembered = client.machineDescriptor?.(machine)?.machine?.commands
   if (!Array.isArray(remembered)) return { commands: null, incomplete: false }
-  if (remembered.length >= SAVED_COMMANDS_CUT) return { commands: null, incomplete: true }
+  if (remembered.length === SAVED_COMMANDS_CUT) return { commands: null, incomplete: true }
   return { commands: remembered.filter((word): word is string => typeof word === "string"), incomplete: false }
 }

@@ -337,7 +337,7 @@ export function machineApp(client: CloudReadClient, machine: string): { version?
  * `console.relay_feature_wait_seconds`.
  *
  * A page that has just opened holds the descriptor it remembered from last
- * time, and the copied client cut that list to its first 64 words on the way
+ * time, and older clients cut that list to its first 64 words on the way
  * into storage while this daemon publishes 151 (`cloudops.Implemented()`). So
  * for the moment between the socket coming up and the first `orch/` envelope
  * being opened, a read of a word past the cut was refused by the page itself,
@@ -397,7 +397,7 @@ export function machineWordPending(client: CloudReadClient, machine: string, wor
   const remembered = descriptorObject(descriptorObject(client.machineDescriptors?.get?.(machine))?.machine)
   const commands = remembered?.commands
   if (!Array.isArray(commands) || commands.includes(word)) return false
-  return commands.length >= REMEMBERED_COMMANDS_CUT
+  return commands.length === REMEMBERED_COMMANDS_CUT
 }
 
 /** The copied client's `AGENT_LIMIT`: the entries one subagent read carries. */
