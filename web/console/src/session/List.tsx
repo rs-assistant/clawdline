@@ -89,8 +89,7 @@ export function ProjectedRow({ title, sessionID, machineID, machineName, assista
     <span className="kid" hidden={!depth} aria-hidden="true" />
     {ancestorThrough && <span className="tree-ancestor" aria-hidden="true" />}
     <RowIdentity title={shownTitle} icon={mark} assistant={assistant} crown={identity.crown} />
-    <div className="meta"><span className="machine" title={machineName}>{machineName}</span>
-      {cwd && <span className="path">{L.path(cwd)}</span>}
+    <div className="meta">{cwd && <span className="path">{L.path(cwd)}</span>}
       <RowActivity at={lastMovementAt ? lastMovementAt / 1000 : undefined} />
       {machineScope && coordinatorBound ? <span className="coordinator-chip" aria-hidden="true">Clawdfather</span> : null}</div>
     {status ? <StateLine row={{ ...status, id: sessionID, state } as SessionRow}
