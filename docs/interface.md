@@ -282,6 +282,9 @@ at the person who made it: it says nothing about iTerm2, an assistant in a tab o
 shown with what the process table knows, and nothing about those tabs is concluded — no tab is
 called gone, and no last reading is kept and aged into `missing`. Sessions in tmux, including
 every session Clawdline opens with tmux installed, are read and typed into as usual.
+When a person opens an iTerm2 session's live screen and that screen cannot be read while this
+setting is off, the explanation appears inside that screen panel. A readable screen and the
+session list do not carry a persistent setting warning.
 
 **Still sent, one Apple Event each, when off:** opening the iTerm2 viewer tab for a tmux session
 (above), **Reveal**, and closing a dispatched child's tab that this daemon opened itself. Each is

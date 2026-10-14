@@ -1,4 +1,4 @@
-import type { Screen } from "@clawdline/contract"
+import type { Screen, ScanSource } from "@clawdline/contract"
 import type { NextWord } from "../next-strings.js"
 import type { ReadState } from "../read-state.js"
 
@@ -12,4 +12,13 @@ export function screenFailureWord(
   if (code === "session_not_found" || code === "not_found") return "screenSessionGone"
   if (code === "forbidden") return "screenForbidden"
   return null
+}
+
+/** A disabled source explains this screen only when it is actually unreadable. */
+export function screenITermScanOff(
+  screen: Pick<Screen, "backend" | "readable"> | null,
+  sources: readonly ScanSource[] | undefined,
+): boolean {
+  return screen?.backend === "iterm" && screen.readable === false &&
+    !!sources?.some((source) => source.source === "iterm" && source.disabled === "setting")
 }
