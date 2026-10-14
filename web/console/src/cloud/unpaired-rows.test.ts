@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/forget.test.ts.
-import { accountMachineNames, accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, withAccountRegistrations } from "./unpaired-rows.ts"
+import { accountMachineForConfirmation, accountMachineNames, accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, withAccountRegistrations } from "./unpaired-rows.ts"
 
 const API = "https://api.example.test"
 
@@ -27,7 +27,7 @@ function account(answer: { status: number; body?: unknown; throws?: boolean }) {
 const LISTED = {
   machines: [
     { id: "mac_1", name: "Studio", platform: "darwin", key_fingerprint: "AAAA", key_epoch: 1, identity_epoch: 1, revoked_at: null },
-    { id: "mac_51463f04", name: "build-box", platform: "linux", key_fingerprint: "BBBB", key_epoch: 1, identity_epoch: 1, revoked_at: null },
+    { id: "mac_c0ffee42", name: "build-box", platform: "linux", key_fingerprint: "BBBB", key_epoch: 1, identity_epoch: 1, revoked_at: null },
     { id: "mac_old", name: "gone", platform: "linux", key_fingerprint: "CCCC", key_epoch: 1, identity_epoch: 1, revoked_at: "2026-09-20T00:00:00Z" },
     { id: "mac_blank", name: "  ", platform: "linux", key_fingerprint: "DDDD", key_epoch: 1, identity_epoch: 1, revoked_at: null },
   ],
@@ -39,7 +39,7 @@ test("the account's names are read with this browser's own cookie, revoked and b
   assert.deepEqual(asked, [{ url: API + "/v1/machines", credentials: "include" }])
   assert.deepEqual([...names.entries()], [
     ["mac_1", { name: "Studio", platform: "darwin" }],
-    ["mac_51463f04", { name: "build-box", platform: "linux" }],
+    ["mac_c0ffee42", { name: "build-box", platform: "linux" }],
   ])
 })
 
@@ -49,7 +49,7 @@ test("the account roster keeps revoked ids so a retained relay snapshot cannot d
   assert.ok(roster)
   assert.deepEqual([...roster.revoked], ["mac_old"])
   assert.equal(roster.names.has("mac_old"), false)
-  assert.deepEqual([...roster.registered.keys()], ["mac_1", "mac_51463f04", "mac_blank"])
+  assert.deepEqual([...roster.registered.keys()], ["mac_1", "mac_c0ffee42", "mac_blank"])
   assert.equal(roster.registered.has("mac_old"), false)
 })
 
@@ -77,7 +77,7 @@ test("account-only registrations remain identifiable and revocable without inven
   }
   const rows = withAccountRegistrations([witnessed], roster.registered, present)
   assert.equal(rows[0], witnessed)
-  assert.deepEqual(rows.map((row) => row.id), ["mac_1", "mac_51463f04", "mac_blank"])
+  assert.deepEqual(rows.map((row) => row.id), ["mac_1", "mac_c0ffee42", "mac_blank"])
   for (const row of rows.slice(1)) {
     assert.equal(row.observedAt, null)
     assert.equal(row.freshness, "unknown")
@@ -89,18 +89,41 @@ test("account-only registrations remain identifiable and revocable without inven
   }
   assert.equal(rows[1]?.name, "build-box")
   assert.equal(rows[2]?.name, "Machine · ac_blank")
-  assert.deepEqual(devicesPageRows(rows, ["mac_51463f04"]).map((row) => row.id), ["mac_1", "mac_blank"])
+  assert.deepEqual(devicesPageRows(rows, ["mac_c0ffee42"]).map((row) => row.id), ["mac_1", "mac_blank"])
+})
+
+test("the Devices revoke confirmation can resolve a registration absent from relay rows", async () => {
+  const { get } = account({ status: 200, body: LISTED })
+  const roster = await accountMachineRoster(API, get)
+  assert.ok(roster)
+  const witnessed = {
+    id: "mac_1", name: "Studio (published)", label: "Desk · Studio (published)", kind: "desk",
+    observedAt: 100, freshness: "current" as const, pairing: "paired" as const,
+    sessions: 3, selectable: true, autoSelectable: true,
+  }
+  const resolve = (id: string, forgotten: string[] = []) =>
+    accountMachineForConfirmation(id, [witnessed], roster.registered, roster.names,
+      (machine: string) => machine === "mac_1", present, forgotten)
+  assert.equal(resolve("mac_1"), witnessed, "an observed machine keeps its own facts")
+  assert.deepEqual(resolve("mac_c0ffee42"), {
+    id: "mac_c0ffee42", name: "build-box", label: "Linux · build-box", kind: "linux",
+    observedAt: null, freshness: "unknown", pairing: "unknown",
+    selectable: false, autoSelectable: false,
+  })
+  assert.equal(resolve("mac_c0ffee42", ["mac_c0ffee42"]), null)
+  assert.equal(resolve("mac_old"), null, "a revoked registration cannot open confirmation")
+  assert.equal(resolve("mac_other"), null, "a guessed id cannot open confirmation")
 })
 
 test("a machine this browser cannot name is called what the account calls it; one it can name keeps its own", () => {
   const rows = [
     { id: "mac_1", name: "Studio (published)", label: "Desk · Studio (published)", kind: "desk" },
-    { id: "mac_51463f04", name: "Machine · 51463f04", label: "Machine · 51463f04", kind: "unknown" },
+    { id: "mac_c0ffee42", name: "Machine · c0ffee42", label: "Machine · c0ffee42", kind: "unknown" },
     { id: "mac_unlisted", name: "Machine · unlisted", label: "Machine · unlisted", kind: "unknown" },
   ]
   const names = new Map([
     ["mac_1", { name: "Studio", platform: "darwin" }],
-    ["mac_51463f04", { name: "build-box", platform: "linux" }],
+    ["mac_c0ffee42", { name: "build-box", platform: "linux" }],
   ])
   const shown = withAccountNames(rows, names, (id: string) => id === "mac_1", present)
   assert.deepEqual(
@@ -121,8 +144,8 @@ test("a count is only said where the sessions could be read", () => {
 
 test("a row always has a stable id fragment and says only the identity facts it knows", () => {
   assert.deepEqual(
-    machineIdentityFacts({ id: "mac_51463f04", kind: "linux", observedAt: Date.UTC(2026, 8, 19) }),
-    { shortID: "51463f04", platform: "linux", seenAt: Date.UTC(2026, 8, 19) },
+    machineIdentityFacts({ id: "mac_c0ffee42", kind: "linux", observedAt: Date.UTC(2026, 8, 19) }),
+    { shortID: "c0ffee42", platform: "linux", seenAt: Date.UTC(2026, 8, 19) },
   )
   assert.deepEqual(machineIdentityFacts({ id: "short", kind: "unknown", observedAt: null }), {
     shortID: "short",

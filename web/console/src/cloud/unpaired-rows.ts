@@ -16,7 +16,7 @@
  * pairing. So a machine this browser is not paired with has no readable name
  * at all, and the copied presentation falls back to the last eight characters
  * of its id —
- * "Machine · 51463f04" — on exactly the row a person has to recognise before
+ * "Machine · c0ffee42" — on exactly the row a person has to recognise before
  * they can decide to pair it.
  *
  * The account holds a name for it anyway. `GET /v1/machines` answers each
@@ -119,6 +119,21 @@ export function withAccountRegistrations(
       selectable: false, autoSelectable: false })
   }
   return result
+}
+
+/** Resolve only a machine the account or relay lists for the existing revoke confirmation. */
+export function accountMachineForConfirmation(
+  id: string,
+  relay: readonly CloudMachine[] | null,
+  registered: ReadonlyMap<string, AccountName>,
+  names: ReadonlyMap<string, AccountName>,
+  described: (id: string) => boolean,
+  present: (id: string, name: string, platform: string) => { name: string; label: string; kind: string },
+  forgotten: readonly string[],
+): CloudMachine | null {
+  if (forgotten.includes(id)) return null
+  const known = withAccountRegistrations(relay ?? [], registered, present).find((machine) => machine.id === id)
+  return known ? withAccountNames([known], names, described, present)[0] ?? null : null
 }
 
 /**
