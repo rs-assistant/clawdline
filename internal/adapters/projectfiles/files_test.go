@@ -41,6 +41,7 @@ func TestProjectFilesInventorySeparatesNestedAndGlobalCandidates(t *testing.T) {
 	put(t, filepath.Join(selected, "CLAUDE.md"), "local rules")
 	put(t, filepath.Join(repo, ".agents", "skills", "one", "SKILL.md"), "project skill")
 	put(t, filepath.Join(selected, ".claude", "skills", "two", "SKILL.md"), "nested skill")
+	put(t, filepath.Join(selected, ".claude", "commands", "release-now.md"), "---\ndescription: Publish and verify a release.\n---\n# Steps\n")
 	put(t, filepath.Join(home, ".codex", "AGENTS.md"), "global rules")
 	put(t, filepath.Join(home, ".claude", "skills", "three", "SKILL.md"), "global skill")
 	put(t, filepath.Join(repo, "sibling", "AGENTS.md"), "not selected")
@@ -56,6 +57,7 @@ func TestProjectFilesInventorySeparatesNestedAndGlobalCandidates(t *testing.T) {
 		{"package/CLAUDE.md", "project", "claude", "ready", true},
 		{".agents/skills/one/SKILL.md", "project", "codex", "ready", true},
 		{"package/.claude/skills/two/SKILL.md", "project", "claude", "ready", true},
+		{"package/.claude/commands/release-now.md", "project", "claude", "ready", true},
 		{".codex/AGENTS.md", "global", "codex", "ready", false},
 		{".claude/skills/three/SKILL.md", "global", "claude", "ready", false},
 		{"package/AGENTS.md", "project", "codex", "missing", false},
@@ -71,6 +73,10 @@ func TestProjectFilesInventorySeparatesNestedAndGlobalCandidates(t *testing.T) {
 		}
 	}
 	global := listed(t, list, ".codex/AGENTS.md")
+	command := listed(t, list, "package/.claude/commands/release-now.md")
+	if command.Kind != "command" || command.Title != "release-now" || command.Description != "Publish and verify a release." {
+		t.Fatalf("command metadata: %+v", command)
+	}
 	if _, err := Save(selected, home, global.ID, strings.Repeat("0", 64), "edit"); !errors.Is(err, ErrReadOnly) {
 		t.Fatalf("global write: %v", err)
 	}

@@ -12,8 +12,11 @@ import type { SessionRow } from "@clawdline/contract"
 type Draft = { id: string; title: string; body: string; global: boolean }
 const blank = (): Draft => ({ id: "", title: "", body: "", global: false })
 const machineOf = (place: ProjectPlace): string => (place as ProjectPlace & { machine?: string }).machine ?? ""
-const availableSkills = (files: ProjectFile[]) => files.filter((file) => file.kind === "skill" && file.status === "ready")
-const skillTitle = (file: ProjectFile) => file.title || file.location.split("/").filter(Boolean).at(-2) || file.name
+const availableSkills = (files: ProjectFile[]) => files.filter((file) => (file.kind === "skill" || file.kind === "command") && file.status === "ready")
+const commandName = (file: ProjectFile) => file.name.replace(/\.md$/i, "")
+const skillTitle = (file: ProjectFile) => file.kind === "command" && (!file.title || file.title === commandName(file))
+  ? commandName(file).replace(/[-_]+/g, " ").replace(/\b[a-z]/g, (letter) => letter.toUpperCase())
+  : file.title || file.location.split("/").filter(Boolean).at(-2) || file.name
 
 /** A Workflow is saved text. Skill import fills an editor, not an execution dependency. */
 function WorkflowPage({ shown }: { shown: boolean }) {
@@ -174,7 +177,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     if (!selectedSkill || !skillText || skillBusy) return
     const name = skillTitle(selectedSkill)
     closeSkill()
-    openDraft({ id: "", title: name, body: W("skillPrompt", { name }), global: false })
+    openDraft({ id: "", title: name, body: selectedSkill.kind === "command" ? W("commandPrompt", { name: commandName(selectedSkill) }) : W("skillPrompt", { name }), global: false })
   }
 
   const skillPicker = <div className="workflow-skill-picker">
@@ -237,7 +240,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     {skillOpen && <div ref={skillDialog} className="workflow-skill-overlay" role="dialog" aria-modal="true" aria-labelledby="workflow-skill-dialog-title"
       onPointerDown={(event) => { if (event.target === event.currentTarget) closeSkill() }}>
       <div className="workflow-skill-dialog">
-        <header><div><h2 id="workflow-skill-dialog-title">{selectedSkill ? W("skillPreviewTitle") : W("skillListTitle")}</h2>
+        <header><div><h2 id="workflow-skill-dialog-title">{selectedSkill ? selectedSkill.kind === "command" ? W("commandPreviewTitle") : W("skillPreviewTitle") : W("skillListTitle")}</h2>
           {selectedSkill && <p>{skillTitle(selectedSkill)}</p>}</div><button type="button" onClick={closeSkill} aria-label={W("cancel")}>×</button></header>
         {selectedSkill ? <>
           <div className="workflow-skill-content">
@@ -250,11 +253,11 @@ function WorkflowPage({ shown }: { shown: boolean }) {
             {skillError && <button type="button" onClick={() => void chooseSkill(selectedSkill)}>{W("reload")}</button>}
             <button className="workflow-primary" type="button" disabled={!skillText || skillBusy} onClick={importSkill}>{W("useSkill")}</button></footer>
         </> : <div className="workflow-skill-content"><div className="workflow-skill-options">{skills.map((skill) => <button type="button" key={skill.id} onClick={() => void chooseSkill(skill)}>
-          <span><strong>{skillTitle(skill)}</strong><small>{skill.source === "global" ? W("global") : W("projectOnly")} · {skill.assistant}</small></span>
+          <span><strong>{skillTitle(skill)}</strong><small>{skill.source === "global" ? W("global") : W("projectOnly")} · {skill.kind === "command" ? W("claudeCommand") : skill.assistant}</small></span>
           <span className="workflow-skill-summary">{skill.description || W("skillNoDescription")}</span>
         </button>)}</div></div>}
         {!selectedSkill && <footer><button type="button" onClick={closeSkill}>{W("cancel")}</button></footer>}
-        {selectedSkill && <p className="workflow-skill-hint">{W("skillImportHint")}</p>}
+        {selectedSkill && <p className="workflow-skill-hint">{W(selectedSkill.kind === "command" ? "commandImportHint" : "skillImportHint")}</p>}
       </div>
     </div>}
   </section>
