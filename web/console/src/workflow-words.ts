@@ -1,4 +1,5 @@
 /** The Workflow surface's English source and Taiwan Traditional Chinese copy. */
+import type { Snippet } from "./legacy/snippets-bridge.js"
 const words = {
   en: {
     reload: "Reload", intro: "Save a launch message for this Project or every Project on this machine. Skill import fills an editable draft.",
@@ -19,10 +20,16 @@ const words = {
     confirmDelete: "Delete Workflow ‘{name}’?",
     skillPrompt: "Use the {name} Skill, complete its workflow, and report the result.",
     noSessionWorkflows: "This Project has no Workflows yet. Create one from the sidebar.",
-    projectResolveUnavailable: "This machine could not identify the Session's Project. Update it before starting a Workflow here.",
+    projectResolveUnavailable: "This machine could not identify the Session's Project. Project Workflows and the built-in review need it; other Global Workflows are available.",
     start: "Start Workflow", starting: "Starting…", startUnknown: "The start result is unknown. Check Session to-dos before sending again.",
     running: "Workflow · In progress", done: "Workflow · Done", sent: "Sent", queued: "Ready to send",
     complete: "Mark done", reopen: "Reopen", send: "Send",
+    zeroReviewTitle: "Zero-Based Review",
+    zeroReviewBody: `Run a zero-based review of this Project. Create an Epic to track it, then assign independent reviews from the relevant roles: product, UX, architecture, code quality, efficiency, documentation, and evidence.
+Require evidence for every finding. Compare the current design with mature expert practice, and distinguish deliberate trade-offs from accumulated complexity.
+Find confusing behavior, redundant steps or reads and writes, and missing capabilities.
+Synthesize a report and a target workflow. Turn improvements into role-owned child items, and list decisions that need my input separately.
+Collect shared facts once and include them in each review brief so reviewers do not repeat the same reading.`,
   },
   "zh-Hant": {
     reload: "重新讀取", intro: "為這個 Project 或這台機器上的所有 Project 儲存啟動訊息。從 Skill 帶入後仍可編輯。",
@@ -43,10 +50,16 @@ const words = {
     confirmDelete: "確定刪除 Workflow「{name}」？",
     skillPrompt: "請執行「{name}」Skill，依照其中流程完成工作並回報結果。",
     noSessionWorkflows: "這個 Project 還沒有 Workflow。請從側邊欄建立。",
-    projectResolveUnavailable: "這台機器無法辨識此 Session 所屬的 Project。更新機器後再從這裡啟動 Workflow。",
+    projectResolveUnavailable: "這台機器無法辨識此 Session 所屬的 Project。專屬 Workflow 與內建審查需要這項資訊；其他全域 Workflow 仍可使用。",
     start: "開始 Workflow", starting: "啟動中…", startUnknown: "啟動結果無法確認。請到 Session 待辦查看紀錄，再決定是否重送。",
     running: "Workflow · 執行中", done: "Workflow · 完成", sent: "已送出", queued: "待送出",
     complete: "標記完成", reopen: "重新開啟", send: "送出",
+    zeroReviewTitle: "歸零審查",
+    zeroReviewBody: `對這個 Project 做一次歸零審查。建立 Epic 追蹤工作，並依需要分派獨立的角色審查：產品、UX、架構、程式碼品質、效率、文件與證據。
+每項結論都要附上證據。對照成熟的人類專家做法，分清刻意取捨與歷史累積的複雜度。
+找出容易誤導人的行為、多餘步驟或讀寫，以及缺少的能力。
+彙整審查報告與目標流程，把改善項目拆成各角色負責的子項目；需要我決定的取捨另外列出。
+共用事實只整理一次，放進每份審查 brief，避免各角色重複讀取。`,
   },
 } as const
 
@@ -55,4 +68,10 @@ export function workflowWord(key: WorkflowWord, holes: Record<string, string> = 
   const lang = typeof document !== "undefined" && document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en"
   const source = words[lang][key]
   return source.replace(/\{(\w+)\}/g, (all, name) => holes[name] ?? all)
+}
+
+/** An unedited built-in uses the reader's language; edited rows keep their text. */
+export function localizedWorkflow(row: Snippet): Snippet {
+  if (row.builtin !== "zero_review") return row
+  return { ...row, title: workflowWord("zeroReviewTitle"), body: workflowWord("zeroReviewBody") }
 }

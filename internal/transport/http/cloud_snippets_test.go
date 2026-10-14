@@ -36,16 +36,14 @@ func aSnippet(title, body string) map[string]any {
 func TestACloudViewerReadsAndWritesTheSnippetsOnThisMac(t *testing.T) {
 	s := cloudStandIn(t)
 
-	// An empty machine answers, and its answer is an empty list rather than a
-	// refusal. The sheet draws two different things for those, so the
-	// difference has to survive the trip.
+	// A fresh machine answers with its shipped example Workflow.
 	answer, payload := s.ask(t, 1, map[string]any{"type": "snippets",
 		"session": cloudops.MachineReplySession, "request": "req-list-0"})
 	if !answer.OK() {
 		t.Fatalf("the list was refused: %d/%q %s", answer.Status, answer.Code, answer.Payload)
 	}
-	if rows, ok := bodyOf(t, payload)["snippets"].([]any); !ok || len(rows) != 0 {
-		t.Fatalf("a machine with no snippets answered %v", payload)
+	if rows, ok := bodyOf(t, payload)["snippets"].([]any); !ok || len(rows) != 1 {
+		t.Fatalf("a fresh machine did not answer its default Workflow: %v", payload)
 	}
 
 	made, payload := s.ask(t, 2, map[string]any{"type": "snippet-create",
@@ -172,5 +170,11 @@ func (s *standIn) snippetCount(t *testing.T, seq uint64) int {
 	if !ok {
 		t.Fatalf("the list carries no rows: %v", payload)
 	}
-	return len(rows)
+	count := 0
+	for _, row := range rows {
+		if item, ok := row.(map[string]any); ok && item["scope"] == "global" {
+			count++
+		}
+	}
+	return count
 }

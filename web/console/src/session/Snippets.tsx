@@ -192,14 +192,16 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const whose = machine ? L.machineFor(row).label : ""
   const shown = snippetOrder(model)
   const projectKey = model.project ? model.project.key : ""
-  const workflows = (answer?.snippets ?? []).filter((item) => item.scope === "workflow" && (!item.project || (!projectUnresolved && item.project === projectKey)))
+  const workflows = (error ? [] : answer?.snippets ?? []).filter((item) => item.scope === "workflow" &&
+    (!item.project || (!projectUnresolved && item.project === projectKey)) &&
+    (!projectUnresolved || item.builtin !== "zero_review"))
   const currentWorkflow = workflows.find((item) => item.id === selectedWorkflow?.id) ?? null
   useEffect(() => {
     if (selectedWorkflow && !currentWorkflow) setSelectedWorkflow(null)
   }, [selectedWorkflow, currentWorkflow])
 
   const startWorkflow = async () => {
-    if (!currentWorkflow || (projectUnresolved && !!currentWorkflow.project) || startingWorkflow) return
+    if (error || !currentWorkflow || (projectUnresolved && (!!currentWorkflow.project || currentWorkflow.builtin === "zero_review")) || startingWorkflow) return
     setStartingWorkflow(true); setWorkflowError("")
     try {
       const text = workflowTodoText(currentWorkflow.id, currentWorkflow.title, currentWorkflow.body)
@@ -583,10 +585,10 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
           ref={list}
           onClick={pressed}
         >{loading ? <SnippetSkeleton label={T.webReading} /> : <div dangerouslySetInnerHTML={{ __html: listHTML }} />}</div> : <div className="snippet-list workflow-picker" id="workflow-picker" role="tabpanel" aria-labelledby="workflow-tab">
-          <div className="workflow-picker-toolbar"><span>{W("chooseWorkflow")}</span>
-            <button type="button" className="workflow-reload" disabled={loading} onClick={() => { void refresh() }}>{W("reload")}</button></div>
           {loading && <SnippetSkeleton label={W("loading")} />}
-          {error && <p role="alert">{error}</p>}
+          {error && <div className="workflow-picker-error" role="alert"><p>{error}</p>
+            <button type="button" onClick={() => { void refresh() }}>{W("reload")}</button></div>}
+          {projectUnresolved && !error && <p className="workflow-picker-notice" role="status">{W("projectResolveUnavailable")}</p>}
           {!loading && !error && !projectUnresolved && workflows.length === 0 && <p className="snippets-note">{W("noSessionWorkflows")}</p>}
           {([true, false] as const).map((global) => {
             const group = workflows.filter((item) => !item.project === global)

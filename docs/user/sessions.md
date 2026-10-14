@@ -62,6 +62,10 @@ The **⋯** menu (**Session 快捷動作**) holds the rest:
   things with **紅筆** (red pen) before sending.
 - **Snippets** (**常用句**) are text you send often. Create them with **新增常用句**, for this project
   or every project. Pressing one only fills the box; you still send it.
+- **Workflows** hold a complete launch message. Open the Workflow tab, select one, then press
+  **Start Workflow**. The shipped **Zero-Based Review** (**歸零審查**) example reviews the current
+  Project and is available in every Project. Its unedited text follows the interface language;
+  you can edit or delete it like another Workflow. A deleted example stays deleted after restart.
 - **Skills:** type `/` (or `$` for Codex) as the whole message to list the session's skills and
   commands. Choosing one writes it into the box and does not send.
 
