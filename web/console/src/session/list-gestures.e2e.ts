@@ -64,6 +64,7 @@ type ReadingScenario =
   | "refresh"
   | "safe-cleared"
   | "unstarted-codex"
+  | "unnamed-bound-codex"
   | "unstarted-claude-refresh"
   | "session-gap"
   | "callback-owner"
@@ -171,8 +172,12 @@ function rows(): Row[] {
     row(UNKNOWN, "Heavy callback queued", unknownCloseability(), 100),
   ]
   if (readingScenario === "unstarted-codex") return [
-    row(SAFE, "Codex has not started", safeCloseability(), 300,
+    row(SAFE, SAFE, safeCloseability(), 300,
       { assistant: "codex", isClaude: false, sessionId: "", identity: "no_record" }),
+  ]
+  if (readingScenario === "unnamed-bound-codex") return [
+    row(SAFE, SAFE, safeCloseability(), 300,
+      { assistant: "codex", isClaude: false, sessionId: "conversation-bound", identity: "registry" }),
   ]
   if (readingScenario === "unstarted-claude-refresh") return [
     row(SAFE, "Claude has not started", unknownCloseability(), 300, {
@@ -336,7 +341,7 @@ const streams = new Set<ServerResponse>()
 function snapshot() {
   generation++
   const age = readingScenario === "five" ? 5 : readingScenario === "ninety" ? 90 : 0
-  const source = readingScenario === "normal" || readingScenario === "worst" || readingScenario === "live-crowded" || readingScenario === "epic" || readingScenario === "unstarted-codex" || readingScenario === "callback-owner" || (readingScenario === "session-gap" && (!sessionGap || sessionGapComplete))
+  const source = readingScenario === "normal" || readingScenario === "worst" || readingScenario === "live-crowded" || readingScenario === "epic" || readingScenario === "unstarted-codex" || readingScenario === "unnamed-bound-codex" || readingScenario === "callback-owner" || (readingScenario === "session-gap" && (!sessionGap || sessionGapComplete))
     ? { freshness: "current", observed_at: Date.now() / 1000, provenance: "fixture" }
     : readingScenario === "expired"
       ? { freshness: "missing", observed_at: Date.now() / 1000 - 121, provenance: "iterm" }
@@ -416,13 +421,26 @@ function daemon(): Server {
       }], others: [],
     })
     if (path === "/v1/places") return json(res, 200, {
-      places: [{ id: "project-fixture", label: "Clawdline", path: "/tmp/fixture", icon: null }],
+      places: [{ id: "project-fixture", label: "Clawdline", path: "/tmp/fixture",
+        icon: { accent: "#e07a5f", cells: [["#e07a5f", "#e07a5f"], ["#e07a5f", "#141416"]] } }],
       assistants: [{ id: "codex", label: "Codex" }],
     })
     if (path === "/v1/projects/project-fixture/files" && req.method === "GET") return json(res, 200, {
-      files: [{ id: "skill-fixture", name: "SKILL.md", location: ".agents/skills/ship-today/SKILL.md",
-        source: "project", assistant: "codex", kind: "skill", status: "ready", editable: true }],
+      files: [{ id: "global-skill-fixture", name: "SKILL.md", title: "Global Review", description: "Review the work with evidence.", location: "skills/global-review/SKILL.md",
+        source: "global", assistant: "codex", kind: "skill", status: "ready", editable: true },
+      { id: "project-command-fixture", name: "release-now.md", title: "release-now", description: "Publish and verify a release.", location: ".claude/commands/release-now.md",
+        source: "project", assistant: "claude", kind: "command", status: "ready", editable: true }],
       truncated: false, skipped: [],
+    })
+    if (path === "/v1/projects/project-fixture/files/global-skill-fixture" && req.method === "GET") return json(res, 200, {
+      file: { id: "global-skill-fixture", name: "SKILL.md", title: "Global Review", description: "Review the work with evidence.",
+        location: "skills/global-review/SKILL.md", source: "global", assistant: "codex", kind: "skill", status: "ready", editable: true },
+      text: "---\nname: Global Review\ndescription: Review the work with evidence.\n---\n# Review steps\nCheck the evidence.", version: "fixture",
+    })
+    if (path === "/v1/projects/project-fixture/files/project-command-fixture" && req.method === "GET") return json(res, 200, {
+      file: { id: "project-command-fixture", name: "release-now.md", title: "release-now", description: "Publish and verify a release.",
+        location: ".claude/commands/release-now.md", source: "project", assistant: "claude", kind: "command", status: "ready", editable: true },
+      text: "---\ndescription: Publish and verify a release.\n---\n# Release now\nRun the publish and verification steps.", version: "fixture",
     })
     if (path === "/v1/snippets" && req.method === "GET") return json(res, 200, {
       project: url.searchParams.has("session") ? { key: "/tmp/fixture", label: "Clawdline" } : undefined,
@@ -1715,25 +1733,70 @@ test("an ordinary Session keeps the Snippets icon", () =>
     assert.equal(await tab.run(`document.getElementById('clawdfather-suggestions') === null`), true)
   }))
 
-test("a phone imports a Skill as editable Workflow text, starts it, and sees its durable progress", () =>
+test("a phone previews a Project Claude command by name and imports an editable Workflow draft", () =>
+  inTab(async (tab) => {
+    workflowRecords = []
+    await tab.go("/#page=workflow")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-skill-picker button:not(:disabled)')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Workflow sources did not arrive'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press('.workflow-skill-picker button')
+    const command = await tab.run(`[...document.querySelectorAll('.workflow-skill-options button')].find(button => button.textContent.includes('Release Now'))?.textContent`)
+    assert.match(command, /Claude 指令|Claude command/)
+    assert.match(command, /Publish and verify a release/)
+    assert.doesNotMatch(command, /\.claude\/commands|release-now\.md/)
+    await tab.press('.workflow-skill-options button:last-child')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-skill-content pre')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Command preview did not load'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-content pre')?.textContent`), /Run the publish and verification steps/)
+    await tab.press('.workflow-skill-dialog footer .workflow-primary')
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Release Now")
+    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /release-now/)
+    assert.doesNotMatch(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Run the publish and verification steps/)
+  }))
+
+test("a phone imports an available global Skill as editable Workflow text, starts it, and sees its durable progress", () =>
   inTab(async (tab) => {
     workflowRecords = []; workflowTodo = null; workflowSends = 0
     await tab.go("/#page=workflow")
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
-        if (document.querySelector('.workflow-actions select option[value="skill-fixture"]')) return resolve(true)
+        if (document.querySelector('.workflow-skill-picker button:not(:disabled)')) return resolve(true)
         if (Date.now() > deadline) return reject(new Error('Workflow Skill option did not arrive'))
         setTimeout(look, 25)
       }; look()
     })`)
-    await tab.run(`(() => {
-      const select = document.querySelector('.workflow-actions select')
-      select.value = 'skill-fixture'
-      select.dispatchEvent(new Event('change', { bubbles: true }))
-    })()`)
-    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "ship-today")
-    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /ship-today/)
+    assert.equal(await tab.run(`document.querySelector('.workflow-skill-picker button')?.disabled`), false)
+    const point = await tab.run(`(() => { const el = document.querySelector('.workflow-skill-picker button'); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+    await tab.tap(point.x, point.y)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-options')?.textContent`), /Global Review/)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-options')?.textContent`), /Review the work with evidence/)
+    assert.doesNotMatch(await tab.run(`document.querySelector('.workflow-skill-options')?.textContent`), /SKILL\.md/)
+    await tab.press('.workflow-skill-options button')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-skill-content pre')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Skill preview did not load'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-content pre')?.textContent`), /Check the evidence/)
+    await tab.press('.workflow-skill-dialog footer .workflow-primary')
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Global Review")
+    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Global Review/)
     await tab.press('.workflow-editor button[type="submit"]')
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
@@ -1789,7 +1852,7 @@ test("a phone imports a Skill as editable Workflow text, starts it, and sees its
     })`)
     assert.equal(workflowSends, 1)
     assert.match(String((workflowTodo as Row | null)?.text), /Clawdline-Workflow/)
-    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /ship-today/)
+    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /Global Review/)
     await tab.shot("workflow-session-progress")
     await tab.press('.session-workflow-row summary')
     await tab.press('.session-workflow-row button')
@@ -1833,16 +1896,27 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
       }; look()
     })`)
     await tab.shot("workflow-empty-mobile")
+    await tab.press('.workflow-project-trigger')
+    assert.equal(await tab.run(`document.querySelectorAll('.workflow-project-menu button .mark').length`), 1)
+    assert.equal(await tab.run(`document.querySelector('.workflow-project-menu button .mark')?.classList.contains('none')`), false)
+    assert.match(await tab.run(`document.querySelector('.workflow-project-trigger')?.getAttribute('aria-label')`), /Clawdline/)
+    await tab.press('.workflow-project-menu button')
+    await tab.press('.workflow-empty .workflow-primary')
+    assert.equal(await tab.run(`document.activeElement?.matches('.workflow-editor input')`), false)
+    await tab.run(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))`)
+    assert.equal(await tab.run(`document.activeElement?.matches('.workflow-editor .workflow-actions button:last-child')`), true)
+    assert.match(await tab.run(`document.querySelector('.workflow-scope label')?.textContent`), /Clawdline|clawdline/)
+    assert.equal(await tab.run(`document.querySelector('.workflow-scope label .mark') !== null`), true)
+    await tab.run(`document.querySelector('.workflow-editor').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor')`), null)
     await tab.press('.workflow-empty .workflow-primary')
     await tab.run(`(() => {
-      const fields = document.querySelectorAll('.workflow-editor input, .workflow-editor textarea')
+      const fields = document.querySelectorAll('.workflow-editor input:not([type="radio"]), .workflow-editor textarea')
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(fields[0], 'Daily release')
       fields[0].dispatchEvent(new Event('input', { bubbles: true }))
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(fields[1], 'Run the release checklist.')
       fields[1].dispatchEvent(new Event('input', { bubbles: true }))
-      const scope = document.querySelector('.workflow-editor select')
-      scope.value = 'global'
-      scope.dispatchEvent(new Event('change', { bubbles: true }))
+      document.querySelectorAll('.workflow-scope input')[1].click()
     })()`)
     await tab.press('.workflow-editor button[type="submit"]')
     await tab.run(`new Promise((resolve, reject) => {
@@ -2716,6 +2790,8 @@ test("an unstarted Codex can be confirmed and closed without a conversation work
       readingScenario = "unstarted-codex"
       pushSessions()
       await tab.until("only the empty Codex row remains", (s) => s.order.join() === SAFE)
+      assert.equal(await tab.run(`document.querySelector('li.row[data-id="${SAFE}"] .title .label')?.textContent`),
+        "Codex Session", "the list gives an unnamed pane the same readable title as its detail header")
       const open = await swipeOpen(tab, SAFE)
       assert.equal(open.actionKind, "safe")
       await tab.press("li.row[data-swipe='open'] > .swipe-end")
@@ -2727,6 +2803,20 @@ test("an unstarted Codex can be confirmed and closed without a conversation work
       await tab.until("the empty Codex close reaches the daemon", () => closes.length > 0)
       assert.equal(closes[0].id, SAFE)
       assert.equal(closes[0].force, false)
+    } finally {
+      readingScenario = "normal"
+    }
+  }))
+
+test("a bound Codex pane still shows a readable title while its name is pending", () =>
+  inTab(async (tab) => {
+    try {
+      await list(tab)
+      readingScenario = "unnamed-bound-codex"
+      pushSessions()
+      await tab.until("only the unnamed Codex row remains", (s) => s.order.join() === SAFE)
+      assert.equal(await tab.run(`document.querySelector('li.row[data-id="${SAFE}"] .title .label')?.textContent`),
+        "Codex Session")
     } finally {
       readingScenario = "normal"
     }

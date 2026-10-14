@@ -2,7 +2,7 @@
 
 The gear on each Project row opens that Project's settings. Its first section inventories disk candidates for Codex instructions, Claude Code instructions, and Skills. It shows each filename, its path relative to the Project or the machine's home directory, its source, and whether it can be read or edited. The inventory does not claim that a running assistant has loaded a file: overrides, plugins, and the time a Session started can change the effective instructions.
 
-The Project scope runs from the nearest repository root through the selected place. It includes `AGENTS.md`, `CLAUDE.md`, `CLAUDE.local.md`, `.claude/CLAUDE.md`, `.claude/CLAUDE.local.md`, and direct `SKILL.md` children under `.agents/skills` or `.claude/skills` at each layer. The home scope includes `.codex/AGENTS.md`, `.claude/CLAUDE.md`, `.claude/CLAUDE.local.md`, and direct skill children under `.agents/skills`, `.codex/skills`, or `.claude/skills`. Missing common instruction files remain listed as missing. Home files are read-only in this interface because changing one may affect every Project.
+The Project scope runs from the nearest repository root through the selected place. It includes `AGENTS.md`, `CLAUDE.md`, `CLAUDE.local.md`, `.claude/CLAUDE.md`, `.claude/CLAUDE.local.md`, direct `SKILL.md` children under `.agents/skills` or `.claude/skills`, and direct `.md` files under `.claude/commands` at each layer. The home scope includes `.codex/AGENTS.md`, `.claude/CLAUDE.md`, `.claude/CLAUDE.local.md`, direct skill children under `.agents/skills`, `.codex/skills`, or `.claude/skills`, and direct `.md` files under `.claude/commands`. Missing common instruction files remain listed as missing. Home files are read-only in this interface because changing one may affect every Project.
 
 `GET /v1/projects/{place}/files` lists candidates; `GET /v1/projects/{place}/files/{file}` returns UTF-8 content and its SHA-256 version. `PUT` to the same file route takes `expected_version` and `content`, plus `Idempotency-Key`. The daemon resolves the place from its current Project catalog. It accepts only a file ID from the bounded inventory, never a browser-supplied path. Regular files are opened beneath bound directory handles; symlink or directory swaps are refused. A save requires the version the editor read, writes a temporary file in the same directory, syncs it, and renames it. Concurrent edits through this API are serialized; a change made elsewhere returns `file_changed` and leaves the browser's draft intact. The interface does not create, delete, or rename files.
 
@@ -17,9 +17,10 @@ Project's own directory, not a repository ancestor or the machine's home directo
 loaded only when expanded; a file's content is requested only when selected. This view is read-only.
 The existing instruction and Skill editor remains in Settings and instructions.
 
-The Workflow editor uses this inventory's ready Project Skills only to fill a
-new launch-message draft. Its saved text does not retain a live dependency on
-the Skill. See [Project Workflows](workflows.md).
+The Workflow editor uses this inventory's ready Skills and Claude commands to fill a
+new launch-message draft. A command import asks the assistant to read that Project's
+command; the command file remains necessary when it runs. A manually written Workflow
+can stand alone. See [Project Workflows](workflows.md).
 
 `GET /v1/projects/{place}/tree?directory=<relative>` lists one directory;
 `GET /v1/projects/{place}/tree/file?path=<relative>` reads one regular UTF-8 text file. The server

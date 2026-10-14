@@ -2022,6 +2022,7 @@ const ScheduleHistory = (() => {
     const runNowButton = document.getElementById("schedule-history-run-now") as HTMLButtonElement | null
     if (runNowButton) {
       runNowButton.textContent = runningNow ? scheduleRunWords().running : scheduleRunWords().button
+      runNowButton.toggleAttribute("data-loading", runningNow)
       runNowButton.disabled = loading || !!pressing || runningNow || !record
     }
     el("schedule-history-close").textContent = T().webClose

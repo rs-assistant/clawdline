@@ -56,6 +56,7 @@ import "./agent-report.css"
 import "./transcript-error.css"
 import { atNewest, jumpOffered } from "./jump.js"
 import { joinTranscript } from "./history.js"
+import { recordSendDiagnostic } from "../cloud/install.js"
 import "./jump.css"
 import "./history.css"
 
@@ -782,6 +783,10 @@ function pendingHTML(card: PendingSend): ReactElement {
         : pendingFailureCanRetry(card.failure)
           ? '<button type="button" class="go" data-pending-retry="' + esc(card.token) + '">' + esc(T.webPlanRetry) + "</button>"
           : "") +
+      (import.meta.env.VITE_HOSTED_CONSOLE
+        ? '<button type="button" class="go" data-pending-diagnose="' + esc(card.token) + '">' +
+          esc(nextWord("sendDiagnose")) + "</button>"
+        : "") +
       dismiss +
       "</div>"
   } else if (card.state === "unknown" && sitsUnsubmitted(card.failure) && card.checking) {
@@ -886,6 +891,16 @@ function enterRefusalSentence(code: string): string {
 /** A press inside a pending card: try again, look, press Enter, close it, or a code block's copy button. */
 function pendingAction(ev: MouseEvent<HTMLElement>) {
   const target = ev.target as Element
+  const diagnose = target.closest?.("[data-pending-diagnose]")
+  if (diagnose) {
+    const card = pendingSends.card(diagnose.getAttribute("data-pending-diagnose") ?? "")
+    if (card?.state === "failed") {
+      const kept = recordSendDiagnostic(card.failure)
+      diagnose.textContent = nextWord(kept ? "sendDiagnosticQueued" : "sendDiagnosticUnavailable")
+      if (diagnose instanceof HTMLButtonElement) diagnose.disabled = kept
+    }
+    return
+  }
   const entered = target.closest?.("[data-pending-enter]")
   if (entered) {
     void enter(entered.getAttribute("data-pending-enter") ?? "")

@@ -147,6 +147,30 @@ test("the live signed machine descriptor keeps commands beyond the archived cach
   assert.equal(client.machineDescriptor("m").machine.commands.includes("session-receipt"), false)
 })
 
+test("a signed descriptor persists the complete command list across reconnects", () => {
+  const stored = new Map()
+  const storage = { getItem: (key) => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value) }
+  const client = Object.create(StatusCloudClient.prototype)
+  client.machineDescriptors = new Map()
+  client.descriptorStorage = storage
+  client._descriptorStorageKey = () => "descriptors"
+  client.viewerEvents = { now: () => 1 }
+  const commands = Array.from({ length: 151 }, (_, i) => `word-${i}`)
+  commands[149] = "end"
+  commands[150] = "session-receipt"
+  client._rememberDescriptor("m", { machine: { platform: "darwin", commands } })
+  const reopened = Object.create(StatusCloudClient.prototype)
+  reopened.descriptorStorage = storage
+  reopened._descriptorStorageKey = () => "descriptors"
+  reopened.machineDescriptors = reopened._loadMachineDescriptors()
+  reopened.orchestratorSnapshots = new Map()
+  reopened.machineLacks = new Map()
+  reopened.macCapabilities = new Map()
+  assert.equal(reopened.machineDescriptor("m").machine.commands.length, 151)
+  assert.equal(reopened._machineImplements("m", "end"), "yes")
+  assert.equal(reopened._machineImplements("m", "session-receipt"), "yes")
+})
+
 test("a cut remembered Linux command list cannot refuse a named transcript read", () => {
   const client = Object.create(StatusCloudClient.prototype)
   client.machineDescriptors = new Map([["m", { machine: {
@@ -193,6 +217,22 @@ test("a paired Mac remains the voice host while its cached command list is incom
   // A complete live descriptor that omits voice is an actual refusal.
   client.orchestratorSnapshots.set("mac", { machine: { platform: "darwin", commands: ["send"] } })
   await assert.rejects(client.voiceHost(), { code: "cloud_voice_host_unavailable" })
+})
+
+test("a missing Whisper refusal records the selected machine without recording speech", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  const rows = []
+  client._voiceHost = () => ({ machine: "mac-b", chosen: true, candidates: ["mac-a", "mac-b"] })
+  client._machineRequest = () => Promise.reject({ code: "no_whisper", detail: { reason: "no_binary" } })
+  client.viewerEvents = { record: (event, data) => rows.push({ event, data }) }
+  client._scheduleViewerEvents = () => {}
+  client.webBuild = "build"
+  await assert.rejects(client.voice("private-audio", 16000), { code: "no_whisper" })
+  assert.deepEqual(rows, [{ event: "cloud.voice.whisper_missing", data: {
+    target_machine: "mac-b", chosen: true, candidates: ["mac-a", "mac-b"],
+    reason: "no_binary", web_build: "build",
+  } }])
+  assert.doesNotMatch(JSON.stringify(rows), /private-audio/)
 })
 
 test("status recovery frees idle relay channels before declaring an event gap", async () => {

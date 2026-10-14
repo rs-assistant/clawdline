@@ -160,7 +160,8 @@ IDE，也不取代 Claude Code 或 Codex：它管理你本來就會開的 Sessio
 ## 文件
 
 - 開始：[安裝與第一次執行](docs/user/install.md)・[平台](docs/user/platforms.md)・
-  [疑難排解](docs/user/troubleshooting.md)
+  [疑難排解](docs/user/troubleshooting.md)・
+  [Linux 上 Agent 無法截圖時](docs/linux-headless-browser.md)（英文）
 - 基本功能：[Session](docs/user/sessions.md)・[快捷鍵](docs/user/keyboard-shortcuts.md)・
   [遠端連線](docs/user/remote-access.md)・[通知](docs/user/notifications.md)・[用量](docs/user/usage.md)
 - 協調工作：[派工與合併確認](docs/user/clawdfather-and-dispatch.md)・

@@ -2308,6 +2308,19 @@ test("a rejected send reports which browser gate stopped it without its contents
   assert.equal(old.calls.length, 0)
 })
 
+test("a persisted complete command list admits close before the next descriptor", async () => {
+  const client = new FakeClient()
+  const commands = Array.from({ length: 151 }, (_, n) => `saved-${n}`)
+  commands[149] = "end"
+  commands[150] = "session-receipt"
+  client.machineDescriptors.set("mac-a", { machine: { commands } })
+  const { reader } = seam(client, { t: 1_000 }, true, 10)
+  const result = await reader.fetch("/v1/sessions/s1/close",
+    post({ force: false }, { "Idempotency-Key": "close-from-cache" }))
+  assert.equal(result.status, 200)
+  assert.equal(client.calls.filter(([name]) => name === "_read").length, 1)
+})
+
 test("every read the writer carries is one it waits for", () => {
   const reads: [string, string][] = [
     ["/v1/work/v2/images/a1", "work-v2-image"],

@@ -486,8 +486,8 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         imageSignals.set(key, new AbortController())
         visibleArtifacts.delete(key)
       }
-      if (signal.aborted) return { kind: "unavailable", reason: "unknown" }
       try {
+        if (signal.aborted) return { kind: "unavailable", reason: "unknown" }
         const infoStarted = Date.now()
         const infoReply = record(await client.infoForGeneration(destination, signal))
         infoMs = Date.now() - infoStarted
@@ -523,11 +523,12 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         // One content-free timing row per opened detail distinguishes waiting
         // for info from waiting for the transcript on a real phone. Subsequent
         // status-driven rereads do not consume the viewer's diagnostics budget.
-        if (firstOpen && !signal.aborted) {
+        if (firstOpen) {
           try { client.viewerEvents?.record?.("cloud.detail.first_read", {
-            machine: destination.machineID, outcome,
+            machine: destination.machineID, session: destination.sessionID,
+            outcome: signal.aborted ? "aborted" : outcome,
             total_ms: Date.now() - started, info_ms: infoMs, transcript_ms: transcriptMs,
-          }, "cloud.detail.first_read|" + destination.machineID) } catch { /* diagnostics cannot fail a read */ }
+          }, "cloud.detail.first_read|" + destination.machineID + "|" + destination.sessionID) } catch { /* diagnostics cannot fail a read */ }
         }
       }
     },

@@ -17,6 +17,22 @@ import japanese from "../../public/catalogs/ja.json" with { type: "json" }
 // @ts-expect-error -- Node runs the source test with type stripping.
 import { activateCatalog, catalogRefusalDetail, resetCatalogForTest } from "../catalog.ts"
 
+test("a failed send can queue a private-free phone diagnostic while reconnecting", () => {
+  const reader = new RelayReader("mac-a")
+  assert.equal(reader.recordSendDiagnostic("cloud_reconnecting"), false)
+  const rows: { event: string; data: Record<string, unknown> }[] = []
+  const client = new FakeClient()
+  client.ready = false
+  client.viewerEvents = { record(event, data) { rows.push({ event, data }); return { n: rows.length } } }
+  reader.attach(client)
+  assert.equal(reader.recordSendDiagnostic("cloud_reconnecting"), true)
+  assert.deepEqual(rows[0]?.event, "cloud.send.diagnostic_requested")
+  assert.equal(rows[0]?.data.code, "cloud_reconnecting")
+  assert.equal(rows[0]?.data.connection, "not_ready")
+  assert.equal(rows[0]?.data.machine, "mac-a")
+  assert.equal(JSON.stringify(rows).includes("message"), false)
+})
+
 test("Session header trail distinguishes started, observed, canceled, unavailable and reconnect without identifiers", async () => {
   const saved = globalThis.sessionStorage
   const entries = new Map<string, string>()
@@ -64,7 +80,7 @@ test("Session header trail distinguishes started, observed, canceled, unavailabl
 
 class FakeClient implements CloudReadClient {
   ready = true
-  viewerEvents?: { record(event: string, data: Record<string, unknown>, key?: string): void }
+  viewerEvents?: { record(event: string, data: Record<string, unknown>, key?: string): void | { n: number } }
   statusSnapshots?: ReadonlyMap<string, unknown>
   sessionInventoryByMachine = new Map<string, unknown>()
   machineRows: { id: string; freshness: "current" | "stale" | "unknown" }[] = [
@@ -431,6 +447,7 @@ test("a cross-machine conversation uses a verified list when its retained status
   assert.deepEqual(client.pinnedReads, [target])
   assert.equal(timings.length, 1)
   assert.equal(timings[0].event, "cloud.transcript.first_read")
+  assert.equal(timings[0].data.session, "s1")
   assert.equal(timings[0].data.outcome, "ready")
   for (const field of ["total_ms", "sessions_ms", "words_ms", "pin_ms", "wire_ms"]) {
     assert.equal(typeof timings[0].data[field], "number", field)
@@ -1753,4 +1770,18 @@ test("squad reads carry exact scope, binding and cursor fields to the chosen mac
     assert.equal((await r.fetch(path)).status, 400, path)
   }
   assert.equal(client.reads.length, count, "invalid reads never reach the machine")
+})
+
+// "Read again" on a waiting card (2026-10-14): across Cloud it is the one-row
+// read, so the machine captures that Session's screen and states its row now.
+test("read again asks the machine for just that row", async () => {
+  const client = new FakeClient()
+  ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements =
+    (_machine, word) => word === "sessions.row" ? "yes" : "unknown"
+  const r = reader(client, { t: 10_000 })
+  await r.fetch("/v1/sessions?look=%2519")
+  assert.deepEqual(client.reads.at(-1), { machine: "mac-a", word: "sessions.row", body: { row: "%19" } })
+  ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements = () => "unknown"
+  await r.fetch("/v1/sessions?look=%2519")
+  assert.equal(client.reads.at(-1)?.word, "sessions.snapshot", "an older machine is asked to restate everything")
 })

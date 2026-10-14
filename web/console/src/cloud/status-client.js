@@ -85,6 +85,31 @@ export function statusChannel(envelope) {
 }
 
 export class StatusCloudClient extends CatalogCloudClient {
+  // The archived client chooses the voice host. Record that choice when the
+  // receiving machine says Whisper is missing, so a phone-only failure leaves
+  // evidence on the paired Mac without retaining audio or recognized words.
+  async voice(audio, rate) {
+    const host = this._voiceHost()
+    try {
+      return await super.voice(audio, rate)
+    } catch (error) {
+      if (error?.code === "no_whisper" && host.machine) {
+        try {
+          const reason = error.detail?.reason || error.reason || null
+          this.viewerEvents.record("cloud.voice.whisper_missing", {
+            target_machine: host.machine,
+            chosen: host.chosen,
+            candidates: host.candidates,
+            reason,
+            web_build: this.webBuild || null,
+          }, ["cloud.voice.whisper_missing", host.machine, reason].join("|"))
+          this._scheduleViewerEvents()
+        } catch { /* diagnostics cannot change the voice result */ }
+      }
+      throw error
+    }
+  }
+
   constructor(options) {
     super(options)
     // Retained rows from a previous connection may say "current" after that
@@ -132,6 +157,37 @@ export class StatusCloudClient extends CatalogCloudClient {
     const live = this.orchestratorSnapshots?.get(machine)
     if (!live?.machine || typeof live.machine !== "object" || Array.isArray(live.machine)) return remembered
     return { ...remembered, machine: { ...live.machine } }
+  }
+
+  // The frozen client's display cache clips command words at 64. Preserve the
+  // signed complete list in the same bounded cache so a reopened phone can
+  // verify end and session-receipt before the next orch/ snapshot arrives.
+  _rememberDescriptor(machine, payload) {
+    super._rememberDescriptor(machine, payload)
+    const commands = payload?.machine?.commands
+    const row = this.machineDescriptors?.get(machine)
+    if (!row || !Array.isArray(commands) || commands.length > 512 ||
+      !commands.every((word) => typeof word === "string" && word.length > 0 && word.length <= 64)) return
+    row.machine = { ...row.machine, commands: commands.slice() }
+    this._persistMachineDescriptors()
+  }
+
+  _loadMachineDescriptors() {
+    const remembered = super._loadMachineDescriptors()
+    try {
+      const key = this._descriptorStorageKey()
+      const parsed = JSON.parse(this.descriptorStorage?.getItem(key) || "null")
+      if (parsed?.v !== 1 || !Array.isArray(parsed.machines)) return remembered
+      for (const row of parsed.machines.slice(-16)) {
+        const commands = row?.machine?.commands
+        const known = remembered.get(row?.id)
+        if (known && Array.isArray(commands) && commands.length <= 512 &&
+          commands.every((word) => typeof word === "string" && word.length > 0 && word.length <= 64)) {
+          known.machine.commands = commands.slice()
+        }
+      }
+    } catch { /* optional display cache */ }
+    return remembered
   }
 
   // The copied client delivers this page's failure log to the one paired
@@ -339,7 +395,7 @@ export class StatusCloudClient extends CatalogCloudClient {
     const remembered = this.machineDescriptors?.get(machine)?.machine?.commands
     const lacks = this.machineLacks?.get(machine)
     if ((!live || typeof live !== "object" || Array.isArray(live)) &&
-      Array.isArray(remembered) && remembered.length >= 64 && !remembered.includes(type) &&
+      Array.isArray(remembered) && remembered.length === 64 && !remembered.includes(type) &&
       !lacks?.has(type)) return "unknown"
     return super._machineImplements(machine, type, options)
   }

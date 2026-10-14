@@ -222,7 +222,13 @@ either:
 ```
 
 The hosted console keeps a row whenever an envelope it receives fails to open or apply, and whenever
-the "This browser cannot decrypt Sessions" door rises or falls. The rows wait in the page's
+the "This browser cannot decrypt Sessions" door rises or falls. A failed message card also offers
+**Record diagnostics** during development; one
+press adds `cloud.send.diagnostic_requested` with the refusal code, selected machine, Cloud client
+readiness, browser online state and page visibility. It never records message text or attachments.
+The button reports that the row was queued locally, not that the machine has received it. Read the
+row together with nearby `cloud.write.failed` and connection events to identify where the send
+stopped. The rows wait in the page's
 `localStorage` (bounded, surviving a reload or a killed Home Screen app) and go to the paired Mac as
 the Cloud command `diagnostics.events` about five seconds after a burst and again after the next
 `ready`. The Mac appends **one line per batch** here, mode `0600`, and writes one counts-only line to

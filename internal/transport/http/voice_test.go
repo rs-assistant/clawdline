@@ -73,6 +73,20 @@ func voiceServer(t *testing.T) *Server {
 	return &Server{cfg: config.Config{Dir: dir}, store: st}
 }
 
+func TestVoiceBinaryProbeDistinguishesBrokenLink(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "whisper-cli")
+	if got := voiceBinaryPathState(path); got != "absent" {
+		t.Fatalf("missing file = %s", got)
+	}
+	if err := os.Symlink(filepath.Join(dir, "missing-target"), path); err != nil {
+		t.Fatal(err)
+	}
+	if got := voiceBinaryPathState(path); got != "broken_link" {
+		t.Fatalf("broken symlink = %s", got)
+	}
+}
+
 // Everything this route decides before a second of anybody's CPU is spent.
 func TestVoiceRefusesWhatItCannotRead(t *testing.T) {
 	s := voiceServer(t)

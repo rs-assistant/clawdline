@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5125,
+  "englishKeys": 5131,
   "counts": {
-    "negation": 1470,
+    "negation": 1471,
     "state": 705,
     "permission": 299,
     "deletion": 106,
     "uncertainty": 149
   },
-  "unionCount": 2247,
+  "unionCount": 2248,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1212,6 +1212,7 @@
       "next.sendAbsentMayDuplicate",
       "next.sendAgainTip",
       "next.sendAsking",
+      "next.sendDiagnosticUnavailable",
       "next.sendEnterBehindQuestion",
       "next.sendEnterMoved",
       "next.sendEnterRefused",
@@ -4532,6 +4533,7 @@
     "next.sendAbsentMayDuplicate",
     "next.sendAgainTip",
     "next.sendAsking",
+    "next.sendDiagnosticUnavailable",
     "next.sendEnterBehindQuestion",
     "next.sendEnterMoved",
     "next.sendEnterRefused",

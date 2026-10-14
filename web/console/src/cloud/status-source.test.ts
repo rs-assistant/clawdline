@@ -400,6 +400,7 @@ test("opening and leaving an exact detail subscribes, reads pinned content, and 
   assert.equal(detail.kind === "ready" && detail.nextBefore, 123)
   assert.equal(timings.length, 1)
   assert.equal(timings[0].event, "cloud.detail.first_read")
+  assert.equal(timings[0].data.session, sessionID)
   assert.equal(timings[0].data.outcome, "ready")
   assert.equal(typeof timings[0].data.info_ms, "number")
   assert.equal(typeof timings[0].data.transcript_ms, "number")
@@ -410,6 +411,28 @@ test("opening and leaving an exact detail subscribes, reads pinned content, and 
   assert.deepEqual(calls, ["subscribe:s/one/same,t/one/same", "info:" + executionGeneration,
     "transcript:" + executionGeneration, "info:" + executionGeneration,
     "transcript:" + executionGeneration, "unsubscribe:s/one/same,t/one/same"])
+})
+
+test("an abandoned first detail read still reports which Session was waiting", async () => {
+  const { client } = clientFixture()
+  const timings: { event: string; data: Record<string, unknown> }[] = []
+  ;(client as typeof client & { viewerEvents: { record: (event: string, data: Record<string, unknown>) => void } })
+    .viewerEvents = { record: (event, data) => { timings.push({ event, data }) } }
+  let finish!: (value: { info: { session: { title: string } } }) => void
+  let began!: () => void
+  const started = new Promise<void>((resolve) => { began = resolve })
+  client.infoForGeneration = async () => new Promise<{ info: { session: { title: string } } }>((resolve) => { finish = resolve; began() })
+  const source = statusSource(() => client as never)
+  const destination = { machineID, sessionID, executionGeneration }
+  const abort = new AbortController()
+  const read = source.readDetail(destination, abort.signal)
+  await started
+  abort.abort()
+  finish({ info: { session: { title: "Pinned" } } })
+  assert.deepEqual(await read, { kind: "unavailable", reason: "unknown" })
+  assert.equal(timings[0].data.session, sessionID)
+  assert.equal(timings[0].data.outcome, "aborted")
+  assert.equal(typeof timings[0].data.total_ms, "number")
 })
 
 test("an image tile reads only an artifact visible in the opened exact execution", async () => {

@@ -20,6 +20,7 @@ import { TerminalInputClient, type InputState } from "./input-client.js"
 import { KEY_ROW, StatusMessage, holderKey, isRegionKey, pasteRefusal, readClipboardPaste, withCtrl } from "./keys.js"
 import { TAB } from "./tab.js"
 import { firstSize } from "./TerminalProjectList.js"
+import { TerminalBackButton } from "./TerminalBackButton.js"
 import { holderWords, terminalRefusalWords, terminalShortID } from "./words.js"
 import { followCursorLine } from "./cursor-line.js"
 import { PasteField } from "./PasteField.js"
@@ -590,7 +591,7 @@ export function TerminalView({ id, shown, label, onBack, onOpenNew }: {
       }}>
       <header className="terminal-head">
         <div className="terminal-head-row">
-          <button className="board-button" type="button" ref={backButton} onClick={onBack}>{nextWord("terminalBack")}</button>
+          <TerminalBackButton buttonRef={backButton} onClick={onBack} />
           <dl className="terminal-facts">
             <div data-tone={outOfDate ? "warn" : undefined}>
               <dt className="terminal-sr">{nextWord("terminalFresh", { time: "" }).trim()}</dt>

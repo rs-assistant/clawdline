@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5125,
-  "riskKeys": 2247,
-  "nonRiskCount": 2878,
+  "englishContentKeys": 5131,
+  "riskKeys": 2248,
+  "nonRiskCount": 2883,
   "groups": [
     {
       "name": "bar / other",
@@ -1921,7 +1921,7 @@
     },
     {
       "name": "next / other",
-      "count": 129,
+      "count": 132,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1960,6 +1960,9 @@
         "next.machineStorageTitle",
         "next.menuCancel",
         "next.menuChooseAgain",
+        "next.menuReread",
+        "next.menuRereadAsked",
+        "next.menuRereading",
         "next.newBuild",
         "next.newBuildReload",
         "next.noticeManyLeftovers",
@@ -2154,7 +2157,7 @@
     },
     {
       "name": "next / send",
-      "count": 8,
+      "count": 10,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2162,6 +2165,8 @@
         "next.sendAgain",
         "next.sendAgainMayDuplicate",
         "next.sendAgainMayDuplicateTip",
+        "next.sendDiagnose",
+        "next.sendDiagnosticQueued",
         "next.sendEnter",
         "next.sendEntering",
         "next.sendLook",

@@ -549,7 +549,7 @@ test("More commands groups the reads and opens the same archive confirmation", (
       ids: [...document.querySelectorAll("#session-actions-main > button")].map((b) => b.id),
       more: document.getElementById("session-more")?.textContent?.trim(),
     }))()`)
-    assert.deepEqual(main.ids, ["session-interrupt", "session-focus", "session-info", "session-screen", "session-more", "session-end"])
+    assert.deepEqual(main.ids, ["session-interrupt", "session-focus", "session-open-terminal", "session-info", "session-screen", "session-more", "session-end"])
     assert.match(main.more, /更多指令/)
 
     await tab.press("#session-more")

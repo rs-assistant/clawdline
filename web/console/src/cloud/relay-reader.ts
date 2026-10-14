@@ -337,7 +337,7 @@ export function machineApp(client: CloudReadClient, machine: string): { version?
  * `console.relay_feature_wait_seconds`.
  *
  * A page that has just opened holds the descriptor it remembered from last
- * time, and the copied client cut that list to its first 64 words on the way
+ * time, and older clients cut that list to its first 64 words on the way
  * into storage while this daemon publishes 151 (`cloudops.Implemented()`). So
  * for the moment between the socket coming up and the first `orch/` envelope
  * being opened, a read of a word past the cut was refused by the page itself,
@@ -397,7 +397,7 @@ export function machineWordPending(client: CloudReadClient, machine: string, wor
   const remembered = descriptorObject(descriptorObject(client.machineDescriptors?.get?.(machine))?.machine)
   const commands = remembered?.commands
   if (!Array.isArray(commands) || commands.includes(word)) return false
-  return commands.length >= REMEMBERED_COMMANDS_CUT
+  return commands.length === REMEMBERED_COMMANDS_CUT
 }
 
 /** The copied client's `AGENT_LIMIT`: the entries one subagent read carries. */
@@ -694,6 +694,20 @@ export class RelayReader {
     if (client.ready !== false) for (const wake of [...this.awaitingClient]) wake()
   }
 
+  /** A deliberate phone-side sample, carried by the existing bounded viewer event log. */
+  recordSendDiagnostic(code: string): boolean {
+    try {
+      const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>): { n?: number | null } } } | null)?.viewerEvents
+      const result = log?.record?.("cloud.send.diagnostic_requested", {
+        code, machine: this.machine,
+        connection: !this.client ? "none" : this.client.ready === false ? "not_ready" : "ready",
+        online: typeof navigator === "undefined" ? null : navigator.onLine,
+        visible: typeof document === "undefined" ? null : document.visibilityState,
+      })
+      return typeof result?.n === "number"
+    } catch { return false }
+  }
+
   /**
    * What `relay-writer.ts` is given of this seam: the machine, the client, the
    * log, and `wrote`, which is how a write reaches the reads after it.
@@ -988,6 +1002,17 @@ export class RelayReader {
           return await this.machineRead(init?.signal, method, path, "squad-events", { after: Number(after), limit: Number(limit) })
         }
         case "/v1/sessions":
+          if (url.searchParams.has("look")) {
+            // "Read again" on a waiting card: this one row, with its screen
+            // captured now (publish.go StateRow, Publisher.Look). The row
+            // comes back on its own channel; the answer only says it was asked.
+            const look = this.only(url, path, "look").look ?? ""
+            if (!look) return this.refuse(method, path, 400, "invalid_session", "No Session was named to read again.")
+            this.questionAsked = null
+            return await this.machineRead(init?.signal, method, path,
+              this.machineImplements("sessions.row") ? "sessions.row" : "sessions.snapshot",
+              this.machineImplements("sessions.row") ? { row: look } : {})
+          }
           this.note(method, path, "local")
           return json(200, await this.initialSnapshot(init?.signal,
             new Headers(init?.headers).get("X-Clawdline-Initial-Read") === "1"))
@@ -1861,9 +1886,9 @@ export class RelayReader {
       try {
         const log = (client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } }).viewerEvents
         log?.record?.("cloud.transcript.first_read", {
-          machine: this.machine, outcome, total_ms: Date.now() - started,
+          machine: this.machine, session, outcome, total_ms: Date.now() - started,
           sessions_ms: sessionsMs, words_ms: wordsMs, pin_ms: pinMs, wire_ms: wireMs,
-        }, "cloud.transcript.first_read|" + this.machine)
+        }, "cloud.transcript.first_read|" + this.machine + "|" + session)
       } catch { /* diagnostics cannot fail a read */ }
     }
     // `transcript` is past the remembered descriptor's cut too, and this read
@@ -2348,6 +2373,12 @@ export class RelayReader {
    * `QUESTION_RESTATE_MS`, so a machine that answers with no question is not
    * asked in a loop.
    */
+  /** Whether this page's machine lists `word` among the reads it answers. */
+  private machineImplements(word: string): boolean {
+    return (this.client as { _machineImplements?(machine: string, word: string): string } | null)
+      ?._machineImplements?.(this.machine, word) === "yes"
+  }
+
   private askForOpenedQuestion(target: SessionDestination): boolean {
     const key = target.sessionID + "\u0000" + target.executionGeneration
     const now = this.now()
@@ -2356,8 +2387,7 @@ export class RelayReader {
     // `.initial` is stated at once rather than at the machine's next pass, once
     // per viewer per pass (publish.go SnapshotFrom); a machine that does not
     // list the word is asked the plain way.
-    const implements_ = (word: string) => (this.client as { _machineImplements?(machine: string, word: string): string } | null)
-      ?._machineImplements?.(this.machine, word) === "yes"
+    const implements_ = (word: string) => this.machineImplements(word)
     // `sessions.row` states just this row, now (publish.go StateRow); the
     // whole restatement is for a machine from before that word.
     const ask = implements_("sessions.row")
