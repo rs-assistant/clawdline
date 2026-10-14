@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5242,
-  "riskKeys": 2316,
-  "nonRiskCount": 2926,
+  "englishContentKeys": 5251,
+  "riskKeys": 2321,
+  "nonRiskCount": 2930,
   "groups": [
     {
       "name": "bar / other",
@@ -1609,7 +1609,7 @@
     },
     {
       "name": "next / archive",
-      "count": 13,
+      "count": 15,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1617,6 +1617,8 @@
         "next.archiveAnyway",
         "next.archiveDone",
         "next.archiveEyebrow",
+        "next.archiveForgetCancel",
+        "next.archiveForgetSay",
         "next.archiveGo",
         "next.archiveLoading",
         "next.archiveNamedTitle",
@@ -1936,7 +1938,7 @@
     },
     {
       "name": "next / other",
-      "count": 152,
+      "count": 154,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2027,6 +2029,8 @@
         "next.secretHandoffName",
         "next.secretHandoffPlaceholder",
         "next.secretHandoffReceived",
+        "next.secretHandoffReplace",
+        "next.secretHandoffSending",
         "next.secretHandoffSubmit",
         "next.sessionCallbackActive",
         "next.sessionCallbackUnverified",

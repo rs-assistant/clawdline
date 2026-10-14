@@ -33,6 +33,7 @@ type humanInterventionWire struct {
 	ReadAt             *int64                         `json:"read_at"`
 	ResolvedAt         *int64                         `json:"resolved_at"`
 	Resolution         string                         `json:"resolution,omitempty"`
+	SecretReceived     bool                           `json:"secret_received,omitempty"`
 	Version            int64                          `json:"version"`
 }
 
@@ -95,7 +96,11 @@ func (s *Server) workV2HumanInterventions(w http.ResponseWriter, r *http.Request
 		}
 		out := make([]humanInterventionWire, 0, len(rows))
 		for _, row := range rows {
-			out = append(out, humanInterventionOf(row))
+			wire := humanInterventionOf(row)
+			if row.Kind == "secret" && row.ResolvedAt == nil {
+				wire.SecretReceived = s.secretHandoffs.Pending(row.ID, conversation)
+			}
+			out = append(out, wire)
 		}
 		writeJSON(w, map[string]any{"ok": true, "rows": out, "pruned_resolved": pruned})
 		return

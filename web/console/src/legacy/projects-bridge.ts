@@ -21,6 +21,7 @@ import { drawIcon } from "./js/core/pixels.js"
 import { tint } from "./js/core/util.js"
 import { makeJSONFetch } from "@clawdline/core/refusal"
 import { bindProjectsPage as bindProjectsPageOriginal } from "./js/view/projects.js"
+import { renderWorktreeRows } from "./js/view/worktrees.js"
 import { lifecyclePlace } from "./lifecycle-place"
 
 let projectReadRefusal: unknown = null
@@ -109,6 +110,7 @@ export interface WorktreeSourceRow {
   cleanup?: { eligible?: boolean; blockers?: Array<{ code?: string }> } | null
 }
 let latestWorktreeRows = new Map<string, WorktreeSourceRow>()
+let worktreeProgressGeneration = 0
 
 export function worktreeSourceRow(id: string): WorktreeSourceRow | undefined {
   return latestWorktreeRows.get(id)
@@ -161,6 +163,40 @@ export interface ProjectsAddress {
 export function bindProjects(doc: Document, navigate: (name: string) => void, address?: ProjectsAddress): ProjectsPage {
   const elements: Record<string, HTMLElement | null> = {}
   for (const id of PROJECTS_ELEMENT_IDS) elements[id] = doc.getElementById(id)
+  async function refreshWithProgress(place: Place) {
+    const project = place.projectId || place.id
+    const generation = ++worktreeProgressGeneration
+    let reading = false
+    let finished = false
+    const timer = setInterval(async () => {
+      if (reading || finished || generation !== worktreeProgressGeneration ||
+          elements["project-worktree-lifecycle"]?.hidden) return
+      reading = true
+      try {
+        const answer = await transport.projectWorktreeLifecycle(project)
+        const snapshot = (answer as { projectWorktreeLifecycle?: unknown }).projectWorktreeLifecycle as {
+          schemaVersion?: number; project?: { id?: string }; error?: { code?: string }
+          rows?: WorktreeSourceRow[]
+        } | undefined
+        if (finished || generation !== worktreeProgressGeneration ||
+            elements["project-worktree-lifecycle"]?.hidden || snapshot?.schemaVersion !== 1 ||
+            snapshot.project?.id !== project || snapshot.error?.code !== "observation_in_progress" ||
+            !Array.isArray(snapshot.rows)) return
+        const rows = elements["project-worktree-rows"]
+        if (rows) renderWorktreeRows(rows, snapshot.rows, { document: doc, language: doc.documentElement.lang })
+        const status = elements["project-worktree-status"]
+        if (status) status.textContent = /^zh/i.test(doc.documentElement.lang)
+          ? "正在逐一觀測工作樹…" : "Observing worktrees one by one…"
+      } catch { /* The final refresh reports failures. */ }
+      finally { reading = false }
+    }, 1500)
+    try {
+      return await rememberWorktreeRead(() => transport.projectWorktreeLifecycleRefresh(project))
+    } finally {
+      finished = true
+      clearInterval(timer)
+    }
+  }
   return (bindProjectsPageOriginal as (elements: Record<string, HTMLElement | null>, environment: Record<string, unknown>) => ProjectsPage)(
     elements,
     {
@@ -177,10 +213,11 @@ export function bindProjects(doc: Document, navigate: (name: string) => void, ad
         }
       },
       lifecycleAvailable: () => true,
-      projectWorktreeLifecycle: (place: Place) => rememberWorktreeRead(() =>
-        transport.projectWorktreeLifecycle(place.projectId || place.id)),
-      projectWorktreeLifecycleRefresh: (place: Place) =>
-        rememberWorktreeRead(() => transport.projectWorktreeLifecycleRefresh(place.projectId || place.id)),
+      projectWorktreeLifecycle: (place: Place) => {
+        ++worktreeProgressGeneration
+        return rememberWorktreeRead(() => transport.projectWorktreeLifecycle(place.projectId || place.id))
+      },
+      projectWorktreeLifecycleRefresh: refreshWithProgress,
       drawIcon,
       tint,
       navigate,

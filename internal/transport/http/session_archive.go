@@ -29,6 +29,7 @@ import (
 const (
 	archivedPath        = "/v1/sessions/archived"
 	archivedRestorePath = archivedPath + "/restore"
+	archivedForgetPath  = archivedPath + "/forget"
 )
 
 // newSessionArchive is the record, with the register's limits and the label
@@ -60,10 +61,44 @@ func (s *Server) archivedRoute(w http.ResponseWriter, r *http.Request) bool {
 			return true
 		}
 		s.restoreWriting(w, r, s.restoreArchived)
+	case archivedForgetPath:
+		if r.Method != http.MethodPost {
+			writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "forgetting an archived session is a POST")
+			return true
+		}
+		s.restoreWriting(w, r, s.forgetArchived)
 	default:
 		return false
 	}
 	return true
+}
+
+// forgetArchived removes only Clawdline's archive row. The assistant's own
+// transcript remains on disk and may still appear in its history.
+func (s *Server) forgetArchived(w http.ResponseWriter, raw []byte) {
+	if s.archive == nil {
+		writeRefusal(w, http.StatusServiceUnavailable, app.ArchiveUnavailable, "This machine keeps no archive record.")
+		return
+	}
+	var body struct {
+		Conversation string `json:"conversation"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil || body.Conversation == "" {
+		writeRefusal(w, http.StatusBadRequest, "bad_request", "A conversation is required.")
+		return
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil || len(fields) != 1 {
+		writeRefusal(w, http.StatusBadRequest, "bad_request", "Only conversation is accepted.")
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := s.archive.Store.RemoveArchived(ctx, body.Conversation); err != nil {
+		writeRefusal(w, http.StatusServiceUnavailable, "store_unavailable", "This machine could not remove the archive record.")
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "conversation_id": body.Conversation})
 }
 
 // archivedWire is one row as the console reads it, the project's mark

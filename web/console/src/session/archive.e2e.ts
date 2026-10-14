@@ -157,6 +157,12 @@ function daemon(): Server {
       pushSessions()
       return
     }
+    if (path === "/v1/sessions/archived/forget" && req.method === "POST") {
+      const body = await bodyOf(req)
+      presses.push({ path, key: String(req.headers["idempotency-key"] ?? ""), body })
+      archived = archived.filter((a) => a.conversation_id !== body.conversation)
+      return json(res, 200, { ok: true, conversation_id: body.conversation })
+    }
     if (path === "/v1/sessions/archived/restore" && req.method === "POST") {
       const body = await bodyOf(req)
       presses.push({ path, key: String(req.headers["idempotency-key"] ?? ""), body })
@@ -304,6 +310,8 @@ const PROBE = `(() => {
         where: e.querySelector(".archive-where")?.textContent ?? "",
         when: e.querySelector(".archive-when")?.textContent ?? "",
         restore: e.querySelector(".archive-restore")?.textContent ?? "",
+        forget: e.querySelector(".archive-forget")?.textContent ?? "",
+        forgetConfirm: e.querySelector(".archive-forget-confirm")?.textContent ?? "",
         outcome: e.querySelector(".archive-outcome")?.textContent ?? "",
       })),
       reopened: [...page.querySelectorAll(".archive-reopened > li")].map((li) => li.textContent),
@@ -335,7 +343,7 @@ interface Seen {
     empty: string | null
     entries: {
       conversation: string; title: string; color: string; mark: { w: number; h: number; none: boolean } | null
-      where: string; when: string; restore: string; outcome: string
+      where: string; when: string; restore: string; forget: string; forgetConfirm: string; outcome: string
     }[]
     reopened: string[]
   } | null
@@ -631,6 +639,34 @@ test("封存 asks first, sends one archive under its key, the row goes, and the 
     await tab.press(".archive-reopened .board-button")
     await tab.until("the reopened Session is the one opened", (s) =>
       s.page === null && s.hash.startsWith("#session=") && s.hash.includes("790"))
+  }))
+
+test("an archived Session can be removed from the phone after a clear confirmation", () =>
+  inTab(async (tab) => {
+    rows = []
+    archived = [{ conversation_id: "conversation-forget", assistant: "claude", place: "place-api",
+      place_label: "api", cwd: "/work/api", title: "Old notes", icon: ICON, archived_at: now() }]
+    presses = []
+    await tab.go("/")
+    await tab.press("#nav-archive")
+    await tab.until("the archived entry is shown", (s) => s.page?.entries.length === 1)
+    await tab.press(".archive-entry .archive-forget")
+    const asked = await tab.until("the removal explanation is shown", (s) =>
+      Boolean(s.page?.entries[0]?.forgetConfirm.includes("原本的對話檔")))
+    assert.match(asked.page!.entries[0].forgetConfirm, /從封存清單刪除/)
+    assert.equal(presses.length, 0, "opening the confirmation changes nothing")
+    assert.ok(asked.wide <= 390, "the confirmation fits the phone")
+    await tab.press(".archive-confirm-actions .board-button:first-child")
+    await tab.until("cancel keeps the entry", (s) => s.page?.entries.length === 1 &&
+      s.page.entries[0].forgetConfirm === "")
+    assert.equal(presses.length, 0)
+    await tab.press(".archive-entry .archive-forget")
+    await tab.press(".archive-forget-go")
+    await tab.until("the confirmed entry leaves", (s) => s.page?.entries.length === 0)
+    assert.equal(presses.length, 1)
+    assert.equal(presses[0].path, "/v1/sessions/archived/forget")
+    assert.deepEqual(presses[0].body, { conversation: "conversation-forget" })
+    assert.ok(presses[0].key.length >= 16)
   }))
 
 test("a blocked archive comes back with the daemon's reasons, and only the second decision forces it", () =>

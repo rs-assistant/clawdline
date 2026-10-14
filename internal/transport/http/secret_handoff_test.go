@@ -50,6 +50,18 @@ func TestSecretHandoffOnlyTargetMayClaimOnce(t *testing.T) {
 	if submitted.Code != http.StatusOK || strings.Contains(submitted.Body.String(), secret) {
 		t.Fatalf("submit: %d %s", submitted.Code, submitted.Body)
 	}
+	listPath := "/v1/work/v2/human-interventions/conversation:" + target
+	listed := httptest.NewRecorder()
+	s.workV2Route(listed, personWorkV2Request(http.MethodGet, listPath, "", "secret-read"))
+	if listed.Code != http.StatusOK || strings.Contains(listed.Body.String(), secret) {
+		t.Fatalf("receipt read: %d %s", listed.Code, listed.Body)
+	}
+	var waiting struct {
+		Rows []humanInterventionWire `json:"rows"`
+	}
+	if err := json.Unmarshal(listed.Body.Bytes(), &waiting); err != nil || len(waiting.Rows) != 1 || !waiting.Rows[0].SecretReceived {
+		t.Fatalf("received state missing after reload: %+v %v", waiting, err)
+	}
 	note, err := s.store.HumanIntervention(t.Context(), id)
 	if err != nil || strings.Contains(note.Title+note.Summary+note.Action+note.Reason+note.Detail+note.Resolution, secret) {
 		t.Fatalf("Note stored value: %v", err)
@@ -115,6 +127,14 @@ func TestSecretHandoffOnlyTargetMayClaimOnce(t *testing.T) {
 	note, err = s.store.HumanIntervention(t.Context(), id)
 	if err != nil || note.ResolvedAt == nil || note.Resolution != "Secret Handoff used" {
 		t.Fatalf("not handled: %+v %v", note, err)
+	}
+	claimedList := httptest.NewRecorder()
+	s.workV2Route(claimedList, personWorkV2Request(http.MethodGet, listPath, "", "secret-read-after-claim"))
+	var handled struct {
+		Rows []humanInterventionWire `json:"rows"`
+	}
+	if err := json.Unmarshal(claimedList.Body.Bytes(), &handled); err != nil || claimedList.Code != http.StatusOK || len(handled.Rows) != 1 || handled.Rows[0].SecretReceived {
+		t.Fatalf("receipt remained after claim: %+v %v", handled, err)
 	}
 	if err := filepath.WalkDir(s.broker.Dir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
