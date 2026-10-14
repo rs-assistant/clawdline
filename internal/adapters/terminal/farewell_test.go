@@ -255,6 +255,31 @@ func TestSomethingElseAtTheFrontLeavesTheTerminalOpen(t *testing.T) {
 	}
 }
 
+func TestTheAssistantsOwnGroupDrainsBeforeTheTerminalCloses(t *testing.T) {
+	f := &fakeTerminal{step: time.Second, sights: []farewellSight{
+		claudeAt(400), {Job: true, PID: 401, Group: 400}, {}}}
+	if err := f.ladder().say(context.Background(), claudeRow); err != nil {
+		t.Fatalf("close after group drained: %v", err)
+	}
+	if got := strings.Join(f.calls, ","); got != "look,send /exit,look,look,close" {
+		t.Fatalf("no unidentified process may be signalled: %s", got)
+	}
+}
+
+func TestTheAssistantsGroupStillOccupiedAtTheDeadlineRemainsOpen(t *testing.T) {
+	f := &fakeTerminal{step: time.Second, sights: []farewellSight{
+		claudeAt(400), {Job: true, PID: 401, Group: 400}}}
+	err := f.ladder().say(context.Background(), claudeRow)
+	var occupied Occupied
+	if !errors.As(err, &occupied) {
+		t.Fatalf("occupied group: %T %v", err, err)
+	}
+	if got := strings.Join(f.calls, ","); strings.Contains(got, "SIGTERM") ||
+		strings.Contains(got, "SIGKILL") || strings.Contains(got, "close") {
+		t.Fatalf("the unidentified process was touched: %s", got)
+	}
+}
+
 // A process that changed between two rungs never inherits the previous one's
 // history: a pid that does not match is plainly different, and the same pid
 // with a different start instant is pid reuse and is just as different.
