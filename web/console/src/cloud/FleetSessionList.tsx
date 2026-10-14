@@ -23,9 +23,10 @@ type Reading = { phase: "loading" } | { phase: "settled"; value: MachineSessionP
 
 /** Only the fleet list is new; the conversation and composer belong to SessionsPage. */
 export function FleetSessionList({ machines, source, target, filter, onFilter, onOpen,
-  carrierOf, onMachineAction, onCloseRequest, onArchiveRequest, onPresentations, onProjection }: {
+  carrierOf, onMachineAction, onCloseRequest, onArchiveRequest, onPresentations, onProjection, titleRevision }: {
   machines: readonly FleetMachine[]
   source: SessionProjectionSource | null
+  titleRevision?: number
   /** Which road this page's reads of that machine take, read as the row is drawn. */
   carrierOf?: (machineID: string) => CarrierReading | null
   target: SessionDestination | null
@@ -68,6 +69,9 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     setManualRefresh((value) => value + 1)
     refreshPresentation((value) => value + 1)
   }
+  useEffect(() => {
+    if (titleRevision) refreshList()
+  }, [titleRevision])
   const refreshFromButton = () => {
     if (refreshFeedback === "loading") return
     if (!source) { setRefreshFeedback("failed"); return }

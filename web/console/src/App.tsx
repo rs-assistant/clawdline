@@ -207,7 +207,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   cloudStartedRow = null, onCloudStartedObserved,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
-  hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions }: {
+  hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved }: {
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
   cloudSessions?: ReactNode
   cloudPeerAccess?: ReactNode | ((active: boolean) => ReactNode)
@@ -229,6 +229,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   hideSessionCounts?: boolean
   focusCloudSessions?: boolean
   onLeaveCloudSessions?: () => void
+  onTitleSaved?: () => void
 } = {}) {
   const fleet = useFleet(client)
   const light = useConnectionLight(fleet.live, fleet.refresh)
@@ -655,14 +656,15 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
 
   // The phone's back gesture (`input/action-confirm.js`), and a window that
   // changes width under an open session (`input/edges.js`).
-  const layoutRef = useRef({ closeDetail, refresh: fleet.refresh })
-  layoutRef.current = { closeDetail, refresh: fleet.refresh }
+  const layoutRef = useRef({ closeDetail, refresh: fleet.refresh, titleSaved: onTitleSaved })
+  layoutRef.current = { closeDetail, refresh: fleet.refresh, titleSaved: onTitleSaved }
 
   // What the overlays ask of the page. `writable` is the original's `S.write`,
   // which comes from `/v1/health`; this daemon's health does not carry it, and
   // the composer already takes the page as writable until a send is refused.
   useEffect(() => {
-    hostInfo({ openId: () => openRef.current, writable: () => true })
+    hostInfo({ openId: () => openRef.current, writable: () => true,
+      refreshSessions: () => { layoutRef.current.refresh(); layoutRef.current.titleSaved?.() } })
     hostConfirm({
       openId: () => openRef.current,
       writable: () => true,
