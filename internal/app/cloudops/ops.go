@@ -730,7 +730,7 @@ func refusalReply(b body, word string, class Class) (string, string, bool) {
 		return "", "", false
 	}
 	switch word {
-	case "send", "answer", "key", "end", "archive-session", "focus", "interrupt", "smart-title", "shell-kill":
+	case "send", "answer", "key", "end", "archive-session", "focus", "interrupt", "smart-title", "title", "shell-kill":
 		return session, "action:" + request, true
 	}
 	// Every machine command, and any word this machine does not know, is answered

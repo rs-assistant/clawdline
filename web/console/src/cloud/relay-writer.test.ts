@@ -27,8 +27,8 @@ type Call = [string, ...unknown[]]
 const FINGERPRINT = "8eca80fffc9359d5f0fca31f3e36b741bd50218b658fc086f05931747bd4c5ce"
 /** The words the Go daemon's descriptor lists (`cloudops.Implemented`), the ones these tests use. */
 // A durable exact-execution action needs the machine to declare its own word as well as
-// `session-receipt` (20f03679); the daemon lists `smart-title` (cloudops ops_local_commands.go).
-const GO_DAEMON = { machine: { commands: ["send", "answer", "key", "end", "archive-session", "interrupt", "focus", "smart-title", "session-receipt"] } }
+// `session-receipt` (20f03679); the daemon lists the two naming commands (cloudops ops_local_commands.go).
+const GO_DAEMON = { machine: { commands: ["send", "answer", "key", "end", "archive-session", "interrupt", "focus", "smart-title", "title", "session-receipt"] } }
 const EXECUTION = "0123456789abcdef0123456789abcdef"
 /** The envelope a failure was sent under: sealed, written, and so possibly run. */
 const REF = { sender: "web_abcdef123456", seq: 12, request: null }
@@ -242,6 +242,7 @@ test("each console route is the Cloud word the machine lists, and nothing else",
     ["GET", "/v1/artifacts/images/img-1", "image"],
     ["POST", "/v1/sessions/s1/interrupt", "interrupt"],
     ["POST", "/v1/sessions/s1/smart-title", "smart-title"],
+    ["POST", "/v1/sessions/s1/title", "title"],
     ["POST", "/v1/push/subscribe", "push-subscribe"],
     ["POST", "/v1/push/unsubscribe", "push-unsubscribe"],
     ["POST", "/v1/push/test", "push-test"],
@@ -434,6 +435,24 @@ test("smart naming reaches the session once under the confirmation's idempotency
   assert.equal(unkeyed.status, 400)
   assert.equal((await json(unkeyed)).error, "bad_request")
   assert.deepEqual(client.calls, [], "an unreceipted model turn never leaves the browser")
+})
+
+test("a manual Session title reaches the selected machine and may be cleared", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  const { reader } = seam(client, { t: 1_000 }, true)
+  for (const value of ["New name", ""]) {
+    const res = await reader.fetch("/v1/sessions/s1/title", post({ title: value }))
+    assert.equal(res.status, 200)
+    assert.deepEqual(client.calls.at(-1)?.slice(0, 4), [
+      "_read", { machine: "mac-a", session: "s1" }, "title",
+      { request: "req-1", text: value, execution_generation: EXECUTION },
+    ])
+  }
+  client.calls = []
+  const bad = await reader.fetch("/v1/sessions/s1/title", post({ title: 12 }))
+  assert.equal(bad.status, 400)
+  assert.deepEqual(client.calls, [])
 })
 
 test("fleet focus and smart naming keep the selected Session execution", async () => {

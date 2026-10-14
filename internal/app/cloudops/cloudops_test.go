@@ -936,6 +936,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: pane, name: "action:req-smart-title",
 		method: "POST", path: "/v1/sessions/%2519/smart-title", body2: `{}`,
 	}, {
+		word:    "title",
+		body:    map[string]any{"type": "title", "session": pane, "request": "req-title", "text": "New name"},
+		session: pane, name: "action:req-title",
+		method: "POST", path: "/v1/sessions/%2519/title", body2: `{"title":"New name"}`,
+	}, {
 		word: "start",
 		body: map[string]any{"type": "start", "session": machine, "request": "req-start",
 			"place": "/Users/sean/code/clawdline-go", "assistant": "claude", "model": "opus"},

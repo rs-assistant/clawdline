@@ -261,6 +261,7 @@ export type WriteRoute =
   | { op: "end"; word: Carried<"end">; session: string }
   | { op: "focus"; word: Carried<"focus">; session: string }
   | { op: "smart-title"; word: Carried<"smart-title">; session: string }
+  | { op: "title"; word: Carried<"title">; session: string }
   | { op: "interrupt"; word: Carried<"interrupt">; session: string }
   // `persona` is "" for none: the route did not end `/as/<persona>`.
   | { op: "start"; word: Carried<"start">; place: string; assistant: string; model: string; persona: string }
@@ -341,8 +342,6 @@ export type WriteRoute =
   | { op: "work-v2-todo-image-create"; word: Carried<"work.v2.todo-image-create">; terminal: string; id: string }
   | { op: "work-v2-todo-action"; word: Carried<"work.v2.todo-action">; terminal: string; id: string; action: "send" | "complete" | "reopen" | "delete" | "edit" }
   | { op: "work-v2-human-intervention-action"; word: Carried<"work.v2.human-intervention-action">; terminal: string; id: string; action: "read" | "resolve" | "reopen" }
-  // Manual `title` is not a Cloud word at all — not here and not in the Swift
-  // app's vocabulary — so this one is a plain string.
   | { op: "uncarried"; word: string; session?: string }
 
 /**
@@ -367,7 +366,6 @@ const USAGE_WORD: Readonly<Record<string, Carried<"usage.session" | "usage.task"
  */
 const NO_CLOUD_WORD: Readonly<Record<string, string>> = {
   rename: "title",
-  title: "title",
 }
 
 /**
@@ -766,6 +764,8 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
         return { op: "focus", word: "focus", session: a }
       case "smart-title":
         return { op: "smart-title", word: "smart-title", session: a }
+      case "title":
+        return { op: "title", word: "title", session: a }
       case "interrupt":
         return { op: "interrupt", word: "interrupt", session: a }
     }
@@ -840,6 +840,7 @@ function spellingOf(route: WriteRoute): Spelling {
     case "archive":
     case "focus":
     case "smart-title":
+    case "title":
     case "interrupt":
     case "info":
     case "skills":
@@ -1148,6 +1149,21 @@ export class RelayWriter {
           target?.identity ?? await this.identity(client, route.session),
           route.word,
           { request, ...(target ? { execution_generation: target.generation } : {}) },
+          "action:" + request,
+        )
+      }
+      case "title": {
+        const body = await bodyOf(init)
+        if (typeof body?.title !== "string" || Object.keys(body).length !== 1) {
+          throw failure("bad_request", "A title write needs one title string.", 400)
+        }
+        if (typeof client._read !== "function") throw failure("cloud_not_carried", route.word, 501)
+        const request = headerOf(init, "idempotency-key") || this.requestID()
+        const target = this.host.exactTarget?.()
+          ? await this.mutationTarget(client, route.session, route.word) : null
+        return (target?.client ?? client)._read!(
+          target?.identity ?? await this.identity(client, route.session), route.word,
+          { request, text: body.title, ...(target ? { execution_generation: target.generation } : {}) },
           "action:" + request,
         )
       }
