@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ComponentPropsWithRe
 import type { SessionRow } from "@clawdline/contract"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
-import { projectedSessionIdentity, sessionCoordinatorBound, sessionMark, sessionName } from "../brand-mark.js"
+import { detailSessionName, projectedSessionIdentity, sessionCoordinatorBound, sessionMark } from "../brand-mark.js"
 import { requestConfirm } from "../overlays/events.js"
 import { ACTION_WIDTH, actionWidth, archivable, revealFor, swipes, type Reveal } from "./swipe.js"
 import { conversationNotStarted } from "./readiness.js"
@@ -429,7 +429,7 @@ export function Row({
     paintSwipe(node, swiped ? "open" : "", swiped ? actionWidthOf(node) : 0)
   }, [swiped, row.sessionId])
   const reveal = swipeReveal(row)
-  const name = sessionName(row)
+  const name = detailSessionName(row)
   // 封存 only where there is a conversation to bring back (`swipe.ts`).
   const canArchive = archivable(row.sessionId)
   // A gesture that moved the row, or a press on its uncovered body, must not

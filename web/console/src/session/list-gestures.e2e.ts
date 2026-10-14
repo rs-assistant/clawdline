@@ -171,7 +171,7 @@ function rows(): Row[] {
     row(UNKNOWN, "Heavy callback queued", unknownCloseability(), 100),
   ]
   if (readingScenario === "unstarted-codex") return [
-    row(SAFE, "Codex has not started", safeCloseability(), 300,
+    row(SAFE, SAFE, safeCloseability(), 300,
       { assistant: "codex", isClaude: false, sessionId: "", identity: "no_record" }),
   ]
   if (readingScenario === "unstarted-claude-refresh") return [
@@ -2728,6 +2728,8 @@ test("an unstarted Codex can be confirmed and closed without a conversation work
       readingScenario = "unstarted-codex"
       pushSessions()
       await tab.until("only the empty Codex row remains", (s) => s.order.join() === SAFE)
+      assert.equal(await tab.run(`document.querySelector('li.row[data-id="${SAFE}"] .title .label')?.textContent`),
+        "Codex Session", "the list gives an unnamed pane the same readable title as its detail header")
       const open = await swipeOpen(tab, SAFE)
       assert.equal(open.actionKind, "safe")
       await tab.press("li.row[data-swipe='open'] > .swipe-end")
