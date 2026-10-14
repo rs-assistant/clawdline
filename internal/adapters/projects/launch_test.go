@@ -10,6 +10,11 @@ import (
 
 func TestLaunchClearsInheritedSquadCapabilityAndSetsOnlyItsOwn(t *testing.T) {
 	t.Setenv("CLAWDLINE_SQUAD_CAPABILITY_FILE", "/stale")
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "codex"), []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	for _, assistant := range []string{AssistantClaude, AssistantCodex} {
 		launch, err := Admit(LaunchRequest{ProjectRoot: "/project", Assistant: assistant})
 		if err != nil {
@@ -22,10 +27,11 @@ func TestLaunchClearsInheritedSquadCapabilityAndSetsOnlyItsOwn(t *testing.T) {
 			{"role", launch.ShellCommandWithEnv([]string{"CLAWDLINE_SQUAD_CAPABILITY_FILE='/own'"}), "/own"},
 		} {
 			t.Run(assistant+"/"+tc.name, func(t *testing.T) {
-				prefix, _, ok := strings.Cut(tc.command, " "+assistant)
-				if !ok {
+				end := strings.LastIndex(tc.command, " "+assistant)
+				if end < 0 {
 					t.Fatalf("missing assistant in %q", tc.command)
 				}
+				prefix := tc.command[:end]
 				out, err := exec.Command("sh", "-c", prefix+" sh -c 'printf %s \"${CLAWDLINE_SQUAD_CAPABILITY_FILE-}\"'").Output()
 				if err != nil {
 					t.Fatal(err)
@@ -60,8 +66,41 @@ func TestLaunchLineIsTheSwiftAppsLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, want := r.ShellCommand(), "env -u CODEX_THREAD_ID -u CODEX_SESSION_ID -u CODEX_SANDBOX "+
-		"-u CODEX_SANDBOX_NETWORK_DISABLED -u CLAWDLINE_SQUAD_CAPABILITY_FILE "+pathEnv+" codex resume 0f1e0000-0000-4000-8000-000000000001 --model opus"; got != want {
+		"-u CODEX_SANDBOX_NETWORK_DISABLED -u CLAWDLINE_SQUAD_CAPABILITY_FILE "+
+		"PATH='"+filepath.Join(state, "bin")+`':"$(dirname "$(command -v codex)")":"$PATH"`+
+		" codex resume 0f1e0000-0000-4000-8000-000000000001 --model opus"; got != want {
 		t.Fatalf("resume first\n got %q\nwant %q", got, want)
+	}
+}
+
+func TestCodexLaunchUsesNodeBesideCodex(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("CLAWDLINE_NEXT_DIR", filepath.Join(root, "state"))
+	wrong := filepath.Join(root, "project-bin")
+	installed := filepath.Join(root, "installed-bin")
+	for _, dir := range []string{wrong, installed} {
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for path, body := range map[string]string{
+		filepath.Join(wrong, "node"):      "#!/bin/sh\necho wrong-node\n",
+		filepath.Join(installed, "node"):  "#!/bin/sh\necho installed-node\n",
+		filepath.Join(installed, "codex"): "#!/usr/bin/env node\n",
+	} {
+		if err := os.WriteFile(path, []byte(body), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	l, err := Admit(LaunchRequest{ProjectRoot: root, Assistant: AssistantCodex})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", "-c", l.ShellCommand())
+	cmd.Env = append(os.Environ(), "PATH="+strings.Join([]string{wrong, installed, "/usr/bin", "/bin"}, string(os.PathListSeparator)))
+	out, err := cmd.CombinedOutput()
+	if err != nil || strings.TrimSpace(string(out)) != "installed-node" {
+		t.Fatalf("codex used wrong Node: output %q, error %v", out, err)
 	}
 }
 
@@ -72,7 +111,7 @@ func TestStartedAssistantCanFindClawdlineOnPATH(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "PATH='" + filepath.Join(state, "bin") + "'" + string(os.PathListSeparator) + `"$PATH"`
+	want := "PATH='" + filepath.Join(state, "bin") + "'" + string(os.PathListSeparator)
 	if got := l.ShellCommand(); !strings.Contains(got, want) {
 		t.Fatalf("started assistant cannot find Clawdline: %q lacks %q", got, want)
 	}
@@ -269,7 +308,7 @@ func TestWeakTitleStepsAsideOnlyForAFallback(t *testing.T) {
 func TestLaunchCarriesTheCodexReasoningEffort(t *testing.T) {
 	state := t.TempDir()
 	t.Setenv("CLAWDLINE_NEXT_DIR", state)
-	pathEnv := "PATH='" + filepath.Join(state, "bin") + "'" + string(os.PathListSeparator) + `"$PATH"`
+	pathEnv := assistantPathEnv(AssistantCodex)
 	l, err := Admit(LaunchRequest{ProjectRoot: "/p", Assistant: AssistantCodex,
 		Model: "gpt-5.6-sol", ReasoningEffort: "xhigh"})
 	if err != nil {
