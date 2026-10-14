@@ -7,6 +7,7 @@ import { CloudProjectReader, cloudTerminalMachine, resolveCloudTerminalProject, 
 import { hostedConsole } from "./api.js"
 import { closeTerminalPane, openTerminalPage } from "./navigate.js"
 import { TerminalView } from "./TerminalView.js"
+import { TerminalBackButton } from "./TerminalBackButton.js"
 import { CloudTerminalPage } from "./CloudTerminalPage.js"
 import "./terminal.css"
 
@@ -81,7 +82,7 @@ export function TerminalPane({ route, create = false, shown }: {
   const project = hosted ? found?.page ?? "" : known?.id ?? ""
   const name = (hosted ? found?.label : known?.label) || project || route.project
   const backButton = (
-    <button className="board-button" type="button" onClick={closeTerminalPane}>{nextWord("terminalBackSessions")}</button>
+    <TerminalBackButton onClick={closeTerminalPane} />
   )
   const note = (body: ReactNode) => <div className="terminal-wrap">
     <header className="board-head terminal-page-head">{backButton}</header>

@@ -11,6 +11,7 @@ import { frameBytes, frameDeltaBytes } from "./frame-writer.js"
 import { TAB } from "./tab.js"
 import { closeTerminalPane, openTerminalPage } from "./navigate.js"
 import { firstSize } from "./TerminalProjectList.js"
+import { TerminalBackButton } from "./TerminalBackButton.js"
 import { KEY_ROW, bindTerminalKeyboard, isRegionKey, readClipboardPaste, withCtrl } from "./keys.js"
 import { PasteField } from "./PasteField.js"
 import { holderWords, terminalRefusalWords, terminalShortID } from "./words.js"
@@ -366,7 +367,7 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
   if (body === "offline" || !host) return <p className="terminal-note" role="status">{nextWord("terminalCloudLineReconnecting")}</p>
   if (body === "no_project") return <p className="terminal-note" role="alert">{nextWord("terminalNoProject")}</p>
   if (body === "list") return <section className="terminal-wrap" aria-label={nextWord("terminalEntryFor", { project: label })}>
-    <header className="board-head terminal-page-head"><button className="board-button" type="button" onClick={goBack}>{nextWord("terminalBackSessions")}</button></header>
+    <header className="board-head terminal-page-head"><TerminalBackButton onClick={goBack} /></header>
     {!error && <p className="terminal-note" role="status">{retryWait ? nextWord("terminalCloudRetrying", { code: retryWait.code,
       attempt: retryWait.attempt, max: CLOUD_TERMINAL_LIST_RETRY_DELAYS_MS.length }) : create ? nextWord("terminalOpening") : nextWord("terminalListLoading")}</p>}
     {error && <div><p className="terminal-note" role="alert">{accessError ? nextWord("terminalCloudNotAuthorized", { code: error }) :
@@ -383,7 +384,7 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
       } else terminal.current?.focus()
     } }}>
     <header className="terminal-head">
-      <div className="terminal-head-row"><button className="board-button" type="button" ref={back} onClick={goBack}>{nextWord("terminalBackSessions")}</button>
+      <div className="terminal-head-row"><TerminalBackButton buttonRef={back} onClick={goBack} />
         <strong className="terminal-context" title={label}>{label}</strong>
         {snapshot.carrier === "direct" && <span className="terminal-note terminal-carrier" title={nextWord("terminalCarrierDirectHelp")}
           aria-label={nextWord("terminalCarrierDirectHelp")}>{nextWord("terminalCarrierDirect")}</span>}
