@@ -224,6 +224,7 @@ test("each console route is the Cloud word the machine lists, and nothing else",
     ["GET", "/v1/sessions/s1/documents", "documents"],
     ["GET", "/v1/sessions/s1/documents/project/demo.md", "document"],
     ["POST", "/v1/sessions/archived/restore", "restore-archived"],
+    ["POST", "/v1/sessions/archived/forget", "forget-archived"],
     ["POST", "/v1/sessions/s1/focus", "focus"],
     ["POST", "/v1/places/p1/start", "start"],
     ["POST", "/v1/places/p1/start/codex/gpt-5", "start"],
@@ -2066,6 +2067,7 @@ test("an archive rides its Session's channel, and the archive's list and restore
   assert.deepEqual(writeRoute("POST", "/v1/sessions/s1/archive"), { op: "archive", word: "archive-session", session: "s1" })
   assert.deepEqual(writeRoute("GET", "/v1/sessions/archived"), { op: "archived", word: "archived-sessions" })
   assert.deepEqual(writeRoute("POST", "/v1/sessions/archived/restore"), { op: "restore-archived", word: "restore-archived" })
+  assert.deepEqual(writeRoute("POST", "/v1/sessions/archived/forget"), { op: "forget-archived", word: "forget-archived" })
   assert.equal(writeRoute("POST", "/v1/sessions/archived"), null)
   assert.equal(writeRoute("GET", "/v1/sessions/archived/restore"), null)
   assert.equal(writeRoute("POST", "/v1/sessions/archived/other"), null)

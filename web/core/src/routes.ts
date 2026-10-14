@@ -19,6 +19,7 @@ export const routes = {
   // Archived Sessions (docs/session-archive.md): the list and the restore.
   archived: "/v1/sessions/archived",
   restoreArchived: "/v1/sessions/archived/restore",
+  forgetArchived: "/v1/sessions/archived/forget",
 } as const
 
 /**

@@ -209,3 +209,26 @@ func TestRestoringArchivedAnswersEachRowThroughTheSharedPath(t *testing.T) {
 		t.Fatalf("21 names: %d %s", rec.Code, rec.Body)
 	}
 }
+
+func TestForgetArchivedRemovesOnlyTheArchiveRow(t *testing.T) {
+	p := archivePane("conv-quiet")
+	s := archiveServer(t, p)
+	if got := act(t, s, "archive", "%4", "archive-before-forget", `{}`); got.Code != http.StatusOK {
+		t.Fatalf("archive: %d %s", got.Code, got.Body)
+	}
+	request := asSender(restorePost(archivedForgetPath, "forget-once", `{"conversation":"conv-quiet"}`), "phone")
+	first := archiveCall(t, s, request)
+	if first.Code != http.StatusOK || len(archivedNow(t, s).Sessions) != 0 {
+		t.Fatalf("forget: %d %s; archive=%+v", first.Code, first.Body, archivedNow(t, s))
+	}
+	again := archiveCall(t, s, asSender(restorePost(archivedForgetPath, "forget-once", `{"conversation":"conv-quiet"}`), "phone"))
+	if again.Code != http.StatusOK || again.Header().Get("Idempotent-Replayed") != "true" {
+		t.Fatalf("retry: %d %s", again.Code, again.Body)
+	}
+	if got := archiveCall(t, s, asDevice(restorePost(archivedForgetPath, "viewer", `{"conversation":"conv-quiet"}`), "viewer", false)); got.Code != http.StatusForbidden {
+		t.Fatalf("viewer: %d %s", got.Code, got.Body)
+	}
+	if got := archiveCall(t, s, asSender(restorePost(archivedForgetPath, "bad", `{}`), "phone")); got.Code != http.StatusBadRequest {
+		t.Fatalf("missing conversation: %d %s", got.Code, got.Body)
+	}
+}

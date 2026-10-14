@@ -996,6 +996,13 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: machine, name: "action:req-unarchive",
 		method: "POST", path: "/v1/sessions/archived/restore",
 		body2: `{"conversations":["018f2f7a"]}`}, {
+		word: "forget-archived",
+		body: map[string]any{"type": "forget-archived", "session": machine, "request": "req-forget-archive",
+			"conversation": "018f2f7a"},
+		session: machine, name: "action:req-forget-archive",
+		method: "POST", path: "/v1/sessions/archived/forget",
+		body2: `{"conversation":"018f2f7a"}`,
+	}, {
 		word: "voice",
 		body: map[string]any{"type": "voice", "session": machine, "request": "req-voice",
 			"audio": "AAAAAA==", "rate": 16000},

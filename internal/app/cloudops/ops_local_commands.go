@@ -361,6 +361,27 @@ func init() {
 					Body: jsonBody(map[string]any{"conversations": p.conversations})}
 			}},
 
+		op{name: "forget-archived",
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "conversation") {
+					return plan{}, false
+				}
+				p, ok := actionPlan(b, false)
+				if !ok || p.request == "" {
+					return plan{}, false
+				}
+				id, ok := b.nonEmpty("conversation")
+				if !ok {
+					return plan{}, false
+				}
+				p.conversations = []string{id}
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "POST", Path: "/v1/sessions/archived/forget",
+					Body: jsonBody(map[string]any{"conversation": p.conversations[0]})}
+			}},
+
 		op{name: "voice",
 			decode: func(b body) (plan, bool) {
 				if !b.has("type", "session", "request", "audio", "rate") {

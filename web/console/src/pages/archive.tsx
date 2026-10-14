@@ -65,6 +65,9 @@ function ArchivePageView({ shown }: { shown: boolean }) {
   const [outcomes, setOutcomes] = useState<Record<string, Outcome>>({})
   const [reopened, setReopened] = useState<Reopened[]>([])
   const [unknown, setUnknown] = useState(false)
+  const [forgetting, setForgetting] = useState<string | null>(null)
+  const [confirmForget, setConfirmForget] = useState<string | null>(null)
+  const [forgetFailure, setForgetFailure] = useState<string | null>(null)
   const ticket = useRef(0)
   const title = useRef<HTMLHeadingElement>(null)
   const personas = usePersonas()
@@ -123,6 +126,25 @@ function ArchivePageView({ shown }: { shown: boolean }) {
       setOutcomes(({ [conversation]: _, ...rest }) => rest)
       setUnknown(true)
       void load()
+    }
+  }
+
+  const forget = async (s: ArchivedSession) => {
+    const conversation = s.conversation_id
+    if (forgetting) return
+    setForgetting(conversation)
+    setForgetFailure(null)
+    try {
+      const answer = await client.forgetArchived(conversation, pressKey())
+      if (!answer.ok || answer.conversation_id !== conversation) throw new Error("Unexpected archive answer")
+      setList((l) => l.read ? { read: true, sessions: withoutRestored(l.sessions, conversation) } : l)
+      setConfirmForget(null)
+    } catch (e) {
+      setForgetFailure(L.failureSentence(e, nextWord("archiveForgetFailed")))
+      // A lost answer may follow a completed write. Read the machine's record.
+      void load()
+    } finally {
+      setForgetting(null)
     }
   }
 
@@ -207,15 +229,35 @@ function ArchivePageView({ shown }: { shown: boolean }) {
                       </p>
                     ) : null}
                   </div>
+                  <div className="archive-actions">
                   <button
                     className="board-button archive-restore"
                     type="button"
-                    disabled={outcome?.kind === "restoring"}
+                    disabled={outcome?.kind === "restoring" || forgetting === s.conversation_id}
                     aria-label={nextWord("archiveRestore") + " " + name}
                     onClick={() => void restore(s)}
                   >
                     {outcome?.kind === "restoring" ? nextWord("archiveRestoring") : nextWord("archiveRestore")}
                   </button>
+                  <button className="board-button archive-forget" type="button"
+                    disabled={outcome?.kind === "restoring" || forgetting === s.conversation_id}
+                    aria-label={nextWord("archiveForget") + " " + name}
+                    aria-expanded={confirmForget === s.conversation_id}
+                    onClick={() => { setConfirmForget(s.conversation_id); setForgetFailure(null) }}>
+                    {nextWord("archiveForget")}
+                  </button>
+                  </div>
+                  {confirmForget === s.conversation_id && <div className="archive-forget-confirm" role="group" aria-label={nextWord("archiveForgetTitle", { session: name })}>
+                    <strong>{nextWord("archiveForgetTitle", { session: name })}</strong>
+                    <p>{nextWord("archiveForgetSay")}</p>
+                    {forgetFailure && <p className="archive-failure" role="status">{forgetFailure}</p>}
+                    <div className="archive-confirm-actions">
+                      <button className="board-button" type="button" disabled={forgetting === s.conversation_id}
+                        onClick={() => { setConfirmForget(null); setForgetFailure(null) }}>{nextWord("archiveForgetCancel")}</button>
+                      <button className="board-button archive-forget-go" type="button" disabled={forgetting === s.conversation_id}
+                        onClick={() => void forget(s)}>{forgetting === s.conversation_id ? nextWord("archiveForgetting") : nextWord("archiveForgetConfirm")}</button>
+                    </div>
+                  </div>}
                 </li>
               )
             })}
