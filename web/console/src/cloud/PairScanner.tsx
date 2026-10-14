@@ -27,7 +27,11 @@ function checkedFragment(value: string): string {
 }
 
 /** Scan inside the PWA so the invitation stays with this app's own key store. */
-export function PairScanner({ onScanned, startRef }: { onScanned: (fragment: string) => void; startRef: RefObject<HTMLButtonElement | null> }) {
+export function PairScanner({ onScanned, onUseCode, startRef }: {
+  onScanned: (fragment: string) => void
+  onUseCode: () => void
+  startRef: RefObject<HTMLButtonElement | null>
+}) {
   const video = useRef<HTMLVideoElement>(null)
   const canvas = useRef<HTMLCanvasElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
@@ -156,7 +160,15 @@ export function PairScanner({ onScanned, startRef }: { onScanned: (fragment: str
           <input type="file" accept="image/*" onClick={() => camera.current?.stop()} onChange={choosePhoto} />
         </label>
       </div>
-      {issue && <p className="cloud-pair-scan-issue" role="status">{nextWord(issueKey[issue])} {nextWord("cloudPairScanFallback")}</p>}
+      {issue && (
+        <div className="cloud-pair-scan-issue">
+          <p role="status">{nextWord(issueKey[issue])} {nextWord("cloudPairScanFallback")}</p>
+          <button className="chip" type="button" id="cloud-pair-scan-use-code" onClick={() => {
+            camera.current?.stop()
+            onUseCode()
+          }}>{nextWord("cloudPairGenerate")}</button>
+        </div>
+      )}
     </div>
   )
 }

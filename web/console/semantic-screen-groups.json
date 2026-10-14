@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5251,
-  "riskKeys": 2321,
-  "nonRiskCount": 2930,
+  "englishContentKeys": 5253,
+  "riskKeys": 2322,
+  "nonRiskCount": 2931,
   "groups": [
     {
       "name": "bar / other",
@@ -1650,7 +1650,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 213,
+      "count": 214,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1750,6 +1750,7 @@
         "next.cloudMachineSessions",
         "next.cloudMachinesFine",
         "next.cloudMachinesLede",
+        "next.cloudMachinesRecovery",
         "next.cloudManageMachines",
         "next.cloudPairAgain",
         "next.cloudPairAgentAdvanced",

@@ -516,6 +516,11 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     )
   }, [])
 
+  const retryMachineList = useCallback(() => {
+    setMachineList({ phase: "loading" })
+    listMachines()
+  }, [listMachines])
+
   // A schedule move asks which machines report in now before it calls one
   // offline (`cloud/schedule-machines.ts`): the list above is not drawn again
   // once a console is on screen, so the fleet it published can be old.
@@ -1068,6 +1073,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     line.current = keepConnectedRecovering(session.current, { onState: onUpdate })
     setCloudConnectionRetry(() => line.current?.retry())
   }, [transport, onUpdate])
+
+  const signInForMachineList = useCallback(() => {
+    const url = session.current?.signInURL()
+    if (url) location.assign(url)
+    else start()
+  }, [start])
 
   useEffect(() => {
     start()
@@ -1680,6 +1691,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           who={who}
           machineList={shown}
           updateClient={client.current}
+          onRetryMachineList={retryMachineList}
+          onSignIn={signInForMachineList}
           problem={problem}
           onChoose={choose}
           onRetry={start}
@@ -1711,6 +1724,8 @@ function GateCard(props: {
   who: { account: string; device: string } | null
   machineList: MachineListState
   updateClient: CloudClientHandle | null
+  onRetryMachineList: () => void
+  onSignIn: () => void
   problem: AccessProblem | null
   onChoose: (machine: CloudMachine) => void
   onRetry: () => void
@@ -1733,7 +1748,7 @@ function GateCard(props: {
   pairing: Parameters<typeof PairPanel>[0] | null
   onPair: (machine: { id: string; name: string } | null) => void
 }) {
-  const { screen, who, machineList, updateClient, problem, onChoose, onRetry, recovery } = props
+  const { screen, who, machineList, updateClient, onRetryMachineList, onSignIn, problem, onChoose, onRetry, recovery } = props
   const { asking, forgetting, forgotten, told, reading, onAsk, onForget, onLeave, onCloseMachinePicker } = props
   const { naming, renaming, renamed, onName, onRename, pairing, onPair } = props
   const mark = useRef<HTMLCanvasElement>(null)
@@ -2208,6 +2223,31 @@ function GateCard(props: {
                         )
                       : null}
               </p>
+            )}
+            {machineList.phase === "empty_authoritative" && (
+              <>
+                <p className="fine">{nextWord("cloudMachinesNoneNext")}</p>
+                <button className="go" type="button" id="cloud-machines-pair" onClick={() => onPair(null)}>
+                  {nextWord("cloudPairStart")}
+                </button>
+              </>
+            )}
+            {machineList.phase === "refused" && (
+              <div className="buttons" role="group" aria-label={nextWord("cloudMachinesRecovery")}>
+                {machineList.next === "sign_in" && (
+                  <button className="go" type="button" id="cloud-machines-sign-in" onClick={onSignIn}>
+                    {T.webPlanSignIn}
+                  </button>
+                )}
+                {machineList.next === "pair" && (
+                  <button className="go" type="button" id="cloud-machines-pair" onClick={() => onPair(null)}>
+                    {nextWord("cloudPairStart")}
+                  </button>
+                )}
+                <button className="chip" type="button" id="cloud-machines-retry" onClick={onRetryMachineList}>
+                  {nextWord("cloudRetry")}
+                </button>
+              </div>
             )}
             {forgetOutcome()}
             {renameOutcome()}

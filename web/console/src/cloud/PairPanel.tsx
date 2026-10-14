@@ -210,7 +210,7 @@ export function PairPanel(props: {
                     <li>{nextWord("cloudPairFromMachineStep1")}</li>
                     <li>{nextWord(canScan ? "cloudPairFromMachineStep2Pwa" : "cloudPairFromMachineStep2")}</li>
                   </ol>
-                  {canScan && <PairScanner onScanned={onScan} startRef={scanStart} />}
+                  {canScan && <PairScanner onScanned={onScan} onUseCode={onBegin} startRef={scanStart} />}
                   <p className="cloud-pair-success">{nextWord("cloudPairFromMachineSuccess")}</p>
                 </article>
                 <article data-recommended={selectedHelper ? "true" : undefined}>

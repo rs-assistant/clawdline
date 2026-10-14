@@ -340,6 +340,8 @@
 .cloud-pair-scan-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .cloud-pair-scan-controls span { color: var(--ink); }
 .cloud-pair-scan-issue { color: var(--warn, var(--ink)); margin: 8px 0 0; }
+.cloud-pair-scan-issue p { margin: 0 0 8px; }
+.cloud-pair-scan-issue button { min-height: 44px; }
 .cloud-pair-photo-options { display: flex; gap: 8px; margin-top: 8px; }
 .cloud-pair-photo-option {
     position: relative; flex: 1; overflow: hidden; padding: 8px 10px;
