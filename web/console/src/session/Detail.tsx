@@ -33,6 +33,11 @@ import { ClawdfatherSuggestions } from "./ClawdfatherSuggestions.js"
 import { conversationNotStarted } from "./readiness.js"
 import { agentName, agentStateWord } from "./WorkTree.js"
 import { nextWord } from "../next-strings.js"
+import { readProjectPlaces } from "../pages/work/api.js"
+import { hostedConsole, openTerminal, TerminalRequestError } from "../pages/terminal/api.js"
+import { firstSize } from "../pages/terminal/TerminalProjectList.js"
+import { openNewTerminal, openTerminalPage } from "../pages/terminal/navigate.js"
+import { terminalRefusalWords } from "../pages/terminal/words.js"
 import { archivable } from "./swipe.js"
 import { BRAND_MARK, detailSessionName, sessionCoordinatorBound } from "../brand-mark.js"
 import { headPersona, type HeadPersona } from "../personas.js"
@@ -283,6 +288,7 @@ export function Detail({
         <div className="tools">
           <Tools
             row={row}
+            project={resolvedProject}
             ending={ending}
             onDid={onDid}
             triggerRef={actionsTrigger}
@@ -477,6 +483,7 @@ function detailSub(row: SessionRow | null, projectedCoordinatorBound = false): s
  */
 function Tools({
   row,
+  project,
   ending,
   onDid,
   triggerRef,
@@ -485,6 +492,7 @@ function Tools({
   onSuggestions,
 }: {
   row: SessionRow | null
+  project: string
   ending: boolean
   onDid: () => void
   triggerRef: RefObject<HTMLButtonElement | null>
@@ -496,6 +504,7 @@ function Tools({
   const steward = !!row && !!(row.machine_scope || row.coordinator)
   const [open, setOpen] = useState(false)
   const [more, setMore] = useState(false)
+  const [openingTerminal, setOpeningTerminal] = useState(false)
   // `level()` first runs when the menu first opens; until then the main level
   // carries no aria-hidden, as the static markup has none.
   const [leveled, setLeveled] = useState(false)
@@ -610,6 +619,35 @@ function Tools({
         if (openNow.current?.id === mine) toastFailure(e, T.webRequestFailed)
       },
     )
+  }
+
+  const startProjectTerminal = async () => {
+    if (!row || openingTerminal) return
+    const mine = row.id
+    setOpeningTerminal(true)
+    try {
+      const places = (await readProjectPlaces()).places
+      const cwd = row.cwd ?? ""
+      const resolved = project && places.find((place) => place.id === project || place.path === project)
+      const candidates = places.filter((place) => !!cwd && !!place.path &&
+        (cwd === place.path || cwd.startsWith(place.path.replace(/\/$/, "") + "/")))
+      const chosen = resolved || candidates.sort((a, b) => b.path.length - a.path.length)[0]
+      if (!chosen) throw new Error(nextWord("terminalProjectUnknown"))
+      if (hostedConsole()) {
+        openNewTerminal(chosen.id)
+      } else {
+        const size = firstSize()
+        const made = await openTerminal(chosen.id, size.cols, size.rows)
+        openTerminalPage(chosen.id, made.id)
+      }
+    } catch (error) {
+      if (openNow.current?.id === mine) {
+        if (error instanceof TerminalRequestError) toastFailure(error, terminalRefusalWords(error.code))
+        else toast(nextWord("terminalOpenFailed", { why: error instanceof Error ? error.message : String(error) }), true)
+      }
+    } finally {
+      setOpeningTerminal(false)
+    }
   }
 
   const onTriggerKey = (ev: ReactKeyboardEvent) => {
@@ -734,6 +772,16 @@ function Tools({
               >
                 {T.webShowOnMac}
               </button>
+              <button
+                id="session-open-terminal"
+                type="button"
+                role="menuitem"
+                disabled={!row || ending || openingTerminal}
+                onClick={() => {
+                  closeMenu(false)
+                  void startProjectTerminal()
+                }}
+              >{nextWord("terminalStartTerminalTab")}</button>
               <button
                 id="session-info"
                 type="button"
