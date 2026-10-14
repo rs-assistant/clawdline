@@ -192,12 +192,10 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
             {page.recent_items.map((item) => <SessionOwnedItem item={item} completed key={item.id} onOpen={() => openWorkItem(item)} />)}
           </section>}
           {!!openWorkflows.length && <section className="session-todos-list session-workflows" aria-label={W("running")}>
-            <p>{W("running")}</p>
             {openWorkflows.map((todo) => <WorkflowTodo key={todo.id} todo={todo} busy={busy === todo.id}
               onAction={(action) => { void run(todo.id, () => directTodoActionV2(rowID, todo.id, action)) }} />)}
           </section>}
           {!!completedWorkflows.length && <section className="session-todos-list session-workflows session-recent-work" aria-label={W("done")}>
-            <p>{W("done")}</p>
             {completedWorkflows.map((todo) => <WorkflowTodo key={todo.id} todo={todo} busy={busy === todo.id}
               onAction={(action) => { void run(todo.id, () => directTodoActionV2(rowID, todo.id, action)) }} />)}
           </section>}
@@ -381,7 +379,8 @@ function WorkflowTodo({ todo, busy, onAction }: { todo: DirectTodoV2; busy: bool
   if (!run) return null
   const status = todo.completed_at ? W("done") : todo.read_at ? W("running") : todo.sent_at ? W("sent") : W("queued")
   return <article className="session-workflow-row" data-state={todo.completed_at ? "done" : "active"}>
-    <details><summary><strong>{run.title}</strong><span>{status}</span></summary>
+    <details><summary><small className="session-workflow-kind">{todo.completed_at ? W("done") : W("running")}</small>
+      <span className="session-workflow-heading"><strong>{run.title}</strong><span>{status}</span></span></summary>
       <p>{run.message}</p>
       <div className="work-actions">
         {!todo.completed_at && !todo.sent_at && <button className="chip" type="button" disabled={busy} onClick={() => onAction("send")}>{W("send")}</button>}
