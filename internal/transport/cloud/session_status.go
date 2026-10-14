@@ -185,6 +185,7 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 	_ = json.Unmarshal(reading.at, &at)
 	statuses := make([]SessionStatus, 0, len(ids))
 	executions := make([]string, 0, len(ids))
+	parentIDs := make([]string, 0, len(ids))
 	// The viewer fetches one pinned list per machine when the presentation id
 	// changes. Include the original row's display facts in that id, but never
 	// in ss/: a line or shell update must wake the list without disclosing its
@@ -198,6 +199,7 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 		status.ParentSessionID = parents[id]
 		statuses = append(statuses, status)
 		executions = append(executions, status.ExecutionGeneration)
+		parentIDs = append(parentIDs, status.ParentSessionID)
 		// The working clock is not news here either (withoutFreshness); the
 		// token count waits for the window with the rest of the volatile
 		// fields.
@@ -218,18 +220,19 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 		steadyDisplays = append(steadyDisplays, volatileFree(display))
 	}
 	// The pass id the rows and the marker share. It names the set: which
-	// Sessions are listed and which execution each row speaks for. While both
-	// stand still an unchanged row that the relay still retains is exactly
-	// what the newest marker means, so it is not re-sent; a closed Session's
-	// id leaves the set and a restarted one brings a new execution, and either
-	// way the id changes and every row states the new one before the marker
-	// does. That is the property the marker was introduced for: a relay-cached
-	// row cannot satisfy a marker of a different set merely because it has the
-	// same terminal id.
+	// Sessions are listed, which execution each row speaks for, and their
+	// visual ancestry. The task row that links a newly opened child can arrive
+	// one pass after the Session itself. Giving that relationship a new pass
+	// makes the corrected row and its marker one complete receipt instead of
+	// leaving a viewer on the first, flat projection. While all three stand
+	// still an unchanged row that the relay still retains is exactly what the
+	// newest marker means, so it is not re-sent; a closed Session, restarted
+	// execution, or changed parent republishes every row before the marker.
 	pass := statusGeneration(struct {
 		IDs        []string `json:"ids"`
 		Executions []string `json:"executions"`
-	}{IDs: ids, Executions: executions})
+		Parents    []string `json:"parents"`
+	}{IDs: ids, Executions: executions, Parents: parentIDs})
 	presentation := statusGeneration(displays)
 	// A row of a Session that has left the set is forgotten, so the id that
 	// comes back is stated again rather than left to whatever the relay still

@@ -346,6 +346,34 @@ func TestStatusResolvesTaskRootFromConversationWhenScreenLinkIsMissing(t *testin
 	}
 }
 
+func TestTaskAncestryArrivingAfterTheSessionSetStartsANewStatusPass(t *testing.T) {
+	c := &collector{}
+	p := &Publisher{MachineID: "mac_a", published: map[string][32]byte{}, sent: map[string]time.Time{}, Publish: c.publish}
+	reading := sessionReading{sessions: []map[string]any{
+		{"id": "root", "state": "working", "execution_generation": "0123456789abcdef0123456789abcdef"},
+		{"id": "child", "state": "working", "execution_generation": "abcdef0123456789abcdef0123456789"},
+	}, at: json.RawMessage(`100`), complete: true}
+	p.publishStatuses(context.Background(), reading, []string{"root", "child"})
+	first := c.payload(t, "ss/mac_a/"+InventorySessionID)["snapshot_generation"]
+	if _, ok := c.payload(t, "ss/mac_a/child")["parent_session_id"]; ok {
+		t.Fatal("a child was linked before the task relationship arrived")
+	}
+
+	c.reset()
+	p.tasks = []map[string]any{{
+		"child": map[string]any{"terminalId": "child"},
+		"root":  map[string]any{"terminalId": "root"},
+	}}
+	p.publishStatuses(context.Background(), reading, []string{"root", "child"})
+	if got := c.payload(t, "ss/mac_a/child")["parent_session_id"]; got != "root" {
+		t.Fatalf("late task ancestry was not published: got %v, want root", got)
+	}
+	marker := c.payload(t, "ss/mac_a/"+InventorySessionID)
+	if marker["snapshot_generation"] == first {
+		t.Fatalf("late task ancestry kept the old status pass: %v", marker)
+	}
+}
+
 func TestStatusInventoryPublishesAnEmptySet(t *testing.T) {
 	c := &collector{}
 	p := &Publisher{MachineID: "mac_a", published: map[string][32]byte{}, sent: map[string]time.Time{}, Publish: c.publish}
