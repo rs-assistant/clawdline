@@ -23,8 +23,8 @@
 .workflow-toolbar h2 { margin: 0; font-size: 1.15rem; }
 .workflow-toolbar h2 span { color: var(--dim); font-weight: 400; margin-left: .35rem; }
 .workflow-actions { display: flex; align-items: end; gap: .7rem; flex-wrap: wrap; }
-.workflow-skill-picker { min-width: 12rem; font-size: .8rem; color: var(--dim); }
-.workflow-skill-picker select { font-size: 1rem; }
+.workflow-skill-picker { display: grid; gap: .4rem; min-width: 12rem; font-size: .8rem; color: var(--dim); }
+.workflow-skill-picker button { width: 100%; }
 .workflow-skill-picker small { color: var(--dim); font-size: .8rem; line-height: 1.4; }
 .workflow-empty { margin: clamp(2rem, 5vw, 4rem) auto; max-width: 42rem; padding: clamp(2rem, 5vw, 4rem); text-align: center; border: 1px solid var(--line); border-radius: 1.25rem; background: var(--card); }
 .workflow-empty-mark { display: grid; place-items: center; width: 3.5rem; height: 3.5rem; margin: 0 auto 1.4rem; border-radius: 1rem; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 1.8rem; }
@@ -53,6 +53,23 @@
 .workflow-editor .workflow-error { margin: 0; }
 .workflow-scope-hint { margin: -.6rem 0 0; color: var(--dim); font-size: .9rem; }
 .workflow-editor .workflow-delete { margin-left: auto; color: var(--danger, #d84a4a); }
+.workflow-skill-overlay { position: fixed; inset: 0; z-index: 125; display: grid; place-items: center; padding: 1rem; background: #000a; }
+.workflow-skill-dialog { display: flex; flex-direction: column; width: min(100%, 42rem); max-height: min(44rem, 90dvh); overflow: hidden; border: 1px solid var(--line); border-radius: 1rem; background: var(--card); box-shadow: 0 1rem 3rem #0008; }
+.workflow-skill-dialog > header { display: flex; justify-content: space-between; align-items: start; gap: 1rem; padding: 1.35rem 1.5rem 1rem; border-bottom: 1px solid var(--line); }
+.workflow-skill-dialog > header h2 { margin: 0; }
+.workflow-skill-dialog > header p { margin: .3rem 0 0; color: var(--dim); }
+.workflow-skill-dialog > header button { flex: none; width: 2.75rem; padding: .3rem; font-size: 1.5rem; }
+.workflow-skill-content { min-height: 0; overflow: auto; padding: 1rem 1.5rem; }
+.workflow-skill-options { display: grid; gap: .65rem; }
+.workflow-page .workflow-skill-options button { display: grid; gap: .45rem; width: 100%; padding: 1rem 1.1rem; text-align: left; }
+.workflow-skill-options button > span:first-child { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.workflow-skill-options strong { color: var(--accent); font-size: 1.05rem; }
+.workflow-skill-options small { color: var(--dim); font-size: .8rem; }
+.workflow-skill-summary, .workflow-skill-description { color: var(--dim); line-height: 1.5; overflow-wrap: anywhere; }
+.workflow-skill-summary { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.workflow-skill-content pre { margin: 1rem 0 0; padding: 1rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: .6rem; line-height: 1.5; font-size: .85rem; }
+.workflow-skill-dialog > footer { display: flex; justify-content: flex-end; gap: .6rem; padding: 1rem 1.5rem; border-top: 1px solid var(--line); }
+.workflow-skill-hint { margin: -.4rem 1.5rem 1rem; color: var(--dim); font-size: .8rem; line-height: 1.4; }
 @media (max-width: 700px) {
   .workflow-head { display: grid; align-items: stretch; gap: 1.5rem; }
   .workflow-head-tools { flex: none; }
@@ -63,4 +80,6 @@
   .workflow-skill-picker { min-width: 0; }
   .workflow-editor { padding: 0; align-items: end; }
   .workflow-editor form { width: 100%; max-height: 95dvh; border-radius: 1rem 1rem 0 0; }
+  .workflow-skill-overlay { padding: 0; align-items: end; }
+  .workflow-skill-dialog { width: 100%; max-height: 92dvh; border-radius: 1rem 1rem 0 0; }
 }

@@ -18,10 +18,11 @@ import (
 )
 
 const (
-	MaxFiles       = 128
-	MaxFileBytes   = 128 << 10
-	MaxWriteBytes  = 256 << 10
-	MaxScanEntries = 1024
+	MaxFiles             = 128
+	MaxFileBytes         = 128 << 10
+	MaxWriteBytes        = 256 << 10
+	MaxScanEntries       = 1024
+	MaxSkillSummaryRunes = 240
 )
 
 var (
@@ -36,17 +37,19 @@ var (
 // File is a disk candidate. Location is relative to the project or the home
 // directory and never contains a person's absolute directory name.
 type File struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Location  string `json:"location"`
-	Source    string `json:"source"`
-	Assistant string `json:"assistant"`
-	Kind      string `json:"kind"`
-	Status    string `json:"status"`
-	Editable  bool   `json:"editable"`
-	Size      int64  `json:"size,omitempty"`
-	root      string
-	rel       string
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	Location    string `json:"location"`
+	Source      string `json:"source"`
+	Assistant   string `json:"assistant"`
+	Kind        string `json:"kind"`
+	Status      string `json:"status"`
+	Editable    bool   `json:"editable"`
+	Size        int64  `json:"size,omitempty"`
+	root        string
+	rel         string
 }
 
 type Listing struct {
@@ -73,9 +76,53 @@ func lockFor(path string) *sync.Mutex {
 
 func candidate(root, rel, source, assistant, kind string) File {
 	sum := sha256.Sum256([]byte(root + "\x00" + rel))
-	return File{ID: hex.EncodeToString(sum[:16]), Name: filepath.Base(rel),
+	f := File{ID: hex.EncodeToString(sum[:16]), Name: filepath.Base(rel),
 		Location: filepath.ToSlash(rel), Source: source, Assistant: assistant,
 		Kind: kind, root: root, rel: rel}
+	if kind == "skill" {
+		f.Title = filepath.Base(filepath.Dir(rel))
+	}
+	return f
+}
+
+func skillField(body, field string) string {
+	body = strings.ReplaceAll(body, "\r\n", "\n")
+	if !strings.HasPrefix(body, "---\n") {
+		return ""
+	}
+	end := strings.Index(body[4:], "\n---")
+	if end < 0 {
+		return ""
+	}
+	lines := strings.Split(body[4:4+end], "\n")
+	for i, line := range lines {
+		if !strings.HasPrefix(line, field+":") {
+			continue
+		}
+		value := strings.TrimSpace(strings.TrimPrefix(line, field+":"))
+		if value == ">" || value == "|" || value == ">-" || value == "|-" {
+			parts := []string{}
+			for _, continued := range lines[i+1:] {
+				if continued != "" && continued[0] != ' ' && continued[0] != '\t' {
+					break
+				}
+				if strings.TrimSpace(continued) != "" {
+					parts = append(parts, strings.TrimSpace(continued))
+				}
+			}
+			return strings.Join(parts, " ")
+		}
+		return strings.Trim(value, "\"'")
+	}
+	return ""
+}
+
+func skillSummary(value string) string {
+	runes := []rune(strings.Join(strings.Fields(value), " "))
+	if len(runes) > MaxSkillSummaryRunes {
+		runes = runes[:MaxSkillSummaryRunes]
+	}
+	return string(runes)
 }
 
 // projectLayers finds the nearest repository root, then includes every
@@ -216,6 +263,15 @@ func inspect(f *File) {
 	default:
 		f.Status, f.Size = "ready", st.Size()
 		f.Editable = f.Source == "project" && st.Mode().Perm()&0200 != 0
+		if f.Kind == "skill" {
+			body, readErr := io.ReadAll(io.LimitReader(file, MaxFileBytes+1))
+			if readErr == nil && utf8.Valid(body) && !strings.ContainsRune(string(body), 0) {
+				if title := skillSummary(skillField(string(body), "name")); title != "" {
+					f.Title = title
+				}
+				f.Description = skillSummary(skillField(string(body), "description"))
+			}
+		}
 	}
 }
 

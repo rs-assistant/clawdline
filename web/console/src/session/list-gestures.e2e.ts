@@ -426,9 +426,14 @@ function daemon(): Server {
       assistants: [{ id: "codex", label: "Codex" }],
     })
     if (path === "/v1/projects/project-fixture/files" && req.method === "GET") return json(res, 200, {
-      files: [{ id: "global-skill-fixture", name: "SKILL.md", location: "skills/global-review/SKILL.md",
+      files: [{ id: "global-skill-fixture", name: "SKILL.md", title: "Global Review", description: "Review the work with evidence.", location: "skills/global-review/SKILL.md",
         source: "global", assistant: "codex", kind: "skill", status: "ready", editable: true }],
       truncated: false, skipped: [],
+    })
+    if (path === "/v1/projects/project-fixture/files/global-skill-fixture" && req.method === "GET") return json(res, 200, {
+      file: { id: "global-skill-fixture", name: "SKILL.md", title: "Global Review", description: "Review the work with evidence.",
+        location: "skills/global-review/SKILL.md", source: "global", assistant: "codex", kind: "skill", status: "ready", editable: true },
+      text: "---\nname: Global Review\ndescription: Review the work with evidence.\n---\n# Review steps\nCheck the evidence.", version: "fixture",
     })
     if (path === "/v1/snippets" && req.method === "GET") return json(res, 200, {
       project: url.searchParams.has("session") ? { key: "/tmp/fixture", label: "Clawdline" } : undefined,
@@ -1728,23 +1733,30 @@ test("a phone imports an available global Skill as editable Workflow text, start
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
-        if (document.querySelector('.workflow-actions select option[value="global-skill-fixture"]')) return resolve(true)
+        if (document.querySelector('.workflow-skill-picker button:not(:disabled)')) return resolve(true)
         if (Date.now() > deadline) return reject(new Error('Workflow Skill option did not arrive'))
         setTimeout(look, 25)
       }; look()
     })`)
-    assert.equal(await tab.run(`document.querySelector('.workflow-actions select')?.disabled`), false)
-    assert.equal(await tab.run(`document.querySelector('.workflow-actions select option[value="global-skill-fixture"]') !== null`), true)
-    const point = await tab.run(`(() => { const el = document.querySelector('.workflow-actions select'); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-skill-picker button')?.disabled`), false)
+    const point = await tab.run(`(() => { const el = document.querySelector('.workflow-skill-picker button'); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
     await tab.tap(point.x, point.y)
-    assert.equal(await tab.run(`document.activeElement?.matches('.workflow-actions select')`), true)
-    await tab.run(`(() => {
-      const select = document.querySelector('.workflow-actions select')
-      select.value = 'global-skill-fixture'
-      select.dispatchEvent(new Event('change', { bubbles: true }))
-    })()`)
-    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "global-review")
-    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /global-review/)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-options')?.textContent`), /Global Review/)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-options')?.textContent`), /Review the work with evidence/)
+    assert.doesNotMatch(await tab.run(`document.querySelector('.workflow-skill-options')?.textContent`), /SKILL\.md/)
+    await tab.press('.workflow-skill-options button')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-skill-content pre')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Skill preview did not load'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-content pre')?.textContent`), /Check the evidence/)
+    await tab.press('.workflow-skill-dialog footer .workflow-primary')
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Global Review")
+    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Global Review/)
     await tab.press('.workflow-editor button[type="submit"]')
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
@@ -1800,7 +1812,7 @@ test("a phone imports an available global Skill as editable Workflow text, start
     })`)
     assert.equal(workflowSends, 1)
     assert.match(String((workflowTodo as Row | null)?.text), /Clawdline-Workflow/)
-    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /global-review/)
+    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /Global Review/)
     await tab.shot("workflow-session-progress")
     await tab.press('.session-workflow-row summary')
     await tab.press('.session-workflow-row button')

@@ -76,6 +76,26 @@ func TestProjectFilesInventorySeparatesNestedAndGlobalCandidates(t *testing.T) {
 	}
 }
 
+func TestSkillInventoryIncludesReadableMetadataWithoutExposingLocationAsTitle(t *testing.T) {
+	base := t.TempDir()
+	repo := filepath.Join(base, "repo")
+	home := filepath.Join(base, "home")
+	put(t, filepath.Join(repo, ".agents", "skills", "review", "SKILL.md"), "---\nname: Product Review\ndescription: >-\n  Review a product flow\n  with evidence.\n---\n# Full instructions\n")
+	put(t, filepath.Join(home, ".codex", "skills", "fallback", "SKILL.md"), "# Skill without frontmatter\n")
+	list, err := List(repo, home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := listed(t, list, ".agents/skills/review/SKILL.md")
+	if got.Title != "Product Review" || got.Description != "Review a product flow with evidence." {
+		t.Fatalf("metadata: %+v", got)
+	}
+	fallback := listed(t, list, ".codex/skills/fallback/SKILL.md")
+	if fallback.Title != "fallback" || fallback.Description != "" {
+		t.Fatalf("fallback: %+v", fallback)
+	}
+}
+
 func TestProjectFilesSaveRequiresCurrentVersionAndKeepsText(t *testing.T) {
 	base := t.TempDir()
 	repo := filepath.Join(base, "repo")
