@@ -840,12 +840,10 @@ func (b *ScheduleBook) Update(ctx context.Context, id string, body map[string]an
 		return refusedSchedule(400, "bad_request", "This schedule repeats. A save may change when it runs, "+
 			"not whether it repeats: send when.days, or remove it and make a new one.")
 	}
-	if !existing.s.FiredAt.IsZero() && moves {
-		return refusedScheduleRaw(409, "schedule_spent", fmt.Sprintf("This schedule was made to run once and already "+
-			"ran at %d. A save may still change its title or what its session is told to do; moving when it runs "+
-			"would be asking a schedule that has run for a second run. Make a new one.", existing.s.FiredAt.Unix()))
-	}
 	now := b.now()
+	// A one-shot that already ran and is given a new date runs again on it:
+	// `fired_at` is left behind with the old date, so the clock sees an
+	// occurrence nobody has run yet.
 	if moves {
 		obj["when_changed_at"] = now.Unix()
 	} else {
@@ -911,7 +909,8 @@ func (b *ScheduleBook) Delete(ctx context.Context, id string, authority Schedule
 }
 
 // Run is `runSchedule`: now, ignoring `enabled` and the clock, and refusing
-// while a run from this schedule is still working or a one-shot has run.
+// while a run from this schedule is still working. How many times it has run
+// already is never a reason: a one-shot that ran may be pressed again.
 //
 // A trigger-only schedule is the exception to ignoring `enabled`: it has no
 // clock, so a press is not a check of what the clock will do but the thing
@@ -943,10 +942,8 @@ func (b *ScheduleBook) run(ctx context.Context, id string, force bool) ScheduleR
 	if !ok {
 		return refusedSchedule(404, "not_found", "No schedule named that")
 	}
-	if !h.s.FiredAt.IsZero() {
-		return refusedScheduleRaw(409, "schedule_spent", fmt.Sprintf(
-			"This schedule was made to run once and already ran at %d. Make a new one.", h.s.FiredAt.Unix()))
-	}
+	// A press is never refused for how many times the schedule has run:
+	// `fired_at` only keeps the clock from running a one-shot's date twice.
 	if h.s.When.TriggerOnly && !h.s.Enabled {
 		return refusedSchedule(409, "schedule_disabled", "This schedule is disabled.")
 	}
@@ -1041,9 +1038,6 @@ func (b *ScheduleBook) RunWebhook(ctx context.Context, id, taskID string) Schedu
 	}
 	if !replay && !h.s.Enabled {
 		return refusedSchedule(409, "schedule_disabled", "This schedule is disabled.")
-	}
-	if !replay && !h.s.FiredAt.IsZero() {
-		return refusedSchedule(409, "schedule_spent", "This one-time schedule already ran.")
 	}
 	b.audit("orchestrator.schedule.run", map[string]string{"schedule": id, "how": "webhook"})
 	id, dir, replayed, warning, err := b.dispatchID(ctx, h.s, time.Time{}, "webhook", taskID)
