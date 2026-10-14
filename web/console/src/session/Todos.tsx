@@ -32,6 +32,8 @@ import { SessionUsage } from "../pages/work/TokenBill.js"
 import { retainCreatedTodos, showCreatedTodo } from "./todo-created.js"
 import "../pages/work/work.css"
 import "./todos.css"
+import { workflowRunOf } from "./workflow-run.js"
+import { workflowWord as W } from "../workflow-words.js"
 
 /** The authoritative projection of unfinished assigned items plus direct user to-dos. */
 export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null; onReplySent?: () => void; onCompose?: (text: string) => void }) {
@@ -121,14 +123,24 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
   /** Ask again; `fresh` when the answer must postdate something just done. */
   const refresh = useCallback((fresh = false) => reader.current?.ask(fresh) ?? Promise.resolve(), [])
 
+  useEffect(() => {
+    const started = () => { void refresh(true) }
+    document.addEventListener("clawdline:workflow-started", started)
+    return () => document.removeEventListener("clawdline:workflow-started", started)
+  }, [refresh])
+
   if (!row) return null
-  const openDirect = page?.direct_todos.filter((todo) => !todo.completed_at) ?? []
-  const completedDirect = page?.direct_todos.filter((todo) => !!todo.completed_at) ?? []
+  const openTodos = page?.direct_todos.filter((todo) => !todo.completed_at) ?? []
+  const completedTodos = page?.direct_todos.filter((todo) => !!todo.completed_at) ?? []
+  const openWorkflows = openTodos.filter((todo) => workflowRunOf(todo.text))
+  const completedWorkflows = completedTodos.filter((todo) => workflowRunOf(todo.text))
+  const openDirect = openTodos.filter((todo) => !workflowRunOf(todo.text))
+  const completedDirect = completedTodos.filter((todo) => !workflowRunOf(todo.text))
   const hasAssigned = !!page?.assigned_items.length
   const hasRecent = !!page?.recent_items.length
   const hasDirect = !!openDirect.length
   const hasCompletedDirect = !!completedDirect.length
-  const empty = page !== null && !hasAssigned && !hasRecent && !hasDirect && !hasCompletedDirect
+  const empty = page !== null && !hasAssigned && !hasRecent && !hasDirect && !hasCompletedDirect && !openWorkflows.length && !completedWorkflows.length
   const run = async (key: string, task: () => Promise<unknown>) => {
     if (busy) return false
     setBusy(key); setFailure("")
@@ -178,6 +190,16 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
           {page && hasRecent && <section className="session-todos-list session-recent-work" aria-label={catalogWord("inline", "fa7b5ebe86c4")}>
             <p>{catalogWord("inline", "4e221e79f8d1")}</p>
             {page.recent_items.map((item) => <SessionOwnedItem item={item} completed key={item.id} onOpen={() => openWorkItem(item)} />)}
+          </section>}
+          {!!openWorkflows.length && <section className="session-todos-list session-workflows" aria-label={W("running")}>
+            <p>{W("running")}</p>
+            {openWorkflows.map((todo) => <WorkflowTodo key={todo.id} todo={todo} busy={busy === todo.id}
+              onAction={(action) => { void run(todo.id, () => directTodoActionV2(rowID, todo.id, action)) }} />)}
+          </section>}
+          {!!completedWorkflows.length && <section className="session-todos-list session-workflows session-recent-work" aria-label={W("done")}>
+            <p>{W("done")}</p>
+            {completedWorkflows.map((todo) => <WorkflowTodo key={todo.id} todo={todo} busy={busy === todo.id}
+              onAction={(action) => { void run(todo.id, () => directTodoActionV2(rowID, todo.id, action)) }} />)}
           </section>}
           {page && hasDirect && <section className="session-todos-list" aria-label={catalogWord("inline", "fc3806d4036b")}>
             {openDirect.map((todo) => (
@@ -351,6 +373,23 @@ function SessionOwnedItem({ item, decisions = [], decisionsError, completed = fa
       onConfirm={() => { void onComplete().then((ok) => { if (ok) { setConfirming(false); announceWorkItemChanged() } }) }}
       onCancel={() => setConfirming(false)} />}
     <WorkSteps steps={item.steps} />
+  </article>
+}
+
+function WorkflowTodo({ todo, busy, onAction }: { todo: DirectTodoV2; busy: boolean; onAction: (action: "send" | "complete" | "reopen") => void }) {
+  const run = workflowRunOf(todo.text)
+  if (!run) return null
+  const status = todo.completed_at ? W("done") : todo.read_at ? W("running") : todo.sent_at ? W("sent") : W("queued")
+  return <article className="session-workflow-row" data-state={todo.completed_at ? "done" : "active"}>
+    <details><summary><strong>{run.title}</strong><span>{status}</span></summary>
+      <p>{run.message}</p>
+      <div className="work-actions">
+        {!todo.completed_at && !todo.sent_at && <button className="chip" type="button" disabled={busy} onClick={() => onAction("send")}>{W("send")}</button>}
+        {todo.completed_at
+          ? <button className="chip" type="button" disabled={busy} onClick={() => onAction("reopen")}>{W("reopen")}</button>
+          : <button className="chip" type="button" disabled={busy} onClick={() => onAction("complete")}>{W("complete")}</button>}
+      </div>
+    </details>
   </article>
 }
 

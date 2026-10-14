@@ -617,6 +617,23 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		capacity.SettingsRequestBodyBytes: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-request guard; no retained buffer"}
 		},
+		capacity.NotificationRulesRows: func() capacity.Reading {
+			v, err := s.settingsFile().Read()
+			if err != nil {
+				return capacity.Unmeasured(err.Error())
+			}
+			rules, err := notificationRules(v)
+			if err != nil {
+				return capacity.Unmeasured(err.Error())
+			}
+			return capacity.Reading{Known: true, Used: int64(len(rules))}
+		},
+		capacity.NotificationRuleLabel: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-rule admission guard; no retained buffer"}
+		},
+		capacity.NotificationRuleWait: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-rule delay guard; no retained buffer"}
+		},
 		capacity.SessionTitleRequestBytes: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-request guard; no retained buffer"}
 		},

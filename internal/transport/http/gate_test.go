@@ -219,6 +219,7 @@ func TestGateCoversEveryChange(t *testing.T) {
 		"/v1/sessions/%25x/send", "/v1/sessions/%25x/interrupt", "/v1/sessions/%25x/close",
 		"/v1/settings",
 		"/v1/settings/browser",
+		"/v1/settings/notifications",
 		"/v1/settings/default-models",
 		"/v1/settings/work-gates",
 		"/v1/projects/p/worktrees/refresh",
@@ -278,7 +279,7 @@ func TestDefaultModelsWriteNeedsLocalOrSendAuthority(t *testing.T) {
 	path := "/v1/settings/default-models"
 	readOnly := auth.Verdict{Allowed: true, Caps: auth.NewCaps(auth.Read)}
 	if status, code, _ := writePolicy(http.MethodPost, path, false, readOnly); status != http.StatusForbidden || code != "forbidden" {
-		t.Fatalf("read-only device: %d %q", status, code)
+		t.Fatalf("read-capability caller: %d %q", status, code)
 	}
 	for name, verdict := range map[string]auth.Verdict{
 		"paired sender": {Allowed: true, Caps: auth.NewCaps(auth.Read, auth.Send)},
@@ -297,7 +298,7 @@ func TestWorkGateSettingsWriteNeedsLocalOrSendAuthority(t *testing.T) {
 	path := "/v1/settings/work-gates"
 	readOnly := auth.Verdict{Allowed: true, Caps: auth.NewCaps(auth.Read)}
 	if status, code, _ := writePolicy(http.MethodPost, path, false, readOnly); status != http.StatusForbidden || code != "forbidden" {
-		t.Fatalf("read-only device: %d %q", status, code)
+		t.Fatalf("read-capability caller: %d %q", status, code)
 	}
 	for name, verdict := range map[string]auth.Verdict{
 		"paired sender": {Allowed: true, Caps: auth.NewCaps(auth.Read, auth.Send)},

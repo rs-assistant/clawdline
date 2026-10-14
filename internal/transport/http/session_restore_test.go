@@ -106,7 +106,7 @@ func TestRestoreAndDismissNeedASenderAndAKey(t *testing.T) {
 	s := restoreServer(t, bootAfter)
 	for _, path := range []string{restorePath, dismissPath} {
 		if rec := restoreCall(t, s, asDevice(restorePost(path, "k", `{"conversations":[]}`), "viewer", false)); rec.Code != http.StatusForbidden {
-			t.Errorf("%s by a read-only device: %d %s", path, rec.Code, rec.Body)
+			t.Errorf("%s by a caller with read capability: %d %s", path, rec.Code, rec.Body)
 		}
 		if rec := restoreCall(t, s, asSender(restorePost(path, "", `{"conversations":[]}`), "phone")); rec.Code != http.StatusBadRequest ||
 			!strings.Contains(rec.Body.String(), "Idempotency-Key") {

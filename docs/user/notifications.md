@@ -9,6 +9,12 @@ Notifications are standard Web Push. The daemon on your machine sends them itsel
 HTTPS to your browser's push service; no Clawdline account is needed. Each browser or phone that
 should be told subscribes once.
 
+The switches under **When to notify me** belong to the selected machine. You
+can change them from the hosted console even when the browser you are using
+cannot receive notifications. That browser's permission and subscription are
+controlled separately under **This device**. A paired device needs Send
+permission to change the machine's switches.
+
 ## Before you start
 
 - A browser can subscribe only on a secure page: `http://127.0.0.1:7727` on the machine itself,
@@ -42,6 +48,9 @@ arrives on this device.
 | A schedule misses its run, dispatch is refused, or its file cannot be read | `push_on_schedule_failure`: missed and refused runs also require **Notify on failure** on the schedule. An invalid file is reported when its fingerprint changes. These open the list. |
 | A capacity row crosses a notification threshold | `push_on_capacity`: the capacity monitor sends the recorded notice; it opens the list. |
 | A task completion notice becomes a dead letter | `push_on_dead_letter`: once for that dead letter; it opens the root Session while present. |
+| A Session records its delivery report | `push_on_delivery`: one push for that report; it opens the reporting Session while present. |
+| All tasks in one dispatched batch finish | `push_on_fanout`: one push when the last task finishes; a batch has at least two tasks dispatched by the same Root while it has active children. It opens the Root Session while present. |
+| Completion wording includes details | `smart_notifications` changes the two preceding notifications: the Session's own delivery summary or task titles appear in the body. It does not send an extra notification or call an external model. |
 | A Cloud or running macOS app release passes its production checks | `push_on_cloud_release_success` and `push_on_app_release_success` are separate. Unset keys inherit the older `push_on_deploy` choice; a fresh installation has both off. Each opens the list. |
 | An App install or Cloud production check fails | `push_on_release_failure` sends one notification for that failed release command and build. An unset key inherits `push_on_deploy`; a fresh installation has it off. It opens the list. |
 | You press **Send a test** | Only the asking device receives it. It opens the selected Session when the machine can still verify it; otherwise it opens the list. |
@@ -49,13 +58,11 @@ arrives on this device.
 Tapping a waiting notification opens that session. A newer notification about the same session
 replaces the older one.
 
-The Notification page lists only events with a working sender. Legacy Session
-delivery and fan-out settings remain stored, but this daemon currently has no
-sender for either. Smart wording has no active completion sender to change.
-The page explains these gaps without offering switches that would have no effect.
-
 The `orchestrator_agent_notify` switch is on by default. When it is off,
 `clawdline notify` is refused with `agent_notify_disabled`.
+
+The former custom waiting rules are no longer evaluated. Their saved data is
+retained for compatibility but has no effect on notifications.
 
 ## Turn them off
 

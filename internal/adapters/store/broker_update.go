@@ -30,6 +30,26 @@ type Tx struct {
 	wrote int64
 }
 
+// BrokerBatchRows returns task records in one batch as seen by this transaction.
+// A settlement can decide whether its batch is complete without racing another.
+func (t *Tx) BrokerBatchRows(batchID string) ([]BrokerRow, error) {
+	rows, err := t.tx.QueryContext(t.ctx, `SELECT `+brokerColumns+` FROM broker_tasks
+		WHERE json_valid(record) AND json_extract(record, '$.batch_id') = ?`, batchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []BrokerRow
+	for rows.Next() {
+		row, err := scanBroker(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 // Notice reads a task's completion envelope as the transaction sees it.
 func (t *Tx) Notice(taskID string) (BrokerNotice, error) {
 	return scanNotice(t.tx.QueryRowContext(t.ctx,

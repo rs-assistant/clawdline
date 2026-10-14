@@ -738,6 +738,36 @@ func init() {
 					Body: p.document, Header: asDevice()}
 			}},
 
+		// A paired phone may edit only notification timing rules, through the
+		// same narrow route exposed by the local console.
+		op{name: "notification-rules", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request") {
+					return plan{}, false
+				}
+				return machinePlan(b)
+			},
+			route: func(p plan) LocalRequest { return LocalRequest{Method: "GET", Path: "/v1/notification-rules"} }},
+		op{name: "notification-rules-update",
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "changes") {
+					return plan{}, false
+				}
+				p, ok := actionPlan(b, false)
+				if !ok || p.request == "" {
+					return plan{}, false
+				}
+				document, ok := b.object("changes", defaultModelsCloudBodyLimit)
+				if !ok {
+					return plan{}, false
+				}
+				p.document = document
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "POST", Path: "/v1/notification-rules", Body: p.document, Header: asDevice()}
+			}},
+
 		// The two Work v2 gate defaults shown by every Settings page. Like the
 		// default-model route above, this is deliberately narrower than
 		// /v1/settings: a paired device can neither read nor write another
@@ -751,6 +781,55 @@ func init() {
 			},
 			route: func(p plan) LocalRequest {
 				return LocalRequest{Method: "GET", Path: "/v1/settings/work-gates"}
+			}},
+
+		op{name: "notification-settings", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request") {
+					return plan{}, false
+				}
+				return machinePlan(b)
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "GET", Path: "/v1/settings/notifications"}
+			}},
+
+		op{name: "notification-settings-update",
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "changes") {
+					return plan{}, false
+				}
+				p, ok := actionPlan(b, false)
+				if !ok || p.request == "" {
+					return plan{}, false
+				}
+				raw, ok := b["changes"].(map[string]any)
+				if !ok {
+					return plan{}, false
+				}
+				for key, value := range raw {
+					switch key {
+					case "push_on_waiting", "orchestrator_agent_notify", "push_on_board_decision", "push_on_board_done",
+						"push_on_schedule_failure", "push_on_capacity", "push_on_dead_letter", "push_on_app_release_success",
+						"push_on_cloud_release_success", "push_on_release_failure":
+					default:
+						return plan{}, false
+					}
+					if value != nil {
+						if _, ok := value.(bool); !ok {
+							return plan{}, false
+						}
+					}
+				}
+				document, err := json.Marshal(raw)
+				if err != nil || len(document) > defaultModelsCloudBodyLimit {
+					return plan{}, false
+				}
+				p.document = document
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "POST", Path: "/v1/settings/notifications", Body: p.document, Header: asDevice()}
 			}},
 
 		op{name: "work-gate-settings-update",

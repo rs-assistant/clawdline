@@ -501,7 +501,7 @@ export function Composer({
 
   const why: ReactNode = failure || (!remote && blockedCode
     ? L.failureSentence({ code: blockedCode }, blockedCode === "write_disabled" ? nextWord("sessionWriteDisabled") : T.sendFailed)
-    : remote || row ? "" : T.webWriteOpen)
+    : "")
   const pinned = sending && sendWidth.current.px ? { minWidth: `${sendWidth.current.px}px` } : undefined
 
   return (

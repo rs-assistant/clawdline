@@ -83,6 +83,35 @@ func workGateSettingsCall(t *testing.T, s *Server, method, contentType, body str
 	return rec
 }
 
+func TestNotificationSettingsAreIndependentOfThisBrowser(t *testing.T) {
+	s := &Server{cfg: config.Config{Dir: filepath.Join(t.TempDir(), "next")}}
+	call := func(method, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, "/v1/settings/notifications", strings.NewReader(body))
+		if method == http.MethodPost {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		rec := httptest.NewRecorder()
+		s.notificationSettingsRoute(rec, req)
+		return rec
+	}
+	if rec := call(http.MethodPost, `{"push_on_waiting":false}`); rec.Code != http.StatusOK {
+		t.Fatalf("write: %d %s", rec.Code, rec.Body)
+	}
+	read := call(http.MethodGet, "")
+	var got map[string]any
+	if err := json.Unmarshal(read.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got["push_on_waiting"] != false {
+		t.Fatalf("notification-only answer: %v", got)
+	}
+	for _, body := range []string{`{"remote_hostname":"example.invalid"}`, `{"push_on_waiting":"false"}`} {
+		if rec := call(http.MethodPost, body); rec.Code != http.StatusBadRequest {
+			t.Errorf("accepted %s: %d %s", body, rec.Code, rec.Body)
+		}
+	}
+}
+
 func TestWorkGateSettingsRouteNeverCarriesOtherSettings(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "clawdline-next")
 	s := &Server{cfg: config.Config{Dir: dir}}

@@ -57,20 +57,8 @@
   flex: 1 8 6ch;
 }
 
-/* A fleet row must identify its machine even after the group heading scrolls
- * away. The pane address is only an internal terminal locator. */
-.projected-row .meta .machine {
-  max-width: 70%;
-}
-
-@media (max-width: 600px) {
-  .projected-row .meta .machine {
-    max-width: 100%;
-  }
-}
-
 .row .meta .session-activity {
-  flex: 0 3 auto;
+  flex: 0 0 auto;
   color: var(--faint);
 }
 
@@ -112,8 +100,9 @@
   gap: 4px;
   min-width: 0;
   color: var(--warn);
-  font: 16px/1.2 sans-serif;
+  font: 11.5px/1.2 var(--mono);
 }
+.row .session-callback-active > span:first-child { font: 16px/1 sans-serif; flex: 0 0 auto; }
 .row .session-callback-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 .row .session-callback-active > canvas.spin { flex: 0 0 auto; }
@@ -242,10 +231,6 @@
 
   .row .meta .agents-chip {
     flex: 0 0 auto;
-  }
-
-  .row .meta .session-activity {
-    max-width: 34%;
   }
 
   .row .state .retained-reading {

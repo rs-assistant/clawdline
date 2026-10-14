@@ -279,7 +279,7 @@ func TestTheAgentsSpentHourDoesNotSilenceCapacity(t *testing.T) {
 }
 
 // The panel is a person's screen, and a person reads it from a browser that is
-// a paired device: /v1/capacity answers a read-only device where
+// a paired device: /v1/capacity answers a caller with read capability where
 // /v1/diagnostics refuses the same device, and it says nothing about where this
 // daemon keeps its state. Without a token it is refused like any other read.
 func TestAPairedDeviceReadsTheCapacityPanel(t *testing.T) {
@@ -296,7 +296,7 @@ func TestAPairedDeviceReadsTheCapacityPanel(t *testing.T) {
 	rec := call{method: http.MethodGet, path: "/v1/capacity", headers: reader}.do(h)
 	var panel contract.CapacityPanel
 	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &panel) != nil {
-		t.Fatalf("a read-only device: %d %s", rec.Code, rec.Body)
+		t.Fatalf("a caller with read capability: %d %s", rec.Code, rec.Body)
 	}
 	if e := entry(t, panel.Capacity, capacity.StoreDB); e.State != contract.CapacityStateFull || !e.Exhausted {
 		t.Fatalf("store.db on the panel: %+v", e)

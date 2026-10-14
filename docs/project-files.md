@@ -6,7 +6,7 @@ The Project scope runs from the nearest repository root through the selected pla
 
 `GET /v1/projects/{place}/files` lists candidates; `GET /v1/projects/{place}/files/{file}` returns UTF-8 content and its SHA-256 version. `PUT` to the same file route takes `expected_version` and `content`, plus `Idempotency-Key`. The daemon resolves the place from its current Project catalog. It accepts only a file ID from the bounded inventory, never a browser-supplied path. Regular files are opened beneath bound directory handles; symlink or directory swaps are refused. A save requires the version the editor read, writes a temporary file in the same directory, syncs it, and renames it. Concurrent edits through this API are serialized; a change made elsewhere returns `file_changed` and leaves the browser's draft intact. The interface does not create, delete, or rename files.
 
-The paired Cloud console carries three distinct words for the inventory read, content read, and save. The Cloud Project ID is resolved to its owning machine before a request is sent. Reads require the paired device's read access; save also requires the remote write gate and carries the editor's idempotency key. A lost save answer is treated as uncertain: the browser reads the file again and confirms matching content before it says the save succeeded. The Cloud relay carries encrypted request and answer content; it does not use a public document URL for these files.
+The paired Cloud console carries three distinct words for the inventory read, content read, and save. The Cloud Project ID is resolved to its owning machine before a request is sent. Paired devices have Read and Send; save carries the editor's idempotency key. A lost save answer is treated as uncertain: the browser reads the file again and confirms matching content before it says the save succeeded. The Cloud relay carries encrypted request and answer content; it does not use a public document URL for these files.
 
 The editor guards its draft when a person closes the modal, changes page, selects another file, or reloads the inventory. On a phone the groups and content stack in one column. Closing the modal returns keyboard focus to the Project gear that opened it.
 
@@ -17,6 +17,10 @@ Project's own directory, not a repository ancestor or the machine's home directo
 loaded only when expanded; a file's content is requested only when selected. This view is read-only.
 The existing instruction and Skill editor remains in Settings and instructions.
 
+The Workflow editor uses this inventory's ready Project Skills only to fill a
+new launch-message draft. Its saved text does not retain a live dependency on
+the Skill. See [Project Workflows](workflows.md).
+
 `GET /v1/projects/{place}/tree?directory=<relative>` lists one directory;
 `GET /v1/projects/{place}/tree/file?path=<relative>` reads one regular UTF-8 text file. The server
 resolves `{place}` from its current Project catalog. It rejects absolute, noncanonical, overlong,
@@ -26,8 +30,7 @@ the tree but cannot be followed or previewed. The directory read stops after 1,0
 says it is truncated; text above 128 KiB or containing NUL or invalid UTF-8 is refused by name.
 
 The paired Cloud console carries separate `project-tree-list` and `project-tree-read` words. Both
-are reads on the Project's owning machine, available to a paired device with read access even when
-the remote write switch is off. Selecting a file sends its text in the encrypted relay answer;
+are reads on the Project's owning machine. Selecting a file sends its text in the encrypted relay answer;
 folder expansion sends only that folder's immediate names and metadata. No tree write word exists.
 On a phone, the folder list and preview stack vertically, and the preview offers a return control
 that focuses the selected file. The native folder disclosure and file buttons remain keyboard
@@ -159,8 +162,7 @@ skill trees costs more, up to the bound. If that becomes noticeable, the field c
 per-Project read the way the unify block reads its plan.
 
 The paired Cloud console carries both words (`web/console/src/cloud/carry.ts`):
-`project-unify-plan`, a read available to a paired device with read access even when the remote
-write switch is off, and `project-unify-apply`, which needs the remote write gate and carries the
+`project-unify-plan`, a read available to a paired device, and `project-unify-apply`, which carries the
 request's idempotency key. A stopped run crosses whole: the Cloud bridge sends the
 `ProjectUnifyApplied` body — `ran`, `failed`, the recomputed plan, and the refusal's `error` and
 `detail` — as the answer's `body` beside status 500 (`cloudops.stoppedUnify`), not as an `error`,

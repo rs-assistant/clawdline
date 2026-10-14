@@ -291,8 +291,8 @@ Two small things worth building on the first pass rather than later:
 - **`用上一則訊息新增`** — prefill the editor from the newest message you sent. `view/user-messages-data.js`
   already computes that list for the 我傳出的訊息 sheet, so it is a call, not a feature.
 
-A read-only device shows the sheet and its rows, with the insert disabled and the reason on screen
-(`S.write === false`), because the composer it would insert into is disabled too.
+Snippet insertion follows the Session composer's current send permission. A
+paired device does not have a separate read-only product mode.
 
 ## Words
 

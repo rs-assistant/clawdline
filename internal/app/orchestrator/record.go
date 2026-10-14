@@ -404,6 +404,9 @@ type Record struct {
 	// account says now.
 	AssistantQuota *AssistantQuotaDecision `json:"assistant_quota,omitempty"`
 	Root           *RootRef                `json:"root,omitempty"`
+	// BatchID groups tasks dispatched under one root while that root still has
+	// unfinished children. A later dispatch starts a new batch.
+	BatchID string `json:"batch_id,omitempty"`
 	// WorkID is the line of work this task is on (D36): the key a task, its
 	// root's to-do and a board item are bound by, in place of guessing from
 	// titles. The dispatch names it, or the broker binds one by its rules

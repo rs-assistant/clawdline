@@ -89,8 +89,7 @@ export function ProjectedRow({ title, sessionID, machineID, machineName, assista
     <span className="kid" hidden={!depth} aria-hidden="true" />
     {ancestorThrough && <span className="tree-ancestor" aria-hidden="true" />}
     <RowIdentity title={shownTitle} icon={mark} assistant={assistant} crown={identity.crown} />
-    <div className="meta"><span className="machine" title={machineName}>{machineName}</span>
-      {cwd && <span className="path">{L.path(cwd)}</span>}
+    <div className="meta">{cwd && <span className="path">{L.path(cwd)}</span>}
       <RowActivity at={lastMovementAt ? lastMovementAt / 1000 : undefined} />
       {machineScope && coordinatorBound ? <span className="coordinator-chip" aria-hidden="true">Clawdfather</span> : null}</div>
     {status ? <StateLine row={{ ...status, id: sessionID, state } as SessionRow}
@@ -433,10 +432,10 @@ export function Row({
   const name = sessionName(row)
   // 封存 only where there is a conversation to bring back (`swipe.ts`).
   const canArchive = archivable(row.sessionId)
-  // A gesture that moved the row, and the press that put an uncovered action
-  // away, are not presses on the row (`swipe.ts`, `tookThePress`).
+  // A gesture that moved the row, or a press on its uncovered body, must not
+  // open the Session (`swipe.ts`, `tookRowPress`).
   const onPress = () => {
-    if (swipes.tookThePress()) return
+    if (swipes.tookRowPress(row.id)) return
     onOpen(row.id)
   }
   const icon = sessionMark(row)

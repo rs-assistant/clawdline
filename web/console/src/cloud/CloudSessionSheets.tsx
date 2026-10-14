@@ -4,6 +4,7 @@ import { Command } from "../session/Command.js"
 import { openNewWorkItem } from "../pages/work/new-item.js"
 import type { SessionDestination, SessionProjectionSource } from "./all-machine-sessions.js"
 import { toolPlan } from "./machine-tool.js"
+import type { StartAnswer, StartPlaceRow } from "../legacy/start-bridge.js"
 import type { MachineToolbarAction } from "./FleetSessionList.js"
 
 export interface PendingMachineAction {
@@ -15,7 +16,7 @@ export interface PendingMachineAction {
 }
 
 /** Connect Cloud actions to the sheets already mounted by App's SessionsPage. */
-export function CloudSessionSheets({ machineID, machines, source, pending, onConsumed, onOpened }: {
+export function CloudSessionSheets({ machineID, machines, source, pending, onConsumed, onOpened, onStartConfirmed }: {
   machineID: string
   /**
    * Every machine the fleet is showing. A Session started from the fleet is
@@ -33,6 +34,7 @@ export function CloudSessionSheets({ machineID, machines, source, pending, onCon
    * original address.
    */
   onOpened: (destination: SessionDestination) => void
+  onStartConfirmed?: (answer: StartAnswer, place: StartPlaceRow | null) => void
 }) {
   // The machines to look through, kept in a ref so that the lookup installed
   // below survives a list that changes while a start is in flight.
@@ -41,6 +43,8 @@ export function CloudSessionSheets({ machineID, machines, source, pending, onCon
   // The lookup below is installed once and outlives this render.
   const opened = useRef(onOpened)
   opened.current = onOpened
+  const confirmed = useRef(onStartConfirmed)
+  confirmed.current = onStartConfirmed
 
   useEffect(() => {
     let closed = false
@@ -64,7 +68,10 @@ export function CloudSessionSheets({ machineID, machines, source, pending, onCon
               item.destination.sessionID === sessionID && item.freshness === "current")
             if (row) {
               settled = true
-              if (accept()) opened.current(row.destination)
+              if (accept()) {
+                const destination = row.destination
+                Start.afterProgressHidden(() => opened.current(destination))
+              }
               stopOpen()
               return
             }
@@ -84,6 +91,7 @@ export function CloudSessionSheets({ machineID, machines, source, pending, onCon
     Start.host({ open, openId: () => null, refresh: () => undefined,
       openStarted: (answer, place, finish) => {
         if (!answer.id) return false
+        confirmed.current?.(answer, place)
         const from = location.hash
         open(answer.id, () => location.hash === from && finish(), place?.machine)
         return true

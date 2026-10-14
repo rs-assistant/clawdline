@@ -232,6 +232,8 @@ test("each console route is the Cloud word the machine lists, and nothing else",
     ["GET", "/v1/places", "places"],
     ["GET", "/v1/settings/default-models", "default-models"],
     ["POST", "/v1/settings/default-models", "default-models-update"],
+    ["GET", "/v1/notification-rules", "notification-rules"],
+    ["POST", "/v1/notification-rules", "notification-rules-update"],
     ["GET", "/v1/settings/work-gates", "work-gate-settings"],
     ["POST", "/v1/settings/work-gates", "work-gate-settings-update"],
     ["POST", "/v1/update/apply", "update-apply"],
@@ -497,9 +499,9 @@ test("a command the machine may have run without answering says so, and nothing 
 
   client.ready = false
   const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-3" }))
-  assert.equal(res.status, 503, "a write with the line down is refused, not left to a transport error")
+  assert.equal(res.status, 503, "a send with no returning line is refused after the bounded wait")
   const offline = await json(res)
-  assert.equal(offline.error, "offline")
+  assert.equal(offline.error, "cloud_reconnecting")
   assert.equal(offline.outcome, "not_done")
 })
 
@@ -1222,6 +1224,23 @@ test("F5: a write with neither an exact target nor a rich row is refused as unve
   assert.deepEqual(client.calls, [])
 })
 
+test("a just-started Session sends through its verified projection before rich-row replay", async () => {
+  const client = new FakeClient()
+  let admitted = 0
+  const reader = new RelayReader("mac-a", {
+    resolveSession: async (machine, session) => machine === "mac-a" && session === "s1"
+      ? { machineID: "mac-a", sessionID: "s1", executionGeneration: EXECUTION } : null,
+    admitFleetMutation: async () => { admitted++ },
+  })
+  const writer = new RelayWriter(reader.writeHost)
+  reader.carryWrites({ route: writeRoute, answer: (route, method, url, init) => writer.answer(route, method, url, init) })
+  reader.attach(client)
+  const response = await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "first" }))
+  assert.equal(response.status, 200)
+  assert.equal(admitted, 1)
+  assert.ok(client.calls.some((call) => call[0] === "_read" && call[2] === "send"))
+})
+
 test("F12: showing a session on the machine does not make every poll re-read its transcript", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
@@ -1877,6 +1896,20 @@ test("a phone reads and changes only the two default models", async () => {
   assert.equal(writeRoute("POST", "/v1/settings/browser"), null)
 })
 
+test("a phone manages machine notification switches without subscribing this browser", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  const read = await reader.fetch("/v1/settings/notifications")
+  assert.equal(read.status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "notification-settings", {}, "read"])
+  const write = await reader.fetch("/v1/settings/notifications", post({ push_on_waiting: false }))
+  assert.equal(write.status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "notification-settings-update", {
+    changes: { push_on_waiting: false },
+  }, "action"])
+  assert.equal((await reader.fetch("/v1/settings/notifications?all=1")).status, 501)
+})
+
 test("a phone reads and changes only the two work gates", async () => {
   const client = new FakeClient()
   const { reader } = seam(client)
@@ -2146,7 +2179,7 @@ test("squad settings carry per-field patches and package reads never gain write 
 // minutes, because the writer carries that read and asked `connected()`, which
 // throws the moment the attached client is not ready. The reader's own machine
 // reads already waited for the client `keepConnected` attaches next; the reads
-// the writer carries now wait the same bound, and its writes still do not.
+// the writer carries now wait the same bound. Receipt-keyed sends do too.
 type Pausable = FakeClient & { lifecycle?: (reason: string) => boolean }
 
 function pausedSeam(coming: boolean, waitMs: number) {
@@ -2219,27 +2252,28 @@ test("the caller's signal ends a carried read's wait for the connection", async 
   assert.deepEqual(retired.calls, [])
 })
 
-test("a write during the gap is refused at once and is never carried after the reconnect", async () => {
+test("a receipt-keyed send during the gap waits for reconnection and is carried once", async () => {
   const { reader, retired, demands } = pausedSeam(true, 5_000)
-  const started = Date.now()
-  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }))
-  assert.ok(Date.now() - started < 1_000, "a write does not wait")
-  assert.equal(res.status, 503)
-  const body = await json(res)
-  assert.equal(body.error, "offline")
-  assert.equal(body.outcome, "not_done")
-  assert.deepEqual(demands, [], "a write does not ask the line to come back")
-
+  const sent = reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-during-gap" }))
+  await new Promise((resolve) => setTimeout(resolve, 5))
   const renewed = new FakeClient()
   renewed.rows = [row("s1")]
   reader.attach(renewed)
-  await new Promise((resolve) => setTimeout(resolve, 10))
+  const res = await sent
+  assert.equal(res.status, 200)
+  assert.deepEqual(demands, ["demand"])
   assert.deepEqual(retired.calls, [])
-  assert.equal(renewed.calls.length, 0, "the refused send is not carried by the new client")
+  assert.equal(renewed.calls.filter(([name]) => name === "_read").length, 1, "the original press is carried once")
+})
 
-  const sent = await reader.fetch("/v1/sessions/s1/send", post({ text: "again" }, { "Idempotency-Key": "send-after-gap" }))
-  assert.equal(sent.status, 200, "a send with the line up is carried as before")
-  assert.equal(renewed.calls.filter(([name]) => name === "_read").length, 1, "exactly the second press, once")
+test("a send is refused without writing when reconnection never arrives", async () => {
+  const { reader, retired } = pausedSeam(true, 20)
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-no-line" }))
+  assert.equal(res.status, 503)
+  const body = await json<{ error: string; outcome: string }>(res)
+  assert.equal(body.error, "cloud_reconnecting")
+  assert.equal(body.outcome, "not_done")
+  assert.deepEqual(retired.calls, [])
 })
 
 test("a send whose capability wait crosses a client renewal uses the successor's descriptor", async () => {
@@ -2274,7 +2308,7 @@ test("a rejected send reports which browser gate stopped it without its contents
   assert.equal(old.calls.length, 0)
 })
 
-test("every read the writer carries is one it waits for, and no write is", () => {
+test("every read the writer carries is one it waits for", () => {
   const reads: [string, string][] = [
     ["/v1/work/v2/images/a1", "work-v2-image"],
     ["/v1/usage/compare-compaction", "usage-compare"],
@@ -2283,6 +2317,8 @@ test("every read the writer carries is one it waits for, and no write is", () =>
     ["/v1/usage/sessions/s1", "usage"],
     ["/v1/capacity", "capacity"],
     ["/v1/settings/default-models", "default-models"],
+    ["/v1/notification-rules", "notification-rules"],
+    ["/v1/settings/notifications", "notification-settings"],
     ["/v1/settings/work-gates", "work-gate-settings"],
     ["/v1/sessions/restorable", "restorable"],
     ["/v1/sessions/archived", "archived"],
@@ -2310,7 +2346,19 @@ test("every read the writer carries is one it waits for, and no write is", () =>
     assert.ok(CARRIED_READS.has(route!.op), `${op} waits for the connection`)
   }
   assert.deepEqual([...CARRIED_READS].sort(), [...new Set(reads.map(([, op]) => op))].sort(), "the list is exactly the GET routes")
-  for (const [method, path] of [["POST", "/v1/sessions/s1/send"], ["POST", "/v1/places/p1/start"], ["POST", "/v1/verifications"]]) {
-    assert.ok(!CARRIED_READS.has(writeRoute(method, path)!.op), `${method} ${path} never waits`)
+  for (const [method, path] of [["POST", "/v1/places/p1/start"], ["POST", "/v1/verifications"]]) {
+    assert.ok(!CARRIED_READS.has(writeRoute(method, path)!.op), `${method} ${path} is not a carried read`)
   }
+})
+
+test("a phone edits a custom notification rule on the chosen machine", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  const rule = { id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", enabled: true, after_minutes: 3, label_contains: "urgent" }
+  assert.equal(writeRoute("GET", "/v1/notification-rules")?.word, "notification-rules")
+  assert.equal((await reader.fetch("/v1/notification-rules")).status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "notification-rules", {}, "read"])
+  assert.equal((await reader.fetch("/v1/notification-rules", post({ action: "create", rule }))).status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "notification-rules-update", { changes: { action: "create", rule } }, "action"])
+  assert.equal((await reader.fetch("/v1/notification-rules?all=1")).status, 501)
 })

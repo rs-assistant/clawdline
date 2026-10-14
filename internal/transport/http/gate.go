@@ -492,6 +492,10 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 		if !(v.Allowed && (v.Local || send)) {
 			return http.StatusForbidden, "forbidden", "This device may read, and not change machine settings."
 		}
+	case p == "/v1/notification-rules":
+		if !(v.Allowed && (v.Local || send)) {
+			return http.StatusForbidden, "forbidden", "This device may read, and not change notification rules."
+		}
 	case p == "/v1/settings/default-models":
 		// This narrow route is the Settings surface carried to a paired phone.
 		// A local console may write it, and a remote device needs Send just as
@@ -505,6 +509,10 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 		// the other machine-wide controls carried to Settings.
 		if !(v.Allowed && (v.Local || v.Caps.Has(auth.Send))) {
 			return http.StatusForbidden, "forbidden", "This device may read, and not change work gates."
+		}
+	case p == "/v1/settings/notifications":
+		if !(v.Allowed && (v.Local || v.Caps.Has(auth.Send))) {
+			return http.StatusForbidden, "forbidden", "This device may read, and not change notification preferences."
 		}
 	case p == "/v1/squad-packages/preview" || p == "/v1/squad-packages/export":
 		// Preview grants and public exports leave catalog and settings unchanged.

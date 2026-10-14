@@ -29,6 +29,7 @@ import { NewBuild } from "./NewBuild.js"
 import { MachineDashboard } from "./machine/MachineDashboard.js"
 import { Start } from "./session/Start.js"
 import { startedRow } from "./session/started-row.js"
+import { askedSession } from "./session/asked-session.js"
 import type { StartAnswer, StartPlaceRow } from "./legacy/start-bridge.js"
 import { SidebarIcon, type SidebarIconName } from "./SidebarIcon.js"
 import { scanRecovering, sessionCountState, sessionReadingChinese, totalSessionWords } from "./session-reading.js"
@@ -62,7 +63,7 @@ import {
  * stylesheet is that app's. The drawer is `input/sidebar.js` and the page
  * switch is `core/pages.js`, rule for rule.
  */
-type Page = "sessions" | "devices" | "projects" | "timeline" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
+type Page = "sessions" | "devices" | "projects" | "workflow" | "timeline" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
 
 /** What became of a session the address asked for: see `openAsked`. */
 type Asked = "none" | "waiting" | "opened" | "gone"
@@ -77,6 +78,7 @@ const PAGES: { id: Page; nav: string; icon: SidebarIconName; key?: string; text?
   { id: "sessions", nav: "nav-sessions", icon: "sessions", key: "webSessions", ready: true },
   { id: "devices", nav: "nav-devices", icon: "devices", key: "webDevices", ready: false },
   { id: "projects", nav: "nav-projects", icon: "projects", key: "webProjects", ready: false },
+  { id: "workflow", nav: "nav-workflow", icon: "workflow", text: "Workflow", ready: false },
   { id: "plan", nav: "nav-plan", icon: "plan", key: "webPlan", ready: false },
   { id: "settings", nav: "nav-settings", icon: "settings", key: "webSettings", ready: false },
   { id: "notifications", nav: "nav-notifications", icon: "notifications", ready: false },
@@ -202,6 +204,7 @@ function rowNode(id: string): HTMLElement | null {
  */
 export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
   fleetTargetIdentity = null, fleetReaderMachine = null,
+  cloudStartedRow = null, onCloudStartedObserved,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
   hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions }: {
@@ -213,6 +216,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   fleetTargetRow?: SessionRow | null
   fleetTargetIdentity?: Pick<ProjectedSession, "machineScope" | "coordinatorBound"> | null
   fleetReaderMachine?: string | null
+  cloudStartedRow?: SessionRow | null
+  onCloudStartedObserved?: (id: string) => void
   fleetDetailProblem?: FleetDetailProblem | null
   /** Whether the opened fleet Session's own row is still missing from this machine's rows. */
   onFleetDetailPending?: (pending: boolean) => void
@@ -404,11 +409,16 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   useEffect(() => {
     if (started && receivedRows.some((row) => row.id === started.id)) setStarted(null)
   }, [receivedRows, started])
+  useEffect(() => {
+    if (cloudStartedRow && receivedRows.some((row) => row.id === cloudStartedRow.id))
+      onCloudStartedObserved?.(cloudStartedRow.id)
+  }, [receivedRows, cloudStartedRow, onCloudStartedObserved])
   // The fleet already holds a pinned, execution-matched display row. Its
   // conversation may arrive before the old one-machine rich-row stream; the
   // opened pane can use that same row while the stream catches up.
-  const availableRows = started && !receivedRows.some((row) => row.id === started.id)
-    ? [started, ...receivedRows] : receivedRows
+  const pendingRow = started ?? cloudStartedRow
+  const availableRows = pendingRow && !receivedRows.some((row) => row.id === pendingRow.id)
+    ? [pendingRow, ...receivedRows] : receivedRows
   const rows = useMemo(() => identifyOpenedFleetRow(fleetTarget && fleetReaderMachine === fleetTarget.machineID && fleetTargetRow &&
     fleetTargetRow.id === fleetTarget.sessionID &&
     fleetTargetRow.execution_generation === fleetTarget.executionGeneration &&
@@ -494,7 +504,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
     if (!finish()) return true
     rowsRef.current = [row, ...rowsRef.current.filter((item) => item.id !== row.id)]
     setStarted(row)
-    openSession(row.id)
+    Start.afterProgressHidden(() => openSession(row.id))
     return true
   }
 
@@ -507,15 +517,13 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   const openAsked = (): Asked => {
     const asked = askedRef.current
     const snapshot = snapshotRef.current
-    if (!asked) return "none"
-    if (!snapshot) return "waiting"
-    const id = asked.find((c) => snapshot.sessions.some((r) => r.id === c))
-    if (id) {
+    const answer = askedSession(asked, rowsRef.current, snapshot?.scan.complete ?? false)
+    if (answer.kind === "none" || answer.kind === "waiting") return answer.kind
+    if (answer.kind === "opened" && answer.id) {
       askedRef.current = null
-      openSession(id, false, true)
+      openSession(answer.id, false, true)
       return "opened"
     }
-    if (!snapshot.scan.complete) return "waiting"
     askedRef.current = null
     if (openRef.current) writeHash(sessionFragment(openRef.current))
     else leaveAddress(history.state)

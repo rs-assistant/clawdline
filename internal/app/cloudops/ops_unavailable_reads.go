@@ -378,6 +378,28 @@ func init() {
 				return LocalRequest{Method: "GET", Path: "/v1/snippets"}
 			}},
 
+		// Resolve the Project on the machine for a selected Session. The answer
+		// carries the same Project identity and scoped rows as the local sheet.
+		op{name: "session-snippets", read: true,
+			decode: func(b body) (plan, bool) {
+				if !b.has("type", "session", "request", "row") {
+					return plan{}, false
+				}
+				p, ok := machinePlan(b)
+				if !ok {
+					return plan{}, false
+				}
+				row, ok := b.nonEmpty("row")
+				if !ok || len(row) > SessionRowIDBytesLimit {
+					return plan{}, false
+				}
+				p.target = row
+				return p, true
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "GET", Path: "/v1/snippets", Query: map[string]string{"session": p.target}}
+			}},
+
 		op{name: "schedule", read: true,
 			decode: func(b body) (plan, bool) {
 				if !b.has("type", "session", "request", "id") {

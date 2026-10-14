@@ -60,10 +60,14 @@ export const CARRIED = {
   capacity: "GET /v1/capacity",
   "default-models": "GET /v1/settings/default-models",
   "default-models-update": "POST /v1/settings/default-models",
+  "notification-rules": "GET /v1/notification-rules",
+  "notification-rules-update": "POST /v1/notification-rules",
   document: "GET /v1/sessions/{id}/documents/{scope}/{path}",
   documents: "GET /v1/sessions/{id}/documents",
   "work-gate-settings": "GET /v1/settings/work-gates",
   "work-gate-settings-update": "POST /v1/settings/work-gates",
+  "notification-settings": "GET /v1/settings/notifications",
+  "notification-settings-update": "POST /v1/settings/notifications",
   // The dashboard behind the session counts (`machine/`): CPU, memory, disk
   // space and grouped reclaim backlog, a machine read with no parameter.
   "machine-usage": "GET /v1/machine/usage",
@@ -196,6 +200,7 @@ export const CARRIED = {
   "snippet-order": "POST /v1/snippets/order",
   "snippet-update": "PATCH /v1/snippets/{id}",
   snippets: "GET /v1/snippets",
+  "session-snippets": "GET /v1/workflow-project?session={id}",
   start: "POST /v1/places/{id}/start[/{assistant}[/{model}][/as/{persona}]]",
   timeline: "GET /v1/timeline?project=&entry=&cursor=&environment=&category=&upcoming=",
   transcript: "GET /v1/transcript?session={id}",

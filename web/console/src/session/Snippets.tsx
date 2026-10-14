@@ -36,8 +36,13 @@ import {
   deleteSnippet,
   orderSnippets,
   readSnippets,
+  readWorkflowProject,
   updateSnippet,
 } from "./snippets-api.js"
+import { createDirectTodoV2, directTodoActionV2 } from "../pages/work/api.js"
+import { workflowTodoText } from "./workflow-run.js"
+import { workflowWord as W } from "../workflow-words.js"
+import "./workflow.css"
 
 /**
  * Snippets — the sheet, and the editor.
@@ -61,12 +66,8 @@ import {
  * Three deliberate differences from the original, all because this console holds
  * things differently:
  *
- *   - The original reads `S.write` to know whether this device may write, and
- *     draws a read-only list when it may not. This console has no capabilities
- *     reading yet, so a device that may only read is told so by the refusal's
- *     own code (`forbidden`, which the catalog has a sentence for) rather than
- *     by a control that was never drawn. `readOnly` below is the one place such
- *     a reading would go.
+ *   - Every paired device can send on this daemon. The copied list renderer
+ *     still accepts a historical readOnly option, which this page keeps off.
  *   - The original takes "my last message" from `S.tx.entries`, the copy the
  *     transcript pane already drew. This one reads the transcript once, when the
  *     editor opens for a new snippet, through the same `userMessageEntries` the
@@ -152,6 +153,11 @@ const TRANSCRIPT_LIMIT = 200
 
 function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const T = L.strings
+  const [tab, setTab] = useState<"snippet" | "workflow">("snippet")
+  const [selectedWorkflow, setSelectedWorkflow] = useState<Snippet | null>(null)
+  const [startingWorkflow, setStartingWorkflow] = useState(false)
+  const [workflowError, setWorkflowError] = useState("")
+  const [projectUnresolved, setProjectUnresolved] = useState(false)
   const [answer, setAnswer] = useState<SnippetAnswer | null>(answered[row.id] ?? null)
   const [loading, setLoading] = useState(!answered[row.id])
   const [error, setError] = useState("")
@@ -186,11 +192,53 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const whose = machine ? L.machineFor(row).label : ""
   const shown = snippetOrder(model)
   const projectKey = model.project ? model.project.key : ""
+  const workflows = (answer?.snippets ?? []).filter((item) => item.scope === "workflow" && (!item.project || (!projectUnresolved && item.project === projectKey)))
+  const currentWorkflow = workflows.find((item) => item.id === selectedWorkflow?.id) ?? null
+  useEffect(() => {
+    if (selectedWorkflow && !currentWorkflow) setSelectedWorkflow(null)
+  }, [selectedWorkflow, currentWorkflow])
+
+  const startWorkflow = async () => {
+    if (!currentWorkflow || (projectUnresolved && !!currentWorkflow.project) || startingWorkflow) return
+    setStartingWorkflow(true); setWorkflowError("")
+    try {
+      const text = workflowTodoText(currentWorkflow.id, currentWorkflow.title, currentWorkflow.body)
+      const created = await createDirectTodoV2(row.id, text)
+      await directTodoActionV2(row.id, created.todo.id, "send")
+      document.dispatchEvent(new CustomEvent("clawdline:workflow-started"))
+      onClose()
+    } catch {
+      // A created row is durable even when the send was refused or its answer
+      // was lost. The to-do fold shows it and offers Send without recreating it.
+      document.dispatchEvent(new CustomEvent("clawdline:workflow-started"))
+      setWorkflowError(W("startUnknown"))
+    } finally { setStartingWorkflow(false) }
+  }
   const editorOpen = !!draft
 
   const refresh = (options: { keepScroll?: boolean } = {}) => {
     const ticket = ++reading.current
     return readSnippets(row.id)
+      .then(async (next) => {
+        if (next.project || !machine) {
+          if (alive.current && ticket === reading.current) setProjectUnresolved(false)
+          return next
+        }
+        try {
+          const resolved = await readWorkflowProject(row.id)
+          if (!resolved.project) throw new Error("missing Project identity")
+          if (alive.current && ticket === reading.current) { setProjectUnresolved(false); setWorkflowError("") }
+          return { ...next, project: resolved.project }
+        } catch {
+          // An older machine still serves the Snippet tab. It cannot promise
+          // which Project's Workflow belongs in this Session.
+          if (alive.current && ticket === reading.current) {
+            setWorkflowError(W("projectResolveUnavailable"))
+            setProjectUnresolved(true)
+          }
+          return next
+        }
+      })
       .then((next) => {
         if (!alive.current || ticket !== reading.current) return
         answered[row.id] = next
@@ -476,7 +524,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const listHTML = snippetsListHTML(model, {
     controls: SNIPPET_CONTROLS,
     readOnly: false,
-    loading,
+    loading: false,
     error,
     menuFor,
   })
@@ -493,7 +541,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       >
         <div className="snippets-head">
           <div className="snippets-heading">
-            <h2 id="snippets-title">{T.webSnippets}</h2>
+            <h2 id="snippets-title">{tab === "snippet" ? T.webSnippets : "Workflow"}</h2>
             <span className="snippets-where" id="snippets-where">
               {[whose, model.project ? model.project.label : ""].filter(Boolean).join(" · ")}
             </span>
@@ -506,7 +554,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
             id="snippets-new"
             type="button"
             ref={newButton}
-            hidden={!may.create || loading || !!error}
+            hidden={tab !== "snippet" || !may.create || loading || !!error}
             aria-label={T.webSnippetNew}
             title={T.webSnippetNew}
             onClick={() => openEditor(null)}
@@ -514,17 +562,53 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
             ＋
           </button>
         </div>
-        <div
+        <div className="snippets-tabs" role="tablist" aria-label="Snippet / Workflow"
+          onKeyDown={(event) => {
+            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+            event.preventDefault()
+            const next = tab === "snippet" ? "workflow" : "snippet"
+            setTab(next)
+            ;(event.currentTarget.querySelector(`#${next}-tab`) as HTMLButtonElement | null)?.focus()
+          }}>
+          <button id="snippet-tab" type="button" role="tab" aria-controls="snippet-list" tabIndex={tab === "snippet" ? 0 : -1}
+            aria-selected={tab === "snippet"} onClick={() => setTab("snippet")}>Snippet</button>
+          <button id="workflow-tab" type="button" role="tab" aria-controls="workflow-picker" tabIndex={tab === "workflow" ? 0 : -1}
+            aria-selected={tab === "workflow"} onClick={() => setTab("workflow")}>Workflow</button>
+        </div>
+        {tab === "snippet" ? <div
           className="snippet-list"
           id="snippet-list"
+          role="tabpanel"
+          aria-labelledby="snippet-tab"
           ref={list}
           onClick={pressed}
-          dangerouslySetInnerHTML={{ __html: listHTML }}
-        />
+        >{loading ? <SnippetSkeleton label={T.webReading} /> : <div dangerouslySetInnerHTML={{ __html: listHTML }} />}</div> : <div className="snippet-list workflow-picker" id="workflow-picker" role="tabpanel" aria-labelledby="workflow-tab">
+          <div className="workflow-picker-toolbar"><span>{W("chooseWorkflow")}</span>
+            <button type="button" className="workflow-reload" disabled={loading} onClick={() => { void refresh() }}>{W("reload")}</button></div>
+          {loading && <SnippetSkeleton label={W("loading")} />}
+          {error && <p role="alert">{error}</p>}
+          {!loading && !error && !projectUnresolved && workflows.length === 0 && <p className="snippets-note">{W("noSessionWorkflows")}</p>}
+          {([true, false] as const).map((global) => {
+            const group = workflows.filter((item) => !item.project === global)
+            if (!group.length) return null
+            return <div className="snippet-group workflow-picker-group" key={String(global)}>
+              <h3 className="snippet-group-title">{global ? W("global") : W("projectOnly")}</h3>
+              {group.map((item) => <button type="button" key={item.id} className="workflow-picker-row"
+                aria-pressed={currentWorkflow?.id === item.id} onClick={() => { setSelectedWorkflow(item); setWorkflowError("") }}>
+                <strong>{item.title}</strong><span>{item.body}</span>
+              </button>)}
+            </div>
+          })}
+        </div>}
+        {tab === "workflow" && currentWorkflow && <div className="workflow-launch">
+          <span className="workflow-launch-label">{W("reviewLaunch")}</span><h3>{currentWorkflow.title}</h3><p>{currentWorkflow.body}</p>
+          {workflowError && <p role="alert">{workflowError}</p>}
+        </div>}
         <p className="said" id="snippets-said" role="status" aria-live="polite">
           {said}
         </p>
         <div className="buttons">
+          {tab === "workflow" && <button className="workflow-start" type="button" disabled={!currentWorkflow || startingWorkflow} onClick={() => void startWorkflow()}>{startingWorkflow ? W("starting") : W("start")}</button>}
           <button className="chip" id="snippets-close" type="button" ref={closeButton} onClick={onClose}>
             {T.webClose}
           </button>
@@ -667,4 +751,12 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       ) : null}
     </>
   )
+}
+
+function SnippetSkeleton({ label }: { label: string }) {
+  return <div className="snippet-skeleton" role="status" aria-label={label}>
+    {[0, 1].map((row) => <div className="snippet-skeleton-row" aria-hidden="true" key={row}>
+      <span className="snippet-skeleton-title" /><span className="snippet-skeleton-body" />
+    </div>)}
+  </div>
 }

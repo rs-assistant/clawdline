@@ -211,6 +211,7 @@ export interface WriteHost {
   readonly machine: string
   exactTarget?(): { machineID: string; sessionID: string; executionGeneration: string } | null
   admitExactTarget?(target: { machineID: string; sessionID: string; executionGeneration: string }): Promise<void>
+  resolveSession?(machine: string, session: string): Promise<{ machineID: string; sessionID: string; executionGeneration: string } | null>
   /** The client, or a throw coded `offline` when the line is not up. */
   connected(): CloudWriteClient
   /**
@@ -276,8 +277,12 @@ export type WriteRoute =
   | { op: "capacity"; word: Carried<"capacity"> }
   | { op: "default-models"; word: Carried<"default-models"> }
   | { op: "default-models-update"; word: Carried<"default-models-update"> }
+  | { op: "notification-rules"; word: Carried<"notification-rules"> }
+  | { op: "notification-rules-update"; word: Carried<"notification-rules-update"> }
   | { op: "work-gate-settings"; word: Carried<"work-gate-settings"> }
   | { op: "work-gate-settings-update"; word: Carried<"work-gate-settings-update"> }
+  | { op: "notification-settings"; word: Carried<"notification-settings"> }
+  | { op: "notification-settings-update"; word: Carried<"notification-settings-update"> }
   | { op: "board-command"; word: Carried<"board-command"> }
   | { op: "machine-usage"; word: Carried<"machine-usage"> }
   | { op: "update"; word: Carried<"update"> }
@@ -449,7 +454,9 @@ export const CARRIED_READS: ReadonlySet<WriteRoute["op"]> = new Set<WriteRoute["
   "usage",
   "capacity",
   "default-models",
+  "notification-rules",
   "work-gate-settings",
+  "notification-settings",
   "restorable",
   "archived",
   "machine-usage",
@@ -514,8 +521,12 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
     if (head === "settings" && a === "default-models" && segments.length === 2) {
       return { op: "default-models", word: "default-models" }
     }
+    if (head === "notification-rules" && segments.length === 1) return { op: "notification-rules", word: "notification-rules" }
     if (head === "settings" && a === "work-gates" && segments.length === 2) {
       return { op: "work-gate-settings", word: "work-gate-settings" }
+    }
+    if (head === "settings" && a === "notifications" && segments.length === 2) {
+      return { op: "notification-settings", word: "notification-settings" }
     }
     if (head === "sessions" && a === "restorable" && segments.length === 2) {
       return { op: "restorable", word: "restorable-sessions" }
@@ -640,11 +651,15 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   if (head === "settings" && a === "default-models" && segments.length === 2) {
     return { op: "default-models-update", word: "default-models-update" }
   }
+  if (head === "notification-rules" && segments.length === 1) return { op: "notification-rules-update", word: "notification-rules-update" }
   if (head === "update" && a === "apply" && segments.length === 2) {
     return { op: "update-apply", word: "update-apply" }
   }
   if (head === "settings" && a === "work-gates" && segments.length === 2) {
     return { op: "work-gate-settings-update", word: "work-gate-settings-update" }
+  }
+  if (head === "settings" && a === "notifications" && segments.length === 2) {
+    return { op: "notification-settings-update", word: "notification-settings-update" }
   }
   if (head === "board" && segments.length === 1) {
     return { op: "board-command", word: "board-command" }
@@ -865,8 +880,12 @@ function spellingOf(route: WriteRoute): Spelling {
     case "worktree-remove":
     case "default-models":
     case "default-models-update":
+    case "notification-rules":
+    case "notification-rules-update":
     case "work-gate-settings":
     case "work-gate-settings-update":
+    case "notification-settings":
+    case "notification-settings-update":
     case "squad-write":
     case "squad-package":
     case "board-command":
@@ -949,9 +968,9 @@ export class RelayWriter {
       })
     }
     let client: CloudWriteClient
-    if (method === "GET" && CARRIED_READS.has(route.op)) {
-      // A read waits out a renewal of this page's own connection, as the
-      // reader's machine reads do. Measured in a production browser: `GET
+    if (method === "GET" && CARRIED_READS.has(route.op) || route.op === "send") {
+      // A read, and a receipt-keyed message send, wait out a renewal of this
+      // page's own connection. Measured in a production browser: `GET
       // /v1/places` answered `offline` for minutes while the relay socket
       // renewed, with the machine online. An abandoned wait is thrown, not
       // refused: a fetch whose signal fired rejects.
@@ -967,8 +986,7 @@ export class RelayWriter {
       }
       client = next
     } else {
-      // A write is refused at once and never held for the next client: an
-      // envelope that was not sent now is not sent later by this seam.
+      // Other writes are refused at once and never held for the next client.
       try {
         client = this.host.connected()
       } catch (error) {
@@ -1325,7 +1343,9 @@ export class RelayWriter {
       }
       case "capacity":
       case "default-models":
+      case "notification-rules":
       case "work-gate-settings":
+      case "notification-settings":
       case "machine-usage":
       case "update":
       case "update-fresh": {
@@ -1557,6 +1577,10 @@ export class RelayWriter {
         // local route reads (`title`, `body`, `scope`, `project`), and the machine
         // is what decides whether it is a snippet and where it lands.
         const snippet = await bodyOf(init)
+        if (url.searchParams.has("machine")) {
+          if (typeof client._machineRequest !== "function") throw failure("cloud_not_carried", "snippet-create", 501)
+          return client._machineRequest(this.namedMachine(url), "snippet-create", { snippet }, "action")
+        }
         if (typeof client.createSnippet !== "function") {
           throw failure("cloud_not_carried", "snippet-create", 501)
         }
@@ -1564,12 +1588,20 @@ export class RelayWriter {
       }
       case "snippet-update": {
         const snippet = await bodyOf(init)
+        if (url.searchParams.has("machine")) {
+          if (typeof client._machineRequest !== "function") throw failure("cloud_not_carried", "snippet-update", 501)
+          return client._machineRequest(this.namedMachine(url), "snippet-update", { id: route.snippet, snippet }, "action")
+        }
         if (typeof client.updateSnippet !== "function") {
           throw failure("cloud_not_carried", "snippet-update", 501)
         }
         return client.updateSnippet(route.snippet, snippet, this.snippetIdentity(url))
       }
       case "snippet-delete": {
+        if (url.searchParams.has("machine")) {
+          if (typeof client._machineRequest !== "function") throw failure("cloud_not_carried", "snippet-delete", 501)
+          return client._machineRequest(this.namedMachine(url), "snippet-delete", { id: route.snippet }, "action")
+        }
         if (typeof client.deleteSnippet !== "function") {
           throw failure("cloud_not_carried", "snippet-delete", 501)
         }
@@ -1617,6 +1649,10 @@ export class RelayWriter {
         }
         return this.machineWorkV2(client, route.word, { changes: await bodyOf(init) }, headerOf(init, "idempotency-key"))
       }
+      case "notification-rules-update": {
+        for (const [key] of url.searchParams) throw failure("cloud_not_carried", `${url.pathname}?${key}= is not carried over Clawdline Cloud.`, 501)
+        return this.machineWorkV2(client, route.word, { changes: await bodyOf(init) }, headerOf(init, "idempotency-key"))
+      }
       case "update-apply": {
         // The press installs the newest release of the machine's channel and
         // nothing else crosses: a version or `force` is the machine's own CLI.
@@ -1630,6 +1666,12 @@ export class RelayWriter {
         return this.machineWorkV2(client, route.word, {}, headerOf(init, "idempotency-key"))
       }
       case "work-gate-settings-update": {
+        for (const [key] of url.searchParams) {
+          throw failure("cloud_not_carried", `${url.pathname}?${key}= is not carried over Clawdline Cloud: change it on the machine.`, 501)
+        }
+        return this.machineWorkV2(client, route.word, { changes: await bodyOf(init) }, headerOf(init, "idempotency-key"))
+      }
+      case "notification-settings-update": {
         for (const [key] of url.searchParams) {
           throw failure("cloud_not_carried", `${url.pathname}?${key}= is not carried over Clawdline Cloud: change it on the machine.`, 501)
         }
@@ -1891,27 +1933,43 @@ export class RelayWriter {
       generation = exact.executionGeneration
     } else {
       const row = await this.row(client, session)
-      if (!row) throw failure("session_unknown", "This page cannot verify that Session yet.", 409)
-      generation = String(row.execution_generation ?? "")
-      identity = row.identity && typeof row.identity.machine === "string" && typeof row.identity.session === "string"
-        ? row.identity : { machine: this.host.machine, session: typeof row.session === "string" ? row.session : session }
+      if (!row) {
+        // A newly started Session can reach the verified status projection before
+        // the rich-row replay. Recheck that exact execution before addressing it.
+        const projected = await this.host.resolveSession?.(this.host.machine, session)
+        if (!projected || !this.host.admitExactTarget) {
+          throw failure("session_unknown", "This page cannot verify that Session yet.", 409)
+        }
+        await this.host.admitExactTarget(projected)
+        identity = { machine: projected.machineID, session: projected.sessionID }
+        generation = projected.executionGeneration
+      } else {
+        generation = String(row.execution_generation ?? "")
+        identity = row.identity && typeof row.identity.machine === "string" && typeof row.identity.session === "string"
+          ? row.identity : { machine: this.host.machine, session: typeof row.session === "string" ? row.session : session }
+      }
       if (identity.machine !== this.host.machine || identity.session !== session || !/^[0-9a-f]{32}$/.test(generation)) {
         throw failure("execution_generation_required", "This session's current execution generation is unavailable.", 409)
       }
     }
-    await this.host.settledWords?.(word, identity.machine)
-    await this.host.settledWords?.("session-receipt", identity.machine)
     const current = await this.host.connectedFor(undefined, word)
-    if (!current || machineCommands(current, identity.machine).incomplete) {
+    if (current) {
+      // A renewal can replace the client while connectedFor waits. Its word
+      // list arrives after the socket is ready, so wait on the new client.
+      await this.host.settledWords?.(word, identity.machine)
+      await this.host.settledWords?.("session-receipt", identity.machine)
+    }
+    const ready = await this.host.connectedFor(undefined, word)
+    if (!ready || machineCommands(ready, identity.machine).incomplete) {
       throw Object.assign(failure("cloud_reconnecting", "The machine's complete command list has not arrived yet.", 503), {
-        diagnosticStage: current ? "command_list_incomplete" : "connection_unavailable",
+        diagnosticStage: ready ? "command_list_incomplete" : "connection_unavailable",
       })
     }
-    const commands = declaredCommands(current, identity.machine)
-    if (!commands?.includes(word) || !commands.includes("session-receipt") || typeof current._read !== "function") {
+    const commands = declaredCommands(ready, identity.machine)
+    if (!commands?.includes(word) || !commands.includes("session-receipt") || typeof ready._read !== "function") {
       throw failure("cloud_machine_unsupported", "This machine cannot provide durable session receipts.", 501)
     }
-    return { identity, generation, client: current }
+    return { identity, generation, client: ready }
   }
 
   private fleetTarget(session: string): { machineID: string; sessionID: string; executionGeneration: string } | null {

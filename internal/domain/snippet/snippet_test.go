@@ -100,6 +100,53 @@ func TestAScopeAndItsProjectAgreeInBothDirections(t *testing.T) {
 	}
 }
 
+func TestAWorkflowIsIndependentProjectText(t *testing.T) {
+	fields, ref := ParseFields(map[string]any{
+		"title": "Ship today", "body": "Check, commit, and release.",
+		"scope": "workflow", "project": "/p",
+	})
+	if ref != nil {
+		t.Fatal(ref)
+	}
+	created, ref := New("id", fields, 0, 1)
+	if ref != nil || created.Scope != Workflow || created.Project != "/p" || created.Body != "Check, commit, and release." {
+		t.Fatalf("workflow = %+v, %v", created, ref)
+	}
+	updated, ref := Patch(created, Fields{Body: "Release after review.", HasBody: true}, 2)
+	if ref != nil || updated.Scope != Workflow || updated.Project != "/p" || updated.Body != "Release after review." {
+		t.Fatalf("independent edit = %+v, %v", updated, ref)
+	}
+	if got := InScope([]Record{updated}, "/p"); len(got) != 1 || got[0].ID != "id" {
+		t.Fatalf("Project workflow absent from its Session: %+v", got)
+	}
+	if got := InScope([]Record{updated}, "/other"); len(got) != 0 {
+		t.Fatalf("Project workflow leaked to another Project: %+v", got)
+	}
+}
+
+func TestGlobalWorkflowIsVisibleAcrossProjects(t *testing.T) {
+	fields, ref := ParseFields(map[string]any{
+		"title": "Ship", "body": "Run the release process.", "scope": "workflow",
+	})
+	if ref != nil {
+		t.Fatal(ref)
+	}
+	created, ref := New("global-workflow", fields, 0, 1)
+	if ref != nil || created.Scope != Workflow || created.Project != "" {
+		t.Fatalf("global workflow = %+v, %v", created, ref)
+	}
+	for _, project := range []string{"/one", "/two", ""} {
+		got := InScope([]Record{created}, project)
+		if len(got) != 1 || got[0].ID != created.ID {
+			t.Fatalf("project %q sees %+v", project, got)
+		}
+	}
+	invalid, _ := ParseFields(map[string]any{"title": "Ship", "body": "Run", "scope": "workflow", "project": ""})
+	if _, ref := New("invalid", invalid, 0, 1); ref == nil || ref.Code != CodeScopeMismatch {
+		t.Fatalf("empty project field accepted: %v", ref)
+	}
+}
+
 func TestAnEmptyTitleOrBodyIsRefused(t *testing.T) {
 	for _, body := range []map[string]any{
 		{"title": "  ", "body": "b", "scope": "global"},

@@ -216,6 +216,8 @@ var effectHandlers = map[string]effectHandler{
 	EffectCapacityPush:          {idempotent: false, run: runCapacityPush},
 	EffectWaitingPush:           {idempotent: false, run: runWaitingPush},
 	EffectWorkItemCompletedPush: {idempotent: false, run: runWorkItemCompletedPush},
+	EffectSessionDeliveryPush:   {idempotent: false, run: runCompletionPush},
+	EffectFanoutCompletedPush:   {idempotent: false, run: runCompletionPush},
 	EffectHumanInterventionPush: {idempotent: false, run: runHumanInterventionPush},
 }
 
