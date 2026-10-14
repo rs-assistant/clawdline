@@ -6,6 +6,8 @@ import { createWorkflow, deleteWorkflow, readReusableTextForMachine, SnippetFail
 import type { PageModule } from "./types.js"
 import "./workflow/workflow.css"
 import { workflowWord as W } from "../workflow-words.js"
+import { Mark } from "../session/List.js"
+import type { SessionRow } from "@clawdline/contract"
 
 type Draft = { id: string; title: string; body: string; global: boolean }
 const blank = (): Draft => ({ id: "", title: "", body: "", global: false })
@@ -21,6 +23,8 @@ function WorkflowPage({ shown }: { shown: boolean }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [projectOpen, setProjectOpen] = useState(false)
+  const projectPicker = useRef<HTMLDivElement>(null)
   const editor = useRef<HTMLDivElement>(null)
   const returnFocus = useRef<HTMLElement | null>(null)
   const openDraft = (next: Draft) => {
@@ -31,19 +35,30 @@ function WorkflowPage({ shown }: { shown: boolean }) {
 
   useEffect(() => {
     if (!draft) return
-    editor.current?.querySelector<HTMLInputElement>("input")?.focus()
+    editor.current?.querySelector<HTMLElement>("form")?.focus()
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") { event.preventDefault(); setDraft(null); return }
       if (event.key !== "Tab") return
       const controls = Array.from(editor.current?.querySelectorAll<HTMLElement>("input, textarea, button:not(:disabled)") ?? [])
       if (!controls.length) return
       const first = controls[0], last = controls[controls.length - 1]
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === editor.current?.querySelector("form"))) { event.preventDefault(); last.focus() }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
     }
     document.addEventListener("keydown", onKey)
     return () => { document.removeEventListener("keydown", onKey); returnFocus.current?.focus(); returnFocus.current = null }
   }, [!!draft])
+
+  useEffect(() => {
+    if (!projectOpen) return
+    const closeOutside = (event: PointerEvent) => {
+      if (!projectPicker.current?.contains(event.target as Node)) setProjectOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setProjectOpen(false) }
+    document.addEventListener("pointerdown", closeOutside)
+    document.addEventListener("keydown", closeOnEscape)
+    return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeOnEscape) }
+  }, [projectOpen])
 
   useEffect(() => {
     if (!shown) return
@@ -130,10 +145,16 @@ function WorkflowPage({ shown }: { shown: boolean }) {
 
   return <section className="page workflow-page" id="workflow" data-page-view="workflow" hidden={!shown}>
     <header className="workflow-head"><div><h1 tabIndex={-1}>Workflow</h1><p>{W("intro")}</p></div>
-      <div className="workflow-head-tools"><label className="workflow-project"><span>{W("projectLabel")}</span>
-        <select value={place?.id ?? ""} onChange={(event) => { setDraft(null); setPlace(places.find((row) => row.id === event.target.value) ?? null) }}>
-          {places.map((row) => <option key={row.id} value={row.id}>{row.label || row.path}</option>)}
-        </select></label>
+      <div className="workflow-head-tools"><div className="workflow-project" ref={projectPicker}><span>{W("projectLabel")}</span>
+        <button type="button" className="workflow-project-trigger" aria-label={`${W("projectLabel")}: ${place?.label || place?.path || ""}`} aria-expanded={projectOpen}
+          onClick={() => setProjectOpen(!projectOpen)}>{place && <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} />}
+          <span>{place?.label || place?.path || W("projectLabel")}</span><span aria-hidden="true">⌄</span></button>
+        {projectOpen && <div className="workflow-project-menu">{places.map((row) => <button
+          type="button" aria-current={row.id === place?.id ? "true" : undefined} key={row.id} onClick={() => {
+            setDraft(null); setPlace(row); setProjectOpen(false)
+          }}><Mark icon={row.icon as SessionRow["icon"]} cellPx={3} /><span>{row.label || row.path}</span>
+          {row.id === place?.id && <span aria-hidden="true">✓</span>}</button>)}</div>}
+      </div>
         <button className="workflow-page-reload" type="button" onClick={() => place && void refresh(place)} disabled={!place || loading || busy}>{W("reload")}</button>
       </div>
     </header>
@@ -152,13 +173,17 @@ function WorkflowPage({ shown }: { shown: boolean }) {
         <span className="workflow-list-copy"><strong>{row.title} <small>{!row.project ? W("global") : W("projectOnly")}</small></strong><span>{row.body}</span></span><span className="workflow-edit-label">{W("editAction")} <span aria-hidden="true">→</span></span>
       </button>)}</div>
     </>}
-    {draft && <div ref={editor} className="workflow-editor" role="dialog" aria-modal="true" aria-label={draft.id ? W("edit") : W("new")}>
-      <form onSubmit={(event) => { event.preventDefault(); void save() }}>
+    {draft && <div ref={editor} className="workflow-editor" role="dialog" aria-modal="true" aria-label={draft.id ? W("edit") : W("new")}
+      onPointerDown={(event) => { if (event.target === event.currentTarget && !busy) setDraft(null) }}>
+      <form tabIndex={-1} onSubmit={(event) => { event.preventDefault(); void save() }}>
         <h2>{draft.id ? W("edit") : W("new")}</h2>
-        <label>{W("name")}<input autoFocus value={draft.title} maxLength={200} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
-        {!draft.id && <label>{W("availability")}<select value={draft.global ? "global" : "project"} onChange={(event) => setDraft({ ...draft, global: event.target.value === "global" })}>
-          <option value="project">{W("projectOnly")}</option><option value="global">{W("global")}</option>
-        </select></label>}
+        <label>{W("name")}<input value={draft.title} maxLength={200} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
+        {!draft.id && <fieldset className="workflow-scope"><legend>{W("availability")}</legend>
+          <label><input type="radio" name="workflow-scope" checked={!draft.global} onChange={() => setDraft({ ...draft, global: false })} />
+            {place && <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} />}<span>{place?.label || place?.path}</span></label>
+          <label><input type="radio" name="workflow-scope" checked={draft.global} onChange={() => setDraft({ ...draft, global: true })} />
+            <span>{W("global")}</span></label>
+        </fieldset>}
         {draft.global && <p className="workflow-scope-hint">{W("globalHint")}</p>}
         <label>{W("message")}<textarea value={draft.body} rows={8} maxLength={4000} onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></label>
         {error && <p role="alert" className="workflow-error">{error}</p>}

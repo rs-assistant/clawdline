@@ -416,7 +416,8 @@ function daemon(): Server {
       }], others: [],
     })
     if (path === "/v1/places") return json(res, 200, {
-      places: [{ id: "project-fixture", label: "Clawdline", path: "/tmp/fixture", icon: null }],
+      places: [{ id: "project-fixture", label: "Clawdline", path: "/tmp/fixture",
+        icon: { accent: "#e07a5f", cells: [["#e07a5f", "#e07a5f"], ["#e07a5f", "#141416"]] } }],
       assistants: [{ id: "codex", label: "Codex" }],
     })
     if (path === "/v1/projects/project-fixture/files" && req.method === "GET") return json(res, 200, {
@@ -1833,16 +1834,27 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
       }; look()
     })`)
     await tab.shot("workflow-empty-mobile")
+    await tab.press('.workflow-project-trigger')
+    assert.equal(await tab.run(`document.querySelectorAll('.workflow-project-menu button .mark').length`), 1)
+    assert.equal(await tab.run(`document.querySelector('.workflow-project-menu button .mark')?.classList.contains('none')`), false)
+    assert.match(await tab.run(`document.querySelector('.workflow-project-trigger')?.getAttribute('aria-label')`), /Clawdline/)
+    await tab.press('.workflow-project-menu button')
+    await tab.press('.workflow-empty .workflow-primary')
+    assert.equal(await tab.run(`document.activeElement?.matches('.workflow-editor input')`), false)
+    await tab.run(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))`)
+    assert.equal(await tab.run(`document.activeElement?.matches('.workflow-editor .workflow-actions button:last-child')`), true)
+    assert.match(await tab.run(`document.querySelector('.workflow-scope label')?.textContent`), /Clawdline|clawdline/)
+    assert.equal(await tab.run(`document.querySelector('.workflow-scope label .mark') !== null`), true)
+    await tab.run(`document.querySelector('.workflow-editor').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor')`), null)
     await tab.press('.workflow-empty .workflow-primary')
     await tab.run(`(() => {
-      const fields = document.querySelectorAll('.workflow-editor input, .workflow-editor textarea')
+      const fields = document.querySelectorAll('.workflow-editor input:not([type="radio"]), .workflow-editor textarea')
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(fields[0], 'Daily release')
       fields[0].dispatchEvent(new Event('input', { bubbles: true }))
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(fields[1], 'Run the release checklist.')
       fields[1].dispatchEvent(new Event('input', { bubbles: true }))
-      const scope = document.querySelector('.workflow-editor select')
-      scope.value = 'global'
-      scope.dispatchEvent(new Event('change', { bubbles: true }))
+      document.querySelectorAll('.workflow-scope input')[1].click()
     })()`)
     await tab.press('.workflow-editor button[type="submit"]')
     await tab.run(`new Promise((resolve, reject) => {
