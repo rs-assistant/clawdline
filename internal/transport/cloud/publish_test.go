@@ -167,6 +167,30 @@ func TestDescriptorAdvertisesPinnedReadOnlyDetailOnlyWhenWired(t *testing.T) {
 	}
 }
 
+func TestTheDescriptorSeparatesAdvertisedCommandsFromLocalOperationPermission(t *testing.T) {
+	out := &collector{}
+	p := newPublisher(&fixedRouter{body: completeScan}, out)
+	allowed, known := false, true
+	p.OperationAccess = func() (bool, bool) { return allowed, known }
+	p.firstPass(context.Background())
+	machine := out.payload(t, "orch/mac-01")["machine"].(map[string]any)
+	if machine["operation_allowed"] != false || len(machine["commands"].([]any)) == 0 {
+		t.Fatalf("a readable, command-capable machine with writes off: %v", machine)
+	}
+	allowed = true
+	p.Pass(context.Background())
+	machine = out.payload(t, "orch/mac-01")["machine"].(map[string]any)
+	if machine["operation_allowed"] != true {
+		t.Fatalf("the next descriptor did not grant operation: %v", machine)
+	}
+	known = false
+	p.Pass(context.Background())
+	machine = out.payload(t, "orch/mac-01")["machine"].(map[string]any)
+	if _, ok := machine["operation_allowed"]; ok {
+		t.Fatalf("an unreadable switch looked off: %v", machine)
+	}
+}
+
 func TestTheInventoryNamesEveryRowItPublished(t *testing.T) {
 	out := &collector{}
 	publisher := newPublisher(&fixedRouter{body: completeScan}, out)

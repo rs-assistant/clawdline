@@ -40,6 +40,24 @@ const ownWords = {
     webCloudPairPinnedFailed:
       "Could not read this machine's paired-browser list, so no browser is accepted now: {why}",
     webFailMachineWritesOff: "This machine does not currently accept commands from Cloud.",
+    cloudSetupTitle: "Connect this machine to Cloud",
+    cloudAccountReady: "Account signed in and this machine registered.",
+    cloudAccountMissing: "Account sign-in and machine registration are needed.",
+    cloudAccountWaiting: "Approve code {code} in the Cloud sign-in page.",
+    cloudAccountFailed: "Sign-in stopped ({code}). Start again.",
+    cloudAccountStart: "Sign in and register this machine",
+    cloudAccountRetry: "Sign this machine in again",
+    cloudAccountOpen: "Open Cloud sign-in page",
+    cloudLineOn: "Connect this machine to Cloud",
+    cloudLineOff: "Disconnect this machine from Cloud",
+    cloudLineNeedsLogin: "Finish account sign-in before connecting this machine.",
+    cloudLineState: "Machine connection: {state}",
+    cloudLineFailure: "Connection blocked by {kind}: {detail}",
+    cloudCommandsTitle: "Allow paired devices to operate this machine",
+    cloudCommandsHint: "Allows paired devices to send messages, start sessions, and use published terminal features. This machine checks the switch on every request. Turning it off or revoking a device takes effect on its next request.",
+    cloudCommandsOn: "Allow operation",
+    cloudCommandsOff: "Stop operation",
+    cloudPairPermission: "A pairing QR lets this browser view this machine's sessions. It does not turn on operation access.",
     settingsCompactWindow: "Compact Claude sessions at",
     settingsCompactWindowHint:
       "Only for Claude sessions Clawdline opens — children, Root Assignments, handoffs — never Codex, never a session you opened. Past this many tokens of context the session replaces its history with a summary: every later call re-reads fewer tokens, which is where most of a long session's cost goes, but the summary can lose detail, files get read again, and each compaction takes about ten seconds. Empty leaves Claude Code alone; it then compacts near its own 1M window. A task can ask for its own. Takes effect at the next launch.",
@@ -84,6 +102,24 @@ const ownWords = {
     webCloudPairRevoked: "已在這台機器撤銷",
     webCloudPairPinnedFailed: "讀不到這台機器的已配對清單，所以現在不接受任何瀏覽器：{why}",
     webFailMachineWritesOff: "這台機器目前不接受來自 Cloud 的指令。",
+    cloudSetupTitle: "連接這台機器到 Cloud",
+    cloudAccountReady: "帳號已登入，這台機器已註冊。",
+    cloudAccountMissing: "尚須登入帳號並註冊這台機器。",
+    cloudAccountWaiting: "請在 Cloud 登入頁核准代碼 {code}。",
+    cloudAccountFailed: "登入已停止（{code}），請重新開始。",
+    cloudAccountStart: "登入並註冊這台機器",
+    cloudAccountRetry: "重新登入這台機器",
+    cloudAccountOpen: "開啟 Cloud 登入頁",
+    cloudLineOn: "讓這台機器連接 Cloud",
+    cloudLineOff: "中斷這台機器的 Cloud 連線",
+    cloudLineNeedsLogin: "先完成帳號登入，才能連接這台機器。",
+    cloudLineState: "機器連線：{state}",
+    cloudLineFailure: "連線受 {kind} 阻擋：{detail}",
+    cloudCommandsTitle: "允許已配對裝置操作這台機器",
+    cloudCommandsHint: "允許已配對裝置傳送訊息、開始 Session，以及使用已發布的終端功能。這台機器每次請求都檢查開關；關閉或撤銷裝置後，下一次請求立即生效。",
+    cloudCommandsOn: "允許操作",
+    cloudCommandsOff: "停止操作",
+    cloudPairPermission: "配對 QR 允許此瀏覽器查看這台機器的 Session，不會自動開放操作。",
     settingsCompactWindow: "Claude session 壓縮門檻",
     settingsCompactWindowHint:
       "只套用在 Clawdline 開的 Claude session——child、Root Assignment、handoff——不會動到 Codex，也不會動到你自己開的 session。context 超過這麼多 token，session 就把歷史換成一份摘要：之後每一次呼叫要重讀的 token 變少，長 session 的花費大多在這裡；代價是摘要可能漏掉細節、檔案要重讀，每次壓縮大約花十秒。空白就是不插手，Claude Code 會等到接近它自己的 1M 上限才壓縮。單一任務可以另外指定。下一次開 session 時生效。",
@@ -109,7 +145,7 @@ function ownWord(key: OwnWord): string {
     (typeof document !== "undefined" && document.documentElement.lang) ||
     (typeof navigator !== "undefined" && navigator.language) ||
     "en"
-  return ownWords[lang === "zh-Hant" ? "zh-Hant" : "en"][key]
+  return ownWords[lang.startsWith("zh-Hant") || lang === "zh-TW" ? "zh-Hant" : "en"][key]
 }
 
 const baseW = {
@@ -250,6 +286,24 @@ const baseW = {
   // rather than an invented settings vocabulary, because this card answers the
   // same questions about the same line and the original has no second spelling.
   webCloudStatus: "Cloud 狀態",
+  cloudSetupTitle: ownWord("cloudSetupTitle"),
+  cloudAccountReady: ownWord("cloudAccountReady"),
+  cloudAccountMissing: ownWord("cloudAccountMissing"),
+  cloudAccountWaiting: ownWord("cloudAccountWaiting"),
+  cloudAccountFailed: ownWord("cloudAccountFailed"),
+  cloudAccountStart: ownWord("cloudAccountStart"),
+  cloudAccountRetry: ownWord("cloudAccountRetry"),
+  cloudAccountOpen: ownWord("cloudAccountOpen"),
+  cloudLineOn: ownWord("cloudLineOn"),
+  cloudLineOff: ownWord("cloudLineOff"),
+  cloudLineNeedsLogin: ownWord("cloudLineNeedsLogin"),
+  cloudLineState: ownWord("cloudLineState"),
+  cloudLineFailure: ownWord("cloudLineFailure"),
+  cloudCommandsTitle: ownWord("cloudCommandsTitle"),
+  cloudCommandsHint: ownWord("cloudCommandsHint"),
+  cloudCommandsOn: ownWord("cloudCommandsOn"),
+  cloudCommandsOff: ownWord("cloudCommandsOff"),
+  cloudPairPermission: ownWord("cloudPairPermission"),
   webCloudStatusReadFailed: ownWord("webCloudStatusReadFailed"),
   webCloudStatusConnection: "連線：{state}",
   webCloudStatusClosed: "上次關閉：{code}",

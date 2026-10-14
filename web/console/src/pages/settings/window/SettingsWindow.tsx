@@ -14,8 +14,13 @@ import {
   beginCloudPairing,
   cancelCloudPairing,
   offerCloudPairing,
+  readCloudLogin,
   readCloudStatus,
   revokeCloudViewer,
+  setCloudCommands,
+  setCloudEnabled,
+  startCloudLogin,
+  type CloudLogin,
   type CloudStatus,
   type CloudViewer,
 } from "../cloud.js"
@@ -97,6 +102,9 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   // The Cloud line's own reading. `undefined` is "not asked yet", `null` is
   // "this daemon would not tell us", and the two draw different cards.
   const [cloud, setCloud] = useState<CloudStatus | null | undefined>(undefined)
+  const [cloudLogin, setCloudLogin] = useState<CloudLogin | null>(null)
+  const [cloudSetupBusy, setCloudSetupBusy] = useState(false)
+  const [cloudSetupSaid, setCloudSetupSaid] = useState("")
   // The tunnel's own reading, the same three ways: not asked, refused, an answer.
   const [tunnel, setTunnel] = useState<TunnelStatus | null | undefined>(undefined)
   // Where the voice language landed, asked of the daemon while the voice tab is
@@ -176,6 +184,20 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
       clearInterval(timer)
     }
   }, [tab, cloud?.pairing?.phase, embedded, remoteTab])
+
+  useEffect(() => {
+    if (tab !== 3) return
+    let live = true
+    const pass = () => {
+      void readCloudLogin().then(
+        (answer) => { if (live) setCloudLogin(answer) },
+        (error: unknown) => { if (live) setCloudSetupSaid(settingsFailureSentence(error)) },
+      )
+    }
+    pass()
+    const timer = cloudLogin?.phase === "waiting" ? setInterval(pass, 2_000) : null
+    return () => { live = false; if (timer) clearInterval(timer) }
+  }, [tab, cloudLogin?.phase])
 
   // The tunnel's reading, while the same tab is open. The Swift window asked
   // its tunnel once a second, because "starting" turns into an address on its
@@ -721,6 +743,81 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
    * turns on a line with no account behind it turns on nothing and says
    * nothing.
    */
+  function cloudSetupBlock() {
+    const ready = cloudLogin?.phase === "complete" || !!cloud?.configured
+    const needsAnotherLogin = cloud?.last_error_kind === "not_signed_in" || cloud?.last_error_kind === "device_not_approved"
+    const run = (action: () => Promise<unknown>) => {
+      setCloudSetupBusy(true)
+      setCloudSetupSaid("")
+      void action().then(
+        async () => {
+          try {
+            const [login, status] = await Promise.all([readCloudLogin(), readCloudStatus()])
+            setCloudLogin(login)
+            setCloud(status)
+          } catch (error) {
+            setCloudSetupSaid(settingsFailureSentence(error))
+          } finally {
+            setCloudSetupBusy(false)
+          }
+        },
+        (error: unknown) => {
+          setCloudSetupSaid(settingsFailureSentence(error))
+          setCloudSetupBusy(false)
+        },
+      )
+    }
+    return (
+      <Block label={W.cloudSetupTitle}>
+        <Note dot={ready ? "live" : "idle"}>
+          {ready ? W.cloudAccountReady : W.cloudAccountMissing}
+        </Note>
+        {cloudLogin?.phase === "waiting" && (
+          <>
+            <Note dot="warn">{fill(W.cloudAccountWaiting, { code: cloudLogin.user_code ?? "" })}</Note>
+            {cloudLogin.verification_url && (
+              <a href={cloudLogin.verification_url} target="_blank" rel="noopener noreferrer">
+                {W.cloudAccountOpen}
+              </a>
+            )}
+          </>
+        )}
+        {cloudLogin?.phase === "failed" && (
+          <Note dot="warn">{fill(W.cloudAccountFailed, { code: cloudLogin.code ?? "unknown" })}</Note>
+        )}
+        {!ready && cloudLogin?.phase !== "waiting" && (
+          <Chip disabled={cloudSetupBusy} onClick={() => run(startCloudLogin)}>{W.cloudAccountStart}</Chip>
+        )}
+        {ready && needsAnotherLogin && cloudLogin?.phase !== "waiting" && (
+          <Chip disabled={cloudSetupBusy} onClick={() => run(() => startCloudLogin(true))}>{W.cloudAccountRetry}</Chip>
+        )}
+        <Note dot={cloud?.state === "connected" ? "live" : "idle"}>
+          {fill(W.cloudLineState, { state: cloud?.state ?? "unknown" })}
+        </Note>
+        {cloud?.last_error && (
+          <Note dot="warn">{fill(W.cloudLineFailure, { kind: cloud.last_error_kind ?? "unknown", detail: cloud.last_error })}</Note>
+        )}
+        {ready ? (
+          <Chip disabled={cloudSetupBusy} onClick={() => run(() => setCloudEnabled(!cloud?.enabled))}>
+            {cloud?.enabled ? W.cloudLineOff : W.cloudLineOn}
+          </Chip>
+        ) : (
+          <Note dot="idle">{W.cloudLineNeedsLogin}</Note>
+        )}
+        {cloud?.enabled && (
+          <>
+            <Note dot={cloud.commands ? "live" : "idle"}>{W.cloudCommandsTitle}</Note>
+            <Note dot="idle">{W.cloudCommandsHint}</Note>
+            <Chip disabled={cloudSetupBusy} onClick={() => run(() => setCloudCommands(!cloud.commands))}>
+              {cloud.commands ? W.cloudCommandsOff : W.cloudCommandsOn}
+            </Chip>
+          </>
+        )}
+        {cloudSetupSaid && <Note dot="warn">{cloudSetupSaid}</Note>}
+      </Block>
+    )
+  }
+
   function cloudBlock() {
     if (cloud === undefined) return null
     if (cloud === null) {
@@ -795,7 +892,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
    * QR's three.
    */
   function cloudPairingBlock() {
-    if (!cloud || !cloud.enabled) return null
+    if (!cloud || !cloud.enabled || !cloud.configured) return null
     const pairing = cloud.pairing ?? { phase: "idle" }
     const viewers = cloud.devices ?? []
 
@@ -866,6 +963,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     return (
       <>
         <Block label={W.webCloudPair}>
+          <Note dot="idle">{W.cloudPairPermission}</Note>
           {lines.map((line) => (
             <Note key={line.key} dot={line.dot}>
               {line.text}
@@ -983,6 +1081,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
           </Row>
         </div>
         <div className="sw-column">
+          {!embedded && cloud !== undefined && cloud !== null && cloudSetupBlock()}
           {!embedded && cloudBlock()}
           {!embedded && cloudPairingBlock()}
           <Row label={W.settingsTunnel} hint={W.settingsTunnelHint} first>

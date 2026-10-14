@@ -111,15 +111,20 @@ func (s *Server) scheduleBook() *app.ScheduleBook {
 
 // StartScheduleWebhooks attaches the Cloud activation method to the same book
 // used by HTTP and the clock, then starts the durable claim/receipt loop.
-func (s *Server) StartScheduleWebhooks(ctx context.Context, identity schedulewebhook.Identity, cloud schedulewebhook.Cloud, build string) {
+func (s *Server) StartScheduleWebhooks(ctx context.Context, identity schedulewebhook.Identity, cloud schedulewebhook.Cloud, build string) <-chan struct{} {
 	book := s.scheduleBook()
 	book.Activate = cloud.Activate
 	runtime := &app.ScheduleWebhookRuntime{
 		Cloud: cloud, Identity: identity, Store: s.store, Book: book, Build: build,
 		Log: func(format string, args ...any) { log.Printf(format, args...) },
 	}
-	go runtime.Run(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		runtime.Run(ctx)
+	}()
 	log.Printf("schedule webhooks: delivery poller started")
+	return done
 }
 
 func writeScheduleReply(w http.ResponseWriter, reply app.ScheduleReply) {

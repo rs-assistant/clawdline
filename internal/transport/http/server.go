@@ -62,6 +62,12 @@ type Server struct {
 	viewer          *adaptercloud.ViewerClient
 	viewerSignature string
 	viewerCancel    context.CancelFunc
+	// cloudReload replaces the live Cloud line after local onboarding changes
+	// its identity or enabled switch. It is installed by serve, never by a
+	// remote Cloud request.
+	cloudReload  func() error
+	cloudLoginMu sync.Mutex
+	cloudLogin   cloudLoginAttempt
 	// version is this build as `clawdline version` prints it, for /v1/health
 	// (SetVersion). Empty leaves `version` out of the answer.
 	version        string
@@ -466,6 +472,9 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/cloud/viewer/skills"}, s.cloudViewerRoute},
 		{Route{"*", "/v1/cloud/viewer/actions"}, s.cloudViewerRoute},
 		{Route{"*", "/v1/cloud/viewer/receipts"}, s.cloudViewerRoute},
+		{Route{"*", "/v1/cloud/login"}, s.cloudLoginRoute},
+		{Route{"*", "/v1/cloud/enabled"}, s.cloudEnabledRoute},
+		{Route{"*", "/v1/cloud/commands"}, s.cloudCommandsRoute},
 		// Pairing a browser with this Mac, and throwing one out again. Same rule:
 		// this machine's own token, because the first of them answers a link that
 		// hands over the account key.

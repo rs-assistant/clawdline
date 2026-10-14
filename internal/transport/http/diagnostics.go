@@ -1150,6 +1150,9 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 			}
 			return capacity.Reading{Known: true, Used: int64(waiting)}
 		},
+		capacity.CloudReloadStopSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-reload clock; a timed-out replacement is refused"}
+		},
 		capacity.CloudTerminalRosterRefresh:        func() capacity.Reading { return s.terminalCapacity(capacity.CloudTerminalRosterRefresh) },
 		capacity.CloudTerminalRosterDeadline:       func() capacity.Reading { return s.terminalCapacity(capacity.CloudTerminalRosterDeadline) },
 		capacity.CloudTerminalRosterRetry:          func() capacity.Reading { return s.terminalCapacity(capacity.CloudTerminalRosterRetry) },

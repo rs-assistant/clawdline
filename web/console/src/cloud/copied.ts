@@ -19,6 +19,7 @@ import { decodePairingInvitation as decodePairingInvitationOriginal } from "../l
 import {
   cloudOnboardingMode as cloudOnboardingModeOriginal,
   cloudViewerDeviceMetadata as cloudViewerDeviceMetadataOriginal,
+  pairingFragmentFromScan as pairingFragmentFromScanOriginal,
 } from "../legacy/js/net/cloud-onboarding.js"
 import type { CloudReadClient } from "./relay-reader.js"
 import type { OpenedPairing, PendingOffer } from "./pair.js"
@@ -61,6 +62,8 @@ export interface CloudMachine {
   observedAt: number | null
   freshness: "current" | "stale" | "unknown"
   pairing: "paired" | "not_paired" | "unknown"
+  /** From this machine's encrypted descriptor, or null when not observed. */
+  operationAllowed?: boolean | null
   /** Absent when this browser has no readable session inventory for the machine. */
   sessions?: number
   selectable: boolean
@@ -92,7 +95,7 @@ export interface CloudClientHandle extends CloudReadClient {
    * null when this browser has opened none — which is every machine it is not
    * paired with (`cloud-client.js`).
    */
-  machineDescriptor?(machine: string): { machine?: { name?: string; platform?: string; commands?: string[] } } | null
+  machineDescriptor?(machine: string): { machine?: { name?: string; platform?: string; commands?: string[]; operation_allowed?: unknown } } | null
   /**
    * What this page's own direct carrier to that machine is doing, for the dot
    * the machine's row draws (`carrier-state.ts`). It opens nothing.
@@ -156,6 +159,9 @@ export const chooseTransport = chooseTransportOriginal as (input: {
 
 /** `install` on an iPhone or iPad not yet running from the Home Screen; `pwa` or `browser` otherwise. */
 export const cloudOnboardingMode = cloudOnboardingModeOriginal as (scope: Window) => "install" | "pwa" | "browser"
+
+/** A camera result from this site's own pairing QR; throws a typed origin/shape error. */
+export const pairingFragmentFromScan = pairingFragmentFromScanOriginal as (value: unknown) => string
 
 /** The coarse name and kind this browser registers itself under; never a user-agent string. */
 export const cloudViewerDeviceMetadata = cloudViewerDeviceMetadataOriginal as (scope: Window) => {
