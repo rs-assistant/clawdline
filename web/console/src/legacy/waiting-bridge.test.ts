@@ -15,8 +15,7 @@ const unread: WaitingModel = {
   sent: false,
   pressing: null,
   write: true,
-  refresh: { busy: false, status: "", off: true },
-  focusOff: true,
+  refresh: { busy: false, status: "" },
   screenOff: false,
   cancel: true,
 }
@@ -83,10 +82,35 @@ test("choices taken from the conversation record say so above their buttons", ()
 // read whole, while the page held only the machine list's row for it. The card
 // said Clawdline "could not read its choices from the screen".
 test("a waiting row that has not brought its menu yet says the choices are on their way", () => {
-  const said = (html: string) => [...html.matchAll(/<div class="say">(.*?)<\/div>/g)].map((m) => m[1]).join(" ")
+  const said = (html: string) =>
+    [...html.matchAll(/<div class="say[^"]*"[^>]*>(?:<canvas class="spin"><\/canvas><span>)?(.*?)(?:<\/span>)?<\/div>/g)].map((m) => m[1]).join(" ")
   const arriving = waitingHTML({ ...unread, arriving: true })
   assert.ok(said(arriving).includes(nextWord("menuArrivingSay")))
   assert.ok(!said(arriving).includes(nextWord("menuUnreadSay")))
   assert.match(arriving, /data-cancel="1">/)
   assert.match(arriving, /data-screen="1">/)
+})
+
+// On 2026-10-14 a question came to a phone late and the card had no way to say
+// whether anything was being read, nor to ask again. Every waiting card, read
+// or not, offers "read again"; it says so while it reads; the bring-forward button (never
+// live here) and the close button (which left a question unanswerable from
+// the page) are gone.
+test("every waiting card offers read again, and neither the bring-forward button nor a close button", () => {
+  const rows = [{ n: 1, label: "Tea" }] as WaitingModel["rows"]
+  for (const html of [waitingHTML(unread), waitingHTML({ ...unread, rows, question: "Tea?" })]) {
+    assert.match(html, /<button type="button" class="go" data-refresh="1">/)
+    assert.ok(html.includes(nextWord("menuReread")))
+    assert.doesNotMatch(html, /data-focus|data-dismiss/)
+  }
+  const busy = waitingHTML({ ...unread, refresh: { busy: true, status: "" } })
+  assert.match(busy, /data-refresh="1" disabled aria-busy="true">/)
+  assert.ok(busy.includes(nextWord("menuRereading")))
+  const done = waitingHTML({ ...unread, refresh: { busy: false, status: "read" } })
+  assert.match(done, /data-refresh-status="1"[^>]*>read</)
+})
+
+test("choices on their way are drawn with the pending spinner", () => {
+  assert.match(waitingHTML({ ...unread, arriving: true }), /class="say pending-state"[^>]*><canvas class="spin">/)
+  assert.doesNotMatch(waitingHTML(unread), /canvas class="spin"/)
 })

@@ -3,7 +3,7 @@ import type { SessionMenu, SessionMenuOption, SessionMenuStep, SessionMenuSubmit
 import { toast, toastFailure } from "../overlays/toast.js"
 import * as L from "../legacy/bridge.js"
 import { askInterrupt } from "../legacy/screen-bridge.js"
-import { menuKey, pressKey, waitingHTML, type KeyFailure } from "../legacy/waiting-bridge.js"
+import { menuKey, pressKey, rereadSession, waitingHTML, type KeyFailure } from "../legacy/waiting-bridge.js"
 import { nextWord } from "../next-strings.js"
 import { menuFingerprint } from "./fingerprint.js"
 import { outcomeOf } from "./outcome.js"
@@ -53,11 +53,16 @@ const PRESS_SHOWN_MS = 150
  * Across Clawdline Cloud the first of those is a second or more
  * (`cloud/relay-writer.ts`).
  *
- * Two things this daemon cannot do from here are drawn switched off rather
- * than left out: the refresh button (no `/v1/sessions/refresh` here, so
- * `aria-disabled="true"`) and "Show on Mac" (`disabled`). "Live screen" opens
- * the session's screen panel when the page gave the card a way to
- * (`onScreen`).
+ * **"Read again" is on every waiting card.** A question can reach the page
+ * late — the machine reads a screen it holds, and across Cloud states a row at
+ * its next pass — and the card had no way to say whether anything was being
+ * read. The button asks the machine to capture this Session's screen now and
+ * state its row again (`rereadSession`), says it is reading while it does, and
+ * says when the machine has taken the ask. "Live screen" opens the session's
+ * screen panel when the page gave the card a way to (`onScreen`). The card
+ * folds out of the way and does not close: a closed card left a question with
+ * no way to answer it from the page until it changed, and the bring-forward button was
+ * never live here (both removed 2026-10-14).
  *
  * **A menu whose choices could not be read still has a way out.** The card
  * says so and offers two things that need no reading: the live screen, to see
@@ -69,7 +74,7 @@ const PRESS_SHOWN_MS = 150
  */
 export function Waiting({ row, write, onScreen }: { row: SessionRow | null; write: boolean; onScreen?: () => void }) {
   const box = useRef<HTMLDivElement>(null)
-  const state = useRef<CardState>({ drawn: null, answered: null, dismissed: null, folded: null })
+  const state = useRef<CardState>({ drawn: null, answered: null, folded: null, reread: null })
   const current = useRef<{ row: SessionRow | null; write: boolean; onScreen?: () => void }>({ row, write, onScreen })
   current.current = { row, write, onScreen }
 
@@ -77,7 +82,6 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
     const el = box.current
     if (!el) return
     const st = state.current
-    const restoreRefreshFocus = !!(document.activeElement as Element | null)?.closest?.("[data-refresh]")
     const open = current.current.row
     const key = open ? open.id : null
     const menu: SessionMenu | null = open && open.state === "waiting" && open.menu ? open.menu : null
@@ -91,13 +95,12 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
     if (st.answered && (!open || st.answered.key !== key || open.state !== "waiting" || Date.now() - st.answered.at > 10000)) {
       st.answered = null
     }
-    if (st.dismissed && (!open || st.dismissed.key !== key || open.state !== "waiting")) st.dismissed = null
+    if (st.reread && (!open || st.reread.key !== key || open.state !== "waiting")) st.reread = null
     if (st.folded && (!open || st.folded.key !== key || open.state !== "waiting")) st.folded = null
     // A press is held until the question it answered has gone — the session
     // moved on, or asks something else — or for ten seconds after the machine
     // said yes, the same allowance `answered` has (`press-holds.ts`).
     const press = open ? holds.current(open.id, menuKey(menu), open.state === "waiting", Date.now()) : null
-    const hushed = !!(st.dismissed && st.dismissed.menu === menuKey(menu))
     const folded = !!(st.folded && st.folded.menu === menuKey(menu))
     const sent = !rows && !!st.answered
     if (sent && st.answered) {
@@ -107,7 +110,7 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
       steps = st.answered.steps
     }
     const want =
-      !open || open.state !== "waiting" || hushed
+      !open || open.state !== "waiting"
         ? ""
         : waitingHTML({
             folded,
@@ -128,8 +131,10 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
                     ? "sending"
                     : null,
             write: current.current.write,
-            refresh: rows ? null : { busy: false, status: "", off: true },
-            focusOff: true,
+            refresh: {
+              busy: !!st.reread?.busy,
+              status: st.reread && !st.reread.busy && st.reread.done ? nextWord("menuRereadAsked") : "",
+            },
             screenOff: !current.current.onScreen,
             cancel: current.current.write,
             screen: open.screen_reading ?? null,
@@ -151,10 +156,6 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
     // A line on its way came or went with that write: the clock follows it.
     turnPendingSpinners()
     if (!want) return
-    if (restoreRefreshFocus) {
-      const replacement = el.querySelector<HTMLElement>("[data-refresh]")
-      replacement?.focus({ preventScroll: true })
-    }
     document.dispatchEvent(new CustomEvent("clawdline:rendered"))
   }
 
@@ -180,9 +181,29 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
         return
       }
 
-      if (target.closest("[data-dismiss]")) {
-        if (open) st.dismissed = { key: open.id, menu: menuKey(open.menu) }
+      // Read again: one ask at a time, its answer said on the card. The
+      // question itself comes the way every row does.
+      const reread = target.closest<HTMLButtonElement>("[data-refresh]")
+      if (reread) {
+        if (!open || reread.disabled || st.reread?.busy) return
+        const asked = open.id
+        const ask = { key: asked, busy: true, done: false }
+        st.reread = ask
         redraw()
+        rereadSession(asked).then(
+          () => {
+            if (state.current.reread !== ask) return
+            ask.busy = false
+            ask.done = true
+            redraw()
+          },
+          (err: KeyFailure) => {
+            if (state.current.reread !== ask) return
+            state.current.reread = null
+            redraw()
+            if (current.current.row?.id === asked) toastFailure(err, L.strings.webRequestFailed)
+          },
+        )
         return
       }
 
@@ -283,9 +304,6 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
         )
         return
       }
-
-      // No refresh or focus route on this daemon: those buttons are drawn
-      // switched off, and a press on them does nothing.
     }
     el.addEventListener("click", click)
     return () => el.removeEventListener("click", click)
@@ -308,8 +326,8 @@ interface CardState {
     steps: SessionMenuStep[] | null
     at: number
   } | null
-  /** A menu waved away (`dismissedMenu`), keyed on what it says. */
-  dismissed: { key: string | null; menu: string } | null
   /** A card folded out of the way (`foldedMenu`). */
   folded: { key: string | null; menu: string } | null
+  /** A "read again" on its way (`busy`) or taken by the machine (`done`). */
+  reread: { key: string | null; busy: boolean; done: boolean } | null
 }

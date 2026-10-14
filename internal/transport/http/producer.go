@@ -256,6 +256,13 @@ func (s *Server) CloudSessionsFresh(context.Context) ([]byte, bool) {
 	return body, true
 }
 
+// CloudSessionLook is the publisher's way to make one Session's next screen
+// reading a capture (cloud.Publisher.Look): the same window a press opens
+// (app.HeldScreens.Pressed), opened by a page asking for that row again.
+func (s *Server) CloudSessionLook(id string) {
+	s.inventory.Held.Pressed(id)
+}
+
 // CloudSessions is the session list as the Cloud publisher reads it: the
 // product every stream reads, encoded as `GET /v1/sessions` answers it, so the
 // publisher no longer builds one of its own through the route.

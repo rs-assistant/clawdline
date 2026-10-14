@@ -62,6 +62,17 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 	// are one build of the machine, not one each. The build keeps the eight
 	// seconds this route gave its own.
 	snapshot := s.lists().snapshot()
+	if look := r.URL.Query().Get("look"); look != "" {
+		// A person pressed "read again" on a waiting Session whose question
+		// has not come: that Session's screen is captured now rather than
+		// served from what is held, and the list is built now rather than
+		// taken from a product up to a tick old. The streams read the same
+		// product, so the next event carries the question too.
+		s.inventory.Held.Pressed(look)
+		if fresh, err := s.lists().sessions.since(time.Now()); err == nil {
+			snapshot = fresh
+		}
+	}
 	if r.URL.Query().Get("parts") == "list" {
 		// The Cloud fleet asks once per machine. Reuse the local single-machine
 		// snapshot, including the fields used by the original row status line.

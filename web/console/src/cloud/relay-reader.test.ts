@@ -1754,3 +1754,17 @@ test("squad reads carry exact scope, binding and cursor fields to the chosen mac
   }
   assert.equal(client.reads.length, count, "invalid reads never reach the machine")
 })
+
+// "Read again" on a waiting card (2026-10-14): across Cloud it is the one-row
+// read, so the machine captures that Session's screen and states its row now.
+test("read again asks the machine for just that row", async () => {
+  const client = new FakeClient()
+  ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements =
+    (_machine, word) => word === "sessions.row" ? "yes" : "unknown"
+  const r = reader(client, { t: 10_000 })
+  await r.fetch("/v1/sessions?look=%2519")
+  assert.deepEqual(client.reads.at(-1), { machine: "mac-a", word: "sessions.row", body: { row: "%19" } })
+  ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements = () => "unknown"
+  await r.fetch("/v1/sessions?look=%2519")
+  assert.equal(client.reads.at(-1)?.word, "sessions.snapshot", "an older machine is asked to restate everything")
+})

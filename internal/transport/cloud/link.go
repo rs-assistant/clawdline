@@ -178,6 +178,9 @@ type LinkOptions struct {
 	// SessionsFresh is Sessions built now, for the passes right after a press
 	// (Publisher.Fresh). Nil reads Sessions.
 	SessionsFresh func(context.Context) ([]byte, bool)
+	// SessionLook makes one Session's next screen reading a capture rather
+	// than the held screen (Publisher.Look). Nil leaves every screen held.
+	SessionLook func(id string)
 	// TerminalService is the only ingress to the local terminal service from
 	// signed Cloud envelopes. The regular Router remains forbidden.
 	TerminalService   func() (*terminals.Service, error)
@@ -747,6 +750,7 @@ func (l *Link) wire() error {
 			AppOrigin: settings.AppOrigin},
 		Sessions: opts.Sessions,
 		Fresh:    opts.SessionsFresh,
+		Look:     opts.SessionLook,
 		// Whether a task row was written since the last pass asked. Without
 		// it the publisher cannot tell a list that moved from one that did
 		// not, and read it on every pass to find out (tasklist.go).
