@@ -1,6 +1,6 @@
 # Secret Handoff (機密交付)
 
-Secret Handoff is the person-to-Session path for a password, credential, or API key needed by a local tool. The Note is an invitation and status surface, never the value's storage. A normal Session message and its transcript are also unsuitable: they retain what was sent. The receiving agent asks for one named secret and the person pastes it into a dedicated input in that Note.
+Secret Handoff is the person-to-Session path for a password, credential, or API key needed by a local tool. The Note is an invitation and status surface, never the value's storage. A normal Session message and its transcript are also unsuitable: they retain what was sent. The receiving agent names the credential in the Note summary, shown as the subtitle directly beneath the Note title. The person pastes its value into the dedicated multi-line input. The summary is a non-secret label, never the value.
 
 ## Contract
 

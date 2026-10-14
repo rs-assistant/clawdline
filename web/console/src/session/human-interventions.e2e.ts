@@ -328,7 +328,7 @@ function fixture(): Server {
     if (path.startsWith("/v1/work/v2/human-interventions/")) {
       const note = { id: NOTE, source_conversation: "10000000-0000-4000-8000-000000000001", source_label: "Manager Session",
         target_conversation: CONVERSATION, target_session: SESSION, kind: secretMode ? "secret" : "answer", title: secretMode ? "Secret Handoff" : "Choose a release day",
-        summary: secretMode ? "A tool needs a credential." : "The release is waiting for a date.", action: secretMode ? "Paste the credential." : "Choose a date.", reason: secretMode ? "The Session needs it for the tool." : "Only the person knows the preferred date.",
+        summary: secretMode ? "Production API key" : "The release is waiting for a date.", action: secretMode ? "Paste the credential." : "Choose a date.", reason: secretMode ? "The Session needs it for the tool." : "Only the person knows the preferred date.",
         document_url: secretMode ? "" : origin + `/#document=1&machine=this-mac&session=${SESSION}&scope=project&path=demo.md`,
         detail: secretMode ? "" : ("The report is ready. Please review the proposed date and the linked evidence.\n").repeat(36), options: secretMode ? [] : showOptions ? [
           { label: "Tuesday", draft: "Tuesday works for me." }, ...singleOption ? [] : [{ label: "Wednesday", draft: "Wednesday works for me." }] ] : [],
@@ -857,17 +857,17 @@ test("Secret Handoff pastes one-line and multi-line values without sending them 
     const mark = browser.loadCount; await browser.send("Page.navigate", { url: origin + "/#session=" + SESSION }, id); await browser.loaded(id, mark)
     await until(`!!document.querySelector(".human-interventions-head")`)
     await run(`document.querySelector(".human-interventions-head").click()`)
-    await until(`!!document.querySelector(".secret-handoff-form input[type=password]")`)
+    await until(`!!document.querySelector(".secret-handoff-form textarea")`)
+    assert.equal(await run(`document.querySelector(".human-intervention-title .human-intervention-subtitle")?.textContent`), "Production API key")
+    assert.equal(await run(`!!document.querySelector(".secret-handoff-form input")`), false)
     assert.equal(await run(`!!document.querySelector(".human-intervention-option")`), false)
-    await run(`document.querySelector(".secret-handoff-form input[type=password]").value = "SAFE_ONE_LINE_FIXTURE"; document.querySelector(".secret-handoff-form button[type=submit]").click()`)
+    await run(`document.querySelector(".secret-handoff-form textarea").value = "SAFE_ONE_LINE_FIXTURE"; document.querySelector(".secret-handoff-form button[type=submit]").click()`)
     await until(`document.querySelector(".human-interventions-status")?.textContent?.includes("已收到機密值")`)
-    await until(`document.querySelector(".secret-handoff-form input[type=password]")?.value === ""`)
+    await until(`document.querySelector(".secret-handoff-form textarea")?.value === ""`)
     assert.deepEqual(handoffValues, ["SAFE_ONE_LINE_FIXTURE"])
     assert.equal(sentTexts.some((text) => text.includes("SAFE_ONE_LINE_FIXTURE")), false)
     assert.equal(await run(`document.querySelector("#msg")?.textContent?.includes("SAFE_ONE_LINE_FIXTURE")`), false)
     await until(`!document.querySelector(".secret-handoff-form button[type=submit]")?.disabled`)
-    await run(`document.querySelector(".secret-handoff-multiline input").click()`)
-    await until(`!!document.querySelector(".secret-handoff-form textarea")`)
     await run(`document.querySelector(".secret-handoff-form textarea").value = "-----BEGIN FIXTURE-----\\nline two"; document.querySelector(".secret-handoff-form button[type=submit]").click()`)
     await until(`document.querySelector(".secret-handoff-form textarea")?.value === ""`)
     assert.deepEqual(handoffValues, ["SAFE_ONE_LINE_FIXTURE", "-----BEGIN FIXTURE-----\nline two"])

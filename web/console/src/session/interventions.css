@@ -34,6 +34,7 @@
 .human-intervention-card p { margin: 7px 0; }
 .human-intervention-title { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
 .human-intervention-title h3 { margin: 0; font: inherit; font-size: 14px; font-weight: 650; }
+.human-intervention-subtitle { display: block; margin-top: 4px; color: var(--ink); font-size: 13px; }
 .human-intervention-stage { display: block; margin-top: 3px; color: var(--muted, #777); font-size: 11px; }
 .human-intervention-created { display: block; margin-top: 2px; color: var(--muted, #777); font-size: 11px; line-height: 1.35; font-variant-numeric: tabular-nums; }
 .human-intervention-type { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; color: var(--dim); font-size: 11px; }
@@ -59,9 +60,8 @@
 .human-intervention-option:disabled, .human-intervention-actions button:disabled { opacity: .5; cursor: not-allowed; }
 .secret-handoff-form { display: grid; gap: 8px; margin-top: 12px; }
 .secret-handoff-form > label:first-child { font-weight: 650; }
-.secret-handoff-form > input, .secret-handoff-form > textarea { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--background, #111); font: inherit; }
-.secret-handoff-form > input:focus-visible, .secret-handoff-form > textarea:focus-visible, .secret-handoff-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.secret-handoff-multiline { display: inline-flex; align-items: center; gap: 6px; width: fit-content; }
+.secret-handoff-form > textarea { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--background, #111); font: inherit; }
+.secret-handoff-form > textarea:focus-visible, .secret-handoff-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .secret-handoff-form p { margin: 0; color: var(--muted, #777); font-size: 12px; }
 .secret-handoff-form button { width: fit-content; border: 1px solid var(--accent); border-radius: 6px; padding: 8px 12px; background: transparent; color: var(--accent); font: inherit; font-weight: 650; cursor: pointer; }
 .secret-handoff-form button:disabled { opacity: .5; cursor: not-allowed; }

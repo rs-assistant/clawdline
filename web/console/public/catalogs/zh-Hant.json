@@ -4278,7 +4278,6 @@
   "next.sendDiagnosticUnavailable": "無法記錄診斷；連線恢復後再試",
   "next.secretHandoffError": "交付未完成。再次嘗試前，請先確認 Session 狀態。",
   "next.secretHandoffLabel": "機密值",
-  "next.secretHandoffMultiline": "多行憑證",
   "next.secretHandoffName": "機密交付",
   "next.secretHandoffNoticeError": "機密值已收到，但無法通知 Session。請傳送一則只提及此機密交付便條紙的訊息。",
   "next.secretHandoffPlaceholder": "貼上所需的密碼或金鑰",

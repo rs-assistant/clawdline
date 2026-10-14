@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5154,
+  "englishKeys": 5153,
   "counts": {
     "negation": 1484,
     "state": 708,
-    "permission": 300,
+    "permission": 299,
     "deletion": 106,
     "uncertainty": 149
   },
-  "unionCount": 2263,
+  "unionCount": 2262,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -2446,7 +2446,6 @@
       "next.schedulePermissionField",
       "next.schedulePermissionFull",
       "next.schedulePermissionFullWarning",
-      "next.secretHandoffMultiline",
       "next.sessionPairToSend",
       "next.signedInLede",
       "next.signedInPassword",
@@ -4557,7 +4556,6 @@
     "next.screenForbidden",
     "next.screenUnanswered",
     "next.secretHandoffError",
-    "next.secretHandoffMultiline",
     "next.secretHandoffNoticeError",
     "next.secretHandoffPrivacy",
     "next.secretHandoffReadyMessage",
