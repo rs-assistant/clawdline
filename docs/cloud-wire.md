@@ -733,6 +733,8 @@ Hosted 頁面讀取失敗時，如果失敗發生在送出之前或回答離開�
 
 相容：這是新增的指令字。舊 daemon 不在描述的 `commands` 裡宣告它，頁面就不送，列留在瀏覽器自己的保存與上限內，不會重試到天荒地老；新 daemon 對今天已上線的頁面只是多一個沒人呼叫的字。
 
+The first-read timing events `cloud.detail.first_read` and `cloud.transcript.first_read` include the opaque Session ID alongside the machine, outcome and stage durations. An abandoned first detail read reports `outcome=aborted`. A slow or refused machine read logs its Session ID too. This joins the phone's opening attempt to the exact machine response without logging a title or conversation text; a timing event for another Session is not evidence about the one on screen.
+
 ### 9.6 本機 broker 的 typed 拒絕
 
 遠端派工會得到本機 orchestrator 原本就有的那組 typed error：`workspace_busy`、`over_capacity`、

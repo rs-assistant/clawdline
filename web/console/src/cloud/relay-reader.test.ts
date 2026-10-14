@@ -447,6 +447,7 @@ test("a cross-machine conversation uses a verified list when its retained status
   assert.deepEqual(client.pinnedReads, [target])
   assert.equal(timings.length, 1)
   assert.equal(timings[0].event, "cloud.transcript.first_read")
+  assert.equal(timings[0].data.session, "s1")
   assert.equal(timings[0].data.outcome, "ready")
   for (const field of ["total_ms", "sessions_ms", "words_ms", "pin_ms", "wire_ms"]) {
     assert.equal(typeof timings[0].data[field], "number", field)

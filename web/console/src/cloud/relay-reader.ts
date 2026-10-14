@@ -1886,9 +1886,9 @@ export class RelayReader {
       try {
         const log = (client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } }).viewerEvents
         log?.record?.("cloud.transcript.first_read", {
-          machine: this.machine, outcome, total_ms: Date.now() - started,
+          machine: this.machine, session, outcome, total_ms: Date.now() - started,
           sessions_ms: sessionsMs, words_ms: wordsMs, pin_ms: pinMs, wire_ms: wireMs,
-        }, "cloud.transcript.first_read|" + this.machine)
+        }, "cloud.transcript.first_read|" + this.machine + "|" + session)
       } catch { /* diagnostics cannot fail a read */ }
     }
     // `transcript` is past the remembered descriptor's cut too, and this read
