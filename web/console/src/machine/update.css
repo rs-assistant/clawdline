@@ -57,6 +57,8 @@
 .update-banner .update-banner-go {
     flex: 0 0 auto; color: #17110e; background: var(--update-orange);
     border-color: var(--update-orange); font-weight: 650; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 32px; padding: 0 10px; line-height: 1;
 }
 .update-banner .update-banner-go:hover:not(:disabled) { background: #ffc16d; border-color: #ffc16d; color: #17110e; }
 .update-banner .update-command {
@@ -78,5 +80,4 @@
     .settings-update .update-auto .settings-switch { justify-self: start; }
     .settings-update .update-now { min-height: 44px; }
     .update-banner { flex-wrap: wrap; }
-    .update-banner-go { min-height: 44px; display: inline-flex; align-items: center; }
 }
