@@ -1,5 +1,11 @@
 import type { CloudMachine } from "./copied.js"
 
+/** A fresh client replaces transport, not the machine-management view the person opened. */
+export function screenAfterConnected<S extends { at: string }>(screen: S, hasReader: boolean): S | { at: "console" | "machines" } {
+  if (screen.at === "machines") return screen
+  return { at: hasReader ? "console" : "machines" }
+}
+
 /** The account's machine list, with absence and failure kept as different facts. */
 export type MachineListState =
   | { phase: "loading" }
