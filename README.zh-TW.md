@@ -14,8 +14,8 @@ Clawdline Cloud 透過端對端加密的中繼，讓手機或其他機器連回�
 
 **在同一處與 Agent 協作：**[圖片標記](docs/user/sessions.md)・
 [重用 Workflow 與常用句](docs/user/sessions.md)・[接收通知](docs/user/notifications.md)・
-[安全交付金鑰](docs/user/secret-handoff.md)・[回覆便條紙、留下待辦](docs/user/board.md#session-to-dos)・
-[看 Agent 傳來的圖](docs/user/sessions.md)・[追蹤看板](docs/user/board.md)・
+[加密交付機密資料](docs/user/secret-handoff.md)・[回覆便條紙、留下待辦](docs/user/board.md#session-to-dos)・
+[直接看 Agent 傳來的圖](docs/user/sessions.md)・[從看板追到合併](docs/user/board.md)・
 [看懂 Session 狀態](docs/user/sessions.md)。[看圖解指南](https://clawdline.com/docs/experience/?lang=zh-TW)。
 
 **macOS 13+ 或 Linux 一行安裝：**
