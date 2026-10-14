@@ -524,7 +524,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const listHTML = snippetsListHTML(model, {
     controls: SNIPPET_CONTROLS,
     readOnly: false,
-    loading,
+    loading: false,
     error,
     menuFor,
   })
@@ -582,11 +582,10 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
           aria-labelledby="snippet-tab"
           ref={list}
           onClick={pressed}
-          dangerouslySetInnerHTML={{ __html: listHTML }}
-        /> : <div className="snippet-list workflow-picker" id="workflow-picker" role="tabpanel" aria-labelledby="workflow-tab">
+        >{loading ? <SnippetSkeleton label={T.webReading} /> : <div dangerouslySetInnerHTML={{ __html: listHTML }} />}</div> : <div className="snippet-list workflow-picker" id="workflow-picker" role="tabpanel" aria-labelledby="workflow-tab">
           <div className="workflow-picker-toolbar"><span>{W("chooseWorkflow")}</span>
             <button type="button" className="workflow-reload" disabled={loading} onClick={() => { void refresh() }}>{W("reload")}</button></div>
-          {loading && <p role="status">{W("loading")}</p>}
+          {loading && <SnippetSkeleton label={W("loading")} />}
           {error && <p role="alert">{error}</p>}
           {!loading && !error && !projectUnresolved && workflows.length === 0 && <p className="snippets-note">{W("noSessionWorkflows")}</p>}
           {([true, false] as const).map((global) => {
@@ -752,4 +751,12 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       ) : null}
     </>
   )
+}
+
+function SnippetSkeleton({ label }: { label: string }) {
+  return <div className="snippet-skeleton" role="status" aria-label={label}>
+    {[0, 1].map((row) => <div className="snippet-skeleton-row" aria-hidden="true" key={row}>
+      <span className="snippet-skeleton-title" /><span className="snippet-skeleton-body" />
+    </div>)}
+  </div>
 }

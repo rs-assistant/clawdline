@@ -20,3 +20,13 @@
 .workflow-launch [role="alert"] { margin: .6rem 0 0; color: var(--danger, #d84a4a); }
 .snippets-sheet .buttons .workflow-start { min-height: 2.75rem; padding: .65rem 1rem; border: 1px solid var(--accent); border-radius: .6rem; background: var(--accent); color: #17191d; font: inherit; font-weight: 650; cursor: pointer; }
 .snippets-sheet .buttons .workflow-start:disabled { opacity: .5; cursor: default; }
+
+.snippet-skeleton { display: grid; gap: 2px; width: 100%; }
+.snippet-skeleton-row { display: grid; gap: 7px; padding: 10px 12px; min-height: 58px; }
+.snippet-skeleton-row span { display: block; height: 11px; border-radius: 5px; background: var(--card-hi); animation: snippet-skeleton-pulse 1.2s ease-in-out infinite alternate; }
+.snippet-skeleton-title { width: 38%; }
+.snippet-skeleton-body { width: 76%; opacity: .7; }
+.snippet-skeleton-row:nth-child(2) .snippet-skeleton-title { width: 55%; }
+.snippet-skeleton-row:nth-child(2) .snippet-skeleton-body { width: 61%; }
+@keyframes snippet-skeleton-pulse { to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .snippet-skeleton-row span { animation: none; } }
