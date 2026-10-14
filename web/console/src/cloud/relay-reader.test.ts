@@ -17,6 +17,22 @@ import japanese from "../../public/catalogs/ja.json" with { type: "json" }
 // @ts-expect-error -- Node runs the source test with type stripping.
 import { activateCatalog, catalogRefusalDetail, resetCatalogForTest } from "../catalog.ts"
 
+test("a failed send can queue a private-free phone diagnostic while reconnecting", () => {
+  const reader = new RelayReader("mac-a")
+  assert.equal(reader.recordSendDiagnostic("cloud_reconnecting"), false)
+  const rows: { event: string; data: Record<string, unknown> }[] = []
+  const client = new FakeClient()
+  client.ready = false
+  client.viewerEvents = { record(event, data) { rows.push({ event, data }); return { n: rows.length } } }
+  reader.attach(client)
+  assert.equal(reader.recordSendDiagnostic("cloud_reconnecting"), true)
+  assert.deepEqual(rows[0]?.event, "cloud.send.diagnostic_requested")
+  assert.equal(rows[0]?.data.code, "cloud_reconnecting")
+  assert.equal(rows[0]?.data.connection, "not_ready")
+  assert.equal(rows[0]?.data.machine, "mac-a")
+  assert.equal(JSON.stringify(rows).includes("message"), false)
+})
+
 test("Session header trail distinguishes started, observed, canceled, unavailable and reconnect without identifiers", async () => {
   const saved = globalThis.sessionStorage
   const entries = new Map<string, string>()
@@ -64,7 +80,7 @@ test("Session header trail distinguishes started, observed, canceled, unavailabl
 
 class FakeClient implements CloudReadClient {
   ready = true
-  viewerEvents?: { record(event: string, data: Record<string, unknown>, key?: string): void }
+  viewerEvents?: { record(event: string, data: Record<string, unknown>, key?: string): void | { n: number } }
   statusSnapshots?: ReadonlyMap<string, unknown>
   sessionInventoryByMachine = new Map<string, unknown>()
   machineRows: { id: string; freshness: "current" | "stale" | "unknown" }[] = [
