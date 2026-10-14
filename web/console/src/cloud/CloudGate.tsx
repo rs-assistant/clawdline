@@ -80,6 +80,7 @@ import {
   machineListAnswer,
   machineListRefusal,
   retryReason,
+  screenAfterConnected,
   type AccessProblem,
   type MachineListState,
   type RetryReason,
@@ -936,6 +937,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       if (!named) return
       setTold(null)
       forgetReturn.current = "console"
+      setManagingMachines(true)
       setAsking(named)
       setScreen({ at: "machines" })
     })
@@ -950,6 +952,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     setAsking(machine)
     if (!machine && forgetReturn.current === "console") {
       forgetReturn.current = "machines"
+      setManagingMachines(false)
       setScreen({ at: "console" })
     }
   }, [])
@@ -1034,11 +1037,11 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             else next.enableClassicSessionView?.(reader.current.machine,
               fleetScopeRef.current ? target?.sessionID : undefined)
             setTerminalHost({ client: next as unknown as TerminalCloudClient, machine: reader.current.machine })
-            setScreen({ at: "console" })
+            setScreen((current) => screenAfterConnected(current, true))
             return
           }
           listMachines()
-          setScreen({ at: "machines" })
+          setScreen((current) => screenAfterConnected(current, false))
           return
         }
         case "sign_in":
