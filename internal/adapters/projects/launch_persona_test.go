@@ -18,6 +18,7 @@ import (
 func shellWords(t *testing.T, line string) []string {
 	t.Helper()
 	line = strings.ReplaceAll(line, ClawdlinePathEnv(), "PATH=/stable/bin")
+	line = strings.ReplaceAll(line, assistantPathEnv(AssistantCodex), "PATH=/stable/bin")
 	var words []string
 	var cur strings.Builder
 	inWord := false

@@ -410,6 +410,18 @@ func ClawdlinePathEnv() string {
 		string(os.PathListSeparator) + `"$PATH"`
 }
 
+// assistantPathEnv keeps the Node next to an npm-installed Codex ahead of a
+// project's Node. The interactive shell may have prepended a project runtime
+// after Codex was installed; npm's shim then selects the wrong architecture.
+func assistantPathEnv(assistant string) string {
+	if assistant == AssistantCodex {
+		return "PATH=" + ShellQuoted(filepath.Join(config.Dir(), "bin")) +
+			string(os.PathListSeparator) + `"$(dirname "$(command -v codex)")"` +
+			string(os.PathListSeparator) + `"$PATH"`
+	}
+	return ClawdlinePathEnv()
+}
+
 // ShellCommand is ProviderLaunchPlan.shellCommand: `env -u …` first, so the
 // program runs as its own process with nothing in front of it in `ps`.
 func (l Launch) ShellCommand() string {
@@ -426,7 +438,7 @@ func (l Launch) ShellCommandWithEnv(set []string) string {
 		}
 		prefix = "env " + strings.Join(append(parts, set...), " ") + " "
 	}
-	return prefix + ClawdlinePathEnv() + " " + strings.Join(append([]string{l.Assistant}, l.Arguments...), " ")
+	return prefix + assistantPathEnv(l.Assistant) + " " + strings.Join(append([]string{l.Assistant}, l.Arguments...), " ")
 }
 
 // ShellLine is ProviderLaunchPlan.shellLine: what an iTerm2 tab is typed.

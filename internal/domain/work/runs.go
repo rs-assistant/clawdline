@@ -108,7 +108,7 @@ func AcceptanceRevisionInstruction(excerpt, itemID, title string, soleOwnedItem 
 				preceding = preceding[cut+size:]
 			}
 			clause := strings.TrimSpace(preceding)
-			if identified && strings.HasSuffix(clause, "plan") &&
+			if (identified || soleOwnedItem) && strings.HasSuffix(clause, "plan") &&
 				!strings.Contains(clause, "驗收") && !strings.Contains(clause, "acceptance") {
 				continue
 			}

@@ -72,6 +72,10 @@ test("an inventory still refreshing is not an iTerm failure", () => {
   )
 })
 
+test("a disabled iTerm2 source does not put a permanent warning above the list", () => {
+  assert.equal(scanFailureWords([], [{ source: "iterm", complete: false, disabled: "setting" }], true), null)
+})
+
 test("the title's number is the same set as the list", () => {
   assert.equal(totalSessionWords(6, true), "6 個 session")
   assert.equal(inCatalog("en", () => totalSessionWords(1, false)), "1 session")

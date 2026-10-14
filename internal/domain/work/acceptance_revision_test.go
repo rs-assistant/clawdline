@@ -18,6 +18,8 @@ func TestAcceptanceRevisionInstructionUsesOnlyUnambiguousConversationContext(t *
 		{"colon before prohibition is not replacement", "請注意：不要修改 " + id + " 的驗收", false, false},
 		{"a requirement can be removed without a colon", "請把 " + id + " 的驗收改為不要求額外網址", false, true},
 		{"switch this cycle and defer a separate plan", "『" + id + " 本輪改以公開安裝後的 App／Agent／首個 Session 驗收；DMG 留在未來 Plan 40000000-0000-4000-8000-000000000004。』 (Clawdline 便條 20000000-0000-4000-8000-000000000002：「請直接修訂驗收」；待回覆事項：請傳送修訂指示。)", false, true},
+		{"short item id with sole ownership and future plan", "『10000000 本輪改以公開安裝後的 App／Agent／首個 Session 驗收；DMG 留在未來 Plan 40000000-0000-4000-8000-000000000004。』 (Clawdline 便條 20000000-0000-4000-8000-000000000002：「請直接修訂 10000000 本輪驗收」；待回覆事項：請傳送修訂指示。)", true, true},
+		{"short item id with several owned items stays ambiguous", "10000000 本輪改以首個 Session 驗收；DMG 留在未來 Plan 40000000-0000-4000-8000-000000000004。", false, false},
 		{"foreign item in a second clause is still ambiguous", "請把 " + id + " 的驗收改以首個 Session 為準；另外修改 30000000-0000-4000-8000-000000000003 的驗收。", false, false},
 		{"future plan alone does not identify this item", "本輪改以首個 Session 驗收；DMG 留在未來 Plan 40000000-0000-4000-8000-000000000004。", false, false},
 		{"English removal is not a denial", "Please revise acceptance for " + id + ": do not require a separate domain", false, true},
