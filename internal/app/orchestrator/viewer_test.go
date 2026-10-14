@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/app/tmuxview"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
@@ -16,6 +17,7 @@ type viewedLauncher struct {
 	tabErr  error
 	tabLine string
 	viewed  string
+	done    chan struct{}
 }
 
 func (l *viewedLauncher) ITermRunning(context.Context) (bool, error) { return true, nil }
@@ -28,7 +30,10 @@ func (l *viewedLauncher) PrepareTmuxViewer(_ context.Context, name string) (stri
 }
 func (l *viewedLauncher) NewITermTab(_ context.Context, line string) (string, error) {
 	l.mu.Lock()
-	defer l.mu.Unlock()
+	defer func() {
+		l.mu.Unlock()
+		close(l.done)
+	}()
 	l.tabLine = line
 	if l.tabErr != nil {
 		return "", l.tabErr
@@ -45,9 +50,11 @@ func TestAChildWithITermAndTmuxIsATmuxPaneShownInATab(t *testing.T) {
 		"tab not opened": errors.New("iTerm2 did not answer in time."),
 	} {
 		t.Run(name, func(t *testing.T) {
+			waitForViewerLane(t)
 			b, ctx := newTestBroker(t)
 			b.Clock = steppingClock(time.Date(2026, 10, 2, 6, 0, 0, 0, time.UTC), 10*time.Second)
-			launcher := &viewedLauncher{recordingLauncher: recordingLauncher{pane: "%82"}, tabErr: tabErr}
+			launcher := &viewedLauncher{recordingLauncher: recordingLauncher{pane: "%82"}, tabErr: tabErr,
+				done: make(chan struct{})}
 			b.Launcher = launcher
 			keys := &typedKeys{}
 			b.Type = keys.Type
@@ -77,10 +84,26 @@ func TestAChildWithITermAndTmuxIsATmuxPaneShownInATab(t *testing.T) {
 				t.Fatalf("briefing typed %d times into the pane and %d into the tab",
 					keys.count("%82"), keys.count("TAB-VIEWER"))
 			}
+			select {
+			case <-launcher.done:
+			case <-time.After(2 * time.Second):
+				t.Fatal("the optional viewer did not finish")
+			}
 			want := ChildSessionName(id)
 			if launcher.viewed != want || launcher.tabLine != "exec '/usr/bin/tmux' attach -t '="+want+"'" {
 				t.Errorf("viewer for %q typed %q", launcher.viewed, launcher.tabLine)
 			}
 		})
+	}
+}
+
+func waitForViewerLane(t *testing.T) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for tmuxview.ViewerOpenCount() != 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("a previous optional viewer did not release its slot")
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
