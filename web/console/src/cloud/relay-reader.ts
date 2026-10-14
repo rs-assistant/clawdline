@@ -988,6 +988,17 @@ export class RelayReader {
           return await this.machineRead(init?.signal, method, path, "squad-events", { after: Number(after), limit: Number(limit) })
         }
         case "/v1/sessions":
+          if (url.searchParams.has("look")) {
+            // "Read again" on a waiting card: this one row, with its screen
+            // captured now (publish.go StateRow, Publisher.Look). The row
+            // comes back on its own channel; the answer only says it was asked.
+            const look = this.only(url, path, "look").look ?? ""
+            if (!look) return this.refuse(method, path, 400, "invalid_session", "No Session was named to read again.")
+            this.questionAsked = null
+            return await this.machineRead(init?.signal, method, path,
+              this.machineImplements("sessions.row") ? "sessions.row" : "sessions.snapshot",
+              this.machineImplements("sessions.row") ? { row: look } : {})
+          }
           this.note(method, path, "local")
           return json(200, await this.initialSnapshot(init?.signal,
             new Headers(init?.headers).get("X-Clawdline-Initial-Read") === "1"))
@@ -2348,6 +2359,12 @@ export class RelayReader {
    * `QUESTION_RESTATE_MS`, so a machine that answers with no question is not
    * asked in a loop.
    */
+  /** Whether this page's machine lists `word` among the reads it answers. */
+  private machineImplements(word: string): boolean {
+    return (this.client as { _machineImplements?(machine: string, word: string): string } | null)
+      ?._machineImplements?.(this.machine, word) === "yes"
+  }
+
   private askForOpenedQuestion(target: SessionDestination): boolean {
     const key = target.sessionID + "\u0000" + target.executionGeneration
     const now = this.now()
@@ -2356,8 +2373,7 @@ export class RelayReader {
     // `.initial` is stated at once rather than at the machine's next pass, once
     // per viewer per pass (publish.go SnapshotFrom); a machine that does not
     // list the word is asked the plain way.
-    const implements_ = (word: string) => (this.client as { _machineImplements?(machine: string, word: string): string } | null)
-      ?._machineImplements?.(this.machine, word) === "yes"
+    const implements_ = (word: string) => this.machineImplements(word)
     // `sessions.row` states just this row, now (publish.go StateRow); the
     // whole restatement is for a machine from before that word.
     const ask = implements_("sessions.row")

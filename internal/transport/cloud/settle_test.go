@@ -3,6 +3,7 @@ package cloud
 import (
 	"context"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -92,6 +93,48 @@ func TestOneSessionRowIsStatedNowEvenUnchanged(t *testing.T) {
 	}
 	if stated, refusal := publisher.StateRow(ctx, "viewer-01", "%99"); refusal != nil || len(stated.IDs) != 0 {
 		t.Fatalf("a row the machine does not have was answered %+v %+v", stated, refusal)
+	}
+	cancel()
+	<-done
+}
+
+// A page asks for a waiting row because its question has not come. On
+// 2026-10-14 the phone reported `rich_state=waiting rich_options=0` five times:
+// the row it was sent had been built from a screen held from before the
+// question was drawn. The ask makes that Session's screen a capture first, and
+// the fresh read comes after it.
+func TestAnAskedRowLooksAtItsScreenBeforeItsFreshRead(t *testing.T) {
+	out := &collector{}
+	body := scanBody(t, true, map[string]bool{"ps": true, "tmux": true, "iterm": true},
+		scanRow{id: "%19", tty: "ttys001", backend: "tmux"})
+	publisher := newPublisher(&fixedRouter{body: body}, out)
+	publisher.Every = time.Hour
+	var mu sync.Mutex
+	var order []string
+	publisher.Look = func(id string) {
+		mu.Lock()
+		defer mu.Unlock()
+		order = append(order, "look "+id)
+	}
+	publisher.Fresh = func(context.Context) ([]byte, bool) {
+		mu.Lock()
+		defer mu.Unlock()
+		order = append(order, "fresh")
+		return []byte(body), true
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { _ = publisher.Run(ctx); close(done) }()
+	waitFor(t, "the first pass", func() bool { return len(legacyChannels(out.channels())) >= 3 })
+	if _, refusal := publisher.StateRow(ctx, "viewer-01", "%19"); refusal != nil {
+		t.Fatalf("refused: %+v", *refusal)
+	}
+	mu.Lock()
+	got := strings.Join(order, ", ")
+	mu.Unlock()
+	if got != "look %19, fresh" {
+		t.Fatalf("the ask did %q; want the screen looked at, then the fresh read", got)
 	}
 	cancel()
 	<-done

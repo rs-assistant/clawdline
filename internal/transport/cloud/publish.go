@@ -127,6 +127,13 @@ type Publisher struct {
 	// because they run right after a press changed a screen and a tick-old list
 	// is the screen before the press. Nil reads Sessions.
 	Fresh func(context.Context) ([]byte, bool)
+	// Look asks for one Session's screen to be captured by the next reading
+	// instead of served from what is held (internal/app HeldScreens.Pressed).
+	// A `sessions.row` ask calls it before its fresh pass: the ask is a page
+	// showing a waiting Session without its question, and a held screen from
+	// before the question was drawn would answer it without one again. Nil
+	// looks at nothing new.
+	Look func(id string)
 	// TaskListMoved answers whether this machine has written a task row since
 	// it was last asked, and clears the fact (link.go, takeTaskListMoved).
 	// Nil answers no, which leaves the list to be read on the first pass, on
@@ -632,6 +639,9 @@ func (p *Publisher) StateRow(ctx context.Context, sender, id string) (cloudops.S
 // stateRow forgets that one row was sent, so the fresh pass sends it again,
 // and answers with it named only if the reading had it.
 func (p *Publisher) stateRow(ctx context.Context, ask rowAsk) {
+	if p.Look != nil {
+		p.Look(ask.id)
+	}
 	delete(p.published, ask.id)
 	delete(p.sent, ask.id)
 	delete(p.steady, ask.id)
