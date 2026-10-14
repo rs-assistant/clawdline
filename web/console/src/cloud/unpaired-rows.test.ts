@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/forget.test.ts.
-import { accountMachineNames, accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames } from "./unpaired-rows.ts"
+import { accountMachineNames, accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, withAccountRegistrations } from "./unpaired-rows.ts"
 
 const API = "https://api.example.test"
 
@@ -49,6 +49,8 @@ test("the account roster keeps revoked ids so a retained relay snapshot cannot d
   assert.ok(roster)
   assert.deepEqual([...roster.revoked], ["mac_old"])
   assert.equal(roster.names.has("mac_old"), false)
+  assert.deepEqual([...roster.registered.keys()], ["mac_1", "mac_51463f04", "mac_blank"])
+  assert.equal(roster.registered.has("mac_old"), false)
 })
 
 test("an account that will not say leaves no names, and no error for the list to trip on", async () => {
@@ -59,9 +61,35 @@ test("an account that will not say leaves no names, and no error for the list to
 })
 
 const present = (id: string, name: string, platform: string) => ({
-  name,
+  name: name || "Machine · " + id.slice(-8),
   label: (platform === "linux" ? "Linux" : "Desk") + " · " + name,
   kind: platform === "linux" ? "linux" : "desk",
+})
+
+test("account-only registrations remain identifiable and revocable without invented relay facts", async () => {
+  const { get } = account({ status: 200, body: LISTED })
+  const roster = await accountMachineRoster(API, get)
+  assert.ok(roster)
+  const witnessed = {
+    id: "mac_1", name: "Studio (published)", label: "Desk · Studio (published)", kind: "desk",
+    observedAt: 100, freshness: "current" as const, pairing: "paired" as const,
+    sessions: 3, selectable: true, autoSelectable: true,
+  }
+  const rows = withAccountRegistrations([witnessed], roster.registered, present)
+  assert.equal(rows[0], witnessed)
+  assert.deepEqual(rows.map((row) => row.id), ["mac_1", "mac_51463f04", "mac_blank"])
+  for (const row of rows.slice(1)) {
+    assert.equal(row.observedAt, null)
+    assert.equal(row.freshness, "unknown")
+    assert.equal(row.pairing, "unknown")
+    assert.equal(row.selectable, false)
+    assert.equal(row.autoSelectable, false)
+    assert.equal("sessions" in row, false)
+    assert.equal(sessionsFact(row), "unknown")
+  }
+  assert.equal(rows[1]?.name, "build-box")
+  assert.equal(rows[2]?.name, "Machine · ac_blank")
+  assert.deepEqual(devicesPageRows(rows, ["mac_51463f04"]).map((row) => row.id), ["mac_1", "mac_blank"])
 })
 
 test("a machine this browser cannot name is called what the account calls it; one it can name keeps its own", () => {

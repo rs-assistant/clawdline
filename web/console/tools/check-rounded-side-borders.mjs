@@ -28,7 +28,9 @@ for (const file of css) {
     const has = (name) => declarations.some((node) => name.test(node.prop) && !/^(0(?:px)?|none|initial|unset)$/i.test(node.value.trim()))
     // This one pseudo-element is a tree connector, not a rounded surface.
     if (rule.selector === ".bg-sheet .agents .one.child::before") return
-    if (has(/^border-(left|inline-start)(?:-|$)/) && has(/^border(?:-[a-z]+)*-radius$/)) {
+    const hasSideShadow = declarations.some((node) => node.prop === "box-shadow" &&
+      /\binset\s+(?:-?\d*\.?\d+(?:px|rem|em))\s+0(?:px)?\b/i.test(node.value))
+    if ((has(/^border-(left|inline-start)(?:-|$)/) || hasSideShadow) && has(/^border(?:-[a-z]+)*-radius$/)) {
       violations.push(`${path.relative(process.cwd(), file)}:${rule.source.start.line} ${rule.selector}`)
     }
   })
@@ -46,7 +48,7 @@ if (uniformLegacyCards.size) violations.push(`Missing uniform overrides for pinn
 const main = await readFile(path.join(source, "main.tsx"), "utf8")
 if (!main.includes('import "./side-border-overrides.css"')) violations.push("main.tsx does not load the pinned CSS overrides")
 if (violations.length) {
-  console.error("Rounded surfaces with a left accent border are forbidden:\n" + violations.join("\n"))
+  console.error("Rounded surfaces with a side accent stripe are forbidden:\n" + violations.join("\n"))
   process.exitCode = 1
 } else {
   console.log(`Checked ${css.length} CSS files: no rounded side-border surfaces`)

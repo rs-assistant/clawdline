@@ -817,7 +817,7 @@
    colour is the peer lavender, apart from the action accent. */
 :root { --work-epic: var(--peer); --work-epic-in: var(--peer-in); --work-epic-ed: var(--peer-ed); }
 .work-epic-card {
-    border-color: var(--work-epic-ed); box-shadow: inset 3px 0 0 var(--work-epic);
+    border-color: var(--work-epic-ed);
     background: color-mix(in srgb, var(--work-epic) 4%, var(--card));
 }
 .work-epic-card h3 { font-size: 18px; font-weight: 700; letter-spacing: .005em; }
