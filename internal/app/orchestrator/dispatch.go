@@ -219,6 +219,15 @@ func (b *Broker) Dispatch(ctx context.Context, req DispatchRequest) (Dispatched,
 	if err != nil {
 		return Dispatched{}, err
 	}
+	if record.Root != nil {
+		record.BatchID = record.ID
+		for _, active := range live {
+			if active.RootTerminalID == record.RootTerminalID && active.BatchID != "" {
+				record.BatchID = active.BatchID
+				break
+			}
+		}
+	}
 	warnings := []Warning{}
 	quotaDecision, quotaAdvice := b.readAssistantQuota(record.Assistant)
 	record.AssistantQuota = quotaDecision
@@ -1304,6 +1313,11 @@ func (b *Broker) settleOnce(ctx context.Context, id string, state State, why str
 		if also != nil {
 			also(r)
 		}
+		batchEffects, err := b.batchFinishedEffects(tx, *r)
+		if err != nil {
+			return nil, err
+		}
+		effects = append(effects, batchEffects...)
 		b.forgetSecret(r.ID)
 		return effects, nil
 	})

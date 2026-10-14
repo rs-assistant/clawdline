@@ -250,7 +250,7 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
       {readUpdate ? <NeedsUpdate update={readUpdate} className="human-interventions-error" /> : readError && <p className="human-interventions-error" role="alert">{shown ? catalogWord("literal", "5789b797c9ef") : catalogWord("literal", "24fe20ab6d4d")} {readError} <button type="button" onClick={() => { void load(destination) }}>{catalogWord("inline", "7e59d0f16293")}</button></p>}
       {actionError && <p className="human-interventions-error" role="alert">{actionError}</p>}
       {actionStatus && <p className="human-interventions-status" role="status">{actionStatus}</p>}
-      {!shown && !readError && <p className="human-interventions-empty">{catalogWord("inline", "656c48dad32b")}</p>}
+      {!shown && !readError && <p className="human-interventions-empty human-interventions-loading" role="status"><span className="human-interventions-spinner" aria-hidden="true" />{catalogWord("inline", "656c48dad32b")}</p>}
       {shown && active.length === 0 && <p className="human-interventions-empty">{catalogWord("inline", "e43b3c54e4b6")}</p>}
       {active.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} onAction={run} onReply={reply} onCompose={compose} />)}
       {recent.length > 0 && <details className="human-interventions-recent"><summary>{catalogFormat("count", "recentInterventions", [recent.length])}</summary>

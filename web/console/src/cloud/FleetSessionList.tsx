@@ -352,11 +352,15 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
       onTouchEnd={() => window.setTimeout(() => { if (swipe.openId() === null) thawOrder() }, 1200)}>
       <div className="cloud-all-status-filters" role="group" aria-label={nextWord("cloudAllState")}>
         <button type="button" className="cloud-all-status-filter cloud-all-refresh" onClick={refreshFromButton}
-          data-state={refreshFeedback} disabled={refreshFeedback === "loading"} aria-busy={refreshFeedback === "loading"}>
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12a7 7 0 1 1-2.05-4.95" /><path d="M19 4.5V9h-4.5" /></svg>
+          data-state={refreshFeedback} disabled={refreshFeedback === "loading"} aria-busy={refreshFeedback === "loading"}
+          aria-label={refreshFeedback === "done" ? nextWord("cloudAllRefreshDone") : undefined}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            {refreshFeedback === "done" ? <path d="m5 12 4 4L19 6" /> :
+              <><path d="M19 12a7 7 0 1 1-2.05-4.95" /><path d="M19 4.5V9h-4.5" /></>}
+          </svg>
           <span aria-live="polite">{nextWord(refreshFeedback === "loading" ? "cloudAllRefreshing" :
-            refreshFeedback === "done" ? "cloudAllRefreshDone" :
             refreshFeedback === "failed" ? "cloudAllRefreshFailed" : "cloudAllRefresh")}</span>
+          <span className="sr-only" aria-live="polite">{refreshFeedback === "done" ? nextWord("cloudAllRefreshDone") : ""}</span>
         </button>
         <button type="button" className="cloud-all-status-filter" aria-pressed={statusFilter === "attention"}
           onClick={() => setStatusFilter((value) => value === "attention" ? "all" : "attention")}>{nextWord("cloudAllAttention")}</button>

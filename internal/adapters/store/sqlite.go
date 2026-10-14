@@ -323,6 +323,27 @@ func (s *Store) Append(ctx context.Context, e Event) error {
 	})
 }
 
+// AppendWithEffects records a fact and its notification intents together.
+func (s *Store) AppendWithEffects(ctx context.Context, e Event, effects ...Effect) ([]int64, error) {
+	var ids []int64
+	err := s.write(ctx, func(tx *sql.Tx) (int64, error) {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO events (at, kind, subject, payload) VALUES (?, ?, ?, ?)`,
+			time.Now().Unix(), e.Kind, e.Subject, string(e.Payload)); err != nil {
+			return 0, err
+		}
+		for _, effect := range effects {
+			id, err := s.insertEffect(ctx, tx, effect)
+			if err != nil {
+				return 0, err
+			}
+			ids = append(ids, id)
+		}
+		return int64(1 + len(effects)), nil
+	})
+	return ids, err
+}
+
 // Counts is what `doctor` reports about the store: how many facts it holds,
 // and how many tasks the broker has recorded.
 func (s *Store) Counts(ctx context.Context) (events, tasks int, err error) {

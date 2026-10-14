@@ -417,11 +417,17 @@ func (b *Broker) ReportSessionDelivery(ctx context.Context, terminalID, summary 
 		"terminal": terminalID, "conversation": s.ConversationID,
 		"assistant": string(s.Assistant), "summary": trimmed, "at": at.Unix(),
 	})
-	if err := b.Store.Append(ctx, store.Event{
+	push, _ := json.Marshal(completionPush{
+		Terminal: terminalID, Summary: trimmed,
+		Language: b.notificationLanguage(), Tag: "session-delivery-" + terminalID,
+	})
+	ids, err := b.Store.AppendWithEffects(ctx, store.Event{
 		Kind: "session.delivered", Subject: terminalID, Payload: payload,
-	}); err != nil {
+	}, store.Effect{Kind: EffectSessionDeliveryPush, Subject: terminalID, Payload: push})
+	if err != nil {
 		return SessionDelivery{}, err
 	}
+	b.runRecorded(ctx, ids)
 	return SessionDelivery{
 		Terminal:     terminalID,
 		Conversation: s.ConversationID,

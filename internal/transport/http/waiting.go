@@ -9,7 +9,6 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
 	"github.com/sainteye/clawdline/internal/app"
-	"github.com/sainteye/clawdline/internal/domain/notificationrule"
 	"github.com/sainteye/clawdline/internal/domain/session"
 	"github.com/sainteye/clawdline/internal/productcopy"
 )
@@ -24,13 +23,6 @@ func (s *Server) waiting() *app.Waiting {
 		return w.(*app.Waiting)
 	}
 	w := &app.Waiting{Store: s.store, After: waitingAfter(), Enabled: func() bool { return s.notificationEnabled("push_on_waiting") }, Language: s.productLanguage}
-	w.Rules = func() ([]notificationrule.Rule, error) {
-		values, err := s.settingsFile().Read()
-		if err != nil {
-			return nil, err
-		}
-		return notificationRules(values)
-	}
 	if s.broker != nil {
 		// The push goes out the way the capacity push does: recorded with its
 		// decision in one transaction, then run by the broker's outbox, whose
