@@ -304,9 +304,9 @@ function InterventionCard({ note, disabled, sending, onAction, onReply, onCompos
   const documentHere = note.document_url ? samePageTarget(note.document_url, window.location) : null
   const internalDocument = documentHere && hasDocumentIntent(documentHere.hash)
   return <article className="human-intervention-card" data-intervention-id={note.id} tabIndex={-1} aria-label={note.title}>
-    <div className="human-intervention-title"><div><h3>{note.title}</h3>{note.kind === "secret" && <span className="human-intervention-subtitle">{note.summary}</span>}<span className="human-intervention-stage">{note.resolved_at ? catalogWord("literal", "927c9ed33728") : catalogWord("literal", "77f6d2cceedd")}</span><time className="human-intervention-created" dateTime={new Date(note.created_at * 1000).toISOString()}>{catalogWord("inline", "0f6f6df015c6")} {when(note.created_at)}</time></div><span className="human-intervention-type"><WorkIcon name={isReading ? "eye" : "edit"} />{note.kind === "secret" ? nextWord("secretHandoffName") : isReading ? catalogWord("literal", "3d9157962dd2") : note.kind === "answer" ? catalogWord("literal", "e12820431ff9") : catalogWord("literal", "5a15e03eaa4a")}</span></div>
+    <div className="human-intervention-title"><div><h3>{note.title}</h3><span className="human-intervention-stage">{note.resolved_at ? catalogWord("literal", "927c9ed33728") : catalogWord("literal", "77f6d2cceedd")}</span><time className="human-intervention-created" dateTime={new Date(note.created_at * 1000).toISOString()}>{catalogWord("inline", "0f6f6df015c6")} {when(note.created_at)}</time></div><span className="human-intervention-type"><WorkIcon name={isReading ? "eye" : "edit"} />{note.kind === "secret" ? nextWord("secretHandoffName") : isReading ? catalogWord("literal", "3d9157962dd2") : note.kind === "answer" ? catalogWord("literal", "e12820431ff9") : catalogWord("literal", "5a15e03eaa4a")}</span></div>
     {fromAnotherSession && <p className="human-intervention-source">{catalogWord("inline", "afc7f76a7d4f")} {note.source_label || catalogWord("literal", "92018c889270")}</p>}
-    {note.kind !== "secret" && <p>{note.summary}</p>}
+    {(note.kind !== "secret" || note.resolved_at) && <p>{note.summary}</p>}
     <p><b>{catalogLabel("inline", "7ed8d242eabd")}</b>{note.action}</p>
     <p className="human-intervention-reason">{catalogLabel("inline", "b9fbb8ede4cb")}{note.reason}</p>
     {note.document_url && <p><a className="human-intervention-document" href={note.document_url}
@@ -358,7 +358,7 @@ function SecretHandoffForm({ note, disabled, sending, onHandoff }: {
     onHandoff(note, value)
   }
   return <form className="secret-handoff-form" onSubmit={submit} aria-busy={sending}>
-    <label htmlFor={`secret-handoff-${note.id}`}>{nextWord("secretHandoffLabel")}</label>
+    <label htmlFor={`secret-handoff-${note.id}`}>{note.summary || nextWord("secretHandoffLabel")}</label>
     <textarea ref={field} id={`secret-handoff-${note.id}`} rows={5} required disabled={disabled}
       placeholder={nextWord("secretHandoffPlaceholder")} autoComplete="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="" data-lpignore="true" data-bwignore="" />
     <p>{nextWord("secretHandoffPrivacy")}</p>
