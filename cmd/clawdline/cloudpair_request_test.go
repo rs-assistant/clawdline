@@ -34,14 +34,30 @@ func TestPairRequestUsesVerifiedInstalledDaemonWhenShellStateHasNoToken(t *testi
 		t.Fatal(err)
 	}
 	stale := config.Config{Dir: t.TempDir()}
-	req, err := cloudPairRequestFor(http.MethodPost, "/v1/cloud/pairing", nil, stale, installed, port, true)
+	staleListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stalePort := staleListener.Addr().(*net.TCPAddr).Port
+	staleListener.Close()
+	req, err := cloudPairRequestFor(http.MethodPost, "/v1/cloud/pairing", nil, stale, installed, stalePort, port)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if req.URL.Path != "/v1/cloud/pairing" || req.Header.Get("Authorization") != "Bearer installed-token" {
 		t.Fatalf("pair request: %s %q", req.URL.Path, req.Header.Get("Authorization"))
 	}
-	if _, err := cloudPairRequestFor(http.MethodPost, "/v1/cloud/pairing", nil, stale, installed, port, false); err == nil {
-		t.Fatal("an explicit daemon port must not silently select the installed daemon")
+	selected := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer selected.Close()
+	_, selectedPortText, err := net.SplitHostPort(strings.TrimPrefix(selected.URL, "http://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	selectedPort, err := strconv.Atoi(selectedPortText)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cloudPairRequestFor(http.MethodPost, "/v1/cloud/pairing", nil, stale, installed, selectedPort, port); err == nil {
+		t.Fatal("a reachable selected daemon must not silently select the installed daemon")
 	}
 }

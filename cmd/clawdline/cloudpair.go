@@ -23,9 +23,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -63,27 +65,34 @@ func cloudDaemonJSON(method, path string, body any, out any) error {
 }
 
 // A copied pairing command can run in a shell carrying an obsolete test state
-// directory. Use the installed daemon only when that directory has no token,
-// the port is the installed port, and its own token authenticates a read.
+// directory and port. Use the installed daemon only when that directory has
+// no token, the selected port is not serving, and its own token authenticates
+// a read.
 func cloudPairRequest(method, path string, body any) (*http.Request, error) {
 	port, err := daemonPort()
 	if err != nil {
 		return nil, err
 	}
-	return cloudPairRequestFor(method, path, body, config.Load(), config.DefaultDir(), port,
-		os.Getenv("CLAWDLINE_NEXT_PORT") == "")
+	return cloudPairRequestFor(method, path, body, config.Load(), config.DefaultDir(), port, config.DefaultPort)
 }
 
-func cloudPairRequestFor(method, path string, body any, cfg config.Config, defaultDir string, port int, allowFallback bool) (*http.Request, error) {
+func cloudPairRequestFor(method, path string, body any, cfg config.Config, defaultDir string, port, installedPort int) (*http.Request, error) {
 	req, err := daemonRequestWithConfig(method, path, body, cfg, port)
-	if err == nil || cfg.Dir == defaultDir || !allowFallback {
+	if err == nil || cfg.Dir == defaultDir {
 		return req, err
 	}
 	if _, statErr := os.Stat(filepath.Join(cfg.Dir, devices.LocalTokenFile)); !os.IsNotExist(statErr) {
 		return nil, err
 	}
+	if port != installedPort {
+		connection, dialErr := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), 300*time.Millisecond)
+		if dialErr == nil {
+			connection.Close()
+			return nil, err
+		}
+	}
 	installed := config.Config{Dir: defaultDir}
-	check, checkErr := daemonRequestWithConfig(http.MethodGet, "/v1/cloud/status", nil, installed, port)
+	check, checkErr := daemonRequestWithConfig(http.MethodGet, "/v1/cloud/status", nil, installed, installedPort)
 	if checkErr != nil {
 		return nil, err
 	}
@@ -96,7 +105,7 @@ func cloudPairRequestFor(method, path string, body any, cfg config.Config, defau
 	if answer.StatusCode != http.StatusOK {
 		return nil, err
 	}
-	return daemonRequestWithConfig(method, path, body, installed, port)
+	return daemonRequestWithConfig(method, path, body, installed, installedPort)
 }
 
 func cloudPairJSON(method, path string, body any, out any) error {
