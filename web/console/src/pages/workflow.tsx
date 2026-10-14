@@ -41,8 +41,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
   const [sourceVersion, setSourceVersion] = useState("")
   const [sourceError, setSourceError] = useState("")
   const [sourceBusy, setSourceBusy] = useState(false)
-  const [syncingSource, setSyncingSource] = useState(false)
-  const [sourceCheck, setSourceCheck] = useState<"checking" | "matched" | "mismatch" | "unavailable">("checking")
+  const [sourceCheck, setSourceCheck] = useState<"checking" | "matched" | "unavailable">("checking")
   const sourceRequest = useRef(0)
   const sourceReturnFocus = useRef<HTMLElement | null>(null)
   const sourceDialog = useRef<HTMLDivElement>(null)
@@ -141,7 +140,12 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     let live = true
     setSourceCheck("checking")
     readProjectFile(source.place_id, source.file_id).then((answer) => {
-      if (live) setSourceCheck(workflowSourceMatches({ body: draft.body, source }, answer.file) ? "matched" : "mismatch")
+      if (!live) return
+      const matches = workflowSourceMatches({ source }, answer.file)
+      setSourceCheck(matches ? "matched" : "unavailable")
+      if (matches) setDraft((current) => current?.source?.file_id === source.file_id && current.source.place_id === source.place_id
+        ? { ...current, body: launchTextFor(answer.file).body,
+            source: { ...current.source, scope: answer.file.source, name: workflowSourceTitle(answer.file), version: answer.version } } : current)
     }).catch(() => { if (live) setSourceCheck("unavailable") })
     return () => { live = false }
   }, [draft?.source?.file_id, draft?.source?.place_id, draft?.source?.name, draft?.body])
@@ -212,7 +216,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
   const save = async () => {
     if ((!place && !draft?.global) || !draft || busy) return
     if (draft.source && (sourceCheck !== "matched" || (draft.global && draft.source.scope === "project"))) {
-      setError(W(draft.global && draft.source.scope === "project" ? "sourceScopeConflict" : "sourceNeedsSync")); return
+      setError(W(draft.global && draft.source.scope === "project" ? "sourceScopeConflict" : "sourceUnavailable")); return
     }
     const title = draft.title.trim()
     const body = draft.body.trim()
@@ -237,21 +241,6 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     try { await deleteWorkflow(place ? machineOf(place) : "", draft.id); if (await refresh(place)) setDraft(null) }
     catch (cause) { setError(cause instanceof SnippetFailure && cause.status !== null && cause.status < 500 ? W("deleteRefused") : W("deleteUnknown")) }
     finally { setBusy(false) }
-  }
-
-  const syncSource = async () => {
-    if (!draft?.source || syncingSource) return
-    const source = draft.source
-    setSyncingSource(true); setError("")
-    try {
-      const answer = await readProjectFile(source.place_id, source.file_id)
-      if (answer.file.kind !== source.kind) throw new Error("source changed")
-      const text = launchTextFor(answer.file)
-      setDraft((current) => current?.source?.file_id === source.file_id && current.source.place_id === source.place_id
-        ? { ...current, title: current.title === source.name ? text.title : current.title, body: text.body,
-            source: { ...source, scope: answer.file.source, name: text.title, version: answer.version } } : current)
-    } catch { setError(W("sourceUnavailable")) }
-    finally { setSyncingSource(false) }
   }
 
   const importSkill = () => {
@@ -312,15 +301,14 @@ function WorkflowPage({ shown }: { shown: boolean }) {
       onPointerDown={(event) => { if (event.target === event.currentTarget && !busy) setDraft(null) }}>
       <form tabIndex={-1} onSubmit={(event) => { event.preventDefault(); void save() }}>
         <h2>{draft.id ? W("edit") : W("new")}</h2>
-        <div className="workflow-source-row"><span>{W("sourceLabel")}</span>{draft.source ? <>
+        <div className="workflow-source-row"><span>{W("sourceLabel")}</span>{draft.source ? <div className="workflow-source-card">
           <button className="workflow-source-link" type="button" onClick={() => void showSource(draft.source!)}><span aria-hidden="true">↗</span><span><small>{draft.source.kind === "command" ? W("claudeCommand") : "Skill"}</small><strong>{draft.source.name}</strong></span></button>
-          <button type="button" onClick={() => void syncSource()} disabled={syncingSource}>{W("syncSource")}</button>
-          <button type="button" onClick={() => setDraft({ ...draft, source: null })}>{W("unlinkSource")}</button>
-        </> : <span>{W("noSource")}</span>}
+          <button className="workflow-source-unlink" type="button" aria-label={W("unlinkSource")} title={W("unlinkSource")}
+            onClick={() => setDraft({ ...draft, source: null })}><span aria-hidden="true">×</span></button>
+        </div> : <span>{W("noSource")}</span>}
           <button type="button" onClick={() => { skillReturnFocus.current = document.activeElement as HTMLElement | null; setLinkingDraft(true); setSkillOpen(true) }} disabled={!skills.length}>{W(draft.source ? "changeSource" : "linkSource")}</button>
         </div>
         {draft.source && <p className="workflow-linked-hint">{W("linkedNameHint")}</p>}
-        {draft.source && sourceCheck === "mismatch" && <p className="workflow-source-mismatch" role="status">{W("sourceTextMismatch")}</p>}
         {draft.source && sourceCheck === "unavailable" && <p className="workflow-source-mismatch" role="status">{W("sourceUnavailable")}</p>}
         {draft.source && draft.global && draft.source.scope === "project" && <p className="workflow-source-mismatch" role="status">{W("sourceScopeConflict")}</p>}
         <label>{W("name")}<input value={draft.title} maxLength={200} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
