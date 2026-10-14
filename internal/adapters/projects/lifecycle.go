@@ -350,7 +350,7 @@ func (l *Lifecycle) Snapshot(id string) (*Snapshot, error) {
 	cached, ok := l.cache[project.ID]
 	l.stateMu.Unlock()
 	if !ok {
-		return notObserved(project), nil
+		return l.preview(project), nil
 	}
 	return encode(cached, l.ports.Now()), nil
 }
@@ -371,7 +371,7 @@ func (l *Lifecycle) Refresh(id string) (*Snapshot, error) {
 	if had && now.Sub(cached.observedAt) < refreshCoalesce && cached.err == nil {
 		return encode(cached, now), nil
 	}
-	obs := l.observe(project)
+	obs := l.observeWithProgress(project, !had)
 	if obs.err != nil && had {
 		// The last good rows are kept, and serve-time freshness reports them stale.
 		kept := cached
@@ -443,6 +443,8 @@ func (l *Lifecycle) RemoveLanded(id, worktreeID string) (*Snapshot, error) {
 }
 
 func (l *Lifecycle) store(obs observation) {
+	// Progress replaces rows while readers use earlier snapshots.
+	obs.rows = append([]row(nil), obs.rows...)
 	l.stateMu.Lock()
 	defer l.stateMu.Unlock()
 	l.cache[obs.project.ID] = obs
@@ -637,6 +639,69 @@ func parseStatus(text string, limit int) (entries []dirtyEntry, ignored int, tru
 }
 
 func (l *Lifecycle) observe(project Identity) observation {
+	return l.observeWithProgress(project, false)
+}
+
+// preview lists identities without examining checkout contents. It cannot
+// establish cleanup eligibility, even when every registered path is listed.
+func (l *Lifecycle) preview(project Identity) *Snapshot {
+	snap := notObserved(project)
+	commonText, ok := previewGit(project.CanonicalPath, "rev-parse", "--git-common-dir")
+	if !ok {
+		return snap
+	}
+	common := strings.TrimSpace(commonText)
+	if !filepath.IsAbs(common) {
+		common = filepath.Join(project.CanonicalPath, common)
+	}
+	common = canonicalFilesystemPath(common)
+	if common == "" {
+		return snap
+	}
+	listing, ok := previewGit(project.CanonicalPath, "worktree", "list", "--porcelain", "-z")
+	if !ok {
+		return snap
+	}
+	registered := parseWorktreeList(listing)
+	snap.Truncated = len(registered) > rowLimit
+	if snap.Truncated {
+		registered = registered[:rowLimit]
+	}
+	for _, entry := range registered {
+		snap.Rows = append(snap.Rows, previewRow(common, entry))
+	}
+	rows := int64(len(snap.Rows))
+	if !snap.Truncated {
+		snap.Counts.Rows = &rows
+	}
+	return snap
+}
+
+func previewRow(common string, entry registered) SnapshotRow {
+	return SnapshotRow{
+		WorktreeID: WorktreeID(common, entry.path), Path: entry.path,
+		Branch: str(entry.branch), Head: str(entry.head),
+		Owner:           RowOwner{Evidence: "unknown"},
+		Classifications: []string{classUnknownEvidence},
+		Local:           LocalObservation{State: "unknown"},
+		Canonical:       CanonicalObservation{State: "unknown"},
+		Context:         RowContext{State: "unknown", Evidence: "unknown"},
+		Storage:         RowStorage{Error: &Issue{"storage_not_observed", "Disk usage has not been observed."}},
+		Cleanup:         RowCleanup{Blockers: []Issue{{"observation_incomplete", "Wait for the complete observation."}}},
+	}
+}
+
+func previewGit(cwd string, args ...string) (string, bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultGitTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = cwd
+	cmd.Env = append(os.Environ(), "LC_ALL=C", "GIT_OPTIONAL_LOCKS=0", "GIT_TERMINAL_PROMPT=0")
+	out, err := cmd.Output()
+	return string(out), err == nil && utf8.Valid(out)
+}
+
+func (l *Lifecycle) observeWithProgress(project Identity, publish bool) observation {
 	started := l.ports.Now()
 	l.deadline = started.Add(observationBudget)
 	defer func() { l.deadline = time.Time{} }()
@@ -673,6 +738,15 @@ func (l *Lifecycle) observe(project Identity) observation {
 	if obs.truncated {
 		reg = reg[:rowLimit]
 	}
+	if publish {
+		obs.rows = make([]row, len(reg))
+		for i, entry := range reg {
+			obs.rows[i] = row{worktreeID: WorktreeID(common, entry.path), path: entry.path,
+				branch: entry.branch, head: entry.head, classifications: []string{classUnknownEvidence}}
+		}
+		obs.err = &Issue{"observation_in_progress", "Worktree observation is still running."}
+		l.store(obs)
+	}
 	budgetExceeded := false
 	for offset, entry := range reg {
 		if !l.ports.Now().Before(l.deadline) {
@@ -686,7 +760,15 @@ func (l *Lifecycle) observe(project Identity) observation {
 				"The bounded observation ran out of time before this row was complete."})
 		}
 		l.classify(&r, obs.target, tasks.Authoritative)
-		obs.rows = append(obs.rows, r)
+		if publish {
+			obs.rows[offset] = r
+			l.store(obs)
+		} else {
+			obs.rows = append(obs.rows, r)
+		}
+	}
+	if publish {
+		obs.err = nil
 	}
 	if budgetExceeded {
 		obs.err = &Issue{"observation_budget_exceeded", "The bounded observation stopped at its two-minute deadline."}
