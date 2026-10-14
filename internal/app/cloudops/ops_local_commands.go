@@ -120,6 +120,24 @@ func init() {
 				return LocalRequest{Method: "POST", Path: "/v1/sessions/" + segment(p.target) + "/smart-title", Body: []byte("{}")}
 			}},
 
+		op{name: "title",
+			decode: func(b body) (plan, bool) {
+				if !b.hasOneOf([]string{"type", "session", "request", "text"},
+					[]string{"type", "session", "request", "text", "execution_generation"}) {
+					return plan{}, false
+				}
+				p, ok := pinnedActionPlan(b)
+				if !ok || p.request == "" {
+					return plan{}, false
+				}
+				p.text, ok = b.str("text")
+				return p, ok
+			},
+			route: func(p plan) LocalRequest {
+				return LocalRequest{Method: "POST", Path: "/v1/sessions/" + segment(p.target) + "/title",
+					Body: jsonBody(map[string]any{"title": p.text})}
+			}},
+
 		op{name: "start",
 			decode: func(b body) (plan, bool) {
 				// `persona` is optional: a page from before personas sends the

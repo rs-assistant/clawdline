@@ -195,6 +195,7 @@ export const CARRIED = {
   // (`relay-reader.ts` askForOpenedQuestion), when the machine advertises it.
   "sessions.row": "relay-reader.ts askForOpenedQuestion (when advertised)",
   "smart-title": "POST /v1/sessions/{id}/smart-title",
+  title: "POST /v1/sessions/{id}/title",
   "snippet-create": "POST /v1/snippets",
   "snippet-delete": "DELETE /v1/snippets/{id}",
   "snippet-order": "POST /v1/snippets/order",

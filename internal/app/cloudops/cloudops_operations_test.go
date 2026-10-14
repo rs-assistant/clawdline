@@ -78,12 +78,14 @@ func TestEveryChangeCarriesAnIdempotencyKey(t *testing.T) {
 func TestTheWriteSwitchIsOffUntilSomebodySaysOtherwise(t *testing.T) {
 	r := &router{}
 	closed := Bridge{MachineID: "mac-01", Router: r}
-	for _, word := range []string{"send", "answer", "end", "focus", "interrupt", "smart-title", "start", "resume", "voice", "intents",
+	for _, word := range []string{"send", "answer", "end", "focus", "interrupt", "smart-title", "title", "start", "resume", "voice", "intents",
 		"schedule-create", "schedule-update", "schedule-delete", "schedule-run",
 		"schedule-webhook-bind-v1", "pair-agent-start",
 		"snippet-create", "snippet-update", "snippet-delete", "snippet-order", "dispatch"} {
 		body := map[string]any{"type": word, "session": pane, "request": "req-" + word}
 		switch word {
+		case "title":
+			body["text"] = "New name"
 		case "send":
 			body["text"], body["images"] = "hello", []any{}
 		case "answer":
@@ -751,7 +753,7 @@ func TestTheVocabularyAndTheImplementedListAgreeWithTheCatalog(t *testing.T) {
 			t.Fatalf("%s is advertised and has no local capability", word)
 		}
 	}
-	for _, word := range []string{"send", "answer", "end", "focus", "interrupt", "smart-title", "start", "resume", "voice", "intents", "agent", "shell",
+	for _, word := range []string{"send", "answer", "end", "focus", "interrupt", "smart-title", "title", "start", "resume", "voice", "intents", "agent", "shell",
 		"transcript", "info", "skills", "git", "git-diff", "screen", "image", "documents", "document", "places",
 		"past-sessions", "schedules", "coordination.leases", "coordination.waits", "coordination.pauses", "schedule", "schedule-create", "schedule-update", "schedule-delete",
 		"schedule-run", "schedule-webhook-bind-v1", "snippets", "session-snippets", "snippet-create", "snippet-update", "snippet-delete",
