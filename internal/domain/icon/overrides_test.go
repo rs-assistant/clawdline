@@ -80,6 +80,80 @@ func TestUnreadableRegistryDoesNotDisappear(t *testing.T) {
 	}
 }
 
+func TestOverridesFollowCreationReplacementRemovalAndLegacy(t *testing.T) {
+	dir := t.TempDir()
+	project := filepath.Join(dir, "project")
+	r, err := NewRegistryWithOverrides(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.path = filepath.Join(dir, "legacy.json")
+	legacy := []byte(`{"projects":{"` + project + `":{"art":{"accent":"#ABCDEF","palette":{"x":"#ABCDEF"},"rows":["x"]}}}}`)
+	if err := os.WriteFile(r.path, legacy, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if got, source := r.Resolve(project); source != SourceRegistry || got.Accent != "#ABCDEF" {
+		t.Fatalf("legacy: %s %s", source, got.Accent)
+	}
+	file := filepath.Join(dir, "project-icon-overrides.json")
+	write := func(accent string) {
+		t.Helper()
+		data, err := json.Marshal(map[string]Grid{project: {Accent: accent, Cells: [][]*string{{&accent}}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		newFile := filepath.Join(dir, "replacement")
+		if err := os.WriteFile(newFile, data, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(newFile, file); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("#68C8D8")
+	if got, source := r.Resolve(project); source != SourceOverride || got.Accent != "#68C8D8" {
+		t.Fatalf("created: %s %s", source, got.Accent)
+	}
+	write("#123456")
+	if got, source := r.Resolve(project); source != SourceOverride || got.Accent != "#123456" {
+		t.Fatalf("replaced: %s %s", source, got.Accent)
+	}
+	if err := os.WriteFile(file, []byte("{"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Refresh(); err == nil {
+		t.Fatal("corrupt file reported success")
+	}
+	if got, source := r.Resolve(project); source != SourceOverride || got.Accent != "#123456" {
+		t.Fatalf("lost last valid mark: %s %s", source, got.Accent)
+	}
+	if err := os.Remove(file); err != nil {
+		t.Fatal(err)
+	}
+	if got, source := r.Resolve(project); source != SourceRegistry || got.Accent != "#ABCDEF" {
+		t.Fatalf("removed: %s %s", source, got.Accent)
+	}
+	replacement := []byte(`{"projects":{"` + project + `":{"art":{"accent":"#654321","palette":{"x":"#654321"},"rows":["x"]}}}}`)
+	if len(replacement) != len(legacy) {
+		t.Fatal("fixture size changed")
+	}
+	if err := os.WriteFile(r.path+".new", replacement, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(r.path+".new", r.path); err != nil {
+		t.Fatal(err)
+	}
+	if got, source := r.Resolve(project); source != SourceRegistry || got.Accent != "#654321" {
+		t.Fatalf("legacy replacement: %s %s", source, got.Accent)
+	}
+	if err := os.WriteFile(r.path, []byte("{"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Refresh(); err == nil {
+		t.Fatal("corrupt legacy file reported success")
+	}
+}
+
 func TestFullIconRegistryKeepsExistingMarks(t *testing.T) {
 	r, err := NewRegistryWithOverrides(t.TempDir())
 	if err != nil {

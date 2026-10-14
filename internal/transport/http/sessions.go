@@ -86,6 +86,12 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 			snapshot = fresh
 		}
 	}
+	// A shared list snapshot may predate an icon file edit. Recompute only its
+	// presentation marks for this response, without changing the producer's rows.
+	if err := s.refreshSnapshotIcons(&snapshot); err != nil {
+		writeRefusal(w, http.StatusServiceUnavailable, "icon_store_unavailable", "Project icons could not be read.")
+		return
+	}
 	if r.URL.Query().Get("parts") == "list" {
 		// The Cloud fleet asks once per machine. Reuse the local single-machine
 		// snapshot, including the fields used by the original row status line.
@@ -140,6 +146,21 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(snapshot)
+}
+
+func (s *Server) refreshSnapshotIcons(snapshot *sessionsSnapshotWire) error {
+	if s.icons == nil {
+		return nil
+	}
+	if err := s.icons.Refresh(); err != nil {
+		return err
+	}
+	rows := append([]sessionRowWire(nil), snapshot.Sessions...)
+	for i := range rows {
+		rows[i].Icon = wireIcon(s.icons.For(rows[i].CWD))
+	}
+	snapshot.Sessions = rows
+	return nil
 }
 
 // The compact Cloud list covers the sources this person enabled. The merged

@@ -33,6 +33,15 @@ func projectCommand(args []string) {
 	case "unify":
 		projectUnifyCommand(args[1:])
 		return
+	case "refresh":
+		if err := runProjectRefresh(args[1:], os.Stdout); err != nil {
+			if errors.Is(err, errProjectNotListed) {
+				fmt.Fprintln(os.Stderr, "clawdline:", err)
+				os.Exit(3)
+			}
+			fail(err)
+		}
+		return
 	}
 	switch args[0] {
 	case "add":
@@ -123,12 +132,14 @@ func projectUsage() {
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.clawdline_project_export_out_file_n.08105c5e", "       clawdline project export [--out file] [--name source]"))
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.clawdline_project_import_clone_repl.fcdc6204", "       clawdline project import [--clone] [--replace-source] <file>"))
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.clawdline_project_unify_apply_check.4c4400ff", "       clawdline project unify [--apply | --check] [--json] [directory]"))
+	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.refresh_usage", "       clawdline project refresh [directory]"))
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.add_directory_keep_existing_directo.69166d26", "  add [directory…]      add directories; with none, add the current directory"))
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.remove_directory_forget_directories.79c5aae6", "  remove <directory…>   hide directories from Project lists without deleting them"))
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.list_show_explicitly_registered_dir.233ccc16", "  list                  show explicitly registered directories"))
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.export_this_machine_s_project_setti.62f59b09", "  export                this machine's project settings (icons, names, untracked skills), as a file"))
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.import_file_mirror_another_machine.f1f762b0", "  import <file>         mirror another machine's project settings here; it owns them from then on"))
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.unify_directory_show_how_claude_and.9b3b6da2", "  unify [directory]     show how Claude and Codex can share this Project's rules and skills; --apply does it"))
+	fmt.Fprintln(os.Stderr, cliCopy("misc", "project.refresh_description", "  refresh [directory]   reread this Project's icon and display status"))
 }
 
 func printProjectRegistry(rows []projects.RegisteredPlace, asJSON bool) {

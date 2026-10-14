@@ -196,6 +196,10 @@ func (s *Server) placesRoute(w http.ResponseWriter, r *http.Request) {
 		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "GET only")
 		return
 	}
+	if err := s.icons.Refresh(); err != nil {
+		writeRefusal(w, http.StatusServiceUnavailable, "icon_store_unavailable", "Project icons could not be read.")
+		return
+	}
 	readers := s.projectReaders()
 	list := readers.places.List(s.liveDirectories(r.Context()), 40)
 	out := contract.StartPlaceList{At: time.Now().Unix(), Assistants: installedAssistants(),
@@ -277,6 +281,10 @@ func summarizeProjectWork(row contract.CatalogProject, projectPath string,
 func (s *Server) projectCatalogRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "GET only")
+		return
+	}
+	if err := s.icons.Refresh(); err != nil {
+		writeRefusal(w, http.StatusServiceUnavailable, "icon_store_unavailable", "Project icons could not be read.")
 		return
 	}
 	readers := s.projectReaders()

@@ -1,6 +1,7 @@
 package icon
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -49,36 +50,71 @@ func NewRegistryWithOverrides(dir string) (*Registry, error) {
 	r := NewRegistry()
 	r.overridePath = filepath.Join(dir, "project-icon-overrides.json")
 	r.overrides = map[string]Grid{}
-	data, err := os.ReadFile(r.overridePath)
-	if errors.Is(err, os.ErrNotExist) {
-		return r, nil
-	}
-	if err != nil {
+	if err := r.Refresh(); err != nil {
 		return nil, err
-	}
-	if err = json.Unmarshal(data, &r.overrides); err != nil {
-		return nil, err
-	}
-	if r.overrides == nil {
-		r.overrides = map[string]Grid{}
-	}
-	if len(r.overrides) > MaxIconOverrides {
-		return nil, ErrIconCapacity
-	}
-	for path, grid := range r.overrides {
-		if !filepath.IsAbs(path) {
-			return nil, errors.New("saved icon path is not absolute")
-		}
-		if err := Validate(grid); err != nil {
-			return nil, fmt.Errorf("invalid saved icon: %w", err)
-		}
 	}
 	return r, nil
+}
+
+// Refresh reads the current file, including a newly created or atomically
+// replaced file. Invalid or unreadable data never replaces the last good map.
+func (r *Registry) Refresh() error {
+	r.overrideMu.Lock()
+	err := r.refreshLocked()
+	r.overrideMu.Unlock()
+	if err != nil {
+		return err
+	}
+	return r.refreshLegacy()
+}
+
+func (r *Registry) refreshLocked() error {
+	if r.overridePath == "" {
+		return nil
+	}
+	data, err := os.ReadFile(r.overridePath)
+	if errors.Is(err, os.ErrNotExist) {
+		if r.overridePresent {
+			r.overrides = map[string]Grid{}
+			r.overrideData = nil
+			r.overridePresent = false
+		}
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if r.overridePresent && bytes.Equal(data, r.overrideData) {
+		return nil
+	}
+	var next map[string]Grid
+	if err := json.Unmarshal(data, &next); err != nil {
+		return err
+	}
+	if next == nil {
+		next = map[string]Grid{}
+	}
+	if len(next) > MaxIconOverrides {
+		return ErrIconCapacity
+	}
+	for path, grid := range next {
+		if !filepath.IsAbs(path) {
+			return errors.New("saved icon path is not absolute")
+		}
+		if err := Validate(grid); err != nil {
+			return fmt.Errorf("invalid saved icon: %w", err)
+		}
+	}
+	r.overrides = next
+	r.overrideData = append([]byte(nil), data...)
+	r.overridePresent = true
+	return nil
 }
 
 func (r *Registry) override(cwd string) (Grid, bool) {
 	r.overrideMu.Lock()
 	defer r.overrideMu.Unlock()
+	_ = r.refreshLocked()
 	return r.overrideLocked(cwd)
 }
 
@@ -108,8 +144,14 @@ func (r *Registry) Save(path string, grid, expected Grid) error {
 	if r.overridePath == "" || !filepath.IsAbs(path) {
 		return errors.New("icon storage is unavailable")
 	}
+	if err := r.refreshLegacy(); err != nil {
+		return err
+	}
 	r.overrideMu.Lock()
 	defer r.overrideMu.Unlock()
+	if err := r.refreshLocked(); err != nil {
+		return err
+	}
 	current, ok := r.overrideLocked(path)
 	if !ok {
 		current = r.legacyFor(path)
@@ -155,6 +197,8 @@ func (r *Registry) Save(path string, grid, expected Grid) error {
 		return err
 	}
 	r.overrides = next
+	r.overrideData = append([]byte(nil), data...)
+	r.overridePresent = true
 	return nil
 }
 
@@ -162,5 +206,6 @@ func (r *Registry) Save(path string, grid, expected Grid) error {
 func (r *Registry) SavedCount() int64 {
 	r.overrideMu.Lock()
 	defer r.overrideMu.Unlock()
+	_ = r.refreshLocked()
 	return int64(len(r.overrides))
 }
