@@ -234,6 +234,9 @@ func TestFirstSendTypesTheWordsAndTheRowThatChecksThemOff(t *testing.T) {
 	if effects := p.done(); len(effects) != 1 || effects[0] != want {
 		t.Fatalf("typed %q, want %q", effects, want)
 	}
+	if run, ok, err := s.runs().Latest(context.Background(), p.s.ConversationID); err != nil || !ok || run.Excerpt != "handle this" {
+		t.Fatalf("sent to-do has no new-work run: %+v, %t, %v", run, ok, err)
+	}
 }
 
 func TestSessionTodosDecodeTerminalNamesOnce(t *testing.T) {
