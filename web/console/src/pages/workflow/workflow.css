@@ -4,9 +4,15 @@
 .workflow-head p { margin: 0; max-width: 38rem; color: var(--dim); line-height: 1.55; }
 .workflow-head-tools { display: flex; align-items: end; gap: .6rem; flex: 0 1 22rem; min-width: 0; }
 .workflow-page label { display: grid; gap: .4rem; }
-.workflow-project { flex: 1; min-width: 0; font-size: .85rem; color: var(--dim); }
+.workflow-project { position: relative; display: grid; flex: 1; min-width: 0; gap: .4rem; font-size: .85rem; color: var(--dim); }
+.workflow-page .workflow-project-trigger, .workflow-project-menu button { display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left; }
+.workflow-project-trigger > span:nth-child(2), .workflow-project-menu button > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-project-menu { position: absolute; z-index: 35; top: 100%; left: 0; right: 0; max-height: min(22rem, 50dvh); overflow: auto; padding: .35rem; border: 1px solid var(--line); border-radius: .8rem; background: var(--card); box-shadow: 0 1rem 3rem #0008; }
+.workflow-project .mark, .workflow-scope .mark { flex: none; }
 .workflow-page select, .workflow-page input, .workflow-page textarea { width: 100%; min-width: 0; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: .6rem; padding: .72rem .85rem; }
 .workflow-page button { min-height: 2.75rem; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: .6rem; padding: .7rem 1rem; cursor: pointer; }
+.workflow-page .workflow-project-menu button { border: 0; background: transparent; }
+.workflow-page .workflow-project-menu button[aria-current="true"], .workflow-page .workflow-project-menu button:hover { background: color-mix(in srgb, var(--accent) 13%, var(--card)); }
 .workflow-page button:hover:not(:disabled), .workflow-page select:hover:not(:disabled) { border-color: var(--accent); }
 .workflow-page button:focus-visible, .workflow-page select:focus-visible, .workflow-page input:focus-visible, .workflow-page textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .workflow-page button:disabled { opacity: .55; cursor: default; }
@@ -36,6 +42,12 @@
 .workflow-editor form { width: min(100%, 42rem); max-height: 90dvh; overflow: auto; display: grid; gap: 1.2rem; padding: clamp(1.3rem, 3vw, 2rem); background: var(--card); border: 1px solid var(--line); border-radius: 1rem; box-shadow: 0 1rem 3rem #0005; }
 .workflow-editor h2 { margin: 0 0 .25rem; }
 .workflow-editor label { font-weight: 600; }
+.workflow-scope { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; margin: 0; padding: 0; border: 0; }
+.workflow-scope legend { margin-bottom: .4rem; font-weight: 600; }
+.workflow-editor .workflow-scope label { display: flex; align-items: center; gap: .55rem; min-width: 0; padding: .7rem .8rem; border: 1px solid var(--line); border-radius: .6rem; font-weight: 500; cursor: pointer; }
+.workflow-editor .workflow-scope label:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+.workflow-scope label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workflow-editor .workflow-scope input { width: auto; min-width: auto; margin: 0; accent-color: var(--accent); }
 .workflow-editor textarea { resize: vertical; line-height: 1.5; }
 .workflow-editor .workflow-error { margin: 0; }
 .workflow-scope-hint { margin: -.6rem 0 0; color: var(--dim); font-size: .9rem; }
