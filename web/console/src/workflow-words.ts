@@ -4,7 +4,7 @@ const words = {
   en: {
     reload: "Reload", intro: "Save a launch message for this Project or every Project on this machine. Linked Skills and commands supply their Workflow name and launch message.",
     projectUnavailable: "Could not read Projects. Try again.", workflowUnavailable: "Could not read this Project's Workflows or Skills. Try again.",
-    loading: "Loading…", new: "Create Workflow", fromSkill: "Create from Skill", chooseSkill: "Choose a Skill",
+    loading: "Loading…", new: "Create Workflow", fromSkill: "Create from Skill", chooseSkill: "Choose a Skill", backToWorkflows: "Back to Workflows",
     empty: "This Project has no Workflows yet.", edit: "Edit Workflow", name: "Name", message: "Launch message",
     emptyTitle: "Give this Project a repeatable start", emptyDetail: "Save a launch message once, then start it from any Session in this Project.",
     emptyGlobalTitle: "Create a Workflow for every Project", emptyGlobalDetail: "Save a launch message once, then start it from a Session in any Project on this machine.",
@@ -51,7 +51,7 @@ Collect shared facts once and include them in each review brief so reviewers do 
   "zh-Hant": {
     reload: "重新讀取", intro: "為這個 Project 或這台機器上的所有 Project 儲存啟動訊息。連結 Skill 或指令時，名稱與啟動訊息由來源決定。",
     projectUnavailable: "無法讀取 Project，請重試。", workflowUnavailable: "無法讀取此 Project 的 Workflow 或 Skill，請重試。",
-    loading: "讀取中…", new: "建立 Workflow", fromSkill: "從 Skill 建立", chooseSkill: "選擇 Skill",
+    loading: "讀取中…", new: "建立 Workflow", fromSkill: "從 Skill 建立", chooseSkill: "選擇 Skill", backToWorkflows: "返回 Workflow 列表",
     empty: "這個 Project 還沒有 Workflow。", edit: "編輯 Workflow", name: "名稱", message: "啟動訊息",
     emptyTitle: "為這個 Project 建立常用流程", emptyDetail: "儲存完整的啟動訊息，之後就能從這個 Project 的 Session 啟動。",
     emptyGlobalTitle: "建立全域常用流程", emptyGlobalDetail: "儲存一次啟動訊息，這台機器上任何 Project 的 Session 都能啟動。",
