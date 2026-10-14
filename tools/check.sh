@@ -13,7 +13,8 @@
 # Roots and children each used to write their own loop over the list in
 # AGENTS.md; this is that loop, kept beside the list so the two change
 # together. Every check runs even after one fails, so one run says everything
-# that is wrong. Nothing here writes to the checkout.
+# that is wrong. The dependency preparation step may populate ignored
+# web/node_modules in a linked worktree.
 #
 # The web checks run when anything under web/ differs from where this branch
 # left main, committed or not, or when --web is given.
@@ -85,6 +86,7 @@ check "windows go vet ./..." env GOOS=windows go vet ./...
 check "go test ./..." go test ./...
 check "contract-gen -check" go run ./tools/contract-gen -check
 check "check-legacy-css.sh" tools/check-legacy-css.sh
+check "web dependencies" node tools/ensure-web-deps.mjs
 check "check-rounded-side-borders.mjs" node web/console/tools/check-rounded-side-borders.mjs
 check "check-machine-words.sh" tools/check-machine-words.sh
 check "check-shell-expansions.sh" tools/check-shell-expansions.sh

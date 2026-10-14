@@ -139,6 +139,7 @@
 | `not_subscribed` | `internal/transport/http/push.go` |
 | `notification_rule_conflict` | `internal/transport/http/notification_rules.go` |
 | `notification_rules_invalid` | `internal/transport/http/notification_rules.go` |
+| `notification_situation_unsupported` | `internal/transport/http/notification_rules.go` |
 | `pairing_expired` | `internal/transport/http/cloud.go` |
 | `pairing_failed` | `internal/transport/http/cloud.go` |
 | `pairing_pending` | `internal/transport/http/cloud.go` |

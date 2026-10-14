@@ -103,6 +103,20 @@ let capped = false
 let reading = false
 let wait: { id: string; from: string | null; late: boolean; eager: boolean; place: Place } | null = null
 let detached: string | null = null
+/**
+ * The start the browser is running, as the progress dialog (./StartProgress.tsx)
+ * shows it: from the press until the row arrives, the wait is let go, or the
+ * person sends it to the band under the header.
+ */
+export interface StartProgress {
+  stage: "asking" | "waiting" | "slow" | "detached"
+  resume: boolean
+  place: Place | null
+  /** The band's own sentence, when the stage has one of its own to say. */
+  words: string
+  background: boolean
+}
+let progress: StartProgress | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 let placesGeneration = 0
 // Held at the placeholder's position through the first following list, so the
@@ -156,6 +170,16 @@ const listeners = new Set<() => void>()
 function renderList(): void {
   version += 1
   listeners.forEach((fn) => fn())
+}
+
+function showProgress(next: StartProgress | null): void {
+  progress = next
+  renderList()
+}
+
+function moveProgress(stage: StartProgress["stage"], words = ""): void {
+  if (!progress) return
+  showProgress({ ...progress, stage, words })
 }
 
 /** Show progress only when a start takes longer than a tap. */
@@ -728,6 +752,8 @@ function press(id: string): void {
   said("")
   draw()
   startPress.start()
+  showProgress({ stage: "asking", resume: false, words: "", background: false, place: place || (id === MACHINE_PLACE
+    ? { id, label: "Clawdfather", path: nextWord("machineSessionScope") } : null) })
   const as = id === MACHINE_PLACE ? "" : chosenPersona()
   asked(() => api.startPlace(id, with_, undefined, as || undefined))
     .then((d) => {
@@ -740,6 +766,7 @@ function press(id: string): void {
     .catch((e: Failure) => {
       startPress.settle(() => {
         pressing = null
+        showProgress(null)
         if (e && e.code === "write_disabled") {
           write = false
         } else if (e && e.code === "not_found") {
@@ -770,6 +797,8 @@ function pick(sessionID: string): void {
   said("")
   draw()
   startPress.start()
+  showProgress({ stage: "asking", resume: true, words: "", background: false,
+    place: { id: place.id, label: row.title, path: place.path, icon: place.icon, machine: place.machine } })
   const as = chosenPersona()
   asked(() => api.resumePlace(place.id, sessionID, with_, undefined, as || undefined))
     .then((d) => {
@@ -781,6 +810,7 @@ function pick(sessionID: string): void {
     .catch((e: Failure) => {
       startPress.settle(() => {
         pressing = null
+        showProgress(null)
         if (e && e.code === "write_disabled") {
           write = false
         } else if (e && e.code === "not_found") {
@@ -800,10 +830,12 @@ function began(answer: L.StartAnswer | undefined, place: Place | null): void {
   close()
   if (!id) {
     band(detached ? detachedWords() : T().webStartSlow, true)
+    moveProgress(detached ? "detached" : "slow", detached ? detachedWords() : T().webStartSlow)
     return
   }
   wait = { id, from: host.openId(), late: false, eager: false, place: place || { id: "" } }
   band(detached ? detachedWords() : T().webStartWaiting, false)
+  moveProgress(detached ? "detached" : "waiting", detached ? detachedWords() : "")
   renderList()
   // The Swift server nudges its watcher here, so the new row arrives the way
   // every other one does; this daemon's stream has no nudge, so the page asks.
@@ -813,6 +845,7 @@ function began(answer: L.StartAnswer | undefined, place: Place | null): void {
     if (!wait) return
     wait.late = true
     band(detached ? detachedWords() : T().webStartSlow, true)
+    moveProgress(detached ? "detached" : "slow", detached ? detachedWords() : T().webStartSlow)
     renderList()
   }, HOLD)
   if (answer && host.openStarted && wait?.id === id) {
@@ -829,6 +862,7 @@ function finishStarted(id: string): boolean {
   if (timer) clearTimeout(timer)
   timer = null
   detached = null
+  progress = null
   hideBand()
   renderList()
   return true
@@ -924,6 +958,16 @@ export const Start = {
   },
   version: () => version,
 
+  /** The start the progress dialog shows, or null when there is none to show. */
+  progress: (): StartProgress | null => progress,
+
+  /** Let the dialog go and keep waiting in the band under the header. */
+  background() {
+    if (!progress) return
+    // With nothing being waited for, the band holds the sentence; the dialog has no more to show.
+    showProgress(wait ? { ...progress, background: true } : null)
+  },
+
   /** `placeholder`: the place the arriving row stands in for, while it is worth drawing. */
   placeholder(): Place | null {
     if (!wait || wait.late || arrived(wait.id)) return null
@@ -942,6 +986,7 @@ export const Start = {
   dismiss() {
     wait = null
     detached = null
+    progress = null
     if (timer) clearTimeout(timer)
     timer = null
     hideBand()
@@ -959,6 +1004,7 @@ export const Start = {
     const { id, from, late } = wait
     landed = late ? null : id
     wait = null
+    progress = null
     if (timer) clearTimeout(timer)
     timer = null
     if (detached) {
