@@ -5,6 +5,8 @@ import type { ProjectUnifyApplied, ProjectUnifyPlan } from "@clawdline/contract"
 export interface ProjectFile {
   id: string
   name: string
+  title?: string
+  description?: string
   location: string
   source: "project" | "global"
   assistant: "codex" | "claude"

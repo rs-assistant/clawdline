@@ -338,9 +338,12 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		"projectfiles.tree_path_bytes": func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-Project-tree request guard"} },
 		"projectfiles.tree_depth":      func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-Project-tree request guard"} },
 		"projectfiles.file_bytes":      func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-file read and save guard"} },
-		"projectfiles.write_bytes":     func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-request save body guard"} },
-		"projectsync.file_bytes":       func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-file guard"} },
-		"projectsync.path_bytes":       func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-path guard"} },
+		"projectfiles.skill_summary_runes": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Skill inventory display limit"}
+		},
+		"projectfiles.write_bytes": func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-request save body guard"} },
+		"projectsync.file_bytes":   func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-file guard"} },
+		"projectsync.path_bytes":   func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-path guard"} },
 		capacity.SessionsShellOutputBytes: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-read window; no retained buffer"}
 		},
