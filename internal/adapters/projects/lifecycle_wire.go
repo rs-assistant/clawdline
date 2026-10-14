@@ -181,6 +181,9 @@ func encode(obs observation, now time.Time) *Snapshot {
 		Untracked:    sum(func(r row) *int64 { return r.untracked }),
 		StorageBytes: sum(func(r row) *int64 { return r.storageBytes }),
 	}
+	if obs.err != nil && obs.err.Code == "observation_in_progress" && !obs.truncated {
+		counts.Rows = i64(int64(len(obs.rows)))
+	}
 	if sound {
 		counts.Rows = i64(int64(len(obs.rows)))
 		var unknown, active int64
@@ -295,7 +298,7 @@ func encodeRow(r row, obs observation, now time.Time) SnapshotRow {
 	if r.storageObserved == nil && r.storageError == nil {
 		storage.Error = &Issue{"storage_not_observed", "Disk usage has not been observed."}
 	}
-	cleanup := RowCleanup{Eligible: len(r.actions) > 0 && len(r.blockers) == 0, Blockers: r.blockers}
+	cleanup := RowCleanup{Eligible: obs.err == nil && !obs.truncated && len(r.actions) > 0 && len(r.blockers) == 0, Blockers: r.blockers}
 	if cleanup.Blockers == nil {
 		cleanup.Blockers = []Issue{}
 	}
