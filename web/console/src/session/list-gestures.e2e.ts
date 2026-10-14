@@ -1772,8 +1772,16 @@ test("a phone links a command with fixed text and replaces that text when linkin
     assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Release Now")
     assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /release-now/)
     assert.doesNotMatch(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Run the publish and verification steps/)
-    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.readOnly && document.querySelector('.workflow-editor textarea')?.readOnly`), true)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.readOnly`), false)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor textarea')?.readOnly`), true)
+    assert.match(await tab.run(`document.querySelector('.workflow-message-locked small')?.textContent`), /無法|cannot/)
     assert.match(await tab.run(`document.querySelector('.workflow-source-link')?.textContent`), /Release Now/)
+    await tab.run(`(() => {
+      const field = document.querySelector('.workflow-editor input')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, 'Custom Release')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Custom Release")
     await tab.press('.workflow-source-row button:last-child')
     await tab.press('.workflow-skill-options button:first-child')
     await tab.run(`new Promise((resolve, reject) => {
@@ -1811,7 +1819,7 @@ test("an older linked Workflow can replace mismatched text from its source", () 
     })`)
     await tab.press('.workflow-list-main')
     assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Sprint")
-    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.readOnly`), true)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.readOnly`), false)
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
@@ -1824,7 +1832,7 @@ test("an older linked Workflow can replace mismatched text from its source", () 
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
-        if (document.querySelector('.workflow-editor input')?.value === 'Global Review') return resolve(true)
+        if (document.querySelector('.workflow-editor input')?.value === 'Sprint' && document.querySelector('.workflow-editor textarea')?.value.includes('Global Review')) return resolve(true)
         if (Date.now() > deadline) return reject(new Error('linked Workflow text did not update'))
         setTimeout(look, 25)
       }; look()
@@ -1901,6 +1909,13 @@ test("a phone imports a linked global Skill, starts it, and sees its durable pro
     await tab.press('.workflow-skill-dialog footer .workflow-primary')
     assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Global Review")
     assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Global Review/)
+    await tab.run(`(() => {
+      const field = document.querySelector('.workflow-editor input')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, 'My Review')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "My Review")
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor textarea')?.readOnly`), true)
     await tab.press('.workflow-editor button[type="submit"]')
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
@@ -1912,6 +1927,7 @@ test("a phone imports a linked global Skill, starts it, and sees its durable pro
     })`)
     assert.equal(workflowRecords.length, 1)
     assert.equal(workflowRecords[0].scope, "workflow")
+    assert.equal(workflowRecords[0].title, "My Review")
     assert.deepEqual(workflowRecords[0].source, { kind: "skill", file_id: "global-skill-fixture",
       place_id: "project-fixture", scope: "global", name: "Global Review", version: "fixture" })
     assert.match(await tab.run(`document.querySelector('.workflow-list-source')?.textContent`), /Global Review/)
@@ -1990,7 +2006,7 @@ test("a phone imports a linked global Skill, starts it, and sees its durable pro
     })`)
     assert.equal(workflowSends, 1)
     assert.match(String((workflowTodo as Row | null)?.text), /Clawdline-Workflow/)
-    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /Global Review/)
+    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /My Review/)
     await tab.shot("workflow-session-progress")
     await tab.press('.session-workflow-row summary')
     await tab.press('.session-workflow-row button')

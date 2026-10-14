@@ -141,10 +141,10 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     let live = true
     setSourceCheck("checking")
     readProjectFile(source.place_id, source.file_id).then((answer) => {
-      if (live) setSourceCheck(workflowSourceMatches({ title: draft.title, body: draft.body, source }, answer.file) ? "matched" : "mismatch")
+      if (live) setSourceCheck(workflowSourceMatches({ body: draft.body, source }, answer.file) ? "matched" : "mismatch")
     }).catch(() => { if (live) setSourceCheck("unavailable") })
     return () => { live = false }
-  }, [draft?.source?.file_id, draft?.source?.place_id, draft?.source?.name, draft?.title, draft?.body])
+  }, [draft?.source?.file_id, draft?.source?.place_id, draft?.source?.name, draft?.body])
 
   useEffect(() => {
     if (!projectOpen) return
@@ -248,7 +248,8 @@ function WorkflowPage({ shown }: { shown: boolean }) {
       if (answer.file.kind !== source.kind) throw new Error("source changed")
       const text = launchTextFor(answer.file)
       setDraft((current) => current?.source?.file_id === source.file_id && current.source.place_id === source.place_id
-        ? { ...current, ...text, source: { ...source, scope: answer.file.source, name: text.title, version: answer.version } } : current)
+        ? { ...current, title: current.title === source.name ? text.title : current.title, body: text.body,
+            source: { ...source, scope: answer.file.source, name: text.title, version: answer.version } } : current)
     } catch { setError(W("sourceUnavailable")) }
     finally { setSyncingSource(false) }
   }
@@ -318,14 +319,16 @@ function WorkflowPage({ shown }: { shown: boolean }) {
         </> : <span>{W("noSource")}</span>}
           <button type="button" onClick={() => { skillReturnFocus.current = document.activeElement as HTMLElement | null; setLinkingDraft(true); setSkillOpen(true) }} disabled={!skills.length}>{W(draft.source ? "changeSource" : "linkSource")}</button>
         </div>
-        {draft.source && <p className="workflow-linked-hint">{W("linkedTextHint")}</p>}
+        {draft.source && <p className="workflow-linked-hint">{W("linkedNameHint")}</p>}
         {draft.source && sourceCheck === "mismatch" && <p className="workflow-source-mismatch" role="status">{W("sourceTextMismatch")}</p>}
         {draft.source && sourceCheck === "unavailable" && <p className="workflow-source-mismatch" role="status">{W("sourceUnavailable")}</p>}
         {draft.source && draft.global && draft.source.scope === "project" && <p className="workflow-source-mismatch" role="status">{W("sourceScopeConflict")}</p>}
-        <label>{W("name")}<input value={draft.title} readOnly={!!draft.source} maxLength={200} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
+        <label>{W("name")}<input value={draft.title} maxLength={200} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
         <p className="workflow-scope-hint">{W("availability")}: {draft.global ? W("global") : place?.label || place?.path}</p>
         {draft.global && <p className="workflow-scope-hint">{draft.source?.scope === "project" ? W("globalSourceHint") : W("globalHint")}</p>}
-        <label>{W("message")}<textarea value={draft.body} readOnly={!!draft.source} rows={8} maxLength={4000} onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></label>
+        <label className={draft.source ? "workflow-message-locked" : undefined}>{W("message")}
+          {draft.source && <small>{W("linkedMessageHint")}</small>}
+          <textarea value={draft.body} readOnly={!!draft.source} rows={8} maxLength={4000} onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></label>
         {error && <p role="alert" className="workflow-error">{error}</p>}
         <div className="workflow-actions"><button className="workflow-primary" type="submit" disabled={busy || !!draft.source && (sourceCheck !== "matched" || draft.global && draft.source.scope === "project")}>{W("save")}</button>
           <button type="button" disabled={busy} onClick={() => setDraft(null)}>{W("cancel")}</button>

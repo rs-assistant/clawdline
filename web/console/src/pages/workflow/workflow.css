@@ -57,6 +57,8 @@
 .workflow-linked-hint { margin: -.55rem 0 0; color: var(--dim); font-size: .85rem; line-height: 1.5; }
 .workflow-source-mismatch { margin: -.65rem 0 0; padding: .6rem .75rem; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: .5rem; color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--card)); font-size: .85rem; line-height: 1.5; }
 .workflow-editor input[readonly], .workflow-editor textarea[readonly] { background: color-mix(in srgb, var(--card) 88%, var(--line)); }
+.workflow-editor .workflow-message-locked textarea { border-style: dashed; cursor: default; }
+.workflow-message-locked small { color: var(--dim); font-size: .82rem; font-weight: 400; line-height: 1.45; }
 .workflow-editor label { font-weight: 600; }
 .workflow-scope { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; margin: 0; padding: 0; border: 0; }
 .workflow-scope legend { margin-bottom: .4rem; font-weight: 600; }

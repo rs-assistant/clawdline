@@ -210,7 +210,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
     let live = true
     setWorkflowSourceStatus("checking")
     readProjectFile(source.place_id, source.file_id).then((answer) => {
-      if (live) setWorkflowSourceStatus(workflowSourceMatches({ title: currentWorkflow.title, body: currentWorkflow.body, source }, answer.file) ? "ready" : "mismatch")
+      if (live) setWorkflowSourceStatus(workflowSourceMatches({ body: currentWorkflow.body, source }, answer.file) ? "ready" : "mismatch")
     }).catch(() => { if (live) setWorkflowSourceStatus("unavailable") })
     return () => { live = false }
   }, [currentWorkflow])
@@ -225,7 +225,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       try {
         const source = currentWorkflow.source
         const answer = await readProjectFile(source.place_id, source.file_id)
-        if (!workflowSourceMatches({ title: currentWorkflow.title, body: currentWorkflow.body, source }, answer.file)) {
+        if (!workflowSourceMatches({ body: currentWorkflow.body, source }, answer.file)) {
           setWorkflowError(W("sourceNeedsSync")); setStartingWorkflow(false); return
         }
       } catch { setWorkflowError(W("sourceStartUnavailable")); setStartingWorkflow(false); return }
