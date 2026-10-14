@@ -38,11 +38,22 @@ export interface Snippet {
   scope: "global" | "project" | "workflow"
   /** Absent on a global snippet — never null; see `snippetCreateBody`. */
   project?: string
+  /** Origin of an imported Workflow. The launch message remains independent. */
+  source?: WorkflowSource
   /** Present while the shipped starter Workflow has not been edited. */
   builtin?: "zero_review"
   position: number
   created_at: number
   updated_at: number
+}
+
+export interface WorkflowSource {
+  kind: "skill" | "command"
+  file_id: string
+  place_id: string
+  scope: "project" | "global"
+  name: string
+  version: string
 }
 
 /** The project the machine resolved for one session, beside its list. */

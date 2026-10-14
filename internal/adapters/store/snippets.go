@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -34,6 +35,10 @@ CREATE TABLE IF NOT EXISTS snippets (
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS snippets_by_place ON snippets(scope, project, position);
+CREATE TABLE IF NOT EXISTS workflow_sources (
+  snippet_id TEXT PRIMARY KEY,
+  source_json TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS snippet_writes (
   seq INTEGER PRIMARY KEY AUTOINCREMENT,
   at  INTEGER NOT NULL
@@ -136,23 +141,32 @@ func (s *Store) Snippets(ctx context.Context) ([]snippet.Record, error) {
 		return nil, err
 	}
 	rows, err := s.rd.QueryContext(ctx,
-		`SELECT id, title, body, scope, project, position, created_at, updated_at FROM snippets`)
+		`SELECT s.id, s.title, s.body, s.scope, s.project, s.position, s.created_at, s.updated_at,
+		 COALESCE(w.source_json, '') FROM snippets s LEFT JOIN workflow_sources w ON w.snippet_id = s.id`)
 	if err != nil {
 		return nil, classify(err)
 	}
-	defer rows.Close()
 	out := []snippet.Record{}
 	for rows.Next() {
 		var r snippet.Record
-		var scope, project string
+		var scope, project, source string
 		if err := rows.Scan(&r.ID, &r.Title, &r.Body, &scope, &project,
-			&r.Position, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			&r.Position, &r.CreatedAt, &r.UpdatedAt, &source); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if err := decodeWorkflowSource(source, &r); err != nil {
+			rows.Close()
 			return nil, err
 		}
 		r.Scope, r.Project = snippet.Scope(scope), project
 		out = append(out, r)
 	}
 	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
 		return nil, err
 	}
 	snippet.Sort(out)
@@ -229,6 +243,9 @@ func (s *Store) CreateSnippet(ctx context.Context, id string, f snippet.Fields,
 			candidate.Project, candidate.Position, candidate.CreatedAt, candidate.UpdatedAt); err != nil {
 			return 0, err
 		}
+		if err := writeWorkflowSource(ctx, tx, candidate); err != nil {
+			return 0, err
+		}
 		made = candidate
 		return 1, nil
 	})
@@ -287,6 +304,9 @@ func (s *Store) UpdateSnippet(ctx context.Context, id string, f snippet.Fields,
 			next.Position, next.UpdatedAt, next.ID); err != nil {
 			return 0, err
 		}
+		if err := writeWorkflowSource(ctx, tx, next); err != nil {
+			return 0, err
+		}
 		saved = next
 		return 1, nil
 	})
@@ -311,6 +331,9 @@ func (s *Store) DeleteSnippet(ctx context.Context, id string, now time.Time) (*s
 			return 0, err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM snippets WHERE id = ?`, id); err != nil {
+			return 0, err
+		}
+		if _, err := tx.ExecContext(ctx, `DELETE FROM workflow_sources WHERE snippet_id = ?`, id); err != nil {
 			return 0, err
 		}
 		return 1, nil
@@ -355,11 +378,12 @@ func (s *Store) OrderSnippets(ctx context.Context, scope snippet.Scope, project 
 
 func oneSnippet(ctx context.Context, tx *sql.Tx, id string) (snippet.Record, bool, error) {
 	var r snippet.Record
-	var scope, project string
+	var scope, project, source string
 	err := tx.QueryRowContext(ctx,
-		`SELECT id, title, body, scope, project, position, created_at, updated_at
-		 FROM snippets WHERE id = ?`, id).
-		Scan(&r.ID, &r.Title, &r.Body, &scope, &project, &r.Position, &r.CreatedAt, &r.UpdatedAt)
+		`SELECT s.id, s.title, s.body, s.scope, s.project, s.position, s.created_at, s.updated_at,
+		 COALESCE(w.source_json, '') FROM snippets s LEFT JOIN workflow_sources w ON w.snippet_id = s.id
+		 WHERE s.id = ?`, id).
+		Scan(&r.ID, &r.Title, &r.Body, &scope, &project, &r.Position, &r.CreatedAt, &r.UpdatedAt, &source)
 	if errors.Is(err, sql.ErrNoRows) {
 		return snippet.Record{}, false, nil
 	}
@@ -367,29 +391,67 @@ func oneSnippet(ctx context.Context, tx *sql.Tx, id string) (snippet.Record, boo
 		return snippet.Record{}, false, err
 	}
 	r.Scope, r.Project = snippet.Scope(scope), project
+	if err := decodeWorkflowSource(source, &r); err != nil {
+		return snippet.Record{}, false, err
+	}
 	return r, true, nil
+}
+
+func decodeWorkflowSource(raw string, r *snippet.Record) error {
+	if raw == "" {
+		return nil
+	}
+	var source snippet.SourceRef
+	if err := json.Unmarshal([]byte(raw), &source); err != nil {
+		return err
+	}
+	r.Source = &source
+	return nil
+}
+
+func writeWorkflowSource(ctx context.Context, tx *sql.Tx, r snippet.Record) error {
+	if r.Source == nil {
+		_, err := tx.ExecContext(ctx, `DELETE FROM workflow_sources WHERE snippet_id = ?`, r.ID)
+		return err
+	}
+	raw, err := json.Marshal(r.Source)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO workflow_sources (snippet_id, source_json) VALUES (?, ?)
+		ON CONFLICT(snippet_id) DO UPDATE SET source_json = excluded.source_json`, r.ID, string(raw))
+	return err
 }
 
 func groupSnippets(ctx context.Context, tx *sql.Tx, scope snippet.Scope, project string) ([]snippet.Record, error) {
 	rows, err := tx.QueryContext(ctx,
-		`SELECT id, title, body, scope, project, position, created_at, updated_at
-		 FROM snippets WHERE scope = ? AND project = ?`, string(scope), project)
+		`SELECT s.id, s.title, s.body, s.scope, s.project, s.position, s.created_at, s.updated_at,
+		 COALESCE(w.source_json, '') FROM snippets s LEFT JOIN workflow_sources w ON w.snippet_id = s.id
+		 WHERE s.scope = ? AND s.project = ?`, string(scope), project)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	out := []snippet.Record{}
 	for rows.Next() {
 		var r snippet.Record
-		var gotScope, gotProject string
+		var gotScope, gotProject, source string
 		if err := rows.Scan(&r.ID, &r.Title, &r.Body, &gotScope, &gotProject,
-			&r.Position, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			&r.Position, &r.CreatedAt, &r.UpdatedAt, &source); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if err := decodeWorkflowSource(source, &r); err != nil {
+			rows.Close()
 			return nil, err
 		}
 		r.Scope, r.Project = snippet.Scope(gotScope), gotProject
 		out = append(out, r)
 	}
 	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
 		return nil, err
 	}
 	snippet.Sort(out)

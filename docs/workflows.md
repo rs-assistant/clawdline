@@ -3,15 +3,23 @@
 # Project Workflows
 
 A Workflow is a Project-scoped name and complete launch message. It may start
-with a Skill invocation, but saving does not bind it to that Skill: the message
-can be edited, and a Workflow made from an empty draft is equally valid.
+with a Skill invocation, but its launch message remains editable and a Workflow
+made from an empty draft is equally valid. Imports also save a source reference
+for attribution; that reference never replaces or rewrites the launch message.
 
 The Workflow page in the sidebar lists one Project's saved messages. It reads
 registered places, Skills, and Claude command files. The import list shows the
 name and frontmatter description, then lets the person preview the full source
 before creating an editable draft. A command import tells the assistant to read
 the Project's named Claude command; the file remains required at run time. The
-editor saves only `title` and `body`. The Project path
+editor saves `title`, `body`, and an optional structured source reference. The
+reference stores the source kind, file ID, original Project place ID, display
+name, and version at import time. It lets the editor show the current source
+through the existing authorized Project file read route. A moved or deleted
+source retains its saved name and shows an unavailable state; it is never
+reconnected by a matching name. Source changes are indicated by version, and
+the saved launch message is not overwritten. Earlier Workflows without a link
+can be linked explicitly in the editor. The Project path
 is assigned from the selected place, not typed into the form. There is no
 description, scheduling rule, or implicit trigger.
 
@@ -46,6 +54,8 @@ result directs the person to that fold before retrying.
 The first version does not schedule Workflows, chain Sessions, run commands
 directly, or define a second step language. The launch message may tell the
 assistant to use a Skill, but Clawdline does not interpret that instruction.
+Global Workflow availability does not make a Project-specific source available
+in another Project; the source reference is historical attribution only.
 
 ## Acceptance
 

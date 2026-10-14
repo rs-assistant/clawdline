@@ -124,6 +124,30 @@ func TestAWorkflowIsIndependentProjectText(t *testing.T) {
 	}
 }
 
+func TestWorkflowSourceIsStructuredAndDoesNotReplaceLaunchText(t *testing.T) {
+	source := map[string]any{"kind": "skill", "file_id": strings.Repeat("a", 32), "place_id": "project-one", "scope": "project", "name": "Release now", "version": strings.Repeat("b", 64)}
+	fields, ref := ParseFields(map[string]any{"title": "Release", "body": "Check the release.", "scope": "workflow", "project": "/one", "source": source})
+	if ref != nil {
+		t.Fatal(ref)
+	}
+	created, ref := New("id", fields, 0, 1)
+	if ref != nil || created.Source == nil || created.Source.PlaceID != "project-one" {
+		t.Fatalf("source lost: %+v %v", created, ref)
+	}
+	updated, ref := Patch(created, Fields{Body: "Review before release.", HasBody: true}, 2)
+	if ref != nil || updated.Body != "Review before release." || updated.Source == nil || updated.Source.FileID != created.Source.FileID {
+		t.Fatalf("edit changed source: %+v %v", updated, ref)
+	}
+	unlinked, ref := Patch(updated, Fields{HasSource: true}, 3)
+	if ref != nil || unlinked.Source != nil {
+		t.Fatalf("unlink failed: %+v %v", unlinked, ref)
+	}
+	source["file_id"] = "not-an-id"
+	if _, ref := ParseFields(map[string]any{"source": source}); ref == nil {
+		t.Fatal("invalid file id accepted")
+	}
+}
+
 func TestGlobalWorkflowIsVisibleAcrossProjects(t *testing.T) {
 	fields, ref := ParseFields(map[string]any{
 		"title": "Ship", "body": "Run the release process.", "scope": "workflow",
