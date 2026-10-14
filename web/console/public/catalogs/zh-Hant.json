@@ -4285,6 +4285,8 @@
   "next.secretHandoffReadyMessage": "機密交付 {id} 已備妥。請用本機一次性領取命令取用；這則訊息不含機密值。",
   "next.secretHandoffReceived": "已收到機密值。此 Session 可在 15 分鐘內領取一次。",
   "next.secretHandoffSubmit": "安全交付",
+  "next.secretHandoffSending": "安全交付中…",
+  "next.secretHandoffReplace": "重新交付",
   "projects.activityInProgress": "{n} 項進行中",
   "projects.activityLastKnown": "上次紀錄：{n}",
   "projects.activityNone": "目前無進行中項目",
