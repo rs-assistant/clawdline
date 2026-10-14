@@ -552,14 +552,21 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         }
         return liveSessionSource.readMachine(machineID, new AbortController().signal)
       },
-      listPresentations: async (machineID) => {
+      listPresentations: async (machineID, expectedCount) => {
         // Reuse the fleet's already verified rows, even if a newer
         // presentation pass has only delivered its first title. A partial
         // batch remains visibly partial until the signed set catches up.
         const held = heldFleetRows(machineID)
-        if (held.length) return held as MachineListPresentation[]
-        return await liveSessionSource.readMachinePresentations?.(
+        // A partial fleet replay must not become the classic list's permanent
+        // answer. Ask the machine for the missing display rows.
+        if (held.length && (expectedCount === null || held.length >= expectedCount))
+          return held as MachineListPresentation[]
+        const fresh = await liveSessionSource.readMachinePresentations?.(
           machineID, new AbortController().signal) ?? null
+        if (!fresh) return held.length ? held as MachineListPresentation[] : null
+        const byExecution = new Map(held.map((row) => [destinationKey(row.destination), row as MachineListPresentation]))
+        for (const row of fresh) byExecution.set(destinationKey(row.destination), row)
+        return [...byExecution.values()]
       },
       resolveSession: async (machineID, sessionID) => {
         const reading = await liveSessionSource.readMachine(machineID, new AbortController().signal)
