@@ -6,6 +6,7 @@ import { createWorkflow, deleteWorkflow, readReusableTextForMachine, SnippetFail
 import type { PageModule } from "./types.js"
 import "./workflow/workflow.css"
 import { workflowWord as W } from "../workflow-words.js"
+import { workflowSourceMatches, workflowSourceText, workflowSourceTitle } from "../workflow-source.js"
 import { Mark } from "../session/List.js"
 import type { SessionRow } from "@clawdline/contract"
 
@@ -13,12 +14,11 @@ type Draft = { id: string; title: string; body: string; global: boolean; source:
 const blank = (): Draft => ({ id: "", title: "", body: "", global: false, source: null })
 const machineOf = (place: ProjectPlace): string => (place as ProjectPlace & { machine?: string }).machine ?? ""
 const availableSkills = (files: ProjectFile[]) => files.filter((file) => (file.kind === "skill" || file.kind === "command") && file.status === "ready")
-const commandName = (file: ProjectFile) => file.name.replace(/\.md$/i, "")
-const skillTitle = (file: ProjectFile) => file.kind === "command" && (!file.title || file.title === commandName(file))
-  ? commandName(file).replace(/[-_]+/g, " ").replace(/\b[a-z]/g, (letter) => letter.toUpperCase())
-  : file.title || file.location.split("/").filter(Boolean).at(-2) || file.name
+const skillTitle = workflowSourceTitle
+const launchTextFor = (file: ProjectFile) => workflowSourceText(file,
+  document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en")
 
-/** A Workflow owns its launch text; source attribution points to an optional original. */
+/** An independent Workflow owns its launch text; a linked one uses source-derived text. */
 function WorkflowPage({ shown }: { shown: boolean }) {
   const [places, setPlaces] = useState<ProjectPlace[]>([])
   const [place, setPlace] = useState<ProjectPlace | null>(null)
@@ -39,6 +39,8 @@ function WorkflowPage({ shown }: { shown: boolean }) {
   const [sourceVersion, setSourceVersion] = useState("")
   const [sourceError, setSourceError] = useState("")
   const [sourceBusy, setSourceBusy] = useState(false)
+  const [syncingSource, setSyncingSource] = useState(false)
+  const [sourceCheck, setSourceCheck] = useState<"checking" | "matched" | "mismatch" | "unavailable">("checking")
   const sourceRequest = useRef(0)
   const sourceReturnFocus = useRef<HTMLElement | null>(null)
   const sourceDialog = useRef<HTMLDivElement>(null)
@@ -65,7 +67,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     setSelectedSkill(skill); setSkillText(""); setSkillError(""); setSkillBusy(true)
     try {
       const answer = await readProjectFile(place.id, skill.id)
-      if (request === skillRequest.current) { setSkillText(answer.text); setSkillVersion(answer.version) }
+      if (request === skillRequest.current) { setSelectedSkill(answer.file); setSkillText(answer.text); setSkillVersion(answer.version) }
     } catch { if (request === skillRequest.current) setSkillError(W("skillReadFailed")) }
     finally { if (request === skillRequest.current) setSkillBusy(false) }
   }
@@ -132,6 +134,17 @@ function WorkflowPage({ shown }: { shown: boolean }) {
   }, [!!draft])
 
   useEffect(() => {
+    const source = draft?.source
+    if (!source) return
+    let live = true
+    setSourceCheck("checking")
+    readProjectFile(source.place_id, source.file_id).then((answer) => {
+      if (live) setSourceCheck(workflowSourceMatches({ title: draft.title, body: draft.body, source }, answer.file) ? "matched" : "mismatch")
+    }).catch(() => { if (live) setSourceCheck("unavailable") })
+    return () => { live = false }
+  }, [draft?.source?.file_id, draft?.source?.place_id, draft?.source?.name, draft?.title, draft?.body])
+
+  useEffect(() => {
     if (!projectOpen) return
     const closeOutside = (event: PointerEvent) => {
       if (!projectPicker.current?.contains(event.target as Node)) setProjectOpen(false)
@@ -187,6 +200,9 @@ function WorkflowPage({ shown }: { shown: boolean }) {
 
   const save = async () => {
     if (!place || !draft || busy) return
+    if (draft.source && (sourceCheck !== "matched" || (draft.global && draft.source.scope === "project"))) {
+      setError(W(draft.global && draft.source.scope === "project" ? "sourceScopeConflict" : "sourceNeedsSync")); return
+    }
     const title = draft.title.trim()
     const body = draft.body.trim()
     if (!title || !body) { setError(W("needsText")); return }
@@ -212,13 +228,27 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     finally { setBusy(false) }
   }
 
+  const syncSource = async () => {
+    if (!draft?.source || syncingSource) return
+    const source = draft.source
+    setSyncingSource(true); setError("")
+    try {
+      const answer = await readProjectFile(source.place_id, source.file_id)
+      if (answer.file.kind !== source.kind) throw new Error("source changed")
+      const text = launchTextFor(answer.file)
+      setDraft((current) => current?.source?.file_id === source.file_id && current.source.place_id === source.place_id
+        ? { ...current, ...text, source: { ...source, scope: answer.file.source, name: text.title, version: answer.version } } : current)
+    } catch { setError(W("sourceUnavailable")) }
+    finally { setSyncingSource(false) }
+  }
+
   const importSkill = () => {
     if (!selectedSkill || !skillText || !skillVersion || skillBusy || !place) return
-    const name = skillTitle(selectedSkill)
-    const source: WorkflowSource = { kind: selectedSkill.kind as "skill" | "command", file_id: selectedSkill.id, place_id: place.id, scope: selectedSkill.source, name, version: skillVersion }
+    const text = launchTextFor(selectedSkill)
+    const source: WorkflowSource = { kind: selectedSkill.kind as "skill" | "command", file_id: selectedSkill.id, place_id: place.id, scope: selectedSkill.source, name: text.title, version: skillVersion }
     closeSkill()
-    if (linkingDraft && draft) setDraft({ ...draft, source })
-    else openDraft({ id: "", title: name, body: selectedSkill.kind === "command" ? W("commandPrompt", { name: commandName(selectedSkill) }) : W("skillPrompt", { name }), global: false, source })
+    if (linkingDraft && draft) setDraft({ ...draft, ...text, source })
+    else openDraft({ id: "", ...text, global: false, source })
     setLinkingDraft(false)
   }
 
@@ -260,7 +290,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
           onClick={() => openDraft({ id: row.id, title: row.title, body: row.body, global: !row.project, source: row.source ?? null })}>
           <span className="workflow-list-copy"><strong>{row.title} <small>{!row.project ? W("global") : W("projectOnly")}</small></strong><span>{row.body}</span></span><span className="workflow-edit-label">{W("editAction")} <span aria-hidden="true">→</span></span>
         </button>{row.source && <button type="button" className="workflow-list-source" onClick={() => void showSource(row.source!)}>
-          {W("sourceLabel")}: {row.source.name} ↗</button>}
+          <span aria-hidden="true">↗</span> {row.source.kind === "command" ? W("claudeCommand") : "Skill"} · {row.source.name}</button>}
       </div>)}</div>
     </>}
     {draft && <div ref={editor} className="workflow-editor" role="dialog" aria-modal="true" aria-label={draft.id ? W("edit") : W("new")}
@@ -268,12 +298,17 @@ function WorkflowPage({ shown }: { shown: boolean }) {
       <form tabIndex={-1} onSubmit={(event) => { event.preventDefault(); void save() }}>
         <h2>{draft.id ? W("edit") : W("new")}</h2>
         <div className="workflow-source-row"><span>{W("sourceLabel")}</span>{draft.source ? <>
-          <button type="button" onClick={() => void showSource(draft.source!)}>{draft.source.kind === "command" ? W("claudeCommand") : "Skill"} · {draft.source.name} ↗</button>
+          <button className="workflow-source-link" type="button" onClick={() => void showSource(draft.source!)}><span aria-hidden="true">↗</span><span><small>{draft.source.kind === "command" ? W("claudeCommand") : "Skill"}</small><strong>{draft.source.name}</strong></span></button>
+          <button type="button" onClick={() => void syncSource()} disabled={syncingSource}>{W("syncSource")}</button>
           <button type="button" onClick={() => setDraft({ ...draft, source: null })}>{W("unlinkSource")}</button>
         </> : <span>{W("noSource")}</span>}
-          <button type="button" onClick={() => { skillReturnFocus.current = document.activeElement as HTMLElement | null; setLinkingDraft(true); setSkillOpen(true) }} disabled={!skills.length}>{W("linkSource")}</button>
+          <button type="button" onClick={() => { skillReturnFocus.current = document.activeElement as HTMLElement | null; setLinkingDraft(true); setSkillOpen(true) }} disabled={!skills.length}>{W(draft.source ? "changeSource" : "linkSource")}</button>
         </div>
-        <label>{W("name")}<input value={draft.title} maxLength={200} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
+        {draft.source && <p className="workflow-linked-hint">{W("linkedTextHint")}</p>}
+        {draft.source && sourceCheck === "mismatch" && <p className="workflow-source-mismatch" role="status">{W("sourceTextMismatch")}</p>}
+        {draft.source && sourceCheck === "unavailable" && <p className="workflow-source-mismatch" role="status">{W("sourceUnavailable")}</p>}
+        {draft.source && draft.global && draft.source.scope === "project" && <p className="workflow-source-mismatch" role="status">{W("sourceScopeConflict")}</p>}
+        <label>{W("name")}<input value={draft.title} readOnly={!!draft.source} maxLength={200} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></label>
         {!draft.id && <fieldset className="workflow-scope"><legend>{W("availability")}</legend>
           <label><input type="radio" name="workflow-scope" checked={!draft.global} onChange={() => setDraft({ ...draft, global: false })} />
             {place && <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} />}<span>{place?.label || place?.path}</span></label>
@@ -281,9 +316,9 @@ function WorkflowPage({ shown }: { shown: boolean }) {
             <span>{W("global")}</span></label>
         </fieldset>}
         {draft.global && <p className="workflow-scope-hint">{draft.source?.scope === "project" ? W("globalSourceHint") : W("globalHint")}</p>}
-        <label>{W("message")}<textarea value={draft.body} rows={8} maxLength={4000} onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></label>
+        <label>{W("message")}<textarea value={draft.body} readOnly={!!draft.source} rows={8} maxLength={4000} onChange={(event) => setDraft({ ...draft, body: event.target.value })} /></label>
         {error && <p role="alert" className="workflow-error">{error}</p>}
-        <div className="workflow-actions"><button className="workflow-primary" type="submit" disabled={busy}>{W("save")}</button>
+        <div className="workflow-actions"><button className="workflow-primary" type="submit" disabled={busy || !!draft.source && (sourceCheck !== "matched" || draft.global && draft.source.scope === "project")}>{W("save")}</button>
           <button type="button" disabled={busy} onClick={() => setDraft(null)}>{W("cancel")}</button>
           {draft.id && <button className="workflow-delete" type="button" disabled={busy} onClick={() => void remove()}>{W("delete")}</button>}</div>
       </form>
@@ -302,13 +337,13 @@ function WorkflowPage({ shown }: { shown: boolean }) {
           </div>
           <footer><button type="button" onClick={() => { skillRequest.current++; setSelectedSkill(null); setSkillText(""); setSkillError(""); setSkillBusy(false) }}>{W("backToSkills")}</button>
             {skillError && <button type="button" onClick={() => void chooseSkill(selectedSkill)}>{W("reload")}</button>}
-            <button className="workflow-primary" type="button" disabled={!skillText || skillBusy} onClick={importSkill}>{W(linkingDraft ? "linkSource" : "useSkill")}</button></footer>
+            <button className="workflow-primary" type="button" disabled={!skillText || skillBusy || !!(linkingDraft && draft?.global && selectedSkill?.source === "project")} onClick={importSkill}>{W(linkingDraft ? "replaceLinkText" : "useSkill")}</button></footer>
         </> : <div className="workflow-skill-content"><div className="workflow-skill-options">{skills.map((skill) => <button type="button" key={skill.id} onClick={() => void chooseSkill(skill)}>
           <span><strong>{skillTitle(skill)}</strong><small>{skill.source === "global" ? W("global") : W("projectOnly")} · {skill.kind === "command" ? W("claudeCommand") : skill.assistant}</small></span>
           <span className="workflow-skill-summary">{skill.description || W("skillNoDescription")}</span>
         </button>)}</div></div>}
         {!selectedSkill && <footer><button type="button" onClick={closeSkill}>{W("cancel")}</button></footer>}
-        {selectedSkill && <p className="workflow-skill-hint">{linkingDraft ? W("linkHint") : W(selectedSkill.kind === "command" ? "commandImportHint" : "skillImportHint")}</p>}
+        {selectedSkill && <p className="workflow-skill-hint">{linkingDraft && draft?.global && selectedSkill.source === "project" ? W("sourceScopeConflict") : linkingDraft ? W("linkHint") : W(selectedSkill.kind === "command" ? "commandImportHint" : "skillImportHint")}</p>}
       </div>
     </div>}
     {sourcePreview && <div className="workflow-skill-overlay" role="dialog" aria-modal="true" aria-label={W("sourceDetail")}

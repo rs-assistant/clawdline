@@ -1738,7 +1738,7 @@ test("an ordinary Session keeps the Snippets icon", () =>
     assert.equal(await tab.run(`document.getElementById('clawdfather-suggestions') === null`), true)
   }))
 
-test("a phone previews a Project Claude command by name and imports an editable Workflow draft", () =>
+test("a phone links a command with fixed text and replaces that text when linking a Skill", () =>
   inTab(async (tab) => {
     workflowRecords = []
     await tab.go("/#page=workflow")
@@ -1769,9 +1769,105 @@ test("a phone previews a Project Claude command by name and imports an editable 
     assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Release Now")
     assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /release-now/)
     assert.doesNotMatch(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Run the publish and verification steps/)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.readOnly && document.querySelector('.workflow-editor textarea')?.readOnly`), true)
+    assert.match(await tab.run(`document.querySelector('.workflow-source-link')?.textContent`), /Release Now/)
+    await tab.press('.workflow-source-row button:last-child')
+    await tab.press('.workflow-skill-options button:first-child')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-skill-content pre')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('replacement Skill preview did not load'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-dialog footer .workflow-primary')?.textContent`), /替換|replace/)
+    await tab.press('.workflow-skill-dialog footer .workflow-primary')
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Global Review")
+    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Global Review/)
+    assert.doesNotMatch(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /release-now/)
+    assert.match(await tab.run(`document.querySelector('.workflow-source-link')?.textContent`), /Global Review/)
+    await tab.press('.workflow-source-row button:nth-of-type(3)')
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.readOnly || document.querySelector('.workflow-editor textarea')?.readOnly`), false)
   }))
 
-test("a phone imports an available global Skill as editable Workflow text, starts it, and sees its durable progress", () =>
+test("an older linked Workflow can replace mismatched text from its source", () =>
+  inTab(async (tab) => {
+    workflowTodo = null
+    workflowRecords = [{ id: "00000000-0000-4000-8000-000000000102", title: "Sprint", body: "Run /sprint", scope: "workflow",
+      project: "/tmp/fixture", position: 100, created_at: 1, updated_at: 1,
+      source: { kind: "skill", file_id: "global-skill-fixture", place_id: "project-fixture", scope: "global", name: "Global Review", version: "fixture" } }]
+    await tab.go("/#page=workflow")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-list-main')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('linked Workflow did not load'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press('.workflow-list-main')
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Sprint")
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.readOnly`), true)
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-source-mismatch')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('mismatched source was not identified'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press('.workflow-source-row button:nth-of-type(2)')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-editor input')?.value === 'Global Review') return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('linked Workflow text did not update'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Global Review/)
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (!document.querySelector('.workflow-source-mismatch')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('source mismatch warning stayed after sync'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.run(`location.hash = ${JSON.stringify("session=" + encodeURIComponent(SAFE))}`)
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('#detail-snippets')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Session detail did not open'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press('#detail-snippets')
+    await tab.press('.snippets-tabs button:last-child')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-picker-row')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('linked Workflow was not offered'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press('.workflow-picker-row')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (/來源|source/i.test(document.querySelector('.workflow-launch [role="status"]')?.textContent || '')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Session did not warn about mismatched source'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-start')?.disabled`), true)
+    assert.equal(workflowTodo, null)
+  }))
+
+test("a phone imports a linked global Skill, starts it, and sees its durable progress", () =>
   inTab(async (tab) => {
     workflowRecords = []; workflowTodo = null; workflowSends = 0
     await tab.go("/#page=workflow")
@@ -1861,6 +1957,14 @@ test("a phone imports an available global Skill as editable Workflow text, start
     })`)
     await tab.press('.workflow-picker-row')
     await tab.shot("workflow-session-launch")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (!document.querySelector('.workflow-start')?.disabled) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('linked source did not validate before launch'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
     await tab.press('.workflow-start')
     await new Promise<void>((resolve, reject) => {
       const deadline = Date.now() + 8000

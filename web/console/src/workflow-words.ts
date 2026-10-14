@@ -2,7 +2,7 @@
 import type { Snippet } from "./legacy/snippets-bridge.js"
 const words = {
   en: {
-    reload: "Reload", intro: "Save a launch message for this Project or every Project on this machine. Import a Skill or command into an editable draft.",
+    reload: "Reload", intro: "Save a launch message for this Project or every Project on this machine. Linked Skills and commands supply their Workflow name and launch message.",
     projectUnavailable: "Could not read Projects. Try again.", workflowUnavailable: "Could not read this Project's Workflows or Skills. Try again.",
     loading: "Loading…", new: "Create Workflow", fromSkill: "Create from Skill", chooseSkill: "Choose a Skill",
     empty: "This Project has no Workflows yet.", edit: "Edit Workflow", name: "Name", message: "Launch message",
@@ -11,12 +11,17 @@ const words = {
     skillListTitle: "Choose a Skill or command", skillPreviewTitle: "Skill preview", commandPreviewTitle: "Command preview", claudeCommand: "Claude command", skillNoDescription: "No description provided",
     skillReadFailed: "Could not read this Skill. Try again.", backToSkills: "Back to Skills", useSkill: "Use this Skill",
     sourceLabel: "Imported from", sourceDetail: "Original source", sourceUnavailable: "This source can no longer be opened. The saved Workflow is still available.",
-    sourceChanged: "The source has changed since this Workflow was linked.", noSource: "Independent Workflow", linkSource: "Link a Skill or command", unlinkSource: "Remove link",
-    linkHint: "Link this source for reference. Your Workflow name and launch message stay as written.",
-    skillImportHint: "This creates an editable Workflow launch message using the Skill name.",
-    commandImportHint: "The editable launch message asks the assistant to read this Project command. The command file is still required.",
+    sourceChanged: "The source has changed since this Workflow was linked.", noSource: "Independent Workflow", linkSource: "Link a Skill or command", changeSource: "Change source", unlinkSource: "Remove link", syncSource: "Update from source", replaceLinkText: "Link and replace text",
+    sourceTextMismatch: "The saved name or launch message differs from this source. Update from source before starting this Workflow.",
+    sourceNeedsSync: "This linked Workflow must be updated from its source before it can be saved or started.",
+    sourceScopeConflict: "A Project-only source cannot be linked to a Global Workflow. Remove the link or create a Workflow for that Project.",
+    sourceChecking: "Checking linked source…", sourceReady: "Linked source checked", sourceStartUnavailable: "The linked source could not be checked. Open the Workflow editor to update or remove its link.",
+    linkedTextHint: "The name and launch message are fixed while linked. Update them from the source, or remove the link to customize this Workflow.",
+    linkHint: "Linking replaces the Workflow name and launch message with text for this source.",
+    skillImportHint: "This creates a linked Workflow with a fixed launch message using the Skill name. Remove the link to customize it.",
+    commandImportHint: "This creates a linked Workflow that asks the assistant to read this Project command. The command file is still required; remove the link to customize the launch message.",
     global: "Global", projectOnly: "This Project", availability: "Available in", globalHint: "Available in every Project on this machine.",
-    globalSourceHint: "Available in every Project. This linked source belongs to one Project, so make the launch message usable elsewhere before starting it there.",
+    globalSourceHint: "This Project-only source cannot be used by a Global Workflow. Remove the link or create a Workflow for that Project.",
     chooseWorkflow: "Choose a Workflow to start", reviewLaunch: "Ready to start", noSkills: "No available Skills or commands to import for this Project",
     save: "Save", cancel: "Cancel", delete: "Delete", needsText: "Enter a name and launch message.",
     saveUnknown: "The save result is unknown. Reload the list before trying again.",
@@ -41,7 +46,7 @@ Synthesize a report and a target workflow. Turn improvements into role-owned chi
 Collect shared facts once and include them in each review brief so reviewers do not repeat the same reading.`,
   },
   "zh-Hant": {
-    reload: "重新讀取", intro: "為這個 Project 或這台機器上的所有 Project 儲存啟動訊息。從 Skill 或指令帶入後仍可編輯。",
+    reload: "重新讀取", intro: "為這個 Project 或這台機器上的所有 Project 儲存啟動訊息。連結 Skill 或指令時，名稱與啟動訊息由來源決定。",
     projectUnavailable: "無法讀取 Project，請重試。", workflowUnavailable: "無法讀取此 Project 的 Workflow 或 Skill，請重試。",
     loading: "讀取中…", new: "建立 Workflow", fromSkill: "從 Skill 建立", chooseSkill: "選擇 Skill",
     empty: "這個 Project 還沒有 Workflow。", edit: "編輯 Workflow", name: "名稱", message: "啟動訊息",
@@ -50,12 +55,17 @@ Collect shared facts once and include them in each review brief so reviewers do 
     skillListTitle: "選擇 Skill 或指令", skillPreviewTitle: "預覽 Skill", commandPreviewTitle: "預覽指令", claudeCommand: "Claude 指令", skillNoDescription: "未提供說明",
     skillReadFailed: "無法讀取這個 Skill，請重試。", backToSkills: "返回 Skill 清單", useSkill: "帶入這個 Skill",
     sourceLabel: "建立來源", sourceDetail: "原始來源", sourceUnavailable: "已無法開啟這個來源；已儲存的 Workflow 仍可使用。",
-    sourceChanged: "這個來源在連結後已有更新。", noSource: "獨立的 Workflow", linkSource: "連結 Skill／指令", unlinkSource: "移除連結",
-    linkHint: "連結來源供日後查閱；Workflow 的名稱與啟動訊息會保留原樣。",
-    skillImportHint: "帶入後會建立使用 Skill 名稱的啟動訊息，仍可編輯。",
-    commandImportHint: "帶入後會建立請助理讀取此 Project 指令的啟動訊息，仍可編輯；執行時仍需原始指令檔案。",
+    sourceChanged: "這個來源在連結後已有更新。", noSource: "獨立的 Workflow", linkSource: "連結 Skill／指令", changeSource: "更換來源", unlinkSource: "移除連結", syncSource: "從來源更新", replaceLinkText: "連結並替換文字",
+    sourceTextMismatch: "已儲存的名稱或啟動訊息與來源不同。啟動前請先從來源更新。",
+    sourceNeedsSync: "這個連結 Workflow 必須先從來源更新，才能儲存或啟動。",
+    sourceScopeConflict: "Project 專屬來源不能連結全域 Workflow。請移除連結，或為該 Project 建立 Workflow。",
+    sourceChecking: "正在檢查連結來源…", sourceReady: "已確認連結來源", sourceStartUnavailable: "無法確認連結來源。請到 Workflow 編輯頁更新或移除連結。",
+    linkedTextHint: "連結期間，名稱與啟動訊息固定。可從來源更新，或移除連結後自行修改。",
+    linkHint: "連結後會以這個來源替換 Workflow 的名稱與啟動訊息。",
+    skillImportHint: "帶入後會建立以 Skill 名稱啟動的連結 Workflow；移除連結後才能自訂文字。",
+    commandImportHint: "帶入後會建立請助理讀取此 Project 指令的連結 Workflow；執行時仍需原始指令檔案。移除連結後才能自訂文字。",
     global: "全域", projectOnly: "這個 Project", availability: "使用範圍", globalHint: "這台機器上的所有 Project 都能使用。",
-    globalSourceHint: "所有 Project 都能看到此 Workflow，但連結的來源只屬於這個 Project。請確認啟動訊息在其他 Project 也能使用。",
+    globalSourceHint: "Project 專屬來源不能用於全域 Workflow。請移除連結，或為該 Project 建立 Workflow。",
     chooseWorkflow: "選擇要啟動的 Workflow", reviewLaunch: "確認啟動", noSkills: "這個 Project 沒有可帶入的 Skill 或指令",
     save: "儲存", cancel: "取消", delete: "刪除", needsText: "請填寫名稱與啟動訊息。",
     saveUnknown: "儲存結果無法確認；請重新讀取清單後再試。",
@@ -82,10 +92,13 @@ Collect shared facts once and include them in each review brief so reviewers do 
 } as const
 
 export type WorkflowWord = keyof typeof words.en
-export function workflowWord(key: WorkflowWord, holes: Record<string, string> = {}): string {
-  const lang = typeof document !== "undefined" && document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en"
+export function workflowWordFor(lang: "en" | "zh-Hant", key: WorkflowWord, holes: Record<string, string> = {}): string {
   const source = words[lang][key]
   return source.replace(/\{(\w+)\}/g, (all, name) => holes[name] ?? all)
+}
+export function workflowWord(key: WorkflowWord, holes: Record<string, string> = {}): string {
+  const lang = typeof document !== "undefined" && document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en"
+  return workflowWordFor(lang, key, holes)
 }
 
 /** An unedited built-in uses the reader's language; edited rows keep their text. */
