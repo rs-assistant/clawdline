@@ -17,7 +17,7 @@ import { nextWord } from "../next-strings.js"
 import { pressKey } from "../press-key.js"
 import { readSessionWorkV2, type DirectTodoV2, type WorkV2Item } from "../pages/work/api.js"
 import { toast, toastFailure } from "./toast.js"
-import { processRecovery, refusedReasons, releasableItems } from "./close-release.js"
+import { processRecovery, reconfirmableReading, refusedReasons, releasableItems } from "./close-release.js"
 
 /**
  * The second press before a session-changing action reaches the daemon —
@@ -45,8 +45,8 @@ import { processRecovery, refusedReasons, releasableItems } from "./close-releas
  *   items before it closes; a release that fails closes nothing.
  * - Over Clawdline Cloud a `close_blocked` arrives without its reasons (the
  *   copied `cloud-failure.js` drops them). The row read at the refused
- *   version lists the same ones, so the sheet reopens with those instead of
- *   saying it cannot tell (`refusedReasons`).
+ *   version supplies them; if it moved, a new session reading supplies the
+ *   current reasons and version for a new confirmation.
  * - "archive" (docs/session-archive.md) is the close with a different ending:
  *   the same sheet, the same work reminder, the same `close_blocked` reopen
  *   and forced second decision, sent to `/v1/sessions/{id}/archive`, which
@@ -544,14 +544,28 @@ export const ActionConfirm = {
    * the authoritative list, from a fresher reading than the page's, so the
    * sheet comes back up carrying them.
    */
-  reopenEndBlocked(id: string, reasons: readonly CloseReason[], kind: CloseKind = "end", attemptedVersion: string | null = null): void {
+  async reopenEndBlocked(id: string, reasons: readonly CloseReason[], kind: CloseKind = "end", attemptedVersion: string | null = null): Promise<void> {
     // A forced second decision is only meaningful when the person can see
-    // exactly what the daemon refused and which reading it refused against.
-    // Older Cloud failure envelopes can lose the reasons; ask for a new row
-    // instead of offering an override over an undisclosed obligation.
-    const row = byId(id) as Record<string, unknown> | null
-    const known = refusedReasons(reasons, row, attemptedVersion)
-    if (!attemptedVersion || known.length === 0) {
+    // the current reasons and the version it confirms. Cloud can lose the
+    // refusal's reasons, so read a newer row when the held row has moved.
+    let row = byId(id) as Record<string, unknown> | null
+    let known = refusedReasons(reasons, row, attemptedVersion)
+    let version = attemptedVersion
+    if (!version || known.length === 0) {
+      // Cloud may strip the refusal's reasons while the retained row moves
+      // to a newer version. Read the row again and pin the second decision to
+      // what the person is now shown, rather than strand them with a toast.
+      try {
+        const snapshot = await client.sessions()
+        row = snapshot.sessions.find((candidate) => candidate.id === id) as Record<string, unknown> | undefined ?? null
+        const reading = reconfirmableReading(row)
+        if (reading) {
+          version = reading.version
+          known = reading.reasons
+        }
+      } catch { /* Keep the refusal visible below if a fresh reading is unavailable. */ }
+    }
+    if (!version || known.length === 0) {
       host.refresh()
       toast(nextWord("endWorkCloseUnknown"), true)
       return
@@ -563,7 +577,7 @@ export const ActionConfirm = {
     // ask, and pressing again is a second decision about what it said, not a
     // retry of a request whose answer was lost.
     pending.request = mintRequest()
-    pending.closeabilityVersion = attemptedVersion
+    pending.closeabilityVersion = version
     const base = (row && (row.closeability as Record<string, unknown>)) || {}
     const refused = { ...(row || { id }), closeability: { ...base, state: "blocked", reasons: known } }
     const projected = closeabilityOf(refused)
@@ -731,7 +745,7 @@ function finishEnd(id: string, ticket: number, ok: boolean, error?: unknown): vo
     ActionConfirm.finish()
     if (!ok && error instanceof RefusalError && error.code === "close_blocked") {
       endWasOpen = false
-      ActionConfirm.reopenEndBlocked(id, error.reasons, endKind, attemptedVersion)
+      void ActionConfirm.reopenEndBlocked(id, error.reasons, endKind, attemptedVersion)
       return
     }
     const open = host.openId()

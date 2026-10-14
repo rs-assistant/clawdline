@@ -3,7 +3,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see `session/order.test.ts`.
-import { processRecovery, refusedReasons, releasableItems } from "./close-release.ts"
+import { processRecovery, reconfirmableReading, refusedReasons, releasableItems } from "./close-release.ts"
 
 const mover = { kind: "session", self: true, person_needed: false }
 const unstarted = (id: string) => ({ code: "board_item_unstarted", kind: "obligation", subject_kind: "work", subject_id: id, mover })
@@ -27,6 +27,14 @@ test("the refusal's own reasons win, and a moved or unblocked reading says nothi
   assert.deepEqual(refusedReasons([], row, null), [])
   assert.deepEqual(refusedReasons([], { closeability: { state: "safe", version: "v1", reasons: [] } }, "v1"), [])
   assert.deepEqual(refusedReasons([], null, "v1"), [])
+})
+
+test("a newer blocked row offers a new pinned confirmation after Cloud loses the refusal reasons", () => {
+  const newer = blockedRow("v2", [started("b")])
+  assert.deepEqual(refusedReasons([], newer, "v1"), [])
+  assert.deepEqual(reconfirmableReading(newer), { version: "v2", reasons: [started("b")] })
+  assert.equal(reconfirmableReading({ closeability: { state: "unknown", version: "v2", reasons: [started("b")] } }), null)
+  assert.equal(reconfirmableReading({ closeability: { state: "blocked", version: "v2", reasons: [] } }), null)
 })
 
 test("only a close blocked by unstarted Board items alone may release them", () => {

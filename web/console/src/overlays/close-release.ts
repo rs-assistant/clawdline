@@ -37,6 +37,14 @@ export function refusedReasons(refused: readonly CloseReason[], row: Row, versio
   return reasonsOf(reading)
 }
 
+/** A newly read blocked row is the complete list for a new confirmation. */
+export function reconfirmableReading(row: Row): { version: string; reasons: CloseReason[] } | null {
+ const reading = row?.closeability
+ if (!reading || reading.state !== "blocked" || typeof reading.version !== "string" || !reading.version) return null
+ const reasons = reasonsOf(reading)
+ return reasons.length ? { version: reading.version, reasons } : null
+}
+
 /**
  * The Board items a close may take this Session off: every one when the only
  * things blocking it are unstarted Board items, and none otherwise — a started
