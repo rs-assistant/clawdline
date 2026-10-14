@@ -28,7 +28,7 @@ func (s *Server) notificationEnabled(key string) bool {
 
 func notificationDefault(key string) bool {
 	switch key {
-	case "push_on_app_release_success", "push_on_cloud_release_success", "push_on_release_failure":
+	case "push_on_app_release_success", "push_on_cloud_release_success", "push_on_release_failure", "smart_notifications":
 		return false
 	default:
 		return true

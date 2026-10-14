@@ -48,6 +48,9 @@ arrives on this device.
 | A schedule misses its run, dispatch is refused, or its file cannot be read | `push_on_schedule_failure`: missed and refused runs also require **Notify on failure** on the schedule. An invalid file is reported when its fingerprint changes. These open the list. |
 | A capacity row crosses a notification threshold | `push_on_capacity`: the capacity monitor sends the recorded notice; it opens the list. |
 | A task completion notice becomes a dead letter | `push_on_dead_letter`: once for that dead letter; it opens the root Session while present. |
+| A Session records its delivery report | `push_on_delivery`: one push for that report; it opens the reporting Session while present. |
+| All tasks in one dispatched batch finish | `push_on_fanout`: one push when the last task finishes; a batch has at least two tasks dispatched by the same Root while it has active children. It opens the Root Session while present. |
+| Completion wording includes details | `smart_notifications` changes the two preceding notifications: the Session's own delivery summary or task titles appear in the body. It does not send an extra notification or call an external model. |
 | A Cloud or running macOS app release passes its production checks | `push_on_cloud_release_success` and `push_on_app_release_success` are separate. Unset keys inherit the older `push_on_deploy` choice; a fresh installation has both off. Each opens the list. |
 | An App install or Cloud production check fails | `push_on_release_failure` sends one notification for that failed release command and build. An unset key inherits `push_on_deploy`; a fresh installation has it off. It opens the list. |
 | You press **Send a test** | Only the asking device receives it. It opens the selected Session when the machine can still verify it; otherwise it opens the list. |
@@ -55,23 +58,11 @@ arrives on this device.
 Tapping a waiting notification opens that session. A newer notification about the same session
 replaces the older one.
 
-The Notification page lists only events with a working sender. Legacy Session
-delivery and fan-out settings remain stored, but this daemon currently has no
-sender for either. Smart wording has no active completion sender to change.
-The page explains these gaps without offering switches that would have no effect.
-
 The `orchestrator_agent_notify` switch is on by default. When it is off,
 `clawdline notify` is refused with `agent_notify_disabled`.
 
-## Describe a notification situation
-
-Under **用一句話設定通知**, describe the situation in a sentence, then press **理解這句話**. The page shows the precise condition it understood before **儲存這條規則** becomes available. For example: "當 Session 等我回答時通知我"; "當 Session 等我回答超過 5 分鐘時通知我"; or "當名稱包含「部署」的 Session 等我回答時通知我". An unrecognized or unsupported situation is refused and not saved. The rule parser accepts the displayed examples and their answer/permission variants in English and Taiwan Traditional Chinese. It does not ask a paid external language model to infer new triggers.
-
-A sentence without a wait time sends when the machine first observes the Session waiting. A sentence with a wait may specify 1–120 minutes. A matching rule replaces the standard ten-minute timing for that wait and works independently of the standard waiting switch. A name condition is case insensitive. The notification opens the waiting Session. Each stop produces at most one push, even if several rules match or the setting changes while it waits. The existing six-per-hour machine limit still applies.
-
-Rules are stored on the chosen machine, up to 16 per machine. They can be disabled or deleted on the Notifications page. A disabled rule no longer matches; the standard waiting setting applies if no other enabled rule matches. Existing waiting notifications cannot be retracted or repeated by editing rules.
-
-These rules currently cover **Session waiting for an answer or permission**. Other notification events retain their individual switches above.
+The former custom waiting rules are no longer evaluated. Their saved data is
+retained for compatibility but has no effect on notifications.
 
 ## Turn them off
 

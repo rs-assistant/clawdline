@@ -17,6 +17,10 @@ var Languages = []string{"en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", 
 // Later secondary-language additions may be empty: Format falls back on that
 // key alone, and Coverage reports the untranslated count.
 var notices = map[string][9]string{
+	"delivery.title":            {"Session delivered", "Session 已交件"},
+	"delivery.body":             {"A Session recorded its delivery report.", "Session 已記錄交件回報。"},
+	"fanout.title":              {"Dispatched tasks finished", "整批派工已結束"},
+	"fanout.body":               {"{count} tasks finished; {failed} did not succeed.", "{count} 個任務已結束，其中 {failed} 個未成功。"},
 	"waiting.title":             {"Waiting for your answer: {label}", "等你回答：{label}", "回答を待っています：{label}", "等待你的回答：{label}", "답변을 기다리는 중: {label}", "Esperando tu respuesta: {label}", "Aguardando sua resposta: {label}", "En attente de votre réponse : {label}", "Wartet auf Ihre Antwort: {label}"},
 	"waiting.body":              {"Waiting on a question for {minutes} minutes", "停在一個問題上 {minutes} 分鐘了", "質問への回答を {minutes} 分間待っています", "等待问题的回答已 {minutes} 分钟", "질문에 대한 답변을 {minutes}분째 기다리고 있습니다", "Lleva {minutes} minutos esperando una respuesta", "Aguardando uma resposta há {minutes} minutos", "En attente d’une réponse depuis {minutes} minutes", "Wartet seit {minutes} Minuten auf eine Antwort"},
 	"waiting.deadline":          {"; this task has {minutes} minutes left", "，這個 task 的時限還剩 {minutes} 分鐘", "。このタスクの残り時間は {minutes} 分です", "；此任务还剩 {minutes} 分钟", "; 이 작업의 남은 시간은 {minutes}분입니다", "; a esta tarea le quedan {minutes} minutos", "; restam {minutes} minutos para esta tarefa", " ; il reste {minutes} minutes à cette tâche", "; diese Aufgabe hat noch {minutes} Minuten"},
