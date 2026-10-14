@@ -377,10 +377,14 @@ function SessionOwnedItem({ item, decisions = [], decisionsError, completed = fa
 function WorkflowTodo({ todo, busy, onAction }: { todo: DirectTodoV2; busy: boolean; onAction: (action: "send" | "complete" | "reopen") => void }) {
   const run = workflowRunOf(todo.text)
   if (!run) return null
-  const status = todo.completed_at ? W("done") : todo.read_at ? W("running") : todo.sent_at ? W("sent") : W("queued")
+  const state = todo.completed_at ? "done" : todo.read_at ? "running" : todo.sent_at ? "sent" : "queued"
+  const status = state === "done" ? W("finished") : state === "running" ? W("inProgress") : state === "sent" ? W("sent") : W("queued")
   return <article className="session-workflow-row" data-state={todo.completed_at ? "done" : "active"}>
-    <details><summary><small className="session-workflow-kind">{todo.completed_at ? W("done") : W("running")}</small>
-      <span className="session-workflow-heading"><strong>{run.title}</strong><span>{status}</span></span></summary>
+    <details><summary><small className="session-workflow-kind">{W("workflow")}</small>
+      <span className="session-workflow-heading"><strong>{run.title}</strong><span className="session-workflow-status" data-state={state}>
+        {state === "done" && <WorkIcon name="check" />}
+        {state === "running" && <span className="session-workflow-spinner" aria-hidden="true" />}
+        {status}</span></span></summary>
       <p>{run.message}</p>
       <div className="work-actions">
         {!todo.completed_at && !todo.sent_at && <button className="chip" type="button" disabled={busy} onClick={() => onAction("send")}>{W("send")}</button>}
