@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5254,
-  "riskKeys": 2323,
-  "nonRiskCount": 2931,
+  "englishContentKeys": 5258,
+  "riskKeys": 2324,
+  "nonRiskCount": 2934,
   "groups": [
     {
       "name": "bar / other",
@@ -1939,7 +1939,7 @@
     },
     {
       "name": "next / other",
-      "count": 154,
+      "count": 157,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1949,6 +1949,9 @@
         "next.brokerWork",
         "next.commandNoPlanner",
         "next.devicesLedeAccount",
+        "next.devicesRosterLoading",
+        "next.devicesRosterReady",
+        "next.devicesRosterRetry",
         "next.devicesThisMachine",
         "next.firstSessionEmptyHint",
         "next.firstSessionRetry",

@@ -30,7 +30,7 @@ import { keepConnectedRecovering, type RecoveringCloudConnection } from "./recov
 import { CARRY_TABLE } from "./carry.js"
 import { afterForget, forgetMachine, honestyIsOurs, type ForgetOutcome } from "./forget.js"
 import { NAME_MAX, renameMachine, type RenameOutcome } from "./rename.js"
-import { setAccountMachines, setMachineForgetting, setMachinePairing } from "../legacy/devices-bridge.js"
+import { setAccountMachines, setAccountRosterStatus, setMachineForgetting, setMachinePairing } from "../legacy/devices-bridge.js"
 import { machinePaired } from "./pairing-completion.js"
 import { setProjectSyncSeam, syncSeamFor, type SyncClient } from "./project-sync.js"
 import { machinePresentation } from "../legacy/js/session/selection.js"
@@ -413,12 +413,26 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const pairingStore = useMemo(() => browserPendingPairings(), [])
 
   /** Apply the account's durable answer, not only the relay's retained snapshots. */
+  const rosterRequest = useRef(0)
   const readAccountRoster = useCallback((apiOrigin: string) => {
+    const request = ++rosterRequest.current
+    setAccountRosterStatus("loading")
     void accountMachineRoster(apiOrigin).then((roster) => {
-      if (!roster) return
+      if (request !== rosterRequest.current) return
+      if (!roster) {
+        namesRef.current = new Map()
+        registeredRef.current = new Map()
+        setNames(namesRef.current)
+        setRegistered(registeredRef.current)
+        setAccountRosterStatus("failed", () => readAccountRoster(apiOrigin))
+        return
+      }
+      namesRef.current = roster.names
+      registeredRef.current = roster.registered
       setNames(roster.names)
       setRegistered(roster.registered)
       setForgotten((was) => [...new Set([...was, ...roster.revoked])])
+      setAccountRosterStatus("ready")
     })
   }, [])
   // An opened handover is the first cryptographic proof for a browser that has
@@ -473,7 +487,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
 
   // The Devices page's list belongs to this gate's line. A gate that is gone
   // leaves no source behind for a page to read an account through.
-  useEffect(() => () => setAccountMachines(null), [])
+  useEffect(() => () => {
+    rosterRequest.current += 1
+    setAccountMachines(null)
+  }, [])
   useEffect(() => () => setProjectSyncSeam(null), [])
   useEffect(() => () => {
     uninstallScheduleWebhooks.current?.()
@@ -980,6 +997,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               retryAfterMs: answer.retryAfterMs,
             }
           })
+          if (transport.kind === "cloud") readAccountRoster(transport.config.apiOrigin)
           unlisten.current?.()
           unlisten.current = next.events((event) => {
             // The fleet list stays visible beside an open Session. Refresh its
@@ -1021,9 +1039,6 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           }
           listMachines()
           setScreen({ at: "machines" })
-          if (transport.kind === "cloud") {
-            readAccountRoster(transport.config.apiOrigin)
-          }
           return
         }
         case "sign_in":

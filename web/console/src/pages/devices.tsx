@@ -106,6 +106,7 @@ function DevicesPageView({ shown }: { shown: boolean }) {
     return () => {
       watch.disconnect()
       stopActions()
+      page.current?.leave()
     }
   }, [])
 

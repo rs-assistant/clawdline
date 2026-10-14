@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5254,
+  "englishKeys": 5258,
   "counts": {
-    "negation": 1506,
+    "negation": 1507,
     "state": 724,
     "permission": 333,
     "deletion": 111,
-    "uncertainty": 153
+    "uncertainty": 154
   },
-  "unionCount": 2323,
+  "unionCount": 2324,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1132,6 +1132,7 @@
       "next.defaultModelsFailed",
       "next.defaultModelsHint",
       "next.devicesLedeThisMachine",
+      "next.devicesRosterFailed",
       "next.documentsListed",
       "next.documentsTasks",
       "next.documentsWalked",
@@ -2810,6 +2811,7 @@
       "next.cloudPeerMachineClear",
       "next.cloudPeerMachinePartial",
       "next.cloudPeerObservationUnknown",
+      "next.devicesRosterFailed",
       "next.fleetUpdateUnknown",
       "next.linksDeployUnreadable",
       "next.linksGitUnreadable",
@@ -4525,6 +4527,7 @@
     "next.defaultModelsSaved",
     "next.devicesLedeThisMachine",
     "next.devicesPairHelp",
+    "next.devicesRosterFailed",
     "next.documentsListed",
     "next.documentsTasks",
     "next.documentsWalked",

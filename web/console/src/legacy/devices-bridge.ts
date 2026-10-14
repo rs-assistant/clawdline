@@ -104,10 +104,31 @@ export const DEVICES_ELEMENT_IDS = [
  */
 let account: MachineSource | null = null
 let accountRows = new Map<string, MachineRow>()
+type AccountRosterStatus = "idle" | "loading" | "ready" | "failed"
+let accountRosterStatus: AccountRosterStatus = "idle"
+let retryAccountRoster: (() => void) | null = null
+const accountChanges = new Set<() => void>()
+
+function accountChanged(): void {
+  for (const changed of accountChanges) changed()
+}
 
 export function setAccountMachines(source: MachineSource | null): void {
+  if (!account && source) accountRosterStatus = "loading"
   account = source
-  if (!source) accountRows = new Map()
+  if (!source) {
+    accountRows = new Map()
+    accountRosterStatus = "idle"
+    retryAccountRoster = null
+  }
+  accountChanged()
+}
+
+/** The account registration request is separate from the relay inventory. */
+export function setAccountRosterStatus(status: Exclude<AccountRosterStatus, "idle">, retry: (() => void) | null = null): void {
+  accountRosterStatus = status
+  retryAccountRoster = status === "failed" ? retry : null
+  accountChanged()
 }
 
 /** The last account row the page itself drew, for decorators outside the copied module. */
@@ -482,13 +503,38 @@ export function bindDevices(
       start,
     },
   )
+  const rosterStatus = doc.getElementById("devices-roster-status")
+  const rosterRetry = doc.getElementById("devices-roster-retry") as HTMLButtonElement | null
+  let entered = false
+  const renderRosterStatus = () => {
+    if (rosterStatus) rosterStatus.textContent = !account ? ""
+      : nextWord(accountRosterStatus === "ready" ? "devicesRosterReady"
+        : accountRosterStatus === "failed" ? "devicesRosterFailed" : "devicesRosterLoading")
+    if (rosterRetry) {
+      rosterRetry.hidden = !account || accountRosterStatus !== "failed" || !retryAccountRoster
+      rosterRetry.textContent = nextWord("devicesRosterRetry")
+      rosterRetry.onclick = () => retryAccountRoster?.()
+    }
+  }
+  const changed = () => {
+    if (!entered) return
+    renderRosterStatus()
+    void page.load(true)
+  }
   return {
     enter() {
+      entered = true
+      accountChanges.add(changed)
       page.enter()
+      renderRosterStatus()
       const lede = elements["devices-lede"]
       if (lede) lede.textContent = words.lede()
     },
-    leave: () => page.leave(),
+    leave() {
+      entered = false
+      accountChanges.delete(changed)
+      page.leave()
+    },
     load: (quiet?: boolean) => page.load(quiet),
   }
 }

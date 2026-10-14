@@ -12,7 +12,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/forget.test.ts. It sits on one line because the directive answers for the line the path is on.
-import { DEVICES_ELEMENT_IDS, bindDevices, devicesLede, forgetLocalPlatform, localMachineKind, localMachines, offerForgetting, offerLastSeen, offerPairing, openMachinePairing, type MachineAnswer, setAccountMachines, setMachineForgetting, setMachinePairing } from "./devices-bridge.ts"
+import { DEVICES_ELEMENT_IDS, bindDevices, devicesLede, forgetLocalPlatform, localMachineKind, localMachines, offerForgetting, offerLastSeen, offerPairing, openMachinePairing, type DevicesPage, type MachineAnswer, setAccountMachines, setAccountRosterStatus, setMachineForgetting, setMachinePairing } from "./devices-bridge.ts"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/forget.test.ts.
 import { nextWord } from "../next-strings.ts"
 
@@ -56,6 +56,8 @@ class Doc {
   readonly byId = new Map<string, Node>()
   constructor() {
     for (const id of DEVICES_ELEMENT_IDS) this.byId.set(id, new Node("div", this))
+    this.byId.set("devices-roster-status", new Node("p", this))
+    this.byId.set("devices-roster-retry", new Node("button", this))
   }
   getElementById(id: string): Node | null {
     return this.byId.get(id) ?? null
@@ -129,10 +131,13 @@ const WORDS = {
 function bound(doc: Doc) {
   const started: string[] = []
   const page = bindDevices(doc as unknown as Document, (machine: string) => started.push(machine), WORDS)
+  boundPages.push(page)
   return { page, started }
 }
 
+const boundPages: DevicesPage[] = []
 test.afterEach(() => {
+  for (const page of boundPages.splice(0)) page.leave()
   setAccountMachines(null)
   setMachineForgetting(null)
   setMachinePairing(null)
@@ -151,6 +156,52 @@ test("an account with two machines draws two cards, not one", async () => {
   const names = cards.map((card) => card.all("device-card-heading")[0].children[0].textContent)
   assert.deepEqual(names, ["Mac · Studio", "Linux / AWS · host-in-a-datacentre"])
   assert.equal(doc.node("devices-empty").hidden, true)
+})
+
+test("an account roster arriving after the Devices page opens redraws its cards", async () => {
+  setAccountMachines(() => Promise.resolve({ ...ACCOUNT, machines: [ACCOUNT.machines[0]!] }))
+  const doc = new Doc()
+  const { page } = bound(doc)
+  page.enter()
+  await page.load()
+  assert.equal(doc.node("devices-rows").all("device-card").length, 1)
+
+  setAccountMachines(() => Promise.resolve(ACCOUNT))
+  await new Promise((done) => setImmediate(done))
+  assert.equal(doc.node("devices-rows").all("device-card").length, 2,
+    "a late account-only registration must appear without leaving the page")
+  page.leave()
+  setAccountMachines(() => Promise.resolve({ ...ACCOUNT, machines: [ACCOUNT.machines[0]!] }))
+  await new Promise((done) => setImmediate(done))
+  assert.equal(doc.node("devices-rows").all("device-card").length, 2,
+    "a hidden page waits until its next entry")
+  page.enter()
+  await page.load()
+  assert.equal(doc.node("devices-rows").all("device-card").length, 1)
+})
+
+test("account registration loading, failure, retry and completion remain distinct from relay status", async () => {
+  setAccountMachines(() => Promise.resolve({ ...ACCOUNT, machines: [ACCOUNT.machines[0]!] }))
+  const doc = new Doc()
+  const { page } = bound(doc)
+  page.enter()
+  await page.load()
+  const status = doc.node("devices-roster-status")
+  const retry = doc.node("devices-roster-retry")
+  assert.equal(status.textContent, nextWord("devicesRosterLoading"))
+  assert.equal(retry.hidden, true)
+
+  let retried = 0
+  setAccountRosterStatus("failed", () => { retried += 1 })
+  assert.equal(status.textContent, nextWord("devicesRosterFailed"))
+  assert.equal(retry.hidden, false)
+  retry.onclick?.()
+  assert.equal(retried, 1)
+
+  setAccountRosterStatus("ready")
+  assert.equal(status.textContent, nextWord("devicesRosterReady"))
+  assert.equal(retry.hidden, true)
+  page.leave()
 })
 
 test("with an account's list under it, the heading says it is the account's", async () => {
