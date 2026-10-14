@@ -22,6 +22,10 @@
 .human-interventions-count { color: var(--muted, #777); font-size: 12px; }
 .human-interventions-body { max-height: min(55vh, 520px); overflow: auto; padding: 8px 14px 10px; scrollbar-gutter: stable; }
 .human-interventions-empty, .human-interventions-retention { margin: 5px 0; color: var(--muted, #777); font-size: 12px; }
+.human-interventions-loading { display: flex; align-items: center; gap: 7px; }
+.human-interventions-spinner { width: 13px; height: 13px; box-sizing: border-box; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: human-interventions-spin .8s linear infinite; }
+@keyframes human-interventions-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .human-interventions-spinner { animation: none; } }
 .human-interventions-error { color: var(--warn, #a33); font-size: 12px; }
 .human-interventions-status { color: var(--muted, #777); font-size: 12px; }
 .human-interventions-error button { margin-left: 8px; }
