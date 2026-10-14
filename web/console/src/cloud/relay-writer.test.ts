@@ -499,9 +499,9 @@ test("a command the machine may have run without answering says so, and nothing 
 
   client.ready = false
   const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-3" }))
-  assert.equal(res.status, 503, "a write with the line down is refused, not left to a transport error")
+  assert.equal(res.status, 503, "a send with no returning line is refused after the bounded wait")
   const offline = await json(res)
-  assert.equal(offline.error, "offline")
+  assert.equal(offline.error, "cloud_reconnecting")
   assert.equal(offline.outcome, "not_done")
 })
 
@@ -2162,7 +2162,7 @@ test("squad settings carry per-field patches and package reads never gain write 
 // minutes, because the writer carries that read and asked `connected()`, which
 // throws the moment the attached client is not ready. The reader's own machine
 // reads already waited for the client `keepConnected` attaches next; the reads
-// the writer carries now wait the same bound, and its writes still do not.
+// the writer carries now wait the same bound. Receipt-keyed sends do too.
 type Pausable = FakeClient & { lifecycle?: (reason: string) => boolean }
 
 function pausedSeam(coming: boolean, waitMs: number) {
@@ -2235,27 +2235,28 @@ test("the caller's signal ends a carried read's wait for the connection", async 
   assert.deepEqual(retired.calls, [])
 })
 
-test("a write during the gap is refused at once and is never carried after the reconnect", async () => {
+test("a receipt-keyed send during the gap waits for reconnection and is carried once", async () => {
   const { reader, retired, demands } = pausedSeam(true, 5_000)
-  const started = Date.now()
-  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }))
-  assert.ok(Date.now() - started < 1_000, "a write does not wait")
-  assert.equal(res.status, 503)
-  const body = await json(res)
-  assert.equal(body.error, "offline")
-  assert.equal(body.outcome, "not_done")
-  assert.deepEqual(demands, [], "a write does not ask the line to come back")
-
+  const sent = reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-during-gap" }))
+  await new Promise((resolve) => setTimeout(resolve, 5))
   const renewed = new FakeClient()
   renewed.rows = [row("s1")]
   reader.attach(renewed)
-  await new Promise((resolve) => setTimeout(resolve, 10))
+  const res = await sent
+  assert.equal(res.status, 200)
+  assert.deepEqual(demands, ["demand"])
   assert.deepEqual(retired.calls, [])
-  assert.equal(renewed.calls.length, 0, "the refused send is not carried by the new client")
+  assert.equal(renewed.calls.filter(([name]) => name === "_read").length, 1, "the original press is carried once")
+})
 
-  const sent = await reader.fetch("/v1/sessions/s1/send", post({ text: "again" }, { "Idempotency-Key": "send-after-gap" }))
-  assert.equal(sent.status, 200, "a send with the line up is carried as before")
-  assert.equal(renewed.calls.filter(([name]) => name === "_read").length, 1, "exactly the second press, once")
+test("a send is refused without writing when reconnection never arrives", async () => {
+  const { reader, retired } = pausedSeam(true, 20)
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "send-no-line" }))
+  assert.equal(res.status, 503)
+  const body = await json<{ error: string; outcome: string }>(res)
+  assert.equal(body.error, "cloud_reconnecting")
+  assert.equal(body.outcome, "not_done")
+  assert.deepEqual(retired.calls, [])
 })
 
 test("a send whose capability wait crosses a client renewal uses the successor's descriptor", async () => {
@@ -2290,7 +2291,7 @@ test("a rejected send reports which browser gate stopped it without its contents
   assert.equal(old.calls.length, 0)
 })
 
-test("every read the writer carries is one it waits for, and no write is", () => {
+test("every read the writer carries is one it waits for", () => {
   const reads: [string, string][] = [
     ["/v1/work/v2/images/a1", "work-v2-image"],
     ["/v1/usage/compare-compaction", "usage-compare"],
@@ -2328,8 +2329,8 @@ test("every read the writer carries is one it waits for, and no write is", () =>
     assert.ok(CARRIED_READS.has(route!.op), `${op} waits for the connection`)
   }
   assert.deepEqual([...CARRIED_READS].sort(), [...new Set(reads.map(([, op]) => op))].sort(), "the list is exactly the GET routes")
-  for (const [method, path] of [["POST", "/v1/sessions/s1/send"], ["POST", "/v1/places/p1/start"], ["POST", "/v1/verifications"]]) {
-    assert.ok(!CARRIED_READS.has(writeRoute(method, path)!.op), `${method} ${path} never waits`)
+  for (const [method, path] of [["POST", "/v1/places/p1/start"], ["POST", "/v1/verifications"]]) {
+    assert.ok(!CARRIED_READS.has(writeRoute(method, path)!.op), `${method} ${path} is not a carried read`)
   }
 })
 
