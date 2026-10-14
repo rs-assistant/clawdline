@@ -61,6 +61,7 @@ type snippetWire struct {
 	Body      string `json:"body"`
 	Scope     string `json:"scope"`
 	Project   string `json:"project,omitempty"`
+	Builtin   string `json:"builtin,omitempty"`
 	Position  int64  `json:"position"`
 	CreatedAt int64  `json:"created_at"`
 	UpdatedAt int64  `json:"updated_at"`
@@ -104,11 +105,15 @@ type snippetRefusalWire struct {
 }
 
 func snippetOf(r snippet.Record) snippetWire {
-	return snippetWire{
+	w := snippetWire{
 		ID: r.ID, Title: r.Title, Body: r.Body, Scope: string(r.Scope),
 		Project: r.Project, Position: r.Position,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
+	if snippet.IsDefaultZeroReview(r) {
+		w.Builtin = "zero_review"
+	}
+	return w
 }
 
 func snippetsOf(records []snippet.Record) []snippetWire {

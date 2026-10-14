@@ -94,6 +94,11 @@ On each tick, each enabled schedule considers only the **latest** occurrence (`L
 （記成「未宣告」並警告，不當成「什麼都不寫」）。`over_capacity` 與 `terminal_busy`（滿了）把這一次還給時鐘，下一分鐘在窗內重試；
 其他拒絕照舊用掉這一次。只跑一次的排程在 session 真的開起來後寫 `fired_at` 進 body。
 
+**`fired_at` 只擋時鐘，不擋人**：它的唯一用途是讓時鐘不把同一個日期跑第二次。一個排程能跑幾次沒有上限——
+跑過的單次排程照樣可以按「立即執行」、照樣可以被 webhook 觸發（兩者都不再回 `409 schedule_spent`），
+存檔時把日期改掉也照收，`fired_at` 跟著舊日期丟掉，新日期到了時鐘會再跑一次。
+`TestAOneTimeScheduleThatRanCanRunAgain` 釘住這三件事。
+
 **重啟**：`last_fire` 在 SQLite，所以重開後同一次不會再跑；停機期間錯過、而且這支 daemon 早就看過的那一次，
 重開後第一跳補跑一次——永遠只有最近那一次，不會補一整批。
 
@@ -136,7 +141,7 @@ or `canceled` is left alone even if Cloud offers the same delivery again.
 asserts zero across three polls, with `TestAnAcceptedDeliveryReachesTheBrokerOnce` as its control;
 with the re-offer guard disabled it failed, sending receipt versions 2 and 3 for a delivery Cloud had
 already declared expired. A `schedule_dispatch_refused` receipt carries a stable code, never text:
-`schedule_not_found`, `schedule_disabled`, `schedule_spent`, `schedule_active`,
+`schedule_not_found`, `schedule_disabled`, `schedule_active`,
 `orchestrator_disabled`, `hook_unbound`, `binding_store_unavailable`, `outcome_unknown` or
 `dispatch_failed`. A finished run sends `task_execution_terminal` with `success`, `failure`,
 `timed_out` (the broker's `timeout`), `cancelled` or `spawn_failed`;

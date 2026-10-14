@@ -14,9 +14,9 @@ import (
 // **Not in the Swift app's directory.** That app keeps one JSON file per
 // snippet under its own state root and is still running beside this daemon on
 // some machines; two writers on one directory, each with its own idea of what
-// a valid file is, is the shape this rewrite exists to stop. So the rows here
-// start empty on every machine, the old files are left exactly where they are,
-// and docs say how to carry them over on purpose.
+// a valid file is, is the shape this rewrite exists to stop. User rows start
+// empty, alongside one editable global starter Workflow. The old files are
+// left exactly where they are, and docs say how to carry them over on purpose.
 //
 // Everything a write decides — the position a new snippet lands at, whether one
 // more fits — is decided inside the transaction that writes it, because each
@@ -39,11 +39,68 @@ CREATE TABLE IF NOT EXISTS snippet_writes (
   at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS snippet_writes_by_time ON snippet_writes(at);
+CREATE TABLE IF NOT EXISTS snippet_seeds (
+  seed      TEXT PRIMARY KEY,
+  seeded_at INTEGER NOT NULL
+);
 `
 
 func openSnippets(db *sql.DB) error {
-	_, err := db.Exec(snippetSchema)
-	return err
+	if _, err := db.Exec(snippetSchema); err != nil {
+		return err
+	}
+	return seedDefaultWorkflow(db)
+}
+
+// Plant the starter once, including on upgrades. The ledger survives deletion,
+// while a full existing collection can make room and receive it on a later open.
+func seedDefaultWorkflow(db *sql.DB) error {
+	tx, err := db.BeginTx(context.Background(), nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var seen int
+	err = tx.QueryRow(`SELECT 1 FROM snippet_seeds WHERE seed = ?`, snippet.DefaultZeroReviewID).Scan(&seen)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	var total, global, existing int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM snippets`).Scan(&total); err != nil {
+		return err
+	}
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM snippets WHERE scope = ? AND project = ''`, snippet.Workflow).Scan(&global); err != nil {
+		return err
+	}
+	if total >= SnippetTotalLimit || global >= SnippetScopeLimit {
+		return nil
+	}
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM snippets WHERE scope = ? AND project = '' AND title IN (?, ?)`,
+		snippet.Workflow, snippet.DefaultZeroReviewTitle, "歸零審查").Scan(&existing); err != nil {
+		return err
+	}
+	now := time.Now().Unix()
+	if existing == 0 {
+		var highest int64
+		if err := tx.QueryRow(`SELECT COALESCE(MAX(position), 0) FROM snippets WHERE scope = ? AND project = ''`,
+			snippet.Workflow).Scan(&highest); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`INSERT INTO snippets (id, title, body, scope, project, position, created_at, updated_at)
+			VALUES (?, ?, ?, ?, '', ?, ?, ?)`, snippet.DefaultZeroReviewID,
+			snippet.DefaultZeroReviewTitle, snippet.DefaultZeroReviewBody, snippet.Workflow,
+			snippet.NextPosition(highest), now, now); err != nil {
+			return err
+		}
+	}
+	if _, err := tx.Exec(`INSERT INTO snippet_seeds (seed, seeded_at) VALUES (?, ?)`,
+		snippet.DefaultZeroReviewID, now); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // SnippetTotalLimit and SnippetScopeLimit are the defaults for the two

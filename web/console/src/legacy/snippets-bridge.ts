@@ -38,6 +38,8 @@ export interface Snippet {
   scope: "global" | "project" | "workflow"
   /** Absent on a global snippet — never null; see `snippetCreateBody`. */
   project?: string
+  /** Present while the shipped starter Workflow has not been edited. */
+  builtin?: "zero_review"
   position: number
   created_at: number
   updated_at: number

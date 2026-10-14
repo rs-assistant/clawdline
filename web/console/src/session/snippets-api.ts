@@ -1,4 +1,5 @@
 import type { Snippet, SnippetAnswer, SnippetControls } from "../legacy/snippets-bridge.js"
+import { localizedWorkflow } from "../workflow-words.js"
 
 /**
  * The five snippet routes as this sheet reads and writes them
@@ -106,8 +107,11 @@ function writing(method: string, body?: unknown): RequestInit {
 }
 
 /** One session's two groups, and the project the machine resolved for it. */
+const localizeAnswer = (answer: SnippetAnswer): SnippetAnswer =>
+  ({ ...answer, snippets: answer.snippets.map(localizedWorkflow) })
+
 export const readSnippets = (sessionRowID: string): Promise<SnippetAnswer> =>
-  call<SnippetAnswer>("/v1/snippets?session=" + encodeURIComponent(sessionRowID))
+  call<SnippetAnswer>("/v1/snippets?session=" + encodeURIComponent(sessionRowID)).then(localizeAnswer)
 
 /** Cloud asks the machine to resolve this Session's Project, including worktrees. */
 export const readWorkflowProject = (sessionRowID: string): Promise<SnippetAnswer> =>
@@ -134,7 +138,7 @@ export const orderSnippets = (
 const onMachine = (machine: string) => "?machine=" + encodeURIComponent(machine)
 
 export const readReusableTextForMachine = (machine: string): Promise<SnippetAnswer> =>
-  call<SnippetAnswer>("/v1/snippets" + onMachine(machine))
+  call<SnippetAnswer>("/v1/snippets" + onMachine(machine)).then(localizeAnswer)
 
 export const createWorkflow = (machine: string, project: string, title: string, body: string): Promise<Snippet> =>
   call<Snippet>("/v1/snippets" + onMachine(machine), writing("POST", project ? { title, body, scope: "workflow", project } : { title, body, scope: "workflow" }))
