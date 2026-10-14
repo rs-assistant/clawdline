@@ -147,6 +147,30 @@ test("the live signed machine descriptor keeps commands beyond the archived cach
   assert.equal(client.machineDescriptor("m").machine.commands.includes("session-receipt"), false)
 })
 
+test("a signed descriptor persists the complete command list across reconnects", () => {
+  const stored = new Map()
+  const storage = { getItem: (key) => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value) }
+  const client = Object.create(StatusCloudClient.prototype)
+  client.machineDescriptors = new Map()
+  client.descriptorStorage = storage
+  client._descriptorStorageKey = () => "descriptors"
+  client.viewerEvents = { now: () => 1 }
+  const commands = Array.from({ length: 151 }, (_, i) => `word-${i}`)
+  commands[149] = "end"
+  commands[150] = "session-receipt"
+  client._rememberDescriptor("m", { machine: { platform: "darwin", commands } })
+  const reopened = Object.create(StatusCloudClient.prototype)
+  reopened.descriptorStorage = storage
+  reopened._descriptorStorageKey = () => "descriptors"
+  reopened.machineDescriptors = reopened._loadMachineDescriptors()
+  reopened.orchestratorSnapshots = new Map()
+  reopened.machineLacks = new Map()
+  reopened.macCapabilities = new Map()
+  assert.equal(reopened.machineDescriptor("m").machine.commands.length, 151)
+  assert.equal(reopened._machineImplements("m", "end"), "yes")
+  assert.equal(reopened._machineImplements("m", "session-receipt"), "yes")
+})
+
 test("a cut remembered Linux command list cannot refuse a named transcript read", () => {
   const client = Object.create(StatusCloudClient.prototype)
   client.machineDescriptors = new Map([["m", { machine: {
