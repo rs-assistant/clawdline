@@ -292,6 +292,19 @@ func (f farewell) waitAndClose(ctx context.Context, s session.Session, asked far
 			return f.close(ctx, s)
 		}
 		if _, why := ours(s, cur); why != "" {
+			// The assistant can leave before the last process in its foreground
+			// group does. That group is still the one this close addressed; wait
+			// for it to drain, without signalling an unidentified process. A new
+			// foreground group is somebody else's work and is refused at once.
+			if asked.Group != 0 && cur.Group == asked.Group && cur.Assistant == "" {
+				if f.now().Sub(started) >= f.polite+f.afterTerm+f.afterKill {
+					return Occupied{Why: "The assistant left, but another process still holds its foreground group, so the terminal was left open."}
+				}
+				if !pause(ctx, f.tick) {
+					return StillRunning{Why: "Waiting for the assistant's foreground group to empty was cut short, so the terminal was left open."}
+				}
+				continue
+			}
 			return Occupied{Why: "Something else came to the front of that terminal as the " +
 				string(assistant) + " left (" + why + "), so it was left open."}
 		}
