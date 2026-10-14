@@ -108,6 +108,23 @@ func TestAFreshMachineAnswersAnEmptySnippetList(t *testing.T) {
 	}
 }
 
+func TestGlobalWorkflowIsListedForEverySessionProject(t *testing.T) {
+	first, second := t.TempDir(), t.TempDir()
+	h := newSnippetHarness(t,
+		session.Session{ID: "%1", TTY: "ttys001", Assistant: "claude", CWD: first},
+		session.Session{ID: "%2", TTY: "ttys002", Assistant: "claude", CWD: second})
+	created := h.write(http.MethodPost, "/v1/snippets", `{"title":"Daily release","body":"Run the checklist.","scope":"workflow"}`)
+	if created.Code != http.StatusOK {
+		t.Fatalf("create: %d %s", created.Code, created.Body.String())
+	}
+	for _, id := range []string{"%1", "%2"} {
+		got := h.list("/v1/snippets?session=" + url.QueryEscape(id))
+		if len(got.Snippets) != 1 || got.Snippets[0].Scope != "workflow" || got.Snippets[0].Project != "" {
+			t.Fatalf("session %s: %+v", id, got.Snippets)
+		}
+	}
+}
+
 // The whole round trip a person makes: write one, read it back, save it, and
 // take it away.
 func TestASnippetIsMadeSavedAndTakenAway(t *testing.T) {

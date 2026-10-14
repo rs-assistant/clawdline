@@ -137,7 +137,7 @@ export const readReusableTextForMachine = (machine: string): Promise<SnippetAnsw
   call<SnippetAnswer>("/v1/snippets" + onMachine(machine))
 
 export const createWorkflow = (machine: string, project: string, title: string, body: string): Promise<Snippet> =>
-  call<Snippet>("/v1/snippets" + onMachine(machine), writing("POST", { title, body, scope: "workflow", project }))
+  call<Snippet>("/v1/snippets" + onMachine(machine), writing("POST", project ? { title, body, scope: "workflow", project } : { title, body, scope: "workflow" }))
 
 export const updateWorkflow = (machine: string, id: string, title: string, body: string): Promise<Snippet> =>
   call<Snippet>("/v1/snippets/" + encodeURIComponent(id) + onMachine(machine), writing("PATCH", { title, body }))

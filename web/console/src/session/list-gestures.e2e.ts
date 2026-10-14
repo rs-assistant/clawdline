@@ -1767,7 +1767,7 @@ test("a phone imports a Skill as editable Workflow text, starts it, and sees its
     })`)
     await tab.press('.workflow-picker-row')
     await tab.shot("workflow-session-launch")
-    await tab.press('.workflow-launch button')
+    await tab.press('.workflow-start')
     await new Promise<void>((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
@@ -1807,15 +1807,65 @@ test("a phone imports a Skill as editable Workflow text, starts it, and sees its
     await tab.press('.snippets-tabs button:last-child')
     await tab.press('.workflow-picker-row')
     workflowRecords = []
-    await tab.press('.workflow-reload')
+    await tab.press('#workflow-picker .workflow-reload')
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
-        if (!document.querySelector('.workflow-launch button') && !document.querySelector('.workflow-picker-row')) return resolve(true)
+        if (!document.querySelector('.workflow-picker-row') && (!document.querySelector('.workflow-start') || document.querySelector('.workflow-start').disabled)) return resolve(true)
         if (Date.now() > deadline) return reject(new Error('a removed Workflow stayed launchable after reload'))
         setTimeout(look, 25)
       }; look()
     })`)
+  }))
+
+test("a phone creates a global Workflow and offers it in a Session", () =>
+  inTab(async (tab) => {
+    workflowRecords = []
+    await tab.go("/#page=workflow")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-empty .workflow-primary')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Workflow empty state did not appear'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.shot("workflow-empty-mobile")
+    await tab.press('.workflow-empty .workflow-primary')
+    await tab.run(`(() => {
+      const fields = document.querySelectorAll('.workflow-editor input, .workflow-editor textarea')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(fields[0], 'Daily release')
+      fields[0].dispatchEvent(new Event('input', { bubbles: true }))
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(fields[1], 'Run the release checklist.')
+      fields[1].dispatchEvent(new Event('input', { bubbles: true }))
+      const scope = document.querySelector('.workflow-editor select')
+      scope.value = 'global'
+      scope.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await tab.press('.workflow-editor button[type="submit"]')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-list button')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('global Workflow did not appear'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.equal(workflowRecords[0].scope, 'workflow')
+    assert.equal(workflowRecords[0].project, undefined)
+    await tab.run(`location.hash = ${JSON.stringify("session=" + encodeURIComponent(SAFE))}`)
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('#detail-snippets')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Session detail did not appear'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press('#detail-snippets')
+    await tab.press('.snippets-tabs button:last-child')
+    assert.match(await tab.run(`document.querySelector('.workflow-picker-row')?.textContent`), /Daily release/)
+    assert.match(await tab.run(`document.querySelector('.workflow-picker-group .snippet-group-title')?.textContent`), /全域|Global/)
   }))
 
 test("Clawdfather stays first above a waiting Session on phone and desktop", () =>

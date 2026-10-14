@@ -182,8 +182,11 @@ func ParseFields(body map[string]any) (Fields, *Refusal) {
 // against a path nobody chose. An empty path beside `scope: "project"` is the
 // same refusal as no key, because an empty path is not a project.
 func ScopeAgrees(f Fields) bool {
-	if f.Scope == Project || f.Scope == Workflow {
+	if f.Scope == Project {
 		return f.HasProject && f.Project != ""
+	}
+	if f.Scope == Workflow {
+		return !f.HasProject || f.Project != ""
 	}
 	return !f.HasProject
 }
@@ -259,7 +262,7 @@ func build(id string, f Fields, position, createdAt, updatedAt int64) (Record, *
 	}
 	if !ScopeAgrees(f) {
 		return Record{}, refuse(400, CodeScopeMismatch,
-			"Project snippets and workflows need one project path; global snippets cannot carry one.", nil)
+			"Project snippets need one project path; workflows may be global or project-specific.", nil)
 	}
 	if len(title) > MaxTitleBytes || len(body) > MaxBodyBytes || len(f.Project) > MaxProjectBytes {
 		return Record{}, refuse(400, CodeTooLong,
@@ -271,7 +274,7 @@ func build(id string, f Fields, position, createdAt, updatedAt int64) (Record, *
 			})
 	}
 	project := ""
-	if f.Scope == Project || f.Scope == Workflow {
+	if f.Scope == Project || (f.Scope == Workflow && f.HasProject) {
 		project = f.Project
 	}
 	return Record{
@@ -344,6 +347,8 @@ func InScope(records []Record, projectKey string) []Record {
 			mine = append(mine, r)
 		case r.Scope == Workflow && projectKey != "" && r.Project == projectKey:
 			mine = append(mine, r)
+		case r.Scope == Workflow && r.Project == "":
+			global = append(global, r)
 		case r.Scope == Global:
 			global = append(global, r)
 		}
