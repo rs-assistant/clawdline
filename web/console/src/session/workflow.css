@@ -2,6 +2,11 @@
 .snippets-tabs button { flex: 1; padding: .55rem; border-radius: .5rem; }
 .snippets-tabs button[aria-selected="true"] { background: var(--card-hi); color: var(--ink); font-weight: 700; }
 .workflow-picker { display: block; }
+.workflow-detail-nav { padding: .5rem 1rem; border-bottom: 1px solid var(--line); }
+.workflow-detail-nav button { padding: .55rem .4rem; color: var(--accent); font: inherit; cursor: pointer; }
+.workflow-detail-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.workflow-detail-scroll .workflow-launch { border-top: 0; background: transparent; }
+.workflow-detail-scroll .workflow-launch p { max-height: none; overflow: visible; }
 .workflow-picker-error { padding: .8rem .75rem; color: var(--danger, #d84a4a); }
 .workflow-picker-error p { margin: 0 0 .5rem; }
 .workflow-picker-error button { color: var(--ink); font: inherit; }

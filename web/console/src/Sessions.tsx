@@ -353,6 +353,7 @@ export function SessionsPage({
         </section>
 
         <Detail key={fleetDetailKey} row={fleetDetailPending ? null : open} tasks={tasks} onOpenSession={onOpen} onBack={onBack} onDid={onDid}
+          scanSources={scanSources}
           projectedCoordinatorBound={fleetCoordinatorBound}
           onSent={streamTasks !== null ? undefined : onDid}
           listUnknown={listUnknown || fleetDetailPending} loadingDetail={fleetDetailPending} emptyProblem={fleetDetailProblem} />

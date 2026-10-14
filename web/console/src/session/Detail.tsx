@@ -1,5 +1,5 @@
 import { catalogWord } from "../catalog.js"
-import type { Icon, SessionAgent, SessionRow, SessionShell, TaskRow } from "@clawdline/contract"
+import type { Icon, ScanSource, SessionAgent, SessionRow, SessionShell, TaskRow } from "@clawdline/contract"
 import {
   useEffect,
   useLayoutEffect,
@@ -96,6 +96,7 @@ export function Detail({
   loadingDetail = false,
   projectedCoordinatorBound = false,
   emptyProblem,
+  scanSources,
 }: {
   row: SessionRow | null
   tasks: TaskRow[] | null
@@ -112,6 +113,7 @@ export function Detail({
   loadingDetail?: boolean
   projectedCoordinatorBound?: boolean
   emptyProblem?: FleetDetailProblem | null
+  scanSources?: readonly ScanSource[]
 }) {
   const T = L.strings
   const [agentId, setAgentId] = useState<string | null>(null)
@@ -302,6 +304,7 @@ export function Detail({
       <ScreenPanel
         row={row}
         open={screenOpen}
+        scanSources={scanSources}
         onClose={(restore) => {
           setScreenOpen(false)
           if (restore && !actionsTrigger.current?.disabled) {

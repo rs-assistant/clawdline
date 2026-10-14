@@ -102,8 +102,7 @@ export function scanFailureWords(
     return catalogWord("literal", "2811b1d9d660")
   }
   if (inventoryRefreshInProgress(notes)) return null
-  // A source the person turned off in Settings is not a failure, and the list
-  // does not repeat their own setting back at them: it says nothing about it.
+  // A source the person turned off is not a list-wide failure.
   const incomplete = (sources ?? []).find((source) => !source.complete && !source.disabled)
   if (incomplete) {
     return catalogFormat("template", "cdf164a88db5", [incomplete.source])

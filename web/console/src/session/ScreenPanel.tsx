@@ -1,10 +1,10 @@
-import type { Screen, SessionRow } from "@clawdline/contract"
+import type { Screen, ScanSource, SessionRow } from "@clawdline/contract"
 import { useEffect, useRef, useState } from "react"
 import { client, followsRelay } from "../client.js"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
 import { readFailure, type ReadState } from "../read-state.js"
-import { screenFailureWord } from "./screen-state.js"
+import { screenFailureWord, screenITermScanOff } from "./screen-state.js"
 import {
   paintRows,
   readScreen,
@@ -54,10 +54,12 @@ export function ScreenPanel({
   row,
   open,
   onClose,
+  scanSources,
 }: {
   row: SessionRow | null
   open: boolean
   onClose: (restore: boolean) => void
+  scanSources?: readonly ScanSource[]
 }) {
   const T = L.strings
   const [screen, setScreen] = useState<Screen | null>(null)
@@ -225,6 +227,9 @@ export function ScreenPanel({
           })}
         </div>
       )
+    }
+    if (screenITermScanOff(screen, scanSources)) {
+      return <div className="screen-note" role="status">{nextWord("screenITermScanOff")}</div>
     }
     if (!screen || screen.text == null) {
       return (

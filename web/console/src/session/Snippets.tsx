@@ -605,7 +605,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
             ＋
           </button>
         </div>
-        <div className="snippets-tabs" role="tablist" aria-label="Snippet / Workflow"
+        {tab === "workflow" && currentWorkflow ? <div className="workflow-detail-nav"><button type="button" onClick={() => setSelectedWorkflow(null)}>← {W("backToWorkflows")}</button></div> : <div className="snippets-tabs" role="tablist" aria-label="Snippet / Workflow"
           onKeyDown={(event) => {
             if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
             event.preventDefault()
@@ -617,7 +617,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
             aria-selected={tab === "snippet"} onClick={() => setTab("snippet")}>Snippet</button>
           <button id="workflow-tab" type="button" role="tab" aria-controls="workflow-picker" tabIndex={tab === "workflow" ? 0 : -1}
             aria-selected={tab === "workflow"} onClick={() => setTab("workflow")}>Workflow</button>
-        </div>
+        </div>}
         {tab === "snippet" ? <div
           className="snippet-list"
           id="snippet-list"
@@ -625,7 +625,12 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
           aria-labelledby="snippet-tab"
           ref={list}
           onClick={pressed}
-        >{loading ? <SnippetSkeleton label={T.webReading} /> : <div dangerouslySetInnerHTML={{ __html: listHTML }} />}</div> : <div className="snippet-list workflow-picker" id="workflow-picker" role="tabpanel" aria-labelledby="workflow-tab">
+        >{loading ? <SnippetSkeleton label={T.webReading} /> : <div dangerouslySetInnerHTML={{ __html: listHTML }} />}</div> : currentWorkflow ? <div className="workflow-detail-scroll"><div className="workflow-launch">
+          <span className="workflow-launch-label">{W("reviewLaunch")}</span><h3>{currentWorkflow.title}</h3><p>{currentWorkflow.source ? workflowPreview?.id === currentWorkflow.id ? workflowPreview.body : W("sourceChecking") : currentWorkflow.body}</p>
+          {currentWorkflow.source && <p className="workflow-launch-source">{currentWorkflow.source.kind === "command" ? W("claudeCommand") : "Skill"} · {workflowPreview?.id === currentWorkflow.id ? workflowPreview.name : currentWorkflow.source.name}</p>}
+          {currentWorkflow.source && workflowSourceStatus !== "ready" && <p role="status">{W(workflowSourceStatus === "checking" ? "sourceChecking" : workflowSourceStatus === "scope" ? "sourceScopeConflict" : "sourceStartUnavailable")}</p>}
+          {workflowError && <p role="alert">{workflowError}</p>}
+        </div></div> : <div className="snippet-list workflow-picker" id="workflow-picker" role="tabpanel" aria-labelledby="workflow-tab">
           {loading && <SnippetSkeleton label={W("loading")} />}
           {error && <div className="workflow-picker-error" role="alert"><p>{error}</p>
             <button type="button" onClick={() => { void refresh() }}>{W("reload")}</button></div>}
@@ -637,17 +642,11 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
             return <div className="snippet-group workflow-picker-group" key={String(global)}>
               <h3 className="snippet-group-title">{global ? W("global") : W("projectOnly")}</h3>
               {group.map((item) => <button type="button" key={item.id} className="workflow-picker-row"
-                aria-pressed={currentWorkflow?.id === item.id} onClick={() => { setSelectedWorkflow(item); setWorkflowError("") }}>
+                onClick={() => { setSelectedWorkflow(item); setWorkflowError("") }}>
                 <strong>{item.title}</strong>{item.source && <small>{item.source.kind === "command" ? W("claudeCommand") : "Skill"} · {item.source.name}</small>}<span>{item.source ? W("linkedPickerHint") : item.body}</span>
               </button>)}
             </div>
           })}
-        </div>}
-        {tab === "workflow" && currentWorkflow && <div className="workflow-launch">
-          <span className="workflow-launch-label">{W("reviewLaunch")}</span><h3>{currentWorkflow.title}</h3><p>{currentWorkflow.source ? workflowPreview?.id === currentWorkflow.id ? workflowPreview.body : W("sourceChecking") : currentWorkflow.body}</p>
-          {currentWorkflow.source && <p className="workflow-launch-source">{currentWorkflow.source.kind === "command" ? W("claudeCommand") : "Skill"} · {workflowPreview?.id === currentWorkflow.id ? workflowPreview.name : currentWorkflow.source.name}</p>}
-          {currentWorkflow.source && workflowSourceStatus !== "ready" && <p role="status">{W(workflowSourceStatus === "checking" ? "sourceChecking" : workflowSourceStatus === "scope" ? "sourceScopeConflict" : "sourceStartUnavailable")}</p>}
-          {workflowError && <p role="alert">{workflowError}</p>}
         </div>}
         <p className="said" id="snippets-said" role="status" aria-live="polite">
           {said}

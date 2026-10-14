@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5253,
+  "englishKeys": 5254,
   "counts": {
-    "negation": 1505,
+    "negation": 1506,
     "state": 724,
     "permission": 333,
     "deletion": 111,
     "uncertainty": 153
   },
-  "unionCount": 2322,
+  "unionCount": 2323,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1236,6 +1236,7 @@
       "next.schedulesReadFailed",
       "next.schedulesRefreshFailed",
       "next.screenForbidden",
+      "next.screenITermScanOff",
       "next.screenUnanswered",
       "next.secretHandoffError",
       "next.secretHandoffNoticeError",
@@ -4684,6 +4685,7 @@
     "next.schedulesReadFailed",
     "next.schedulesRefreshFailed",
     "next.screenForbidden",
+    "next.screenITermScanOff",
     "next.screenUnanswered",
     "next.secretHandoffError",
     "next.secretHandoffNoticeError",
