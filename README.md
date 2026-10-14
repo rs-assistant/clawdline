@@ -13,6 +13,15 @@ session hand work to another and prove that it landed. Your agents and code stay
 optional Clawdline Cloud reaches it from a phone or other machines through an end-to-end encrypted
 relay.
 
+**Install on macOS 13+ or Linux:**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
+```
+
+This installs the verified release and opens the local console. To see a Session, install and sign
+in to Claude Code or Codex separately. [Install and first run](docs/user/install.md)
+
 Work does not have to occupy one long turn. A Session can leave a long-running command with the
 daemon and return when it finishes; an Agent can leave a concrete request for you in the Session's
 attention panel; and you can save future work as a Session to-do without interrupting its current
