@@ -30,6 +30,10 @@ func (s *Server) workV2Agent(w http.ResponseWriter, r *http.Request, parts []str
 		s.agentCreateHumanIntervention(w, r)
 		return
 	}
+	if len(parts) == 3 && parts[0] == "human-interventions" && workID(parts[1]) && parts[2] == "claim" && r.Method == http.MethodPost {
+		s.agentClaimSecretHandoff(w, r, parts[1])
+		return
+	}
 	if len(parts) == 1 && parts[0] == "items" && r.Method == http.MethodPost {
 		s.agentCreateItem(w, r)
 		return

@@ -891,6 +891,7 @@ test("Work v2 person actions keep their exact route subject and body across Clou
     ["/v1/work/v2/session-todos/%251/t1/reopen", {}, "work.v2.todo-action", { terminal: "%1", id: "t1", action: "reopen", item: {} }],
     ["/v1/work/v2/session-todos/%251/t1/edit", { text: "Revised", expected_version: 2 }, "work.v2.todo-action", { terminal: "%1", id: "t1", action: "edit", item: { text: "Revised", expected_version: 2 } }],
     ["/v1/work/v2/human-interventions/conversation%3A10000000-0000-4000-8000-000000000002/10000000-0000-4000-8000-000000000003/read", { expected_version: 1 }, "work.v2.human-intervention-action", { terminal: "conversation:10000000-0000-4000-8000-000000000002", id: "10000000-0000-4000-8000-000000000003", action: "read", item: { expected_version: 1 } }],
+    ["/v1/work/v2/human-interventions/conversation%3A10000000-0000-4000-8000-000000000002/10000000-0000-4000-8000-000000000003/handoff", { value: "SAFE_FIXTURE" }, "work.v2.human-intervention-action", { terminal: "conversation:10000000-0000-4000-8000-000000000002", id: "10000000-0000-4000-8000-000000000003", action: "handoff", item: { value: "SAFE_FIXTURE" } }],
   ]
   for (const [path, sent, word, body] of cases) {
     const response = await reader.fetch(path, post(sent))

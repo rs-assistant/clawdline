@@ -150,6 +150,8 @@ func main() {
 		todoCommand(os.Args[2:])
 	case "note":
 		noteCommand(os.Args[2:])
+	case "secret":
+		secretCommand(os.Args[2:])
 	case "item":
 		itemCommand(os.Args[2:])
 	case "landings":
@@ -493,6 +495,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_handoff_summary_file_check_hand_this", "  handoff --summary <file> [--check]   hand this Session's work to a fresh Session at a milestone, with a bounded summary"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_todo_add_list_done_this_session", "  todo <add|list|done>          this session's own to-dos, added only when the person asks"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_note_create_post_a_human_intervention", "  note create                   post a human intervention to one Session"))
+	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_secret_run", "  secret run <note-id> -- <command> [args...]   feed a one-time Secret Handoff to a tool"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_item_add_claim_name_child_assign", "  item <add|claim|name|child|assign|show|steps|step-add|step-done|doc|phase>   Board items, a Root's own name, steps, documents and phase"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_send_to_terminal_text_relay_a", "  send --to <terminal> [text…]  relay a message into another session's composer"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_notify_title_t_body_b_push", "  notify --title <t> --body <b>   push a notification to the person"))

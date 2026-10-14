@@ -64,10 +64,11 @@ type Server struct {
 	viewerCancel    context.CancelFunc
 	// version is this build as `clawdline version` prints it, for /v1/health
 	// (SetVersion). Empty leaves `version` out of the answer.
-	version   string
-	proxy     *httputil.ReverseProxy
-	inventory app.Inventory
-	store     *store.Store
+	version        string
+	proxy          *httputil.ReverseProxy
+	inventory      app.Inventory
+	store          *store.Store
+	secretHandoffs *app.SecretHandoffs
 	// Tests can supply a machine identity without starting a Cloud link.
 	executionMachineID string
 	// replaceMachineItemReceipt is a test seam for a failed post-create
@@ -252,18 +253,19 @@ func New(cfg config.Config) (*Server, error) {
 	home, _ := os.UserHomeDir()
 	agents := subagents.New(home)
 	srv := &Server{
-		store:     st,
-		cfg:       cfg,
-		proxy:     proxy,
-		terminals: terminal.Hosts(),
-		facts:     transcript.NewRecordFacts(),
-		icons:     icons,
-		swift:     swiftstore.Open(swiftstore.Dir()),
-		pictures:  newPictures(cfg.Dir),
-		thumbs:    artifacts.NewThumbnailCache(int(CapacityLimit(capacity.CacheImageThumbs))),
-		skillMenu: skillmenu.NewCache(),
-		links:     projectlinks.NewCache(),
-		agents:    agents,
+		store:          st,
+		secretHandoffs: app.NewSecretHandoffs(),
+		cfg:            cfg,
+		proxy:          proxy,
+		terminals:      terminal.Hosts(),
+		facts:          transcript.NewRecordFacts(),
+		icons:          icons,
+		swift:          swiftstore.Open(swiftstore.Dir()),
+		pictures:       newPictures(cfg.Dir),
+		thumbs:         artifacts.NewThumbnailCache(int(CapacityLimit(capacity.CacheImageThumbs))),
+		skillMenu:      skillmenu.NewCache(),
+		links:          projectlinks.NewCache(),
+		agents:         agents,
 		inventory: app.Inventory{
 			Process:   process.New(),
 			Terminals: terminal.Hosts(),

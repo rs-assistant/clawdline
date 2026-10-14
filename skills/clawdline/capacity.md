@@ -216,6 +216,10 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `session.no_movement_seconds` | 1800 | `seconds` | `expire` | `diagnostics, sender` | — |
 | `session.report_open_todo_characters` | 120 | `characters` | `refuse` | `diagnostics, sender` | — |
 | `session.report_open_todo_rows` | 20 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `session.secret_handoff_bytes` | 16384 | `bytes` | `refuse` | `diagnostics, sender` | — |
+| `session.secret_handoff_delivery_seconds` | 5 | `seconds` | `refuse` | `diagnostics, sender` | — |
+| `session.secret_handoff_pending` | 128 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `session.secret_handoff_seconds` | 900 | `seconds` | `expire` | `diagnostics, sender` | — |
 | `session.title_age` | 7776000 | `seconds` | `evict_oldest` | `diagnostics, notice` | — |
 | `session.title_characters` | 200 | `characters` | `refuse` | `diagnostics, sender` | — |
 | `session.title_request_bytes` | 16384 | `bytes` | `refuse` | `diagnostics, sender` | — |

@@ -31,6 +31,7 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 | [user/install.md](user/install.md) | User page | English | Build, start the daemon, open the console, and see a session in the list |
 | [user/platforms.md](user/platforms.md) | User page | English | The macOS app, a Linux `systemd --user` service, and what Windows can do |
 | [user/sessions.md](user/sessions.md) | User page | English | Read the list, answer Agent attention notes, send messages, start, stop and close Sessions |
+| [user/secret-handoff.md](user/secret-handoff.md) | User page | English | Paste a password or key into a Session's one-time Secret Handoff Note |
 | [user/keyboard-shortcuts.md](user/keyboard-shortcuts.md) | User page | English | Every key the console answers to |
 | [user/notifications.md](user/notifications.md) | User page | English | Web Push on a computer or phone: turning it on, what you are told about, a test |
 | [user/remote-access.md](user/remote-access.md) | User page | English | Another computer over SSH, a phone over your own tunnel, and Clawdline Cloud pairing and permissions |
@@ -50,6 +51,7 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 | --- | --- | --- | --- |
 | [getting-started.md](getting-started.md) | Public design note | English | From a clone to a running console, a session in the list, and Clawdline Cloud |
 | [architecture.md](architecture.md) | Public design note | English | The whole system on one page, with links into everything below |
+| [secret-handoff.md](secret-handoff.md) | Public design note | English | A Note-backed, one-time path for giving a local tool a password or API key |
 
 ## How it is designed
 

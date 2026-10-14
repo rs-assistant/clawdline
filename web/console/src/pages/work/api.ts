@@ -298,7 +298,7 @@ export interface HumanInterventionV2 {
   source_label: string
   target_conversation: string
   target_session: string
-  kind: "read" | "answer" | "action" | "report"
+  kind: "read" | "answer" | "action" | "report" | "secret"
   title: string
   summary: string
   action: string
@@ -493,6 +493,11 @@ export const humanInterventionActionV2 = (
   `/v1/work/v2/human-interventions/${encodeURIComponent(`conversation:${conversationID}`)}/${note.id}/${action}`,
   { expected_version: note.version },
 )
+export const submitSecretHandoffV2 = (conversationID: string, noteID: string, value: string) =>
+  mutate<{ ok: boolean; received: boolean }>(
+    `/v1/work/v2/human-interventions/${encodeURIComponent(`conversation:${conversationID}`)}/${noteID}/handoff`,
+    { value },
+  )
 export const readSessionsForWorkV2 = () => call<SessionsSnapshot>("/v1/sessions")
 /** The token ledger's bill of a Board item, and of one session (docs/token-ledger.md). */
 export const readItemUsage = (itemID: string) => call<UsageItem>(`/v1/usage/items/${encodeURIComponent(itemID)}`)

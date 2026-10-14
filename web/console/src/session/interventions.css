@@ -57,6 +57,14 @@
 .human-intervention-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
 .human-intervention-option:focus-visible, .human-intervention-actions button:focus-visible, .human-interventions-head:focus-visible, .human-intervention-more > summary:focus-visible { outline: 2px solid var(--accent, #4787db); outline-offset: 2px; }
 .human-intervention-option:disabled, .human-intervention-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.secret-handoff-form { display: grid; gap: 8px; margin-top: 12px; }
+.secret-handoff-form > label:first-child { font-weight: 650; }
+.secret-handoff-form > input, .secret-handoff-form > textarea { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--background, #111); font: inherit; }
+.secret-handoff-form > input:focus-visible, .secret-handoff-form > textarea:focus-visible, .secret-handoff-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.secret-handoff-multiline { display: inline-flex; align-items: center; gap: 6px; width: fit-content; }
+.secret-handoff-form p { margin: 0; color: var(--muted, #777); font-size: 12px; }
+.secret-handoff-form button { width: fit-content; border: 1px solid var(--accent); border-radius: 6px; padding: 8px 12px; background: transparent; color: var(--accent); font: inherit; font-weight: 650; cursor: pointer; }
+.secret-handoff-form button:disabled { opacity: .5; cursor: not-allowed; }
 .human-interventions-recent { margin-top: 8px; }
 .human-interventions-recent > summary { cursor: pointer; font-size: 12px; }
 @media (max-width: 480px) {

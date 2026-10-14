@@ -167,6 +167,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `proposal_is_for_sessions` | `internal/transport/http/proposals.go` |
 | `rate_limited` | `internal/transport/http/auth.go`, `internal/transport/http/snippets.go` |
 | `receipt_expired` | `internal/transport/http/receipts.go`, `internal/transport/http/work.go` |
+| `receipt_unavailable` | `internal/transport/http/secret_handoff.go` |
 | `receipt_update_failed` | `internal/transport/http/work_v2_agent.go` |
 | `receipts_full` | `internal/transport/http/receipts.go`, `internal/transport/http/work.go` |
 | `report_local_only` | `internal/transport/http/reports.go` |
@@ -181,6 +182,13 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `role_drafter_out_of_quota` | `internal/transport/http/squad_role_draft.go` |
 | `run_unknown` | `internal/transport/http/runs.go` |
 | `scope_mismatch` | `internal/transport/http/squad.go` |
+| `secret_empty` | `internal/transport/http/secret_handoff.go` |
+| `secret_handoff_callback_invalid` | `internal/transport/http/secret_handoff.go` |
+| `secret_handoff_delivery_failed` | `internal/transport/http/secret_handoff.go` |
+| `secret_handoff_target_changed` | `internal/transport/http/secret_handoff.go` |
+| `secret_handoff_unavailable` | `internal/transport/http/secret_handoff.go` |
+| `secret_handoffs_full` | `internal/transport/http/secret_handoff.go` |
+| `secret_too_large` | `internal/transport/http/secret_handoff.go` |
 | `send_required` | `internal/transport/http/projects.go` |
 | `session_actor_required` | `internal/transport/http/squad_actor.go`, `internal/transport/http/squad_events.go` |
 | `session_cannot_create_item` | `internal/transport/http/work_v2.go` |
