@@ -40,6 +40,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -122,7 +124,14 @@ func run(pathspecs []string, dir string) privacy.Answer {
 			continue
 		}
 		nread++
+		publicLicense := dir != "" && !binary && pinnedLibeventLicense(rel, data)
 		for _, f := range scanner.Scan(rel, data) {
+			// The pinned upstream LICENSE is part of every carried-tmux
+			// archive. Its authors' public addresses are not this person's
+			// data. A changed byte loses this exception; other rules still run.
+			if publicLicense && f.Rule == "email" {
+				continue
+			}
 			// A binary's strings are every literal compiled into it, its
 			// dependencies' too: the fixed rules' exemptions are written for
 			// source files and do not reach them. What a binary must never
@@ -181,6 +190,20 @@ func run(pathspecs []string, dir string) privacy.Answer {
 	}
 	fmt.Printf("private: %d files clean; %s\n", nread, wordNote)
 	return privacy.Clean
+}
+
+const libeventLicenseSHA256 = "ff02effc9b331edcdac387d198691bfa3e575e7d244ad10cb826aa51ef085670"
+
+func pinnedLibeventLicense(path string, data []byte) bool {
+	return exactLibeventLicense(path, data, libeventLicenseSHA256)
+}
+
+func exactLibeventLicense(path string, data []byte, digest string) bool {
+	if !strings.HasSuffix(path, "/licenses/libevent.txt") {
+		return false
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]) == digest
 }
 
 // wordsPath is where the list is looked for, said back to somebody who has
