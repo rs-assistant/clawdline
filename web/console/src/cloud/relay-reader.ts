@@ -703,6 +703,7 @@ export class RelayReader {
       machine: this.machine,
       exactTarget: this.options.fleetTarget,
       admitExactTarget: this.options.admitFleetMutation,
+      resolveSession: this.options.resolveSession,
       connected: () => this.connected() as CloudWriteClient,
       connectedFor: async (signal, word) => {
         const client = await this.connectedFor(signal)

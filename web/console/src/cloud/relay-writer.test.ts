@@ -1224,6 +1224,23 @@ test("F5: a write with neither an exact target nor a rich row is refused as unve
   assert.deepEqual(client.calls, [])
 })
 
+test("a just-started Session sends through its verified projection before rich-row replay", async () => {
+  const client = new FakeClient()
+  let admitted = 0
+  const reader = new RelayReader("mac-a", {
+    resolveSession: async (machine, session) => machine === "mac-a" && session === "s1"
+      ? { machineID: "mac-a", sessionID: "s1", executionGeneration: EXECUTION } : null,
+    admitFleetMutation: async () => { admitted++ },
+  })
+  const writer = new RelayWriter(reader.writeHost)
+  reader.carryWrites({ route: writeRoute, answer: (route, method, url, init) => writer.answer(route, method, url, init) })
+  reader.attach(client)
+  const response = await reader.fetch("/v1/sessions/s1/send", post({ text: "hi" }, { "Idempotency-Key": "first" }))
+  assert.equal(response.status, 200)
+  assert.equal(admitted, 1)
+  assert.ok(client.calls.some((call) => call[0] === "_read" && call[2] === "send"))
+})
+
 test("F12: showing a session on the machine does not make every poll re-read its transcript", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
