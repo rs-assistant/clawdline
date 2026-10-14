@@ -177,6 +177,23 @@ function showProgress(next: StartProgress | null): void {
   renderList()
 }
 
+/**
+ * Run `then` once a frame without the progress dialog has been painted.
+ *
+ * A navigation is what iOS Safari snapshots for the back swipe: opening the
+ * arrived row in the same tick the dialog is let go puts the dialog in that
+ * picture, and it flashes under the finger on every swipe back to the list.
+ */
+function afterProgressHidden(then: () => void): void {
+  const dialog = document.querySelector<HTMLDialogElement>("dialog.start-progress")
+  if (!dialog?.open) {
+    then()
+    return
+  }
+  dialog.close()
+  requestAnimationFrame(() => requestAnimationFrame(then))
+}
+
 function moveProgress(stage: StartProgress["stage"], words = ""): void {
   if (!progress) return
   showProgress({ ...progress, stage, words })
@@ -961,6 +978,8 @@ export const Start = {
   /** The start the progress dialog shows, or null when there is none to show. */
   progress: (): StartProgress | null => progress,
 
+  afterProgressHidden,
+
   /** Let the dialog go and keep waiting in the band under the header. */
   background() {
     if (!progress) return
@@ -1023,7 +1042,7 @@ export const Start = {
     draw()
     renderList()
     if (late || host.openId() !== from) return false
-    host.open(id)
+    afterProgressHidden(() => host.open(id))
     return true
   },
 }

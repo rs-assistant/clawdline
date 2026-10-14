@@ -504,7 +504,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
     if (!finish()) return true
     rowsRef.current = [row, ...rowsRef.current.filter((item) => item.id !== row.id)]
     setStarted(row)
-    openSession(row.id)
+    Start.afterProgressHidden(() => openSession(row.id))
     return true
   }
 

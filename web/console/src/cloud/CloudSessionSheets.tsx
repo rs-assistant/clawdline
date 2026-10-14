@@ -68,7 +68,10 @@ export function CloudSessionSheets({ machineID, machines, source, pending, onCon
               item.destination.sessionID === sessionID && item.freshness === "current")
             if (row) {
               settled = true
-              if (accept()) opened.current(row.destination)
+              if (accept()) {
+                const destination = row.destination
+                Start.afterProgressHidden(() => opened.current(destination))
+              }
               stopOpen()
               return
             }
