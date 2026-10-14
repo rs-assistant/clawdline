@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5128,
-  "riskKeys": 2247,
-  "nonRiskCount": 2881,
+  "englishContentKeys": 5131,
+  "riskKeys": 2248,
+  "nonRiskCount": 2883,
   "groups": [
     {
       "name": "bar / other",
@@ -2157,7 +2157,7 @@
     },
     {
       "name": "next / send",
-      "count": 8,
+      "count": 10,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2165,6 +2165,8 @@
         "next.sendAgain",
         "next.sendAgainMayDuplicate",
         "next.sendAgainMayDuplicateTip",
+        "next.sendDiagnose",
+        "next.sendDiagnosticQueued",
         "next.sendEnter",
         "next.sendEntering",
         "next.sendLook",

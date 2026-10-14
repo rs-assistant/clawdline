@@ -22,6 +22,11 @@ import type { RelayReader } from "./relay-reader.js"
 let activeReader: RelayReader | null = null
 let networkFetch: typeof globalThis.fetch | null = null
 let cloudConnectionRetry: (() => void) | null = null
+/** Record a failed card without its message, attachment, session or request identifier. */
+export function recordSendDiagnostic(code: string): boolean {
+  if (!activeReader) return false
+  return activeReader.recordSendDiagnostic(code)
+}
 export function setCloudConnectionRetry(retry: (() => void) | null): void {
   cloudConnectionRetry = retry
 }
