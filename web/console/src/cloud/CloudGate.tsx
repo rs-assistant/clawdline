@@ -313,6 +313,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     refreshFleetProjection((revision) => revision + 1)
   }, [])
   const [fleetPresentationRevision, refreshFleetPresentation] = useState(0)
+  const [titleRevision, refreshTitles] = useState(0)
   const noteFleetPresentations = useCallback((machineID: string,
     rows: readonly (SessionListPresentation & { destination: SessionDestination;
       projection?: ProjectedSession })[]) => {
@@ -1585,6 +1586,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
           <App key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
+            onTitleSaved={() => refreshTitles((revision) => revision + 1)}
             cloudStartedRow={!fleetScope && confirmedStart?.machineID === reading ? confirmedStart.row : null}
             onCloudStartedObserved={startedObserved}
             cloudPeerAccess={(active) => <PeerAccessPage active={active}
@@ -1620,6 +1622,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               platform: platformWord(machineIdentityFacts(machine).platform), freshness: machine.freshness,
             }))}
             source={liveSessionSource}
+            titleRevision={titleRevision}
             target={fleetTarget}
             filter={filter} onFilter={onFilter}
             onOpen={openFleetSession}
