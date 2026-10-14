@@ -13,6 +13,13 @@ session hand work to another and prove that it landed. Your agents and code stay
 optional Clawdline Cloud reaches it from a phone or other machines through an end-to-end encrypted
 relay.
 
+**Work with your Agent, in one place:** [mark a picture](docs/user/sessions.md#answer-and-send) ·
+[reuse Workflows and Snippets](docs/user/sessions.md#answer-and-send) ·
+[get notified](docs/user/notifications.md) · [hand off a secret](docs/user/secret-handoff.md) ·
+[answer Notes and leave to-dos](docs/user/board.md#session-to-dos) ·
+[see images from an Agent](docs/user/sessions.md) · [follow the Board](docs/user/board.md) ·
+[read Session states](docs/user/sessions.md). [See the visual guide](https://clawdline.com/docs/experience/).
+
 **Install on macOS 13+ or Linux:**
 
 ```sh
