@@ -8,3 +8,13 @@
 .workflow-launch { padding: .8rem; border: 1px solid var(--line); border-radius: .6rem; }
 .workflow-launch p { white-space: pre-wrap; max-height: 12rem; overflow: auto; }
 .workflow-launch button { padding: .65rem .9rem; border-radius: .6rem; background: var(--accent); color: var(--ink); }
+
+.snippet-skeleton { display: grid; gap: 2px; width: 100%; }
+.snippet-skeleton-row { display: grid; gap: 7px; padding: 10px 12px; min-height: 58px; }
+.snippet-skeleton-row span { display: block; height: 11px; border-radius: 5px; background: var(--card-hi); animation: snippet-skeleton-pulse 1.2s ease-in-out infinite alternate; }
+.snippet-skeleton-title { width: 38%; }
+.snippet-skeleton-body { width: 76%; opacity: .7; }
+.snippet-skeleton-row:nth-child(2) .snippet-skeleton-title { width: 55%; }
+.snippet-skeleton-row:nth-child(2) .snippet-skeleton-body { width: 61%; }
+@keyframes snippet-skeleton-pulse { to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .snippet-skeleton-row span { animation: none; } }
