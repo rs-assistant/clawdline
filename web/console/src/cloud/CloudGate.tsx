@@ -543,9 +543,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
       fleetPresentations: heldFleetRows,
-      machineProjection: (machineID) => {
+      machineProjection: (machineID, fresh = false) => {
         const held = fleetProjections.current.get(machineID)
-        if (held && Date.now() - held.receivedAt <= STATUS_FRESH_MS) {
+        if (!fresh && held && Date.now() - held.receivedAt <= STATUS_FRESH_MS) {
           const live = statusProjection(client.current, machineID)
           if (live.kind === "ready" && live.observedAt > (held.reading.observedAt ?? 0))
             return Promise.resolve(live)

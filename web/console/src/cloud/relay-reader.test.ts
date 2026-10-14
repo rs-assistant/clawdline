@@ -254,7 +254,7 @@ test("the original page keeps rich titles only for current executions named by s
 function statusPass(machine: string, generation: string, ...sessions: string[]) {
   return new Map<string, unknown>([
     [JSON.stringify([machine, "__clawdline_inventory_v1__"]),
-      { payload: { complete: true, inventory: { version: 1, sessions } } }],
+      { payload: { complete: true, snapshot_generation: generation, inventory: { version: 1, sessions } } }],
     ...sessions.map((session) => [JSON.stringify([machine, session]),
       { payload: { execution_generation: generation } }] as [string, unknown]),
   ])
@@ -864,6 +864,48 @@ test("refresh asks the machine to restate quiet Sessions after the first list", 
 
   await r.fetch("/v1/sessions", { signal: new AbortController().signal })
   assert.deepEqual(client.reads, [{ machine: "mac-a", word: "sessions.snapshot", body: {} }])
+})
+
+test("refresh waits for the newly stated Session set before answering the page", async () => {
+  const client = new FakeClient()
+  const generation = "a".repeat(32)
+  client.rows = [row("mac-a", "s1", { execution_generation: generation })]
+  client.statusSnapshots = statusPass("mac-a", generation, "s1")
+  client.readAnswer = async () => ({ sessions: ["s1", "s2"], complete: true })
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000 })
+  r.attach(client)
+  await r.fetch("/v1/sessions", { signal: new AbortController().signal })
+  let answered = false
+  const refreshed = r.fetch("/v1/sessions", { signal: new AbortController().signal })
+    .then((response) => { answered = true; return body<SessionsSnapshot>(response) })
+  await settled()
+  assert.equal(answered, false, "the command reply is earlier than the new ss/ pass")
+  client.rows = [row("mac-a", "s1", { execution_generation: "b".repeat(32) }),
+    row("mac-a", "s2", { execution_generation: "b".repeat(32) })]
+  client.statusSnapshots = statusPass("mac-a", "b".repeat(32), "s1", "s2")
+  client.emit({ type: "sessions", identity: { machine: "mac-a" } })
+  assert.deepEqual((await refreshed).sessions.map((session) => session.id).sort(), ["s1", "s2"])
+})
+
+test("refresh waits for a resumed Session even when its id has not changed", async () => {
+  const client = new FakeClient()
+  const previous = "a".repeat(32)
+  const resumed = "b".repeat(32)
+  client.rows = [row("mac-a", "s1", { execution_generation: previous })]
+  client.statusSnapshots = statusPass("mac-a", previous, "s1")
+  client.readAnswer = async () => ({ sessions: ["s1"], complete: true })
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000 })
+  r.attach(client)
+  await r.fetch("/v1/sessions", { signal: new AbortController().signal })
+  let answered = false
+  const refreshed = r.fetch("/v1/sessions", { signal: new AbortController().signal })
+    .then((response) => { answered = true; return body<SessionsSnapshot>(response) })
+  await settled()
+  assert.equal(answered, false, "an unchanged id is not proof of a new execution")
+  client.rows = [row("mac-a", "s1", { execution_generation: resumed })]
+  client.statusSnapshots = statusPass("mac-a", resumed, "s1")
+  client.emit({ type: "sessions", identity: { machine: "mac-a" } })
+  assert.equal((await refreshed).sessions[0]?.execution_generation, resumed)
 })
 
 test("reopening a complete list reads the relay once without restating every Session", async () => {
