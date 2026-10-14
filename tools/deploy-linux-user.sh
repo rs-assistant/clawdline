@@ -36,8 +36,8 @@ data_root=${XDG_DATA_HOME:-$HOME/.local/share}/clawdline-next
 release=$data_root/releases/$commit
 mkdir -p "$data_root/releases"
 
-tools/check-worktrees.sh --ephemeral --rev "$commit" -- \
-  tools/build-linux-user-release.sh "$release" "$commit"
+HEAVY_HANDOFF=0 tools/check-worktrees.sh --ephemeral --rev "$commit" -- \
+  tools/heavy.sh tools/build-linux-user-release.sh "$release" "$commit"
 
 if [ "$stage_only" -eq 1 ]; then
   current=$data_root/current

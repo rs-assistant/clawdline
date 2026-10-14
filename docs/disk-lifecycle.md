@@ -102,13 +102,20 @@ reclaimed by this mechanism. The register operation is intentionally internal
 to the gate dispatch; an arbitrary path, including a shared GOPATH or
 GOCACHE, is not admitted as gate scratch.
 
-Before an operator clears the shared cache, read `go env GOCACHE`, the active
-compile lease and queue, and whether other Go commands are using it. Wait for
-builds to finish. Record the exact cache path, approximate bytes by age,
-request count if an external service is involved, and filesystem free space
-before and after. Do not infer reclaimable space from a sum of directory sizes
-or from allocated bytes alone. An unavailable process or lease reading is an
-unknown owner, not proof that the cache is idle.
+On Linux, `tools/heavy.sh` runs its command and then clears Go's build, module,
+test, and fuzz caches before releasing the compile slot. It also clears after
+a failed command and preserves that command's failure. The Linux user-service
+deploy runs its release build through this wrapper. This deliberately trades
+repeat downloads and cold compilations for bounded cache lifetime. Commands
+that bypass `tools/heavy.sh` are outside this cleanup path.
+
+Before an operator manually clears the shared cache, read `go env GOCACHE`,
+the active compile lease and queue, and whether other Go commands are using
+it. Wait for builds to finish. Record the exact cache path, approximate bytes
+by age, request count if an external service is involved, and filesystem free
+space before and after. Do not infer reclaimable space from a sum of directory
+sizes or from allocated bytes alone. An unavailable process or lease reading
+is an unknown owner, not proof that the cache is idle.
 
 ## Remaining product work
 

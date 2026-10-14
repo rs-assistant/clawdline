@@ -71,6 +71,9 @@ checkout's HEAD ([updates.md](updates.md)).
 The deploy builds from a disposable checkout, leaves the running version alone when a check fails,
 atomically switches `~/.local/share/clawdline-next/current`, restarts only the daemon, checks both
 `GET /` and the authenticated `BUILD.json`, and restores the previous release if either check fails.
+Its build holds the compile slot and clears Go's caches when the build finishes,
+including when a check fails. Other Linux builds should use `tools/heavy.sh`
+for the same cleanup.
 The user unit uses `KillMode=process`, so restarting the daemon does not kill the tmux server or the
 assistants it opened. `loginctl enable-linger` keeps the user manager alive without an interactive
 login; that is why the bootstrap needs root exactly once.

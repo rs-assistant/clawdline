@@ -16,6 +16,12 @@ set -euo pipefail
 
 [ "$#" -gt 0 ] || { echo "usage: tools/heavy.sh <command> [args…]" >&2; exit 2; }
 
+run=("$@")
+if [ "$(uname -s)" = Linux ]; then
+  script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+  run=("$script_dir/run-heavy-linux.sh" "$@")
+fi
+
 cl=""
 for cand in "${CLAWDLINE:-}" "$(command -v clawdline 2>/dev/null || true)" \
     "${XDG_DATA_HOME:-$HOME/.local/share}/clawdline-next/current/clawdline"; do
@@ -34,7 +40,7 @@ if [ -n "$cl" ] && { "$cl" 2>&1 || true; } | grep -q '|heavy|'; then
       echo "tools/heavy.sh: this clawdline predates --handoff; waiting in place" >&2
     fi
   fi
-  exec "$cl" heavy ${heavy_flags[@]+"${heavy_flags[@]}"} -- "$@"
+  exec "$cl" heavy ${heavy_flags[@]+"${heavy_flags[@]}"} -- ${run[@]+"${run[@]}"}
 fi
 echo "tools/heavy.sh: no clawdline with \`heavy\` found; running without the compile slot" >&2
-exec "$@"
+exec ${run[@]+"${run[@]}"}
