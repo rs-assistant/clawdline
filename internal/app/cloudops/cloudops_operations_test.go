@@ -25,6 +25,23 @@ func TestWorkV2TodoActionCarriesReopen(t *testing.T) {
 	}
 }
 
+func TestSecretHandoffCloudActionCarriesValueOnlyToTheLocalRoute(t *testing.T) {
+	r := &router{}
+	answer := open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "work.v2.human-intervention-action", "session": MachineReplySession, "request": "req-secret-handoff",
+		"terminal": "conversation:10000000-0000-4000-8000-000000000002",
+		"id":       "10000000-0000-4000-8000-000000000003", "action": "handoff",
+		"item": map[string]any{"value": "SAFE_FIXTURE"},
+	}))
+	if answer.Status != 200 || len(r.seen) != 1 {
+		t.Fatalf("handoff answer: %+v; routes: %+v", answer, r.seen)
+	}
+	got := r.last()
+	if got.Method != "POST" || !strings.HasSuffix(got.Path, "/handoff") || string(got.Body) != `{"value":"SAFE_FIXTURE"}` {
+		t.Fatalf("handoff local route: %+v", got)
+	}
+}
+
 // TestAMovedHookBindCarriesItsRevision: a moved hook is bound on the target
 // at the revision the move answered, so `hook_revision` reaches the local route
 // as the integer it was; a body without it is the plain bind, unchanged.

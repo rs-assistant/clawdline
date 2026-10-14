@@ -212,6 +212,26 @@ func SetDaemonLog(dir string, w *logs.Writer) { daemonLogs.Store(dir, w) }
 // own and each cheap: a stat, a length, a count kept in memory.
 func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 	return map[string]func() capacity.Reading{
+		capacity.SecretHandoffBytes: func() capacity.Reading {
+			if s.secretHandoffs == nil {
+				return capacity.Reading{Known: true, Note: "no handoff service attached"}
+			}
+			_, largest := s.secretHandoffs.Usage()
+			return capacity.Reading{Known: true, Used: largest, Note: "largest pending value; content and identifiers omitted"}
+		},
+		capacity.SecretHandoffPending: func() capacity.Reading {
+			if s.secretHandoffs == nil {
+				return capacity.Reading{Known: true, Note: "no handoff service attached"}
+			}
+			pending, _ := s.secretHandoffs.Usage()
+			return capacity.Reading{Known: true, Used: pending}
+		},
+		capacity.SecretHandoffSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-value expiry; no retained wait"}
+		},
+		capacity.SecretHandoffDeliverySeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-loopback delivery deadline; no retained wait"}
+		},
 		capacity.DeployHealthSeconds: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-deploy health guard; no retained wait"}
 		},

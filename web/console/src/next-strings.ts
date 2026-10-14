@@ -14,6 +14,16 @@ import { catalogWord } from "./catalog.ts"
 const words = {
   en: {
     sessionPairToSend: "Pair this browser",
+    secretHandoffName: "Secret Handoff",
+    secretHandoffLabel: "Secret value",
+    secretHandoffPlaceholder: "Paste the requested password or key",
+    secretHandoffMultiline: "Multi-line credential",
+    secretHandoffPrivacy: "The value goes to this Session once. It will not appear in the Note or conversation.",
+    secretHandoffSubmit: "Hand off securely",
+    secretHandoffReceived: "Secret received. This Session can use it once within 15 minutes.",
+    secretHandoffError: "The handoff did not complete. Check the Session before trying again.",
+    secretHandoffReadyMessage: "Secret Handoff {id} is ready. Use the one-time local handoff command; the value is not in this message.",
+    secretHandoffNoticeError: "The value was received, but the Session was not notified. Send a message naming this Secret Handoff Note.",
     sessionTrySendingAgain: "Try sending again",
     sessionWriteDisabled: "Sending is disabled on this machine.",
     olderNotRead:
@@ -1293,6 +1303,16 @@ const words = {
     signedInCapsSendTerminal: "Read, send and open a shell",
   },
   "zh-Hant": {
+    secretHandoffName: "機密交付",
+    secretHandoffLabel: "機密值",
+    secretHandoffPlaceholder: "貼上所需的密碼或金鑰",
+    secretHandoffMultiline: "多行憑證",
+    secretHandoffPrivacy: "機密值只會交給此 Session 一次，不會出現在便條紙或對話中。",
+    secretHandoffSubmit: "安全交付",
+    secretHandoffReceived: "已收到機密值。此 Session 可在 15 分鐘內領取一次。",
+    secretHandoffError: "交付未完成。再次嘗試前，請先確認 Session 狀態。",
+    secretHandoffReadyMessage: "機密交付 {id} 已備妥。請用本機一次性領取命令取用；這則訊息不含機密值。",
+    secretHandoffNoticeError: "機密值已收到，但無法通知 Session。請傳送一則只提及此機密交付便條紙的訊息。",
     sessionPairToSend: "配對這個瀏覽器",
     sessionTrySendingAgain: "重新嘗試傳送",
     sessionWriteDisabled: "這台機器已停用傳送功能。",

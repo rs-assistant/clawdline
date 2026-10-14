@@ -33,6 +33,8 @@ let readDelay = 0
 let noteCount = 1
 let showOptions = true
 let singleOption = false
+let secretMode = false
+let handoffValues: string[] = []
 let listWaiting = false
 let listAttentionCount = 1
 let documentMode: "ready" | "refused" | "keyed" = "ready"
@@ -265,7 +267,7 @@ function fixture(): Server {
   const publish = () => { for (const client of eventClients) client.write("event: sessions\ndata: " + JSON.stringify(snapshot()) + "\n\n") }
   return createServer((req, res) => {
     const path = new URL(req.url ?? "/", "http://fixture").pathname
-    if (path === "/__fixture/reset") { readAt = null; resolvedAt = null; version = 1; failReads = false; failActions = false; readDelay = 0; noteReads = 0; todoReads = 0; noteCount = 1; showOptions = true; singleOption = false; listWaiting = false; listAttentionCount = 1; documentMode = "ready"; documentListMode = "ready"; documentReadDelay = 0; sendRequests = 0; sentTexts = []; sentBeforeResolve = []; failSends = false; sendDelay = 0; return json(res, 200, { ok: true }) }
+    if (path === "/__fixture/reset") { readAt = null; resolvedAt = null; version = 1; failReads = false; failActions = false; readDelay = 0; noteReads = 0; todoReads = 0; noteCount = 1; showOptions = true; singleOption = false; secretMode = false; handoffValues = []; listWaiting = false; listAttentionCount = 1; documentMode = "ready"; documentListMode = "ready"; documentReadDelay = 0; sendRequests = 0; sentTexts = []; sentBeforeResolve = []; failSends = false; sendDelay = 0; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/document-mode") { const mode = new URL(req.url ?? "/", "http://fixture").searchParams.get("value"); documentMode = mode === "refused" || mode === "keyed" ? mode : "ready"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/document-list-mode") { const value = new URL(req.url ?? "/", "http://fixture").searchParams.get("value"); documentListMode = value === "empty" || value === "starting" ? value : "ready"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/document-read-delay") { documentReadDelay = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("ms")) || 0; return json(res, 200, { ok: true }) }
@@ -276,6 +278,7 @@ function fixture(): Server {
     if (path === "/__fixture/count") { noteCount = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("value")) || 1; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/options") { showOptions = new URL(req.url ?? "/", "http://fixture").searchParams.get("on") !== "0"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/single-option") { singleOption = true; return json(res, 200, { ok: true }) }
+    if (path === "/__fixture/secret-mode") { secretMode = true; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/fail-reads") { failReads = new URL(req.url ?? "/", "http://fixture").searchParams.get("on") === "1"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/fail-actions") { failActions = new URL(req.url ?? "/", "http://fixture").searchParams.get("on") === "1"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/read-delay") { readDelay = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("ms")) || 0; return json(res, 200, { ok: true }) }
@@ -324,10 +327,10 @@ function fixture(): Server {
     if (path.startsWith("/v1/work/v2/session-todos/")) { todoReads++; return json(res, 200, { ok: true, direct_todos: [], assigned_items: [], recent_items: [], truncated: false }) }
     if (path.startsWith("/v1/work/v2/human-interventions/")) {
       const note = { id: NOTE, source_conversation: "10000000-0000-4000-8000-000000000001", source_label: "Manager Session",
-        target_conversation: CONVERSATION, target_session: SESSION, kind: "answer", title: "Choose a release day",
-        summary: "The release is waiting for a date.", action: "Choose a date.", reason: "Only the person knows the preferred date.",
-        document_url: origin + `/#document=1&machine=this-mac&session=${SESSION}&scope=project&path=demo.md`,
-        detail: ("The report is ready. Please review the proposed date and the linked evidence.\n").repeat(36), options: showOptions ? [
+        target_conversation: CONVERSATION, target_session: SESSION, kind: secretMode ? "secret" : "answer", title: secretMode ? "Secret Handoff" : "Choose a release day",
+        summary: secretMode ? "A tool needs a credential." : "The release is waiting for a date.", action: secretMode ? "Paste the credential." : "Choose a date.", reason: secretMode ? "The Session needs it for the tool." : "Only the person knows the preferred date.",
+        document_url: secretMode ? "" : origin + `/#document=1&machine=this-mac&session=${SESSION}&scope=project&path=demo.md`,
+        detail: secretMode ? "" : ("The report is ready. Please review the proposed date and the linked evidence.\n").repeat(36), options: secretMode ? [] : showOptions ? [
           { label: "Tuesday", draft: "Tuesday works for me." }, ...singleOption ? [] : [{ label: "Wednesday", draft: "Wednesday works for me." }] ] : [],
         created_at: now, read_at: readAt, resolved_at: resolvedAt, version }
       if (req.method === "GET") {
@@ -342,6 +345,7 @@ function fixture(): Server {
         req.on("end", () => {
           if (failActions) { setTimeout(() => json(res, 503, { error: "action_failed" }), 200); return }
           const body = JSON.parse(Buffer.concat(chunks).toString("utf8"))
+          if (secretMode && path.endsWith("/handoff")) { handoffValues.push(body.value); return json(res, 200, { ok: true, received: true }) }
           if (body.expected_version !== version) return json(res, 409, { error: "version_conflict" })
           if (path.endsWith("/read")) readAt = now
           else if (path.endsWith("/resolve")) { sentBeforeResolve.push(sentTexts.length); readAt = now; resolvedAt = now; listAttentionCount = 0; publish() }
@@ -824,6 +828,51 @@ test("a Session the row says has no notes reads none of them until the panel is 
     await run(`document.querySelector(".human-interventions-head").click()`)
     await until(`!!document.querySelector(".human-intervention-card")`)
     assert.equal(noteReads, 1, "opening the panel is the read")
+  } finally {
+    await fetch(origin + "/__fixture/reset")
+    await browser.send("Target.closeTarget", { targetId })
+  }
+})
+
+test("Secret Handoff pastes one-line and multi-line values without sending them as messages", async () => {
+  const { targetId } = await browser.send("Target.createTarget", { url: "about:blank" })
+  const { sessionId: id } = await browser.send("Target.attachToTarget", { targetId, flatten: true })
+  const run = async (expression: string) => {
+    const { result, exceptionDetails } = await browser.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }, id)
+    if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text)
+    return result.value
+  }
+  const until = async (expression: string) => {
+    const deadline = Date.now() + 8_000
+    while (!(await run(expression))) {
+      if (Date.now() > deadline) assert.fail("Secret Handoff did not reach " + expression)
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+  }
+  try {
+    await fetch(origin + "/__fixture/reset")
+    await fetch(origin + "/__fixture/secret-mode")
+    await browser.send("Page.enable", {}, id); await browser.send("Runtime.enable", {}, id)
+    await browser.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }, id)
+    const mark = browser.loadCount; await browser.send("Page.navigate", { url: origin + "/#session=" + SESSION }, id); await browser.loaded(id, mark)
+    await until(`!!document.querySelector(".human-interventions-head")`)
+    await run(`document.querySelector(".human-interventions-head").click()`)
+    await until(`!!document.querySelector(".secret-handoff-form input[type=password]")`)
+    assert.equal(await run(`!!document.querySelector(".human-intervention-option")`), false)
+    await run(`document.querySelector(".secret-handoff-form input[type=password]").value = "SAFE_ONE_LINE_FIXTURE"; document.querySelector(".secret-handoff-form button[type=submit]").click()`)
+    await until(`document.querySelector(".human-interventions-status")?.textContent?.includes("已收到機密值")`)
+    await until(`document.querySelector(".secret-handoff-form input[type=password]")?.value === ""`)
+    assert.deepEqual(handoffValues, ["SAFE_ONE_LINE_FIXTURE"])
+    assert.equal(sentTexts.some((text) => text.includes("SAFE_ONE_LINE_FIXTURE")), false)
+    assert.equal(await run(`document.querySelector("#msg")?.textContent?.includes("SAFE_ONE_LINE_FIXTURE")`), false)
+    await until(`!document.querySelector(".secret-handoff-form button[type=submit]")?.disabled`)
+    await run(`document.querySelector(".secret-handoff-multiline input").click()`)
+    await until(`!!document.querySelector(".secret-handoff-form textarea")`)
+    await run(`document.querySelector(".secret-handoff-form textarea").value = "-----BEGIN FIXTURE-----\\nline two"; document.querySelector(".secret-handoff-form button[type=submit]").click()`)
+    await until(`document.querySelector(".secret-handoff-form textarea")?.value === ""`)
+    assert.deepEqual(handoffValues, ["SAFE_ONE_LINE_FIXTURE", "-----BEGIN FIXTURE-----\nline two"])
+    assert.equal(sentTexts.some((text) => text.includes("BEGIN FIXTURE")), false)
+    assert.equal(await run(`document.documentElement.scrollWidth <= 390`), true)
   } finally {
     await fetch(origin + "/__fixture/reset")
     await browser.send("Target.closeTarget", { targetId })

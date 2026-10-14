@@ -984,7 +984,7 @@ func decodeWorkV2HumanInterventionAction(b body) (plan, bool) {
 	action, actionOK := b.nonEmpty("action")
 	document, documentOK := b.object("item", workV2CloudBodyLimit)
 	if !ok || p.request == "" || !conversationOK || len(conversation) > 256 || !idOK || len(id) > 256 ||
-		!actionOK || !documentOK || (action != "read" && action != "resolve" && action != "reopen") {
+		!actionOK || !documentOK || (action != "read" && action != "resolve" && action != "reopen" && action != "handoff") {
 		return plan{}, false
 	}
 	p.target, p.id, p.kind, p.document = conversation, id, action, document

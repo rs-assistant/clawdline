@@ -129,7 +129,7 @@ func ValidateHumanDocumentURL(raw, machine, session string) error {
 
 func validateHumanIntervention(c CreateHumanIntervention) error {
 	switch c.Kind {
-	case "read", "answer", "action", "report":
+	case "read", "answer", "action", "report", "secret":
 	default:
 		return humanInterventionError("intervention_kind_invalid", "Choose a supported intervention kind.")
 	}
@@ -146,6 +146,9 @@ func validateHumanIntervention(c CreateHumanIntervention) error {
 	}
 	if len(c.Options) != 0 && (c.Kind != "answer" || len(c.Options) < 2 || len(c.Options) > 4) {
 		return humanInterventionError("intervention_options_invalid", "Answer suggestions need two to four options.")
+	}
+	if c.Kind == "secret" && (c.Detail != "" || c.DocumentURL != "") {
+		return humanInterventionError("secret_note_content_invalid", "A Secret Handoff Note cannot contain detail or a document link.")
 	}
 	for _, o := range c.Options {
 		if !humanText(o.Label, humanInterventionTitleLimit) || !humanText(o.Draft, humanInterventionDraftLimit) {
@@ -216,6 +219,9 @@ func (h *HumanInterventions) Update(ctx context.Context, id, conversation, actio
 		}
 		if prev.TargetConversation != conversation {
 			return store.ErrHumanInterventionNotFound
+		}
+		if action == "reopen" && prev.Kind == "secret" && prev.Resolution == "Secret Handoff used" {
+			return humanInterventionError("secret_handoff_used", "A used Secret Handoff cannot be reopened. Create a new request.")
 		}
 		if prev.Version != version {
 			return store.ErrConflict

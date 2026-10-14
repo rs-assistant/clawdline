@@ -100,6 +100,10 @@ func (s *Server) workV2HumanInterventions(w http.ResponseWriter, r *http.Request
 		writeJSON(w, map[string]any{"ok": true, "rows": out, "pruned_resolved": pruned})
 		return
 	}
+	if len(parts) == 3 && workID(parts[1]) && parts[2] == "handoff" && r.Method == http.MethodPost {
+		s.personSubmitSecretHandoff(w, r, conversation, parts[1], actor)
+		return
+	}
 	if len(parts) == 3 && workID(parts[1]) && r.Method == http.MethodPost {
 		action := parts[2]
 		var body struct {

@@ -132,6 +132,16 @@ func (t *WorkV2Tx) HumanIntervention(id string) (work.HumanIntervention, error) 
 	return v, err
 }
 
+// HumanIntervention reads one Note without disclosing any handoff value: that
+// value is never in this store.
+func (s *Store) HumanIntervention(ctx context.Context, id string) (work.HumanIntervention, error) {
+	v, err := scanHumanIntervention(s.rd.QueryRowContext(ctx, `SELECT `+humanInterventionColumns+` FROM human_interventions WHERE id=?`, id))
+	if errors.Is(err, sql.ErrNoRows) {
+		return v, ErrHumanInterventionNotFound
+	}
+	return v, err
+}
+
 func (t *WorkV2Tx) PutHumanIntervention(prev, next work.HumanIntervention) error {
 	if prev.ResolvedAt != nil && next.ResolvedAt == nil {
 		var open int

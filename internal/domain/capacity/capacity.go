@@ -217,38 +217,42 @@ const (
 	SessionDirectTodos        = "session.direct_todos"
 	// The token ledger's work-unit cursors (docs/token-ledger.md "One unit of
 	// work", limits N73).
-	UsageWorkCursorRows       = "usage.work_cursor_rows"
-	UsageWorkCursorQueue      = "usage.work_cursor_queue"
-	UsageWorkUnitsInAnswer    = "usage.work_units_per_answer"
-	HumanInterventionsOpen    = "session.human_interventions_open"
-	HumanInterventionsTotal   = "session.human_interventions_total"
-	HumanInterventionsRecent  = "session.human_interventions_recent"
-	HumanInterventionTitle    = "session.human_intervention_title_bytes"
-	HumanInterventionText     = "session.human_intervention_text_bytes"
-	HumanInterventionDetail   = "session.human_intervention_detail_bytes"
-	HumanInterventionDocument = "session.human_intervention_document_bytes"
-	HumanInterventionDraft    = "session.human_intervention_draft_bytes"
-	SettingsRequestBodyBytes  = "settings.request_body_bytes"
-	NotificationRulesRows     = "notification.rules_rows"
-	NotificationRuleLabel     = "notification.rule_label_characters"
-	NotificationRuleWait      = "notification.rule_wait_seconds"
-	SessionTitleRequestBytes  = "session.title_request_bytes"
-	SessionTitleCharacters    = "session.title_characters"
-	SessionTitleRows          = "session.title_rows"
-	SessionTitleAge           = "session.title_age"
-	WorkItemTitleBytes        = "work.item_title_bytes"
-	WorkItemDescriptionBytes  = "work.item_description_bytes"
-	WorkItemUserActionBytes   = "work.item_user_action_bytes"
-	WorkCompletionReasonBytes = "work.completion_reason_bytes"
-	SessionDirectTodoBytes    = "session.direct_todo_bytes"
-	SessionTodoBatchRows      = "session.todo_batch_rows"
-	ReportOpenTodoRows        = "session.report_open_todo_rows"
-	ReportOpenTodoCharacters  = "session.report_open_todo_characters"
-	RunCreatedItems           = "run.created_items"
-	RunClaimedItems           = "run.claimed_items"
-	EpicChildItems            = "epic.child_items"
-	PlanReviewBlockingListed  = "planreview.blocking_listed"
-	WorkRequestBodyBytes      = "work.request_body_bytes"
+	UsageWorkCursorRows          = "usage.work_cursor_rows"
+	UsageWorkCursorQueue         = "usage.work_cursor_queue"
+	UsageWorkUnitsInAnswer       = "usage.work_units_per_answer"
+	HumanInterventionsOpen       = "session.human_interventions_open"
+	HumanInterventionsTotal      = "session.human_interventions_total"
+	HumanInterventionsRecent     = "session.human_interventions_recent"
+	HumanInterventionTitle       = "session.human_intervention_title_bytes"
+	HumanInterventionText        = "session.human_intervention_text_bytes"
+	HumanInterventionDetail      = "session.human_intervention_detail_bytes"
+	HumanInterventionDocument    = "session.human_intervention_document_bytes"
+	HumanInterventionDraft       = "session.human_intervention_draft_bytes"
+	SecretHandoffBytes           = "session.secret_handoff_bytes"
+	SecretHandoffPending         = "session.secret_handoff_pending"
+	SecretHandoffSeconds         = "session.secret_handoff_seconds"
+	SecretHandoffDeliverySeconds = "session.secret_handoff_delivery_seconds"
+	SettingsRequestBodyBytes     = "settings.request_body_bytes"
+	NotificationRulesRows        = "notification.rules_rows"
+	NotificationRuleLabel        = "notification.rule_label_characters"
+	NotificationRuleWait         = "notification.rule_wait_seconds"
+	SessionTitleRequestBytes     = "session.title_request_bytes"
+	SessionTitleCharacters       = "session.title_characters"
+	SessionTitleRows             = "session.title_rows"
+	SessionTitleAge              = "session.title_age"
+	WorkItemTitleBytes           = "work.item_title_bytes"
+	WorkItemDescriptionBytes     = "work.item_description_bytes"
+	WorkItemUserActionBytes      = "work.item_user_action_bytes"
+	WorkCompletionReasonBytes    = "work.completion_reason_bytes"
+	SessionDirectTodoBytes       = "session.direct_todo_bytes"
+	SessionTodoBatchRows         = "session.todo_batch_rows"
+	ReportOpenTodoRows           = "session.report_open_todo_rows"
+	ReportOpenTodoCharacters     = "session.report_open_todo_characters"
+	RunCreatedItems              = "run.created_items"
+	RunClaimedItems              = "run.claimed_items"
+	EpicChildItems               = "epic.child_items"
+	PlanReviewBlockingListed     = "planreview.blocking_listed"
+	WorkRequestBodyBytes         = "work.request_body_bytes"
 	// Planning and verification gates use the exact stable names approved by
 	// the Epic plan. Unlike older rows, these names are one underscore-delimited
 	// protocol word because typed refusals and export manifests carry them
@@ -1213,6 +1217,30 @@ func Register() []Entry {
 			Limit: 2 << 10, AtLimit: Refuse,
 			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/app.humanInterventionDraftLimit"},
+		},
+		{
+			Name: SecretHandoffBytes, Class: Buffer, Unit: Bytes,
+			Limit: 16 << 10, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/app.MaxSecretHandoffBytes"},
+		},
+		{
+			Name: SecretHandoffPending, Class: Buffer, Unit: Rows,
+			Limit: 128, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/app.MaxSecretHandoffPending"},
+		},
+		{
+			Name: SecretHandoffSeconds, Class: Idempotency, Unit: Seconds,
+			Limit: 15 * 60, AtLimit: Expire,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/app.MaxSecretHandoffSeconds"},
+		},
+		{
+			Name: SecretHandoffDeliverySeconds, Class: Buffer, Unit: Seconds,
+			Limit: 5, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/app.MaxSecretHandoffDeliverySeconds"},
 		},
 		{
 			Name: WorkItemTitleBytes, Class: Evidence, Unit: Bytes,

@@ -1,12 +1,12 @@
 import { catalogFormat } from "../catalog.js"
 import { catalogWord } from "../catalog.js"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type FormEvent, type Ref } from "react"
 import type { SessionRow } from "@clawdline/contract"
 import { asMachineNeedsUpdate, type MachineNeedsUpdate } from "@clawdline/core"
 import { NeedsUpdate } from "../machine/NeedsUpdate.js"
 import { nextWord } from "../next-strings.js"
 import * as L from "../legacy/bridge.js"
-import { humanInterventionActionV2, readHumanInterventionsV2, type HumanInterventionV2, type HumanInterventionsV2 } from "../pages/work/api.js"
+import { humanInterventionActionV2, readHumanInterventionsV2, submitSecretHandoffV2, type HumanInterventionV2, type HumanInterventionsV2 } from "../pages/work/api.js"
 import { failureWords, when } from "../pages/work/shared.js"
 import { WorkIcon } from "../pages/work/WorkIcon.js"
 import { interventionTarget, sameInterventionTarget, type InterventionTarget } from "./intervention-composer.js"
@@ -229,6 +229,31 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
     setActionError("")
   }
 
+  const handoff = async (note: HumanInterventionV2, value: string) => {
+    if (note.kind !== "secret" || readError || busyRef.current || !sameInterventionTarget(destination, latest.current) || pageKey !== key) return
+    const serial = ++actionSerial.current
+    busyRef.current = true
+    setBusy(note.id); setActionError(""); setActionStatus("")
+    let received = false
+    try {
+      await submitSecretHandoffV2(destination.conversation, note.id, value)
+      received = true
+      if (sameInterventionTarget(destination, latest.current)) setActionStatus(nextWord("secretHandoffReceived"))
+      if (row) {
+        const card = pendingSends.add(row.id, nextWord("secretHandoffReadyMessage", { id: note.id }), [], Date.now())
+        const code = await deliverUntilSeen(card)
+        if (code && sameInterventionTarget(destination, latest.current)) setActionError(nextWord("secretHandoffNoticeError"))
+        if (!code) onReplySent?.()
+      }
+    } catch (error) {
+      // The request may have reached the machine. The value is cleared by
+      // the form; never put it into an error, retry card or transcript.
+      if (sameInterventionTarget(destination, latest.current)) setActionError(received ? nextWord("secretHandoffNoticeError") : failureWords(error))
+    } finally {
+      if (serial === actionSerial.current) { busyRef.current = false; setBusy("") }
+    }
+  }
+
   const countWords = readUpdate ? `${catalogWord("inline", "a4f8e0fcaaf8")}: ${nextWord("machineNeedsUpdate")}` : readError ? catalogWord("literal", "ff569bc2e31d") : unresolved !== null ? catalogFormat("template", "f16df8b87a41", [unresolved]) : catalogWord("literal", "e44c005aa593")
   const head = <button className="human-interventions-head" type="button" aria-expanded={expanded} aria-controls={expanded ? "human-interventions-body" : undefined}
     aria-label={`${countWords}${actionError ? catalogWord("literal", "f095f6af37ff") : ""}`}
@@ -252,9 +277,9 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
       {actionStatus && <p className="human-interventions-status" role="status">{actionStatus}</p>}
       {!shown && !readError && <p className="human-interventions-empty human-interventions-loading" role="status"><span className="human-interventions-spinner" aria-hidden="true" />{catalogWord("inline", "656c48dad32b")}</p>}
       {shown && active.length === 0 && <p className="human-interventions-empty">{catalogWord("inline", "e43b3c54e4b6")}</p>}
-      {active.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} onAction={run} onReply={reply} onCompose={compose} />)}
+      {active.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} onAction={run} onReply={reply} onCompose={compose} onHandoff={handoff} />)}
       {recent.length > 0 && <details className="human-interventions-recent"><summary>{catalogFormat("count", "recentInterventions", [recent.length])}</summary>
-        {recent.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} onAction={run} onReply={reply} onCompose={compose} />)}
+        {recent.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} onAction={run} onReply={reply} onCompose={compose} onHandoff={handoff} />)}
       </details>}
       {!!shown?.pruned_resolved && <p className="human-interventions-retention">{catalogFormat("count", "prunedInterventions", [shown.pruned_resolved])}</p>}
     </div>
@@ -264,13 +289,14 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
   return { head, live, body, close: () => setExpanded(false) }
 }
 
-function InterventionCard({ note, disabled, sending, onAction, onReply, onCompose }: {
+function InterventionCard({ note, disabled, sending, onAction, onReply, onCompose, onHandoff }: {
   note: HumanInterventionV2
   disabled: boolean
   sending: boolean
   onAction: (note: HumanInterventionV2, action: "resolve" | "reopen") => void
   onReply: (note: HumanInterventionV2, text: string) => void
   onCompose: (note: HumanInterventionV2, draft: string) => void
+  onHandoff: (note: HumanInterventionV2, value: string) => void
 }) {
   const fromAnotherSession = note.source_conversation !== note.target_conversation
   const isReading = note.kind === "read" || note.kind === "report"
@@ -278,7 +304,7 @@ function InterventionCard({ note, disabled, sending, onAction, onReply, onCompos
   const documentHere = note.document_url ? samePageTarget(note.document_url, window.location) : null
   const internalDocument = documentHere && hasDocumentIntent(documentHere.hash)
   return <article className="human-intervention-card" data-intervention-id={note.id} tabIndex={-1} aria-label={note.title}>
-    <div className="human-intervention-title"><div><h3>{note.title}</h3><span className="human-intervention-stage">{note.resolved_at ? catalogWord("literal", "927c9ed33728") : catalogWord("literal", "77f6d2cceedd")}</span><time className="human-intervention-created" dateTime={new Date(note.created_at * 1000).toISOString()}>{catalogWord("inline", "0f6f6df015c6")} {when(note.created_at)}</time></div><span className="human-intervention-type"><WorkIcon name={isReading ? "eye" : "edit"} />{isReading ? catalogWord("literal", "3d9157962dd2") : note.kind === "answer" ? catalogWord("literal", "e12820431ff9") : catalogWord("literal", "5a15e03eaa4a")}</span></div>
+    <div className="human-intervention-title"><div><h3>{note.title}</h3><span className="human-intervention-stage">{note.resolved_at ? catalogWord("literal", "927c9ed33728") : catalogWord("literal", "77f6d2cceedd")}</span><time className="human-intervention-created" dateTime={new Date(note.created_at * 1000).toISOString()}>{catalogWord("inline", "0f6f6df015c6")} {when(note.created_at)}</time></div><span className="human-intervention-type"><WorkIcon name={isReading ? "eye" : "edit"} />{note.kind === "secret" ? nextWord("secretHandoffName") : isReading ? catalogWord("literal", "3d9157962dd2") : note.kind === "answer" ? catalogWord("literal", "e12820431ff9") : catalogWord("literal", "5a15e03eaa4a")}</span></div>
     {fromAnotherSession && <p className="human-intervention-source">{catalogWord("inline", "afc7f76a7d4f")} {note.source_label || catalogWord("literal", "92018c889270")}</p>}
     <p>{note.summary}</p>
     <p><b>{catalogLabel("inline", "7ed8d242eabd")}</b>{note.action}</p>
@@ -292,7 +318,8 @@ function InterventionCard({ note, disabled, sending, onAction, onReply, onCompos
         window.location.hash = documentHere.hash
       }}><WorkIcon name="file" />{catalogWord("inline", "740cf7e11430")}</a></p>}
     {note.detail && <details className="human-intervention-more"><summary>{catalogWord("inline", "61e5b2be1827")}</summary><div className="human-intervention-detail" dangerouslySetInnerHTML={{ __html: L.richTextHTML(note.detail) }} /></details>}
-    <div className="human-intervention-drafts" role="group" aria-label={catalogWord("inline", "c4636462e1de")} aria-busy={sending}>
+    {note.kind === "secret" && !note.resolved_at && <SecretHandoffForm note={note} disabled={disabled} sending={sending} onHandoff={onHandoff} />}
+    {note.kind !== "secret" && <div className="human-intervention-drafts" role="group" aria-label={catalogWord("inline", "c4636462e1de")} aria-busy={sending}>
       <h4>{catalogWord("inline", "c4636462e1de")}</h4>
       <p className="human-intervention-hint">{composeOnly ? catalogWord("literal", "981ea9fd14d5") : catalogWord("literal", "3e129c69ac26")}</p>
       {(note.options.length ? note.options : [{ label: catalogWord("literal", "cc6ade09e09b"), draft: note.action }]).map((option, index) =>
@@ -301,7 +328,7 @@ function InterventionCard({ note, disabled, sending, onAction, onReply, onCompos
           {note.options.length > 0 && <strong>{option.label}</strong>}
           <span>{option.draft}</span>
         </button>)}
-    </div>
+    </div>}
     <div className="human-intervention-state">
       <div className="human-intervention-actions">
         {!note.resolved_at ? <button className="human-intervention-resolve" type="button" disabled={disabled} onClick={() => onAction(note, "resolve")}><WorkIcon name="check" />{catalogWord("inline", "f51bfc3ed707")}</button>
@@ -314,4 +341,31 @@ function InterventionCard({ note, disabled, sending, onAction, onReply, onCompos
 function interventionReplyText(note: HumanInterventionV2, draft: string): string {
   const context = `(Clawdline 便條 ${note.id}：「${note.title}」；待回覆事項：${note.action})`
   return `${draft.replace(/[\r\n]+$/, "")}\n\n${context}`
+}
+
+function SecretHandoffForm({ note, disabled, sending, onHandoff }: {
+  note: HumanInterventionV2
+  disabled: boolean
+  sending: boolean
+  onHandoff: (note: HumanInterventionV2, value: string) => void
+}) {
+  const [multiline, setMultiline] = useState(false)
+  const field = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null)
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const value = field.current?.value ?? ""
+    if (!value || disabled || sending) return
+    if (field.current) field.current.value = ""
+    onHandoff(note, value)
+  }
+  return <form className="secret-handoff-form" onSubmit={submit} aria-busy={sending}>
+    <label htmlFor={`secret-handoff-${note.id}`}>{nextWord("secretHandoffLabel")}</label>
+    {multiline ? <textarea ref={field as Ref<HTMLTextAreaElement>} id={`secret-handoff-${note.id}`} rows={5} required disabled={disabled}
+      placeholder={nextWord("secretHandoffPlaceholder")} autoComplete="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="" data-lpignore="true" data-bwignore="" />
+      : <input ref={field as Ref<HTMLInputElement>} id={`secret-handoff-${note.id}`} type="password" required disabled={disabled}
+        placeholder={nextWord("secretHandoffPlaceholder")} autoComplete="new-password" autoCapitalize="off" spellCheck={false} data-1p-ignore="" data-lpignore="true" data-bwignore="" />}
+    <label className="secret-handoff-multiline"><input type="checkbox" checked={multiline} disabled={disabled} onChange={(event) => setMultiline(event.currentTarget.checked)} />{nextWord("secretHandoffMultiline")}</label>
+    <p>{nextWord("secretHandoffPrivacy")}</p>
+    <button type="submit" disabled={disabled || sending}>{nextWord("secretHandoffSubmit")}</button>
+  </form>
 }

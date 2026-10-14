@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5131,
-  "riskKeys": 2248,
-  "nonRiskCount": 2883,
+  "englishContentKeys": 5154,
+  "riskKeys": 2263,
+  "nonRiskCount": 2891,
   "groups": [
     {
       "name": "bar / other",
@@ -367,7 +367,7 @@
     },
     {
       "name": "http / other",
-      "count": 558,
+      "count": 561,
       "sources": [
         "internal/productcopy/http_refusals/en.json"
       ],
@@ -455,6 +455,7 @@
         "http.2a0f7ef23d02710a",
         "http.2a65eafd7cf38048",
         "http.2b02249fc2c91498",
+        "http.2b02c06447341d8b",
         "http.2be1bd61c997b7f1",
         "http.2c69910b0e7f157c",
         "http.2c84f1ba6995145a",
@@ -561,6 +562,7 @@
         "http.56f8ef9947d27864",
         "http.5789e9d7beada5db",
         "http.5796663b9c0bddd0",
+        "http.5844528fad0ee782",
         "http.58ff235db302eaf4",
         "http.59ddb09eaafb2147",
         "http.5a841b4b9f8c8aeb",
@@ -699,6 +701,7 @@
         "http.9aa9fbc599eaf924",
         "http.9b364f75d3c70a26",
         "http.9bcf10c099d3535f",
+        "http.9c15ed81764c0fb4",
         "http.9c33c5bd0c7f833e",
         "http.9c3d7703886dc67c",
         "http.9c59acc5d492f230",
@@ -1921,7 +1924,7 @@
     },
     {
       "name": "next / other",
-      "count": 132,
+      "count": 137,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1993,6 +1996,11 @@
         "next.schedulesListLabel",
         "next.schedulesLoading",
         "next.screenSessionGone",
+        "next.secretHandoffLabel",
+        "next.secretHandoffName",
+        "next.secretHandoffPlaceholder",
+        "next.secretHandoffReceived",
+        "next.secretHandoffSubmit",
         "next.sessionCallbackActive",
         "next.sessionCallbackUnverified",
         "next.sessionCallbacksActive",

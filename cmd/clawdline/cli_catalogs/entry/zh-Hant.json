@@ -19,6 +19,7 @@
   "main_leases_sessions_json_who_holds_or": "  leases | sessions [--json]    各租約的持有者或等候者；send、wait 或 handoff 可指定的 Session",
   "main_memory_shared_project": "  memory <list|show|add|update|forget|import>   Claude 與 Codex 共用的 Project 記憶資料",
   "main_note_create_post_a_human_intervention": "  note create                   向一個 Session 張貼人工介入事項",
+  "main_secret_run": "  secret run <note-id> -- <command> [args...]   將一次性機密值交給工具的標準輸入",
   "main_notify_title_t_body_b_push": "  notify --title <t> --body <b>   推播通知給使用者",
   "main_open_print_sign_a_browser_in": "  open [--print]   授權瀏覽器登入，以讀取及傳送訊息",
   "main_pair_watch_show_the_code_when": "  pair [--watch]            裝置要求配對時顯示驗證碼",
