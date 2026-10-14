@@ -318,7 +318,7 @@ func TestACloudReadIsRecordedOnlyWhenRefusedOrSlow(t *testing.T) {
 	if len(slow) != 1 {
 		t.Fatalf("a slow read left %d lines: %v", len(slow), slow)
 	}
-	for _, wanted := range []string{"cloud: read answered:", "operation=work.v2.session-todos", "status=200",
+	for _, wanted := range []string{"cloud: read answered:", "operation=work.v2.session-todos", "session=__clawdline_machine__", "status=200",
 		"code=ok", "ms=6200", "sender=viewer-device-01", "seq=520"} {
 		if !strings.Contains(slow[0], wanted) {
 			t.Errorf("log %q does not contain %q", slow[0], wanted)

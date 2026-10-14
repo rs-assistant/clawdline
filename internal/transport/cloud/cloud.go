@@ -270,8 +270,8 @@ func (s Service) Answer(ctx context.Context, request Inbound) cloudops.Answer {
 	// refused or was slow is the line a person reading their phone's
 	// "loading" needs to find on this machine.
 	if elapsed := s.now().Sub(started); !answer.OK() || elapsed > slowReadAnswer {
-		s.logf("cloud: read answered: operation=%s status=%d code=%s ms=%d sender=%s seq=%d",
-			operationOrUnknown(answer.Operation), answer.Status, codeOrOK(answer.Code),
+		s.logf("cloud: read answered: operation=%s session=%s status=%d code=%s ms=%d sender=%s seq=%d",
+			operationOrUnknown(answer.Operation), subjectOrUnknown(answer.Subject), answer.Status, codeOrOK(answer.Code),
 			elapsed.Milliseconds(), request.Sender, request.Sequence)
 	}
 	return answer
