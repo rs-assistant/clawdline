@@ -310,6 +310,7 @@ export interface HumanInterventionV2 {
   read_at: number | null
   resolved_at: number | null
   resolution?: string
+  secret_received?: boolean
   version: number
 }
 

@@ -84,6 +84,16 @@ func (h *SecretHandoffs) Put(id, conversation string, value []byte) error {
 	return nil
 }
 
+// Pending reports only whether an unclaimed value is waiting for this
+// conversation. It never exposes the value or its size.
+func (h *SecretHandoffs) Pending(id, conversation string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.expire(h.Now())
+	entry, ok := h.values[id]
+	return ok && entry.conversation == conversation && !h.claimed[id]
+}
+
 // Take is a single-use claim. It returns a detached byte slice for the local
 // command to pipe to a tool; that command must wipe it after writing.
 func (h *SecretHandoffs) Take(id, conversation string) ([]byte, error) {

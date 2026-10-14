@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5153,
+  "englishContentKeys": 5155,
   "riskKeys": 2262,
-  "nonRiskCount": 2891,
+  "nonRiskCount": 2893,
   "groups": [
     {
       "name": "bar / other",
@@ -1924,7 +1924,7 @@
     },
     {
       "name": "next / other",
-      "count": 137,
+      "count": 139,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2000,6 +2000,8 @@
         "next.secretHandoffName",
         "next.secretHandoffPlaceholder",
         "next.secretHandoffReceived",
+        "next.secretHandoffReplace",
+        "next.secretHandoffSending",
         "next.secretHandoffSubmit",
         "next.sessionCallbackActive",
         "next.sessionCallbackUnverified",

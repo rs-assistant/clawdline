@@ -35,6 +35,8 @@ let showOptions = true
 let singleOption = false
 let secretMode = false
 let handoffValues: string[] = []
+let handoffDelay = 0
+let failHandoff = false
 let listWaiting = false
 let listAttentionCount = 1
 let documentMode: "ready" | "refused" | "keyed" = "ready"
@@ -267,7 +269,9 @@ function fixture(): Server {
   const publish = () => { for (const client of eventClients) client.write("event: sessions\ndata: " + JSON.stringify(snapshot()) + "\n\n") }
   return createServer((req, res) => {
     const path = new URL(req.url ?? "/", "http://fixture").pathname
-    if (path === "/__fixture/reset") { readAt = null; resolvedAt = null; version = 1; failReads = false; failActions = false; readDelay = 0; noteReads = 0; todoReads = 0; noteCount = 1; showOptions = true; singleOption = false; secretMode = false; handoffValues = []; listWaiting = false; listAttentionCount = 1; documentMode = "ready"; documentListMode = "ready"; documentReadDelay = 0; sendRequests = 0; sentTexts = []; sentBeforeResolve = []; failSends = false; sendDelay = 0; return json(res, 200, { ok: true }) }
+    if (path === "/__fixture/reset") { readAt = null; resolvedAt = null; version = 1; failReads = false; failActions = false; readDelay = 0; noteReads = 0; todoReads = 0; noteCount = 1; showOptions = true; singleOption = false; secretMode = false; handoffValues = []; handoffDelay = 0; failHandoff = false; listWaiting = false; listAttentionCount = 1; documentMode = "ready"; documentListMode = "ready"; documentReadDelay = 0; sendRequests = 0; sentTexts = []; sentBeforeResolve = []; failSends = false; sendDelay = 0; return json(res, 200, { ok: true }) }
+    if (path === "/__fixture/handoff-delay") { handoffDelay = 400; return json(res, 200, { ok: true }) }
+    if (path === "/__fixture/handoff-fail") { failHandoff = true; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/document-mode") { const mode = new URL(req.url ?? "/", "http://fixture").searchParams.get("value"); documentMode = mode === "refused" || mode === "keyed" ? mode : "ready"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/document-list-mode") { const value = new URL(req.url ?? "/", "http://fixture").searchParams.get("value"); documentListMode = value === "empty" || value === "starting" ? value : "ready"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/document-read-delay") { documentReadDelay = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("ms")) || 0; return json(res, 200, { ok: true }) }
@@ -332,7 +336,7 @@ function fixture(): Server {
         document_url: secretMode ? "" : origin + `/#document=1&machine=this-mac&session=${SESSION}&scope=project&path=demo.md`,
         detail: secretMode ? "" : ("The report is ready. Please review the proposed date and the linked evidence.\n").repeat(36), options: secretMode ? [] : showOptions ? [
           { label: "Tuesday", draft: "Tuesday works for me." }, ...singleOption ? [] : [{ label: "Wednesday", draft: "Wednesday works for me." }] ] : [],
-        created_at: now, read_at: readAt, resolved_at: resolvedAt, version }
+        created_at: now, read_at: readAt, resolved_at: resolvedAt, secret_received: secretMode && handoffValues.length > 0 && !resolvedAt, version }
       if (req.method === "GET") {
         noteReads++
         const answer = () => failReads ? json(res, 503, { error: "read_failed" }) : json(res, 200, { ok: true, rows: Array.from({ length: noteCount }, (_, index) => ({ ...note, id: `10000000-0000-4000-8000-${String(32 + index).padStart(12, "0")}` })), pruned_resolved: 0 })
@@ -345,7 +349,13 @@ function fixture(): Server {
         req.on("end", () => {
           if (failActions) { setTimeout(() => json(res, 503, { error: "action_failed" }), 200); return }
           const body = JSON.parse(Buffer.concat(chunks).toString("utf8"))
-          if (secretMode && path.endsWith("/handoff")) { handoffValues.push(body.value); return json(res, 200, { ok: true, received: true }) }
+          if (secretMode && path.endsWith("/handoff")) {
+            return setTimeout(() => {
+              if (failHandoff) return json(res, 503, { error: "machine_offline" })
+              handoffValues.push(body.value)
+              json(res, 200, { ok: true, received: true })
+            }, handoffDelay)
+          }
           if (body.expected_version !== version) return json(res, 409, { error: "version_conflict" })
           if (path.endsWith("/read")) readAt = now
           else if (path.endsWith("/resolve")) { sentBeforeResolve.push(sentTexts.length); readAt = now; resolvedAt = now; listAttentionCount = 0; publish() }
@@ -852,6 +862,7 @@ test("Secret Handoff pastes one-line and multi-line values without sending them 
   try {
     await fetch(origin + "/__fixture/reset")
     await fetch(origin + "/__fixture/secret-mode")
+    await fetch(origin + "/__fixture/handoff-delay")
     await browser.send("Page.enable", {}, id); await browser.send("Runtime.enable", {}, id)
     await browser.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }, id)
     const mark = browser.loadCount; await browser.send("Page.navigate", { url: origin + "/#session=" + SESSION }, id); await browser.loaded(id, mark)
@@ -863,16 +874,33 @@ test("Secret Handoff pastes one-line and multi-line values without sending them 
     assert.equal(await run(`!!document.querySelector(".secret-handoff-form input")`), false)
     assert.equal(await run(`!!document.querySelector(".human-intervention-option")`), false)
     await run(`document.querySelector(".secret-handoff-form textarea").value = "SAFE_ONE_LINE_FIXTURE"; document.querySelector(".secret-handoff-form button[type=submit]").click()`)
-    await until(`document.querySelector(".human-interventions-status")?.textContent?.includes("已收到機密值")`)
-    await until(`document.querySelector(".secret-handoff-form textarea")?.value === ""`)
+    await until(`document.querySelector(".secret-handoff-form button")?.textContent?.includes("安全交付中")`)
+    assert.equal(await run(`document.querySelector(".secret-handoff-form textarea")?.disabled`), true)
+    assert.deepEqual(handoffValues, [], "the delayed machine has not acknowledged the value")
+    await until(`document.querySelector(".secret-handoff-received")?.textContent?.includes("已收到機密值")`)
     assert.deepEqual(handoffValues, ["SAFE_ONE_LINE_FIXTURE"])
     assert.equal(sentTexts.some((text) => text.includes("SAFE_ONE_LINE_FIXTURE")), false)
     assert.equal(await run(`document.querySelector("#msg")?.textContent?.includes("SAFE_ONE_LINE_FIXTURE")`), false)
-    await until(`!document.querySelector(".secret-handoff-form button[type=submit]")?.disabled`)
+    await until(`document.querySelector(".human-interventions-head")?.getAttribute("aria-expanded") === "false"`)
+    await run(`document.querySelector(".human-interventions-head").click()`)
+    await until(`!!document.querySelector(".secret-handoff-received")`)
+    assert.equal(await run(`!!document.querySelector(".secret-handoff-form textarea")`), false, "a received value is not an open form")
+    const reload = browser.loadCount; await browser.send("Page.reload", {}, id); await browser.loaded(id, reload)
+    await until(`!!document.querySelector(".human-interventions-head")`)
+    await run(`document.querySelector(".human-interventions-head").click()`)
+    await until(`!!document.querySelector(".secret-handoff-received")`)
+    await run(`document.querySelector(".secret-handoff-received button").click()`)
+    await until(`!!document.querySelector(".secret-handoff-form textarea")`)
     await run(`document.querySelector(".secret-handoff-form textarea").value = "-----BEGIN FIXTURE-----\\nline two"; document.querySelector(".secret-handoff-form button[type=submit]").click()`)
-    await until(`document.querySelector(".secret-handoff-form textarea")?.value === ""`)
+    await until(`!!document.querySelector(".secret-handoff-received")`)
     assert.deepEqual(handoffValues, ["SAFE_ONE_LINE_FIXTURE", "-----BEGIN FIXTURE-----\nline two"])
     assert.equal(sentTexts.some((text) => text.includes("BEGIN FIXTURE")), false)
+    await run(`document.querySelector(".secret-handoff-received button").click()`)
+    await fetch(origin + "/__fixture/handoff-fail")
+    await run(`document.querySelector(".secret-handoff-form textarea").value = "REJECTED_FIXTURE"; document.querySelector(".secret-handoff-form button[type=submit]").click()`)
+    await until(`!!document.querySelector(".human-interventions-error")`)
+    assert.deepEqual(handoffValues, ["SAFE_ONE_LINE_FIXTURE", "-----BEGIN FIXTURE-----\nline two"], "a rejected value is not reported as received")
+    assert.equal(sentTexts.some((text) => text.includes("REJECTED_FIXTURE")), false)
     assert.equal(await run(`document.documentElement.scrollWidth <= 390`), true)
   } finally {
     await fetch(origin + "/__fixture/reset")

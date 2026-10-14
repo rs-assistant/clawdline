@@ -4285,6 +4285,8 @@
   "next.secretHandoffReadyMessage": "Secret Handoff {id} is ready. Use the one-time local handoff command; the value is not in this message.",
   "next.secretHandoffReceived": "Secret received. This Session can use it once within 15 minutes.",
   "next.secretHandoffSubmit": "Hand off securely",
+  "next.secretHandoffSending": "Sending securely…",
+  "next.secretHandoffReplace": "Replace value",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

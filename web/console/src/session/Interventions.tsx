@@ -45,6 +45,10 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
   const [actionStatus, setActionStatus] = useState("")
   const [reading, setReading] = useState(false)
   const [busy, setBusy] = useState("")
+  const [secretReceipt, setSecretReceipt] = useState<{ id: string; phase: "sending" | "received" } | null>(null)
+  const receiptTimer = useRef<number | null>(null)
+  const collapseTimer = useRef<number | null>(null)
+  const [collapsing, setCollapsing] = useState(false)
   const busyRef = useRef(false)
   const actionSerial = useRef(0)
   const [expanded, setExpanded] = useState(false)
@@ -73,11 +77,14 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
   }, [])
 
   useEffect(() => {
+    if (receiptTimer.current) clearTimeout(receiptTimer.current)
+    if (collapseTimer.current) clearTimeout(collapseTimer.current)
+    receiptTimer.current = null
     ticket.current++
     actionSerial.current++
     busyRef.current = false
-    setPage(null); setPageKey(""); setReadError(""); setReadUpdate(null); setActionError(""); setActionStatus(""); setBusy(""); setExpanded(false)
-    return () => { ticket.current++ }
+    setPage(null); setPageKey(""); setReadError(""); setReadUpdate(null); setActionError(""); setActionStatus(""); setBusy(""); setSecretReceipt(null); setExpanded(false); setCollapsing(false)
+    return () => { ticket.current++; if (receiptTimer.current) clearTimeout(receiptTimer.current); if (collapseTimer.current) clearTimeout(collapseTimer.current) }
   // Identity is an immutable machine / route Session / conversation tuple.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
@@ -124,6 +131,11 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
   }, [attentionCount, expanded, hasPage, load])
 
   const closeWithFocus = () => {
+    if (receiptTimer.current) clearTimeout(receiptTimer.current)
+    if (collapseTimer.current) clearTimeout(collapseTimer.current)
+    receiptTimer.current = null
+    collapseTimer.current = null
+    setCollapsing(false)
     setExpanded(false)
     document.querySelector<HTMLElement>(".human-interventions-head")?.focus({ preventScroll: true })
   }
@@ -132,6 +144,10 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
       event.preventDefault(); event.stopPropagation()
+      if (receiptTimer.current) clearTimeout(receiptTimer.current)
+      if (collapseTimer.current) clearTimeout(collapseTimer.current)
+      receiptTimer.current = null; collapseTimer.current = null
+      setCollapsing(false)
       setExpanded(false)
       document.querySelector<HTMLElement>(".human-interventions-head")?.focus({ preventScroll: true })
     }
@@ -231,24 +247,52 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
 
   const handoff = async (note: HumanInterventionV2, value: string) => {
     if (note.kind !== "secret" || readError || busyRef.current || !sameInterventionTarget(destination, latest.current) || pageKey !== key) return
+    if (receiptTimer.current) clearTimeout(receiptTimer.current)
+    if (collapseTimer.current) clearTimeout(collapseTimer.current)
+    receiptTimer.current = null
+    collapseTimer.current = null
+    setCollapsing(false)
     const serial = ++actionSerial.current
     busyRef.current = true
-    setBusy(note.id); setActionError(""); setActionStatus("")
+    setBusy(note.id); setActionError(""); setActionStatus(""); setSecretReceipt({ id: note.id, phase: "sending" })
     let received = false
     try {
       await submitSecretHandoffV2(destination.conversation, note.id, value)
       received = true
-      if (sameInterventionTarget(destination, latest.current)) setActionStatus(nextWord("secretHandoffReceived"))
+      if (sameInterventionTarget(destination, latest.current)) {
+        setSecretReceipt({ id: note.id, phase: "received" })
+        receiptTimer.current = window.setTimeout(() => {
+          if (!sameInterventionTarget(destination, latest.current)) return
+          setCollapsing(true)
+          collapseTimer.current = window.setTimeout(() => closeWithFocus(), 260)
+        }, 1300)
+      }
+      await load(destination)
       if (row) {
         const card = pendingSends.add(row.id, nextWord("secretHandoffReadyMessage", { id: note.id }), [], Date.now())
         const code = await deliverUntilSeen(card)
-        if (code && sameInterventionTarget(destination, latest.current)) setActionError(nextWord("secretHandoffNoticeError"))
+        if (code && sameInterventionTarget(destination, latest.current)) {
+          if (receiptTimer.current) clearTimeout(receiptTimer.current)
+          if (collapseTimer.current) clearTimeout(collapseTimer.current)
+          receiptTimer.current = null
+          collapseTimer.current = null
+          setCollapsing(false)
+          setActionError(nextWord("secretHandoffNoticeError"))
+        }
         if (!code) onReplySent?.()
       }
     } catch (error) {
       // The request may have reached the machine. The value is cleared by
       // the form; never put it into an error, retry card or transcript.
-      if (sameInterventionTarget(destination, latest.current)) setActionError(received ? nextWord("secretHandoffNoticeError") : failureWords(error))
+      if (sameInterventionTarget(destination, latest.current)) {
+        if (receiptTimer.current) clearTimeout(receiptTimer.current)
+        if (collapseTimer.current) clearTimeout(collapseTimer.current)
+        receiptTimer.current = null
+        collapseTimer.current = null
+        setCollapsing(false)
+        if (!received) setSecretReceipt(null)
+        setActionError(received ? nextWord("secretHandoffNoticeError") : failureWords(error))
+      }
     } finally {
       if (serial === actionSerial.current) { busyRef.current = false; setBusy("") }
     }
@@ -257,7 +301,7 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
   const countWords = readUpdate ? `${catalogWord("inline", "a4f8e0fcaaf8")}: ${nextWord("machineNeedsUpdate")}` : readError ? catalogWord("literal", "ff569bc2e31d") : unresolved !== null ? catalogFormat("template", "f16df8b87a41", [unresolved]) : catalogWord("literal", "e44c005aa593")
   const head = <button className="human-interventions-head" type="button" aria-expanded={expanded} aria-controls={expanded ? "human-interventions-body" : undefined}
     aria-label={`${countWords}${actionError ? catalogWord("literal", "f095f6af37ff") : ""}`}
-    onClick={(event) => { event.preventDefault(); event.stopPropagation(); if (readError) { void load(destination); return } if (!expanded) { onExpand?.(); setActionStatus("") } setExpanded(!expanded) }}>
+    onClick={(event) => { event.preventDefault(); event.stopPropagation(); if (receiptTimer.current) clearTimeout(receiptTimer.current); if (collapseTimer.current) clearTimeout(collapseTimer.current); receiptTimer.current = null; collapseTimer.current = null; setCollapsing(false); if (readError) { void load(destination); return } if (!expanded) { onExpand?.(); setActionStatus("") } setExpanded(!expanded) }}>
       <span>{catalogWord("inline", "a4f8e0fcaaf8")}</span>
       {(unresolved ?? 0) > 0 && <span className="human-interventions-dot" aria-hidden="true" />}
       {unresolved !== null && unresolved > 0 && <span className="human-interventions-count">{catalogFormat("count", "pendingInterventions", [unresolved])}</span>}
@@ -269,7 +313,7 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
     <span className="human-interventions-live" role="status" aria-live="polite" aria-atomic="true">{unresolved !== null || readError ? countWords : ""}</span>
     {actionError && <span className="human-interventions-live" role="alert">{catalogWord("inline", "9aaa26b21b0c")}</span>}
   </>
-  const body = expanded && <section className="human-interventions" aria-labelledby="human-interventions-title">
+  const body = expanded && <section className={`human-interventions${collapsing ? " is-collapsing" : ""}`} aria-labelledby="human-interventions-title">
     <div className="human-interventions-panelbar"><h2 id="human-interventions-title">{catalogWord("inline", "0999edae13a4")}</h2><button type="button" onClick={closeWithFocus}><WorkIcon name="close" />{catalogWord("inline", "1fa4945f108c")}</button></div>
     <div className="human-interventions-body" id="human-interventions-body">
       {readUpdate ? <NeedsUpdate update={readUpdate} className="human-interventions-error" /> : readError && <p className="human-interventions-error" role="alert">{shown ? catalogWord("literal", "5789b797c9ef") : catalogWord("literal", "24fe20ab6d4d")} {readError} <button type="button" onClick={() => { void load(destination) }}>{catalogWord("inline", "7e59d0f16293")}</button></p>}
@@ -277,9 +321,9 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
       {actionStatus && <p className="human-interventions-status" role="status">{actionStatus}</p>}
       {!shown && !readError && <p className="human-interventions-empty human-interventions-loading" role="status"><span className="human-interventions-spinner" aria-hidden="true" />{catalogWord("inline", "656c48dad32b")}</p>}
       {shown && active.length === 0 && <p className="human-interventions-empty">{catalogWord("inline", "e43b3c54e4b6")}</p>}
-      {active.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} onAction={run} onReply={reply} onCompose={compose} onHandoff={handoff} />)}
+      {active.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} secretReceived={!!note.secret_received || secretReceipt?.id === note.id && secretReceipt.phase === "received"} onReplace={() => { if (receiptTimer.current) clearTimeout(receiptTimer.current); if (collapseTimer.current) clearTimeout(collapseTimer.current); receiptTimer.current = null; collapseTimer.current = null; setCollapsing(false) }} onAction={run} onReply={reply} onCompose={compose} onHandoff={handoff} />)}
       {recent.length > 0 && <details className="human-interventions-recent"><summary>{catalogFormat("count", "recentInterventions", [recent.length])}</summary>
-        {recent.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} onAction={run} onReply={reply} onCompose={compose} onHandoff={handoff} />)}
+        {recent.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} secretReceived={false} onReplace={() => {}} onAction={run} onReply={reply} onCompose={compose} onHandoff={handoff} />)}
       </details>}
       {!!shown?.pruned_resolved && <p className="human-interventions-retention">{catalogFormat("count", "prunedInterventions", [shown.pruned_resolved])}</p>}
     </div>
@@ -289,15 +333,19 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
   return { head, live, body, close: () => setExpanded(false) }
 }
 
-function InterventionCard({ note, disabled, sending, onAction, onReply, onCompose, onHandoff }: {
+function InterventionCard({ note, disabled, sending, secretReceived, onReplace, onAction, onReply, onCompose, onHandoff }: {
   note: HumanInterventionV2
   disabled: boolean
   sending: boolean
+  secretReceived: boolean
+  onReplace: () => void
   onAction: (note: HumanInterventionV2, action: "resolve" | "reopen") => void
   onReply: (note: HumanInterventionV2, text: string) => void
   onCompose: (note: HumanInterventionV2, draft: string) => void
   onHandoff: (note: HumanInterventionV2, value: string) => void
 }) {
+  const [replacingSecret, setReplacingSecret] = useState(false)
+  useEffect(() => { if (secretReceived && !sending) setReplacingSecret(false) }, [secretReceived, sending])
   const fromAnotherSession = note.source_conversation !== note.target_conversation
   const isReading = note.kind === "read" || note.kind === "report"
   const composeOnly = note.options.length <= 1
@@ -318,7 +366,9 @@ function InterventionCard({ note, disabled, sending, onAction, onReply, onCompos
         window.location.hash = documentHere.hash
       }}><WorkIcon name="file" />{catalogWord("inline", "740cf7e11430")}</a></p>}
     {note.detail && <details className="human-intervention-more"><summary>{catalogWord("inline", "61e5b2be1827")}</summary><div className="human-intervention-detail" dangerouslySetInnerHTML={{ __html: L.richTextHTML(note.detail) }} /></details>}
-    {note.kind === "secret" && !note.resolved_at && <SecretHandoffForm note={note} disabled={disabled} sending={sending} onHandoff={onHandoff} />}
+    {note.kind === "secret" && !note.resolved_at && (secretReceived && !replacingSecret
+      ? <div className="secret-handoff-received" role="status"><WorkIcon name="check" /><span>{nextWord("secretHandoffReceived")}</span><button type="button" disabled={disabled} onClick={() => { onReplace(); setReplacingSecret(true) }}>{nextWord("secretHandoffReplace")}</button></div>
+      : <SecretHandoffForm note={note} disabled={disabled} sending={sending} onHandoff={onHandoff} />)}
     {note.kind !== "secret" && <div className="human-intervention-drafts" role="group" aria-label={catalogWord("inline", "c4636462e1de")} aria-busy={sending}>
       <h4>{catalogWord("inline", "c4636462e1de")}</h4>
       <p className="human-intervention-hint">{composeOnly ? catalogWord("literal", "981ea9fd14d5") : catalogWord("literal", "3e129c69ac26")}</p>
@@ -362,6 +412,6 @@ function SecretHandoffForm({ note, disabled, sending, onHandoff }: {
     <textarea ref={field} id={`secret-handoff-${note.id}`} rows={5} required disabled={disabled}
       placeholder={nextWord("secretHandoffPlaceholder")} autoComplete="off" autoCapitalize="off" spellCheck={false} data-1p-ignore="" data-lpignore="true" data-bwignore="" />
     <p>{nextWord("secretHandoffPrivacy")}</p>
-    <button type="submit" disabled={disabled || sending}>{nextWord("secretHandoffSubmit")}</button>
+    <button type="submit" disabled={disabled || sending}>{sending ? <><span className="human-interventions-spinner" aria-hidden="true" />{nextWord("secretHandoffSending")}</> : nextWord("secretHandoffSubmit")}</button>
   </form>
 }
