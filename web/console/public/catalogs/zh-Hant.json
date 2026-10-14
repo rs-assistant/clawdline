@@ -4367,7 +4367,7 @@
   "next.secretHandoffReplace": "重新交付",
   "next.cloudMachinesNoneNext": "請在已安裝 Clawdline 的機器開啟「設定 → 遠端」，啟用 Cloud，再從那台機器配對這個瀏覽器。",
   "next.cloudMachinesRecovery": "恢復機器清單",
-  "next.sessionsITermScanOff": "設定已關閉 iTerm2 掃描，因此直接在 iTerm2 開啟的 session 不會顯示在這裡。若要顯示，請到設定開啟「讀取 iTerm2 分頁」。",
+  "next.screenITermScanOff": "設定已關閉「讀取 iTerm2 分頁」，因此無法讀取這個 session 的 iTerm2 畫面。若要在這裡查看畫面，請開啟該設定。",
   "projects.activityInProgress": "{n} 項進行中",
   "projects.activityLastKnown": "上次紀錄：{n}",
   "projects.activityNone": "目前無進行中項目",
