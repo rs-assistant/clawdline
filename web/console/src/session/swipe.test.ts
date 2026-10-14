@@ -87,6 +87,17 @@ test("one row is open at a time, and the press that closes one opens nothing", (
   assert.equal(s.tookThePress(), false, "asked once, answered once")
 })
 
+test("pressing the body of an open row dismisses its actions without opening the Session", () => {
+  const s = new Swipes()
+  s.begin("a", 300, 400, 0)
+  s.move(180, 400, 16)
+  s.end()
+  assert.equal(s.tookThePress(), true)
+  assert.equal(s.tookRowPress("a"), true)
+  assert.equal(s.openId(), null)
+  assert.equal(s.tookRowPress("a"), false, "the next press may open the Session")
+})
+
 test("a gesture that moved the row is not a press on the row", () => {
   const s = new Swipes()
   s.begin("a", 300, 400, 0)

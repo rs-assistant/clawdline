@@ -300,6 +300,14 @@ export class Swipes {
     return took
   }
 
+  /** A press on an uncovered row's body dismisses its actions instead of opening it. */
+  tookRowPress(id: string): boolean {
+    if (this.tookThePress()) return true
+    if (this.opened !== id) return false
+    this.closeOpen()
+    return true
+  }
+
   /** React's seam: `useSyncExternalStore(swipes.subscribe, swipes.openId)`. */
   subscribe = (watch: () => void): (() => void) => {
     this.watchers.add(watch)
