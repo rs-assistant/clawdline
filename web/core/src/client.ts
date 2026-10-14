@@ -170,6 +170,11 @@ export class ClawdlineClient {
    * A row that did not open says why in its own `code`; the call as a whole
    * only rejects when the daemon refused the request.
    */
+  /** Remove one archive shortcut, leaving the assistant's transcript intact. */
+  forgetArchived(conversation: string, request: string): Promise<{ ok: boolean; conversation_id: string }> {
+    return this.post(routes.forgetArchived, { conversation }, { "Idempotency-Key": request })
+  }
+
   restoreArchived(conversations: string[], request: string): Promise<RestoreArchivedAnswer> {
     return this.post(routes.restoreArchived, { conversations }, { "Idempotency-Key": request })
   }

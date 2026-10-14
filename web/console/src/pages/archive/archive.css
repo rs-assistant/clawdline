@@ -27,7 +27,13 @@
 .archive-when { color: var(--faint); font-size: 12px; line-height: 1.6; font-variant-numeric: tabular-nums; }
 .archive-outcome { margin: 2px 0 0; color: var(--dim); font-size: 12.5px; line-height: 1.6; overflow-wrap: anywhere; }
 .archive-outcome[data-failed] { color: var(--bad); }
-.archive-restore { align-self: center; min-height: 40px; white-space: nowrap; }
+.archive-actions { display: flex; gap: 8px; align-self: center; }
+.archive-actions .board-button { min-height: 40px; white-space: nowrap; }
+.archive-forget { color: var(--bad); }
+.archive-forget-confirm { grid-column: 1 / -1; margin-top: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
+.archive-forget-confirm p { margin: 8px 0; color: var(--dim); line-height: 1.6; }
+.archive-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.archive-forget-go { color: var(--bad); }
 
 .archive-empty { margin: 16px 0 0; color: var(--faint); font-size: 13px; line-height: 1.6; }
 .archive-failure { margin: 16px 0 0; color: var(--bad); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
@@ -44,5 +50,5 @@
 @media (max-width: 640px) {
     .archive-page { padding-inline: 16px; }
     .archive-entry { grid-template-columns: auto minmax(0, 1fr); padding: 14px; }
-    .archive-restore { grid-column: 1 / -1; justify-self: stretch; margin-top: 6px; }
+    .archive-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; margin-top: 6px; }
 }

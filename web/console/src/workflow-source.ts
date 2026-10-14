@@ -18,9 +18,6 @@ export function workflowSourceText(file: ProjectFile, language: Language): { tit
     : workflowWordFor(language, "skillPrompt", { name: title }) }
 }
 
-export function workflowSourceMatches(saved: { body: string; source: WorkflowSource }, file: ProjectFile): boolean {
-  if (file.id !== saved.source.file_id || file.kind !== saved.source.kind || file.status !== "ready") return false
-  const current = workflowSourceTitle(file)
-  if (saved.source.name !== current) return false
-  return (["en", "zh-Hant"] as const).some((language) => saved.body === workflowSourceText(file, language).body)
+export function workflowSourceMatches(saved: { source: WorkflowSource }, file: ProjectFile): boolean {
+  return file.id === saved.source.file_id && file.kind === saved.source.kind && file.status === "ready"
 }

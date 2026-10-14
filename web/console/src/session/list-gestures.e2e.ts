@@ -1798,11 +1798,13 @@ test("a phone links a command with fixed text and replaces that text when linkin
     assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Global Review/)
     assert.doesNotMatch(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /release-now/)
     assert.match(await tab.run(`document.querySelector('.workflow-source-link')?.textContent`), /Global Review/)
-    await tab.press('.workflow-source-row button:nth-of-type(3)')
+    assert.equal(await tab.run(`document.querySelector('.workflow-source-row [title="從來源更新"]') === null`), true)
+    assert.equal(await tab.run(`document.querySelector('.workflow-source-unlink')?.getAttribute('aria-label')`), '移除連結')
+    await tab.press('.workflow-source-unlink')
     assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.readOnly || document.querySelector('.workflow-editor textarea')?.readOnly`), false)
   }))
 
-test("an older linked Workflow can replace mismatched text from its source", () =>
+test("a linked Workflow uses the current source without a manual update", () =>
   inTab(async (tab) => {
     workflowTodo = null
     workflowRecords = [{ id: "00000000-0000-4000-8000-000000000102", title: "Sprint", body: "Run /sprint", scope: "workflow",
@@ -1823,29 +1825,14 @@ test("an older linked Workflow can replace mismatched text from its source", () 
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
-        if (document.querySelector('.workflow-source-mismatch')) return resolve(true)
-        if (Date.now() > deadline) return reject(new Error('mismatched source was not identified'))
+        if (document.querySelector('.workflow-editor textarea')?.value.includes('Global Review')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('current source text was not shown'))
         setTimeout(look, 25)
       }; look()
     })`)
-    await tab.press('.workflow-source-row button:nth-of-type(2)')
-    await tab.run(`new Promise((resolve, reject) => {
-      const deadline = Date.now() + 8000
-      const look = () => {
-        if (document.querySelector('.workflow-editor input')?.value === 'Sprint' && document.querySelector('.workflow-editor textarea')?.value.includes('Global Review')) return resolve(true)
-        if (Date.now() > deadline) return reject(new Error('linked Workflow text did not update'))
-        setTimeout(look, 25)
-      }; look()
-    })`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), 'Sprint')
     assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Global Review/)
-    await tab.run(`new Promise((resolve, reject) => {
-      const deadline = Date.now() + 8000
-      const look = () => {
-        if (!document.querySelector('.workflow-source-mismatch')) return resolve(true)
-        if (Date.now() > deadline) return reject(new Error('source mismatch warning stayed after sync'))
-        setTimeout(look, 25)
-      }; look()
-    })`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-source-mismatch') === null`), true)
     await tab.run(`location.hash = ${JSON.stringify("session=" + encodeURIComponent(SAFE))}`)
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
@@ -1869,13 +1856,22 @@ test("an older linked Workflow can replace mismatched text from its source", () 
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
-        if (/來源|source/i.test(document.querySelector('.workflow-launch [role="status"]')?.textContent || '')) return resolve(true)
-        if (Date.now() > deadline) return reject(new Error('Session did not warn about mismatched source'))
+        if (!document.querySelector('.workflow-start')?.disabled) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('current source was not accepted'))
         setTimeout(look, 25)
       }; look()
     })`)
-    assert.equal(await tab.run(`document.querySelector('.workflow-start')?.disabled`), true)
-    assert.equal(workflowTodo, null)
+    await tab.press('.workflow-start')
+    await new Promise<void>((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (workflowTodo) return resolve()
+        if (Date.now() > deadline) return reject(new Error('Workflow did not start'))
+        setTimeout(look, 25)
+      }; look()
+    })
+    assert.match(String((workflowTodo as Row | null)?.text), /Global Review/)
+    assert.doesNotMatch(String((workflowTodo as Row | null)?.text), /Run \/sprint/)
   }))
 
 test("a phone imports a linked global Skill, starts it, and sees its durable progress", () =>

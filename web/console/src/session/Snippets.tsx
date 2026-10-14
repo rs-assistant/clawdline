@@ -43,7 +43,7 @@ import { createDirectTodoV2, directTodoActionV2 } from "../pages/work/api.js"
 import { workflowTodoText } from "./workflow-run.js"
 import { workflowWord as W } from "../workflow-words.js"
 import { readProjectFile } from "../pages/projects/project-files-api.js"
-import { workflowSourceMatches } from "../workflow-source.js"
+import { workflowSourceMatches, workflowSourceText, workflowSourceTitle } from "../workflow-source.js"
 import "./workflow.css"
 
 /**
@@ -159,7 +159,8 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const [selectedWorkflow, setSelectedWorkflow] = useState<Snippet | null>(null)
   const [startingWorkflow, setStartingWorkflow] = useState(false)
   const [workflowError, setWorkflowError] = useState("")
-  const [workflowSourceStatus, setWorkflowSourceStatus] = useState<"checking" | "ready" | "mismatch" | "unavailable" | "scope">("checking")
+  const [workflowSourceStatus, setWorkflowSourceStatus] = useState<"checking" | "ready" | "unavailable" | "scope">("checking")
+  const [workflowPreview, setWorkflowPreview] = useState<{ id: string; body: string; name: string; version: string } | null>(null)
   const [projectUnresolved, setProjectUnresolved] = useState(false)
   const [answer, setAnswer] = useState<SnippetAnswer | null>(answered[row.id] ?? null)
   const [loading, setLoading] = useState(!answered[row.id])
@@ -205,12 +206,17 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
 
   useEffect(() => {
     const source = currentWorkflow?.source
+    setWorkflowPreview(null)
     if (!currentWorkflow || !source) { setWorkflowSourceStatus("ready"); return }
     if (!currentWorkflow.project && source.scope === "project") { setWorkflowSourceStatus("scope"); return }
     let live = true
     setWorkflowSourceStatus("checking")
     readProjectFile(source.place_id, source.file_id).then((answer) => {
-      if (live) setWorkflowSourceStatus(workflowSourceMatches({ body: currentWorkflow.body, source }, answer.file) ? "ready" : "mismatch")
+      if (!live) return
+      if (!workflowSourceMatches({ source }, answer.file)) { setWorkflowSourceStatus("unavailable"); return }
+      setWorkflowPreview({ id: currentWorkflow.id, name: workflowSourceTitle(answer.file), version: answer.version,
+        body: workflowSourceText(answer.file, document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en").body })
+      setWorkflowSourceStatus("ready")
     }).catch(() => { if (live) setWorkflowSourceStatus("unavailable") })
     return () => { live = false }
   }, [currentWorkflow])
@@ -218,6 +224,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const startWorkflow = async () => {
     if (error || !currentWorkflow || (projectUnresolved && (!!currentWorkflow.project || currentWorkflow.builtin === "zero_review")) || startingWorkflow) return
     setStartingWorkflow(true); setWorkflowError("")
+    let launchBody = currentWorkflow.body
     if (currentWorkflow.source) {
       if (!currentWorkflow.project && currentWorkflow.source.scope === "project") {
         setWorkflowError(W("sourceScopeConflict")); setStartingWorkflow(false); return
@@ -225,13 +232,20 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       try {
         const source = currentWorkflow.source
         const answer = await readProjectFile(source.place_id, source.file_id)
-        if (!workflowSourceMatches({ body: currentWorkflow.body, source }, answer.file)) {
-          setWorkflowError(W("sourceNeedsSync")); setStartingWorkflow(false); return
+        if (!workflowSourceMatches({ source }, answer.file)) {
+          setWorkflowError(W("sourceStartUnavailable")); setStartingWorkflow(false); return
+        }
+        launchBody = workflowSourceText(answer.file,
+          document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en").body
+        if (!workflowPreview || workflowPreview.id !== currentWorkflow.id || workflowPreview.body !== launchBody ||
+            workflowPreview.name !== workflowSourceTitle(answer.file) || workflowPreview.version !== answer.version) {
+          setWorkflowPreview({ id: currentWorkflow.id, name: workflowSourceTitle(answer.file), version: answer.version, body: launchBody })
+          setWorkflowError(W("sourceChangedReview")); setStartingWorkflow(false); return
         }
       } catch { setWorkflowError(W("sourceStartUnavailable")); setStartingWorkflow(false); return }
     }
     try {
-      const text = workflowTodoText(currentWorkflow.id, currentWorkflow.title, currentWorkflow.body)
+      const text = workflowTodoText(currentWorkflow.id, currentWorkflow.title, launchBody)
       const created = await createDirectTodoV2(row.id, text)
       await directTodoActionV2(row.id, created.todo.id, "send")
       document.dispatchEvent(new CustomEvent("clawdline:workflow-started"))
@@ -624,15 +638,15 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
               <h3 className="snippet-group-title">{global ? W("global") : W("projectOnly")}</h3>
               {group.map((item) => <button type="button" key={item.id} className="workflow-picker-row"
                 aria-pressed={currentWorkflow?.id === item.id} onClick={() => { setSelectedWorkflow(item); setWorkflowError("") }}>
-                <strong>{item.title}</strong>{item.source && <small>{item.source.kind === "command" ? W("claudeCommand") : "Skill"} · {item.source.name}</small>}<span>{item.body}</span>
+                <strong>{item.title}</strong>{item.source && <small>{item.source.kind === "command" ? W("claudeCommand") : "Skill"} · {item.source.name}</small>}<span>{item.source ? W("linkedPickerHint") : item.body}</span>
               </button>)}
             </div>
           })}
         </div>}
         {tab === "workflow" && currentWorkflow && <div className="workflow-launch">
-          <span className="workflow-launch-label">{W("reviewLaunch")}</span><h3>{currentWorkflow.title}</h3><p>{currentWorkflow.body}</p>
-          {currentWorkflow.source && <p className="workflow-launch-source">{currentWorkflow.source.kind === "command" ? W("claudeCommand") : "Skill"} · {currentWorkflow.source.name}</p>}
-          {currentWorkflow.source && workflowSourceStatus !== "ready" && <p role="status">{W(workflowSourceStatus === "checking" ? "sourceChecking" : workflowSourceStatus === "mismatch" ? "sourceNeedsSync" : workflowSourceStatus === "scope" ? "sourceScopeConflict" : "sourceStartUnavailable")}</p>}
+          <span className="workflow-launch-label">{W("reviewLaunch")}</span><h3>{currentWorkflow.title}</h3><p>{currentWorkflow.source ? workflowPreview?.id === currentWorkflow.id ? workflowPreview.body : W("sourceChecking") : currentWorkflow.body}</p>
+          {currentWorkflow.source && <p className="workflow-launch-source">{currentWorkflow.source.kind === "command" ? W("claudeCommand") : "Skill"} · {workflowPreview?.id === currentWorkflow.id ? workflowPreview.name : currentWorkflow.source.name}</p>}
+          {currentWorkflow.source && workflowSourceStatus !== "ready" && <p role="status">{W(workflowSourceStatus === "checking" ? "sourceChecking" : workflowSourceStatus === "scope" ? "sourceScopeConflict" : "sourceStartUnavailable")}</p>}
           {workflowError && <p role="alert">{workflowError}</p>}
         </div>}
         <p className="said" id="snippets-said" role="status" aria-live="polite">

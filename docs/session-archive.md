@@ -56,6 +56,7 @@ writes 451 transcripts and resumes the oldest: `Resume` refuses it, `ResumeRecor
 | `POST /v1/sessions/{id}/archive` | a device that may send, with an `Idempotency-Key` | body `{force?, expected_closeability_version?}`; answers `{ok, id, action: "archived", forced?, archived: ArchivedSession}` |
 | `GET /v1/sessions/archived` | any paired device | `{sessions: [ArchivedSession], at}`, most recently archived first |
 | `POST /v1/sessions/archived/restore` | a device that may send, with an `Idempotency-Key` | body `{conversations: [id…]}`; one result per distinct id: `{conversation_id, ok, code?, message?, id?, backend?, attach?}` |
+| `POST /v1/sessions/archived/forget` | a device that may send, with an `Idempotency-Key` | body `{conversation: id}`; removes one archive row and answers `{ok, conversation_id}` |
 
 `ArchivedSession` is `{conversation_id, assistant, place, place_label, cwd, title, persona?, icon?,
 archived_at}`. `icon` is computed when the list is read, from `cwd`, by the same registry the
@@ -72,9 +73,9 @@ transcript is the one thing a resume must not do), `place_unavailable`, `convers
 `open_failed` or `over_capacity`. Only a row that opened is removed. A list longer than the batch
 bound is refused whole with `archive_batch_too_large`.
 
-Clawdline Cloud carries the three as the relay words `archive-session` (on the Session's own
+Clawdline Cloud carries the four as the relay words `archive-session` (on the Session's own
 channel, as `end` is; `force` and `expected_closeability_version` are optional),
-`archived-sessions` and `restore-archived`. The archive route rereads the same identity,
+`archived-sessions`, `restore-archived` and `forget-archived`. The archive route rereads the same identity,
 terminal state, Board items, and to-dos as close immediately before it starts.
 
 The bounds — 500 archived conversations and 20 per restore — are registered as
@@ -83,8 +84,7 @@ The bounds — 500 archived conversations and 20 per restore — are registered 
 
 ## What is not covered
 
-- **There is no forget.** A row goes when it is restored or pushed out past the bound; nothing
-  removes one by hand.
+- **Forget removes only the archive row.** The assistant’s original transcript stays on disk and may still appear in its history. The page confirms this distinction before sending the request.
 - **The model is not recorded.** A restored Session starts with the assistant's default model, as
   a reboot restore does.
 - **A dropped row is not announced.** Past 500 the oldest row goes and the diagnostics count says
@@ -109,6 +109,6 @@ The bounds — 500 archived conversations and 20 per restore — are registered 
   leaving the list, because `archive_not_recorded` arrives after the close.
 - **The Archive page** (`pages/archive.tsx`, drawer row 封存) lists `GET /v1/sessions/archived`
   with each entry's mark, title in the row's tint, folder, assistant, persona and when it was
-  archived, and restores one conversation per press. An entry leaves only when it opened.
+  archived, and restores one conversation per press. An entry leaves when it opened or when the person confirms removing its archive record.
 - The three relay words are carried (`cloud/carry.ts`), wired in `cloud/relay-writer.ts`.
 - `session/archive.e2e.ts` drives the whole path on a 390px phone.
