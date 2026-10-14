@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -390,6 +391,15 @@ func (s *Server) startPlace(w http.ResponseWriter, r *http.Request, id, assistan
 		writePlaceRefusal(w, http.StatusNotFound, "not_found", "No place named that", "")
 		return
 	}
+	if assistantNeedsSignIn(ctx, assistant) {
+		name := "Claude Code"
+		if assistant == projects.AssistantCodex {
+			name = "Codex"
+		}
+		writePlaceRefusal(w, http.StatusConflict, "assistant_sign_in_required",
+			name+" is installed but not signed in. Sign in on this machine, then retry this Session.", name)
+		return
+	}
 	made, err := starter.Start(ctx, place, assistant, model, "", persona)
 	if err != nil {
 		code := writeStartRefusal(w, err)
@@ -402,6 +412,53 @@ func (s *Server) startPlace(w http.ResponseWriter, r *http.Request, id, assistan
 	writeJSON(w, contract.PlaceStarted{OK: true, ID: made.ID, Backend: contract.Backend(made.Backend),
 		Assistant: assistant, Model: made.Model, Persona: persona, Place: place.ID, CWD: place.Path, Attach: made.Attach,
 		At: time.Now().Unix()})
+}
+
+// A known signed-out CLI needs a guided retry before opening its tmux pane.
+// Unknown answers from older CLIs are left to the regular start path.
+func assistantNeedsSignIn(parent context.Context, assistant string) bool {
+	if assistant == projects.AssistantClaude && (os.Getenv("ANTHROPIC_API_KEY") != "" ||
+		os.Getenv("ANTHROPIC_AUTH_TOKEN") != "" || os.Getenv("CLAUDE_CODE_USE_BEDROCK") != "" ||
+		os.Getenv("CLAUDE_CODE_USE_VERTEX") != "" || os.Getenv("CLAUDE_CODE_USE_FOUNDRY") != "") ||
+		assistant == projects.AssistantCodex && os.Getenv("OPENAI_API_KEY") != "" {
+		return false
+	}
+	name := "claude"
+	args := []string{"auth", "status", "--json"}
+	if assistant == projects.AssistantCodex {
+		name, args = "codex", []string{"login", "status"}
+	}
+	path, err := exec.LookPath(name)
+	if err != nil {
+		home, _ := os.UserHomeDir()
+		for _, dir := range []string{home + "/.local/bin", home + "/.claude/local", "/opt/homebrew/bin", "/usr/local/bin"} {
+			candidate := filepath.Join(dir, name)
+			if st, statErr := os.Stat(candidate); statErr == nil && st.Mode()&0111 != 0 {
+				path = candidate
+				break
+			}
+		}
+	}
+	if path == "" {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(parent, 3*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, path, args...)
+	command.Env = append(os.Environ(), "LC_ALL=C")
+	output, err := command.CombinedOutput()
+	if ctx.Err() != nil {
+		return false
+	}
+	if assistant == projects.AssistantCodex {
+		return err != nil && strings.TrimSpace(string(output)) == "Not logged in"
+	}
+	var status struct {
+		LoggedIn    *bool  `json:"loggedIn"`
+		APIProvider string `json:"apiProvider"`
+	}
+	return json.Unmarshal(output, &status) == nil && status.APIProvider == "firstParty" &&
+		status.LoggedIn != nil && !*status.LoggedIn
 }
 
 func (s *Server) resumePlace(w http.ResponseWriter, r *http.Request, id, assistant, conversation, persona string) {

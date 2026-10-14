@@ -118,15 +118,17 @@ export function streamURL(id: string, tab: string): string {
 
 /** What this machine says about terminals and platform capability. */
 export interface TerminalMachine {
+  os?: string
   capability?: PlatformCapability
   terminals?: TerminalDiagnostics
 }
 
 export async function readTerminalMachine(signal?: AbortSignal): Promise<TerminalMachine> {
-  const d = await call<{ platform?: { capabilities?: PlatformCapability[] }; terminals?: TerminalDiagnostics }>(
+  const d = await call<{ platform?: { os?: string; capabilities?: PlatformCapability[] }; terminals?: TerminalDiagnostics }>(
     "/v1/diagnostics", { signal },
   )
   return {
+    os: d.platform?.os,
     capability: d.platform?.capabilities?.find((c) => c.name === "terminal"),
     terminals: d.terminals,
   }

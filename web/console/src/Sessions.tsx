@@ -243,7 +243,7 @@ export function SessionsPage({
       : !live
         ? [T.webEmptyWaitTitle, T.webEmptyWaitHint]
         : emptyAuthoritative
-          ? [T.noSession, T.webEmptyNoneHint]
+          ? [T.noSession, nextWord("firstSessionEmptyHint")]
           : sourceFailure
             ? [nextWord("sessionsListIncompleteTitle"), sourceFailure]
             : [nextWord("sessionsListWaitTitle"), nextWord("sessionsListWaitHint")]
@@ -333,6 +333,11 @@ export function SessionsPage({
                 <>
                   <b>{said.current[0]}</b>
                   {said.current[1]}
+                  {homeEmpty && emptyAuthoritative && live && (
+                    <button className="chip" type="button" onClick={() => Start.open()}>
+                      {nextWord("firstSessionStart")}
+                    </button>
+                  )}
                 </>
               ) : null}
             </div>

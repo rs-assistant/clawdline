@@ -12,6 +12,7 @@ Nothing here needs reading to use the app. It is here because most of it is a de
 have gone the other way, and a decision with no reason written down is one the next person deletes.
 
 - [Which session it sends to](#which-session-it-sends-to)
+- [Starting the first Session](#starting-the-first-session)
 - [Running under `tmux -CC`](#running-under-tmux--cc)
 - [When there is no tmux server yet](#when-there-is-no-tmux-server-yet)
 - [Which session wants you](#which-session-wants-you)
@@ -21,6 +22,21 @@ have gone the other way, and a decision with no reason written down is one the n
 - [Dropping in a file or an image](#dropping-in-a-file-or-an-image)
 - [The notch](#the-notch)
 - [Browsing mascots](#browsing-mascots)
+
+## Starting the first Session
+
+An authoritative empty Session list offers a Start button. Start reads the selected machine's
+Projects and available assistants. The Add Project picker browses existing folders on that
+machine and registers the chosen folder only after confirmation. It does not create folders.
+This route works in the local and hosted console; a hosted browser does not show the local Mac
+App setup link.
+
+If Projects cannot be read, Start shows a retry instead of claiming that there are none. If
+there is no available AI tool, it explains the missing dependency. On a local Mac, the App can
+guide Codex installation or sign-in; on other systems the console names the machine where the
+tool needs attention. A start request rejects only a proven signed-out assistant, with a reason
+to sign in and retry; an older CLI without a supported status command proceeds to the ordinary
+start path. The Session appears in the list after the assistant starts.
 
 ## Which session it sends to
 

@@ -1,8 +1,8 @@
 # Install and first run
 
-After this page Clawdline runs on your machine as a service that starts at login, the console
-is open in your browser, and one Claude Code or Codex session shows in its list. Each step ends
-with a check.
+After this page Clawdline runs on your machine as a service that starts at login and the console
+is open. You can start the first Claude Code or Codex Session from the console after choosing an
+existing work folder. Each step ends with a check.
 
 ## Before you start
 
@@ -50,8 +50,8 @@ signature, and runs `clawdline setup` from it, which:
 
 Each check prints one ✓ line; `--verbose` adds the paths and versions behind it. The install ends
 with a **Next:** block: how to sign in (on a machine with no desktop, the address and the
-`ssh -L` line that reaches it from your laptop), how to start an assistant inside tmux, and how to
-turn autostart off or remove Clawdline, each with `--port` when you chose another port.
+`ssh -L` line that reaches it from your laptop), how to start an assistant, and how to turn
+autostart off or remove Clawdline, each with `--port` when you chose another port.
 
 "Next" in `Clawdline Next.app`, `clawdline-next.service` and `~/.config/clawdline-next` is this
 generation's internal name; the product is Clawdline.
@@ -101,7 +101,21 @@ until it has been used. On a machine with no desktop, reach it over an SSH port 
 
 ## 3. Put a session in the list
 
-The daemon finds sessions running in tmux (and iTerm2 on a Mac). Start one:
+On a desktop, the empty Session list has **Start your first Session**. In the Start panel, choose
+**Add Project**, browse to an existing work folder and confirm its registration. Select that
+Project and Claude Code or Codex, then start. The Session opens here once it appears in the
+list. The folder picker registers an existing folder; it does not create a new one. Create a
+work folder in Finder or your file manager first if you have none.
+
+If Project loading fails, the panel says so and offers a retry. If an AI tool is missing on a Mac,
+**Open AI tool setup** opens the installed Clawdline App, where you can confirm an installation of
+Codex or open the Claude Code guide. Codex sign-in shows a one-time code and opens OpenAI's login
+page; you finish sign-in in the browser, then retry the Project. A CLI status command that cannot
+answer is not treated as proof you are signed out. On Linux or a headless machine, install and
+sign in to the AI tool on that machine, then retry in the console.
+
+The daemon also finds sessions already running in tmux (and iTerm2 on a Mac). To start one from a
+terminal instead:
 
 ```sh
 tmux new -s work
