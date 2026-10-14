@@ -38,12 +38,27 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/cloud/commands",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/cloud/devices/revoke",
       "guide": "cloud"
     },
     {
       "method": "*",
+      "pattern": "/v1/cloud/enabled",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/cloud/keys/rotate",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/cloud/login",
       "guide": "cloud"
     },
     {

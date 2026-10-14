@@ -6,7 +6,7 @@ import { CLOSE_EXECUTION_CHANGED } from "../overlays/events.js"
 import { BRAND_MARK } from "../brand-mark.js"
 import type { ConnectionLight } from "../connection-state.js"
 import * as L from "../legacy/bridge.js"
-import { nextWord } from "../next-strings.js"
+import { nextWord, type NextWord } from "../next-strings.js"
 import { bootCatalog } from "../catalog.js"
 import { cardsAreFor } from "../session/send.js"
 import { namesSession, sessionFragment } from "../session/address.js"
@@ -231,6 +231,27 @@ function platformWord(platform: ReturnType<typeof machineIdentityFacts>["platfor
     default:
       return nextWord("cloudMachinePlatformUnknown")
   }
+}
+
+/** Each fact has a separate witness; a relay login never implies pairing or permission. */
+function machineAccessFacts(machine: CloudMachine): string[] {
+  const online = machine.freshness === "current"
+  const paired = machine.pairing === "paired"
+  const operation = paired && online && machine.operationAllowed === true
+  const reason: NextWord = !paired
+    ? machine.pairing === "unknown" ? "cloudAccessPairUnknown" : "cloudAccessPairRequired"
+    : !online
+      ? machine.freshness === "unknown" ? "cloudAccessOnlineUnknown" : "cloudAccessOffline"
+      : machine.operationAllowed === false
+        ? "cloudAccessCommandsOff"
+        : "cloudAccessCommandsUnknown"
+  return [
+    nextWord("cloudAccessSignedIn"),
+    nextWord(online ? "cloudAccessOnline" : machine.freshness === "stale" ? "cloudAccessOffline" : "cloudAccessOnlineUnknown"),
+    nextWord(paired ? "cloudAccessPaired" : machine.pairing === "not_paired" ? "cloudAccessNotPaired" : "cloudAccessPairUnknown"),
+    nextWord(paired ? "cloudAccessCanView" : "cloudAccessCannotView"),
+    nextWord(operation ? "cloudAccessCanOperate" : "cloudAccessCannotOperate", operation ? undefined : { reason: nextWord(reason) }),
+  ]
 }
 
 /**
@@ -1134,6 +1155,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       if (machineList.phase !== "ready") return machineList
       const visible = withAccountNames(machineList.machines, names, described, present)
         .filter((machine) => !forgotten.includes(machine.id))
+        .map((machine) => {
+          const operation = client.current?.machineDescriptor?.(machine.id)?.machine?.operation_allowed
+          return { ...machine, operationAllowed: typeof operation === "boolean" ? operation : null }
+        })
       return visible.length ? { ...machineList, machines: visible } : { phase: "empty_authoritative" }
     },
     // `described` reads the client, which changes only with a new line and
@@ -1249,7 +1274,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // under the ones it can, each with its Pair press, so pairing another
   // machine does not mean finding the full machine screen first.
   const quickUnpaired = shown.phase === "ready"
-    ? shown.machines.filter((machine) => !machine.selectable && machine.pairing === "not_paired")
+    ? shown.machines.filter((machine) => !machine.selectable && machine.pairing !== "paired")
     : []
 
   // The machines a schedule may be on are the ones this switcher offers, in
@@ -1545,6 +1570,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               failedReason: typeof answer.failed_reason === "string" ? answer.failed_reason : "",
             }
           },
+          canScan: cloudOnboardingMode(window) === "pwa",
+          onScan: readInvitation,
         }
       : null
   // Once drawn, the console stays: the copied modules bind to the document
@@ -1748,7 +1775,8 @@ function GateCard(props: {
         className="door-card"
         role={question || nameQuestion ? "alertdialog" : "dialog"}
         aria-modal="true"
-        aria-label="clawdline"
+        aria-label={pairing ? undefined : "clawdline"}
+        aria-labelledby={pairing ? "cloud-pair-title" : undefined}
         aria-busy={forgetting || renaming ? "true" : undefined}
         aria-describedby={question ? "cloud-forget-say" : nameQuestion ? "cloud-rename-say" : undefined}
       >
@@ -2075,7 +2103,7 @@ function GateCard(props: {
                   const count = sessionsFact(m)
                   const name = m.name || m.label || m.id
                   const identity = machineIdentityFacts(m)
-                  const pairable = m.pairing === "not_paired"
+                  const pairable = m.pairing !== "paired"
                   return (
                     <li
                       key={m.id}
@@ -2108,6 +2136,7 @@ function GateCard(props: {
                               ? T.webDeviceOnline
                               : T.webStartMachineStale}
                         </span>
+                        <span className="cloud-machine-access">{machineAccessFacts(m).join(" · ")}</span>
                         <FleetUpdateRow
                           client={updateClient}
                           machine={m}

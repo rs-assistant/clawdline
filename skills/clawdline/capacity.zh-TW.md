@@ -42,6 +42,7 @@
 | `cloud.peer_outbox` | 512 | `rows` | `refuse` | `diagnostics, notice, health` | — |
 | `cloud.peer_pairs` | 128 | `rows` | `refuse` | `diagnostics, notice, health` | — |
 | `cloud.relay_queue` | 64 | `rows` | `refuse` | `diagnostics, notice, cloud_status, log, sender` | — |
+| `cloud.reload_stop_seconds` | 15 | `seconds` | `refuse` | `diagnostics, sender, log` | — |
 | `cloud.session_row_asks` | 64 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `cloud.session_row_id_bytes` | 256 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `cloud.session_row_volatile_seconds` | 15 | `seconds` | `expire` | `diagnostics` | — |

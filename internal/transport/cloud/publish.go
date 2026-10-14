@@ -113,6 +113,9 @@ type Publisher struct {
 	// before offering one: an older daemon says nothing here, so no offer is
 	// ever sent to one and every read of it stays on the relay.
 	SessionCarrierV1 bool
+	// OperationAccess is the current per-machine write switch. Its second
+	// return distinguishes a readable off from an unreadable setting.
+	OperationAccess func() (allowed bool, known bool)
 	// Router is this daemon's own routes — the same in-process dispatch a Cloud
 	// read goes through, so the rows a viewer sees are the rows the local
 	// console sees.
@@ -781,6 +784,11 @@ func (p *Publisher) publishDescriptor(ctx context.Context) {
 		"at":      time.Now().Unix(),
 		"app":     appStamp,
 		"machine": machine,
+	}
+	if p.OperationAccess != nil {
+		if allowed, known := p.OperationAccess(); known {
+			snapshot["machine"].(map[string]any)["operation_allowed"] = allowed
+		}
 	}
 	// A machine with no task a viewer can reach publishes the descriptor it
 	// always did. The hosted console replaces a machine's whole snapshot with

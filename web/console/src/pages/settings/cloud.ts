@@ -64,6 +64,7 @@ export type CloudStatus = {
   machine_name?: string
   fingerprint?: string
   last_error?: string
+  last_error_kind?: string
   last_error_at?: number
   last_close?: string
   connected_since?: number
@@ -87,6 +88,15 @@ export type CloudStatus = {
   pinned_error?: string
   pairing?: CloudPairing
   commandset?: string[]
+}
+
+export type CloudLogin = {
+  phase: "idle" | "waiting" | "complete" | "failed"
+  user_code?: string
+  verification_url?: string
+  expires_at?: number
+  next_poll_at?: number
+  code?: string
 }
 
 /**
@@ -138,6 +148,22 @@ async function cloudCall<T>(method: string, path: string, body?: unknown): Promi
     throw new Error(catalogFormat("template", "75357881ddad", [path, res.status]))
   }
   return parsed as T
+}
+
+export function readCloudLogin(): Promise<CloudLogin> {
+  return cloudCall<CloudLogin>("GET", "/v1/cloud/login")
+}
+
+export function startCloudLogin(replace = false): Promise<CloudLogin> {
+  return cloudCall<CloudLogin>("POST", "/v1/cloud/login", replace ? { replace: true } : undefined)
+}
+
+export function setCloudEnabled(enabled: boolean): Promise<{ enabled: boolean }> {
+  return cloudCall("POST", "/v1/cloud/enabled", { enabled })
+}
+
+export function setCloudCommands(enabled: boolean): Promise<{ commands: boolean }> {
+  return cloudCall("POST", "/v1/cloud/commands", { enabled })
 }
 
 /** Show a fresh one-time link. Whatever was waiting is replaced. */
