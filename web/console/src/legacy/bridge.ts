@@ -24,7 +24,7 @@ import { currentCloseability, currentCloseabilityBadge, currentCloseabilityShape
 import { S } from "./js/core/state.js"
 import { T, applyStrings, fill, words } from "./js/core/i18n.js"
 import { atMac as atMacOriginal, hasKeyboard } from "./js/core/env.js"
-import { generatedMark as generatedMarkOriginal, markForSession as markForSessionOriginal, projectLabel as projectLabelOriginal } from "./js/view/project-mark.js"
+import { generatedMark as generatedMarkOriginal, projectLabel as projectLabelOriginal } from "./js/view/project-mark.js"
 import { copyForUserMessages } from "./js/view/user-messages-data.js"
 import { copyCodeBlock, inlineMd, richText } from "./js/view/markdown.js"
 import { boardWorkflowRecordHTML, parseBoardWorkflowRecord } from "./js/view/board-workflow-record.js"
@@ -251,8 +251,14 @@ export const assistantIconsOn = (): boolean => !!(S as Record<string, unknown>).
 /* The detail head's helpers, from the copied modules. */
 /** Whether this page is being read on the Mac that serves it. */
 export const atMac = atMacOriginal as () => boolean
-/** A session's project mark, falling back to a generated one as the original does. */
-export const markForSession = markForSessionOriginal as (session: unknown, projectKey?: string) => (Icon & { generated?: boolean }) | null
+/** The machine's Project mark for a Session, when its presentation has arrived. */
+// The daemon always supplies a Project icon, including its deterministic
+// fallback. A missing icon in a partial Cloud presentation means the answer
+// has not arrived, not that the browser should invent another identity.
+export const markForSession = (session: unknown, _projectKey?: string): (Icon & { generated?: boolean }) | null => {
+  const row = session as { icon?: Icon | null } | null
+  return row?.icon?.cells?.length ? row.icon : null
+}
 export const projectLabel = projectLabelOriginal as (key: string | undefined) => string
 export const generatedMark = generatedMarkOriginal as (key: string | undefined) => (Icon & { generated?: boolean }) | null
 /** The "my messages" copy in the page's language, from that module's own table. */
