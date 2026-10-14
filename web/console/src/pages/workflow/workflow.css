@@ -83,8 +83,8 @@
   .workflow-empty { padding: 2rem 1.2rem; }
   .workflow-empty .workflow-actions { display: grid; }
   .workflow-skill-picker { min-width: 0; }
-  .workflow-editor { padding: 0; align-items: end; }
-  .workflow-editor form { width: 100%; max-height: 95dvh; border-radius: 1rem 1rem 0 0; }
+  .workflow-editor { padding: 1rem; }
+  .workflow-editor form { width: 100%; max-height: calc(100dvh - 2rem); }
   .workflow-skill-overlay { padding: 0; align-items: end; }
   .workflow-skill-dialog { width: 100%; max-height: 92dvh; border-radius: 1rem 1rem 0 0; }
 }

@@ -1934,6 +1934,11 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
     await tab.press('.workflow-project-menu button')
     await tab.press('.workflow-empty .workflow-primary')
     assert.equal(await tab.run(`document.activeElement?.matches('.workflow-editor input')`), false)
+    assert.equal(await tab.run(`(() => {
+      const overlay = document.querySelector('.workflow-editor').getBoundingClientRect()
+      const form = document.querySelector('.workflow-editor form').getBoundingClientRect()
+      return form.top > 0 && Math.abs((form.top - overlay.top) - (overlay.bottom - form.bottom)) <= 2
+    })()`), true)
     await tab.run(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }))`)
     assert.equal(await tab.run(`document.activeElement?.matches('.workflow-editor .workflow-actions button:last-child')`), true)
     assert.match(await tab.run(`document.querySelector('.workflow-scope label')?.textContent`), /Clawdline|clawdline/)
