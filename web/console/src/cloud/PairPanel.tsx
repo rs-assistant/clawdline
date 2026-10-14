@@ -189,19 +189,6 @@ export function PairPanel(props: {
               <p className="cloud-pair-status">{nextWord("cloudPairStatusUnpaired")}</p>
               <p className="fine">{nextWord("cloudPairWaysIntro")}</p>
               <div className="cloud-pair-ways">
-                <article data-recommended={selectedHelper ? undefined : "true"}>
-                  <div className="cloud-pair-way-head">
-                    <h3>{nextWord("cloudPairFromMachineTitle")}</h3>
-                    {!selectedHelper && <span>{nextWord("cloudPairRecommended")}</span>}
-                  </div>
-                  <p>{nextWord("cloudPairFromMachineWhen")}</p>
-                  <ol>
-                    <li>{nextWord("cloudPairFromMachineStep1")}</li>
-                    <li>{nextWord("cloudPairFromMachineStep2")}</li>
-                  </ol>
-                  <code>clawdline cloud pair</code>
-                  <p className="cloud-pair-success">{nextWord("cloudPairFromMachineSuccess")}</p>
-                </article>
                 <article data-recommended={selectedHelper ? "true" : undefined}>
                   <div className="cloud-pair-way-head">
                     <h3>{selectedHelper && asked ? nextWord("cloudPairCloudHand") : nextWord("cloudPairFromBrowserTitle")}</h3>
@@ -228,7 +215,7 @@ export function PairPanel(props: {
                     </>
                   )}
                   <button
-                    className="chip cloud-pair-generate"
+                    className="go cloud-pair-generate"
                     type="button"
                     id="cloud-pair-go"
                     ref={first}
@@ -239,6 +226,19 @@ export function PairPanel(props: {
                   >
                     {asked && selectedHelper ? nextWord("cloudPairCloudHand") : nextWord("cloudPairGenerate")}
                   </button>
+                </article>
+                <article data-recommended={selectedHelper ? undefined : "true"}>
+                  <div className="cloud-pair-way-head">
+                    <h3>{nextWord("cloudPairFromMachineTitle")}</h3>
+                    {!selectedHelper && <span>{nextWord("cloudPairRecommended")}</span>}
+                  </div>
+                  <p>{nextWord("cloudPairFromMachineWhen")}</p>
+                  <ol>
+                    <li>{nextWord("cloudPairFromMachineStep1")}</li>
+                    <li>{nextWord("cloudPairFromMachineStep2")}</li>
+                  </ol>
+                  <code>clawdline cloud pair</code>
+                  <p className="cloud-pair-success">{nextWord("cloudPairFromMachineSuccess")}</p>
                 </article>
               </div>
               <p className="fine cloud-pair-protection">{nextWord("cloudPairWhy")}</p>
