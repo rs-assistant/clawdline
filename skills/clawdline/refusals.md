@@ -59,6 +59,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `epic_children_open` | `internal/domain/work/v2.go` |
 | `epic_not_planned` | `internal/domain/work/v2.go` |
 | `event_conflict` | `internal/transport/http/squad_events.go` |
+| `execution_check_unavailable` | `internal/transport/http/sessions.go` |
 | `execution_generation_changed` | `internal/transport/http/cloud_peer.go` |
 | `execution_target_required` | `internal/transport/http/images.go` |
 | `expired` | `internal/transport/http/auth.go` |

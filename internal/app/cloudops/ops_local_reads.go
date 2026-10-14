@@ -9,13 +9,28 @@ func init() {
 		// MARK: reads with a local capability
 		op{name: "sessions.list", read: true,
 			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request") {
+				if !b.hasOneOf([]string{"type", "session", "request"},
+					[]string{"type", "session", "request", "fresh"}) {
 					return plan{}, false
 				}
-				return machinePlan(b)
+				p, ok := machinePlan(b)
+				if !ok {
+					return plan{}, false
+				}
+				if value, named := b["fresh"]; named {
+					p.fresh, ok = value.(bool)
+					if !ok || !p.fresh {
+						return plan{}, false
+					}
+				}
+				return p, true
 			},
-			route: func(plan) LocalRequest {
-				return LocalRequest{Method: "GET", Path: "/v1/sessions", Query: map[string]string{"parts": "list"}}
+			route: func(p plan) LocalRequest {
+				query := map[string]string{"parts": "list"}
+				if p.fresh {
+					query["fresh"] = "1"
+				}
+				return LocalRequest{Method: "GET", Path: "/v1/sessions", Query: query}
 			}},
 
 		op{name: "skills", read: true,

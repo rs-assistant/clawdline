@@ -88,6 +88,8 @@ export interface CloudWriteClient extends CloudReadClient {
   /** Machines that have shown `cloud_status.v >= 1` (§11.4). */
   readonly macCapabilities?: Set<string>
   machineDescriptor?(machine: string): RememberedDescriptor | null
+  /** An authenticated, uncached list from the machine, when it supports pinned reads. */
+  listPresentationsForMachine?(machine: string, signal: AbortSignal, options?: { fresh?: boolean }): Promise<unknown>
   send(identity: CloudIdentity, text: string, images: string[]): Promise<unknown>
   answer(identity: CloudIdentity, answer: string): Promise<unknown>
   end(identity: CloudIdentity, acceptLoss: boolean, closeabilityVersion: string): Promise<unknown>
@@ -1948,8 +1950,18 @@ export class RelayWriter {
       identity = { machine: exact.machineID, session: exact.sessionID }
       generation = exact.executionGeneration
     } else {
-      const row = await this.row(client, session)
-      if (!row) {
+      // The classic list is a retained rich-row replay. A retry after an
+      // execution changes must not reuse its old generation: ask the machine
+      // directly before sending words, as opening its current row does.
+      const fresh = word === "send" && client.listPresentationsForMachine
+        ? await this.freshSendGeneration(client, session) : null
+      const row = fresh ? null : await this.row(client, session)
+      if (fresh) {
+        identity = { machine: this.host.machine, session }
+        generation = fresh
+      } else if (word === "send" && client.listPresentationsForMachine) {
+        throw failure("session_unknown", "The machine cannot verify this Session now.", 409)
+      } else if (!row) {
         // A newly started Session can reach the verified status projection before
         // the rich-row replay. Recheck that exact execution before addressing it.
         const projected = await this.host.resolveSession?.(this.host.machine, session)
@@ -1986,6 +1998,27 @@ export class RelayWriter {
       throw failure("cloud_machine_unsupported", "This machine cannot provide durable session receipts.", 501)
     }
     return { identity, generation, client: ready }
+  }
+
+  private async freshSendGeneration(client: CloudWriteClient, session: string): Promise<string | null> {
+    let reply: unknown
+    try {
+      reply = await client.listPresentationsForMachine!(this.host.machine, new AbortController().signal, { fresh: true })
+    } catch {
+      throw failure("execution_check_unavailable", "The machine's current Session list could not be read.", 503)
+    }
+    const sessions = (reply as { sessions?: unknown } | null)?.sessions
+    if (!Array.isArray(sessions)) {
+      throw failure("execution_check_unavailable", "The machine's current Session list is invalid.", 503)
+    }
+    const matches = sessions.filter((item: unknown) => item && typeof item === "object" &&
+      (item as { id?: unknown }).id === session)
+    if (matches.length !== 1) return null
+    const generation = (matches[0] as { execution_generation?: unknown }).execution_generation
+    if (typeof generation !== "string" || !/^[0-9a-f]{32}$/.test(generation)) {
+      throw failure("execution_generation_required", "The current Session execution generation is unavailable.", 409)
+    }
+    return generation
   }
 
   private fleetTarget(session: string): { machineID: string; sessionID: string; executionGeneration: string } | null {

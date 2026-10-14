@@ -1073,13 +1073,13 @@ export class StatusCloudClient extends CatalogCloudClient {
   }
 
   /** The list gets only a pinned title; full detail stays on the opened Session. */
-  listPresentationsForMachine(machineID, signal) {
+  listPresentationsForMachine(machineID, signal, options = {}) {
     if (!machineID || signal?.aborted) {
       return Promise.reject(refused("execution_target_required", "a machine is required"))
     }
     const request = crypto.randomUUID()
     return this._read({ machine: machineID, session: "__clawdline_machine__" }, "sessions.list", {
-      machine_id: machineID, request,
+      machine_id: machineID, request, ...(options.fresh ? { fresh: true } : {}),
     }, "read:" + request, PINNED_LIST_READ_TIMEOUT_MS, { signal })
   }
 
