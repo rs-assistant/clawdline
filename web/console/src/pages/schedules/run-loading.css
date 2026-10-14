@@ -1,0 +1,15 @@
+#schedule-history-run-now[data-loading]::before {
+    content: "";
+    display: inline-block;
+    width: 0.8em; height: 0.8em;
+    margin-right: 0.45em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    vertical-align: -0.08em;
+    animation: schedule-run-spin 0.8s linear infinite;
+}
+@keyframes schedule-run-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    #schedule-history-run-now[data-loading]::before { animation: none; }
+}
