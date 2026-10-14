@@ -32,6 +32,7 @@
  *
  * Nothing is imported at run time, so `node --test` loads it as it is.
  */
+import type { CloudMachine } from "./copied.js"
 
 /** One machine as the account names it. */
 export interface AccountName {
@@ -42,6 +43,7 @@ export interface AccountName {
 /** The account's authoritative machine roster, including registrations it revoked. */
 export interface AccountMachineRoster {
   names: Map<string, AccountName>
+  registered: Map<string, AccountName>
   revoked: Set<string>
 }
 
@@ -57,6 +59,7 @@ type Get = (url: string, init?: RequestInit) => Promise<{ status: number; json()
 /** The account's names for its machines, by id; empty when it would not say. */
 export async function accountMachineRoster(apiOrigin: string, get: Get = fetch): Promise<AccountMachineRoster | null> {
   const names = new Map<string, AccountName>()
+  const registered = new Map<string, AccountName>()
   const revoked = new Set<string>()
   try {
     const res = await get(apiOrigin + "/v1/machines", { credentials: "include" })
@@ -70,13 +73,18 @@ export async function accountMachineRoster(apiOrigin: string, get: Get = fetch):
         continue
       }
       const name = typeof row.name === "string" ? row.name.trim() : ""
-      if (!name) continue
-      names.set(row.id, { name, platform: typeof row.platform === "string" ? row.platform : "" })
+      const account = { name, platform: typeof row.platform === "string" ? row.platform : "" }
+      registered.set(row.id, account)
+      if (name) names.set(row.id, account)
+    }
+    for (const id of revoked) {
+      names.delete(id)
+      registered.delete(id)
     }
   } catch {
     return null
   }
-  return { names, revoked }
+  return { names, registered, revoked }
 }
 
 /** Compatibility for callers that only need labels and can tolerate no account answer. */
@@ -90,6 +98,27 @@ interface Row {
   name?: string
   label: string
   kind?: string
+}
+
+/**
+ * A registered machine stays visible even when this browser has received no
+ * decryptable relay envelope from it. Account registration proves its identity
+ * and label, but says nothing about pairing, presence, or session access.
+ */
+export function withAccountRegistrations(
+  rows: readonly CloudMachine[],
+  registered: ReadonlyMap<string, AccountName>,
+  present: (id: string, name: string, platform: string) => { name: string; label: string; kind: string },
+): CloudMachine[] {
+  const result = [...rows]
+  const seen = new Set(rows.map((row) => row.id))
+  for (const [id, account] of registered) {
+    if (seen.has(id)) continue
+    const shown = present(id, account.name, account.platform)
+    result.push({ id, ...shown, observedAt: null, freshness: "unknown", pairing: "unknown",
+      selectable: false, autoSelectable: false })
+  }
+  return result
 }
 
 /**
