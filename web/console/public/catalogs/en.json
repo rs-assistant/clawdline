@@ -4278,7 +4278,6 @@
   "next.sendDiagnosticUnavailable": "Could not record diagnostics; try again after reconnecting",
   "next.secretHandoffError": "The handoff did not complete. Check the Session before trying again.",
   "next.secretHandoffLabel": "Secret value",
-  "next.secretHandoffMultiline": "Multi-line credential",
   "next.secretHandoffName": "Secret Handoff",
   "next.secretHandoffNoticeError": "The value was received, but the Session was not notified. Send a message naming this Secret Handoff Note.",
   "next.secretHandoffPlaceholder": "Paste the requested password or key",

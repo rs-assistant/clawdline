@@ -4,8 +4,8 @@ Use **Secret Handoff** when a Session needs a password, credential, or API key f
 
 ## Hand off a value
 
-1. Open the Session that asked for the value. Check the Note's title, reason, and Session name before entering anything.
-2. In the **Secret Handoff** Note, paste the value into **Secret value**. The normal field hides one-line values. Choose **Multi-line credential** before pasting a certificate or other multi-line value; that field shows the text while you enter it.
+1. Open the Session that asked for the value. Check its name, the Note's title and reason, and the credential name shown directly beneath the Note title. The requesting agent sets that name.
+2. Paste the value into the **Secret value** field. The field always accepts one-line and multi-line values and shows the text while you enter it; check your surroundings before pasting.
 3. Select **Hand off securely**. The confirmation says the machine received the value. It does not display the value again.
 4. The named Session can use the value once, within 15 minutes. After it uses the value, the Note moves to handled. If the machine restarts or the time runs out first, ask the Session for a fresh Secret Handoff Note.
 
