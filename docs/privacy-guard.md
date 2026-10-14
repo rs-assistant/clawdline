@@ -42,6 +42,13 @@ deduplicates them, and the commit is put back onto a finding afterwards.
 `--all` is what you want before making the repository public, because every branch and tag goes
 with it.
 
+The release gate also scans every unpacked archive with `-dir`. Its bundled tmux includes
+libevent's public upstream `LICENSE`, copied from the SHA-256-pinned libevent source archive.
+That file contains its authors' public email addresses. Only the `email` rule is exempted when
+`licenses/libevent.txt` has the exact pinned license digest; a changed byte loses the exemption,
+and all other rules, including the person's private-word list, still scan that file. This
+exception applies only to `-dir`, never to a repository tree or history scan.
+
 ## Four answers, and why the fourth one exists
 
 | Exit | Answer | What it means |
