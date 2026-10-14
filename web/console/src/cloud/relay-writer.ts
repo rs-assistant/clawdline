@@ -302,6 +302,7 @@ export type WriteRoute =
   | { op: "archive"; word: Carried<"archive-session">; session: string }
   | { op: "archived"; word: Carried<"archived-sessions"> }
   | { op: "restore-archived"; word: Carried<"restore-archived"> }
+  | { op: "forget-archived"; word: Carried<"forget-archived"> }
   // Things waiting to be verified. Machine words, not session ones: a record
   // belongs to the machine, and the page that reads it holds no session.
   | { op: "verification-read"; word: Carried<"verification.list" | "verification.get">; id: string }
@@ -750,6 +751,7 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   // The same for the archive: `archived` is not a session id.
   if (head === "sessions" && a === "archived" && segments.length === 3) {
     if (b === "restore") return { op: "restore-archived", word: "restore-archived" }
+    if (b === "forget") return { op: "forget-archived", word: "forget-archived" }
     return null
   }
   if (head === "sessions" && a && segments.length === 3) {
@@ -934,6 +936,7 @@ function spellingOf(route: WriteRoute): Spelling {
     // and `/v1/sessions/archived*` refuses flat too (docs/session-archive.md).
     case "archived":
     case "restore-archived":
+    case "forget-archived":
       return "flat"
     default:
       return "nested"
@@ -1394,6 +1397,14 @@ export class RelayWriter {
           throw failure("cloud_not_carried", `${url.pathname}?${key}= is not carried over Clawdline Cloud: read it on the machine.`, 501)
         }
         return client._machineRequest(this.host.machine, route.word, {}, "read")
+      }
+      case "forget-archived": {
+        const request = headerOf(init, "idempotency-key")
+        if (!request) throw failure("bad_request", `${route.word} needs an Idempotency-Key`, 400)
+        if (typeof client._machineRequestAs !== "function") throw failure("cloud_not_carried", route.word, 501)
+        const sent = await bodyOf(init)
+        return client._machineRequestAs(request, this.host.machine, route.word,
+          { conversation: sent.conversation }, "action")
       }
       case "restore-archived": {
         // One resume per conversation, as `restore` below: the press's key is

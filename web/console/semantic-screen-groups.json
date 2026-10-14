@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5153,
-  "riskKeys": 2262,
-  "nonRiskCount": 2891,
+  "englishContentKeys": 5160,
+  "riskKeys": 2267,
+  "nonRiskCount": 2893,
   "groups": [
     {
       "name": "bar / other",
@@ -1609,7 +1609,7 @@
     },
     {
       "name": "next / archive",
-      "count": 13,
+      "count": 15,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1617,6 +1617,8 @@
         "next.archiveAnyway",
         "next.archiveDone",
         "next.archiveEyebrow",
+        "next.archiveForgetCancel",
+        "next.archiveForgetSay",
         "next.archiveGo",
         "next.archiveLoading",
         "next.archiveNamedTitle",

@@ -165,6 +165,7 @@ export const CARRIED = {
   "archive-session": "POST /v1/sessions/{id}/archive",
   "archived-sessions": "GET /v1/sessions/archived",
   "restore-archived": "POST /v1/sessions/archived/restore",
+  "forget-archived": "POST /v1/sessions/archived/forget",
   "coordination.leases": "GET /v1/orchestrator/leases",
   "coordination.waits": "GET /v1/orchestrator/waits",
   "coordination.pauses": "GET /v1/orchestrator/pauses",
