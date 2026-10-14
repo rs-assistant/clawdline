@@ -9,7 +9,10 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -144,6 +147,14 @@ func (s *Server) transcribe(w http.ResponseWriter, r *http.Request) {
 	seconds := float64(len(samples)) / float64(whisper.Rate*2)
 
 	if err != nil {
+		if errors.Is(err, whisper.ErrNoBinary) {
+			// A missing binary is decided by the machine that received this recording.
+			// Record the search inputs at the refusal, without audio or transcript.
+			log.Printf("audit voice.binary_missing os=%s configured=%s arm_brew=%s intel_brew=%s path=%s",
+				runtime.GOOS, voiceBinaryPathState(engine.Binary),
+				voiceBinaryPathState("/opt/homebrew/bin/whisper-cli"),
+				voiceBinaryPathState("/usr/local/bin/whisper-cli"), voiceBinaryLookPath())
+		}
 		// Written where every other refusal on this daemon is written, and
 		// without one character of what was said: the seconds and the failure
 		// are the whole of what a person diagnosing this needs.
@@ -162,6 +173,40 @@ func (s *Server) transcribe(w http.ResponseWriter, r *http.Request) {
 	// said", and "nothing" is an answer to that; a 4xx here would have a page
 	// apologising for a microphone that was working perfectly.
 	writeJSON(w, contract.VoiceResult{Text: text, Ms: ms})
+}
+
+func voiceBinaryPathState(path string) string {
+	if path == "" {
+		return "unset"
+	}
+	link, err := os.Lstat(path)
+	if os.IsNotExist(err) {
+		return "absent"
+	}
+	if err != nil {
+		return "lstat_error"
+	}
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) && link.Mode()&os.ModeSymlink != 0 {
+		return "broken_link"
+	}
+	if err != nil {
+		return "stat_error"
+	}
+	if info.IsDir() {
+		return "directory"
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o111 == 0 {
+		return "not_executable"
+	}
+	return "executable"
+}
+
+func voiceBinaryLookPath() string {
+	if _, err := exec.LookPath("whisper-cli"); err == nil {
+		return "found"
+	}
+	return "missing"
 }
 
 // voiceSamples reads the body and decides everything that can be decided

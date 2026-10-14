@@ -85,6 +85,31 @@ export function statusChannel(envelope) {
 }
 
 export class StatusCloudClient extends CatalogCloudClient {
+  // The archived client chooses the voice host. Record that choice when the
+  // receiving machine says Whisper is missing, so a phone-only failure leaves
+  // evidence on the paired Mac without retaining audio or recognized words.
+  async voice(audio, rate) {
+    const host = this._voiceHost()
+    try {
+      return await super.voice(audio, rate)
+    } catch (error) {
+      if (error?.code === "no_whisper" && host.machine) {
+        try {
+          const reason = error.detail?.reason || error.reason || null
+          this.viewerEvents.record("cloud.voice.whisper_missing", {
+            target_machine: host.machine,
+            chosen: host.chosen,
+            candidates: host.candidates,
+            reason,
+            web_build: this.webBuild || null,
+          }, ["cloud.voice.whisper_missing", host.machine, reason].join("|"))
+          this._scheduleViewerEvents()
+        } catch { /* diagnostics cannot change the voice result */ }
+      }
+      throw error
+    }
+  }
+
   constructor(options) {
     super(options)
     // Retained rows from a previous connection may say "current" after that

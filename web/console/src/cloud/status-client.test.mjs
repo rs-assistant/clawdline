@@ -219,6 +219,22 @@ test("a paired Mac remains the voice host while its cached command list is incom
   await assert.rejects(client.voiceHost(), { code: "cloud_voice_host_unavailable" })
 })
 
+test("a missing Whisper refusal records the selected machine without recording speech", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  const rows = []
+  client._voiceHost = () => ({ machine: "mac-b", chosen: true, candidates: ["mac-a", "mac-b"] })
+  client._machineRequest = () => Promise.reject({ code: "no_whisper", detail: { reason: "no_binary" } })
+  client.viewerEvents = { record: (event, data) => rows.push({ event, data }) }
+  client._scheduleViewerEvents = () => {}
+  client.webBuild = "build"
+  await assert.rejects(client.voice("private-audio", 16000), { code: "no_whisper" })
+  assert.deepEqual(rows, [{ event: "cloud.voice.whisper_missing", data: {
+    target_machine: "mac-b", chosen: true, candidates: ["mac-a", "mac-b"],
+    reason: "no_binary", web_build: "build",
+  } }])
+  assert.doesNotMatch(JSON.stringify(rows), /private-audio/)
+})
+
 test("status recovery frees idle relay channels before declaring an event gap", async () => {
   const client = Object.create(StatusCloudClient.prototype)
   client.ready = true
