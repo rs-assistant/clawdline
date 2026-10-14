@@ -1,6 +1,4 @@
 import type { Icon, SessionRow } from "@clawdline/contract"
-// @ts-expect-error -- Node's strip-types test runner needs the source extension.
-import { conversationNotStarted } from "./session/readiness.ts"
 
 // The wordmark and every machine workspace Session share the same mark.
 export const BRAND_MARK: Icon = {
@@ -14,10 +12,10 @@ export function sessionName(row: SessionRow): string {
   return row.machine_scope || row.coordinator ? "Clawdfather" : row.label || row.tty || row.id
 }
 
-/** A just-opened pane has an identity before its display name reaches the list. */
+/** A pane can have a conversation identity before its display name reaches the list. */
 export function detailSessionName(row: SessionRow): string {
   if (row.machine_scope || row.coordinator) return sessionName(row)
-  if (conversationNotStarted(row) && (!row.label || row.label === row.id) && (!row.tty || row.tty === row.id)) {
+  if ((!row.label || row.label === row.id) && (!row.tty || row.tty === row.id)) {
     const assistant = row.assistant === "codex" ? "Codex" : row.assistant === "claude" ? "Claude" : "Assistant"
     return `${assistant} Session`
   }
