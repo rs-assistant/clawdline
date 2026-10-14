@@ -5,10 +5,12 @@ import type { ProjectUnifyApplied, ProjectUnifyPlan } from "@clawdline/contract"
 export interface ProjectFile {
   id: string
   name: string
+  title?: string
+  description?: string
   location: string
   source: "project" | "global"
   assistant: "codex" | "claude"
-  kind: "instruction" | "skill"
+  kind: "instruction" | "skill" | "command"
   status: "ready" | "missing" | "unsafe" | "unreadable" | "too_large"
   editable: boolean
   size?: number

@@ -2313,6 +2313,11 @@ func Register() []Entry {
 			Sources: []string{"internal/adapters/projectfiles.MaxFileBytes"},
 		},
 		{
+			Name: "projectfiles.skill_summary_runes", Class: Observation, Unit: Characters,
+			Limit: 240, AtLimit: EvictOldest, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/projectfiles.MaxSkillSummaryRunes"},
+		},
+		{
 			Name: "projectfiles.write_bytes", Class: Buffer, Unit: Bytes,
 			Limit: 256 << 10, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/adapters/projectfiles.MaxWriteBytes"},

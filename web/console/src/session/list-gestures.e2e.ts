@@ -426,9 +426,21 @@ function daemon(): Server {
       assistants: [{ id: "codex", label: "Codex" }],
     })
     if (path === "/v1/projects/project-fixture/files" && req.method === "GET") return json(res, 200, {
-      files: [{ id: "global-skill-fixture", name: "SKILL.md", location: "skills/global-review/SKILL.md",
-        source: "global", assistant: "codex", kind: "skill", status: "ready", editable: true }],
+      files: [{ id: "global-skill-fixture", name: "SKILL.md", title: "Global Review", description: "Review the work with evidence.", location: "skills/global-review/SKILL.md",
+        source: "global", assistant: "codex", kind: "skill", status: "ready", editable: true },
+      { id: "project-command-fixture", name: "release-now.md", title: "release-now", description: "Publish and verify a release.", location: ".claude/commands/release-now.md",
+        source: "project", assistant: "claude", kind: "command", status: "ready", editable: true }],
       truncated: false, skipped: [],
+    })
+    if (path === "/v1/projects/project-fixture/files/global-skill-fixture" && req.method === "GET") return json(res, 200, {
+      file: { id: "global-skill-fixture", name: "SKILL.md", title: "Global Review", description: "Review the work with evidence.",
+        location: "skills/global-review/SKILL.md", source: "global", assistant: "codex", kind: "skill", status: "ready", editable: true },
+      text: "---\nname: Global Review\ndescription: Review the work with evidence.\n---\n# Review steps\nCheck the evidence.", version: "fixture",
+    })
+    if (path === "/v1/projects/project-fixture/files/project-command-fixture" && req.method === "GET") return json(res, 200, {
+      file: { id: "project-command-fixture", name: "release-now.md", title: "release-now", description: "Publish and verify a release.",
+        location: ".claude/commands/release-now.md", source: "project", assistant: "claude", kind: "command", status: "ready", editable: true },
+      text: "---\ndescription: Publish and verify a release.\n---\n# Release now\nRun the publish and verification steps.", version: "fixture",
     })
     if (path === "/v1/snippets" && req.method === "GET") return json(res, 200, {
       project: url.searchParams.has("session") ? { key: "/tmp/fixture", label: "Clawdline" } : undefined,
@@ -1721,6 +1733,39 @@ test("an ordinary Session keeps the Snippets icon", () =>
     assert.equal(await tab.run(`document.getElementById('clawdfather-suggestions') === null`), true)
   }))
 
+test("a phone previews a Project Claude command by name and imports an editable Workflow draft", () =>
+  inTab(async (tab) => {
+    workflowRecords = []
+    await tab.go("/#page=workflow")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-skill-picker button:not(:disabled)')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Workflow sources did not arrive'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press('.workflow-skill-picker button')
+    const command = await tab.run(`[...document.querySelectorAll('.workflow-skill-options button')].find(button => button.textContent.includes('Release Now'))?.textContent`)
+    assert.match(command, /Claude 指令|Claude command/)
+    assert.match(command, /Publish and verify a release/)
+    assert.doesNotMatch(command, /\.claude\/commands|release-now\.md/)
+    await tab.press('.workflow-skill-options button:last-child')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-skill-content pre')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Command preview did not load'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-content pre')?.textContent`), /Run the publish and verification steps/)
+    await tab.press('.workflow-skill-dialog footer .workflow-primary')
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Release Now")
+    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /release-now/)
+    assert.doesNotMatch(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Run the publish and verification steps/)
+  }))
+
 test("a phone imports an available global Skill as editable Workflow text, starts it, and sees its durable progress", () =>
   inTab(async (tab) => {
     workflowRecords = []; workflowTodo = null; workflowSends = 0
@@ -1728,23 +1773,30 @@ test("a phone imports an available global Skill as editable Workflow text, start
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
-        if (document.querySelector('.workflow-actions select option[value="global-skill-fixture"]')) return resolve(true)
+        if (document.querySelector('.workflow-skill-picker button:not(:disabled)')) return resolve(true)
         if (Date.now() > deadline) return reject(new Error('Workflow Skill option did not arrive'))
         setTimeout(look, 25)
       }; look()
     })`)
-    assert.equal(await tab.run(`document.querySelector('.workflow-actions select')?.disabled`), false)
-    assert.equal(await tab.run(`document.querySelector('.workflow-actions select option[value="global-skill-fixture"]') !== null`), true)
-    const point = await tab.run(`(() => { const el = document.querySelector('.workflow-actions select'); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-skill-picker button')?.disabled`), false)
+    const point = await tab.run(`(() => { const el = document.querySelector('.workflow-skill-picker button'); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
     await tab.tap(point.x, point.y)
-    assert.equal(await tab.run(`document.activeElement?.matches('.workflow-actions select')`), true)
-    await tab.run(`(() => {
-      const select = document.querySelector('.workflow-actions select')
-      select.value = 'global-skill-fixture'
-      select.dispatchEvent(new Event('change', { bubbles: true }))
-    })()`)
-    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "global-review")
-    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /global-review/)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-options')?.textContent`), /Global Review/)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-options')?.textContent`), /Review the work with evidence/)
+    assert.doesNotMatch(await tab.run(`document.querySelector('.workflow-skill-options')?.textContent`), /SKILL\.md/)
+    await tab.press('.workflow-skill-options button')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-skill-content pre')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Skill preview did not load'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-content pre')?.textContent`), /Check the evidence/)
+    await tab.press('.workflow-skill-dialog footer .workflow-primary')
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "Global Review")
+    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /Global Review/)
     await tab.press('.workflow-editor button[type="submit"]')
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
@@ -1800,7 +1852,7 @@ test("a phone imports an available global Skill as editable Workflow text, start
     })`)
     assert.equal(workflowSends, 1)
     assert.match(String((workflowTodo as Row | null)?.text), /Clawdline-Workflow/)
-    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /global-review/)
+    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /Global Review/)
     await tab.shot("workflow-session-progress")
     await tab.press('.session-workflow-row summary')
     await tab.press('.session-workflow-row button')

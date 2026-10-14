@@ -212,6 +212,51 @@ func TestReportedTurnSaysWhichBoardItemAwaitsAcceptance(t *testing.T) {
 	}
 }
 
+func TestNewMessageSupersedesOnlyTheEarlierSessionReceipt(t *testing.T) {
+	p := &pane{s: session.Session{ID: "pane-9", Backend: session.BackendTmux, Assistant: session.AssistantClaude,
+		ConversationID: "10000000-0000-4000-8000-000000000009", State: session.StateIdle, PID: os.Getpid()}}
+	s := paneServer(t, p)
+	s.broker.Live = func(context.Context) []session.Session { return []session.Session{p.s} }
+	s.swift = swiftstore.Open(t.TempDir())
+	ctx := context.Background()
+	state := func() (contract.WorkState, *contract.WorkDisposition) {
+		t.Helper()
+		for _, row := range s.sessionsPayload(ctx).Sessions {
+			if row.ID == p.s.ID {
+				return row.WorkState, row.Disposition
+			}
+		}
+		t.Fatal("session row missing")
+		return "", nil
+	}
+	reportTurn(t, s, p.s.ID)
+	if got, receipt := state(); got != contract.WorkStateMilestoneComplete || receipt == nil {
+		t.Fatalf("first report: %s %+v", got, receipt)
+	}
+	if _, err := s.runs().Issue(ctx, p.s, "local", "Deploy this too"); err != nil {
+		t.Fatal(err)
+	}
+	if got, receipt := state(); got != contract.WorkStateReady || receipt != nil {
+		t.Fatalf("new work after report: %s %+v", got, receipt)
+	}
+	reportTurn(t, s, p.s.ID)
+	if got, receipt := state(); got != contract.WorkStateMilestoneComplete || receipt == nil {
+		t.Fatalf("new report after work: %s %+v", got, receipt)
+	}
+	resumed := p.s
+	resumed.ID = "previous-pane"
+	if _, err := s.runs().Issue(ctx, resumed, "local", "One more task after resuming"); err != nil {
+		t.Fatal(err)
+	}
+	if got, receipt := state(); got != contract.WorkStateReady || receipt != nil {
+		t.Fatalf("message from another terminal in the same conversation: %s %+v", got, receipt)
+	}
+	reportTurn(t, s, p.s.ID)
+	if got, receipt := state(); got != contract.WorkStateMilestoneComplete || receipt == nil {
+		t.Fatalf("resumed conversation reported again: %s %+v", got, receipt)
+	}
+}
+
 // A Board that cannot be read is unknown on the row, never none.
 func TestUnreadBoardIsUnknownAcceptanceNotNone(t *testing.T) {
 	if got := rowAcceptance("conversation", nil, errors.New("closed")); got.State != "unknown" {

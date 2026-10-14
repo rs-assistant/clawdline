@@ -18,9 +18,19 @@ The foreground path asks `GET /v1/update/fresh` (the separate `update-fresh` Clo
 progress polling uses cached `GET /v1/update`. A controlled release host first returned a signed
 v0.11.0 manifest to a v0.10.0 daemon, then 404: the cached route still reported
 `update_available`, while the fresh route returned `unknown`, no latest version, and
-`no_release_published`. These are browser and daemon contract checks. A real phone reopen,
-background return, completed update, and published withdrawal have not been observed together;
-the phone acceptance step remains open.
+`no_release_published`. These are browser and daemon contract checks.
+
+The paired iPhone then used the same isolated machine identity with a signed beta release
+install. The machine reported `update_available` for v0.10.2-test.1, and the person saw the
+hosted console's direct Update Now action. When the local test release host withdrew its
+`latest` manifest, the fresh daemon answer became `unknown` with `no_release_published`; the
+person reported that the update button was gone. After the test machine was switched to the
+signed v0.10.2-test.1 release and the manifest restored, the daemon reported `current` with
+identical running and latest stamps. The person reported no update button throughout a phone
+reload and background return. This checks the visible available, withdrawn, and installed
+states on the phone. The phone did not press the install action; release installation and
+post-update health were independently exercised in the installation matrix below. The
+withdrawal was a controlled local release-host change, not a public release withdrawal.
 
 ## Old daemon with current Cloud
 
@@ -31,14 +41,21 @@ isolated state root and connected to the production Cloud. Account approval retu
 identity, its daemon logged `cloud ready`, and `clawdline cloud pair` completed with an iPhone
 viewer whose browser and machine key fingerprints matched. The daemon subsequently logged that
 the paired viewer had been heard from. Production served the `ab82bd6e` hosted console with
-CloudGate during this run. These observations establish account login, pairing, and a live relay
-connection, but not the phone's terminal rendering or a command receipt.
+CloudGate during this run. Those first observations established account login, pairing, and a
+live relay connection; the later phone terminal observation and receipt are recorded below.
 
-The v0.10.0 terminal handler explicitly refuses its `/v1/terminals` route when reached through
-Cloud with `terminal_cloud_not_supported`. That source-level incompatibility is a reason to
-inspect the hosted console's actionable update prompt on the paired phone, not evidence that
-the phone showed it. The acceptance step remains open until the phone view and command receipts
-or the applicable incompatibility prompt have been observed end to end.
+The v0.10.0 terminal handler refuses generic Cloud HTTP `/v1/terminals` with
+`terminal_cloud_not_supported`; the hosted console uses the separate encrypted terminal
+channels. On 2026-10-13 the paired iPhone first showed `terminal_unsupported` in its terminal
+list. The daemon log identified the actual fixture fault: its terminal socket path was 123 bytes,
+above the 104-byte Unix socket limit. Restarting the same isolated v0.10.0 machine identity
+through a short state-directory symlink removed that fault. The iPhone then showed the empty
+terminal list, and, after a throwaway terminal was opened on the isolated daemon, sent
+`printf 'phone-ok\n'` from the hosted terminal view. The daemon's terminal history contained
+the command and its `phone-ok` output, while its Cloud terminal log recorded successful input
+receipts. These observations complete the phone terminal-view and command-receipt check for
+this old-daemon/new-Cloud pair. The socket-path failure was fixture setup, not evidence that
+the old daemon lacked the Cloud terminal protocol or needed an update prompt.
 
 ## Installation matrix
 

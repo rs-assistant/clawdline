@@ -159,6 +159,7 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `projectfiles.file_bytes` | 131072 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `projectfiles.list` | 128 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `projectfiles.scan_entries` | 1024 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `projectfiles.skill_summary_runes` | 240 | `characters` | `evict_oldest` | `diagnostics, sender` | — |
 | `projectfiles.tree_depth` | 64 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `projectfiles.tree_path_bytes` | 4096 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `projectfiles.write_bytes` | 262144 | `bytes` | `refuse` | `diagnostics, sender` | — |
