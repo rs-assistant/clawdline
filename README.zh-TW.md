@@ -12,6 +12,15 @@ Clawdline 是在 macOS 與 Linux 上執行的本機 daemon，附網頁主控台�
 把工作交給另一個，並證明結果真的合併進去了。Agent 與程式碼都留在你的機器上；選用的
 Clawdline Cloud 透過端對端加密的中繼，讓手機或其他機器連回來。
 
+**macOS 13+ 或 Linux 一行安裝：**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
+```
+
+指令會安裝經驗證的發行版並開啟本機主控台。要看到 Session，還需另行安裝並登入 Claude Code
+或 Codex。[安裝與首次使用](docs/user/install.md)
+
 工作不必一直占著同一輪對話。Session 可以把耗時命令交給常駐服務，等完成時再回來；Agent
 可以在 Session 的「關注」面板留下需要你處理的事；你也能先替忙碌中的 Session 記下待辦，
 不打斷它眼前的工作。
