@@ -442,6 +442,7 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
                                            injectionTime: .atDocumentStart,
                                            forMainFrameOnly: true))
         content.add(WeakMessageHandler(self), name: "shellSettings")
+        content.add(WeakMessageHandler(self), name: "shellAgentSetup")
         // The notch island listens to the same stream and opens this window
         // when its character is pressed (NotchIsland.swift).
         NotchIsland.shared.attach(to: content, open: { [weak self] in self?.showConsole() })
@@ -794,6 +795,14 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "shellAgentSetup" {
+            guard message.frameInfo.isMainFrame, message.webView === web,
+                  let page = web.url, page.scheme == home.scheme,
+                  page.host == home.host, page.port == home.port,
+                  !showingCloud else { return }
+            showAgentSetup()
+            return
+        }
         if message.name == "shellSettings" {
             settingsMessage(message)
             return
@@ -987,6 +996,13 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
         NSWorkspace.shared.open(URL(string: "https://github.com/sainteye/clawdline#readme")!)
     }
 
+    private func showAgentSetup() {
+        AgentSetupWindowController.shared.show { [weak self] in
+            guard let web = self?.web else { return }
+            web.evaluateJavaScript("window.dispatchEvent(new Event('clawdline:agent-setup-changed'))")
+        }
+    }
+
     /// clawdline-next://open, so a hotkey utility, Shortcuts or a script can
     /// summon the window without the built-in combination. Its own scheme: the
     /// Swift app owns clawdline://. Only what this app can do is answered.
@@ -996,8 +1012,10 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
         switch url.host ?? "" {
         case "toggle":
             toggleConsole()
-        case "", "open", "home", "setup":
+        case "", "open", "home":
             showConsole()
+        case "setup":
+            showAgentSetup()
         case "cloud-signed-in":
             // The browser sign-in's answer, when it reached the app rather than
             // the sign-in session that asked for it (Browser.swift). Without

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5153,
-  "riskKeys": 2262,
-  "nonRiskCount": 2891,
+  "englishContentKeys": 5163,
+  "riskKeys": 2268,
+  "nonRiskCount": 2895,
   "groups": [
     {
       "name": "bar / other",
@@ -1924,7 +1924,7 @@
     },
     {
       "name": "next / other",
-      "count": 137,
+      "count": 141,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1935,6 +1935,10 @@
         "next.commandNoPlanner",
         "next.devicesLedeAccount",
         "next.devicesThisMachine",
+        "next.firstSessionEmptyHint",
+        "next.firstSessionRetry",
+        "next.firstSessionRetryAgent",
+        "next.firstSessionStart",
         "next.fontScaleHint",
         "next.fontScaleLarger",
         "next.fontScaleReset",

@@ -92,6 +92,9 @@ let team = ""
 /** The persona chosen for the next resume from the place entered; "" for none. */
 let resumeAs = ""
 let loading = false
+let placesUnread = false
+let agentSignInRequired = false
+let startOS = ""
 let pressing: string | null = null
 let find = ""
 let resume = false
@@ -257,6 +260,7 @@ function ownWhy(e: Failure, reading?: "past"): string {
   }
   if (code === "cloud_not_carried") return nextWord("cloudNotCarried")
   if (code === "write_disabled") return T().webStartOff
+  if (code === "assistant_sign_in_required") return nextWord("firstSessionSignInRequired", { assistant: e.app || "AI tool" })
   if (code === "coordinator_online") return nextWord("machineSessionOnline")
   if (code === "coordinator_liveness_unknown") return nextWord("machineSessionUnknown")
   if (code === "coordinator_session_exists") return nextWord("machineSessionExists")
@@ -305,7 +309,7 @@ function when(unix: number | undefined): string {
 function drawWith(): void {
   const row = el("start-with")
   // No `machines` read on this transport, so the first half is always false.
-  row.hidden = assistants.length < 2 || !!at
+  row.hidden = assistants.length < 2 || !!at || !places?.length
   if (row.hidden) {
     row.innerHTML = ""
     return
@@ -465,7 +469,20 @@ function draw(): void {
   const box = el<HTMLInputElement>("start-filter")
   const machineAction = el<HTMLButtonElement>("start-machine-action")
   const projectActions = el("start-project-actions")
-  projectActions.hidden = machineOnly || mode !== "session" || !!at || !write
+  projectActions.hidden = machineOnly || mode !== "session" || !!at || !write || placesUnread
+  const agentHelp = el("start-agent-help")
+  const retry = el<HTMLButtonElement>("start-retry-places")
+  const setup = el<HTMLAnchorElement>("start-agent-setup")
+  const needsAgent = !!places?.length && assistants.length === 0 || agentSignInRequired
+  const localMac = !hostedConsole() && (startOS === "darwin" || !!(window as Window & {
+    webkit?: { messageHandlers?: { shellAgentSetup?: unknown } }
+  }).webkit?.messageHandlers?.shellAgentSetup)
+  retry.hidden = machineOnly || mode !== "session" || !(placesUnread || needsAgent)
+  retry.disabled = loading
+  retry.textContent = placesUnread ? nextWord("firstSessionRetry") : nextWord("firstSessionRetryAgent")
+  setup.hidden = machineOnly || mode !== "session" || !needsAgent || !localMac
+  agentHelp.hidden = machineOnly || mode !== "session" || !needsAgent
+  agentHelp.textContent = localMac ? nextWord("firstSessionAgentMacHint") : nextWord("firstSessionAgentOtherHint")
   const editProjects = el<HTMLButtonElement>("start-edit-projects")
   const editLabel = catalogWord("projects", editingProjects ? "editDone" : "editList")
   editProjects.setAttribute("aria-label", editLabel)
@@ -534,8 +551,12 @@ function draw(): void {
       ? T().webStartWaiting
       : loading && !places
         ? T().webLoading
-        : places && !places.length
+        : placesUnread
+          ? nextWord("firstSessionPlacesUnread")
+          : places && !places.length
           ? catalogWord("projects", "emptyAdd")
+          : places?.length && assistants.length === 0
+            ? nextWord("firstSessionAgentMissing")
           : "",
   )
 
@@ -552,7 +573,7 @@ function draw(): void {
     row.type = "button"
     row.className = "place"
     row.dataset.id = p.id
-    row.disabled = !!pressing || !!wait || editingProjects
+    row.disabled = !!pressing || !!wait || editingProjects || !with_
     if (pressing === p.id) row.dataset.busy = "1"
     row.innerHTML = '<canvas></canvas><span class="name"></span><span class="where"></span>'
 
@@ -674,6 +695,8 @@ function load(background = false): void {
   asked(() => api.places(onMachine?.id))
     .then((d) => {
       if (generation !== placesGeneration) return
+      placesUnread = false
+      said("")
       places = (d && d.places) || []
       assistants = (d && d.assistants) || []
       if (!with_ || !assistants.some((a) => a.id === with_)) {
@@ -682,8 +705,11 @@ function load(background = false): void {
     })
     .catch((e: Failure) => {
       if (generation !== placesGeneration) return
-      places = places || []
-      if (!background) said(why(e), e)
+      placesUnread = true
+      places = null
+      assistants = []
+      with_ = null
+      said(why(e), e)
     })
     .then(() => {
       if (generation !== placesGeneration) return
@@ -759,13 +785,14 @@ function press(id: string): void {
     })
     return
   }
-  if (pressing || wait || !write || typeof api.startPlace !== "function") return
+  if (pressing || wait || !write || !with_ || typeof api.startPlace !== "function") return
   const place = (places || []).find((p) => p.id === id) ?? null
   if (resume && resumable() && place) {
     enter(place)
     return
   }
   pressing = id
+  agentSignInRequired = false
   said("")
   draw()
   startPress.start()
@@ -786,6 +813,8 @@ function press(id: string): void {
         showProgress(null)
         if (e && e.code === "write_disabled") {
           write = false
+        } else if (e && e.code === "assistant_sign_in_required") {
+          agentSignInRequired = true
         } else if (e && e.code === "not_found") {
           places = null
           load()
@@ -914,10 +943,17 @@ function openMode(machine: boolean, requested: StartMode = "session", on: { id: 
   el("start-title").textContent = machine ? "Clawdfather" : T().webStart
   el("start").hidden = false
   said("")
+  placesUnread = false
+  agentSignInRequired = false
+  startOS = ""
   leave()
   persona = ""
   team = rememberedTeam()
   if (mode === "session") void loadPersonas(undefined, onMachine?.id ?? null).then(() => draw())
+  if (mode === "session" && !hostedConsole()) void readTerminalMachine().then((reading) => {
+    startOS = reading.os || ""
+    draw()
+  }).catch(() => { /* The App link stays hidden when the platform is unknown. */ })
   if (!wait) load()
   if (mode === "terminal") checkTerminalAccess()
   draw()
@@ -1087,6 +1123,13 @@ export function StartSheet() {
     const onInput = () => Start.typed(filter.value)
     const onScroll = () => Start.scrolled()
     const onAddProject = () => setFolderOpen(true)
+    const onRetryPlaces = () => { if (!loading) { placesUnread = false; agentSignInRequired = false; places = null; load() } }
+    const onAgentSetup = (ev: Event) => {
+      const handler = (window as Window & { webkit?: { messageHandlers?: { shellAgentSetup?: { postMessage: (body: unknown) => void } } } })
+        .webkit?.messageHandlers?.shellAgentSetup
+      if (handler && !hostedConsole()) { ev.preventDefault(); handler.postMessage({ kind: "open" }) }
+    }
+    const onAgentChanged = () => { if (!sheetHidden() && mode === "session") load(true) }
     const onEditProjects = () => { editingProjects = !editingProjects; draw() }
     const onList = (ev: Event) => {
       const remove = (ev.target as Element).closest?.<HTMLButtonElement>(".start-project-remove")
@@ -1116,7 +1159,7 @@ export function StartSheet() {
         return
       }
       if (ev.key === "Tab") {
-        const focusable = [...sheet.querySelectorAll<HTMLElement>('button:not([disabled]):not([hidden]):not([tabindex="-1"]), input:not([disabled]):not([hidden]), [tabindex]:not([tabindex="-1"])')]
+        const focusable = [...sheet.querySelectorAll<HTMLElement>('button:not([disabled]):not([hidden]):not([tabindex="-1"]), a[href]:not([hidden]), input:not([disabled]):not([hidden]), [tabindex]:not([tabindex="-1"])')]
           .filter((node) => !node.closest("[hidden]") && node.getClientRects().length > 0)
         if (!focusable.length) {
           ev.preventDefault()
@@ -1146,6 +1189,10 @@ export function StartSheet() {
     el("start-close").addEventListener("click", onClose)
     el("start-machine-action").addEventListener("click", onMachine)
     el("start-add-project").addEventListener("click", onAddProject)
+    el("start-retry-places").addEventListener("click", onRetryPlaces)
+    el("start-agent-setup").addEventListener("click", onAgentSetup)
+    window.addEventListener("clawdline:agent-setup-changed", onAgentChanged)
+    window.addEventListener("focus", onAgentChanged)
     el("start-edit-projects").addEventListener("click", onEditProjects)
     filter.addEventListener("input", onInput)
     list.addEventListener("scroll", onScroll, { passive: true })
@@ -1162,6 +1209,10 @@ export function StartSheet() {
       el("start-close")?.removeEventListener("click", onClose)
       el("start-machine-action")?.removeEventListener("click", onMachine)
       el("start-add-project")?.removeEventListener("click", onAddProject)
+      el("start-retry-places")?.removeEventListener("click", onRetryPlaces)
+      el("start-agent-setup")?.removeEventListener("click", onAgentSetup)
+      window.removeEventListener("clawdline:agent-setup-changed", onAgentChanged)
+      window.removeEventListener("focus", onAgentChanged)
       el("start-edit-projects")?.removeEventListener("click", onEditProjects)
       filter.removeEventListener("input", onInput)
       list.removeEventListener("scroll", onScroll)
@@ -1218,6 +1269,9 @@ export function StartSheet() {
             </div>
           </div>
           <ul className="places" id="start-list"></ul>
+          <button className="chip wide" id="start-retry-places" type="button" hidden>{nextWord("firstSessionRetry")}</button>
+          <a className="chip wide" id="start-agent-setup" href="clawdline-next://setup" hidden>{nextWord("firstSessionOpenSetup")}</a>
+          <p className="say" id="start-agent-help" hidden>{nextWord("firstSessionAgentOtherHint")}</p>
           <p className="said" id="start-said" role="status" aria-live="polite"></p>
         </div>
 

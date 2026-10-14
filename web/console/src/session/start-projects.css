@@ -11,6 +11,11 @@
 .start-project-actions button[aria-pressed="false"] .start-edit-done { display: none; }
 .start-project-actions button:focus-visible, .start-project-remove:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 #start-say:empty { display: none; }
+.sheet #start-retry-places[hidden],
+.sheet #start-agent-setup[hidden],
+.sheet #start-agent-help[hidden] { display: none; }
+.sheet #start-agent-setup { box-sizing: border-box; color: var(--ink); text-decoration: none; }
+.sheet #start-agent-setup:hover { text-decoration: underline; }
 #start-list[data-editing="1"] li { display: flex; align-items: center; min-width: 0; }
 #start-list[data-editing="1"] .place { flex: 1 1 auto; min-width: 0; opacity: 1; }
 .start-project-remove { display: grid; place-items: center; flex: 0 0 44px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--dim); padding: 0; cursor: pointer; }
