@@ -229,6 +229,24 @@ test("the list keeps each selected row's document identity", async () => {
   assert.deepEqual(documentIdentityForSession(snap.sessions, "s1", "cloud"), { machine: "mac-a", session: "s1" })
 })
 
+test("Cloud update status reads the selected machine and preserves its answer", async () => {
+  const client = new FakeClient()
+  const status = {
+    state: "update_available",
+    running: { version: "v0.10.0", stamp: "old" },
+    latest: { version: "v0.11.0", stamp: "new" },
+    apply: { state: "idle" },
+  }
+  client.readAnswer = async (word) => word === "update" ? status : { read: word }
+  const r = reader(client, { t: 1000 })
+  assert.deepEqual(await body(await r.fetch("/v1/update")), status)
+  assert.deepEqual(client.reads, [{ machine: "mac-a", word: "update", body: {} }])
+  const extra = await r.fetch("/v1/update?machine=mac-b")
+  assert.equal(extra.status, 501, "a query must not silently read another machine")
+  assert.equal((await body<{ error: string }>(extra)).error, "cloud_not_carried")
+  assert.equal(client.reads.length, 1)
+})
+
 test("the original page keeps rich titles only for current executions named by ss", async () => {
   const client = new FakeClient()
   const generation = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

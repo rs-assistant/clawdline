@@ -32,6 +32,7 @@ type Frame = { type: string; channels?: string[]; envelope?: { ch: string; body:
 class Relay {
   holds: string[] = []
   frames: Frame[] = []
+  snapshot = { sessions: [] as string[], complete: true }
   /** Called for each subscribe or unsubscribe before it is applied; may return a refusal code. */
   refuse: (frame: Frame) => string | null = () => null
   /** Called after a frame is applied: the lost-update race drops channels here. */
@@ -60,7 +61,8 @@ class Relay {
       this.say({ type: "ack", ch: frame.envelope!.ch, seq: this.seq, fanout: delivered ? 1 : 0, status: "delivered" })
       if (delivered) {
         this.say({ type: "envelope", envelope: { ch: REPLY, seq: this.seq, ts: Date.now(), sender: "mac-sender",
-          payload: { read: "read:" + body.request, body: { answered: body.type } } } })
+          payload: { read: "read:" + body.request, body: String(body.type).startsWith("sessions.snapshot")
+            ? this.snapshot : { answered: body.type } } } })
       }
       this.seq += 1
     }
@@ -119,6 +121,44 @@ async function settled(client: any) {
 function read(client: any) {
   return client._machineRequest(MACHINE, "projects", {}, "read") as Promise<{ answered: string }>
 }
+
+test("a complete empty snapshot settles a first Session list when its marker was lost", async () => {
+  const client = await connected(new Relay())
+  try {
+    const reader = new RelayReader(MACHINE)
+    reader.attach(client)
+    assert.equal((await reader.snapshot()).scan.emptyAuthoritative, false)
+    client._askSessionSnapshot(MACHINE, 1)
+    await settled(client)
+    assert.equal((await reader.snapshot()).scan.emptyAuthoritative, true)
+  } finally {
+    client.stop()
+  }
+})
+
+test("an incomplete or previously populated snapshot cannot invent an empty machine", async () => {
+  const incomplete = new Relay()
+  incomplete.snapshot.complete = false
+  const first = await connected(incomplete)
+  try {
+    first._askSessionSnapshot(MACHINE, 1)
+    await settled(first)
+    assert.equal(first.sessionInventoryByMachine.has(MACHINE), false)
+  } finally {
+    first.stop()
+  }
+
+  const second = await connected(new Relay())
+  try {
+    second.sessionSnapshots.set(MACHINE + "\u0000old", { machine: MACHINE, session: "old", id: "old" })
+    second._askSessionSnapshot(MACHINE, 1)
+    await settled(second)
+    assert.equal(second.sessionInventoryByMachine.has(MACHINE), false)
+    assert.equal(second.sessionSnapshots.size, 1)
+  } finally {
+    second.stop()
+  }
+})
 
 test("aborted reads release eight distinct channels before another read publishes", async () => {
   const relay = new Relay()

@@ -1216,6 +1216,9 @@ export class RelayReader {
           this.note(method, path, "local")
           return json(200, health)
         }
+        case "/v1/update":
+          this.only(url, path)
+          return await this.machineRead(init?.signal, method, path, "update", {})
         case "/v1/push/key": {
           // The first request of a registration, and the one the whole
           // feature stopped on: a phone that pressed "notify me" got as far

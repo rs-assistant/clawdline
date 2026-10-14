@@ -45,6 +45,7 @@ import {
   resumePendingPairing,
 } from "./pair-pending.js"
 import { PairPanel, type PairRequest } from "./PairPanel.js"
+import { FleetUpdateRow } from "./FleetUpdateRow.js"
 import type { PairAgentProgress, PairAgentReply } from "./pair-agent.js"
 import { DeviceLimitPanel } from "./DeviceLimitPanel.js"
 import { readThroughRelay, setCloudConnectionRetry } from "./install.js"
@@ -58,7 +59,7 @@ import { CloudAccountContext } from "./account-context.js"
 import { machinesByCapability } from "./machine-access.js"
 import { answerSchedulePresence, publishScheduleFleet, type ScheduleMachine } from "./schedule-machines.js"
 import { bundledCatalog, catalogURL } from "./strings.js"
-import { RelayReader } from "./relay-reader.js"
+import { RelayReader, machineApp } from "./relay-reader.js"
 import { OPENED_ROW_QUIET_MS, openedRowShow } from "./opened-row.js"
 import { FleetSessionList, type MachineToolbarAction } from "./FleetSessionList.js"
 import { CarrierDot } from "./CarrierDot.js"
@@ -1651,6 +1652,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           screen={screen}
           who={who}
           machineList={shown}
+          updateClient={client.current}
           problem={problem}
           onChoose={choose}
           onRetry={start}
@@ -1681,6 +1683,7 @@ function GateCard(props: {
   screen: Screen
   who: { account: string; device: string } | null
   machineList: MachineListState
+  updateClient: CloudClientHandle | null
   problem: AccessProblem | null
   onChoose: (machine: CloudMachine) => void
   onRetry: () => void
@@ -1703,7 +1706,7 @@ function GateCard(props: {
   pairing: Parameters<typeof PairPanel>[0] | null
   onPair: (machine: { id: string; name: string } | null) => void
 }) {
-  const { screen, who, machineList, problem, onChoose, onRetry, recovery } = props
+  const { screen, who, machineList, updateClient, problem, onChoose, onRetry, recovery } = props
   const { asking, forgetting, forgotten, told, reading, onAsk, onForget, onLeave, onCloseMachinePicker } = props
   const { naming, renaming, renamed, onName, onRename, pairing, onPair } = props
   const mark = useRef<HTMLCanvasElement>(null)
@@ -2105,6 +2108,11 @@ function GateCard(props: {
                               ? T.webDeviceOnline
                               : T.webStartMachineStale}
                         </span>
+                        <FleetUpdateRow
+                          client={updateClient}
+                          machine={m}
+                          appVersion={updateClient ? machineApp(updateClient, m.id).version : undefined}
+                        />
                       </button>
                       {/* The row and its controls are siblings: nesting buttons
                          would be invalid, while a disabled unpaired row must

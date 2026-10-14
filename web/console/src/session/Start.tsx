@@ -95,6 +95,7 @@ let loading = false
 let placesUnread = false
 let agentSignInRequired = false
 let startOS = ""
+let startArch = ""
 let pressing: string | null = null
 let find = ""
 let resume = false
@@ -474,7 +475,7 @@ function draw(): void {
   const retry = el<HTMLButtonElement>("start-retry-places")
   const setup = el<HTMLAnchorElement>("start-agent-setup")
   const needsAgent = !!places?.length && assistants.length === 0 || agentSignInRequired
-  const localMac = !hostedConsole() && (startOS === "darwin" || !!(window as Window & {
+  const localMac = !hostedConsole() && ((startOS === "darwin" && startArch === "arm64") || !!(window as Window & {
     webkit?: { messageHandlers?: { shellAgentSetup?: unknown } }
   }).webkit?.messageHandlers?.shellAgentSetup)
   retry.hidden = machineOnly || mode !== "session" || !(placesUnread || needsAgent)
@@ -946,12 +947,14 @@ function openMode(machine: boolean, requested: StartMode = "session", on: { id: 
   placesUnread = false
   agentSignInRequired = false
   startOS = ""
+  startArch = ""
   leave()
   persona = ""
   team = rememberedTeam()
   if (mode === "session") void loadPersonas(undefined, onMachine?.id ?? null).then(() => draw())
   if (mode === "session" && !hostedConsole()) void readTerminalMachine().then((reading) => {
     startOS = reading.os || ""
+    startArch = reading.arch || ""
     draw()
   }).catch(() => { /* The App link stays hidden when the platform is unknown. */ })
   if (!wait) load()

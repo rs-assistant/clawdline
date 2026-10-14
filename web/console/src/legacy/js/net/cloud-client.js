@@ -1789,7 +1789,25 @@ export class CloudClient {
                 return sessionIdentityKey({ machine: machine, session: id });
             });
             if (!self._missingSessionKeys(entry.expected).length) {
+                // A complete empty snapshot is the machine's authenticated
+                // receipt that it published no rows. If the relay lost its
+                // inventory channel, this answer is enough to finish a new
+                // viewer's first list. Do not use it over held rows: without
+                // the marker's sequence it cannot order a deletion against
+                // a newer row that may already have arrived.
+                var emptyReceipt = body && body.complete === true &&
+                    Array.isArray(body.sessions) && body.sessions.length === 0 &&
+                    !self.sessionInventoryByMachine.has(machine) &&
+                    !Array.from(self.sessionSnapshots.values()).some(function (row) {
+                        return row && row.machine === machine;
+                    });
+                if (emptyReceipt) {
+                    self.sessionInventoryByMachine.set(machine, { sequence: 0, ids: new Set() });
+                    self.inventoriesHeard.add(machine);
+                }
                 self._setSessionRecovery(machine, null);
+                if (emptyReceipt) self._emit({ type: "sessions", data: self._sessionResponse(0),
+                    identity: { machine: machine, session: SESSION_INVENTORY_ID }, authoritative: true });
                 return;
             }
             entry.timer = self.setTimeout(function () {
