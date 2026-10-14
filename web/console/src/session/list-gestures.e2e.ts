@@ -1807,7 +1807,9 @@ test("a phone imports a Skill as editable Workflow text, starts it, and sees its
     await tab.press('.snippets-tabs button:last-child')
     await tab.press('.workflow-picker-row')
     workflowRecords = []
-    await tab.press('#workflow-picker .workflow-reload')
+    await tab.press('#snippets-close')
+    await tab.press('#detail-snippets')
+    await tab.press('.snippets-tabs button:last-child')
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
@@ -1864,8 +1866,59 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
     })`)
     await tab.press('#detail-snippets')
     await tab.press('.snippets-tabs button:last-child')
+    assert.equal(await tab.run(`document.querySelector('.workflow-picker-toolbar, .workflow-reload')`), null)
     assert.match(await tab.run(`document.querySelector('.workflow-picker-row')?.textContent`), /Daily release/)
     assert.match(await tab.run(`document.querySelector('.workflow-picker-group .snippet-group-title')?.textContent`), /全域|Global/)
+  }))
+
+test("a phone starts the shipped global Workflow in its interface language", () =>
+  inTab(async (tab) => {
+    workflowTodo = null; workflowSends = 0
+    workflowRecords = [{ id: "00000000-0000-4000-8000-000000000101", title: "Zero-Based Review",
+      body: "Run a zero-based review of this Project.", scope: "workflow", builtin: "zero_review",
+      position: 100, created_at: 1, updated_at: 1 }]
+    await tab.go("/#session=" + encodeURIComponent(SAFE))
+    await tab.run(`document.documentElement.lang = "zh-Hant-TW"`)
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        const button = document.querySelector('#detail-snippets')
+        if (button && button.getClientRects().length) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Session detail did not appear'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press("#detail-snippets")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('#snippets-sheet .snippets-tabs')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('Workflow sheet did not open'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press(".snippets-tabs button:last-child")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-picker-row')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('default Workflow did not appear'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.match(await tab.run(`document.querySelector('.workflow-picker-row')?.textContent`), /歸零審查/)
+    assert.equal(await tab.run(`document.querySelector('.workflow-picker-toolbar, .workflow-reload')`), null)
+    await tab.press(".workflow-picker-row")
+    await tab.press(".workflow-start")
+    await new Promise<void>((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (workflowTodo && workflowSends === 1) return resolve()
+        if (Date.now() > deadline) return reject(new Error('default Workflow was not sent'))
+        setTimeout(look, 25)
+      }; look()
+    })
+    assert.match(String((workflowTodo as Row | null)?.text), /每項結論都要附上證據/)
   }))
 
 test("Clawdfather stays first above a waiting Session on phone and desktop", () =>

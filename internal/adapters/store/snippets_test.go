@@ -15,8 +15,44 @@ func openSnippetStore(t *testing.T) (*Store, context.Context) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Most store tests exercise an otherwise empty collection. The new-install
+	// starter is covered separately below; removing it here spends no write quota.
+	if _, err := st.db.Exec(`DELETE FROM snippets WHERE id = ?`, snippet.DefaultZeroReviewID); err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() { st.Close() })
 	return st, context.Background()
+}
+
+func TestFreshMachineGetsEditableGlobalWorkflowAndDeletedSeedStaysDeleted(t *testing.T) {
+	dir := t.TempDir()
+	st, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	rows, err := st.Snippets(ctx)
+	if err != nil || len(rows) != 1 || !snippet.IsDefaultZeroReview(rows[0]) {
+		t.Fatalf("new machine starter: %#v, %v", rows, err)
+	}
+	if rows[0].Project != "" || rows[0].Scope != snippet.Workflow {
+		t.Fatalf("starter is not global: %#v", rows[0])
+	}
+	if ref, err := st.DeleteSnippet(ctx, snippet.DefaultZeroReviewID, time.Now()); err != nil || ref != nil {
+		t.Fatal(ref, err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	st, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	rows, err = st.Snippets(ctx)
+	if err != nil || len(rows) != 0 {
+		t.Fatalf("deleted starter came back: %#v, %v", rows, err)
+	}
 }
 
 func globalFields(title, body string) snippet.Fields {
