@@ -52,6 +52,31 @@ func TestMachineListUsesTheSingleMachineSnapshotAndItsRowStatus(t *testing.T) {
 	}
 }
 
+func TestFreshMachineListReadsAfterTheRequestInsteadOfTheHeldSnapshot(t *testing.T) {
+	p := &pane{s: session.Session{ID: "%41", Backend: session.BackendTmux, Assistant: session.AssistantCodex,
+		State: session.StateIdle, Label: "Before"}}
+	s := paneServer(t, p)
+	s.cfg = config.Config{Dir: filepath.Join(t.TempDir(), "clawdline-next")}
+	read := func(path string) {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		s.sessions(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("machine list: %d %s", rec.Code, rec.Body)
+		}
+	}
+	read("/v1/sessions?parts=list")
+	builds := s.lists().sessions.builds.Load()
+	read("/v1/sessions?parts=list")
+	if got := s.lists().sessions.builds.Load(); got != builds {
+		t.Fatalf("ordinary list rebuilt the held snapshot: %d -> %d", builds, got)
+	}
+	read("/v1/sessions?parts=list&fresh=1")
+	if got := s.lists().sessions.builds.Load(); got != builds+1 {
+		t.Fatalf("fresh list did not start a new build: %d -> %d", builds, got)
+	}
+}
+
 // A title chosen in Session Info is durable in this daemon's own config, is
 // the first label rung on the fleet list, and clearing it reveals the title the
 // conversation had before. Nothing is written to the retired app's store.

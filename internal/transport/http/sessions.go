@@ -62,7 +62,19 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 	// (producer.go): a page's first read, the Cloud fleet's and the streams'
 	// are one build of the machine, not one each. The build keeps the eight
 	// seconds this route gave its own.
-	snapshot := s.lists().snapshot()
+	var snapshot sessionsSnapshotWire
+	if r.URL.Query().Get("parts") == "list" && r.URL.Query().Get("fresh") == "1" {
+		// A person's send must check the current execution against a scan
+		// begun after the press, not the producer's previous list tick.
+		fresh, err := s.lists().sessions.since(time.Now())
+		if err != nil {
+			writeRefusal(w, http.StatusServiceUnavailable, "execution_check_unavailable", "The current Session list could not be read.")
+			return
+		}
+		snapshot = fresh
+	} else {
+		snapshot = s.lists().snapshot()
+	}
 	if look := r.URL.Query().Get("look"); look != "" {
 		// A person pressed "read again" on a waiting Session whose question
 		// has not come: that Session's screen is captured now rather than

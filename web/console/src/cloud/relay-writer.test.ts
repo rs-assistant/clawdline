@@ -50,6 +50,7 @@ class FakeClient implements CloudWriteClient {
   transcriptAsks = 0
   signature = "1-1"
   fail: Record<string, Error | undefined> = {}
+  listPresentationsForMachine?: (machine: string, signal: AbortSignal, options?: { fresh?: boolean }) => Promise<unknown>
   /** What `_machineRequestAs` settles with, as the copied client resolves a payload's `body`. */
   machineAnswer: unknown = undefined
   events(_listener: (event: CloudEvent) => void) {
@@ -345,6 +346,33 @@ test("a send goes as the machine's `send` under the row's own identity, and answ
   assert.equal(last.word, "send")
   assert.equal(last.answer, "relay")
   assert.equal(typeof last.ms, "number")
+})
+
+test("a send uses the machine's fresh execution when the retained Session row is stale", async () => {
+  const client = new FakeClient()
+  const current = "abcdef0123456789abcdef0123456789"
+  client.rows = [row("s1")]
+  client.listPresentationsForMachine = async (machine, _signal, options) => {
+    assert.equal(machine, "mac-a")
+    assert.deepEqual(options, { fresh: true })
+    return { sessions: [{ id: "s1", execution_generation: current }] }
+  }
+  const { reader } = seam(client)
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-fresh" }))
+  assert.equal(res.status, 200)
+  assert.deepEqual(client.calls[0]?.[3],
+    { request: "send-fresh", execution_generation: current, text: "hello", images: [] })
+})
+
+test("an unreadable fresh Session list never falls back to a retained send target", async () => {
+  const client = new FakeClient()
+  client.rows = [row("s1")]
+  client.listPresentationsForMachine = async () => { throw new Error("offline") }
+  const { reader } = seam(client)
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-unverified" }))
+  assert.equal(res.status, 503)
+  assert.equal((await json(res)).error, "execution_check_unavailable")
+  assert.deepEqual(client.calls, [])
 })
 
 test("an opened exact Session sends while the legacy rich-row replay is missing", async () => {

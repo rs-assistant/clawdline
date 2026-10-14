@@ -387,6 +387,8 @@ test("one machine list read uses a read-only machine reply waiter", async () => 
   assert.equal(calls[0][2].machine_id, "m")
   assert.equal(calls[0][3], "read:" + calls[0][2].request)
   assert.equal(calls[0][5].signal, signal)
+  await client.listPresentationsForMachine("m", signal, { fresh: true })
+  assert.equal(calls[1][2].fresh, true)
 })
 
 test("opening one Session asks the machine for its fresh row", async () => {

@@ -239,7 +239,7 @@ type plan struct {
 	// is a dismissal that named none, which means every one on offer.
 	conversations                                  []string
 	allConversations                               bool
-	upcoming, acceptLoss, force                    bool
+	upcoming, acceptLoss, force, fresh             bool
 	closeability                                   string
 	rate, limit, byteWindow, offset, after, before int64
 	document                                       []byte

@@ -93,6 +93,13 @@ func TestMachineListReadsOneLocalSnapshotWithTranscriptAuthority(t *testing.T) {
 	if refused := b.Handle(context.Background(), contentReadRequest(t, body)); refused.Code != "read_transcript_required" || len(r.seen) != 1 {
 		t.Fatalf("revoked viewer read the list: %+v, %+v", refused, r.seen)
 	}
+	b.TranscriptAuthority = func(context.Context, string, ed25519.PublicKey) Authority {
+		return contentReadAuthority(true)
+	}
+	body["fresh"] = true
+	if answer := b.Handle(context.Background(), contentReadRequest(t, body)); !answer.OK() || r.last().Query["fresh"] != "1" {
+		t.Fatalf("fresh machine list: answer=%+v route=%+v", answer, r.last())
+	}
 }
 
 func TestOriginalDetailCommandsAcceptAnExactExecutionPin(t *testing.T) {
