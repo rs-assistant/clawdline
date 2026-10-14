@@ -18,9 +18,19 @@ The foreground path asks `GET /v1/update/fresh` (the separate `update-fresh` Clo
 progress polling uses cached `GET /v1/update`. A controlled release host first returned a signed
 v0.11.0 manifest to a v0.10.0 daemon, then 404: the cached route still reported
 `update_available`, while the fresh route returned `unknown`, no latest version, and
-`no_release_published`. These are browser and daemon contract checks. A real phone reopen,
-background return, completed update, and published withdrawal have not been observed together;
-the phone acceptance step remains open.
+`no_release_published`. These are browser and daemon contract checks.
+
+The paired iPhone then used the same isolated machine identity with a signed beta release
+install. The machine reported `update_available` for v0.10.2-test.1, and the person saw the
+hosted console's direct Update Now action. When the local test release host withdrew its
+`latest` manifest, the fresh daemon answer became `unknown` with `no_release_published`; the
+person reported that the update button was gone. After the test machine was switched to the
+signed v0.10.2-test.1 release and the manifest restored, the daemon reported `current` with
+identical running and latest stamps. The person reported no update button throughout a phone
+reload and background return. This checks the visible available, withdrawn, and installed
+states on the phone. The phone did not press the install action; release installation and
+post-update health were independently exercised in the installation matrix below. The
+withdrawal was a controlled local release-host change, not a public release withdrawal.
 
 ## Old daemon with current Cloud
 
