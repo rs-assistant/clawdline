@@ -45,6 +45,9 @@ function clientFixture() {
     },
     subscribe(channels: string[]) { calls.push("subscribe:" + channels.join(",")) },
     unsubscribe(channels: string[]) { calls.push("unsubscribe:" + channels.join(",")) },
+    async refreshSessionStatus(machine: string, session: string) {
+      calls.push("sessions.row:" + machine + ":" + session)
+    },
     async listPresentationsForMachine(machine: string) {
       calls.push("sessions.list:" + machine)
       return { at, complete: true, sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title",
@@ -163,6 +166,22 @@ test("status-only list never subscribes to or reads rich content", async () => {
   const read = await source.readMachine(machineID, new AbortController().signal)
   assert.equal(read.kind, "ready")
   assert.deepEqual(calls, [])
+})
+
+test("opening a Session requests only its fresh machine status", async () => {
+  const { client, calls } = clientFixture()
+  client.refreshSessionStatus = async (machine, session) => {
+    calls.push("sessions.row:" + machine + ":" + session)
+  }
+  const source = statusSource(() => client as never)
+  const before = await source.readMachine(machineID, new AbortController().signal)
+  await source.refreshSessionStatus?.({ machineID, sessionID, executionGeneration }, new AbortController().signal)
+  assert.deepEqual(calls, ["sessions.row:" + machineID + ":" + sessionID])
+  client.refreshSessionStatus = async () => { throw new Error("machine unavailable") }
+  await assert.rejects(async () => source.refreshSessionStatus?.(
+    { machineID, sessionID, executionGeneration }, new AbortController().signal))
+  assert.deepEqual(await source.readMachine(machineID, new AbortController().signal), before,
+    "a failed fresh read leaves the published row unchanged")
 })
 
 test("a cold status gap uses one complete pinned machine list for rows and titles", async () => {
