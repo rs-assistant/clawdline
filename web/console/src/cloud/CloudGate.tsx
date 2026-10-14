@@ -35,7 +35,7 @@ import { machinePaired } from "./pairing-completion.js"
 import { setProjectSyncSeam, syncSeamFor, type SyncClient } from "./project-sync.js"
 import { machinePresentation } from "../legacy/js/session/selection.js"
 import { forgetPersonas } from "../personas.js"
-import { accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, type AccountName } from "./unpaired-rows.js"
+import { accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, withAccountRegistrations, type AccountName } from "./unpaired-rows.js"
 import { machineSeenWord } from "./machine-seen.js"
 import { PairingRun, dropInvitation, watchInvitations, type PairStart, type PairState } from "./pair.js"
 import {
@@ -283,6 +283,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   )
   const [who, setWho] = useState<{ account: string; device: string } | null>(null)
   const [managingMachines, setManagingMachines] = useState(false)
+  const managingMachinesRef = useRef(managingMachines)
+  managingMachinesRef.current = managingMachines
   const [machineList, setMachineList] = useState<MachineListState>({ phase: "loading" })
   const machines = machineList.phase === "ready" ? machineList.machines : null
   const [problem, setProblem] = useState<AccessProblem | null>(null)
@@ -406,6 +408,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const [pairRequest, setPairRequest] = useState<PairRequest | null>(null)
   const [pairState, setPairState] = useState<PairState>({ phase: "idle" })
   const [names, setNames] = useState<ReadonlyMap<string, AccountName>>(new Map())
+  const [registered, setRegistered] = useState<ReadonlyMap<string, AccountName>>(new Map())
   const [connectionVersion, setConnectionVersion] = useState(0)
   const pairingStore = useMemo(() => browserPendingPairings(), [])
 
@@ -414,6 +417,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     void accountMachineRoster(apiOrigin).then((roster) => {
       if (!roster) return
       setNames(roster.names)
+      setRegistered(roster.registered)
       setForgotten((was) => [...new Set([...was, ...roster.revoked])])
     })
   }, [])
@@ -426,6 +430,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const invitation = useRef<PairingInvitation | null>(null)
   const namesRef = useRef(names)
   namesRef.current = names
+  const registeredRef = useRef(registered)
+  registeredRef.current = registered
 
   const session = useRef<RecoverableCloudSession | null>(null)
   const line = useRef<RecoveringCloudConnection | null>(null)
@@ -964,7 +970,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             // The same corrections the gate's list makes: the account's name
             // where this browser has none of its own, no forgotten machine, and
             // no session count where it could not read the sessions to count them.
-            const named = withAccountNames(answer.machines, namesRef.current, described, present)
+            const named = withAccountNames(
+              withAccountRegistrations(answer.machines, registeredRef.current, present),
+              namesRef.current, described, present)
             return {
               machines: devicesPageRows(named, gone.current),
               syncing: answer.syncing,
@@ -976,7 +984,11 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             // The fleet list stays visible beside an open Session. Refresh its
             // machine freshness after a complete status pass, not after each
             // row in that pass (which would churn the list while it arrives).
-            if (!reader.current && (event.type === "orchestrator" || event.type === "session_status")) listMachines()
+            // The management list is also visible over a reader, and a
+            // decrypted session may be its first proof of a machine pairing.
+            if (managingMachinesRef.current && (event.type === "sessions" ||
+              event.type === "orchestrator" || event.type === "session_status")) listMachines()
+            else if (!reader.current && (event.type === "orchestrator" || event.type === "session_status")) listMachines()
             else if (fleetScopeRef.current && (event.type === "orchestrator" ||
               event.type === "session_status" && event.identity?.session === "__clawdline_inventory_v1__")) listMachines()
             // A decryptable inventory clears only the problem attributed to
@@ -1126,8 +1138,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       /* nothing remembered */
     }
     setManagingMachines(true)
+    // The open console may have decrypted machine rows since this list was
+    // last drawn. Re-read their pairing and observation facts on entry.
+    listMachines()
+    if (transport.kind === "cloud") readAccountRoster(transport.config.apiOrigin)
     setScreen({ at: "machines" })
-  }, [who])
+  }, [who, listMachines, readAccountRoster, transport])
 
   /** Put away the in-place picker without changing the machine underneath it. */
   const closeMachinePicker = useCallback(() => {
@@ -1163,18 +1179,20 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
 
   const shown = useMemo<MachineListState>(
     () => {
-      if (machineList.phase !== "ready") return machineList
-      const visible = withAccountNames(machineList.machines, names, described, present)
+      if (machineList.phase === "refused") return machineList
+      const relay = machineList.phase === "ready" ? machineList.machines : []
+      const visible = withAccountNames(withAccountRegistrations(relay, registered, present), names, described, present)
         .filter((machine) => !forgotten.includes(machine.id))
         .map((machine) => {
           const operation = client.current?.machineDescriptor?.(machine.id)?.machine?.operation_allowed
           return { ...machine, operationAllowed: typeof operation === "boolean" ? operation : null }
         })
-      return visible.length ? { ...machineList, machines: visible } : { phase: "empty_authoritative" }
+      return visible.length ? { phase: "ready", machines: visible }
+        : machineList.phase === "ready" ? { phase: "empty_authoritative" } : machineList
     },
     // `described` reads the client, which changes only with a new line and
     // then with a new list.
-    [machineList, names, forgotten],
+    [machineList, names, registered, forgotten],
   )
   const quickMachines = shown.phase === "ready" ? shown.machines.filter((machine) => machine.selectable) : []
   // The names the detail's own sentences use, read when one is written rather
@@ -2149,7 +2167,7 @@ function GateCard(props: {
                             ? T.webDeviceNotPaired
                             : m.freshness === "current"
                               ? T.webDeviceOnline
-                              : T.webStartMachineStale}
+                              : m.freshness === "stale" ? T.webStartMachineStale : T.webCoordUnknown}
                         </span>
                         <span className="cloud-machine-access">{machineAccessFacts(m).join(" · ")}</span>
                         <FleetUpdateRow
