@@ -18,7 +18,10 @@
 .session-owned-decision .session-owned-decision-receipt { color: var(--ok); }
 .session-workflow-row { border: 1px solid var(--line); border-radius: .5rem; margin: .4rem 0; }
 .session-workflow-row[data-state="active"] { border-color: var(--accent-ed); }
-.session-workflow-row summary { display: flex; justify-content: space-between; gap: .7rem; padding: .7rem; cursor: pointer; }
-.session-workflow-row summary span { flex: 0 0 auto; color: var(--dim); }
+.session-workflow-row summary { display: grid; gap: .35rem; padding: .7rem; cursor: pointer; }
+.session-workflow-kind { color: var(--faint); font-size: 11px; line-height: 1.6; }
+.session-workflow-heading { display: flex; justify-content: space-between; align-items: baseline; gap: .7rem; }
+.session-workflow-heading strong { min-width: 0; overflow-wrap: anywhere; }
+.session-workflow-heading > span { flex: 0 0 auto; color: var(--dim); }
 .session-workflow-row p { white-space: pre-wrap; padding: 0 .7rem; max-height: 12rem; overflow: auto; }
 .session-workflow-row .work-actions { padding: .5rem .7rem .7rem; }
