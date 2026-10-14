@@ -482,6 +482,12 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   const openSession = (id: string, keepFocus = false, arrived = false) => {
     if (!rowsRef.current.some((r) => r.id === id)) return
     if (closing() && openRef.current === id) return
+    if (!fleetList) {
+      // The local route captures this Session's screen and rebuilds the shared
+      // list now. Only a successful look may replace the row on this page.
+      void fetch("/v1/sessions?look=" + encodeURIComponent(id), { cache: "no-store" })
+        .then((answer) => { if (answer.ok) fleet.refresh() }, () => undefined)
+    }
     go("sessions")
     setSelected(id)
     setOpen(id)

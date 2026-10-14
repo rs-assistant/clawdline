@@ -326,6 +326,7 @@ const ORDER_ONCE_SPARE_MOVED = [BLOCKED, SPARE, SAFE, NEEDS_ATTESTATION, UNKNOWN
 let generation = 0
 /** Every `/v1/sessions` read, so a refresh is counted rather than guessed at. */
 let listReads = 0
+const openedLooks: string[] = []
 /** Project filters sent by the Board, including a Project-page deep link. */
 let workProjectReads: string[] = []
 /** `POST /v1/sessions/{id}/close`, with the Idempotency-Key each arrived under. */
@@ -408,6 +409,7 @@ function daemon(): Server {
     }
     if (path === "/v1/sessions") {
       listReads++
+      if (url.searchParams.has("look")) openedLooks.push(url.searchParams.get("look") ?? "")
       return json(res, 200, snapshot())
     }
     if (path === "/v1/health") return json(res, 200, { ok: true })
@@ -1340,8 +1342,11 @@ test("keyboard moves through focused options and Enter opens the highlighted Ses
         }))()`)
         assert.deepEqual(state, { selected: id, focused: id })
       }
+      const before = openedLooks.length
       await tab.key("Enter")
       assert.equal(await tab.run(`document.querySelector('#rows > li.row.open')?.dataset.id`), NEEDS_ATTESTATION)
+      await tab.until("the opened Session is read fresh", () => openedLooks.length > before)
+      assert.equal(openedLooks.at(-1), NEEDS_ATTESTATION)
     }
   }))
 

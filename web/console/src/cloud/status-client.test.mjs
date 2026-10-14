@@ -389,6 +389,16 @@ test("one machine list read uses a read-only machine reply waiter", async () => 
   assert.equal(calls[0][5].signal, signal)
 })
 
+test("opening one Session asks the machine for its fresh row", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  const calls = []
+  client._machineRequest = (...args) => { calls.push(args); return Promise.resolve({ ids: ["s"] }) }
+  const signal = new AbortController().signal
+  await client.refreshSessionStatus("m", "s", signal)
+  assert.deepEqual(calls[0].slice(0, 4), ["m", "sessions.row", { row: "s" }, "read"])
+  assert.equal(calls[0][5].signal, signal)
+})
+
 test("a transcript picture uses an exact image waiter and rejects a missing execution", async () => {
   const client = Object.create(StatusCloudClient.prototype)
   const calls = []

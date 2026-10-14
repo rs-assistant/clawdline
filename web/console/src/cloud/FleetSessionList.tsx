@@ -54,6 +54,14 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   const [refreshFeedback, setRefreshFeedback] = useState<"idle" | "loading" | "done" | "failed">("idle")
   const refreshStartedAt = useRef(0)
   const previousTarget = useRef(target)
+  useEffect(() => {
+    if (!target || !source?.refreshSessionStatus) return
+    const abort = new AbortController()
+    // The published ss/ row reaches the existing subscription and updates both
+    // the list and open detail. A refused or interrupted read leaves them as is.
+    void source.refreshSessionStatus(target, abort.signal).catch(() => undefined)
+    return () => abort.abort()
+  }, [source, target && destinationKey(target)])
   const refreshList = () => {
     presentationPasses.current.clear()
     presentationFailures.current.clear()
