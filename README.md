@@ -156,7 +156,8 @@ schedules — when the hard part is running several agents reliably over time.
 ## Documentation
 
 - Start: [Install and first run](docs/user/install.md) · [Platforms](docs/user/platforms.md) ·
-  [Troubleshooting](docs/user/troubleshooting.md)
+  [Troubleshooting](docs/user/troubleshooting.md) ·
+  [When an agent on Linux cannot take a screenshot](docs/linux-headless-browser.md)
 - Basics: [Sessions](docs/user/sessions.md) · [Keyboard shortcuts](docs/user/keyboard-shortcuts.md) ·
   [Remote access](docs/user/remote-access.md) · [Notifications](docs/user/notifications.md) ·
   [Usage](docs/user/usage.md)

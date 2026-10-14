@@ -42,6 +42,7 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 | [user/new-machine.md](user/new-machine.md) | User page | English | One prompt, in English and Traditional Chinese, that has an Agent set up a second machine: git, credentials, clones and project settings |
 | [user/usage.md](user/usage.md) | User page | English | Token bills by category, assistant quotas, the compaction window and capacity |
 | [user/troubleshooting.md](user/troubleshooting.md) | User page | English | From a symptom to its cause and fix |
+| [linux-headless-browser.md](linux-headless-browser.md) | User page | English | An agent on Linux cannot screenshot a page: install the browser's libraries and fonts, with or without `sudo` |
 
 ## Start here
 
