@@ -4367,6 +4367,7 @@
   "next.secretHandoffReplace": "Replace value",
   "next.cloudMachinesNoneNext": "On a machine with Clawdline installed, open Settings → Remote and turn on Cloud. Then pair this browser from that machine.",
   "next.cloudMachinesRecovery": "Recover the machine list",
+  "next.sessionsITermScanOff": "iTerm2 scanning is off in Settings. Sessions opened directly in iTerm2 will not appear here. Turn on ‘Read iTerm2 tabs’ to show them.",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

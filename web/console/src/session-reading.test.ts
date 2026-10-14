@@ -72,6 +72,13 @@ test("an inventory still refreshing is not an iTerm failure", () => {
   )
 })
 
+test("a disabled iTerm2 source explains why native sessions are absent", () => {
+  const sources = [{ source: "iterm", complete: false, disabled: "setting" as const }]
+  assert.match(scanFailureWords(["iTerm2 scanning is turned off (setting iterm_scan)"], sources, true) ?? "", /直接在 iTerm2 開啟/)
+  assert.match(inCatalog("en", () => scanFailureWords([], sources, false)) ?? "", /Sessions opened directly in iTerm2/)
+  assert.equal(scanFailureWords([], [{ source: "tmux", complete: true }], true), null)
+})
+
 test("the title's number is the same set as the list", () => {
   assert.equal(totalSessionWords(6, true), "6 個 session")
   assert.equal(inCatalog("en", () => totalSessionWords(1, false)), "1 session")
