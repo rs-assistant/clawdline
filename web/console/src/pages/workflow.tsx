@@ -12,6 +12,7 @@ import type { SessionRow } from "@clawdline/contract"
 type Draft = { id: string; title: string; body: string; global: boolean }
 const blank = (): Draft => ({ id: "", title: "", body: "", global: false })
 const machineOf = (place: ProjectPlace): string => (place as ProjectPlace & { machine?: string }).machine ?? ""
+const availableSkills = (files: ProjectFile[]) => files.filter((file) => file.kind === "skill" && file.status === "ready")
 
 /** A Workflow is saved text. Skill import fills an editor, not an execution dependency. */
 function WorkflowPage({ shown }: { shown: boolean }) {
@@ -81,7 +82,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
         listProjectFiles(selected.id),
       ])
       setRows((answer.snippets ?? []).filter((row) => row.scope === "workflow" && (!row.project || row.project === selected.path)))
-      setSkills(files.files.filter((file) => file.kind === "skill" && file.source === "project" && file.status === "ready"))
+      setSkills(availableSkills(files.files))
       setError("")
       return true
     } catch { setError(W("workflowUnavailable")); return false }
@@ -91,11 +92,12 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     if (!shown || !place) return
     let live = true
     setLoading(true)
+    setSkills([])
     Promise.all([readReusableTextForMachine(machineOf(place)), listProjectFiles(place.id)])
       .then(([answer, files]) => {
         if (!live) return
         setRows((answer.snippets ?? []).filter((row) => row.scope === "workflow" && (!row.project || row.project === place.path)))
-        setSkills(files.files.filter((file) => file.kind === "skill" && file.source === "project" && file.status === "ready"))
+        setSkills(availableSkills(files.files))
         setError("")
       }).catch(() => { if (live) setError(W("workflowUnavailable")) })
       .finally(() => { if (live) setLoading(false) })
@@ -137,10 +139,11 @@ function WorkflowPage({ shown }: { shown: boolean }) {
   }
 
   const skillPicker = <label className="workflow-skill-picker"><span>{W("importSkill")}</span>
-    <select aria-label={W("chooseSkill")} title={!skills.length ? W("noSkills") : undefined} value="" onChange={(event) => importSkill(event.target.value)} disabled={!skills.length}>
+    <select aria-label={W("chooseSkill")} value="" onChange={(event) => importSkill(event.target.value)} disabled={!skills.length}>
       <option value="">{W("chooseSkill")}</option>
       {skills.map((skill) => <option key={skill.id} value={skill.id}>{skill.location}</option>)}
     </select>
+    {!skills.length && !loading && <small>{W("noSkills")}</small>}
   </label>
 
   return <section className="page workflow-page" id="workflow" data-page-view="workflow" hidden={!shown}>

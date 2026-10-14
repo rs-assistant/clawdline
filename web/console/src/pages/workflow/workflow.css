@@ -25,6 +25,7 @@
 .workflow-actions { display: flex; align-items: end; gap: .7rem; flex-wrap: wrap; }
 .workflow-skill-picker { min-width: 12rem; font-size: .8rem; color: var(--dim); }
 .workflow-skill-picker select { font-size: 1rem; }
+.workflow-skill-picker small { color: var(--dim); font-size: .8rem; line-height: 1.4; }
 .workflow-empty { margin: clamp(2rem, 5vw, 4rem) auto; max-width: 42rem; padding: clamp(2rem, 5vw, 4rem); text-align: center; border: 1px solid var(--line); border-radius: 1.25rem; background: var(--card); }
 .workflow-empty-mark { display: grid; place-items: center; width: 3.5rem; height: 3.5rem; margin: 0 auto 1.4rem; border-radius: 1rem; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: 1.8rem; }
 .workflow-empty h2 { margin: 0; font-size: clamp(1.4rem, 2.5vw, 1.8rem); }
