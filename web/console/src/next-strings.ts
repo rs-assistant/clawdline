@@ -663,6 +663,10 @@ const words = {
     // says what it does have (`legacy/devices-bridge.ts`).
     devicesLedeAccount:
       "The machines on this account, their status, and whether this browser can read them.",
+    devicesRosterLoading: "Checking which machines are registered on this account…",
+    devicesRosterReady: "Account machine registrations checked.",
+    devicesRosterFailed: "Could not check account machine registrations. Some machines may be missing from this list.",
+    devicesRosterRetry: "Try checking again",
     devicesLedeThisMachine:
       "Only the machine serving this page. A console served by the daemon reaches no other machine; which machines are on your account is answered by the Clawdline Cloud console.",
     devicesThisMachine: "This machine",
@@ -1940,6 +1944,10 @@ const words = {
     cloudRenameTooLong: "在這個帳號上，一台機器的名字最多 {max} 個字元。",
     cloudBlocked: "這個 console 是給 {origin} 用的，現在卻從 {here} 打開，所以不會連線。",
     devicesLedeAccount: "這個帳號上的機器、目前狀態，以及這個瀏覽器能不能讀取它們。",
+    devicesRosterLoading: "正在查詢這個帳號已註冊的機器…",
+    devicesRosterReady: "已查詢這個帳號的機器註冊名冊。",
+    devicesRosterFailed: "無法查詢這個帳號的機器註冊名冊，這份清單可能缺少機器。",
+    devicesRosterRetry: "重新查詢",
     devicesLedeThisMachine:
       "只有服務這一頁的那一台機器。daemon 服務的 console 連不到別台；帳號上有哪些機器，要問 Clawdline Cloud 的 console。",
     devicesThisMachine: "這台機器",
