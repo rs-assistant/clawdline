@@ -426,8 +426,8 @@ function daemon(): Server {
       assistants: [{ id: "codex", label: "Codex" }],
     })
     if (path === "/v1/projects/project-fixture/files" && req.method === "GET") return json(res, 200, {
-      files: [{ id: "skill-fixture", name: "SKILL.md", location: ".agents/skills/ship-today/SKILL.md",
-        source: "project", assistant: "codex", kind: "skill", status: "ready", editable: true }],
+      files: [{ id: "global-skill-fixture", name: "SKILL.md", location: "skills/global-review/SKILL.md",
+        source: "global", assistant: "codex", kind: "skill", status: "ready", editable: true }],
       truncated: false, skipped: [],
     })
     if (path === "/v1/snippets" && req.method === "GET") return json(res, 200, {
@@ -1721,25 +1721,30 @@ test("an ordinary Session keeps the Snippets icon", () =>
     assert.equal(await tab.run(`document.getElementById('clawdfather-suggestions') === null`), true)
   }))
 
-test("a phone imports a Skill as editable Workflow text, starts it, and sees its durable progress", () =>
+test("a phone imports an available global Skill as editable Workflow text, starts it, and sees its durable progress", () =>
   inTab(async (tab) => {
     workflowRecords = []; workflowTodo = null; workflowSends = 0
     await tab.go("/#page=workflow")
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const look = () => {
-        if (document.querySelector('.workflow-actions select option[value="skill-fixture"]')) return resolve(true)
+        if (document.querySelector('.workflow-actions select option[value="global-skill-fixture"]')) return resolve(true)
         if (Date.now() > deadline) return reject(new Error('Workflow Skill option did not arrive'))
         setTimeout(look, 25)
       }; look()
     })`)
+    assert.equal(await tab.run(`document.querySelector('.workflow-actions select')?.disabled`), false)
+    assert.equal(await tab.run(`document.querySelector('.workflow-actions select option[value="global-skill-fixture"]') !== null`), true)
+    const point = await tab.run(`(() => { const el = document.querySelector('.workflow-actions select'); el.scrollIntoView({ block: 'center' }); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+    await tab.tap(point.x, point.y)
+    assert.equal(await tab.run(`document.activeElement?.matches('.workflow-actions select')`), true)
     await tab.run(`(() => {
       const select = document.querySelector('.workflow-actions select')
-      select.value = 'skill-fixture'
+      select.value = 'global-skill-fixture'
       select.dispatchEvent(new Event('change', { bubbles: true }))
     })()`)
-    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "ship-today")
-    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /ship-today/)
+    assert.equal(await tab.run(`document.querySelector('.workflow-editor input')?.value`), "global-review")
+    assert.match(await tab.run(`document.querySelector('.workflow-editor textarea')?.value`), /global-review/)
     await tab.press('.workflow-editor button[type="submit"]')
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
@@ -1795,7 +1800,7 @@ test("a phone imports a Skill as editable Workflow text, starts it, and sees its
     })`)
     assert.equal(workflowSends, 1)
     assert.match(String((workflowTodo as Row | null)?.text), /Clawdline-Workflow/)
-    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /ship-today/)
+    assert.match(await tab.run(`document.querySelector('.session-workflow-row')?.textContent`), /global-review/)
     await tab.shot("workflow-session-progress")
     await tab.press('.session-workflow-row summary')
     await tab.press('.session-workflow-row button')

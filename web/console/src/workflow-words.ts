@@ -9,7 +9,7 @@ const words = {
     emptyTitle: "Give this Project a repeatable start", emptyDetail: "Save a launch message once, then start it from any Session in this Project.",
     importSkill: "Import a Skill", editAction: "Edit", workflowCount: "Saved Workflows", projectLabel: "Project",
     global: "Global", projectOnly: "This Project", availability: "Available in", globalHint: "Available in every Project on this machine.",
-    chooseWorkflow: "Choose a Workflow to start", reviewLaunch: "Ready to start", noSkills: "No Project Skills available to import",
+    chooseWorkflow: "Choose a Workflow to start", reviewLaunch: "Ready to start", noSkills: "No available Skills to import for this Project",
     save: "Save", cancel: "Cancel", delete: "Delete", needsText: "Enter a name and launch message.",
     saveUnknown: "The save result is unknown. Reload the list before trying again.",
     deleteUnknown: "The delete result is unknown. Reload the list.",
