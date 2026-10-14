@@ -267,7 +267,7 @@ const WITH_UNPAIRED: MachineAnswer = {
   machines: [
     ...ACCOUNT.machines,
     {
-      id: "machine-three-51463f04",
+      id: "machine-three-c0ffee42",
       name: "build-box",
       label: "Linux · build-box",
       kind: "linux",
@@ -304,7 +304,7 @@ test("a card for a machine this browser is not paired with gets a Pair button th
   assert.equal(pair[0].textContent, nextWord("cloudPair"))
   assert.equal(pair[0].title, nextWord("cloudPairOne", { machine: "Linux · build-box" }))
   pair[0].onclick?.()
-  assert.deepEqual(asked, ["machine-three-51463f04"], "the full id the copied card carries, not its short form")
+  assert.deepEqual(asked, ["machine-three-c0ffee42"], "the full id the copied card carries, not its short form")
 
   // The copied sentence sends a person to "Pair a Browser" on the machine, a
   // control a Linux daemon does not have; with a button on the card, the card

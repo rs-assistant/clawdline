@@ -35,7 +35,7 @@ import { machinePaired } from "./pairing-completion.js"
 import { setProjectSyncSeam, syncSeamFor, type SyncClient } from "./project-sync.js"
 import { machinePresentation } from "../legacy/js/session/selection.js"
 import { forgetPersonas } from "../personas.js"
-import { accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, withAccountRegistrations, type AccountName } from "./unpaired-rows.js"
+import { accountMachineForConfirmation, accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, withAccountRegistrations, type AccountName } from "./unpaired-rows.js"
 import { machineSeenWord } from "./machine-seen.js"
 import { PairingRun, dropInvitation, watchInvitations, type PairStart, type PairState } from "./pair.js"
 import {
@@ -913,9 +913,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       openPairing({ id, name: named ? named.name || named.label || id : id })
     })
     setMachineForgetting((id) => {
-      const known = machinesRef.current?.find((m) => m.id === id)
-      if (!known || gone.current.includes(id)) return
-      const named = withAccountNames([known], namesRef.current, described, present)[0]
+      const named = accountMachineForConfirmation(
+        id, machinesRef.current, registeredRef.current, namesRef.current,
+        described, present, gone.current)
+      if (!named) return
       setTold(null)
       forgetReturn.current = "console"
       setAsking(named)
