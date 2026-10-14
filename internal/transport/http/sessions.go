@@ -17,6 +17,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/coordinator"
 	"github.com/sainteye/clawdline/internal/domain/icon"
@@ -283,6 +284,18 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 	// missing for every row, as an unreadable Swift store is.
 	own, ownErr := s.ownOverlay(records, lives)
 	swift = swift.With(own)
+	// A delivery is historical. A later message typed by the person starts new
+	// work, even when the terminal has already gone idle again. Read the run
+	// ledger once for the fleet; sequence numbers order sends and receipts that
+	// happened in the same second.
+	runSubjects := make([]string, 0, len(items))
+	deliverySubjects := make([]string, 0, len(items))
+	for _, item := range items {
+		runSubjects = append(runSubjects, item.ConversationID)
+		deliverySubjects = append(deliverySubjects, item.ID)
+	}
+	runs, runsErr := s.store.LatestEvents(records, app.EventRunLatest, runSubjects)
+	deliveries, deliveriesErr := s.store.LatestEvents(records, eventSessionDelivered, deliverySubjects)
 	responsibilities, responsibilityErr := s.store.OpenSessionResponsibilities(records)
 	openBySession := make(map[string][]store.SessionResponsibility)
 	for _, item := range responsibilities {
@@ -334,6 +347,10 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 			ownRole:             ownRole,
 			epicParent:          epicParents[string(item.Assistant)+"\x00"+item.ConversationID],
 			acceptance:          rowAcceptance(item.ConversationID, pending, pendingErr),
+			latestRun:           runs[item.ConversationID],
+			latestRunErr:        runsErr,
+			latestDelivery:      deliveries[item.ID],
+			latestDeliveryErr:   deliveriesErr,
 		})
 		// The light Cloud list has no task collection. Carry the names of live
 		// child Sessions with a broker peer wait so its hourglass can name them.
@@ -708,7 +725,51 @@ type rowInput struct {
 	ownRole    bool
 	epicParent store.EpicRootParent
 	// acceptance is shown only beside a Session's own delivery receipt.
-	acceptance *contract.SessionAcceptance
+	acceptance        *contract.SessionAcceptance
+	latestRun         store.Event
+	latestRunErr      error
+	latestDelivery    store.Event
+	latestDeliveryErr error
+}
+
+// receiptSuperseded compares durable events, not the terminal's current
+// activity. A run belongs to this exact conversation and assistant; a reused
+// terminal or a run for another assistant cannot retire its receipt.
+func receiptSuperseded(in rowInput, receipt *contract.WorkDisposition) (bool, bool) {
+	if in.latestRunErr != nil || in.latestDeliveryErr != nil {
+		return false, false
+	}
+	if in.latestRun.Seq == 0 || receipt == nil || receipt.Scope != "session" {
+		return false, true
+	}
+	var run struct {
+		Session   string `json:"session_id"`
+		Terminal  string `json:"terminal_id"`
+		Assistant string `json:"assistant"`
+		At        int64  `json:"at"`
+	}
+	if json.Unmarshal(in.latestRun.Payload, &run) != nil || run.Session != in.live.ConversationID ||
+		run.Terminal != in.live.TerminalID || run.Assistant != in.live.Assistant {
+		return false, false
+	}
+	// The current daemon writes both facts into one event ledger. Its sequence
+	// distinguishes the order even when both timestamps share a second. A
+	// retired Swift receipt has no sequence; only a strictly later time wins.
+	if in.latestDelivery.Seq != 0 {
+		var delivered struct {
+			Conversation string `json:"conversation"`
+			Assistant    string `json:"assistant"`
+			At           int64  `json:"at"`
+		}
+		if json.Unmarshal(in.latestDelivery.Payload, &delivered) != nil {
+			return false, false
+		}
+		if delivered.Conversation == in.live.ConversationID && delivered.Assistant == in.live.Assistant &&
+			delivered.At == receipt.ReceiptAt {
+			return in.latestRun.Seq > in.latestDelivery.Seq, true
+		}
+	}
+	return run.At > receipt.ReceiptAt, true
 }
 
 var errBoardUnreadable = errors.New("board store is not open")
@@ -799,6 +860,16 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		out.WorkPersonNeeded = work.PersonNeeded
 		row.Owed = work.Owed
 		row.Disposition = work.Disposition
+		if work.Disposition != nil && work.Disposition.Scope == "session" {
+			superseded, known := receiptSuperseded(in, work.Disposition)
+			if !known {
+				row.WorkState = contract.WorkStateUnknown
+				row.Disposition = nil
+			} else if superseded {
+				row.WorkState = contract.WorkStateReady
+				row.Disposition = nil
+			}
+		}
 	} else {
 		// Without the store there is no reading of the task, the delivery or
 		// the declaration behind a state, and the honest projection is the

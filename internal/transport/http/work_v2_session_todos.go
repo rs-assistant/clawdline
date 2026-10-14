@@ -294,11 +294,13 @@ func (s *Server) workV2SessionTodos(w http.ResponseWriter, r *http.Request, part
 		for _, picture := range pictures {
 			dataURLs = append(dataURLs, "data:"+picture.Image.MediaType+";base64,"+base64.StdEncoding.EncodeToString(picture.Data))
 		}
-		if _, sendErr := s.actions().SendWithPictures(r.Context(), terminalID,
-			app.DirectTodoSendText(found.ID, found.Text), dataURLs); sendErr != nil {
+		sent, sendErr := s.actions().SendWithPictures(r.Context(), terminalID,
+			app.DirectTodoSendText(found.ID, found.Text), dataURLs)
+		if sendErr != nil {
 			err = &app.WorkError{Status: http.StatusBadGateway, Code: "send_failed", Message: sendErr.Error()}
 			break
 		}
+		s.issueRun(r.Context(), r, sent, found.Text)
 		var td work.DirectTodoV2
 		td, err = s.workV2().MarkDirectTodoSent(r.Context(), id, conversation, time.Now(), found.Version)
 		if err == nil {
