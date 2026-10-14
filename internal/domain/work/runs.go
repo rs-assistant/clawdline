@@ -3,6 +3,7 @@ package work
 import (
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Runs: how a session relays what a person said to it (design-decisions U4,
@@ -98,6 +99,19 @@ func AcceptanceRevisionInstruction(excerpt, itemID, title string, soleOwnedItem 
 	for n := 0; n+36 <= len(words); n++ {
 		candidate := words[n : n+36]
 		if RunShaped(candidate) && candidate != strings.ToLower(itemID) {
+			// A separately stated future Plan may be named as the destination
+			// for work removed from this item's acceptance. It is not another
+			// acceptance target when that clause does not discuss acceptance.
+			preceding := words[:n]
+			if cut := strings.LastIndexAny(preceding, "。！？?;；"); cut >= 0 {
+				_, size := utf8.DecodeRuneInString(preceding[cut:])
+				preceding = preceding[cut+size:]
+			}
+			clause := strings.TrimSpace(preceding)
+			if identified && strings.HasSuffix(clause, "plan") &&
+				!strings.Contains(clause, "驗收") && !strings.Contains(clause, "acceptance") {
+				continue
+			}
 			return false
 		}
 	}
@@ -114,7 +128,7 @@ func AcceptanceRevisionInstruction(excerpt, itemID, title string, soleOwnedItem 
 			continue
 		}
 		change := false
-		for _, verb := range []string{"修訂", "修改", "更新", "改寫", "改成", "改為", "調整", "刪除", "revise", "change", "update", "edit", "remove"} {
+		for _, verb := range []string{"修訂", "修改", "更新", "改寫", "改成", "改為", "改以", "調整", "刪除", "revise", "change", "update", "edit", "remove"} {
 			change = change || strings.Contains(clause, verb)
 		}
 		if !change {
@@ -144,7 +158,7 @@ func AcceptanceRevisionInstruction(excerpt, itemID, title string, soleOwnedItem 
 			continue
 		}
 		request := false
-		for _, marker := range []string{"請", "幫我", "麻煩", "我要求", "我要", "我想要", "改成", "改為", "應改", "please "} {
+		for _, marker := range []string{"請", "幫我", "麻煩", "我要求", "我要", "我想要", "改成", "改為", "改以", "應改", "please "} {
 			request = request || strings.Contains(clause, marker)
 		}
 		for _, imperative := range []string{"revise ", "change ", "update ", "edit ", "remove "} {
