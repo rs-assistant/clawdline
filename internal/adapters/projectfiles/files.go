@@ -81,6 +81,8 @@ func candidate(root, rel, source, assistant, kind string) File {
 		Kind: kind, root: root, rel: rel}
 	if kind == "skill" {
 		f.Title = filepath.Base(filepath.Dir(rel))
+	} else if kind == "command" {
+		f.Title = strings.TrimSuffix(filepath.Base(rel), ".md")
 	}
 	return f
 }
@@ -263,7 +265,7 @@ func inspect(f *File) {
 	default:
 		f.Status, f.Size = "ready", st.Size()
 		f.Editable = f.Source == "project" && st.Mode().Perm()&0200 != 0
-		if f.Kind == "skill" {
+		if f.Kind == "skill" || f.Kind == "command" {
 			body, readErr := io.ReadAll(io.LimitReader(file, MaxFileBytes+1))
 			if readErr == nil && utf8.Valid(body) && !strings.ContainsRune(string(body), 0) {
 				if title := skillSummary(skillField(string(body), "name")); title != "" {
@@ -338,6 +340,45 @@ func skills(out *Listing, root, rel, source, assistant string) {
 	}
 }
 
+func commands(out *Listing, root, rel, source string) {
+	base, err := os.OpenRoot(root)
+	if err != nil {
+		out.Skipped = append(out.Skipped, filepath.ToSlash(rel))
+		return
+	}
+	defer base.Close()
+	dir, err := openDirectory(base, rel)
+	if errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	if err != nil {
+		out.Skipped = append(out.Skipped, filepath.ToSlash(rel))
+		return
+	}
+	defer dir.Close()
+	f, err := dir.Open(".")
+	if err != nil {
+		out.Skipped = append(out.Skipped, filepath.ToSlash(rel))
+		return
+	}
+	defer f.Close()
+	names, err := f.Readdirnames(MaxScanEntries + 1)
+	if err != nil && !errors.Is(err, io.EOF) {
+		out.Skipped = append(out.Skipped, filepath.ToSlash(rel))
+		return
+	}
+	if len(names) > MaxScanEntries {
+		names, out.Truncated = names[:MaxScanEntries], true
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if name == "" || strings.HasPrefix(name, ".") || strings.ContainsAny(name, `/\`) || !strings.HasSuffix(name, ".md") {
+			continue
+		}
+		add(out, candidate(root, filepath.Join(rel, name), source, "claude", "command"))
+	}
+}
+
 // List does not read skill manifests to decide whether a running assistant
 // enabled them. It reports direct project and home skill files as candidates.
 func List(place, home string) (Listing, error) {
@@ -356,6 +397,7 @@ func List(place, home string) (Listing, error) {
 		for _, spec := range []struct{ dir, assistant string }{{filepath.Join(".agents", "skills"), "codex"}, {filepath.Join(".claude", "skills"), "claude"}} {
 			skills(&out, root, filepath.Join(layer, spec.dir), "project", spec.assistant)
 		}
+		commands(&out, root, filepath.Join(layer, ".claude", "commands"), "project")
 	}
 	for _, spec := range []struct{ name, assistant string }{
 		{filepath.Join(".codex", "AGENTS.md"), "codex"},
@@ -369,6 +411,7 @@ func List(place, home string) (Listing, error) {
 	} {
 		skills(&out, home, spec.dir, "global", spec.assistant)
 	}
+	commands(&out, home, filepath.Join(".claude", "commands"), "global")
 	return out, nil
 }
 

@@ -7,8 +7,11 @@ with a Skill invocation, but saving does not bind it to that Skill: the message
 can be edited, and a Workflow made from an empty draft is equally valid.
 
 The Workflow page in the sidebar lists one Project's saved messages. It reads
-registered places and that Project's Skill files; choosing a Skill fills a
-new editable draft. The editor saves only `title` and `body`. The Project path
+registered places, Skills, and Claude command files. The import list shows the
+name and frontmatter description, then lets the person preview the full source
+before creating an editable draft. A command import tells the assistant to read
+the Project's named Claude command; the file remains required at run time. The
+editor saves only `title` and `body`. The Project path
 is assigned from the selected place, not typed into the form. There is no
 description, scheduling rule, or implicit trigger.
 
@@ -46,8 +49,8 @@ assistant to use a Skill, but Clawdline does not interpret that instruction.
 
 ## Acceptance
 
-- A Project Workflow can be created blank or from a Skill, edited after import,
-  read after a reload, and deleted without changing the source Skill.
+- A Project Workflow can be created blank or from a Skill or Claude command,
+  edited after import, read after a reload, and deleted without changing the source file.
 - A Session in another Project sees no Workflow from this Project.
 - Snippets still insert text and never send; a Workflow start leaves a durable
   to-do and one send receipt.
