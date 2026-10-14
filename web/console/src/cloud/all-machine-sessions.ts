@@ -157,6 +157,8 @@ export type SessionOlderPage =
 export interface SessionProjectionSource {
   /** Must settle or reject; each machine is requested independently. */
   readMachine(machineID: string, signal: AbortSignal): Promise<MachineSessionProjection>
+  /** Request a fresh machine observation of the opened Session. Published status arrives through subscribe. */
+  refreshSessionStatus?(destination: SessionDestination, signal: AbortSignal): Promise<void>
   /** One read_transcript-authorized display snapshot per machine; each row is joined by execution. */
   readMachinePresentations?(machineID: string, signal: AbortSignal): Promise<MachineListPresentation[] | null>
   /** Content is requested only after a person opens an exact destination. */

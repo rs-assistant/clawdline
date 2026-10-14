@@ -64,6 +64,10 @@ runtime=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 export XDG_RUNTIME_DIR=$runtime
 export DBUS_SESSION_BUS_ADDRESS=unix:path=$runtime/bus
 
+# Reading the registered health deadline compiles a small Go program. Finish
+# that compilation and clear its caches before switching the running release.
+deploy_health_seconds=$(HEAVY_HANDOFF=0 tools/heavy.sh go run ./tools/deploy-limit)
+
 current=$data_root/current
 previous=""
 if [ -L "$current" ]; then
@@ -101,7 +105,6 @@ state_dir=$(unit_value CLAWDLINE_NEXT_DIR)
 state_dir=${state_dir:-${XDG_CONFIG_HOME:-$HOME/.config}/clawdline-next}
 token=$(cat "$state_dir/local-token")
 healthy=0
-deploy_health_seconds=$(go run ./tools/deploy-limit)
 deadline=$((SECONDS + deploy_health_seconds))
 while [ "$SECONDS" -lt "$deadline" ]; do
   page=$(curl --connect-timeout 1 --max-time 2 -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:$port/ || true)

@@ -1083,6 +1083,15 @@ export class StatusCloudClient extends CatalogCloudClient {
     }, "read:" + request, PINNED_LIST_READ_TIMEOUT_MS, { signal })
   }
 
+  /** Ask the machine to observe and publish one Session now. Its ss/ event updates the list. */
+  refreshSessionStatus(machineID, sessionID, signal) {
+    if (!machineID || !sessionID || signal?.aborted) {
+      return Promise.reject(refused("execution_target_required", "a Session is required"))
+    }
+    return this._machineRequest(machineID, "sessions.row", { row: sessionID }, "read",
+      PINNED_LIST_READ_TIMEOUT_MS, { signal })
+  }
+
   /** Let each schedule machine answer independently of its slower peers. */
   schedules(options) {
     if (!options?.fresh || !options.machine) return super.schedules(options)

@@ -29,6 +29,7 @@ type StatusClient = CloudClientHandle & {
   /** The daemon must atomically compare the execution generation before reading content. */
   infoForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
   listPresentationsForMachine?(machineID: string, signal: AbortSignal): Promise<unknown>
+  refreshSessionStatus?(machineID: string, sessionID: string, signal: AbortSignal): Promise<unknown>
   transcriptForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
   transcriptPageForGeneration?(destination: SessionDestination, before: number, signal: AbortSignal): Promise<unknown>
   skillsForGeneration?(destination: SessionDestination, signal: AbortSignal): Promise<unknown>
@@ -312,6 +313,11 @@ export function statusSource(current: () => StatusClient | null): SessionProject
   }
   return {
     readMachine,
+    async refreshSessionStatus(destination, signal): Promise<void> {
+      const client = current()
+      if (!client?.refreshSessionStatus || signal.aborted) return
+      await client.refreshSessionStatus(destination.machineID, destination.sessionID, signal)
+    },
     async readMachinePresentations(machineID, signal): Promise<MachineListPresentation[] | null> {
       const client = current()
       if (!client?.listPresentationsForMachine || pinnedReadSupport(client, machineID) === "no" || signal.aborted) return null
