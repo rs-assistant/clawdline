@@ -560,12 +560,16 @@ function draw(): void {
   const kept = typed ? typed.value : ""
   const focused = !!typed && document.activeElement === typed
   let titleBox = box.querySelector<HTMLInputElement>(".title-editor input")
+  // A status refresh can arrive between touchstart and touchend on a phone.
+  // Keep the form (and its pressed button) attached across that redraw.
+  const editor = editingTitle && !busy ? box.querySelector<HTMLFormElement>(".title-editor") : null
   const keptTitle = titleBox ? titleBox.value : null
   const titleFocused = !!titleBox && document.activeElement === titleBox
   const titleCaret = titleFocused ? titleBox?.selectionStart ?? null : null
   const again = drawn
   box.classList.toggle("again", again)
   box.innerHTML = data ? html(data) : ""
+  if (editor) box.querySelector(".title-editor")?.replaceWith(editor)
   const roleButton = box.querySelector<HTMLButtonElement>("button[data-role-detail]")
   const persona = personaById(personasNow(), session()?.persona)
   if (roleButton && persona) L.paintIcon(roleButton.querySelector<HTMLCanvasElement>("canvas.persona-info-bot"), persona.icon, 3)
@@ -927,6 +931,13 @@ export function bindInfo(): () => void {
     const input = form.querySelector("input")
     Info.switchTo(input ? input.value : "", "")
   }
+  const onTouchEnd = (ev: TouchEvent) => {
+    const button = (ev.target as Element | null)?.closest<HTMLButtonElement>('.title-editor button[type="submit"]')
+    if (!button || button.disabled) return
+    ev.preventDefault() // iOS can dismiss the keyboard before dispatching a synthetic click.
+    const input = button.form?.querySelector<HTMLInputElement>('input[name="title"]')
+    Info.saveTitle(input?.value ?? "")
+  }
   const onKeyDown = (ev: KeyboardEvent) => {
     const target = ev.target as Element | null
     if (ev.key === "Escape" && target?.closest(".title-editor")) {
@@ -944,6 +955,7 @@ export function bindInfo(): () => void {
   refresh.addEventListener("click", onRefresh)
   body.addEventListener("click", onBody)
   body.addEventListener("submit", onSubmit)
+  body.addEventListener("touchend", onTouchEnd, { passive: false })
   body.addEventListener("keydown", onKeyDown)
   return () => {
     offPersonas()
@@ -953,6 +965,7 @@ export function bindInfo(): () => void {
     refresh.removeEventListener("click", onRefresh)
     body.removeEventListener("click", onBody)
     body.removeEventListener("submit", onSubmit)
+    body.removeEventListener("touchend", onTouchEnd)
     body.removeEventListener("keydown", onKeyDown)
   }
 }

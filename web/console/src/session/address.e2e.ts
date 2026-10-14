@@ -96,6 +96,7 @@ let projectRemoves = 0
 let projectFileText = "first instruction"
 let projectFileVersion = "version-one"
 let smartTitleRequests = 0
+let manualTitleRequests = 0
 let machineSettings: Record<string, unknown> = {
   codex_default_model: "",
   claude_default_model: "",
@@ -286,6 +287,18 @@ function daemon(): Server {
         downstream_synced: false,
         ...(smartTitleNamedBy ? { named_by: smartTitleNamedBy } : {}),
       }), () => json(res, 400, { error: "invalid_json", detail: "fixture could not read JSON" }))
+      return
+    }
+    const manualTitle = /^\/v1\/sessions\/([^/]+)\/title$/.exec(path)
+    if (manualTitle && req.method === "POST") {
+      manualTitleRequests++
+      void requestJSON(req).then((body) => {
+        const title = String(body.title ?? "")
+        const session = ROWS.find((candidate) => candidate.id === decodeURIComponent(manualTitle[1]))
+        if (session) session.label = title
+        json(res, 200, { ok: true, title, display_title: title, local_applied: true,
+          downstream: "local_only", downstream_synced: false })
+      }, () => json(res, 400, { error: "invalid_json", detail: "fixture could not read JSON" }))
       return
     }
     if (path === "/v1/health") return json(res, 200, { ok: true })
@@ -1241,6 +1254,49 @@ test("Settings selects provider model defaults, fits a phone, and restores a ref
     if (evidence) await tab.screenshot(join(evidence, "desktop-default-models.png"))
   })
 })
+
+test("phone: one touch on Save writes the edited Session title", () =>
+  inTab(PHONE, async (tab) => {
+    manualTitleRequests = 0
+    const session = ROWS.find((candidate) => candidate.id === TTY)!
+    const original = session.label
+    try {
+      await tab.go("/" + FRAGMENT[TTY])
+      await tab.until("the session opens", (s) => s.open === TTY)
+      await tab.run(`document.getElementById("detail-info")?.click()`)
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const read = () => {
+          if (document.querySelector("button[data-title-edit]")) return resolve(true)
+          if (Date.now() > deadline) return reject(new Error("the title editor did not become available"))
+          setTimeout(read, 25)
+        }
+        read()
+      })`)
+      await tab.run(`document.querySelector("button[data-title-edit]")?.click()`)
+      const touch = await tab.run(`(() => {
+        const input = document.querySelector(".title-editor input")
+        const save = document.querySelector('.title-editor button[type="submit"]')
+        input.value = "One tap saved this title"
+        const event = new Event("touchend", { bubbles: true, cancelable: true })
+        save.dispatchEvent(event)
+        return { canceled: event.defaultPrevented, editorShown: !!document.querySelector(".title-editor") }
+      })()`)
+      assert.equal(touch.canceled, true, "the touch is handled before the keyboard consumes its click")
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const read = () => {
+          if (document.querySelector(".session-title span")?.textContent === "One tap saved this title") return resolve(true)
+          if (Date.now() > deadline) return reject(new Error("the first touch did not save the title"))
+          setTimeout(read, 25)
+        }
+        read()
+      })`)
+      assert.equal(manualTitleRequests, 1)
+    } finally {
+      session.label = original
+    }
+  }))
 
 test("desk: smart naming explains the one model turn before it spends it, then saves the answer", () =>
   inTab(DESK, async (tab) => {
