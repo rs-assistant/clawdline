@@ -75,6 +75,7 @@
 | `git_too_large` | `internal/transport/http/git.go` |
 | `git_unavailable` | `internal/transport/http/git.go` |
 | `home_unavailable` | `internal/transport/http/project_files.go`, `internal/transport/http/project_folders.go` |
+| `icon_store_unavailable` | `internal/transport/http/projects.go`, `internal/transport/http/sessions.go` |
 | `idempotency_conflict` | `internal/transport/http/squad.go` |
 | `idempotency_key_required` | `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/work.go` |
 | `idempotency_key_reused` | `internal/transport/http/receipts.go` |

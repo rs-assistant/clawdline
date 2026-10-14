@@ -11,7 +11,9 @@
 package icon
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -176,17 +178,20 @@ type Registry struct {
 	// mirror is the settings another machine owns for a project here
 	// (internal/domain/projectsync). It wins over every local source, because
 	// a mirrored project's mark is by definition not this machine's to choose.
-	mirror       func(cwd string) (Grid, string, bool)
-	overrideMu   sync.Mutex
-	overridePath string
-	overrides    map[string]Grid
-	mu           sync.Mutex
-	path         string
+	mirror          func(cwd string) (Grid, string, bool)
+	overrideMu      sync.Mutex
+	overridePath    string
+	overrides       map[string]Grid
+	overrideData    []byte
+	overridePresent bool
+	mu              sync.Mutex
+	path            string
 	// home is this account's home directory. A row there names that
 	// directory alone, never its descendants; see covers.
-	home     string
-	stamp    string
-	projects map[string]entry
+	home          string
+	projects      map[string]entry
+	legacyData    []byte
+	legacyPresent bool
 }
 
 // Source says where a project's mark came from. Generated is the stable
@@ -210,35 +215,43 @@ func NewRegistry() *Registry {
 }
 
 func (r *Registry) load() map[string]entry {
+	_ = r.refreshLegacy()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.projects
+}
+
+// refreshLegacy follows the symlink target and compares its bytes. An atomic
+// replacement may preserve size and mtime, so a stat stamp alone is not enough.
+func (r *Registry) refreshLegacy() error {
 	if r.path == "" {
 		return nil
 	}
-	st, err := os.Stat(r.path)
-	if err != nil {
-		return nil
-	}
-	// Through the symlink deliberately: this file is normally a link into a
-	// checkout, and stat'ing the link gives a number that never changes.
-	stamp := fmt.Sprintf("%d:%d", st.Size(), st.ModTime().UnixNano())
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.stamp == stamp && r.projects != nil {
-		return r.projects
-	}
 	data, err := os.ReadFile(r.path)
+	if errors.Is(err, os.ErrNotExist) {
+		r.projects = nil
+		r.legacyData = nil
+		r.legacyPresent = false
+		return nil
+	}
 	if err != nil {
-		return r.projects
+		return err
+	}
+	if r.legacyPresent && bytes.Equal(data, r.legacyData) {
+		return nil
 	}
 	var root struct {
 		Projects map[string]entry `json:"projects"`
 	}
-	if json.Unmarshal(data, &root) != nil {
-		return r.projects
+	if err := json.Unmarshal(data, &root); err != nil {
+		return err
 	}
 	r.projects = root.Projects
-	r.stamp = stamp
-	return r.projects
+	r.legacyData = append([]byte(nil), data...)
+	r.legacyPresent = true
+	return nil
 }
 
 // For returns the mark for a working directory.
