@@ -1,4 +1,4 @@
-import type { Snippet, SnippetAnswer, SnippetControls } from "../legacy/snippets-bridge.js"
+import type { Snippet, SnippetAnswer, SnippetControls, WorkflowSource } from "../legacy/snippets-bridge.js"
 import { localizedWorkflow } from "../workflow-words.js"
 
 /**
@@ -140,11 +140,11 @@ const onMachine = (machine: string) => "?machine=" + encodeURIComponent(machine)
 export const readReusableTextForMachine = (machine: string): Promise<SnippetAnswer> =>
   call<SnippetAnswer>("/v1/snippets" + onMachine(machine)).then(localizeAnswer)
 
-export const createWorkflow = (machine: string, project: string, title: string, body: string): Promise<Snippet> =>
-  call<Snippet>("/v1/snippets" + onMachine(machine), writing("POST", project ? { title, body, scope: "workflow", project } : { title, body, scope: "workflow" }))
+export const createWorkflow = (machine: string, project: string, title: string, body: string, source?: WorkflowSource): Promise<Snippet> =>
+  call<Snippet>("/v1/snippets" + onMachine(machine), writing("POST", { title, body, scope: "workflow", ...(project ? { project } : {}), ...(source ? { source } : {}) }))
 
-export const updateWorkflow = (machine: string, id: string, title: string, body: string): Promise<Snippet> =>
-  call<Snippet>("/v1/snippets/" + encodeURIComponent(id) + onMachine(machine), writing("PATCH", { title, body }))
+export const updateWorkflow = (machine: string, id: string, title: string, body: string, source?: WorkflowSource | null): Promise<Snippet> =>
+  call<Snippet>("/v1/snippets/" + encodeURIComponent(id) + onMachine(machine), writing("PATCH", { title, body, ...(source !== undefined ? { source } : {}) }))
 
 export const deleteWorkflow = (machine: string, id: string): Promise<{ ok: boolean; deleted: string }> =>
   call<{ ok: boolean; deleted: string }>("/v1/snippets/" + encodeURIComponent(id) + onMachine(machine), writing("DELETE"))

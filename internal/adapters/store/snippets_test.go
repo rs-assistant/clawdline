@@ -55,6 +55,56 @@ func TestFreshMachineGetsEditableGlobalWorkflowAndDeletedSeedStaysDeleted(t *tes
 	}
 }
 
+func TestWorkflowSourceSurvivesReadsEditsAndRestart(t *testing.T) {
+	dir := t.TempDir()
+	st, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	source := &snippet.SourceRef{Kind: "command", FileID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", PlaceID: "place-one", Scope: "project", Name: "Release now", Version: "version-one"}
+	fields := snippet.Fields{Title: "Release", HasTitle: true, Body: "Start release.", HasBody: true, Scope: snippet.Workflow, HasScope: true, Project: "/one", HasProject: true, Source: source, HasSource: true}
+	if _, ref, err := st.CreateSnippet(ctx, "linked", fields, roomy, time.Unix(1, 0)); err != nil || ref != nil {
+		t.Fatal(ref, err)
+	}
+	if _, ref, err := st.UpdateSnippet(ctx, "linked", snippet.Fields{Body: "Check first.", HasBody: true}, roomy, time.Unix(2, 0)); err != nil || ref != nil {
+		t.Fatal(ref, err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	st, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	rows, err := st.Snippets(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var linked *snippet.Record
+	for i := range rows {
+		if rows[i].ID == "linked" {
+			linked = &rows[i]
+		}
+	}
+	if linked == nil || linked.Source == nil || linked.Source.Name != "Release now" || linked.Body != "Check first." {
+		t.Fatalf("source after restart: %+v", linked)
+	}
+	if _, ref, err := st.UpdateSnippet(ctx, "linked", snippet.Fields{HasSource: true}, roomy, time.Unix(3, 0)); err != nil || ref != nil {
+		t.Fatal(ref, err)
+	}
+	rows, err = st.Snippets(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range rows {
+		if row.ID == "linked" && row.Source != nil {
+			t.Fatalf("source survived unlink: %+v", row.Source)
+		}
+	}
+}
+
 func globalFields(title, body string) snippet.Fields {
 	return snippet.Fields{Title: title, HasTitle: true, Body: body, HasBody: true,
 		Scope: snippet.Global, HasScope: true}

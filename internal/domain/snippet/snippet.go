@@ -78,9 +78,21 @@ type Record struct {
 	Body      string
 	Scope     Scope
 	Project   string
+	Source    *SourceRef
 	Position  int64
 	CreatedAt int64
 	UpdatedAt int64
+}
+
+// SourceRef records where a Workflow was imported from. It is attribution,
+// never an instruction to execute or a copy of the source file.
+type SourceRef struct {
+	Kind    string `json:"kind"`
+	FileID  string `json:"file_id"`
+	PlaceID string `json:"place_id"`
+	Scope   string `json:"scope"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
 }
 
 // Refusal is one answer that is not a snippet: its status, the code a client
@@ -122,12 +134,14 @@ type Fields struct {
 	HasScope   bool
 	Project    string
 	HasProject bool
+	Source     *SourceRef
+	HasSource  bool
 }
 
 // writable is the exact set of keys a create or a save may carry. An unknown
 // key is refused rather than ignored: a client sending `postition` has a
 // defect, and accepting the body silently is how it ships.
-var writable = map[string]bool{"title": true, "body": true, "scope": true, "project": true}
+var writable = map[string]bool{"title": true, "body": true, "scope": true, "project": true, "source": true}
 
 // ParseFields reads a request body into Fields.
 //
@@ -142,6 +156,23 @@ func ParseFields(body map[string]any) (Fields, *Refusal) {
 		if !writable[key] {
 			return f, refuse(400, CodeMalformed,
 				"A snippet contains missing or unknown fields.", nil)
+		}
+		if key == "source" {
+			f.HasSource = true
+			if value == nil {
+				continue
+			}
+			fields, ok := value.(map[string]any)
+			if !ok || len(fields) != 6 {
+				return f, refuse(400, CodeMalformed, "A Workflow source is invalid.", nil)
+			}
+			read := func(name string) string { value, _ := fields[name].(string); return value }
+			source := &SourceRef{Kind: read("kind"), FileID: read("file_id"), PlaceID: read("place_id"), Scope: read("scope"), Name: read("name"), Version: read("version")}
+			if !validSource(source) {
+				return f, refuse(400, CodeMalformed, "A Workflow source is invalid.", nil)
+			}
+			f.Source = source
+			continue
 		}
 		text, ok := value.(string)
 		if !ok {
@@ -169,6 +200,25 @@ func ParseFields(body map[string]any) (Fields, *Refusal) {
 			})
 	}
 	return f, nil
+}
+
+func validSource(source *SourceRef) bool {
+	if source.Kind != "skill" && source.Kind != "command" {
+		return false
+	}
+	if source.Scope != "project" && source.Scope != "global" {
+		return false
+	}
+	if len(source.FileID) != 32 || len(source.PlaceID) == 0 || len(source.PlaceID) > 200 ||
+		len(source.Name) == 0 || len(source.Name) > MaxTitleBytes || len(source.Version) == 0 || len(source.Version) > 200 {
+		return false
+	}
+	for _, c := range source.FileID {
+		if !strings.ContainsRune("0123456789abcdef", c) {
+			return false
+		}
+	}
+	return true
 }
 
 // ScopeAgrees is the one agreement a scope and a project path have to reach,
@@ -221,7 +271,7 @@ func New(id string, f Fields, position, now int64) (Record, *Refusal) {
 // caller that has nothing to send has a sheet to close, and a request that
 // says nothing is a client defect worth naming.
 func Patch(current Record, f Fields, now int64) (Record, *Refusal) {
-	if !f.HasTitle && !f.HasBody && !f.HasScope && !f.HasProject {
+	if !f.HasTitle && !f.HasBody && !f.HasScope && !f.HasProject && !f.HasSource {
 		return Record{}, refuse(400, CodeMalformed,
 			"A snippet change contains no fields or an unknown field.", nil)
 	}
@@ -239,6 +289,9 @@ func Patch(current Record, f Fields, now int64) (Record, *Refusal) {
 	// under, so a save that only changes the title need not repeat the path.
 	if !f.HasProject && (merged.Scope == Project || merged.Scope == Workflow) && current.Project != "" {
 		merged.Project, merged.HasProject = current.Project, true
+	}
+	if !f.HasSource {
+		merged.Source = current.Source
 	}
 	return build(current.ID, merged, current.Position, current.CreatedAt, now)
 }
@@ -260,6 +313,9 @@ func build(id string, f Fields, position, createdAt, updatedAt int64) (Record, *
 		return Record{}, refuse(400, CodeMalformed,
 			"A reusable text's scope is `global`, `project`, or `workflow`.", nil)
 	}
+	if f.Source != nil && f.Scope != Workflow {
+		return Record{}, refuse(400, CodeMalformed, "Only a Workflow can link to a source.", nil)
+	}
 	if !ScopeAgrees(f) {
 		return Record{}, refuse(400, CodeScopeMismatch,
 			"Project snippets need one project path; workflows may be global or project-specific.", nil)
@@ -279,6 +335,7 @@ func build(id string, f Fields, position, createdAt, updatedAt int64) (Record, *
 	}
 	return Record{
 		ID: id, Title: title, Body: body, Scope: f.Scope, Project: project,
+		Source:   f.Source,
 		Position: position, CreatedAt: createdAt, UpdatedAt: updatedAt,
 	}, nil
 }

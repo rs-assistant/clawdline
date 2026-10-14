@@ -1808,6 +1808,32 @@ test("a phone imports an available global Skill as editable Workflow text, start
     })`)
     assert.equal(workflowRecords.length, 1)
     assert.equal(workflowRecords[0].scope, "workflow")
+    assert.deepEqual(workflowRecords[0].source, { kind: "skill", file_id: "global-skill-fixture",
+      place_id: "project-fixture", scope: "global", name: "Global Review", version: "fixture" })
+    assert.match(await tab.run(`document.querySelector('.workflow-list-source')?.textContent`), /Global Review/)
+    await tab.press('.workflow-list-source')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelector('.workflow-skill-overlay pre')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('list source detail did not load'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    await tab.press('.workflow-skill-overlay header button')
+    await tab.press('.workflow-list-main')
+    await tab.press('.workflow-source-row button:first-of-type')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (document.querySelectorAll('.workflow-skill-overlay .workflow-skill-content pre').length) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('linked Skill detail did not load'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.match(await tab.run(`document.querySelector('.workflow-skill-overlay pre')?.textContent`), /Check the evidence/)
+    await tab.press('.workflow-skill-overlay header button')
+    await tab.press('.workflow-editor .workflow-actions button:nth-child(2)')
     await tab.shot("workflow-project-page")
     await tab.run(`location.hash = ${JSON.stringify("session=" + encodeURIComponent(SAFE))}`)
     await tab.run(`new Promise((resolve, reject) => {

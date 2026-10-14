@@ -32,7 +32,9 @@
 .workflow-empty p { max-width: 29rem; margin: .85rem auto 1.8rem; color: var(--dim); line-height: 1.6; }
 .workflow-empty .workflow-actions { justify-content: center; }
 .workflow-list { display: grid; gap: .8rem; margin: 1.1rem 0; }
-.workflow-list button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; text-align: left; padding: 1.15rem 1.3rem; }
+.workflow-list-card { border: 1px solid var(--line); border-radius: .6rem; background: var(--card); overflow: hidden; }
+.workflow-page .workflow-list-main { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; text-align: left; padding: 1.15rem 1.3rem; border: 0; border-radius: 0; }
+.workflow-page .workflow-list-source { min-height: 0; margin: 0 1.3rem .8rem; padding: .25rem .45rem; border: 0; background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent); font-size: .82rem; text-align: left; }
 .workflow-list-copy { display: grid; gap: .45rem; min-width: 0; }
 .workflow-list-copy strong { font-size: 1.06rem; }
 .workflow-list-copy small { display: inline-block; margin-left: .45rem; padding: .15rem .45rem; border-radius: .35rem; color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); font-size: .72rem; font-weight: 600; vertical-align: middle; }
@@ -42,6 +44,9 @@
 .workflow-editor { position: fixed; inset: 0; z-index: 120; background: #000a; display: grid; place-items: center; padding: 1rem; }
 .workflow-editor form { width: min(100%, 42rem); max-height: 90dvh; overflow: auto; display: grid; gap: 1.2rem; padding: clamp(1.3rem, 3vw, 2rem); background: var(--card); border: 1px solid var(--line); border-radius: 1rem; box-shadow: 0 1rem 3rem #0005; }
 .workflow-editor h2 { margin: 0 0 .25rem; }
+.workflow-source-row { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; color: var(--dim); font-size: .88rem; }
+.workflow-source-row > span:first-child { width: 100%; font-weight: 600; }
+.workflow-page .workflow-source-row button { min-height: 2.3rem; padding: .4rem .7rem; font-size: .88rem; }
 .workflow-editor label { font-weight: 600; }
 .workflow-scope { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; margin: 0; padding: 0; border: 0; }
 .workflow-scope legend { margin-bottom: .4rem; font-weight: 600; }

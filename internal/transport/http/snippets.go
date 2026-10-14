@@ -56,15 +56,16 @@ const snippetBodyLimit = 64 << 10
 // console builds its next request out of what it was given, and the store
 // refuses a body carrying `project` beside `scope: "global"` at all.
 type snippetWire struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Body      string `json:"body"`
-	Scope     string `json:"scope"`
-	Project   string `json:"project,omitempty"`
-	Builtin   string `json:"builtin,omitempty"`
-	Position  int64  `json:"position"`
-	CreatedAt int64  `json:"created_at"`
-	UpdatedAt int64  `json:"updated_at"`
+	ID        string             `json:"id"`
+	Title     string             `json:"title"`
+	Body      string             `json:"body"`
+	Scope     string             `json:"scope"`
+	Project   string             `json:"project,omitempty"`
+	Source    *snippet.SourceRef `json:"source,omitempty"`
+	Builtin   string             `json:"builtin,omitempty"`
+	Position  int64              `json:"position"`
+	CreatedAt int64              `json:"created_at"`
+	UpdatedAt int64              `json:"updated_at"`
 }
 
 // snippetProjectWire is the project this machine resolved, which the sheet
@@ -108,6 +109,7 @@ func snippetOf(r snippet.Record) snippetWire {
 	w := snippetWire{
 		ID: r.ID, Title: r.Title, Body: r.Body, Scope: string(r.Scope),
 		Project: r.Project, Position: r.Position,
+		Source:    r.Source,
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 	if snippet.IsDefaultZeroReview(r) {
