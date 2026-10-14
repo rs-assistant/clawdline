@@ -425,7 +425,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
                     open={!!target && destinationKey(target) === destinationKey(row.destination)}
                     selectionKey={destinationKey(row.destination)}
                     swiped={swiped === destinationKey(row.destination)}
-                    consumePress={() => swipe.tookThePress()}
+                    consumePress={() => swipe.tookRowPress(destinationKey(row.destination))}
                     onClose={row.freshness === "current" && machine.freshness === "current"
                       ? () => { swipe.closeOpen(); thawOrder(); onCloseRequest(row.destination,
                         title) } : undefined}
