@@ -115,6 +115,8 @@ func (p *Places) List(live []string, limit int) []Place {
 		}
 		return out
 	}
+	// Recorded folders are found, not chosen; recorded and codexRecorded
+	// leave out the ones under ~/Library (library.go).
 	all := p.recorded(60, 240)
 	all = append(all, p.codexRecorded(60, 40)...)
 	if p.Registered != nil {
@@ -398,6 +400,11 @@ func (p *Places) recorded(folders, scan int) []Place {
 		if !ok {
 			continue
 		}
+		if InUserLibrary(path) {
+			// Found, not chosen, and never read in the background (library.go);
+			// p.label would read the folder for its icon.
+			continue
+		}
 		out = append(out, Place{ID: PlaceID(path), Path: path, Label: p.label(path), At: ts[0].at})
 	}
 	return out
@@ -654,6 +661,9 @@ func (p *Places) codexRecorded(days, limit int) []Place {
 	}
 	out := make([]Place, 0, len(list))
 	for _, w := range list {
+		if InUserLibrary(w.path) {
+			continue
+		}
 		out = append(out, Place{ID: PlaceID(w.path), Path: w.path, Label: p.label(w.path), At: w.at})
 	}
 	return out
