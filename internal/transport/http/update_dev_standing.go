@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/release"
 	"github.com/sainteye/clawdline/internal/adapters/release/updater"
 	"github.com/sainteye/clawdline/internal/contract"
@@ -99,13 +98,9 @@ func (s *Server) readDevStanding(dev, latest string) {
 // on 2026-10-15), and a git process the daemon starts there can make a macOS
 // privacy prompt name Clawdline. A clawdline checkout is not kept there.
 func (s *Server) placeDirectories(ctx context.Context) []string {
-	library := ""
-	if home, err := os.UserHomeDir(); err == nil {
-		library = filepath.Join(home, "Library") + string(filepath.Separator)
-	}
 	var dirs []string
 	for _, place := range s.squadListedPlaces(ctx) {
-		if library != "" && strings.HasPrefix(filepath.Clean(place.Path)+string(filepath.Separator), library) {
+		if projects.InUserLibrary(place.Path) {
 			continue
 		}
 		dirs = append(dirs, place.Path)

@@ -89,7 +89,12 @@ work=$(mktemp -d)
 # an EXIT trap runs, so a build that stopped half-way reported success
 # (v0.10.0, 2026-10-07). A run that did not reach its last line fails.
 finished=0
-trap 's=$?; rm -rf -- "$work"; if [ "$finished" != 1 ] && [ "$s" = 0 ]; then exit 1; fi' EXIT
+# shellcheck source=tools/release/codesign.sh
+. "$(dirname "$0")/codesign.sh"
+trap 's=$?; codesign_end; rm -rf -- "$work"; if [ "$finished" != 1 ] && [ "$s" = 0 ]; then exit 1; fi' EXIT
+if [ "$(uname -s)" = Darwin ]; then
+  codesign_begin
+fi
 
 if [ "$tests" = 1 ]; then
   ( umask 022; go test ./... )
@@ -136,10 +141,10 @@ carry_tmux() {
   cp "$built/tmux" "$stage/libexec/tmux"
   cp "$built/tmux.json" "$stage/libexec/tmux.json"
   cp "$built"/licenses/*.txt "$stage/licenses/"
-  # Signed ad hoc, like the daemon beside it: an arm64 Mac does not run an
-  # unsigned binary.
+  # Signed like the daemon beside it (codesign.sh): an arm64 Mac does not run
+  # an unsigned binary.
   if [ "$goos" = darwin ] && command -v codesign >/dev/null; then
-    codesign --force --sign - "$stage/libexec/tmux"
+    codesign_path "$stage/libexec/tmux"
   fi
 }
 
@@ -153,6 +158,11 @@ for target in $targets; do
   echo "building ${goos}/${goarch}…"
   CGO_ENABLED=0 GOOS=$goos GOARCH=$goarch go build -trimpath -buildvcs=true -ldflags "$ldflags" \
     -o "$stage/clawdline" ./cmd/clawdline
+  # The linker signs a darwin binary ad hoc; it is signed again with the
+  # build's certificate so its identity survives updates (codesign.sh).
+  if [ "$goos" = darwin ] && command -v codesign >/dev/null; then
+    codesign_path "$stage/clawdline"
+  fi
   cp -R "$dist" "$stage/dist"
   printf '{"stamp":"%s","committed_at":"%s","version":"%s"}\n' "$commit" "$committed_at" "$version" >"$stage/dist/BUILD.json"
   tar_into "$out/clawdline_${version}_${goos}_${goarch}.tar.gz" "$stage"

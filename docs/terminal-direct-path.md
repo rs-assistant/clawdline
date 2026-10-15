@@ -153,9 +153,18 @@ removed on 2026-10-06: a hidden page now keeps its Cloud connection exactly as a
   learn each end's public address and nothing else. There is no TURN server: when no direct pair
   works, the relay is the fallback, and running a TURN service would be a second relay.
 - **The machine only checks addresses it may reach.** It drops loopback, link-local, multicast and
-  unspecified candidates, never gathers on them, and accepts at most 32 candidates per offer. A
-  viewer who may already type into this machine's terminals can still make it send a few STUN
-  binding requests to private addresses of its choosing, within the offer rate. That residual risk
-  is accepted.
+  unspecified candidates, never gathers on them, and accepts at most 32 candidates per offer.
+- **Nothing is sent to the local network** (2026-10-16). macOS asks before a process reaches a device
+  on the local network, and the dialog names Clawdline: opening a Session on Cloud asked "allow
+  clawdline to find devices on your local network", because the viewer's offer carried its private
+  address and the machine sent checks there. So the machine also drops private (RFC 1918,
+  unique-local IPv6) candidates and `.local` names, never resolves mDNS (a resolution is a
+  multicast query), and leaves its own private host addresses out of its answer. The pair is made
+  over the public addresses STUN finds. The cost: a viewer on the same network, or in a browser on
+  the same Mac — the 198 ms mDNS pair measured above — reaches the machine only through the
+  router's public address, which some routers do not loop back; then the relay carries it, as for
+  any viewer without a direct pair. The local console is the fast path on the same Mac. This also
+  retires the earlier residual risk that a viewer could make the machine probe private addresses
+  of its choosing.
 - **No relay change.** Keeping receipts and registrations on the relay and probing it from the
   machine gives the relay's gate the same reach without a new relay message or deploy.
