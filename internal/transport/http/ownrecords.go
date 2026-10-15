@@ -160,6 +160,12 @@ func ownTasks(records []orchestrator.Record, byTerminal map[string]swiftstore.Li
 			ChildTerminal: stringPtr(r.ChildTerminalID),
 			ChildBackend:  stringPtr(r.ChildBackend),
 		}
+		if r.Callback != nil {
+			t.CallbackIntent = r.Callback.Intent
+			if t.CallbackIntent == "" {
+				t.CallbackIntent = orchestrator.CallbackIntentWait
+			}
+		}
 		if r.State.Terminal() {
 			at := r.FinishedAt
 			if at.IsZero() {

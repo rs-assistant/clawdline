@@ -630,7 +630,11 @@ export function featureRootChip(session) {
  * at its end of the same press, so a page holding a stale frame cannot close past it blindly.
  */
 export function lostIfClosed(id) {
-    var lost = tasksOfRoot(id).filter(taskLive).map(function (t) { return t.title || t.id; });
+    // A wait callback outlives its root: the daemon stops only heavy ones at
+    // a close, so a wait is not something the close takes away.
+    var lost = tasksOfRoot(id).filter(function (t) {
+        return taskLive(t) && t.callback_intent !== "wait";
+    }).map(function (t) { return t.title || t.id; });
     var s = byId(id);
     var waiters = ((s && s.coordination && s.coordination.waitedOnBy) || []).length;
     if (waiters === 1) lost.push(T.sessionWaitedOnByOne);
