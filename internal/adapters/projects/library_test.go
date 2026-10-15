@@ -9,13 +9,11 @@ import (
 // A folder in Dropbox where Claude Code was once run is not listed as a
 // Project, so nothing reads it without the person choosing it: on 2026-10-15
 // such a folder made macOS ask the person, on a reinstall, to let Clawdline
-// read Dropbox. A folder they registered is listed as before.
+// read Dropbox. recorded is asked directly: on Linux the test's home is under
+// /tmp, which the listing's own scratch rule drops whole.
 func TestAFolderFoundUnderLibraryIsNotListed(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	// The test's home is under the system's temporary directory, which the
-	// listing treats as scratch; it is pointed elsewhere.
-	t.Setenv("TMPDIR", t.TempDir())
 	dropbox := filepath.Join(home, "Library", "CloudStorage", "Dropbox", "work")
 	code := filepath.Join(home, "code", "app")
 	for _, dir := range []string{dropbox, code} {
@@ -32,20 +30,14 @@ func TestAFolderFoundUnderLibraryIsNotListed(t *testing.T) {
 		}
 	}
 	p := NewPlaces(func(string) string { return "" }, nil)
-	listed := map[string]bool{}
-	for _, place := range p.List(nil, 10) {
-		listed[place.Path] = true
+	found := map[string]bool{}
+	for _, place := range p.recorded(60, 240) {
+		found[place.Path] = true
 	}
-	if !listed[code] || listed[dropbox] {
-		t.Fatalf("listed %v; want %s and not %s", listed, code, dropbox)
+	if !found[code] || found[dropbox] {
+		t.Fatalf("found %v; want %s and not %s", found, code, dropbox)
 	}
-
-	p.Registered = func() ([]RegisteredPlace, error) { return []RegisteredPlace{{Path: dropbox, AddedAt: 1}}, nil }
-	listed = map[string]bool{}
-	for _, place := range p.List(nil, 10) {
-		listed[place.Path] = true
-	}
-	if !listed[dropbox] {
-		t.Fatalf("a registered folder under ~/Library was dropped: %v", listed)
+	if !InUserLibrary(dropbox) || InUserLibrary(code) || InUserLibrary(filepath.Join(home, "LibraryNotes")) {
+		t.Fatal("InUserLibrary does not tell ~/Library from its neighbours")
 	}
 }

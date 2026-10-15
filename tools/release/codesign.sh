@@ -38,7 +38,7 @@ codesign_begin() {
   # in codesign_end.
   local list=()
   while IFS= read -r k; do [ -n "$k" ] && list+=("$k"); done <<<"$codesign_search"
-  security list-keychains -d user -s "${list[@]}" "$codesign_keychain"
+  security list-keychains -d user -s ${list[@]+"${list[@]}"} "$codesign_keychain"
   CLAWDLINE_CODESIGN_ID=$(security find-identity -p codesigning "$codesign_keychain" |
     awk '/[0-9A-F]{40}/ { print $2; exit }')
   [ -n "$CLAWDLINE_CODESIGN_ID" ] || { codesign_end; echo "no code-signing identity in $CLAWDLINE_CODESIGN_P12" >&2; return 1; }
@@ -58,7 +58,7 @@ codesign_end() {
   [ "${codesign_owner:-0}" = 1 ] || return 0
   local list=()
   while IFS= read -r k; do [ -n "$k" ] && list+=("$k"); done <<<"$codesign_search"
-  [ ${#list[@]} = 0 ] || security list-keychains -d user -s "${list[@]}"
+  [ ${#list[@]} = 0 ] || security list-keychains -d user -s ${list[@]+"${list[@]}"}
   security delete-keychain "$codesign_keychain" 2>/dev/null || true
   rm -rf "$codesign_dir"
   codesign_owner=0
