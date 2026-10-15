@@ -96,12 +96,16 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
     }
   }
 
-  const visible = Boolean(version || sending || following || (!dismissedResult && (completed || checkFailed || pressRefused || pressOlder || problem)))
+  const finishedVersion = last.current?.apply?.state === "healthy" ? last.current.apply.to : ""
+  const visible = Boolean(version || sending || following || (!dismissedResult && (
+    completed || checkFailed || pressRefused || pressOlder || problem || view.progress || (view.done && dismissed !== finishedVersion)
+  )))
   if (!visible) return null
   const dismiss = () => {
-    if (version) {
-      setDismissed(version)
-      try { localStorage.setItem(UPDATE_BANNER_DISMISSED_KEY, version) } catch { /* current page only */ }
+    const dismissedRelease = version || finishedVersion
+    if (dismissedRelease) {
+      setDismissed(dismissedRelease)
+      try { localStorage.setItem(UPDATE_BANNER_DISMISSED_KEY, dismissedRelease) } catch { /* current page only */ }
     }
     setCompleted(false)
     setDismissedResult(true)
@@ -110,15 +114,22 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
     setPressOlder(false)
   }
   const canPress = read?.kind === "status" && (Boolean(version) || view.press.shown) && !sending && !following && !completed
+  const busy = Boolean(sending || following || view.progress)
   const message = checkFailed ? nextWord("updateIsUnknown")
-    : dismissedResult ? null : problem?.sentence || view.progress || (completed ? view.done || nextWord("updateHealthy", { to: target }) : null)
+    : dismissedResult ? null : problem?.sentence || view.progress || (sending ? nextWord("updateVerifying", { to: target }) : null)
+      || (completed ? view.done || nextWord("updateHealthy", { to: target }) : null)
+      || (view.done && dismissed !== finishedVersion ? view.done : null)
 
   return (
-    <div className="update-banner" id={embedded ? undefined : "update-banner"} role="status" data-version={version || target}>
+    <div className="update-banner" id={embedded ? undefined : "update-banner"} role="status" aria-busy={busy} data-version={version || target}>
       {version && !sending && !following && !completed && !problem ? (
         <span className="update-banner-say" lang={catalogWordLanguage("next", "updateBanner")}>{nextWord("updateBanner", { version })}</span>
       ) : null}
-      {message ? <span className="update-banner-say" aria-live="polite">{message}</span> : null}
+      {message ? <span className="update-banner-say" aria-live="polite">
+        {busy ? <span className="update-banner-spinner" aria-hidden="true" /> : null}
+        {message}
+        {view.staged ? <small className="update-banner-staged">{view.staged}</small> : null}
+      </span> : null}
       {pressOlder ? <code className="update-command">{INSTALL_COMMAND}</code> : null}
       {canPress && !checkFailed ? (
         <button className="chip update-banner-go" type="button" onClick={() => void press()}>

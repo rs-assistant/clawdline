@@ -216,7 +216,9 @@ The panel shows the running and latest version (a short commit for a source buil
   The seconds in which the daemon restarts and no read answers show as restarting, not as a
   failure; when the new daemon serves a different console, the page reloads itself.
 - `rolled_back` and `failed` show `apply.error.code` and `detail` and say the previous release still
-  runs. `staged_app` says the app is replaced once it is quit.
+  runs. The session-list banner animates while an update is checking or moving, keeps the completed
+  result visible after a page reload until dismissed, and shows `staged_app` beside that result: the
+  daemon has updated, while the open Mac app keeps its old bundle until the person next quits it.
 - **自動更新** writes `update_auto_apply` through `/v1/settings`. Over Cloud it is shown but disabled,
   with a sentence saying to change it on the machine: the settings route takes only the machine's
   own token.
