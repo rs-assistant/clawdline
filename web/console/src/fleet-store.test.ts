@@ -36,3 +36,26 @@ test("a complete reading taken after a Session was last seen still takes it off 
   )
   assert.deepEqual(list.sessions.map((r: { id: string }) => r.id), ["%1"])
 })
+
+test("a Session the machine's newer complete set leaves out goes, even from a partial reading of an older pass", () => {
+  const partial = { ...reading(2, 150, [row("%1", 150)]), inventory: { at: 260, sessions: ["%1"] } }
+  partial.scan = { ...partial.scan, complete: false, completed: { complete: false, sequence: 2 } }
+  const list = held(reading(1, 200, [row("%1", 200), row("%2", 200)]), partial)
+  assert.deepEqual(list.sessions.map((r: { id: string }) => r.id), ["%1"])
+})
+
+test("a set taken before a Session was seen does not take that Session off the list", () => {
+  const list = held(
+    reading(1, 200, [row("%1", 200), row("%2", 200)]),
+    { ...reading(2, 150, [row("%1", 150)]), inventory: { at: 150, sessions: ["%1"] } },
+  )
+  assert.deepEqual(list.sessions.map((r: { id: string }) => r.id).sort(), ["%1", "%2"])
+})
+
+test("a Session this page closed goes from the list though the reading was taken before it was last seen", () => {
+  const list = held(
+    reading(1, 200, [row("%1", 200), row("%2", 200)]),
+    { ...reading(2, 150, [row("%1", 150)]), closed: ["%2"] },
+  )
+  assert.deepEqual(list.sessions.map((r: { id: string }) => r.id), ["%1"])
+})
