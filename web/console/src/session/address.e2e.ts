@@ -152,6 +152,9 @@ const PERSONAS = PERSONA_NAMES.map(([id, en, zh]) => ({
 let createdWork: Record<string, unknown> | null = null
 let createdWorkBody: Record<string, unknown> | null = null
 let assignmentReply: (() => void) | null = null
+// While set, `/v1/sessions` is answered only when the test releases it: the
+// Session list a Cloud relay can take seconds to state.
+let heldSessions: (() => void)[] | null = null
 let personaSuggestionRequests = 0
 let personaSuggestionKey = ""
 const PROJECT_ICON = {
@@ -223,7 +226,10 @@ function daemon(): Server {
       if (!existsSync(file)) return json(res, 404, { error: "catalog_missing" })
       return json(res, 200, JSON.parse(readFileSync(file, "utf8")))
     }
-    if (path === "/v1/sessions") return json(res, 200, snapshot())
+    if (path === "/v1/sessions") {
+      if (heldSessions) return void heldSessions.push(() => json(res, 200, snapshot()))
+      return json(res, 200, snapshot())
+    }
     if (path === "/v1/settings/default-models" && req.method === "GET") return json(res, 200, machineSettings)
     if (path === "/v1/settings/default-models" && req.method === "POST") {
       void requestJSON(req).then((change) => {
@@ -432,6 +438,7 @@ function daemon(): Server {
       return
     }
     if (path === "/v1/work/v2/proposals") return json(res, 200, { rows: [], truncated: false })
+    if (path === "/v1/work/decisions") return json(res, 200, { counts: {}, rows: [], next_cursor: null })
     if (path === "/v1/intents" && req.method === "POST") {
       intentRequests++
       void requestJSON(req).then((body) => {
@@ -703,8 +710,16 @@ async function inTab(size: { width: number; height: number; mobile: boolean }, b
   try {
     await body(tab)
   } finally {
+    releaseSessions()
     await tab.close()
   }
+}
+
+/** Answers every held `/v1/sessions` and stops holding, so no later test waits on one. */
+function releaseSessions() {
+  const held = heldSessions ?? []
+  heldSessions = null
+  for (const answer of held) answer()
 }
 
 let server: Server
@@ -2109,8 +2124,11 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
       title.dispatchEvent(new Event("input", { bubbles: true }))
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(description, "Keep this item open so it can be assigned.")
       description.dispatchEvent(new Event("input", { bubbles: true }))
-      document.querySelector(".work-new-modal form").requestSubmit()
     })()`)
+    // The Board's refresh after creating waits on the Session list, which a
+    // Cloud relay can take seconds to state; the new card does not wait with it.
+    heldSessions = []
+    await tab.run(`document.querySelector(".work-new-modal form").requestSubmit()`)
     const card = await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 5000
       const read = () => {
@@ -2173,7 +2191,7 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
         rolesScrollSideways: true, roleEdgeRoom: 7 },
       title: "React console shortcut",
       eyebrow: "工作項目已建立",
-      kind: "Issue · 建立",
+      kind: "Issue · 已建立",
       missing: "0",
       roleDescription: null,
       chosenRole: "不指定",
@@ -2186,6 +2204,19 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
       sessionsPage: true,
       boardPage: false,
     })
+    assert.ok(heldSessions && heldSessions.length > 0, "the Session list read after creating was not held")
+    assert.deepEqual(await tab.run(`(() => {
+      const route = document.querySelector('.work-created-modal [aria-labelledby^="work-assign-new-"]')
+      const disabled = (selector) => [...route.querySelectorAll(selector)].map((button) => button.disabled)
+      return {
+        assistants: disabled(".work-new-session:not(.work-new-persona) .chip"),
+        ai: disabled(".work-persona-ai-button"),
+        firstRole: route.querySelector(".work-new-persona .chip")?.disabled,
+        open: disabled(".work-assignment-action"),
+      }
+    })()`), { assistants: [false, false], ai: [false], firstRole: false, open: [false] },
+    "the new card waited for the Board's refresh before it could be assigned")
+    releaseSessions()
     assert.equal(personaSuggestionRequests, 0, "opening and rendering the item must not call AI")
     await tab.shot("smart-role-phone-light")
     await tab.view(PHONE, "dark")
@@ -2283,8 +2314,8 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
       }
     })()`), { chosenRole: "不指定", aiStatus: "AI 建議：後端工程師目前已改選其他角色" })
 
-    // When this context has no eligible Session, the menu explains why and
-    // still offers no confirmation action.
+    // The menu lists this Project's Sessions, and nothing is confirmed until
+    // one of them is chosen.
     await tab.run(`document.querySelector('.work-created-modal .work-session-trigger').click()`)
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 5000
@@ -2298,10 +2329,11 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
     assert.deepEqual(await tab.run(`(() => {
       const card = document.querySelector('.work-created-modal .work-v2-card')
       return {
-        empty: card.querySelector('.work-session-menu')?.textContent,
+        listed: ["Alpha on a tmux pane", "Bravo on a tty", "Charlie in iTerm", "Delta from an old link"]
+          .every((label) => card.querySelector('.work-session-menu')?.textContent?.includes(label)),
         action: card.querySelector('[aria-labelledby^="work-assign-existing-"] .work-assignment-action')?.textContent ?? null,
       }
-    })()`), { empty: "這個 Project 目前沒有可用的 Session。", action: null })
+    })()`), { listed: true, action: null })
 
     // Hold a real assignment request so its loading control can be measured.
     await tab.run(`document.querySelector('.work-created-modal [aria-labelledby^="work-assign-new-"] .work-assignment-action').click()`)
