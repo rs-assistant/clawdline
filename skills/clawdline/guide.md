@@ -1149,7 +1149,9 @@ This is `POST /v1/orchestrator/messages` with `{from_session, to_session, text}`
 - Refusals: `source_not_found`, `target_not_found`, `same_session`, `target_busy` (the recipient
   shows a menu; nothing was typed), `terminal_busy`, `delivery_failed`.
 
-**Show the person a picture.** Do not paste a local path: on a phone it opens nothing.
+**Show the person a picture.** Do not paste a local path: on a phone it opens nothing. This is
+the route whenever the person asks to see an image — "send me the picture", "show me the
+screenshot", 「傳圖片給我」「給我看截圖」 — and whenever a screenshot you took is part of your answer.
 
 ```
 POST /v1/artifacts/images    {"images": [{"path": "/absolute/path.png"}]}

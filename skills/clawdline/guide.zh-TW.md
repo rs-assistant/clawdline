@@ -998,7 +998,8 @@ envelope。
 - 拒絕：`source_not_found`、`target_not_found`、`same_session`、`target_busy`（收件者正在顯示選單；
   什麼都沒打進去）、`terminal_busy`、`delivery_failed`。
 
-**給使用者看一張圖。** 不要貼本機路徑：在手機上點了什麼都打不開。
+**給使用者看一張圖。** 不要貼本機路徑：在手機上點了什麼都打不開。使用者說要看圖時——「傳圖片給我」
+「給我看截圖」"send me the picture" "show me the screenshot"——以及你截的圖是回答的一部分時，都走這條。
 
 ```
 POST /v1/artifacts/images    {"images": [{"path": "/absolute/path.png"}]}
