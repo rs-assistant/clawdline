@@ -76,7 +76,7 @@ the command instead.
 | `clawdline send --to <terminal> "…"` | Relays a message into another session (§8) |
 | `clawdline notify --title "…" --body "…"` | Pushes a notification to the person (§9) |
 | `clawdline note create --body-file <JSON> [--target <terminal>]` | Leaves one actionable note above a Session (§9a) |
-| `clawdline image send <picture>…` | Shows the person pictures under this Session's next reply (§8) |
+| `clawdline image send <picture>…` | Shows the person pictures under this Session's reply (§8) |
 | `clawdline assistants` | What each assistant's account has left |
 | `clawdline landings` | Every landing still owed on this machine; `--work-id <item id>`: every landing recorded for one Board item |
 | `clawdline leases [--json]` | Who holds the compile slot and each landing lease, and who waits behind them |
@@ -1158,13 +1158,15 @@ screenshot", 「傳圖片給我」「給我看截圖」 — and whenever a scree
 clawdline image send /absolute/path.png [more.png …]
 ```
 
-It stores the pictures as shown in your own Session, and the console draws them under **the next
-reply your Session writes**. Nothing has to be written into that reply. It is
+It stores the pictures as shown in your own Session, and the console draws them under **the first
+reply your Session writes into its record after they are stored** — usually the message that ran
+the command, since Claude Code records it after the command starts, otherwise the next one.
+Nothing has to be written into it. It is
 `POST /v1/artifacts/images` with `{"images": [{"path": …}], "terminal": "<your terminal id>"}`.
 
 - **Stored is not seen.** The command answering is not the person seeing the pictures. They appear
-  once your next reply is written; `GET /v1/transcript?session=<terminal id>` then lists them in that
-  reply's `artifacts`. Send them before the reply that talks about them, not after it.
+  once that reply is in the record; `GET /v1/transcript?session=<terminal id>` then lists them in that
+  reply's `artifacts`. Send them in the message that talks about them, or before it.
 - Do not rely on a `<clawdline-image id="…">` marker written into your prose. Newer models keep the
   prose written between two tool calls only as a summary of it, and the marker goes with it: the
   upload answers 200, the reply is written, and the person sees nothing. A marker still works where a
