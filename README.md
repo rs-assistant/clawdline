@@ -7,11 +7,9 @@
 
 **See which Claude Code and Codex Sessions need you, then open one to respond or leave a to-do.**
 
-Illustrative demo based on the console:
+One console flow, recorded with sample data:
 
-<img src="docs/assets/cloud-sessions-demo.gif" width="390" alt="Sample Cloud console: a Session list shows one waiting for you; opening it reveals its to-do.">
-
-<img src="docs/assets/agent-picture-demo.png" width="390" alt="Sample Session view: an Agent sends a picture in its reply, with a thumbnail that opens for inspection.">
+<img src="docs/assets/cloud-sessions-demo.gif" width="390" alt="A phone recording of the console: pixel-marked Sessions, one waiting for you; open it to see a to-do and an image sent by the Agent, then enlarge the image.">
 
 ## What you can do
 
