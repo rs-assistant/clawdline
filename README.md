@@ -5,11 +5,13 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8.svg)](go.mod)
 
-**See which Claude Code and Codex Sessions need you, then open one to respond or leave a to-do.**
+**With Clawdline Cloud, see Claude Code and Codex Sessions across your machines in one phone list, then open one to reply or leave a to-do.**
 
-One console flow, recorded with sample data:
+One continuous console recording with sample data:
 
-<img src="docs/assets/cloud-sessions-demo.gif" width="390" alt="A phone recording of the console: pixel-marked Sessions, one waiting for you; open it to see a to-do and an image sent by the Agent, then enlarge the image.">
+<img src="docs/assets/cloud-sessions-demo-en.gif" width="390" alt="A phone recording of Clawdline Cloud: pixel-marked Sessions grouped under Studio Mac and Build Linux, one waiting for you; open it to see a to-do and a map webpage screenshot sent by the Agent, then enlarge the image.">
+
+[Herdr](https://github.com/herdrdev/herdr/blob/master/docs/versions/0.9.1/website/src/content/docs/connecting-machines.mdx) also lists agents across SSH machines in one TUI; [T3 Code](https://github.com/pingdotgg/t3code/blob/main/docs/user/remote-access.md) connects to multiple environments. Clawdline Cloud groups them in a phone browser list and opens their conversations, to-dos, and images there.
 
 ## What you can do
 
@@ -19,7 +21,7 @@ One console flow, recorded with sample data:
 - **Delegate and track delivery:** [Dispatch](docs/user/clawdfather-and-dispatch.md) to another Session, verify that its work landed, and follow larger work on the optional [Board](docs/user/board.md).
 - **Run work later:** Queue long commands with [callbacks](docs/user/clawdfather-and-dispatch.md#callbacks-for-long-commands) or start tasks with [schedules](docs/user/schedules.md). Cloud Pro adds webhook triggers.
 - **Bring your projects together:** [Register projects](docs/user/projects.md), share rules and skills across Claude Code and Codex with [unify](docs/project-files.md#unify), and see [usage](docs/user/usage.md).
-- **Use another device:** Open the console through [remote access](docs/user/remote-access.md), including optional end-to-end encrypted Clawdline Cloud.
+- **See every machine:** [Clawdline Cloud](docs/user/remote-access.md) shows Sessions from multiple machines together on your phone and connects through an end-to-end encrypted relay.
 
 Clawdline runs the daemon and console on your machine and works with Claude Code and Codex Sessions you already use. Cloud is optional; its relay carries encrypted data. [How it works](docs/architecture.md)
 
