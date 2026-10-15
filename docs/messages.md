@@ -103,39 +103,41 @@ and retained long enough to distinguish deletion from an unknown id. Pruning rem
 whose opaque ids and metadata belong to this store; its directory is mode `0700` and its files are
 `0600`. `CLAWDLINE_SESSION_IMAGE_DIR` moves the whole deleting store, including for isolated tests.
 
-## The marker a session writes in its own reply
+## Pictures a session shows the person
 
 The route above cannot show a picture to the session that is speaking. It delivers by typing into
 the target terminal, and injected text is a `user` turn — so a session sending itself an envelope
 would be handing itself a new instruction, and `POST /v1/orchestrator/messages` refuses
 `same_session`. That refusal is correct and is not going anywhere.
 
-What replaces it keeps Clawdline reading transcripts and writing none. `POST /v1/artifacts/images`
-stores the bytes through the same owned store and answers with the same reference plus a ready-made
-`marker`; the session pastes that marker into the reply it was already writing, its own CLI records
-that turn, and the transcript reader resolves the marker when it reads that turn back. The request
-body has **only** `images`, with 1…6 local files, each as an object with exactly one absolute
-`path`. Each file must be a plain file no larger than 12 MiB or 12,000 px on a side. A local path
-printed in the reply is not a phone-readable picture.
-
-For one screenshot, call the local daemon and keep the orchestrator token out of the command line
-and transcript. Substitute the actual absolute path; then copy the returned `artifacts[0].marker`
-into the **assistant reply in that same Session**, outside a code fence:
+What replaces it keeps Clawdline reading transcripts and writing none:
 
 ```sh
-DIR="${CLAWDLINE_NEXT_DIR:-$HOME/.config/clawdline-next}"
-curl --fail-with-body -sS -X POST http://127.0.0.1:7727/v1/artifacts/images \
-  -H @<(printf 'X-Clawdline-Orchestrator: %s\n' "$(cat "$DIR/orchestrator-token")") \
-  -H 'Content-Type: application/json' \
-  --data '{"images":[{"path":"/absolute/path/to/screenshot.png"}]}'
+clawdline image send /absolute/path/to/screenshot.png
 ```
 
-The response has `ok: true` and an `artifacts` array. Use its returned marker verbatim; do not
-invent an id, add dimensions or wrap it in Markdown image syntax. The marker is resolved when the
-transcript is read, and Cloud carries the resulting image from the paired machine. The browser
-does not read the original local path. Cloud accepts the stored image's `image/png` or `image/jpeg`
-media type; changing a JPEG filename to `.png` does not change its bytes or media type. Use
-`clawdline guide send` again if the installed daemon's contract changes.
+It is `POST /v1/artifacts/images` with `{"images": [{"path": …}], "terminal": "<terminal id>"}`,
+the terminal being the caller's own Session. The store keeps each picture with the conversation record of
+that Session and the start of the first row written after it (`artifacts.Shown`); the transcript
+route reads forward from there to the first assistant entry, keeps that row as the picture's
+anchor, and draws the picture under that entry on every page (`images_shown.go`). The model's text
+is not involved. A row still being written is left out of the offset, so it always meets a row's
+start. The request body has `images`, with 1…6 local files, each as an object with exactly one
+absolute `path`, and optionally `terminal`. Each file must be a plain file no larger than 12 MiB or
+12,000 px on a side. A local path printed in the reply is not a phone-readable picture.
+
+**This used to be a marker.** The response still carries a `marker` for each picture, and a reply
+that contains one still shows it (once: a shown picture whose reply also carries its marker is drawn
+a single time). But on 2026-10-15 two Sessions on Opus 5.5 stored pictures, were answered 200,
+wrote the markers between two tool calls, and the person saw nothing: those models keep prose
+written between tool calls only as a summary of it in the record, and the marker went with the rest.
+Nothing told either agent. So the guide no longer asks for a marker, and says plainly that stored is
+not seen — `GET /v1/transcript?session=…` lists the pictures in their reply's `artifacts` once it is
+written. Claude Code's `SendUserFile` does not reach the Clawdline console.
+
+The browser does not read the original local path; Cloud carries the image from the paired machine.
+Cloud accepts the stored image's `image/png` or `image/jpeg` media type; changing a JPEG filename
+to `.png` does not change its bytes or media type.
 
 The spelling is exactly one, and it carries an id and nothing else:
 

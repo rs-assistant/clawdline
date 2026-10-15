@@ -190,6 +190,7 @@ func (s *Server) transcriptPageBefore(id string, item session.Session, limit int
 		row.Artifacts = s.pictures.wireArtifacts(e, now)
 		entries = append(entries, row)
 	}
+	s.showPictures(item, path, read.Entries, entries, now)
 	kept, omitted := boundedTranscriptRows(entries, read.Entries)
 	page.Entries = kept
 	page.NextBefore = read.NextBefore
@@ -251,6 +252,7 @@ func (s *Server) transcriptPageAfter(id string, item session.Session, limit int,
 		row.Artifacts = s.pictures.wireArtifacts(e, now)
 		entries = append(entries, row)
 	}
+	s.showPictures(item, path, read.Entries, entries, now)
 	kept, omitted := boundedTranscriptRows(entries, read.Entries)
 	if omitted > 0 {
 		return page, true

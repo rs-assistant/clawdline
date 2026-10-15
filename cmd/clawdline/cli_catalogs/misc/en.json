@@ -255,5 +255,13 @@
   "coordination.timed_out": "The lease wait ended before a grant; the command did not run.",
   "coordination.release_failed": "The lease release could not be confirmed; inspect the holder before another exclusive operation.",
   "tmux.passed": "  (%s)\n",
-  "tmux.none": "clawdline tmux: there is no tmux on this machine, and this build carries none"
+  "tmux.none": "clawdline tmux: there is no tmux on this machine, and this build carries none",
+  "image.usage": "usage: clawdline image send <picture> [<picture>…] [--target <terminal id>] [--from <conversation id>] [--port n]",
+  "image.usage_detail": "  one to six PNG, JPEG or GIF files; they appear under the next reply this Session writes",
+  "image.no_conversation": "clawdline image send: %s Nothing was sent.\n",
+  "image.name_a_session": "clawdline image send: run it inside a Session, or name one with --target. Nothing was sent.",
+  "image.failed": "clawdline image send:",
+  "image.whoami_no_terminal": "clawdline image send: whoami answered without a terminal id. Nothing was sent.",
+  "image.stored_shown": "Stored %d picture(s) for Session %s. They appear under the next reply this Session writes; nothing has to be written into it.\n",
+  "image.check": "Stored is not seen: GET /v1/transcript?session=%s lists them in that reply's artifacts once it is written.\n"
 }

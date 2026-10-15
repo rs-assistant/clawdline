@@ -76,6 +76,7 @@ the command instead.
 | `clawdline send --to <terminal> "…"` | Relays a message into another session (§8) |
 | `clawdline notify --title "…" --body "…"` | Pushes a notification to the person (§9) |
 | `clawdline note create --body-file <JSON> [--target <terminal>]` | Leaves one actionable note above a Session (§9a) |
+| `clawdline image send <picture>…` | Shows the person pictures under this Session's next reply (§8) |
 | `clawdline assistants` | What each assistant's account has left |
 | `clawdline landings` | Every landing still owed on this machine; `--work-id <item id>`: every landing recorded for one Board item |
 | `clawdline leases [--json]` | Who holds the compile slot and each landing lease, and who waits behind them |
@@ -1153,15 +1154,26 @@ This is `POST /v1/orchestrator/messages` with `{from_session, to_session, text}`
 the route whenever the person asks to see an image — "send me the picture", "show me the
 screenshot", 「傳圖片給我」「給我看截圖」 — and whenever a screenshot you took is part of your answer.
 
-```
-POST /v1/artifacts/images    {"images": [{"path": "/absolute/path.png"}]}
+```sh
+clawdline image send /absolute/path.png [more.png …]
 ```
 
+It stores the pictures as shown in your own Session, and the console draws them under **the next
+reply your Session writes**. Nothing has to be written into that reply. It is
+`POST /v1/artifacts/images` with `{"images": [{"path": …}], "terminal": "<your terminal id>"}`.
+
+- **Stored is not seen.** The command answering is not the person seeing the pictures. They appear
+  once your next reply is written; `GET /v1/transcript?session=<terminal id>` then lists them in that
+  reply's `artifacts`. Send them before the reply that talks about them, not after it.
+- Do not rely on a `<clawdline-image id="…">` marker written into your prose. Newer models keep the
+  prose written between two tool calls only as a summary of it, and the marker goes with it: the
+  upload answers 200, the reply is written, and the person sees nothing. A marker still works where a
+  reply keeps it; it is no longer the way to show a picture.
+- Claude Code's `SendUserFile` does not reach the Clawdline console.
 - Orchestrator token only. One to six local files; each must be a plain file, at most 12 MiB and
   12,000 px a side. PNG, JPEG and GIF are read directly; other formats go through `sips` on macOS.
-- The answer lists `artifacts`, each with a `marker` such as `<clawdline-image id="…">`. **Put the
-  marker in your reply**; the console shows the picture where the marker is. Pictures are kept 24
-  hours.
+  Pictures are kept 24 hours. Refusals: `session_not_found`, `session_has_no_record` (the Session
+  has not written its first conversation yet).
 
 ## 9. Tell the person
 

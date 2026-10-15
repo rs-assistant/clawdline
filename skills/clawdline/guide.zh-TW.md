@@ -70,6 +70,7 @@ Swift app 已於 2026-09-19 退役：它被停掉、取消了登入時啟動，p
 | `clawdline send --to <terminal> "…"` | 把一則訊息轉進另一個 session（§8） |
 | `clawdline notify --title "…" --body "…"` | 推播一則通知給使用者（§9） |
 | `clawdline note create --body-file <JSON> [--target <terminal>]` | 在 Session 上方留下需要人處理的便條（§9a） |
+| `clawdline image send <picture>…` | 把圖片顯示在這個 Session 下一則回覆底下給使用者看（§8） |
 | `clawdline assistants` | 每個助理的帳號還剩多少額度 |
 | `clawdline landings` | 這台機器上所有還欠著的 landing；`--work-id <item id>`：一個看板項目所有已記錄的 landing |
 | `clawdline leases [--json]` | 編譯名額與每個 landing lease 目前由誰持有、誰在後面排隊 |
@@ -1001,14 +1002,24 @@ envelope。
 **給使用者看一張圖。** 不要貼本機路徑：在手機上點了什麼都打不開。使用者說要看圖時——「傳圖片給我」
 「給我看截圖」"send me the picture" "show me the screenshot"——以及你截的圖是回答的一部分時，都走這條。
 
-```
-POST /v1/artifacts/images    {"images": [{"path": "/absolute/path.png"}]}
+```sh
+clawdline image send /absolute/path.png [more.png …]
 ```
 
+它會把圖片存成「在你自己的 Session 裡顯示」，console 會把它們畫在**你的 Session 下一則寫出的回覆**底下。
+回覆裡不需要寫任何東西。它就是 `POST /v1/artifacts/images`，body 為
+`{"images": [{"path": …}], "terminal": "<你的 terminal id>"}`。
+
+- **存好不等於看到。** 指令有回應，不代表使用者已經看到圖。圖會在你下一則回覆寫出後出現；之後
+  `GET /v1/transcript?session=<terminal id>` 會在那則回覆的 `artifacts` 裡列出它們。要在談到這些圖
+  的回覆之前送，不是之後。
+- 不要依賴寫在文字裡的 `<clawdline-image id="…">` marker。較新的模型只會把兩次工具呼叫之間寫的文字
+  存成摘要，marker 也跟著消失：上傳回 200、回覆也寫了，使用者卻什麼都沒看到。回覆保留 marker 的地方
+  它仍然有效，但已經不是顯示圖片的方法。
+- Claude Code 的 `SendUserFile` 不會出現在 Clawdline console。
 - 只接受 orchestrator token。一到六個本機檔案；每一個都必須是一般檔案，最多 12 MiB、每邊最多
-  12,000 px。PNG、JPEG、GIF 直接讀；其他格式在 macOS 上會先交給 `sips` 轉。
-- 回應會列出 `artifacts`，每一個都有一個 `marker`，例如 `<clawdline-image id="…">`。**把 marker 放進
-  你的回覆裡**；console 會在 marker 的位置顯示圖片。圖片保留 24 小時。
+  12,000 px。PNG、JPEG、GIF 直接讀；其他格式在 macOS 上會先交給 `sips` 轉。圖片保留 24 小時。
+  拒絕：`session_not_found`、`session_has_no_record`（那個 Session 還沒寫出第一段對話）。
 
 ## 9. 通知使用者
 
