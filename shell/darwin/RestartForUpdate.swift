@@ -6,6 +6,17 @@ import Foundation
 /// this process, waits for the daemon to replace the bundle, then opens that
 /// exact installed path. It does not touch the service.
 ///
+/// Any replacement of the bundle ends the wait (its Info.plist is a new file),
+/// not only the version asked for: the bundle
+/// staged by the time this app quits can be a later one. On 2026-10-15 the
+/// machine went from a dev build back to its release while the page still
+/// offered the dev build's app; the daemon put 1.0.7 in place and the helper
+/// waited out its whole bound for 1.0.7-dev.b89b91a, so the person saw the
+/// app close and not come back, though 1.0.7 was in place within seconds —
+/// the same version the app had, so only the file says it changed. The bound
+/// is 30 s: the daemon looks for a
+/// quit app every AppSwapPollSecondsLimit (2 s) and copies one bundle.
+///
 /// `behind` reopens without bringing the app forward (`open -g`), for a
 /// restart the person did not ask for. `console` says the window was on
 /// screen, so the new process puts it back (ReopenArgument).
@@ -18,6 +29,8 @@ func restartForStagedUpdate(_ version: String, behind: Bool = false, console: Bo
     let expected = version.hasPrefix("v") ? String(version.dropFirst()) : version
     let script = """
     pid="$1"; app="$2"; expected="$3"; behind="$4"; console="$5"
+    plist="$app/Contents/Info.plist"
+    before=$(/usr/bin/stat -f %m:%i "$plist" 2>/dev/null)
     n=0
     while /bin/kill -0 "$pid" 2>/dev/null && [ "$n" -lt 300 ]; do
       /bin/sleep 0.1; n=$((n+1))
@@ -27,13 +40,17 @@ func restartForStagedUpdate(_ version: String, behind: Bool = false, console: Bo
       exit 1
     fi
     n=0
-    while [ "$n" -lt 900 ]; do
-      actual=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist" 2>/dev/null)
+    while [ "$n" -lt 300 ]; do
+      actual=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist" 2>/dev/null)
       [ "$actual" = "$expected" ] && break
+      now=$(/usr/bin/stat -f %m:%i "$plist" 2>/dev/null)
+      [ -n "$now" ] && [ "$now" != "$before" ] && break
       /bin/sleep 0.1; n=$((n+1))
     done
-    if [ "$actual" != "$expected" ]; then
+    if [ "$actual" != "$expected" ] && [ "$now" = "$before" ]; then
       /usr/bin/logger -t clawdline 'app update: staged bundle did not replace the installed app before relaunch'
+    elif [ "$actual" != "$expected" ]; then
+      /usr/bin/logger -t clawdline "app update: reopening $actual, staged after $expected was offered"
     fi
     flags=""
     [ "$behind" = 1 ] && flags="-g"

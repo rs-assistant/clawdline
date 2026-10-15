@@ -52,6 +52,18 @@
         "force": { "description": "Install `version` even when it is not newer than the running release. Never below the release's `min_version`.", "type": "boolean" }
       }
     },
+    "UpdateDevReleaseResult": {
+      "description": "POST /v1/update/dev-release, on a machine running a dev build (`clawdline dev install`): the Root Session opened in the Project that holds the running commit, to cut a release of it by docs/releasing.md. Answered 202. The same commit asked again answers the Root already opened. Refused 409 `not_a_dev_build`, `dev_project_not_found`, or `dev_commit_not_on_main`.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "project_dir", "root_assignment_id", "label"],
+      "properties": {
+        "commit": { "description": "The running dev build's full commit.", "type": "string" },
+        "project_dir": { "description": "The repository the Root works in.", "type": "string" },
+        "root_assignment_id": { "description": "The Root Assignment opened, GET /v1/orchestrator/root-assignments/<id>.", "type": "string" },
+        "label": { "description": "The Root Session's label.", "type": "string" }
+      }
+    },
     "BuildStamp": {
       "description": "One build: the commit it was built from and, when its BUILD.json said so, that commit's committer time (RFC3339 UTC). An older BUILD.json has no time.",
       "type": "object",

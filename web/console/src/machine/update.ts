@@ -1,6 +1,6 @@
 import { client } from "../client.js"
 import { isDifferentBuild } from "../build-freshness.js"
-import { classifyApplyAnswer, classifyUpdateRead, createUpdateReadStore, type Answer, type ApplyAnswer, type UpdateRead } from "./update-model.js"
+import { classifyApplyAnswer, classifyDevReleaseAnswer, classifyUpdateRead, createUpdateReadStore, type Answer, type ApplyAnswer, type DevReleaseAnswer, type UpdateRead } from "./update-model.js"
 
 /**
  * `/v1/update` and `/v1/update/apply`, asked the way `read.ts` asks
@@ -26,9 +26,19 @@ export function applyUpdate(): Promise<ApplyAnswer> {
   return call("POST", "/v1/update/apply", "{}").then(classifyApplyAnswer)
 }
 
-async function call(method: string, path: string, body?: string): Promise<Answer> {
+/**
+ * "Release this version": the daemon fetches main and opens a Root Session,
+ * which can take longer than an update's start.
+ */
+export function requestDevRelease(): Promise<DevReleaseAnswer> {
+  return call("POST", "/v1/update/dev-release", "{}", DEV_RELEASE_WAIT_MS).then(classifyDevReleaseAnswer)
+}
+
+const DEV_RELEASE_WAIT_MS = 90_000
+
+async function call(method: string, path: string, body?: string, waitMs = 15_000): Promise<Answer> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 15_000)
+  const timer = setTimeout(() => controller.abort(), waitMs)
   try {
     const headers: Record<string, string> = {}
     if (body !== undefined) {

@@ -266,6 +266,35 @@ export function buildName(build: { stamp?: string; version?: string } | undefine
 }
 
 /**
+ * The commit of a dev build (`clawdline dev install`, docs/updates.md), or
+ * null: its version is v<x.y.z>-dev.<commit>, the release it went over.
+ */
+export function devCommit(build: { version?: string } | undefined): string | null {
+  return /-dev\.([0-9a-f]+)$/.exec(build?.version ?? "")?.[1] ?? null
+}
+
+/** What POST /v1/update/dev-release answered. */
+export type DevReleaseAnswer =
+  | { kind: "opened"; label: string }
+  | { kind: "refused"; code: string; detail: string }
+  | { kind: "unanswered" }
+
+export function classifyDevReleaseAnswer(answer: Answer): DevReleaseAnswer {
+  if (answer.transport === "failed") return { kind: "unanswered" }
+  const label = (answer.parsed as { label?: unknown } | null)?.label
+  if (answer.status === 202 && typeof label === "string" && label) return { kind: "opened", label }
+  return { kind: "refused", code: refusalCode(answer.parsed), detail: refusalDetail(answer.parsed) }
+}
+
+/** The sentence a dev release press ends with. */
+export function devReleaseSentence(answer: DevReleaseAnswer, say: Say): string {
+  if (answer.kind === "opened") return say("updateDevReleaseOpened", { label: answer.label })
+  if (answer.kind === "refused" && answer.code === "dev_commit_not_on_main") return say("updateDevReleaseNotOnMain")
+  if (answer.kind === "refused" && answer.code === "dev_project_not_found") return say("updateDevReleaseNoProject")
+  return say("updateDevReleaseFailed")
+}
+
+/**
  * The older daemon's one line, or null: only `update_available` and
  * `differs` speak, and a machine that is current, ahead, or could not tell
  * says nothing. This is what a daemon from before release installs gets,
@@ -388,6 +417,11 @@ export interface UpdatePanelView {
    * only stable releases.
    */
   auto: { shown: boolean; on: boolean; enabled: boolean; state: string; beta: string | null; note: string | null }
+  /**
+   * "Release this version", beside the way back, while a dev build runs. Only
+   * on the machine's own console: Cloud does not carry the route.
+   */
+  devRelease: { shown: boolean; commit: string }
   /** How soon the panel should read again. */
   everyMs: number
   /** The daemon is between the old release and the new one. */
@@ -428,6 +462,7 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
     staged: null,
     sourceNote: null,
     auto: { shown: false, on: false, enabled: false, state: "", beta: null, note: null },
+    devRelease: { shown: false, commit: "" },
     everyMs: UPDATE_READ_EVERY_MS,
     restarting: false,
   }
@@ -464,7 +499,11 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
   view.kind = "panel"
   const release = status.install_kind === "release"
   const latestName = buildName(status.latest)
-  view.facts.push({ key: "running", label: say("updateRunning"), value: buildName(status.running) || say("updateUnknownVersion") })
+  // A dev build sorts before the release it went over, so that release reads
+  // as available: here it is the way back, and the button names it.
+  const dev = release ? devCommit(status.running) : null
+  view.facts.push({ key: "running", label: say("updateRunning"),
+    value: dev ? say("updateRunningDev", { commit: dev }) : buildName(status.running) || say("updateUnknownVersion") })
   if (latestName) {
     const fact: UpdateFact = { key: "latest", label: say("updateLatest"), value: latestName }
     if (release && status.latest.notes_url) {
@@ -481,7 +520,11 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
 
   if (status.state === "current") view.stateLine = say("updateIsCurrent")
   else if (status.state === "ahead") view.stateLine = say("updateIsAhead")
-  else if (status.state === "update_available" && latestName) view.stateLine = say("updateIsAvailable", { latest: latestName })
+  else if (status.state === "update_available" && latestName) {
+    view.stateLine = say(dev ? "updateDevBack" : "updateIsAvailable", { latest: latestName })
+    if (dev) view.press.label = say("updateToVersion", { latest: latestName })
+  }
+  if (dev && !input.overCloud) view.devRelease = { shown: true, commit: dev }
   else if (status.state === "unknown") {
     view.stateLine = say("updateIsUnknown")
     view.stateDetails = details("", status.reason || status.error)
@@ -501,8 +544,13 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
 
   const apply = status.apply
   const moving = !restarting && applyMoving(status)
-  const to = apply?.to || latestName
-  const from = apply?.from || buildName(status.running)
+  // A dev build is named as its commit, not as v1.0.7-dev.4c41b18.
+  const named = (version: string) => {
+    const commit = devCommit({ version })
+    return commit ? say("updateRunningDev", { commit }) : version
+  }
+  const to = named(apply?.to || latestName)
+  const from = named(apply?.from || buildName(status.running))
   if (restarting) view.progress = say("updateRestarting")
   else if (input.sending) view.progress = say("updateSending")
   else if (moving && apply) {
@@ -517,7 +565,7 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
   // console, and after one auto-update installed overnight — for as long as
   // it is the machine's last.
   if (!moving && !restarting && apply?.state === "healthy" && apply.from) {
-    const installed = apply.to || buildName(status.running)
+    const installed = named(apply.to || buildName(status.running))
     view.done = say("updateReady", { to: installed })
   } else if (!view.progress && apply?.state === "healthy" && input.following) {
     view.progress = say("updateHealthy", { to: buildName(status.running) || to })

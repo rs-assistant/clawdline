@@ -203,6 +203,10 @@ func main() {
 		// Install this release as the per-user service, repair it, or
 		// --uninstall it (setup.go). install.sh ends here.
 		setupCommand(os.Args[2:])
+	case "dev":
+		// Run a commit of this checkout in place of the installed release,
+		// to test it (dev.go, docs/updates.md).
+		devCommand(os.Args[2:])
 	case "update":
 		// Whether this machine trails the cloud's latest build, and on Linux
 		// deploying it (update.go, docs/updates.md).

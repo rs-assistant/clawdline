@@ -159,6 +159,16 @@ func Open(manifest, sigs []byte, keys []ed25519.PublicKey) (Manifest, error) {
 		}
 		return Manifest{}, refuse(CodeSignatureInvalid, "the signature does not match the manifest")
 	}
+	return Parse(manifest)
+}
+
+// Parse reads and validates a manifest without any signature. Open is the
+// only path for a release; this is for a dev build the machine built itself
+// (updater.BeginLocal), and for Open after its signature check.
+func Parse(manifest []byte) (Manifest, error) {
+	if len(manifest) > maxManifestBytes {
+		return Manifest{}, refuse(CodeManifestMalformed, "manifest is longer than %d bytes", maxManifestBytes)
+	}
 	var m Manifest
 	dec := json.NewDecoder(bytes.NewReader(manifest))
 	if err := dec.Decode(&m); err != nil {

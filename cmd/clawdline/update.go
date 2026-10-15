@@ -369,6 +369,12 @@ func applyRelease(stdout, stderr io.Writer, port int, version string, force bool
 		to = started.Apply.To
 	}
 	fmt.Fprintf(stdout, cliCopy("ops", "release.updating_to", "updating to %s\n"), to)
+	return followApply(stdout, stderr, b, port, to)
+}
+
+// followApply reads /v1/update until the update to `to` that has been handed
+// to the supervisor settles, printing each state, and says how it ended.
+func followApply(stdout, stderr io.Writer, b *broker, port int, to string) int {
 	b.client.Timeout = 5 * time.Second
 	deadline := time.Now().Add(applyFollowSecondsLimit * time.Second)
 	last := contract.UpdateApplyState("")

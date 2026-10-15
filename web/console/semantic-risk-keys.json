@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5282,
+  "englishKeys": 5292,
   "counts": {
-    "negation": 1512,
-    "state": 728,
+    "negation": 1515,
+    "state": 730,
     "permission": 334,
     "deletion": 110,
     "uncertainty": 155
   },
-  "unionCount": 2332,
+  "unionCount": 2336,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1349,6 +1349,9 @@
       "next.updateAutoSay",
       "next.updateCheckFailed",
       "next.updateCopyFailed",
+      "next.updateDevReleaseFailed",
+      "next.updateDevReleaseNoProject",
+      "next.updateDevReleaseNotOnMain",
       "next.updateFailed",
       "next.updateIsAvailable",
       "next.updateIsUnknown",
@@ -2119,6 +2122,8 @@
       "next.todosRefreshFailed",
       "next.todosRetryTip",
       "next.updateAutoFailed",
+      "next.updateDevBack",
+      "next.updateDevReleaseFailed",
       "next.updateIsAvailable",
       "next.updateRunning",
       "next.worktreeRemoveRisk",
@@ -4872,6 +4877,10 @@
     "next.updateAutoSay",
     "next.updateCheckFailed",
     "next.updateCopyFailed",
+    "next.updateDevBack",
+    "next.updateDevReleaseFailed",
+    "next.updateDevReleaseNoProject",
+    "next.updateDevReleaseNotOnMain",
     "next.updateFailed",
     "next.updateIsAvailable",
     "next.updateIsUnknown",

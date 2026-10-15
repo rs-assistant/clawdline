@@ -161,6 +161,12 @@ const (
 	CodeBootGuard           = "boot_guard"
 	CodeSupervisorGaveUp    = "supervisor_gave_up"
 	CodeStateUnreadable     = "update_state_unreadable"
+	// CodeDevBuildRunning: auto-apply does not take a dev build away from
+	// the person testing it; they choose when to go back.
+	CodeDevBuildRunning = "dev_build_running"
+	// CodeNotADevBuild: a local manifest names a version that is not a dev
+	// build, which only the signed path installs.
+	CodeNotADevBuild = "not_a_dev_build"
 )
 
 func fail(code, format string, a ...any) *Error {
@@ -321,7 +327,8 @@ func ChannelFor(running string) string {
 	case ChannelStable:
 		return ChannelStable
 	}
-	if v, err := release.ParseVersion(running); err == nil && v.Pre != "" {
+	// A dev build follows the channel of the release it went over: stable.
+	if v, err := release.ParseVersion(running); err == nil && v.Pre != "" && !v.IsDev() {
 		return ChannelBeta
 	}
 	return ChannelStable

@@ -122,5 +122,18 @@
   "usage.units_unreadable": "units (unreadable)",
   "usage.unpriced": "unknown (unpriced)",
   "usage.unreadable": "the daemon's answer could not be read",
-  "usage.verdict_prefix": "  verdict: "
+  "usage.verdict_prefix": "  verdict: ",
+  "dev.not_checkout": "run it inside a clawdline checkout: %v",
+  "dev.not_clawdline": "%s is not a clawdline checkout (no tools/release/build.sh)",
+  "dev.no_commit": "%s is not a commit here: %v",
+  "dev.not_release": "this machine is not installed from a release (current is %q); a dev build goes over a release install",
+  "dev.already": "%s is already running",
+  "dev.building": "building %s from %s…\n",
+  "dev.build_failed": "the build failed, and nothing was changed: %v",
+  "dev.refused": "the switch was refused: %v",
+  "dev.switch_failed": "the switch did not start, and %s still runs: %v",
+  "dev.switching": "switching to %s\n",
+  "dev.follow_unavailable": "clawdline: the switch was handed over; `clawdline update` shows how it ends (%v)\n",
+  "dev.way_back": "to go back: clawdline update --apply, or the version panel's button\n",
+  "dev.usage": "usage: clawdline dev install [--rev <commit>] [--port n]\n\nBuilds a commit of this checkout and runs it on this machine in place of the\ninstalled release, to test it. Going back is the ordinary update: the version\npanel's button, or clawdline update --apply. If the build does not start,\nClawdline goes back to the release by itself.\n\n  --rev <commit>   the commit to build (default HEAD of this checkout)\n  --port <n>       the daemon's port (default CLAWDLINE_NEXT_PORT, else 7727)\n\nRun it inside a clawdline checkout, on a machine installed from a release.\ndocs/updates.md says more."
 }

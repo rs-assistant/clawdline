@@ -203,6 +203,43 @@ on a Mac whose iTerm2 does not answer, that rule would otherwise wait for good. 
 (`release.auto_apply_retry_seconds`), so the update starts once the sessions are idle rather than
 at the next check hours later.
 
+## Dev builds: testing a commit on a release install
+
+A machine installed from a release can run a commit of this repository in place of its release, to
+test it, and go back to the release afterwards. The two take turns: one daemon, one port, one store.
+Decided on 2026-10-15, so that a person tests the dev build on the machine they use every day and
+returns to the stable release when they are done.
+
+```sh
+clawdline dev install [--rev <commit>]     # inside a clawdline checkout
+```
+
+- **What it installs.** The commit is built in a disposable worktree by
+  `tools/release/build.sh --channel dev --host-only` — this machine's os/arch only, unsigned,
+  carrying the tmux of the running release (`--tmux-installed`) — and installed as
+  `releases/v<x.y.z>-dev.<short commit>/`, where `v<x.y.z>` is the release it goes over. The
+  switch is the updater's own (`updater.BeginLocal`, then `Execute`): store snapshot, supervisor,
+  health check, rollback when it does not come up. The checkout's HEAD does not move.
+- **Who can start it.** Only the CLI on this machine. The unsigned manifest is a local file the
+  CLI hands the updater; no route takes one, so Cloud and a phone cannot install a dev build.
+  `BeginLocal` refuses a version that is not `-dev.` (`not_a_dev_build`).
+- **The way back.** `v1.0.7-dev.4c41b18` sorts before `v1.0.7`, and a dev build follows the stable
+  channel (`ChannelFor`), so the release it went over reads as available: the ordinary signed
+  update installs it. The panel names it — the running fact says `dev <commit>`, the button
+  **Update to v1.0.7** — and so does the session-list banner. Automatic updates never take a dev
+  build away (`dev_build_running`); the person chooses when to go back.
+- **Releasing it.** Beside the way back, the machine's own console shows **Release this version**.
+  It posts `/v1/update/dev-release`, which finds the Project whose repository holds the running
+  commit, fetches `main`, refuses a commit that is not on `origin/main`
+  (`dev_commit_not_on_main`; `dev_project_not_found` when no Project holds it), and opens a Root
+  Assignment whose brief is [releasing.md](releasing.md) for exactly that commit. That Root stops
+  before the `release` environment's approval and before `gate.sh --publish`, which stay the
+  person's, and notifies them. The request id is derived from the commit, so a second press
+  answers the Root already opened.
+- **The store.** The switch to a dev build snapshots the store like any update. Store migrations
+  are additive by rule, so the release reads a store a dev build has touched; a dev build whose
+  change is not additive must not be installed this way.
+
 ## The console's update panel
 
 The Settings page's **Clawdline 版本** panel (`web/console/src/machine/UpdatePanel.tsx`, its logic
