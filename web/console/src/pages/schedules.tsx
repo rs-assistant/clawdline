@@ -6,6 +6,7 @@ import { readAnswer, readFailure, readReady, type ReadState } from "../read-stat
 import { invalidScheduleErrorHTML } from "../schedule-errors.js"
 import { isTriggerOnly, scheduleNextLine, scheduleTimeZone, scheduleWhenFields } from "../schedule-when.js"
 import { historyRecordFor, shouldOpenHistory } from "../schedule-history-open.js"
+import { CHECK_ICON, COPY_ICON, maskedWebhookURL } from "../schedule-webhook-url.js"
 import { runScheduleWithForce } from "../schedule-force-run.js"
 import { laneOnScreen, laneOwesRead } from "./schedules-lane.js"
 import "../schedule-errors.css"
@@ -1732,6 +1733,16 @@ const ScheduleHistory = (() => {
   let helpOpen = false
   let webhookOpen = false
   let runningNow = false
+  // Whether the last press of Copy URL wrote the clipboard: "yes" for a moment
+  // after it did, then back to "", so the button says so where it was pressed.
+  let urlCopied: "" | "yes" | "no" = ""
+  // After Run now was accepted: the sheet says so in green, says closing it
+  // does not stop the run, and once the run shows up offers to open it.
+  // `startedTask` is that run's task id; "" while it has not appeared yet.
+  let started = false
+  let startedTask = ""
+  let startedTicket = 0
+  let urlCopiedTimer: ReturnType<typeof setTimeout> | null = null
 
   const scheduleRunWords = () => scheduleRunCopy(lang())
 
@@ -1748,6 +1759,71 @@ const ScheduleHistory = (() => {
 
   const webhookWords = () => scheduleWebhookCopy(lang())
   const webhookNode = (id: string) => document.getElementById(id)
+
+  /**
+   * The URL row above the buttons: the one-time URL as far as it can be shown,
+   * and Copy URL beside it with an icon. The whole URL stays in `ephemeralURL`
+   * only — `scheduleWebhookSecretIsEphemeral` holds the page to that — so the row
+   * draws the host and path and the token's last four characters.
+   */
+  function ensureWebhookURL(): void {
+    const panel = webhookNode("schedule-webhook")
+    const copy = webhookNode("schedule-webhook-copy")
+    if (!panel || !copy || webhookNode("schedule-webhook-url")) return
+    const actions = panel.querySelector(".buttons")
+    if (!actions) return
+    const row = document.createElement("div")
+    row.id = "schedule-webhook-url"
+    row.className = "schedule-webhook-url"
+    row.hidden = true
+    const text = document.createElement("code")
+    text.id = "schedule-webhook-url-text"
+    row.appendChild(text)
+    copy.classList.add("schedule-webhook-copy")
+    copy.removeAttribute("hidden")
+    copy.innerHTML = '<span class="schedule-webhook-copy-icon" aria-hidden="true"></span>' +
+      '<span class="schedule-webhook-copy-label"></span>'
+    row.appendChild(copy)
+    panel.insertBefore(row, actions)
+  }
+
+  function drawWebhookURL(): void {
+    const row = webhookNode("schedule-webhook-url")
+    const copy = webhookNode("schedule-webhook-copy")
+    if (!row || !copy) return
+    row.hidden = !ephemeralURL
+    const text = webhookNode("schedule-webhook-url-text")!
+    text.textContent = ephemeralURL ? maskedWebhookURL(ephemeralURL) : ""
+    text.setAttribute("aria-label", nextWord("scheduleWebhookUrlLabel"))
+    text.title = nextWord("scheduleWebhookUrlLabel")
+    copy.dataset.copied = urlCopied
+    copy.querySelector(".schedule-webhook-copy-icon")!.innerHTML = urlCopied === "yes" ? CHECK_ICON : COPY_ICON
+    copy.querySelector(".schedule-webhook-copy-label")!.textContent =
+      urlCopied === "yes" ? nextWord("scheduleWebhookCopied") : webhookWords().copy
+  }
+
+  function copyWebhookURL(url: string): Promise<void> {
+    if (!webhook) return Promise.resolve()
+    if (urlCopiedTimer) clearTimeout(urlCopiedTimer)
+    return Promise.resolve(webhook.copy(url)).then(
+      () => {
+        urlCopied = "yes"
+        webhookNode("schedule-webhook-status")!.textContent = nextWord("scheduleWebhookCopiedSaid")
+        urlCopiedTimer = setTimeout(() => {
+          urlCopied = ""
+          urlCopiedTimer = null
+          drawWebhook()
+        }, 2000)
+        drawWebhook()
+      },
+      () => {
+        // refusal-ok: a browser refusing the clipboard is not a machine refusal and carries no code
+        urlCopied = "no"
+        webhookNode("schedule-webhook-status")!.textContent = nextWord("scheduleWebhookCopyFailed")
+        drawWebhook()
+      },
+    )
+  }
 
   function ensureWebhookToggle(): void {
     const panel = webhookNode("schedule-webhook")
@@ -1819,6 +1895,7 @@ const ScheduleHistory = (() => {
     if (!panel) return
     ensureWebhookToggle()
     ensureWebhookHelp()
+    ensureWebhookURL()
     const words = webhookWords()
     panel.hidden = !webhook || !record
     panel.dataset.collapsed = webhookOpen ? "false" : "true"
@@ -1836,7 +1913,6 @@ const ScheduleHistory = (() => {
     }
     webhookNode("schedule-webhook-warning")!.textContent = scheduleWebhookManagementWarning(hook, managementContext)
     webhookNode("schedule-webhook-generate")!.textContent = words.generate
-    webhookNode("schedule-webhook-copy")!.textContent = words.copy
     webhookNode("schedule-webhook-rotate")!.textContent = words.rotate
     webhookNode("schedule-webhook-disable")!.textContent = words.disable
     const helpToggle = webhookNode("schedule-webhook-help-toggle")
@@ -1854,7 +1930,7 @@ const ScheduleHistory = (() => {
       hook,
       managementContext,
     )
-    webhookNode("schedule-webhook-copy")!.hidden = !ephemeralURL
+    drawWebhookURL()
     webhookNode("schedule-webhook-rotate")!.hidden = !current || current.state !== "active"
     ;(webhookNode("schedule-webhook-rotate") as HTMLButtonElement).disabled =
       effectiveTier === null || effectiveTier === "free"
@@ -1909,7 +1985,8 @@ const ScheduleHistory = (() => {
   function webhookAction(action: string): Promise<void> {
     if (!webhook || !record) return Promise.resolve()
     webhookNode("schedule-webhook-status")!.textContent = ""
-    if (action === "copy" && ephemeralURL) return webhook.copy(ephemeralURL)
+    if (action === "copy" && ephemeralURL) return copyWebhookURL(ephemeralURL)
+    urlCopied = ""
     if (action === "generate") {
       return generateAndBindScheduleWebhook(
         webhook.client,
@@ -2014,7 +2091,7 @@ const ScheduleHistory = (() => {
     el("schedule-history-runs-label").textContent = T().webResumePick
     el("schedule-run-rows").innerHTML = scheduleRunsHTML(runs, Date.now() / 1000, terminalIsOpen)
     el("schedule-history-empty").textContent = T().webResumeEmpty
-    el("schedule-history-empty").hidden = loading || runs.length > 0 || !!el("schedule-history-said").textContent
+    el("schedule-history-empty").hidden = loading || started || runs.length > 0 || !!el("schedule-history-said").textContent
     el("schedule-history-capped").textContent = T().webResumeCapped
     el("schedule-history-capped").hidden = !(record && record.runs_may_be_truncated)
     el("schedule-history-edit").textContent = T().webScheduleEdit
@@ -2026,6 +2103,7 @@ const ScheduleHistory = (() => {
       runNowButton.disabled = loading || !!pressing || runningNow || !record
     }
     el("schedule-history-close").textContent = T().webClose
+    drawStarted()
     el<HTMLButtonElement>("schedule-history-close").disabled = !!pressing || runningNow
 
     const buttons = el("schedule-run-rows").querySelectorAll<HTMLButtonElement>(".schedule-run-button")
@@ -2105,6 +2183,12 @@ const ScheduleHistory = (() => {
     hook = null
     deliveries.length = 0
     ephemeralURL = null
+    started = false
+    startedTask = ""
+    startedTicket++
+    urlCopied = ""
+    if (urlCopiedTimer) clearTimeout(urlCopiedTimer)
+    urlCopiedTimer = null
     effectiveTier = null
     for (const key of Object.keys(observedReceipts)) delete observedReceipts[key]
     for (const key of Object.keys(observingReceipts)) delete observingReceipts[key]
@@ -2120,6 +2204,65 @@ const ScheduleHistory = (() => {
     Schedule.openEdit(id)
   }
 
+  function ensureStarted(): HTMLElement | null {
+    const said = el("schedule-history-said")
+    let notice = document.getElementById("schedule-history-started")
+    if (notice || !said) return notice
+    notice = document.createElement("div")
+    notice.id = "schedule-history-started"
+    notice.className = "schedule-history-started"
+    notice.setAttribute("role", "status")
+    notice.hidden = true
+    notice.innerHTML =
+      '<span class="schedule-history-started-icon" aria-hidden="true">' + CHECK_ICON + "</span>" +
+      '<div class="schedule-history-started-words"><strong></strong><p></p></div>' +
+      '<button class="chip confirm-go" type="button" hidden></button>'
+    notice.querySelector("button")!.addEventListener("click", () => {
+      if (startedTask) pick(startedTask, "open")
+    })
+    said.insertAdjacentElement("afterend", notice)
+    return notice
+  }
+
+  function drawStarted(): void {
+    const notice = ensureStarted()
+    if (!notice) return
+    notice.hidden = !started
+    if (!started) return
+    notice.querySelector("strong")!.textContent = nextWord("scheduleRunStartedTitle")
+    notice.querySelector("p")!.textContent = nextWord(startedTask ? "scheduleRunStartedOpen" : "scheduleRunStartedWaiting")
+    const button = notice.querySelector("button")!
+    const selected = startedTask ? run(startedTask) : null
+    const openable = !!(selected && selected.terminal_id && terminalIsOpen(selected.terminal_id))
+    button.hidden = !openable
+    button.textContent = nextWord("scheduleRunOpenThis")
+    button.disabled = loading || !!pressing || runningNow
+  }
+
+  /**
+   * Read the schedule again until the run Run now started is among its runs —
+   * dispatch is asynchronous, so the first read often has not got it yet.
+   */
+  function findStartedRun(id: string, before: Set<string>, ticket: number, tries = 0): void {
+    scheduleApi.schedule(id, scheduleOwner(id)).then(
+      (answer) => {
+        if (scheduleId !== id || ticket !== startedTicket) return
+        record = (answer && answer.schedule) || record
+        const fresh = ((record && record.runs) || [])
+          .filter((candidate) => candidate && candidate.task_id && !before.has(candidate.task_id))
+          .sort((a, b) => (b.created || 0) - (a.created || 0))[0]
+        if (fresh) startedTask = fresh.task_id
+        draw()
+        const openable = fresh && fresh.terminal_id && terminalIsOpen(fresh.terminal_id)
+        if (!openable && tries < 10) setTimeout(() => findStartedRun(id, before, ticket, tries + 1), 1500)
+      },
+      () => {
+        if (scheduleId !== id || ticket !== startedTicket) return
+        if (tries < 10) setTimeout(() => findStartedRun(id, before, ticket, tries + 1), 1500)
+      },
+    )
+  }
+
   function runNow(): void {
     if (loading || pressing || runningNow || !record) return
     if (!write) {
@@ -2129,7 +2272,10 @@ const ScheduleHistory = (() => {
     if (!window.confirm(scheduleRunConfirmation(record.title || scheduleId || "", lang()))) return
 
     const id = scheduleId!
+    const before = new Set(((record && record.runs) || []).map((candidate) => candidate && candidate.task_id))
     runningNow = true
+    started = false
+    startedTask = ""
     el("schedule-history-said").textContent = ""
     draw()
     runScheduleWithForce(
@@ -2139,17 +2285,11 @@ const ScheduleHistory = (() => {
       .then(() => {
         if (scheduleId !== id) return
         runningNow = false
-        el("schedule-history-said").textContent = scheduleRunWords().accepted
+        started = true
+        startedTask = ""
         draw()
         Schedules.refresh()
-        return scheduleApi.schedule(id, scheduleOwner(id)).then(
-          (answer) => {
-            if (scheduleId !== id) return
-            record = (answer && answer.schedule) || record
-            draw()
-          },
-          () => {},
-        )
+        findStartedRun(id, before, ++startedTicket)
       })
       .catch((error: ScheduleFailureLike) => {
         if (scheduleId !== id) return

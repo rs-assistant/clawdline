@@ -709,6 +709,19 @@ const words = {
     signedInSignOutFailed: "This browser was not signed out: {why}",
     cloudMisdeclared: "This console's Clawdline Cloud declaration cannot be used: {reason}",
     cloudNotCarried: "This cannot be done over Clawdline Cloud yet. Do it on the machine itself.",
+    // The one-time schedule webhook URL. Only its host, path and last four characters are
+    // drawn: the whole URL is a password and never enters the page.
+    scheduleWebhookUrlLabel: "Webhook URL, partly hidden",
+    scheduleWebhookCopied: "Copied",
+    scheduleWebhookCopiedSaid: "URL copied. Save it as a secret now; Clawdline will not show it again.",
+    scheduleWebhookCopyFailed: "The URL could not be copied. Try again, or Rotate URL to get a new one.",
+    // What the history sheet says once Run now was accepted, in place of the
+    // copied "Run accepted. Refreshing its execution history…", which stayed on
+    // screen in the sheet's error colour and never said whether it was safe to leave.
+    scheduleRunStartedTitle: "Started",
+    scheduleRunStartedWaiting: "The run is starting on the machine. You can close this window; it keeps running. It will appear below under Which conversation?",
+    scheduleRunStartedOpen: "The run is going on the machine. You can close this window; it keeps running. Open it to watch, or find it later under Which conversation?",
+    scheduleRunOpenThis: "Open this run",
     gitNoDirectory: "This Session's folder no longer exists on its machine, so there are no Git changes to show.",
     gitPermissionDenied: "Its machine is not allowed to read this Session's folder, so its Git changes cannot be shown.",
     todosReadFailed: "Could not load",
@@ -1997,6 +2010,14 @@ const words = {
     signedInSignOutFailed: "這個瀏覽器沒有登出：{why}",
     cloudMisdeclared: "這個 console 的 Clawdline Cloud 宣告不能用：{reason}",
     cloudNotCarried: "這件事還不能經由 Clawdline Cloud 做，請直接在那台機器上操作。",
+    scheduleWebhookUrlLabel: "Webhook 網址（部分隱藏）",
+    scheduleWebhookCopied: "已複製",
+    scheduleWebhookCopiedSaid: "已複製網址，請馬上存成機密資料；Clawdline 不會再次顯示。",
+    scheduleWebhookCopyFailed: "無法複製網址，請再試一次；若仍失敗，可輪替網址取得新網址。",
+    scheduleRunStartedTitle: "已開始執行",
+    scheduleRunStartedWaiting: "正在機器上啟動這次執行。現在可以關閉這個視窗，它會繼續跑；啟動後會出現在下方「要接哪一段？」。",
+    scheduleRunStartedOpen: "這次執行已經在機器上跑了。現在可以關閉這個視窗，它會繼續跑；想看進度就打開它，之後也能在「要接哪一段？」找到。",
+    scheduleRunOpenThis: "打開這次的對話",
     gitNoDirectory: "這個 Session 的資料夾在它的機器上已經不存在，所以沒有 Git 變更可以顯示。",
     gitPermissionDenied: "它的機器沒有權限讀取這個 Session 的資料夾，所以無法顯示 Git 變更。",
     todosReadFailed: "讀取失敗",
