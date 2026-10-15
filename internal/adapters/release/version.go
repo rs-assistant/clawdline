@@ -87,6 +87,15 @@ func Compare(a, b Version) int {
 	return 0
 }
 
+// DevPre begins the pre-release of a build installed from a commit on this
+// machine (`clawdline dev install`): v1.0.7-dev.4c41b18 is commit 4c41b18
+// installed over v1.0.7. It sorts before v1.0.7, so the stable release it was
+// installed over is always the newer one, and installing it is the way back.
+const DevPre = "dev."
+
+// IsDev says whether v is such a build.
+func (v Version) IsDev() bool { return strings.HasPrefix(v.Pre, DevPre) }
+
 func (v Version) String() string {
 	s := "v" + strconv.Itoa(v.Major) + "." + strconv.Itoa(v.Minor) + "." + strconv.Itoa(v.Patch)
 	if v.Pre != "" {

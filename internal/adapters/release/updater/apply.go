@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/install"
@@ -54,6 +56,45 @@ func (e Env) Begin(ctx context.Context, exe string, req Request) (*Plan, error) 
 		return nil, fail(CodeNotAReleaseInstall, "this daemon runs from %s, which is a %s and not a release install; %s",
 			exe, kind, "a source build is updated from its checkout (docs/updates.md)")
 	}
+	return e.begin(from, func() (*Plan, error) { return e.decide(ctx, from, req) })
+}
+
+// BeginLocal is Begin for a dev build this machine built itself
+// (`clawdline dev install`): the unsigned manifest at manifestPath, whose
+// artifacts are file:// URLs beside it. It is reached only from the CLI, by
+// the person on this machine, never through a route: the trust is that they
+// built it. It installs only a dev version, in either direction of version
+// order, and leaves every other check to Execute.
+func (e Env) BeginLocal(manifestPath string) (*Plan, error) {
+	from, kind := e.Layout.CurrentRelease()
+	if kind != install.KindRelease {
+		return nil, fail(CodeNotAReleaseInstall, "%s is not a release install (current is %q); a dev build goes over a release install", e.Layout.Root, from)
+	}
+	return e.begin(from, func() (*Plan, error) {
+		body, err := readLimited(manifestPath, release.MaxManifestBytes())
+		if err != nil {
+			return nil, fail(CodeStateUnreadable, "the dev manifest: %v", err)
+		}
+		m, err := release.Parse(body)
+		if err != nil {
+			return nil, err
+		}
+		if v, _ := release.ParseVersion(m.Version); !v.IsDev() {
+			return nil, fail(CodeNotADevBuild, "%s is not a dev build (v<x.y.z>-%s<commit>); a release is installed through its signature", m.Version, release.DevPre)
+		}
+		if m.Version == from {
+			return nil, fail(CodeAlreadyCurrent, "%s is already running", from)
+		}
+		if _, err := m.Artifact(e.GOOS, e.GOARCH, release.KindDaemon); err != nil {
+			return nil, err
+		}
+		return &Plan{From: from, Manifest: m}, nil
+	})
+}
+
+// begin is what Begin and BeginLocal share: the service, no update already
+// handed over, and update.lock held while decide runs and after it succeeds.
+func (e Env) begin(from string, decide func() (*Plan, error)) (*Plan, error) {
 	svc, err := install.ReadServiceFile(e.StateDir)
 	if err != nil {
 		return nil, fail(CodeNoService, "the daemon is not installed as a service: %s has no %s (%v); the installer writes it when it installs the service", e.StateDir, install.ServiceFileName, err)
@@ -67,7 +108,7 @@ func (e Env) Begin(ctx context.Context, exe string, req Request) (*Plan, error) 
 	if err != nil {
 		return nil, err
 	}
-	plan, err := e.decide(ctx, from, req)
+	plan, err := decide()
 	if err != nil {
 		unlock()
 		return nil, err
@@ -92,6 +133,9 @@ func (e Env) decide(ctx context.Context, from string, req Request) (*Plan, error
 	running, err := release.ParseVersion(from)
 	if err != nil {
 		return nil, err
+	}
+	if req.Auto && running.IsDev() {
+		return nil, fail(CodeDevBuildRunning, "%s is a dev build; going back to %s is the person's choice", from, m.Version)
 	}
 	next, _ := release.ParseVersion(m.Version)
 	switch c := release.Compare(next, running); {
@@ -185,6 +229,16 @@ func (e Env) download(ctx context.Context, a release.Artifact) (string, error) {
 	if err := os.MkdirAll(e.Layout.Staging, 0o700); err != nil {
 		return "", err
 	}
+	// A dev build's artifacts are files beside its manifest; only
+	// BeginLocal's manifest names one, and it is checked as any download is.
+	if name, ok := strings.CutPrefix(a.URL, "file://"); ok {
+		src, err := os.Open(name)
+		if err != nil {
+			return "", fail(CodeDownloadFailed, "%v", err)
+		}
+		defer src.Close()
+		return e.stage(a, src)
+	}
 	ctx, cancel := context.WithTimeout(ctx, DownloadTimeoutSecondsLimit*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.URL, nil)
@@ -199,12 +253,18 @@ func (e Env) download(ctx context.Context, a release.Artifact) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", fail(CodeDownloadFailed, "%s answered %d", a.URL, resp.StatusCode)
 	}
+	return e.stage(a, resp.Body)
+}
+
+// stage copies r into staging as a.Name, checking a's size and sha256 on the
+// way. The file is removed on any failure.
+func (e Env) stage(a release.Artifact, r io.Reader) (string, error) {
 	path := filepath.Join(e.Layout.Staging, a.Name)
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return "", err
 	}
-	cerr := a.Check(resp.Body, f)
+	cerr := a.Check(r, f)
 	if err := f.Close(); cerr == nil {
 		cerr = err
 	}
@@ -277,4 +337,21 @@ func (e Env) smoke(ctx context.Context, dir string, m release.Manifest) error {
 			got.Version, short(got.Commit), m.Version, short(m.Commit))
 	}
 	return nil
+}
+
+// readLimited reads path, refusing one longer than limit bytes.
+func readLimited(path string, limit int64) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	body, err := io.ReadAll(io.LimitReader(f, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("%s is longer than %d bytes", path, limit)
+	}
+	return body, nil
 }
