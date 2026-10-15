@@ -4,6 +4,7 @@ import { catalogWordLanguage } from "../catalog.js"
 import { nextWord } from "../next-strings.js"
 import { followsRelay } from "../client.js"
 import { applyUpdate, checkUpdateNow, currentUpdateRead, publishUpdateRead, refreshUpdate, subscribeUpdate } from "./update.js"
+import { canRestartStagedApp, restartStagedApp } from "./restart-app.js"
 import { INSTALL_COMMAND, UPDATE_BANNER_DISMISSED_KEY, buildName, canStartUpdateAfterFresh, updateBannerVersion, updatePanel } from "./update-model.js"
 import "./update.css"
 
@@ -115,6 +116,7 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
   }
   const canPress = read?.kind === "status" && (Boolean(version) || view.press.shown) && !sending && !following && !completed
   const busy = Boolean(sending || following || view.progress)
+  const restartVersion = view.staged ? last.current?.apply?.to || "" : ""
   const message = checkFailed ? nextWord("updateIsUnknown")
     : dismissedResult ? null : problem?.sentence || view.progress || (sending ? nextWord("updateVerifying", { to: target }) : null)
       || (completed ? view.done || nextWord("updateHealthy", { to: target }) : null)
@@ -134,6 +136,11 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
       {canPress && !checkFailed ? (
         <button className="chip update-banner-go" type="button" onClick={() => void press()}>
           {view.press.label}
+        </button>
+      ) : null}
+      {restartVersion && canRestartStagedApp() ? (
+        <button className="chip update-banner-go" type="button" onClick={() => restartStagedApp(restartVersion)}>
+          {nextWord("updateRestartApp")}
         </button>
       ) : null}
       {!sending && !following ? (

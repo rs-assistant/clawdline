@@ -443,6 +443,7 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
                                            forMainFrameOnly: true))
         content.add(WeakMessageHandler(self), name: "shellSettings")
         content.add(WeakMessageHandler(self), name: "shellAgentSetup")
+        content.add(WeakMessageHandler(self), name: "shellRestartApp")
         // The notch island listens to the same stream and opens this window
         // when its character is pressed (NotchIsland.swift).
         NotchIsland.shared.attach(to: content, open: { [weak self] in self?.showConsole() })
@@ -795,6 +796,14 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
     }
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "shellRestartApp" {
+            guard message.frameInfo.isMainFrame, message.webView === web,
+                  let page = web.url, isConsole(page), !showingCloud,
+                  let body = message.body as? [String: String],
+                  let version = body["version"] else { return }
+            _ = restartForStagedUpdate(version)
+            return
+        }
         if message.name == "shellAgentSetup" {
             guard message.frameInfo.isMainFrame, message.webView === web,
                   let page = web.url, page.scheme == home.scheme,

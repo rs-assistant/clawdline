@@ -1063,9 +1063,11 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
             {sidebarPages.filter((p) => p.id === "settings").map(sidebarPage)}
           </section>
           <div className="sidebar-version" role="status">
-            {!focusCloudSessions && machineVersion.version
-              ? nextWord("sidebarServiceVersion", { version: machineVersion.version.replace(/^v/i, "") })
-              : nextWord("sidebarVersionUnknown")}
+            {focusCloudSessions
+              ? nextWord("sidebarChooseMachineVersion")
+              : machineVersion.version
+                ? nextWord("sidebarServiceVersion", { version: machineVersion.version.replace(/^v/i, "") })
+                : nextWord("sidebarVersionUnknown")}
             {!focusCloudSessions && stagedAppVersion
               ? <span>{nextWord("sidebarAppStaged", { version: stagedAppVersion.replace(/^v/i, "") })}</span> : null}
           </div>

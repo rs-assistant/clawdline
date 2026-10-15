@@ -44,6 +44,8 @@
     grid-template-columns: minmax(0, 1fr) auto;
     margin-top: 14px;
 }
+.settings-update .update-app-staged { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.settings-update .update-app-staged .say { margin: 0; }
 .settings-update .update-auto strong { font-size: 12.5px; font-weight: 600; color: var(--ink); }
 .settings-update .update-auto .say { margin: 4px 0 0; }
 

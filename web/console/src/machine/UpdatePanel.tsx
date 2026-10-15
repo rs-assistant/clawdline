@@ -9,6 +9,7 @@ import { Switch } from "../pages/settings/Switch.js"
 import { useMachineVersion } from "./NeedsUpdate.js"
 import { needsUpdateWords } from "./needs-update-model.js"
 import { applyUpdate, currentUpdateRead, publishUpdateRead, refreshUpdate, servedConsoleChanged, subscribeUpdate } from "./update.js"
+import { canRestartStagedApp, restartStagedApp } from "./restart-app.js"
 import {
   applyMoving,
   asksForUpdatePanel,
@@ -212,6 +213,7 @@ export function UpdatePanel({ shown }: { shown: boolean }) {
   }
 
   const running = last.current ? buildName(last.current.running) : ""
+  const restartVersion = view.staged ? last.current?.apply?.to || "" : ""
   const pressButton = view.press.shown ? (
     <div className="row">
       <button className="chip update-now" id="settings-update-now" type="button" disabled={!view.press.enabled} onClick={press}>
@@ -257,7 +259,14 @@ export function UpdatePanel({ shown }: { shown: boolean }) {
         </div>
       ) : null}
       {view.press.below ? pressButton : null}
-      {view.staged ? <p className="say">{view.staged}</p> : null}
+      {view.staged ? <div className="update-app-staged">
+        <p className="say">{view.staged}</p>
+        {restartVersion && canRestartStagedApp() ? (
+          <button className="chip" type="button" onClick={() => restartStagedApp(restartVersion)}>
+            {nextWord("updateRestartApp")}
+          </button>
+        ) : null}
+      </div> : null}
       {view.auto.shown ? (
         <div className="update-auto">
           <div>

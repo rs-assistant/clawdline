@@ -43,9 +43,13 @@ deploying the hosted console does not require quitting the local app or restarti
    `failed` or `rolled_back`, preserve the previous running release and record the error code;
    investigate before trying again.
 4. On macOS, a healthy daemon update can leave the app bundle staged while the app remains open.
-   `apply.staged_app` records that state. Leave the app open; Clawdline installs that bundle after
-   the app next quits on its own. Report the running daemon version and the app bundle version
-   separately until they agree. Do not force the app to quit merely to clear `staged_app`.
+   `apply.staged_app` records that state. The installed Mac app offers **Restart app now** in its
+   update banner and Settings panel; only the person's press closes it, waits for the staged bundle
+   to replace the old one, and opens it again. They can also leave it open and use the new bundle
+   after their next ordinary quit. Report the running daemon version and the app bundle version
+   separately until they agree. An older app shell without this button needs one ordinary quit
+   and reopen after its first update; a newly served web page cannot add a native action to an
+   already running old shell. Do not force the app to quit merely to clear `staged_app`.
 
 This procedure keeps the existing console available through the release approval and download
 period. The updater itself performs the brief service restart in step 5 below, with its health
@@ -218,7 +222,8 @@ The panel shows the running and latest version (a short commit for a source buil
 - `rolled_back` and `failed` show `apply.error.code` and `detail` and say the previous release still
   runs. The session-list banner animates while an update is checking or moving, keeps the completed
   result visible after a page reload until dismissed, and shows `staged_app` beside that result: the
-  daemon has updated, while the open Mac app keeps its old bundle until the person next quits it.
+  daemon has updated, while the open Mac app keeps its old bundle until the person presses
+  **Restart app now** in the installed Mac app or next quits it.
 - **自動更新** writes `update_auto_apply` through `/v1/settings`. Over Cloud it is shown but disabled,
   with a sentence saying to change it on the machine: the settings route takes only the machine's
   own token.
