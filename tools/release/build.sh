@@ -3,9 +3,13 @@
 # (docs/releasing.md). Signing is a separate step, so the key is never needed
 # on a machine that only builds.
 #
-# usage: tools/release/build.sh <version> <out-dir> [--channel stable|beta]
+# usage: tools/release/build.sh <version> <out-dir> [--channel stable|beta|dev]
 #          [--base-url URL] [--min-version vX.Y.Z] [--no-app] [--skip-tests]
-#          [--test-key <base64 public key>] [--tmux-from <dir>]
+#          [--test-key <base64 public key>] [--tmux-from <dir>] [--host-only]
+#
+# --channel dev is a dev build (`clawdline dev install`, docs/updates.md): a
+# vX.Y.Z-dev.<commit> version, unsigned, installed only on the machine that
+# built it. --host-only builds this machine's os/arch alone.
 #
 # <out-dir> must not exist. It ends up holding:
 #   clawdline_<v>_<os>_<arch>.tar.gz   `clawdline`, `dist/`, and the tmux the
@@ -32,7 +36,7 @@ die() { echo "release build: $*" >&2; exit 2; }
 [ "$#" -ge 2 ] || die "usage: tools/release/build.sh <version> <out-dir> [options]"
 version=$1 out=$2
 shift 2
-channel=stable base_url="" min_version="" app=1 tests=1 test_key="" tmux_from=""
+channel=stable base_url="" min_version="" app=1 tests=1 test_key="" tmux_from="" host_only=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --channel) channel=${2:?}; shift ;;
@@ -42,14 +46,17 @@ while [ "$#" -gt 0 ]; do
     --skip-tests) tests=0 ;;
     --test-key) test_key=${2:?}; shift ;;
     --tmux-from) tmux_from=${2:?}; shift ;;
+    --host-only) host_only=1 ;;
     *) die "unknown option $1" ;;
   esac
   shift
 done
 
 [[ "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.]+)?$ ]] || die "$version is not vX.Y.Z[-pre]"
-case "$channel" in stable|beta) ;; *) die "--channel is stable or beta" ;; esac
+case "$channel" in stable|beta|dev) ;; *) die "--channel is stable, beta or dev" ;; esac
 [ "$channel" = stable ] && [[ "$version" == *-* ]] && die "a pre-release version belongs on the beta channel"
+[ "$channel" = dev ] && [[ ! "$version" =~ -dev\.[0-9a-f]+$ ]] && die "a dev build is vX.Y.Z-dev.<commit>"
+[ "$channel" != dev ] && [[ "$version" =~ -dev\. ]] && die "a -dev. version is built with --channel dev"
 if [ -n "$test_key" ]; then
   [[ "$version" =~ -test\.[0-9]+$ ]] || die "--test-key is only for a vX.Y.Z-test.N version"
 fi
@@ -129,7 +136,9 @@ carry_tmux() {
   fi
 }
 
-for target in linux/amd64 linux/arm64 darwin/arm64 darwin/amd64; do
+targets="linux/amd64 linux/arm64 darwin/arm64 darwin/amd64"
+[ "$host_only" = 0 ] || targets="$(go env GOOS)/$(go env GOARCH)"
+for target in $targets; do
   goos=${target%/*} goarch=${target#*/}
   stage="$work/$goos-$goarch"
   mkdir -p "$stage"
