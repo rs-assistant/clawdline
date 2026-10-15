@@ -46,6 +46,12 @@ NAME="Clawdline Next"
 ID="com.sainteye.clawdline-next"     # deliberately not the Swift app's id:
                                       # both must be installable at once
 APP="dist/$NAME.app"
+# The oldest macOS the app runs on: Info.plist says it, and every binary in the
+# bundle is built for it. swiftc without -target builds for the Mac it runs on,
+# so v0.11.0 and v1.0.0, built on a macOS 26 runner, carried a shell with minos
+# 26.0 under an Info.plist that said 13.0: LaunchServices refused to open it on
+# macOS 15 (error -10825) and the installer quietly opened the browser instead.
+MACOS_MIN="13.0"
 INSTALL_APP=""
 VERSION="$(git describe --tags --always 2>/dev/null || echo 0.0.1)"
 RELEASE_VERSION="${CLAWDLINE_RELEASE_VERSION:-}"
@@ -144,7 +150,7 @@ else
   CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" \
     -o "$BUILD/Contents/MacOS/clawdline" ./cmd/clawdline
 fi
-swiftc -O -o "$BUILD/Contents/MacOS/$NAME" shell/darwin/*.swift
+swiftc -O -target "arm64-apple-macos$MACOS_MIN" -o "$BUILD/Contents/MacOS/$NAME" shell/darwin/*.swift
 
 # The tmux the app carries, with the licenses of what it is built from.
 TMUX_DIR="${CLAWDLINE_TMUX_DIR:-dist/tmux/darwin-arm64}"
@@ -227,7 +233,7 @@ cat > "$BUILD/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>Clawdline</string>
-  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>LSMinimumSystemVersion</key><string>$MACOS_MIN</string>
   <key>NSHighResolutionCapable</key><true/>
   <!-- Dictation. The console records in the WKWebView and this machine's own
        whisper reads it (POST /v1/voice); nothing about that leaves the
@@ -245,6 +251,20 @@ cat > "$BUILD/Contents/Info.plist" <<PLIST
   </dict></array>
 </dict></plist>
 PLIST
+
+# No binary may need a newer macOS than Info.plist promises: LaunchServices
+# reads the binary, not the promise.
+for bin in "$BUILD/Contents/MacOS/$NAME" "$BUILD/Contents/MacOS/clawdline" "$BUILD/Contents/Helpers/tmux"; do
+  minos="$(vtool -show-build "$bin" | awk '$1 == "minos" { print $2; exit }')"
+  if ! awk -v a="$minos" -v b="$MACOS_MIN" 'BEGIN {
+      if (a == "") exit 1
+      split(a, x, "."); split(b, y, ".")
+      for (i = 1; i <= 3; i++) { if (x[i] + 0 < y[i] + 0) exit 0; if (x[i] + 0 > y[i] + 0) exit 1 }
+      exit 0 }'; then
+    echo "error: $bin needs macOS ${minos:-?}, but the app says it runs on macOS $MACOS_MIN" >&2
+    exit 1
+  fi
+done
 
 # Signed ad hoc, as one bundle. The linker signs each binary on its own, but
 # launch at login (SMAppService) asks about the application, and an unsigned
