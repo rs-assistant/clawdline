@@ -27,6 +27,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync 
 import { tmpdir } from "node:os"
 import { dirname, extname, join, normalize, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { SITE_CALLOUTS, SITE_LANG, SITE_SHOTS, calloutScript, siteSuffix, siteText } from "./site-shots.ts"
 
 const here = dirname(fileURLToPath(import.meta.url))
 const dist = resolve(process.env.CLAWDLINE_DIST || resolve(here, "../../dist"))
@@ -389,7 +391,7 @@ const TYPES: Record<string, string> = {
 
 function json(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { "content-type": "application/json" })
-  res.end(JSON.stringify(body))
+  res.end(siteText(JSON.stringify(body)))
 }
 
 /** The document with its words written in, as `page.go` writes them. */
@@ -398,7 +400,7 @@ function document(): string {
   const words = JSON.parse(readFileSync(join(dist, "strings", "zh-Hant.json"), "utf8"))
   words.lang = "zh-Hant"
   words.dir = "ltr"
-  const slot = "<script>localStorage.setItem('ui_language','zh-Hant');window.__strings=" + JSON.stringify(words).replaceAll("</", "<\\/") + "</script>"
+  const slot = "<script>localStorage.setItem('ui_language'," + JSON.stringify(SITE_LANG) + ");window.__strings=" + JSON.stringify(words).replaceAll("</", "<\\/") + "</script>"
   return html.replace("<!-- clawdline:strings -->", slot).replace("<!-- clawdline:cloud -->", "")
 }
 
@@ -407,7 +409,7 @@ function daemon(): Server {
     const url = new URL(req.url ?? "/", "http://fixture")
     const path = url.pathname
     if (path === "/v1/strings") {
-      return json(res, 200, JSON.parse(readFileSync(join(dist, "catalogs", "zh-Hant.json"), "utf8")))
+      return json(res, 200, JSON.parse(readFileSync(join(dist, "catalogs", SITE_LANG + ".json"), "utf8")))
     }
     if (path === "/v1/sessions") {
       listReads++
@@ -644,6 +646,11 @@ function daemon(): Server {
       res.writeHead(200, { "content-type": "image/png" })
       return res.end(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"))
     }
+    // The pictured Session has no notes; answering keeps its header from reading
+    // "could not load" in a website picture.
+    if (SITE_SHOTS && path.startsWith("/v1/work/v2/human-interventions/") && req.method === "GET") {
+      return json(res, 200, { ok: true, rows: [], pruned_resolved: 0 })
+    }
     const sessionWork = /^\/v1\/work\/v2\/session-todos\/(.+)$/.exec(path)
     if (sessionWork && req.method === "GET") {
       sessionWorkReads++
@@ -651,7 +658,10 @@ function daemon(): Server {
         res.writeHead(409, { "content-type": "application/json" })
         return res.end(JSON.stringify({ error: "session_unavailable" }))
       }
-      const sessionID = decodeURIComponent(sessionWork[1])
+      // The page reads a Session's to-dos by its conversation (`conversation:<id>`,
+      // ad35bfcd1) and older consoles by its terminal; this fixture's conversation
+      // for a pane is `conversation-<pane>`, so both name the same row.
+      const sessionID = decodeURIComponent(sessionWork[1]).replace(/^conversation:conversation-/, "")
       const ownsSafe = sessionID === SAFE || sessionID === "conversation:conversation-" + SAFE
       const assigned = ownsSafe && readingScenario !== "safe-cleared"
         ? [{
@@ -773,7 +783,7 @@ function daemon(): Server {
     }
     if (path === "/v1/events") {
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" })
-      res.write("event: sessions\ndata: " + JSON.stringify(snapshot()) + "\n\n")
+      res.write("event: sessions\ndata: " + siteText(JSON.stringify(snapshot())) + "\n\n")
       streams.add(res)
       req.on("close", () => streams.delete(res))
       return // held open, as the daemon's stream is
@@ -1138,6 +1148,12 @@ class Tab {
     if (!click) return
     await this.b.send("Input.dispatchMouseEvent", { type: "mousePressed", x, y, button: "left", clickCount: 1 }, this.session)
     await this.b.send("Input.dispatchMouseEvent", { type: "mouseReleased", x, y, button: "left", clickCount: 1 }, this.session)
+  }
+
+  /** The phone's screen as PNG bytes. */
+  async picture(): Promise<Buffer> {
+    const { data } = await this.b.send("Page.captureScreenshot", { format: "png" }, this.session)
+    return Buffer.from(data, "base64")
   }
 
   /** A picture of the phone, for the report. */
@@ -2840,8 +2856,11 @@ test("an expanded Session todo fold shades the conversation and a backdrop tap c
     assert.match(openVisuals.veilFilter, /blur\(7px\)/)
     assert.match(openVisuals.hitClass, /session-todos-backdrop/)
     assert.match(openVisuals.bodyAnimation, /session-todos-body-in/)
-    assert.ok(Math.abs(openVisuals.veilTop - openVisuals.foldHeight) <= 2,
-      `veil began at ${openVisuals.veilTop}px instead of the ${openVisuals.foldHeight}px fold edge`)
+    // The veil's top is `calc(100% - 1px)` of the padding box, so it starts on
+    // the fold's 1px bottom border: 2px above the border box's height. A fold
+    // whose height is not a whole pixel put that 0.0004px past a "within 2" check.
+    assert.ok(Math.abs(openVisuals.veilTop - (openVisuals.foldHeight - 2)) <= 0.5,
+      `veil began at ${openVisuals.veilTop}px instead of on the ${openVisuals.foldHeight}px fold's bottom border`)
     assert.ok(openVisuals.transcriptTop <= openVisuals.foldBottom + 2,
       `conversation began at ${openVisuals.transcriptTop}px beyond the ${openVisuals.foldBottom}px fold edge`)
     await tab.shot("session-todos-open-glass-layer")
@@ -3526,4 +3545,57 @@ test("a reading beyond the retention window removes the row and says the source 
     } finally {
       readingScenario = "normal"
     }
+  }))
+
+// ---- the website's pictures (tools/site-shots.sh; skipped unless SITE_SHOTS is set)
+
+async function siteUntil(tab: Tab, expression: string) {
+  const deadline = Date.now() + 8000
+  while (!(await tab.run(expression))) {
+    if (Date.now() > deadline) assert.fail("the page never reached " + expression)
+    await new Promise((r) => setTimeout(r, 50))
+  }
+}
+
+async function siteSave(tab: Tab, scene: string) {
+  await new Promise((r) => setTimeout(r, 400))
+  writeFileSync(join(SITE_SHOTS, `${scene}-${siteSuffix}.png`), await tab.picture())
+}
+
+test("site shot: a Session to-do with its attachment", { skip: !SITE_SHOTS }, () =>
+  inTab(async (tab) => {
+    await tab.go("/#session=" + encodeURIComponent(BLOCKED))
+    await siteUntil(tab, `(() => {
+      const fold = document.querySelector('.session-todos')
+      if (fold && !fold.open) fold.querySelector('summary')?.click()
+      return !!document.querySelector('.session-todo-image-link')?.getAttribute('href')?.startsWith('blob:')
+    })()`)
+    // The fold opens with an animation; a picture taken during it clips the row.
+    await new Promise((r) => setTimeout(r, 1200))
+    await tab.run(`document.querySelector('.session-direct-todo').scrollIntoView({ block: "center" })`)
+    await new Promise((r) => setTimeout(r, 800))
+    const [todo, attachment] = SITE_CALLOUTS["session-todo"]
+    await tab.run(calloutScript([
+      { sel: ".session-direct-todo", n: 1, label: todo },
+      { sel: ".session-todo-image-link", n: 2, label: attachment, pad: 4 },
+    ]))
+    await siteSave(tab, "session-todo")
+  }))
+
+test("site shot: a Board item's review and assignment", { skip: !SITE_SHOTS }, () =>
+  inTab(async (tab) => {
+    readingScenario = "normal"
+    await tab.go("/#page=work")
+    await siteUntil(tab, `(() => {
+      const summary = document.querySelector('#work [data-work-id="assignment-fixture"] .work-card-summary')
+      if (summary && !document.querySelector('.work-item-detail-modal')) summary.click()
+      return !!document.querySelector('.work-item-detail-modal .work-assignment')
+    })()`)
+    await new Promise((r) => setTimeout(r, 600))
+    const [review, assign] = SITE_CALLOUTS["board-item"]
+    await tab.run(calloutScript([
+      { sel: ".work-item-detail-modal .work-review-required", n: 1, label: review },
+      { sel: ".work-item-detail-modal .work-assignment", n: 2, label: assign },
+    ]))
+    await siteSave(tab, "board-item")
   }))
