@@ -174,5 +174,9 @@ fi
 args=(-version "$version" -commit "$commit" -committed-at "$committed_at" -channel "$channel" -base-url "$base_url")
 [ -z "$min_version" ] || args+=(-min-version "$min_version")
 go run ./tools/release manifest ${args[@]+"${args[@]}"} "$out"
-echo "release $version ($commit) built in $out; sign it with: go run ./tools/release sign -key <file> $out"
+if [ "$channel" = dev ]; then
+  echo "dev build $version ($commit) built in $out"
+else
+  echo "release $version ($commit) built in $out; sign it with: go run ./tools/release sign -key <file> $out"
+fi
 finished=1
