@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5258,
+  "englishKeys": 5259,
   "counts": {
-    "negation": 1508,
+    "negation": 1509,
     "state": 724,
-    "permission": 333,
+    "permission": 334,
     "deletion": 111,
     "uncertainty": 154
   },
-  "unionCount": 2324,
+  "unionCount": 2325,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1417,6 +1417,7 @@
       "settings.webCloudStatusNoDrops",
       "settings.webCloudStatusReadFailed",
       "settings.webFailMacWritesOff",
+      "settings.webRemoteMachineOnly",
       "template.00ac5e87de81",
       "template.0e6efad65a6c",
       "template.0efa5a61894d",
@@ -2577,6 +2578,7 @@
       "settings.webCloudPairSealing",
       "settings.webCloudPairStart",
       "settings.webCloudStatusToken",
+      "settings.webRemoteMachineOnly",
       "template.5c513a465185",
       "verify.reasonNeeded",
       "worktree.refreshed"
@@ -4991,6 +4993,7 @@
     "settings.webCloudStatusReadFailed",
     "settings.webCloudStatusToken",
     "settings.webFailMacWritesOff",
+    "settings.webRemoteMachineOnly",
     "template.00ac5e87de81",
     "template.0452d5f2c3a3",
     "template.08166fe2eeb1",

@@ -112,11 +112,15 @@ func fail(err error) {
 // named "Browser on this machine", handed over in the address. In the fragment,
 // not the query — a browser never sends a fragment and never logs it.
 func openCommand(args []string) {
-	fs := flag.NewFlagSet("open", flag.ExitOnError)
-	printOnly := fs.Bool("print", false, "print the address instead of opening it (it carries a key)")
-	_ = fs.Parse(args)
+	printOnly, port, err := parseOpenArgs(args)
+	if errors.Is(err, flag.ErrHelp) {
+		return
+	}
+	if err != nil {
+		fail(err)
+	}
 
-	req, err := daemonRequest(http.MethodPost, "/v1/auth/devices/browser", contract.BrowserRequest{})
+	req, err := daemonRequestWithConfig(http.MethodPost, "/v1/auth/devices/browser", contract.BrowserRequest{}, config.Load(), port)
 	if err != nil {
 		fail(err)
 	}
@@ -132,7 +136,7 @@ func openCommand(args []string) {
 	if err := json.NewDecoder(res.Body).Decode(&made); err != nil {
 		fail(fmt.Errorf(cliCopy("core", "auth.device_unreadable", "the daemon's answer was not a device: %w"), err))
 	}
-	if *printOnly {
+	if printOnly {
 		fmt.Println(made.URL)
 		return
 	}
@@ -140,6 +144,31 @@ func openCommand(args []string) {
 		fail(fmt.Errorf(cliCopy("core", "auth.browser_open_failed", "could not open a browser (%v); run `clawdline open --print` and open the address yourself"), err))
 	}
 	fmt.Printf(cliCopy("core", "auth.opened_browser", "opened a browser as device %s\n"), made.ID)
+}
+
+// parseOpenArgs reads `open`'s flags. --port is the one `clawdline setup`
+// prints for an install on a port other than 7727 ("Not in front of you? Run
+// clawdline open --port 7790"); without it that line answered "flag provided
+// but not defined: -port". With no --port the port is CLAWDLINE_NEXT_PORT,
+// else 7727, as before.
+func parseOpenArgs(args []string) (printOnly bool, port int, err error) {
+	fs := flag.NewFlagSet("open", flag.ContinueOnError)
+	wantPrint := fs.Bool("print", false, "print the address instead of opening it (it carries a key)")
+	named := fs.Int("port", 0, cliCopy("item", "flag.port", "the daemon's port (default CLAWDLINE_NEXT_PORT, else 7727)"))
+	if err := fs.Parse(args); err != nil {
+		return false, 0, err
+	}
+	if fs.NArg() > 0 {
+		return false, 0, fmt.Errorf("open takes no arguments, only --print and --port; got %q", fs.Arg(0))
+	}
+	if *named == 0 {
+		port, err := daemonPort()
+		return *wantPrint, port, err
+	}
+	if *named < 1 || *named > 65535 {
+		return false, 0, fmt.Errorf("--port %d is not a port", *named)
+	}
+	return *wantPrint, *named, nil
 }
 
 func openURL(u string) error {

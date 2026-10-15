@@ -4593,6 +4593,7 @@
   "settings.webCloudStatusMac": "Machine {machine}",
   "settings.webCloudStatusNoDrops": "This machine has dropped no commands since {at}.",
   "settings.webCloudStatusReadFailed": "Could not read this machine's status.",
+  "settings.webRemoteMachineOnly": "This browser cannot manage Cloud or the tunnel; only this machine's own sign-in can. Use the Clawdline app's settings on this machine, or run clawdline cloud login and clawdline tunnel in a terminal on this machine.",
   "settings.webCloudStatusToken": "Machine credential expires: {at}",
   "settings.webFailMacWritesOff": "This machine does not currently accept commands from Cloud.",
   "settings.cloudSetupTitle": "Connect this machine to Cloud",

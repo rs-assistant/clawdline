@@ -27,6 +27,8 @@ const ownWords = {
     settingsHotkeyRefused:
       "{combo} could not be registered (the operating system returned {status}). The ✳ in Clawdline's menu still opens the input box; press the button above to choose another combination.",
     webCloudStatusReadFailed: "Could not read this machine's status.",
+    webRemoteMachineOnly:
+      "This browser cannot manage Cloud or the tunnel; only this machine's own sign-in can. Use the Clawdline app's settings on this machine, or run clawdline cloud login and clawdline tunnel in a terminal on this machine.",
     webCloudStatusToken: "Machine credential expires: {at}",
     webCloudStatusKey: "Machine key: {key}",
     webCloudStatusMachine: "Machine {machine}",
@@ -91,6 +93,8 @@ const ownWords = {
     settingsHotkeyRefused:
       "{combo} 註冊不起來（作業系統回 {status}）。Clawdline 選單裡的 ✳ 一樣打得開輸入框；要換一組就按上面的按鈕。",
     webCloudStatusReadFailed: "讀不到這台機器的狀態。",
+    webRemoteMachineOnly:
+      "這個瀏覽器不能管理 Cloud 與通道，只有這台機器本身的登入可以。請改用這台機器上 Clawdline App 的設定，或在這台機器的終端機執行 clawdline cloud login 與 clawdline tunnel。",
     webCloudStatusToken: "機器憑證到期：{at}",
     webCloudStatusKey: "機器金鑰：{key}",
     webCloudStatusMachine: "機器 {machine}",
@@ -305,6 +309,7 @@ const baseW = {
   cloudCommandsOff: ownWord("cloudCommandsOff"),
   cloudPairPermission: ownWord("cloudPairPermission"),
   webCloudStatusReadFailed: ownWord("webCloudStatusReadFailed"),
+  webRemoteMachineOnly: ownWord("webRemoteMachineOnly"),
   webCloudStatusConnection: "連線：{state}",
   webCloudStatusClosed: "上次關閉：{code}",
   webCloudStatusToken: ownWord("webCloudStatusToken"),

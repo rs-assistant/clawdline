@@ -15,6 +15,7 @@ import {
   cancelCloudPairing,
   offerCloudPairing,
   readCloudLogin,
+  MACHINE_ONLY,
   readCloudStatus,
   revokeCloudViewer,
   setCloudCommands,
@@ -23,6 +24,7 @@ import {
   type CloudLogin,
   type CloudStatus,
   type CloudViewer,
+  type MachineOnly,
 } from "../cloud.js"
 import { DEFAULTS, reading, type SettingKey } from "./defaults.js"
 import { readTunnelStatus } from "../tunnel.js"
@@ -107,6 +109,18 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   const [cloudSetupSaid, setCloudSetupSaid] = useState("")
   // The tunnel's own reading, the same three ways: not asked, refused, an answer.
   const [tunnel, setTunnel] = useState<TunnelStatus | null | undefined>(undefined)
+  // Whether the Remote tab's readings were refused because only this machine's
+  // own token may read them (cloud.ts MACHINE_ONLY). Then both cards say where
+  // Cloud and the tunnel are managed, once, instead of a read failure each.
+  const [remoteMachineOnly, setRemoteMachineOnly] = useState(false)
+  const takeCloud = (answer: CloudStatus | MachineOnly | null) => {
+    setRemoteMachineOnly(answer === MACHINE_ONLY)
+    setCloud(answer === MACHINE_ONLY ? null : answer)
+  }
+  const takeTunnel = (answer: TunnelStatus | MachineOnly | null) => {
+    setRemoteMachineOnly(answer === MACHINE_ONLY)
+    setTunnel(answer === MACHINE_ONLY ? null : answer)
+  }
   // Where the voice language landed, asked of the daemon while the voice tab is
   // open and again after every write — the General tab's language moves it too.
   const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage | null>(null)
@@ -169,7 +183,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     let live = true
     const pass = () => {
       void readCloudStatus().then((answer) => {
-        if (live) setCloud(answer)
+        if (live) takeCloud(answer)
       })
     }
     pass()
@@ -185,8 +199,11 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     }
   }, [tab, cloud?.pairing?.phase, embedded, remoteTab])
 
+  // The account sign-in, on the same Remote tab. Its index moves with the
+  // input bar and voice tabs (remoteTab); a fixed 3 was the Remote tab only in
+  // the Mac app with both on, so a browser never read the sign-in at all.
   useEffect(() => {
-    if (tab !== 3) return
+    if (tab !== remoteTab || embedded) return
     let live = true
     const pass = () => {
       void readCloudLogin().then(
@@ -197,7 +214,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     pass()
     const timer = cloudLogin?.phase === "waiting" ? setInterval(pass, 2_000) : null
     return () => { live = false; if (timer) clearInterval(timer) }
-  }, [tab, cloudLogin?.phase])
+  }, [tab, cloudLogin?.phase, remoteTab, embedded])
 
   // The tunnel's reading, while the same tab is open. The Swift window asked
   // its tunnel once a second, because "starting" turns into an address on its
@@ -208,7 +225,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     let live = true
     const pass = () => {
       void readTunnelStatus().then((answer) => {
-        if (live) setTunnel(answer)
+        if (live) takeTunnel(answer)
       })
     }
     pass()
@@ -240,7 +257,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
       // A Remote-tab switch moves the tunnel at once (the daemon applies it
       // on the write); the card asks again rather than waiting its turn.
       if (!embedded && ("remote" in keys || "remote_tunnel" in keys || "remote_hostname" in keys)) {
-        void readTunnelStatus().then(setTunnel)
+        void readTunnelStatus().then(takeTunnel)
       }
       return answer
     } catch (error) {
@@ -754,7 +771,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
           try {
             const [login, status] = await Promise.all([readCloudLogin(), readCloudStatus()])
             setCloudLogin(login)
-            setCloud(status)
+            takeCloud(status)
           } catch (error) {
             setCloudSetupSaid(settingsFailureSentence(error))
           } finally {
@@ -823,7 +840,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     if (cloud === null) {
       return (
         <Block label={W.webCloudStatus}>
-          <Note dot="idle">{W.webCloudStatusReadFailed}</Note>
+          <Note dot="idle">{remoteMachineOnly ? W.webRemoteMachineOnly : W.webCloudStatusReadFailed}</Note>
         </Block>
       )
     }
@@ -906,7 +923,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
       void what().then(
         () =>
           readCloudStatus().then((answer) => {
-            setCloud(answer)
+            takeCloud(answer)
             setPairingBusy(false)
           }),
         (error: unknown) => {
@@ -1123,6 +1140,9 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   function tunnelBlock() {
     if (tunnel === undefined) return null
     if (tunnel === null) {
+      // Refused for the same reason as the Cloud card, which already says where
+      // both are managed; a second copy of that sentence would say nothing new.
+      if (remoteMachineOnly) return null
       return (
         <Block>
           <Note dot="idle">{W.webCloudStatusReadFailed}</Note>
