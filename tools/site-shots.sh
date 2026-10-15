@@ -22,7 +22,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 
 scenes=(attention-note session-todo board-item)
 for lang in en zh-Hant; do
-  for scene in "${scenes[@]}"; do rm -f "$out/$scene-$lang.png"; done
+  for scene in ${scenes[@]+"${scenes[@]}"}; do rm -f "$out/$scene-$lang.png"; done
   ( cd "$root/web/console" && SITE_SHOTS="$out" SITE_SHOTS_LANG="$lang" \
       node --test --experimental-strip-types --test-name-pattern='^site shot' \
       src/session/human-interventions.e2e.ts src/session/list-gestures.e2e.ts )
@@ -30,7 +30,7 @@ done
 
 missing=0
 for lang in en zh-Hant; do
-  for scene in "${scenes[@]}"; do
+  for scene in ${scenes[@]+"${scenes[@]}"}; do
     if [ ! -s "$out/$scene-$lang.png" ]; then
       echo "site-shots: $scene-$lang.png was not written" >&2
       missing=1

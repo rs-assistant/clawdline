@@ -249,13 +249,13 @@ export function ProjectSetup({ shown, ref }: { shown: boolean; ref?: Ref<Project
           <p>{catalogWord("inline", "9efc27432575")}</p>
           {!projectPath && !loading && places.length > 0 && <span className="project-setup-total">{complete}/{places.length}<small>{catalogWord("inline", "1f18df830a84")}</small></span>}
         </div>
-        {projectPath && visiblePlaces[0] && <ProjectUnify key={visiblePlaces[0].id} place={visiblePlaces[0]}
-          openRequest={unifyRequest.place === visiblePlaces[0].id ? unifyRequest.count : 0} />}
-        {projectPath && visiblePlaces[0] && <ProjectFiles key={visiblePlaces[0].id} place={visiblePlaces[0]} onState={updateFilesState} />}
         {loading && <p className="project-setup-loading" role="status">{catalogWord("inline", "db8653492c3a")}</p>}
         {!loading && !error && visiblePlaces.length > 0 && <ol className="project-readiness-list">
           {visiblePlaces.map(place => <ProjectReadiness key={place.id} place={place} select={select} openUnify={openUnify} />)}
         </ol>}
+        {projectPath && visiblePlaces[0] && <ProjectUnify key={visiblePlaces[0].id} place={visiblePlaces[0]}
+          openRequest={unifyRequest.place === visiblePlaces[0].id ? unifyRequest.count : 0} />}
+        {projectPath && visiblePlaces[0] && <ProjectFiles key={visiblePlaces[0].id} place={visiblePlaces[0]} onState={updateFilesState} />}
         {!loading && !error && visiblePlaces.length === 0 && <p className="project-setup-empty" role="status">{projectPath ? catalogWord("literal", "0e8fb42d973e") : <>{catalogWord("inline", "76d12ea59749")} <code>{catalogWord("inline", "fa482be8fef0")}</code>{catalogWord("inline", "7aa0955db160")}</>}</p>}
         {error && <p role="alert">{error}</p>}
         <button className="project-setup-refresh" type="button" disabled={loading} onClick={() => void load()}>{catalogWord("inline", "358a13c304aa")}</button>

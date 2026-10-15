@@ -4,6 +4,14 @@
   display: block;
 }
 
+.command-sheet:has(#command-draft:not([hidden])) .command-input {
+  display: none;
+}
+
+.command-sheet #command-list[hidden] {
+  display: none;
+}
+
 .command-sheet .command-input textarea {
   min-height: 120px;
   margin-bottom: 0;

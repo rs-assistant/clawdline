@@ -1873,7 +1873,7 @@ test("phone: Projects opens a reviewable setup Session without using the intent 
             if (draft && !draft.hidden) return resolve({
               pageHidden: document.getElementById("projects").hidden,
               instructions: document.getElementById("command-instructions").value,
-              picked: document.querySelector('#command-list .place[aria-pressed="true"]')?.dataset.id,
+              projectListHidden: document.getElementById("command-list").hidden,
               focused: document.activeElement?.id,
               buttonWidth: buttonBox.width,
               cardWidth: actionBox.width,
@@ -1905,7 +1905,7 @@ test("phone: Projects opens a reviewable setup Session without using the intent 
     })`)
     assert.equal(intentRequests, plannedBefore, "a known Project and task do not need the paid intent planner")
     assert.equal(reviewed.pageHidden, false)
-    assert.equal(reviewed.picked, "fixture-place")
+    assert.equal(reviewed.projectListHidden, true, "a Project setup review keeps its known Project without asking again")
     assert.equal(reviewed.focused, "command-instructions", "keyboard review starts on the editable instructions")
     assert.match(reviewed.instructions, /clawdline guide zh-TW project/)
     assert.match(reviewed.instructions, /deploy／CI/)

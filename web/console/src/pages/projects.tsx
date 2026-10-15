@@ -13,7 +13,6 @@ import { ActionConfirm, Info, requestPage, shown as overlayShown } from "../over
 import sectionMarkup from "./projects/section.html?raw"
 import { nextWord, type NextWord } from "../next-strings.js"
 import { workPageHash } from "../page-route.js"
-import { openTerminalPage } from "./terminal/navigate.js"
 import { showProjectRefusalDetail } from "./projects/refusal-detail.js"
 import { removeProjectPlace } from "./work/api.js"
 import { failureSentence } from "../legacy/bridge.js"
@@ -163,9 +162,8 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       }
       requestPage({ page: "work", hash: false })
     }
-    // The copied renderer owns its click listener. Its ordinary branch opens
-    // retired usage detail, so capture the row and open the repository lifecycle
-    // instead. Work is a separate action inside that Project's detail.
+    // The copied renderer owns its click listener; capture the row so its
+    // primary action opens the same settings dialog as the gear.
     const rows = document.getElementById("projects-rows")
     const onProject = (ev: Event) => {
       const button = (ev.target as Element | null)?.closest<HTMLButtonElement>("button.project-row[data-place-id]")
@@ -174,7 +172,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       if (!project?.path) return
       ev.preventDefault()
       ev.stopImmediatePropagation()
-      void bound.openLifecycle(project)
+      setup.current?.open(project.path, button)
     }
     const onWork = () => {
       const project = bound.state.place
@@ -272,19 +270,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
         </svg>`
         wrapper.classList.add("has-settings")
         wrapper.appendChild(gear)
-        // 終端: this project's terminals, locally or through the selected Cloud machine.
-        const name = wrapper.querySelector(".project-row-name")?.textContent || nextWord("terminalEntry")
-        const terminal = document.createElement("button")
-        terminal.type = "button"
-        terminal.className = "project-row-terminal"
-        terminal.dataset.placeId = project.dataset.placeId
-        terminal.title = nextWord("terminalEntry")
-        terminal.setAttribute("aria-label", nextWord("terminalEntryFor", { project: name }))
-        terminal.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-          <rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="m7.5 10 3 2.5-3 2.5M12.5 15h4"/>
-        </svg>`
-        wrapper.classList.add("has-terminal")
-        wrapper.appendChild(terminal)
+        const name = wrapper.querySelector(".project-row-name")?.textContent || catalogWord("literal", "fb67023ade0c")
         const remove = document.createElement("button")
         remove.type = "button"
         remove.className = "project-row-remove"
@@ -306,14 +292,6 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       const project = page.current?.state.places?.find(place => place.id === gear.dataset.placeId)
       if (project?.path) setup.current?.open(project.path, gear)
     }
-    const onTerminal = (ev: Event) => {
-      const button = (ev.target as Element | null)?.closest<HTMLButtonElement>("button.project-row-terminal[data-place-id]")
-      if (!button || !rows.contains(button)) return
-      // Every project's terminals are in the Session page's terminal list,
-      // each row named by its project; there is no per-project page any more.
-      const project = page.current?.state.places?.find((place) => place.id === button.dataset.placeId)
-      if (project?.path) openTerminalPage(project.path)
-    }
     const onRemove = (ev: Event) => {
       const button = (ev.target as Element | null)?.closest<HTMLButtonElement>("button.project-row-remove[data-place-id]")
       if (!button || !rows.contains(button)) return
@@ -321,7 +299,6 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       if (project?.path) { setRemoveError(""); setRemoveTarget(project) }
     }
     rows.addEventListener("click", onSettings)
-    rows.addEventListener("click", onTerminal)
     rows.addEventListener("click", onRemove)
     const observer = new MutationObserver(decorate)
     observer.observe(rows, { childList: true, subtree: true })
@@ -330,7 +307,6 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
     return () => {
       observer.disconnect()
       rows.removeEventListener("click", onSettings)
-      rows.removeEventListener("click", onTerminal)
       rows.removeEventListener("click", onRemove)
     }
   }, [])

@@ -569,31 +569,6 @@ after(async () => {
   if (profile) rmSync(profile, { recursive: true, force: true, maxRetries: 5 })
 })
 
-/** Whether the throwaway project is a row of the Projects page, which lists the Board's start points. */
-async function projectsPageLists(path: string): Promise<boolean> {
-  const answer = await api("/v1/board").catch(() => null)
-  const projects = (answer?.board ?? answer)?.projects ?? []
-  return projects.some((p: { isStartPoint?: boolean; displayPath?: string }) => p.isStartPoint === true && p.displayPath === path)
-}
-
-test("the Projects page's 終端 leads to the Session terminal list", { skip }, async (t) => {
-  const place = (await api("/v1/places")).places.find((p: { id: string }) => p.id === project)
-  if (!(await projectsPageLists(place.path))) {
-    t.skip("the throwaway project is not a Board start point on this daemon, so the Projects page has no row for it")
-    return
-  }
-  const tab = await Tab.open(browser)
-  await tab.go("#page=projects")
-  await tab.run(`new Promise((ok, fail) => {
-    const t = setTimeout(() => fail(new Error("no 終端 button on the project rows")), 8000)
-    const look = () => document.querySelector("button.project-row-terminal") ? (clearTimeout(t), ok(true)) : setTimeout(look, 50)
-    look()
-  })`)
-  await tab.press("button.project-row-terminal")
-  assert.equal(await tab.run("location.hash"), "#page=sessions&mode=terminal", "the Projects page leads to the Session terminal list, not a page of its own")
-  await tab.close()
-})
-
 test("the retired terminal page's address opens the Session terminal list", { skip }, async () => {
   const place = (await api("/v1/places")).places.find((p: { id: string }) => p.id === project)
   const tab = await Tab.open(browser)

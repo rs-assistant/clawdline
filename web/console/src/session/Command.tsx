@@ -25,7 +25,6 @@ const HOLD = 15_000
 const POLL = 400
 const SEND_TRIES = 4
 const SEND_WAIT = 2_000
-const MODELS = ["haiku", "sonnet", "opus"]
 const SURE = 0.5
 
 let host: CommandHost = { open: () => {}, refresh: () => {} }
@@ -35,7 +34,6 @@ let placesNote = ""
 let assistants: Assistant[] = []
 let chosenPlace: string | null = null
 let chosenAssistant: string | null = null
-let chosenModel = ""
 let openedID: string | null = null
 let run = 0
 
@@ -80,7 +78,6 @@ function paint(): void {
   el<HTMLTextAreaElement>("command-instructions").disabled = b
   el("command-list").querySelectorAll<HTMLButtonElement>(".place").forEach((row) => (row.disabled = b))
   el("command-with").querySelectorAll<HTMLButtonElement>(".chip").forEach((chip) => (chip.disabled = b))
-  el("command-model").querySelectorAll<HTMLButtonElement>(".chip").forEach((chip) => (chip.disabled = b))
   el<HTMLButtonElement>("command-go").disabled =
     b || (phase === "idle" && !el<HTMLTextAreaElement>("command-text").value.trim()) || (phase === "draft" && !chosenPlace)
 }
@@ -103,33 +100,7 @@ function drawWith(): void {
     chip.disabled = busy()
     chip.onclick = () => {
       chosenAssistant = assistant.id
-      if (chosenAssistant !== "claude") chosenModel = ""
       drawWith()
-      drawModel()
-    }
-    row.appendChild(chip)
-  })
-}
-
-function drawModel(): void {
-  const row = el("command-model")
-  row.innerHTML = ""
-  row.hidden = chosenAssistant !== "claude"
-  if (row.hidden) return
-  const label = document.createElement("span")
-  label.className = "with-label"
-  label.textContent = T().webCommandModel
-  row.appendChild(label)
-  MODELS.forEach((model) => {
-    const chip = document.createElement("button")
-    chip.type = "button"
-    chip.className = "chip" + (model === chosenModel ? " on" : "")
-    chip.textContent = model
-    chip.setAttribute("aria-pressed", model === chosenModel ? "true" : "false")
-    chip.disabled = busy()
-    chip.onclick = () => {
-      chosenModel = chosenModel === model ? "" : model
-      drawModel()
     }
     row.appendChild(chip)
   })
@@ -144,6 +115,7 @@ function markPicked(row: HTMLButtonElement, on: boolean): void {
 }
 
 function drawList(): void {
+  el("command-list").hidden = false
   let where = document.getElementById("command-where-label")
   if (!where) {
     where = document.createElement("div")
@@ -226,17 +198,15 @@ function reveal(draft: IntentDraft, instructions: string): void {
     : assistants[0]?.id || null
   const confident = draft.confidence >= SURE && !!draft.place_id
   chosenPlace = confident ? draft.place_id || null : null
-  chosenModel = chosenAssistant === "claude" && MODELS.includes(draft.model) ? draft.model : ""
   el<HTMLTextAreaElement>("command-instructions").value = instructions
   drawWith()
-  drawModel()
   drawList()
   el("command-draft").hidden = false
   phase = "draft"
   sayTop(T().webCommandDraft)
   if (confident && chosenPlace) {
     paint()
-    void openIt(chosenPlace, chosenAssistant, chosenModel, instructions)
+    void openIt(chosenPlace, chosenAssistant, "", instructions)
     return
   }
   sayStatus(draft.question || T().webCommandUnsure)
@@ -359,14 +329,13 @@ function reset(): void {
   assistants = []
   chosenPlace = null
   chosenAssistant = null
-  chosenModel = ""
   openedID = null
   el<HTMLTextAreaElement>("command-text").value = ""
   el<HTMLTextAreaElement>("command-instructions").value = ""
   el("command-draft").hidden = true
   el("command-with").innerHTML = ""
-  el("command-model").innerHTML = ""
   el("command-list").innerHTML = ""
+  el("command-list").hidden = false
   document.getElementById("command-where-label")?.remove()
   sayTop(T().webCommandSay)
   sayStatus("")
@@ -408,11 +377,9 @@ async function reviewProjectSetup(place: string, instructions: string): Promise<
     }
     chosenPlace = place
     chosenAssistant = assistants[0]?.id || null
-    chosenModel = ""
     el<HTMLTextAreaElement>("command-instructions").value = instructions
     drawWith()
-    drawModel()
-    drawList()
+    el("command-list").hidden = true
     el("command-draft").hidden = false
     phase = "draft"
     sayTop(T().webCommandDraft)
@@ -474,7 +441,7 @@ function press(): void {
     paint()
     void sendInstructions(openedID, el<HTMLTextAreaElement>("command-instructions").value, SEND_TRIES, mine)
   } else if (chosenPlace) {
-    void openIt(chosenPlace, chosenAssistant, chosenModel, el<HTMLTextAreaElement>("command-instructions").value)
+    void openIt(chosenPlace, chosenAssistant, "", el<HTMLTextAreaElement>("command-instructions").value)
   }
 }
 
@@ -547,7 +514,6 @@ export function CommandSheet() {
         </div>
         <div className="block draft" id="command-draft" hidden>
           <div className="row" id="command-with"></div>
-          <div className="row" id="command-model"></div>
           <ul className="places" id="command-list"></ul>
           <textarea className="find" id="command-instructions" rows={4} aria-label={words.webCommandFirst} spellCheck={false} data-1p-ignore="" data-lpignore="true" data-bwignore=""></textarea>
         </div>

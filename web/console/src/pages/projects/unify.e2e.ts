@@ -455,29 +455,16 @@ test("phone: a copied Projects refusal retains its code and exposes raw detail a
     assert.equal(await tab.run(`document.querySelectorAll("#projects-status span[data-catalog-refusal-detail]").length`), 1)
   }))
 
-test("phone: a copied worktree refusal shows its real translated producer detail", () =>
+test("phone: the Project row opens the same settings dialog as its gear", () =>
   inTab(PHONE, async (tab) => {
     reset()
-    refuseWorktrees = true
     await tab.go("/#page=projects")
     await tab.until("the registered Project is visible despite the empty Board", `!!document.querySelector('button.project-row[data-place-id="fixture-place"]')?.offsetParent`)
     await tab.run(`document.querySelector('button.project-row[data-place-id="fixture-place"]')?.click()`)
-    await tab.until("the Project detail opens", `document.querySelector("#projects-detail-view")?.hidden === false`)
-    assert.equal(await tab.run(`document.getElementById("project-name")?.textContent`), "Example project")
-    assert.equal(await tab.run(`document.getElementById("project-open-work")?.textContent`), "查看工作項目")
-    const translated = JSON.parse(readFileSync(join(dist, "catalogs/zh-Hant.json"), "utf8"))["http.37e9f28e30eb6248"]
-    try {
-      await tab.until("the keyed worktree detail is translated", `document.querySelector("#project-worktree-status span[data-catalog-refusal-detail]")?.textContent?.includes(${JSON.stringify(translated)})`)
-    } catch (error) {
-      const snapshot = await tab.run(`({status: document.getElementById("project-worktree-status")?.textContent,
-        lifecycle: document.getElementById("project-worktree-lifecycle")?.outerHTML?.slice(0, 1800),
-        detail: document.querySelector("#project-worktree-status span[data-catalog-refusal-detail]")?.textContent})`)
-      throw new Error(JSON.stringify(snapshot), { cause: error })
-    }
-    assert.match(await tab.run(`document.getElementById("project-worktree-status")?.textContent`), /worktree_lifecycle_busy/u)
-    assert.equal(await tab.run(`document.querySelector("#project-worktree-status span[data-catalog-refusal-detail]")?.lang`), "")
-    assert.equal(await tab.run(`document.querySelectorAll("#project-worktree-status span[data-catalog-refusal-detail]").length`), 1)
-    assert.equal(await tab.run(`document.documentElement.scrollWidth <= 390`), true)
+    await tab.until("the Project settings dialog opens", `document.querySelector(".project-setup-dialog")?.open === true`)
+    assert.match(await tab.run(`document.querySelector(".project-setup-dialog h2")?.textContent`), /Example project/u)
+    assert.equal(await tab.run(`document.querySelector("button.project-row-terminal")`), null)
+    assert.equal(await tab.run(`document.querySelector("#projects-detail-view")?.hidden`), true)
   }))
 
 test("desk: a failed read says 無法判斷, the preview shows both columns, and apply after a changed plan reaches 已共用", () =>
