@@ -7,11 +7,9 @@
 
 **一眼看出哪些 Claude Code 和 Codex Session 在等你，點進去就能回覆或留下待辦。**
 
-以下為依產品介面繪製的示意畫面：
+使用示意資料錄製的連續操作：
 
-<img src="docs/assets/cloud-sessions-demo.gif" width="390" alt="Cloud 主控台示意畫面：Session 清單顯示哪個在等你，點進去可看到待辦。">
-
-<img src="docs/assets/agent-picture-demo.png" width="390" alt="Session 示意畫面：Agent 在回覆中傳送圖片，使用者可點縮圖查看。">
+<img src="docs/assets/cloud-sessions-demo.gif" width="390" alt="手機主控台操作錄影：帶有 Pixel 圖示的 Session 清單顯示哪個在等你；點進去可看到待辦與 Agent 傳來的圖片，並放大查看。">
 
 ## 你可以做什麼
 
