@@ -5,18 +5,11 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8.svg)](go.mod)
 
-**你已經在跑的 Claude Code 與 Codex Session，都在這裡管理。**
+**一眼看出哪些 Claude Code 和 Codex Session 在等你，點進去就能回覆或留下待辦。**
 
-Clawdline 是在 macOS 與 Linux 上執行的本機 daemon，附網頁主控台。它不需要 wrapper 或 hook，
-就能找到你在 tmux（Mac 上也包括 iTerm2）裡的 Session，告訴你哪一個在等你，也讓一個 Session
-把工作交給另一個，並證明結果真的合併進去了。Agent 與程式碼都留在你的機器上；選用的
-Clawdline Cloud 透過端對端加密的中繼，讓手機或其他機器連回來。
+<img src="docs/assets/cloud-sessions-demo.gif" width="390" alt="Cloud 主控台示意畫面：Session 清單顯示哪個在等你，點進去可看到待辦。">
 
-**在同一處與 Agent 協作：**[圖片標記](docs/user/sessions.md)・
-[重用 Workflow 與常用句](docs/user/sessions.md)・[接收通知](docs/user/notifications.md)・
-[加密交付機密資料](docs/user/secret-handoff.md)・[回覆便條紙、留下待辦](docs/user/board.md#session-to-dos)・
-[直接看 Agent 傳來的圖](docs/user/sessions.md)・[從看板追到合併](docs/user/board.md)・
-[看懂 Session 狀態](docs/user/sessions.md)。[看圖解指南](https://clawdline.com/docs/experience/?lang=zh-TW)。
+<img src="docs/assets/agent-picture-demo.png" width="390" alt="Session 示意畫面：Agent 在回覆中傳送圖片，使用者可點縮圖查看。">
 
 **macOS 13+ 或 Linux 一行安裝：**
 

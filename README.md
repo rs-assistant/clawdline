@@ -5,20 +5,11 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8.svg)](go.mod)
 
-**A control plane for the Claude Code and Codex sessions you already run.**
+**See which Claude Code and Codex Sessions need you, then open one to respond or leave a to-do.**
 
-Clawdline is a local daemon with a web console, for macOS and Linux. It finds your sessions in
-tmux (and iTerm2 on macOS) without a wrapper or hooks, shows which ones need you, and lets one
-session hand work to another and prove that it landed. Your agents and code stay on your machine;
-optional Clawdline Cloud reaches it from a phone or other machines through an end-to-end encrypted
-relay.
+<img src="docs/assets/cloud-sessions-demo.gif" width="390" alt="Sample Cloud console: a Session list shows one waiting for you; opening it reveals its to-do.">
 
-**Work with your Agent, in one place:** [mark a picture](docs/user/sessions.md#answer-and-send) ·
-[reuse Workflows and Snippets](docs/user/sessions.md#answer-and-send) ·
-[get notified](docs/user/notifications.md) · [hand off a secret](docs/user/secret-handoff.md) ·
-[answer Notes and leave to-dos](docs/user/board.md#session-to-dos) ·
-[see images from an Agent](docs/user/sessions.md) · [follow the Board](docs/user/board.md) ·
-[read Session states](docs/user/sessions.md). [See the visual guide](https://clawdline.com/docs/experience/).
+<img src="docs/assets/agent-picture-demo.png" width="390" alt="Sample Session view: an Agent sends a picture in its reply, with a thumbnail that opens for inspection.">
 
 **Install on macOS 13+ or Linux:**
 
