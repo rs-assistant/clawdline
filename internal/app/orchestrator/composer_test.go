@@ -15,6 +15,10 @@ import (
 // broker saw an assistant on a tty, typed the briefing, and the Return at the
 // end of it answered the dialog — which was highlighting "No, exit".
 // `claude-composer` is a running Claude Code session, captured the same way.
+// `claude-subagents` is the bottom of a 243-column pane of Claude Code 2.1.300
+// with subagents running, captured on 2026-10-15 holding a message a phone had
+// typed and never submitted; its project, path, agents' work and draft are this
+// test's own words. It is the same file as the terminal package's.
 //
 // The `codex-*` screens are codex-cli 0.155.1, captured on 2026-09-20 from a
 // disposable session on a private tmux server: the first screen of a fresh run
@@ -50,6 +54,8 @@ func TestTheTwoCLIsDrawTheirOwnComposer(t *testing.T) {
 	}{
 		{"claude-composer", session.AssistantClaude, true, false,
 			"a drawn Claude Code composer, so no child would ever be briefed"},
+		{"claude-subagents", session.AssistantClaude, true, false,
+			"a Claude Code composer above the list of its running subagents, whose highlighted row is a caret"},
 		{"claude-trust", session.AssistantClaude, false, true,
 			"the workspace-trust dialog, whose highlighted answer is \"No, exit\""},
 		{"codex-composer", session.AssistantCodex, true, false,
@@ -293,5 +299,13 @@ func TestACodexRootsComposerIsReadFromItsStatusBar(t *testing.T) {
 		if got := ReadComposer(barred(c.input), session.AssistantClaude); got != ComposerNone {
 			t.Errorf("%s: asked for Claude's frame, a Codex screen answered %v", c.name, got)
 		}
+	}
+}
+
+// A draft in a composer with subagents listed under it is a draft: a notice
+// typed there would be glued to it.
+func TestADraftAboveTheListOfSubagentsIsADraft(t *testing.T) {
+	if got := ReadComposer(screen(t, "claude-subagents"), session.AssistantClaude); got != ComposerDraft {
+		t.Errorf("ReadComposer = %v, want ComposerDraft", got)
 	}
 }

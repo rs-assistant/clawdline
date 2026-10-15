@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -153,6 +154,30 @@ func TestSubmitNudgesOnlyAFramedComposerThatKeptThePaste(t *testing.T) {
 	}
 }
 
+// subagentsScreen is testdata/claude-subagents.txt, a tmux capture of Claude
+// Code with subagents running, its composer holding composer instead of the
+// draft it was captured with. Under the composer's frame Claude Code draws the
+// list of agents, whose highlighted row begins "❯ ⏺ main"; the project, path,
+// agents' work and the draft are this test's own words. With no argument it is
+// the capture as it was.
+func subagentsScreen(composer ...string) string {
+	b, err := os.ReadFile("testdata/claude-subagents.txt")
+	if err != nil {
+		panic(err)
+	}
+	lines := strings.Split(string(b), "\n")
+	if composer == nil {
+		return string(b)
+	}
+	open := slices.IndexFunc(lines, isFrame)
+	shut := open + 1 + slices.IndexFunc(lines[open+1:], isFrame)
+	return strings.Join(slices.Concat(lines[:open+1], composer, lines[shut:]), "\n")
+}
+
+// subagentsDraft is the draft in testdata/claude-subagents.txt, as it was sent.
+const subagentsDraft = "請把登入頁的錯誤訊息改清楚一點，並且在密碼錯誤時告訴我還剩幾次可以再試請把登入頁的錯誤訊息改清楚一點，並且在密碼錯誤時告訴我還剩幾次可以再試\n\n" +
+	"(Clawdline to-do 00000000-0000-4000-8000-000000000001. When it is done: clawdline todo done 00000000-0000-4000-8000-000000000001)"
+
 // ruleCase is one screen pair the rule is asked about, in Go and in
 // JavaScript alike.
 type ruleCase struct {
@@ -202,6 +227,15 @@ func ruleCases() []ruleCase {
 			After: "user@mac ~ % claude --add-dir /tmp/x", Text: "claude --add-dir /tmp/x", Shows: true},
 		{Name: "a shell line is never nudged", Before: "❯ ", After: "❯ claude --add-dir /tmp/x",
 			Text: "claude --add-dir /tmp/x", Shows: true},
+		// Claude Code with subagents running draws their list under its
+		// footer, and the list's highlighted row is "❯ ⏺ main": the lowest
+		// caret on the screen, more than screenLines below the composer.
+		// Reading it as the input line is how a phone's message sat typed in
+		// the composer, three times, with no Enter on it.
+		{Name: "claude's composer above its list of subagents", Before: subagentsScreen("❯\u00a0"),
+			After: subagentsScreen(), Text: subagentsDraft, Shows: true, Holds: true},
+		{Name: "the list of subagents under an empty composer is not its input line",
+			Before: subagentsScreen("❯\u00a0"), After: subagentsScreen("❯\u00a0"), Text: "⏺ main"},
 		{Name: "a chooser is not a composer",
 			Before: "❯ No, exit\n  Yes, I trust this folder\nEnter to confirm",
 			After:  "❯ No, exit\n  Yes, I trust this folder\nEnter to confirm", Text: "please read CHILD.md"},

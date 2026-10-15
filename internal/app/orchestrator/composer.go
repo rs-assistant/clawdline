@@ -91,6 +91,11 @@ func readComposer(screen string, assistant session.Assistant) (caret, furnished 
 		return false, false, ""
 	}
 	bottom := written[len(written)-1]
+	if assistant != session.AssistantCodex {
+		if i, ok := framedComposer(lines); ok {
+			return true, true, lines[i]
+		}
+	}
 	from := len(written) - composerTail
 	if from < 0 {
 		from = 0
@@ -106,6 +111,30 @@ func readComposer(screen string, assistant session.Assistant) (caret, furnished 
 		return true, furnitureUnder(lines, i, bottom, assistant), lines[i]
 	}
 	return false, false, ""
+}
+
+// framedComposer finds Claude Code's composer by its whole frame: a caret
+// directly under a rule, with a rule somewhere under it and no other caret
+// between. It is looked for before the lowest caret, and anywhere on the
+// screen, because of what Claude Code draws under its footer while subagents
+// run: a list of them whose highlighted row is "❯ ⏺ main". That row is the
+// lowest caret and has no frame under it, so a root with subagents running
+// was read as choosing, and every notice for it was held. The list can also
+// be long enough to push the composer past composerTail. No dialog Claude Code
+// draws puts its highlighted row directly under a rule: its question comes
+// first.
+func framedComposer(lines []string) (int, bool) {
+	for i := len(lines) - 1; i > 0; i-- {
+		if !hasCaret(lines[i]) || !isRule(lines[i-1]) {
+			continue
+		}
+		for j := i + 1; j < len(lines) && !hasCaret(lines[j]); j++ {
+			if isRule(lines[j]) {
+				return i, true
+			}
+		}
+	}
+	return 0, false
 }
 
 // ComposerState is what a composer holds, once there is one.
