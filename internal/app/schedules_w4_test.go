@@ -299,7 +299,7 @@ func TestAScheduledRunHasItsOwnSecretBriefingAndClock(t *testing.T) {
 		t.Fatalf("no CHILD.md: %v", err)
 	}
 	if !strings.Contains(string(brief), `started by the schedule "morning report"`) ||
-		!strings.Contains(string(brief), "You have 7 minutes") {
+		!strings.Contains(string(brief), "expects this to take about 7 minutes") {
 		t.Fatalf("CHILD.md does not brief a scheduled run:\n%s", brief)
 	}
 	if strings.Contains(string(brief), secret[1]) {

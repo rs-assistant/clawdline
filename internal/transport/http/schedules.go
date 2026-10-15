@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
+	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
@@ -67,6 +68,13 @@ func (s *Server) scheduleBook() *app.ScheduleBook {
 		IsDirectory: func(p string) bool {
 			info, err := os.Stat(p)
 			return err == nil && info.IsDir()
+		},
+		Conversations: app.RunConversations{
+			Find:   projects.ClaudeChildConversations,
+			TaskOf: projects.ClaudeChildTask,
+			Recorded: func(dir, assistant, id string) bool {
+				return projects.Recorded(projects.Place{Path: dir}, assistant, id)
+			},
 		},
 		DispatchEnabled: func() bool {
 			v, err := nextconfig.Open(dir).Read()

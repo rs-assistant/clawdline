@@ -367,6 +367,12 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		capacity.SessionsShellOutputBytes: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-read window; no retained buffer"}
 		},
+		capacity.ScheduleRunTranscriptsProbed: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-lookup guard; no retained buffer"}
+		},
+		capacity.ScheduleRunTranscriptHead: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-file read guard; no retained buffer"}
+		},
 		"places.git_config_bytes": func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-read guard; no retained buffer"}
 		},

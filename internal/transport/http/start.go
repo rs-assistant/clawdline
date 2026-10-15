@@ -477,6 +477,14 @@ func (s *Server) resumePlace(w http.ResponseWriter, r *http.Request, id, assista
 		return
 	}
 	made, err := starter.Resume(ctx, place, conversation, assistant, persona)
+	var refusal app.StartRefusal
+	if errors.As(err, &refusal) && refusal.Code == "not_found" &&
+		s.scheduleBook().ScheduledConversation(ctx, place.Path, assistant, conversation) {
+		// Not on the project's own history, which leaves scheduled children
+		// out: a finished scheduled run's conversation, proved by its run
+		// (app/schedule_resume.go), resumes as an ordinary Session.
+		made, err = starter.Start(ctx, place, assistant, "", conversation, persona)
+	}
 	if err != nil {
 		code := writeStartRefusal(w, err)
 		log.Printf("audit place.resume place=%s cwd=%q assistant=%s session=%.64s persona=%s ok=0 why=%s",
