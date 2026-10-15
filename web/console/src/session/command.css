@@ -34,3 +34,15 @@
 .command-sheet .buttons .command-mic svg {
   margin: 0;
 }
+
+/* Once a draft is written, the instructions are what the person reads and edits
+   before starting. They are often many paragraphs, so the sheet widens and the
+   field takes the height the viewport has, instead of an 88px slot that showed
+   four lines of a long draft in the middle of an empty overlay. */
+.command-sheet:has(#command-draft:not([hidden])) {
+  width: min(760px, 100%);
+}
+
+.command-sheet #command-instructions {
+  min-height: clamp(160px, calc(var(--vvh, 100dvh) - 360px), 640px);
+}
