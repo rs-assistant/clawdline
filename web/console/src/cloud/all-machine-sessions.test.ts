@@ -3,7 +3,7 @@ import test from "node:test"
 import type { SessionRow } from "@clawdline/contract"
 import {
   afterEventGap, checkedProjection, destinationAvailable, destinationFragment, destinationFromFragment,
-  displayedPresentationStatus, fleetRowTitle, identifyOpenedFleetRow,
+  displayedPresentationStatus, fleetRowTitle, identifyOpenedFleetRow, withConfirmedFleetTitle,
   destinationKey, prependOlderPage, projectionRefreshAt, settleProjection, SessionDetailCache,
   supersedingDestination,
   type MachineSessionProjection, type ProjectedSession,
@@ -21,7 +21,19 @@ test("fleet list names come from authorized presentations, never routing ids", (
   const ordinary = row("machine/a", "%14", "7")
   assert.equal(fleetRowTitle(ordinary, { title: "Named work" }, "Unknown"), "Named work")
   assert.equal(fleetRowTitle(ordinary, undefined, "Unknown"), "Unknown")
+  assert.equal(fleetRowTitle(ordinary, { title: "Old" }, "Unknown", "Saved"), "Saved")
   assert.equal(fleetRowTitle({ ...ordinary, machineScope: true }, undefined, "Unknown"), "Clawdfather")
+})
+
+test("a saved title reaches only the selected machine and execution while its list is stale", () => {
+  const target = row("machine/a", "%14", "7").destination
+  const old = { id: target.sessionID, execution_generation: target.executionGeneration, label: "Old" } as SessionRow
+  const nextRun = { ...old, execution_generation: "8".padStart(32, "0") }
+  const otherMachine = { ...old, machine: "machine/b" }
+  const shown = withConfirmedFleetTitle([old, nextRun], target, "machine/a", "New")
+  assert.deepEqual(shown.map((item) => item.label), ["New", "Old"])
+  assert.equal(withConfirmedFleetTitle([old], target, "machine/b", "New")[0].label, "Old")
+  assert.equal(withConfirmedFleetTitle([otherMachine], target, "machine/b", "New")[0].label, "Old")
 })
 
 test("the opened Cloud detail uses the signed machine identity for only its exact execution", () => {

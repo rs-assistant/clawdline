@@ -21,7 +21,7 @@ import { verifyWord } from "./pages/verify/words.js"
 import { nextWord } from "./next-strings.js"
 import { bootLocalCatalog } from "./catalog.js"
 import { namesSession, sessionFragment, sessionsInFragment } from "./session/address.js"
-import { destinationFragment, destinationFromFragment, destinationKey, identifyOpenedFleetRow,
+import { destinationFragment, destinationFromFragment, destinationKey, identifyOpenedFleetRow, withConfirmedFleetTitle,
   type FleetDetailProblem, type ProjectedSession, type SessionDestination } from "./cloud/all-machine-sessions.js"
 import { notificationAddress } from "./push/navigation.js"
 import { hasDocumentIntent } from "./legacy/documents-bridge.js"
@@ -207,7 +207,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   cloudStartedRow = null, onCloudStartedObserved,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
-  hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved }: {
+  hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved, confirmedTitle }: {
   aside?: ReactNode | ((light: ConnectionLight) => ReactNode)
   cloudSessions?: ReactNode
   cloudPeerAccess?: ReactNode | ((active: boolean) => ReactNode)
@@ -229,7 +229,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   hideSessionCounts?: boolean
   focusCloudSessions?: boolean
   onLeaveCloudSessions?: () => void
-  onTitleSaved?: () => void
+  onTitleSaved?: (id: string, title: string | undefined) => void
+  confirmedTitle?: string
 } = {}) {
   const fleet = useFleet(client)
   const light = useConnectionLight(fleet.live, fleet.refresh)
@@ -420,14 +421,15 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   const pendingRow = started ?? cloudStartedRow
   const availableRows = pendingRow && !receivedRows.some((row) => row.id === pendingRow.id)
     ? [pendingRow, ...receivedRows] : receivedRows
-  const rows = useMemo(() => identifyOpenedFleetRow(fleetTarget && fleetReaderMachine === fleetTarget.machineID && fleetTargetRow &&
+  const rows = useMemo(() => withConfirmedFleetTitle(identifyOpenedFleetRow(fleetTarget && fleetReaderMachine === fleetTarget.machineID && fleetTargetRow &&
     fleetTargetRow.id === fleetTarget.sessionID &&
     fleetTargetRow.execution_generation === fleetTarget.executionGeneration &&
     !availableRows.some((row) => row.id === fleetTarget.sessionID &&
       row.execution_generation === fleetTarget.executionGeneration)
     ? [...availableRows, fleetTargetRow] : availableRows, fleetTarget, fleetReaderMachine, fleetTargetIdentity),
+    fleetTarget, fleetReaderMachine, confirmedTitle),
   [availableRows, fleetTarget && destinationKey(fleetTarget), fleetReaderMachine, fleetTargetRow,
-    fleetTargetIdentity?.machineScope, fleetTargetIdentity?.coordinatorBound])
+    fleetTargetIdentity?.machineScope, fleetTargetIdentity?.coordinatorBound, confirmedTitle])
   // The opened fleet Session, waiting for its own row. The pane has nothing to
   // draw until the row is here, and the cloud layer decides how long that may
   // go on without being said (`cloud/opened-row.ts`).
@@ -664,7 +666,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   // the composer already takes the page as writable until a send is refused.
   useEffect(() => {
     hostInfo({ openId: () => openRef.current, writable: () => true,
-      refreshSessions: () => { layoutRef.current.refresh(); layoutRef.current.titleSaved?.() } })
+      refreshSessions: (id, title) => { layoutRef.current.refresh(); layoutRef.current.titleSaved?.(id, title) } })
     hostConfirm({
       openId: () => openRef.current,
       writable: () => true,
