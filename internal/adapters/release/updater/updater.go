@@ -89,8 +89,12 @@ const (
 	// remembered, so auto-apply does not try them again.
 	FailedVersionsLimit = 16
 	// AppSwapPollSecondsLimit is how often a daemon with a staged app bundle
-	// looks whether the app has quit, so the bundle can be swapped in.
-	AppSwapPollSecondsLimit = 60
+	// looks whether the app has quit, so the bundle can be swapped in. A
+	// person who quits and reopens the app inside one interval reopens the
+	// old bundle, so it is seconds, not a minute: on 2026-10-15 a 60 s poll
+	// missed every reopen for four releases in a row. A look without a
+	// staged bundle reads one small file; with one, it also lists processes.
+	AppSwapPollSecondsLimit = 2
 	// AutoApplyRetrySecondsLimit is how often an auto-apply held back by a
 	// busy session looks again whether the sessions are idle, between
 	// release checks.

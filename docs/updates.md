@@ -133,7 +133,7 @@ The update runs in these steps; `apply.state` names the one it is in:
    apart).
 6. **`healthy`**: the update is done. Releases besides `current` and the two newest others are
    removed. On macOS the staged app bundle replaces the installed one now if the app is not
-   running; otherwise `apply.staged_app` names it and the daemon swaps it in within a minute of the
+   running; otherwise `apply.staged_app` names it and the daemon swaps it in within a few seconds of the
    app quitting. The replaced bundle is kept under `releases/<from>/app`.
 7. **`rolled_back`**: the new release did not come up. `current` points at the old release again,
    the service is restarted, and, when the manifest says `non_additive_migration`, the old release

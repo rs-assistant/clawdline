@@ -4201,7 +4201,7 @@
   "next.updateSourceCheckout": "This machine runs a build from a source checkout, not a release: pull the checkout and rebuild to update it.",
   "next.updateSourceDeploy": "This machine follows a source checkout, not releases: run tools/deploy-linux-user.sh in the checkout to update it, or run clawdline setup --adopt to move it onto releases.",
   "next.updateStaged": "{to} is ready; Clawdline restarts in a moment…",
-  "next.updateStagedApp": "Reopen the app to use the new version.",
+  "next.updateStagedApp": "Quit the app and open it again to use the new version; closing its window is not enough.",
   "next.updateRestartApp": "Restart app now",
   "next.updateTitle": "Clawdline version",
   "next.updateUnknownVersion": "unknown",

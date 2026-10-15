@@ -1,8 +1,8 @@
 {
   "version": 1,
   "englishContentKeys": 5279,
-  "riskKeys": 2331,
-  "nonRiskCount": 2948,
+  "riskKeys": 2332,
+  "nonRiskCount": 2947,
   "groups": [
     {
       "name": "bar / other",
@@ -1941,7 +1941,7 @@
     },
     {
       "name": "next / other",
-      "count": 166,
+      "count": 165,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2109,7 +2109,6 @@
         "next.updateRetry",
         "next.updateSending",
         "next.updateStaged",
-        "next.updateStagedApp",
         "next.updateTitle",
         "next.updateVerifying"
       ]

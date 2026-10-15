@@ -2,13 +2,13 @@
   "version": 1,
   "englishKeys": 5279,
   "counts": {
-    "negation": 1511,
-    "state": 727,
+    "negation": 1512,
+    "state": 728,
     "permission": 334,
     "deletion": 111,
     "uncertainty": 155
   },
-  "unionCount": 2331,
+  "unionCount": 2332,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1358,6 +1358,7 @@
       "next.updateRolledBack",
       "next.updateSourceCheckout",
       "next.updateSourceDeploy",
+      "next.updateStagedApp",
       "next.worktreeRemoveFailed",
       "next.worktreeRemoveUnavailable",
       "projects.activityNone",
@@ -2120,6 +2121,7 @@
       "next.updateAutoFailed",
       "next.updateIsAvailable",
       "next.updateRunning",
+      "next.updateStagedApp",
       "projects.editDone",
       "projects.folderGo",
       "projects.folderTruncated",
@@ -4881,6 +4883,7 @@
     "next.updateRunning",
     "next.updateSourceCheckout",
     "next.updateSourceDeploy",
+    "next.updateStagedApp",
     "next.updateUnknownVersion",
     "next.worktreeRemoveBusy",
     "next.worktreeRemoveButton",

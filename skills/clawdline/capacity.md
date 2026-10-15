@@ -181,7 +181,7 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `projectsync.project_files` | 64 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `proposals.open` | 500 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `push.subscriptions` | 128 | `rows` | `refuse` | `diagnostics, notice, health` | — |
-| `release.app_swap_poll_seconds` | 60 | `seconds` | `evict_oldest` | `diagnostics` | — |
+| `release.app_swap_poll_seconds` | 2 | `seconds` | `evict_oldest` | `diagnostics` | — |
 | `release.apply_follow_seconds` | 1500 | `seconds` | `refuse` | `diagnostics` | — |
 | `release.archive_entries` | 20000 | `rows` | `refuse` | `diagnostics` | — |
 | `release.artifact_bytes` | 536870912 | `bytes` | `refuse` | `diagnostics` | — |

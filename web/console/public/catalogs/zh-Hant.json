@@ -4201,7 +4201,7 @@
   "next.updateSourceCheckout": "這台機器執行的是原始碼建置，不走正式版本：拉取最新程式碼後重新建置即可更新。",
   "next.updateSourceDeploy": "這台機器跟著原始碼部署，不走正式版本：在原始碼目錄執行 tools/deploy-linux-user.sh 即可更新；執行 clawdline setup --adopt 可以改用正式版本。",
   "next.updateStaged": "{to} 已準備好，Clawdline 馬上會重新啟動……",
-  "next.updateStagedApp": "重新開啟 App 後即可使用新版。",
+  "next.updateStagedApp": "結束 App 再打開，就會換成新版；只關掉視窗不算。",
   "next.updateRestartApp": "立即重新啟動 App",
   "next.updateTitle": "Clawdline 版本",
   "next.updateUnknownVersion": "不明",

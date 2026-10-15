@@ -1644,7 +1644,7 @@ func Register() []Entry {
 			// How often a daemon with a staged app bundle looks whether the app
 			// has quit; a running app keeps its bundle until the next look.
 			Name: ReleaseAppSwapPollSeconds, Class: Observation, Unit: Seconds,
-			Limit: 60, AtLimit: EvictOldest,
+			Limit: 2, AtLimit: EvictOldest,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 			Sources: []string{"internal/adapters/release/updater.AppSwapPollSecondsLimit"},
 		},
