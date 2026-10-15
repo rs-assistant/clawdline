@@ -20,3 +20,56 @@
 
 #schedule-machine-block[hidden] { display: none; }
 .schedules > #schedules-state { margin: 6px 12px; color: var(--dim); font-size: 12px; }
+
+/* The one-time webhook URL, partly hidden, with Copy URL beside it
+   (`schedule-webhook-url.ts`). Copy URL turns green with a check for a moment
+   once the clipboard has it. */
+.schedule-webhook-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 4px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-width: 0;
+}
+.schedule-webhook-url[hidden] { display: none; }
+.schedule-webhook-url code {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+  font-size: 13px;
+}
+.schedule-webhook-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.schedule-webhook-copy-icon { display: inline-flex; }
+.schedule-webhook-copy[data-copied="yes"] {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+/* Run now accepted: green, with what happens next and whether the sheet can
+   be closed. The sheet's own `.said` line is drawn in the error colour. */
+.schedule-history-started {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--ok);
+  border-radius: 10px;
+}
+.schedule-history-started[hidden] { display: none; }
+.schedule-history-started-icon { display: inline-flex; color: var(--ok); padding-top: 2px; }
+.schedule-history-started-words { flex: 1 1 auto; min-width: 0; }
+.schedule-history-started-words strong { color: var(--ok); font-size: 13px; }
+.schedule-history-started-words p { margin: 3px 0 0; color: var(--dim); font-size: 12px; line-height: 1.5; }
+.schedule-history-started > .chip { flex: 0 0 auto; align-self: center; }
