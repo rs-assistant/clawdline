@@ -24,6 +24,32 @@ up.
   pre-release, and wait until no assistant session is working
   ([Automatic updates](#automatic-updates)).
 
+## Release-day procedure for an installed Mac
+
+The homepage's one-line installer is for the first installation. Once this Mac is a release
+install, use Clawdline's built-in updater for subsequent releases. Publishing a GitHub release or
+deploying the hosted console does not require quitting the local app or restarting its service.
+
+1. Keep the installed app and service running while the new release is built, signed, reviewed,
+   published, and checked. Do not run the installer again, install a locally built app over it,
+   quit the app, kill its process, or restart its LaunchAgent to prepare for a release.
+2. After the signed release is public, let the installed Clawdline discover it. Use **立即更新** in
+   the local console, or enable **自動更新** and let its idle-session rule choose when to apply it.
+   Do not substitute `clawdline setup`, a manual bundle replacement, or a service restart for this
+   update path. When verifying an update button, press that button and observe its result.
+3. Read the updater's result. Confirm `apply.state: healthy`, the running version and served
+   `BUILD.json`, `GET /` returning 200, and that existing sessions remain available. If it reports
+   `failed` or `rolled_back`, preserve the previous running release and record the error code;
+   investigate before trying again.
+4. On macOS, a healthy daemon update can leave the app bundle staged while the app remains open.
+   `apply.staged_app` records that state. Leave the app open; Clawdline installs that bundle after
+   the app next quits on its own. Report the running daemon version and the app bundle version
+   separately until they agree. Do not force the app to quit merely to clear `staged_app`.
+
+This procedure keeps the existing console available through the release approval and download
+period. The updater itself performs the brief service restart in step 5 below, with its health
+check and rollback; a release operator does not start that restart independently.
+
 ## Release installs
 
 A machine set up from a release (`install_kind: release`) learns of new releases from a signed
