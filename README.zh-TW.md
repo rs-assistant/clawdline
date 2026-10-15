@@ -5,11 +5,13 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8.svg)](go.mod)
 
-**一眼看出哪些 Claude Code 和 Codex Session 在等你，點進去就能回覆或留下待辦。**
+**透過 Clawdline Cloud，在手機同一份清單查看多台機器的 Claude Code 和 Codex Session，點開就能回覆或留待辦。**
 
 使用示意資料錄製的連續操作：
 
-<img src="docs/assets/cloud-sessions-demo.gif" width="390" alt="手機主控台操作錄影：帶有 Pixel 圖示的 Session 清單顯示哪個在等你；點進去可看到待辦與 Agent 傳來的圖片，並放大查看。">
+<img src="docs/assets/cloud-sessions-demo-zh-Hant.gif" width="390" alt="手機主控台操作錄影：Studio Mac 與 Build Linux 的 Pixel 圖示 Session 列在同一頁；點開等待中的 Session，查看待辦與 Agent 傳來的地圖網頁截圖，並放大圖片。">
+
+[Herdr](https://github.com/herdrdev/herdr/blob/master/docs/versions/0.9.1/website/src/content/docs/connecting-machines.mdx) 也能在 SSH 的 TUI 視窗列出多台機器的 Agent；[T3 Code](https://github.com/pingdotgg/t3code/blob/main/docs/user/remote-access.md) 可連接多個環境。Clawdline Cloud 則在手機瀏覽器將 Session 依機器列在同一頁，並直接開啟對話、待辦與圖片。
 
 ## 你可以做什麼
 
@@ -19,7 +21,7 @@
 - **派工並追蹤交付：** [派給](docs/user/clawdfather-and-dispatch.md)另一個 Session、確認成果已合併，用選用的[看板](docs/user/board.md)追蹤較大的工作。
 - **稍後執行：** 用 [Callback](docs/user/clawdfather-and-dispatch.md#callbacks-for-long-commands) 排入耗時命令，或用[排程](docs/user/schedules.md)啟動任務；Cloud Pro 可用 Webhook 觸發。
 - **整理專案：** [登錄專案](docs/user/projects.md)、透過 [unify](docs/project-files.md#unify) 讓 Claude Code 和 Codex 共用規則與 skill，並查看[用量](docs/user/usage.md)。
-- **跨裝置使用：** 透過[遠端連線](docs/user/remote-access.md)開啟主控台，也可選用端對端加密的 Clawdline Cloud。
+- **掌握每台機器：** [Clawdline Cloud](docs/user/remote-access.md) 在手機彙整多台機器的 Session，透過端對端加密中繼連線。
 
 Clawdline 的常駐服務與主控台在你的機器上執行，管理你已使用的 Claude Code 和 Codex Session。Cloud 是選用功能；中繼只傳送密文。[運作方式](docs/architecture.md)
 
