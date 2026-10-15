@@ -448,7 +448,7 @@ func (s *Server) projectsRoute(w http.ResponseWriter, r *http.Request) {
 			writeRefusal(w, http.StatusTooManyRequests, "worktree_lifecycle_busy", "Worktree lifecycle work is already queued on this machine; try again shortly.")
 			return
 		}
-		snap, err := readers.lifecycle.RemoveLanded(parts[0], parts[2])
+		snap, err := readers.lifecycle.Remove(parts[0], parts[2])
 		<-readers.busy
 		var refusal *projects.Refusal
 		if errors.As(err, &refusal) {

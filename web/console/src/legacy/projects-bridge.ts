@@ -116,7 +116,7 @@ export function worktreeSourceRow(id: string): WorktreeSourceRow | undefined {
   return latestWorktreeRows.get(id)
 }
 
-export async function removeLandedWorktree(project: string, worktree: string): Promise<void> {
+export async function removeWorktree(project: string, worktree: string): Promise<void> {
   await jsonFetch("/v1/projects/" + encodeURIComponent(project) + "/worktrees/" + encodeURIComponent(worktree),
     { method: "DELETE" })
 }
