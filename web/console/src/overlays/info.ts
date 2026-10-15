@@ -64,7 +64,7 @@ export interface InfoHost {
   /** `S.write`. */
   writable(): boolean
   /** Re-read the session list after a title write. */
-  refreshSessions(): void
+  refreshSessions(id: string, title: string | undefined): void
 }
 
 let host: InfoHost = { openId: () => null, writable: () => false, refreshSessions: () => {} }
@@ -798,7 +798,7 @@ export const Info = {
           data.session.title = answer.display_title
         }
         SessionFacts.drop(id)
-        host.refreshSessions()
+        host.refreshSessions(id, answer.display_title)
         load(id, true)
         if (answer.local_applied === false) said(T.webInfoTitleNotDurable, true)
         else if (answer.downstream === "queued") said(T.webInfoTitleQueued, true)
@@ -843,7 +843,7 @@ export const Info = {
           data.session.title = answer.display_title
         }
         SessionFacts.drop(id)
-        host.refreshSessions()
+        host.refreshSessions(id, answer.display_title)
         load(id, true)
         said(answer.named_by ? nextWord("smartTitleSavedBy", { assistant: namingAssistantName(answer.named_by) })
           : nextWord("smartTitleSaved"), true)

@@ -339,6 +339,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [])
   const [fleetPresentationRevision, refreshFleetPresentation] = useState(0)
   const [titleRevision, refreshTitles] = useState(0)
+  const confirmedTitles = useRef(new Map<string, string>())
   const noteFleetPresentations = useCallback((machineID: string,
     rows: readonly (SessionListPresentation & { destination: SessionDestination;
       projection?: ProjectedSession })[]) => {
@@ -352,9 +353,11 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           held.destination.executionGeneration !== row.destination.executionGeneration) {
           fleetPresentations.current.delete(key)
           fleetPresentationReceivedAt.current.delete(key)
+          confirmedTitles.current.delete(key)
         }
       }
       const key = destinationKey(row.destination)
+      if (confirmedTitles.current.get(key) === row.title) confirmedTitles.current.delete(key)
       fleetPresentations.current.set(key, row)
       fleetPresentationReceivedAt.current.set(key, Date.now())
     }
@@ -1645,11 +1648,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     }
     return { ...status, id: fleetTarget.sessionID, session: fleetTarget.sessionID,
       machine: fleetTarget.machineID, execution_generation: fleetTarget.executionGeneration,
-      label: presentation.title, cwd: presentation.cwd, icon: presentation.icon,
+      label: confirmedTitles.current.get(destinationKey(fleetTarget)) ?? presentation.title,
+      cwd: presentation.cwd, icon: presentation.icon,
       backend: presentation.projection.backend, assistant: presentation.projection.assistant,
       isClaude: presentation.projection.assistant === "claude",
       evidence: "none", closeability } as SessionRow
-  }, [fleetScope, fleetTarget && destinationKey(fleetTarget), fleetPresentationRevision])
+  }, [fleetScope, fleetTarget && destinationKey(fleetTarget), fleetPresentationRevision, titleRevision])
   const fleetTargetIdentity = useMemo(() => {
     if (!fleetScope || !fleetTarget) return null
     const reading = fleetProjections.current.get(fleetTarget.machineID)?.reading
@@ -1662,7 +1666,14 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
           <App key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
-            onTitleSaved={() => refreshTitles((revision) => revision + 1)}
+            confirmedTitle={fleetTarget ? confirmedTitles.current.get(destinationKey(fleetTarget)) : undefined}
+            onTitleSaved={(id, title) => {
+              const target = fleetTargetRef.current
+              if (target?.sessionID === id && typeof title === "string")
+                confirmedTitles.current.set(destinationKey(target), title)
+              refreshTitles((revision) => revision + 1)
+              refreshFleetPresentation((revision) => revision + 1)
+            }}
             cloudStartedRow={!fleetScope && confirmedStart?.machineID === reading ? confirmedStart.row : null}
             onCloudStartedObserved={startedObserved}
             cloudPeerAccess={(active) => <PeerAccessPage active={active}
@@ -1699,6 +1710,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             }))}
             source={liveSessionSource}
             titleRevision={titleRevision}
+            confirmedTitles={confirmedTitles.current}
             target={fleetTarget}
             filter={filter} onFilter={onFilter}
             onOpen={openFleetSession}

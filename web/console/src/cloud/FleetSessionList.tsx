@@ -23,10 +23,11 @@ type Reading = { phase: "loading" } | { phase: "settled"; value: MachineSessionP
 
 /** Only the fleet list is new; the conversation and composer belong to SessionsPage. */
 export function FleetSessionList({ machines, source, target, filter, onFilter, onOpen,
-  carrierOf, onMachineAction, onCloseRequest, onArchiveRequest, onPresentations, onProjection, titleRevision }: {
+  carrierOf, onMachineAction, onCloseRequest, onArchiveRequest, onPresentations, onProjection, titleRevision, confirmedTitles }: {
   machines: readonly FleetMachine[]
   source: SessionProjectionSource | null
   titleRevision?: number
+  confirmedTitles?: ReadonlyMap<string, string>
   /** Which road this page's reads of that machine take, read as the row is drawn. */
   carrierOf?: (machineID: string) => CarrierReading | null
   target: SessionDestination | null
@@ -286,7 +287,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     const presentationLoading = !!missingTitle && !presentationFailed
     const filtered = reading?.phase === "settled" && reading.value.rows
       ? reading.value.rows.filter((row) => matchesFleetFilter(row, statusFilter) &&
-        (!search || `${machine.name} ${machine.id} ${machine.platform} ${row.machineScope ? "Clawdfather" : (presentations.current.get(destinationKey(row.destination))?.title ?? "")} ${row.destination.sessionID} ${stateWord(row.state)}`
+        (!search || `${machine.name} ${machine.id} ${machine.platform} ${row.machineScope ? "Clawdfather" : (confirmedTitles?.get(destinationKey(row.destination)) ?? presentations.current.get(destinationKey(row.destination))?.title ?? "")} ${row.destination.sessionID} ${stateWord(row.state)}`
           .toLocaleLowerCase().includes(search))) : []
     const shown = filtered.map((row) => {
       const presentation = presentations.current.get(destinationKey(row.destination))
@@ -297,7 +298,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     })
     const waitingKey = fleetWaitingKey(shown)
     const titles = new Map(shown.map((row) => [row.destination.sessionID,
-      presentations.current.get(destinationKey(row.destination))?.title ?? ""]))
+      confirmedTitles?.get(destinationKey(row.destination)) ?? presentations.current.get(destinationKey(row.destination))?.title ?? ""]))
     const hold = orderHolds.current.get(machine.id)
     if (hold && hold.waiting !== waitingKey)
       orderHolds.current.delete(machine.id)
@@ -423,7 +424,8 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               : <ul className="rows" role="listbox" aria-label={`${machine.name} ${nextWord("cloudSingleSessions")}`}>
                 {rows.map(({ row, depth, branchThrough, ancestorThrough }) => {
                   const presentation = presentations.current.get(destinationKey(row.destination))
-                  const title = fleetRowTitle(row, presentation, nextWord("cloudAllUnknown"))
+                  const title = fleetRowTitle(row, presentation, nextWord("cloudAllUnknown"),
+                    confirmedTitles?.get(destinationKey(row.destination)))
                   return <ProjectedRow key={destinationKey(row.destination)}
                     title={title} icon={presentation?.icon} cwd={presentation?.cwd}
                     machineScope={row.machineScope === true} coordinatorBound={row.coordinatorBound === true}

@@ -40,8 +40,8 @@ export interface MachineListPresentation extends SessionListPresentation {
 
 /** A status projection contains no name; never present its routing id as one. */
 export function fleetRowTitle(row: ProjectedSession, presentation: SessionListPresentation | undefined,
-  unavailableWord: string): string {
-  return row.machineScope ? "Clawdfather" : presentation?.title || unavailableWord
+  unavailableWord: string, confirmedTitle?: string): string {
+  return row.machineScope ? "Clawdfather" : confirmedTitle ?? (presentation?.title || unavailableWord)
 }
 
 /** Keep a prior list reading for the same execution, unless fresh ss/ contradicts its state. */
@@ -106,6 +106,14 @@ export function identifyOpenedFleetRow(rows: SessionRow[], target: SessionDestin
   if (!target || readerMachine !== target.machineID || identity?.machineScope !== true) return rows
   return rows.map((row) => row.id === target.sessionID && row.execution_generation === target.executionGeneration
     ? { ...row, machine_scope: true, coordinator_bound: identity.coordinatorBound === true } : row)
+}
+
+/** Show a confirmed title while the machine's presentation pass catches up. */
+export function withConfirmedFleetTitle(rows: SessionRow[], target: SessionDestination | null,
+  readerMachine: string | null, title: string | undefined): SessionRow[] {
+  if (title === undefined || !target || readerMachine !== target.machineID) return rows
+  return rows.map((row) => row.id === target.sessionID && row.execution_generation === target.executionGeneration
+    ? { ...row, label: title } : row)
 }
 
 /**
