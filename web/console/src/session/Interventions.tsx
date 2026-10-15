@@ -15,6 +15,7 @@ import { deliverUntilSeen, pendingSends } from "./send.js"
 import { browserRefreshEnvironment, readWithOneRetry, TODO_REFRESH_MS, TODO_SAFETY_MS, watchTodoRefresh } from "./todo-refresh.js"
 import { attentionReads, countMoveNeedsRead, unresolvedNoteCount } from "./attention-reads.js"
 import { onWorkItemChanged } from "../pages/work/item-changed.js"
+import { announceAttentionRead } from "./attention-changed.js"
 import { samePageTarget } from "../same-page-links.js"
 import { hasDocumentIntent } from "../legacy/documents-bridge.js"
 import { requestPage } from "../overlays/index.js"
@@ -28,6 +29,8 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
   const latest = useRef<InterventionTarget | null>(destination)
   latest.current = destination
   const attentionCount = typeof row?.attention_count === "number" ? row.attention_count : null
+  const rowReading = useRef({ sessionID: row?.id ?? "", count: attentionCount })
+  rowReading.current = { sessionID: row?.id ?? "", count: attentionCount }
   // Whether the row counts the notes is read when the page opens: a count
   // that comes and goes must not restart the panel, or move where its news
   // comes from half way through.
@@ -64,6 +67,9 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
         const next = await readWithOneRetry(() => readHumanInterventionsV2(target.conversation))
         if (mine === ticket.current && sameInterventionTarget(target, latest.current)) {
           setPage(next); setPageKey(targetKey); setReadError(""); setReadUpdate(null)
+          const unresolved = next.rows.filter((note) => !note.resolved_at).length
+          if (rowReading.current.sessionID && rowReading.current.count !== unresolved)
+            announceAttentionRead(rowReading.current.sessionID, unresolved)
         }
       } catch (error) {
         if (mine === ticket.current && sameInterventionTarget(target, latest.current)) { setReadError(failureWords(error)); setReadUpdate(asMachineNeedsUpdate(error)) }
