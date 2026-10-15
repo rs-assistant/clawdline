@@ -25,7 +25,7 @@ function run(argv) {
   if (!it.running()) return JSON.stringify({ ok: false, error: "iTerm2 is not running" });
   let found = null;
   const walk = itermEach(it, function (s) {
-    if (String(s.id()) !== id) return false;
+    if (!itermIs(s, id)) return false;
     found = s;
     return true;
   });
@@ -95,7 +95,7 @@ func (i *ITerm) Keystroke(ctx context.Context, s session.Session, codes []byte) 
 	if len(codes) == 0 {
 		return errors.New("there is no key to send")
 	}
-	if !ITermScan() {
+	if !itermMayAct(ctx) {
 		return ITermScanOff{Op: "press a key in that iTerm2 session"}
 	}
 	args := []string{"key", s.ID}
@@ -117,9 +117,11 @@ func (i *ITerm) Capture(ctx context.Context, s session.Session) (string, bool) {
 // opposed to a particular tab having gone away. The held-screen reader uses
 // that distinction to back off the whole source only during an outage.
 func (i *ITerm) CaptureWithFailure(ctx context.Context, s session.Session) (string, bool, bool) {
-	// Scanning turned off reads no screen. It is not a source failure: the
-	// held-screen reader must not back off and retry a bridge nobody asked.
-	if s.Backend != session.BackendITerm || s.ID == "" || !ITermScan() {
+	// Scanning turned off reads no screen for the session list. It is not a
+	// source failure: the held-screen reader must not back off and retry a
+	// bridge nobody asked. A read that one action needs — the input line a
+	// send checks before and after it types — is asked for, and is taken.
+	if s.Backend != session.BackendITerm || s.ID == "" || !itermMayAct(ctx) {
 		return "", false, false
 	}
 	answer, err := i.keyScript(ctx, "capture", s.ID)
@@ -137,5 +139,6 @@ func captureSourceFailed(err error) bool {
 
 var (
 	_ ports.KeyHost    = (*ITerm)(nil)
+	_ ports.TTYHolder  = (*ITerm)(nil)
 	_ ports.ScreenHost = (*ITerm)(nil)
 )

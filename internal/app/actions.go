@@ -204,8 +204,26 @@ func (a Actions) read(ctx context.Context) session.Inventory {
 }
 
 // host returns the terminal that owns this session.
-func (a Actions) host(s session.Session) (ports.TerminalHost, error) {
+//
+// **A row only the process table saw is driven by the backend that holds its
+// tty**, when one does (ports.TTYHolder). With iTerm2's listing switched off,
+// every assistant in a hand-opened iTerm2 tab is such a row: refusing it as
+// having no backend left a Note's reply, a send from the phone and a menu
+// answer all failing with backend_unsupported, while the tab was plainly
+// there. Whether the tty is iTerm2's is read from the process table, so
+// asking costs no Apple Event. A tty no backend holds — another terminal
+// application — is refused as before.
+func (a Actions) host(ctx context.Context, s session.Session) (ports.TerminalHost, error) {
 	if session.SourceForID(s.ID) == "ps" {
+		tty := s.TTY
+		if tty == "" {
+			tty = s.ID
+		}
+		for _, h := range a.Terminals {
+			if holder, ok := h.(ports.TTYHolder); ok && holder.HoldsTTY(ctx, tty) {
+				return h, nil
+			}
+		}
 		return nil, Refusal{Code: "backend_unsupported", RawDetail: true,
 			Detail: "this process has no terminal backend Clawdline can type into"}
 	}
@@ -265,7 +283,8 @@ func (a Actions) SendIfIdle(ctx context.Context, id, text string) (session.Sessi
 }
 
 func (a Actions) send(ctx context.Context, s session.Session, text string) (session.Session, error) {
-	h, err := a.host(s)
+	ctx = ports.Asked(ctx)
+	h, err := a.host(ctx, s)
 	if err != nil {
 		return session.Session{}, beforeTheFirstByte(err)
 	}
@@ -333,6 +352,7 @@ func questionOnScreen(s session.Session) error {
 // caller: it clears a Claude Code root's composer through the CLI's own stash
 // (orchestrator stash.go).
 func (a Actions) SendPrepared(ctx context.Context, id, text string, prepare orchestrator.Prepare) (session.Session, error) {
+	ctx = ports.Asked(ctx)
 	if text == "" {
 		return session.Session{}, Refusal{Code: "empty_text", Detail: "there is nothing to type",
 			Cause: terminal.Unsent{Why: "there is nothing to type"}}
@@ -341,7 +361,7 @@ func (a Actions) SendPrepared(ctx context.Context, id, text string, prepare orch
 	if err != nil {
 		return session.Session{}, beforeTheFirstByte(err)
 	}
-	h, err := a.host(s)
+	h, err := a.host(ctx, s)
 	if err != nil {
 		return session.Session{}, beforeTheFirstByte(err)
 	}
@@ -438,6 +458,7 @@ const pasteboardQueue = 4
 // A nil error means the bytes reached the tty, as for Send. Files that never
 // reached one are removed; the rest are kept for the program to read later.
 func (a Actions) SendWithPictures(ctx context.Context, id, text string, images []string) (session.Session, error) {
+	ctx = ports.Asked(ctx)
 	if len(images) == 0 {
 		return a.Send(ctx, id, text)
 	}
@@ -454,7 +475,7 @@ func (a Actions) SendWithPictures(ctx context.Context, id, text string, images [
 	if err != nil {
 		return session.Session{}, err
 	}
-	h, err := a.host(s)
+	h, err := a.host(ctx, s)
 	if err != nil {
 		return session.Session{}, err
 	}
@@ -636,11 +657,12 @@ func quotedPath(path string) string {
 
 // Interrupt stops the current turn without closing the session.
 func (a Actions) Interrupt(ctx context.Context, id string) (session.Session, error) {
+	ctx = ports.Asked(ctx)
 	s, err := a.Find(ctx, id)
 	if err != nil {
 		return session.Session{}, err
 	}
-	h, err := a.host(s)
+	h, err := a.host(ctx, s)
 	if err != nil {
 		return session.Session{}, err
 	}
@@ -700,7 +722,7 @@ func (a Actions) ClosePinned(ctx context.Context, id string, force bool, pid int
 			}
 		}
 	}
-	closeIt, err := a.closer(s)
+	closeIt, err := a.closer(ctx, s)
 	if err != nil {
 		return session.Session{}, err
 	}
@@ -756,7 +778,7 @@ func (a Actions) ClosePinned(ctx context.Context, id string, force bool, pid int
 // socket of its own was closed from the phone twice, got close_nothing_there
 // both times, and stayed on the list. The process is what there is, so the
 // process is what is asked to leave.
-func (a Actions) closer(s session.Session) (func(context.Context, session.Session) error, error) {
+func (a Actions) closer(ctx context.Context, s session.Session) (func(context.Context, session.Session) error, error) {
 	if session.SourceForID(s.ID) == "ps" {
 		if a.Processes == nil {
 			return nil, Refusal{
@@ -767,11 +789,13 @@ func (a Actions) closer(s session.Session) (func(context.Context, session.Sessio
 		}
 		return a.Processes.CloseProcess, nil
 	}
-	h, err := a.host(s)
+	h, err := a.host(ctx, s)
 	if err != nil {
 		return nil, err
 	}
-	return h.Close, nil
+	// A close was asked for: it is not the list's poll, and a terminal whose
+	// polling is switched off still carries it out (ports.Asked).
+	return func(ctx context.Context, s session.Session) error { return h.Close(ports.Asked(ctx), s) }, nil
 }
 
 // closeRefusal names which rung of the close stopped it.

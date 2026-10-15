@@ -57,6 +57,7 @@ func KeyName(key string) (bytes []byte, digit int, ok bool) {
 // refusal (`menu_moved`, `menu_unreadable`) with nothing sent. Empty is an
 // older page that named none, answered as before.
 func (a Actions) Key(ctx context.Context, id, key, expect string) (session.Session, error) {
+	ctx = ports.Asked(ctx)
 	bytes, digit, ok := KeyName(key)
 	if !ok {
 		return session.Session{}, Refusal{Code: "bad_request",
@@ -70,7 +71,7 @@ func (a Actions) Key(ctx context.Context, id, key, expect string) (session.Sessi
 	if err != nil {
 		return session.Session{}, err
 	}
-	h, err := a.host(s)
+	h, err := a.host(ctx, s)
 	if err != nil {
 		return session.Session{}, err
 	}

@@ -59,6 +59,20 @@ func (i *ITerm) SetInventoryBackoff(first, maximum time.Duration) {
 
 func (i *ITerm) Name() string { return "iterm" }
 
+// HoldsTTY says whether iTerm2 holds one pseudo-terminal, read from the
+// process table and never from iTerm2 (itermPTYs): asking it costs no Apple
+// Event, so it may be asked with scanning off. A table that could not be read
+// holds nothing — an action is then refused rather than aimed at a terminal
+// nobody showed belongs to iTerm2.
+func (i *ITerm) HoldsTTY(ctx context.Context, tty string) bool {
+	tty = strings.TrimPrefix(tty, "/dev/")
+	if tty == "" {
+		return false
+	}
+	held, ok := i.ptys(ctx)
+	return ok && held.ttys[tty]
+}
+
 // itermEach is the one walk every iTerm2 script takes over the sessions, and
 // it is prepended to each of them.
 //
@@ -75,11 +89,25 @@ func (i *ITerm) Name() string { return "iterm" }
 //
 // visit answers true to stop the walk.
 //
+// itermIs is how a walk recognises the session it was sent for. An id is
+// iTerm2's own; a row only the process table saw is named by its tty
+// ("ttys037", session.SourceForID), which iTerm2 never uses as an id, so that
+// one is matched on the pty the session holds. That is what lets a send reach
+// a hand-opened tab while iTerm2's listing is switched off (ports.Asked).
+//
 // itermMissing is what a script that looked for one session and did not find
 // it says. A walk that skipped a window it could not read has not seen that
 // session, which is not the same as its being gone (F7 of the review of
 // e54e338): "gone" is said only by a walk that read everything.
 const itermEach = `
+function itermIs(s, id) {
+  if (/^tty[a-z]*[0-9]+$/.test(id)) {
+    let tty = "";
+    try { tty = String(s.tty() || ""); } catch (e) {}
+    return tty === "/dev/" + id;
+  }
+  return String(s.id()) === id;
+}
 function itermMissing(walk) {
   if (!walk || !walk.unreadable) return "That session is gone";
   return "That session was not seen: " + walk.unreadable + " window(s) or tab(s) could not be read";
@@ -434,7 +462,7 @@ function run(argv) {
   }
   let found = null;
   const walk = itermEach(it, function (s) {
-    if (String(s.id()) !== id) return false;
+    if (!itermIs(s, id)) return false;
     found = s;
     return true;
   });
@@ -475,7 +503,7 @@ var itermSendLimit = sendConfirm + 6*time.Second
 // on a current macOS, and iTerm2's own `write` does not bring the window
 // forward, which is the whole point.
 func (i *ITerm) Send(ctx context.Context, s session.Session, text string) error {
-	if !ITermScan() {
+	if !itermMayAct(ctx) {
 		return ITermScanOff{Op: "type into that iTerm2 session"}
 	}
 	return itermCall(ctx, "send", itermSendScript, itermSendLimit, s.ID, text)
@@ -512,7 +540,7 @@ func (i *ITerm) Close(ctx context.Context, s session.Session) error {
 	if s.ID == "" {
 		return Unsent{Why: "there is no iTerm2 session id to close"}
 	}
-	if !ITermScan() {
+	if !itermMayAct(ctx) {
 		return ITermScanOff{Op: "close that iTerm2 session"}
 	}
 	return i.farewell().say(ctx, s)

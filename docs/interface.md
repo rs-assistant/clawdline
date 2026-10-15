@@ -274,23 +274,32 @@ whether Clawdline asks iTerm2 about its tabs at all. It is there to measure, not
 the person decided on 2026-10-09 to run one week with it off and compare it with a week with it on
 (docs/design-decisions.md D71). It takes effect on the next reading; nothing restarts.
 
-**Off, no Apple Event is sent to list iTerm2's sessions, read their screens, type into them, press
-keys in them, interrupt them or close them.** Those actions on an iTerm2 session are refused
-before anything is sent, with "iTerm2 scanning is turned off in Settings". The iTerm2 source
-answers `disabled: setting` instead of a list. The session list does not repeat the setting back
-at the person who made it: it says nothing about iTerm2, an assistant in a tab opened by hand is
-shown with what the process table knows, and nothing about those tabs is concluded — no tab is
-called gone, and no last reading is kept and aged into `missing`. Sessions in tmux, including
-every session Clawdline opens with tmux installed, are read and typed into as usual.
+**Off, Clawdline sends iTerm2 no Apple Event of its own accord.** It does not list iTerm2's
+sessions or sample their screens for the session list. The iTerm2 source answers
+`disabled: setting` instead of a list. The session list does not repeat the setting back at the
+person who made it: it says nothing about iTerm2, an assistant in a tab opened by hand is shown
+with what the process table knows, and nothing about those tabs is concluded — no tab is called
+gone, and no last reading is kept and aged into `missing`. Sessions in tmux, including every
+session Clawdline opens with tmux installed, are read and typed into as usual.
 When a person opens an iTerm2 session's live screen and that screen cannot be read while this
 setting is off, the explanation appears inside that screen panel. A readable screen and the
 session list do not carry a persistent setting warning.
 
-**Still sent, one Apple Event each, when off:** opening the iTerm2 viewer tab for a tmux session
-(above), **Reveal**, and closing a dispatched child's tab that this daemon opened itself. Each is
-something a person or the broker asked for at that moment, not a poll, and refusing them would
-leave a tmux session with no window to show it. A child started with **iTerm2 (native tab)** runs
-in iTerm2 itself and cannot be briefed with scanning off; use auto or tmux for that week.
+**What somebody asks for still happens, with the Apple Events that one action needs**
+(`ports.Asked`, amended 2026-10-15). A send — from the phone, the console, a Note's suggested
+reply, or a broker notice — a key, an Enter, an interrupt, a close, and Reveal each reach the tab.
+An assistant in a hand-opened tab is a row only the process table saw, named by its tty
+(`ttys037`); Clawdline checks in the process table that iTerm2 holds that tty, which costs no
+Apple Event, and the action's script finds the tab by the pty it holds. A tty iTerm2 does not hold
+(Terminal.app, a tmux server on a socket of its own) is still refused as `backend_unsupported`.
+The person's rule: the switch may cost nothing day to day and must not break anything when it is
+needed. Before this, a reply to such a tab was refused as `backend_unsupported` while the tab was
+plainly there.
+
+**Also still sent when off:** opening the iTerm2 viewer tab for a tmux session (above), and
+closing a dispatched child's tab that this daemon opened itself. A child started with **iTerm2
+(native tab)** runs in iTerm2 itself and cannot be briefed with scanning off; use auto or tmux for that
+week.
 
 **The numbers.** Every iTerm2 osascript run is counted by kind (`list`, `capture`, `send`, `type`,
 `key`, `close`, `find`, `open`, `reveal…`, `probe`), with its failures, summed time and longest

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/sainteye/clawdline/internal/app/ports"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
@@ -57,5 +58,44 @@ func TestITermScanOffSendsNoAppleEvent(t *testing.T) {
 	a, _, _, _ := after.Runs()
 	if a != b {
 		t.Fatalf("%d osascript runs started with iTerm2 scanning off", a-b)
+	}
+}
+
+// The switch stops the session list's polling; it does not stop what one
+// action needs. An action marks its context (ports.Asked), and that context
+// passes the switch whether it is on or off. A plain context — every list
+// reader's — passes only while scanning is on, which the test above holds to
+// zero Apple Events.
+func TestAnAskedActionPassesTheITermScanSwitch(t *testing.T) {
+	t.Cleanup(func() { SetITermScan(true) })
+	plain, asked := context.Background(), ports.Asked(context.Background())
+	for _, on := range []bool{true, false} {
+		SetITermScan(on)
+		if !itermMayAct(asked) {
+			t.Errorf("scanning on=%v: an asked action was refused", on)
+		}
+		if itermMayAct(plain) != on {
+			t.Errorf("scanning on=%v: a poll answered %v", on, itermMayAct(plain))
+		}
+	}
+}
+
+// Whether a row only the process table saw is iTerm2's is read from the
+// process table, never from iTerm2: it is asked with scanning off, before any
+// Apple Event may be sent. A table that could not be read holds nothing.
+func TestITermHoldsATTYOnlyWhenTheProcessTableSaysSo(t *testing.T) {
+	i := NewITerm()
+	i.ptys = func(context.Context) (itermPTYs, bool) {
+		return itermPTYs{ttys: map[string]bool{"ttys037": true}, hosts: 1}, true
+	}
+	ctx := context.Background()
+	for tty, want := range map[string]bool{"ttys037": true, "/dev/ttys037": true, "ttys038": false, "": false} {
+		if got := i.HoldsTTY(ctx, tty); got != want {
+			t.Errorf("HoldsTTY(%q) = %v, want %v", tty, got, want)
+		}
+	}
+	i.ptys = func(context.Context) (itermPTYs, bool) { return itermPTYs{}, false }
+	if i.HoldsTTY(ctx, "ttys037") {
+		t.Fatal("an unreadable process table was taken to hold the tty")
 	}
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/app/lane"
+	"github.com/sainteye/clawdline/internal/app/ports"
 	"github.com/sainteye/clawdline/internal/domain/session"
 	"github.com/sainteye/clawdline/internal/domain/work"
 )
@@ -951,7 +952,10 @@ func (b *Broker) readComposer(ctx context.Context, terminalID, assistant string)
 	if b.Screen == nil {
 		return ComposerEmpty, ""
 	}
-	screen, ok := b.Screen(ctx, terminalID)
+	// The look belongs to the notice about to be typed, not to a poll: a
+	// root whose terminal's polling is switched off is still read for it
+	// (ports.Asked), so a draft there is stashed rather than submitted.
+	screen, ok := b.Screen(ports.Asked(ctx), terminalID)
 	if !ok {
 		return ComposerEmpty, ""
 	}

@@ -1,22 +1,29 @@
 package terminal
 
 import (
+	"context"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/sainteye/clawdline/internal/app/ports"
 )
 
 // The iTerm2 scan switch (setting `iterm_scan`, docs/interface.md "Turning
 // iTerm2 scanning off").
 //
-// Off, this daemon sends iTerm2 no Apple Event to list its sessions, read
-// their screens, type into them or press keys in them, and the iTerm2 source
-// answers a reading that says it was turned off rather than an empty one
-// (session.Inventory.Disabled). Opening a viewer tab for a tmux session,
-// Reveal, and closing a child tab this daemon opened itself still send their
-// one Apple Event each: those are effects a person or the broker asked for,
-// not a poll.
+// Off, this daemon sends iTerm2 no Apple Event of its own accord: it does not
+// list its sessions or sample their screens for the session list, and the
+// iTerm2 source answers a reading that says it was turned off rather than an
+// empty one (session.Inventory.Disabled).
+//
+// **What somebody asked for still happens** (ports.Asked). A send, a key, an
+// Enter, an interrupt or a close on one session, a viewer tab for a tmux
+// session, Reveal, and closing a child tab this daemon opened itself each send
+// the Apple Events that one action needs: those are effects a person or the
+// broker asked for, not a poll. A row only the process table saw is reached
+// through the tty iTerm2 holds it on (itermIs).
 //
 // The zero value is on, which is what every machine did before the switch
 // existed; the composition root sets it from the settings file.
@@ -27,6 +34,10 @@ func SetITermScan(on bool) { itermScanOff.Store(!on) }
 
 // ITermScan reports whether iTerm2 scanning is on.
 func ITermScan() bool { return !itermScanOff.Load() }
+
+// itermMayAct is whether one call may send iTerm2 an Apple Event: always for
+// an action somebody asked for, and otherwise only while scanning is on.
+func itermMayAct(ctx context.Context) bool { return ITermScan() || ports.WasAsked(ctx) }
 
 // ITermScanDisabledBy is the typed reason a disabled iTerm2 source carries on
 // a reading and on the wire.
