@@ -20,41 +20,70 @@ import (
 // drops work, "update to v1.0.7" gains it — and only git can: release
 // versions say nothing about ancestry. This is that reading.
 
-// devStandingMemo holds one answer. Two commits' histories never change, so
-// the answer for a pair stands until the running build or the latest release
-// is another commit. An unknown answer is not kept: right after a start the
-// daemon has not listed its Projects yet, and the first read of a dev build
-// that had just been installed answered "no Project holds both commits" and
-// kept saying so with the clawdline checkout, holding both, listed a moment
-// later. A machine with no such Project asks git again on each read, which
-// GET /v1/update's readers do every ten minutes.
+// devStandingMemo holds one answer, and is read without waiting for git.
+//
+// **The request never computes it.** The first version ran git, and listed
+// every Project, inside GET /v1/update under this lock. Listing Projects reads
+// every live Session, which can take minutes on a busy machine, and every read
+// of the route queued behind it: on 2026-10-15 GET /v1/update answered nothing
+// for over two minutes while /v1/health answered in a millisecond, and
+// `clawdline dev install`, which follows the switch by reading that route, hung
+// at "switching". So a read answers what is held for the pair of commits —
+// nothing yet, an unknown, or the standing — and starts one reading in the
+// background when there is none running and none known.
+//
+// Two commits' histories never change, so a known answer stands until the
+// running build or the latest release is another commit. An unknown one is
+// asked again by the next read: right after a start the daemon has not listed
+// its Projects yet, and the first reading of a dev build installed a moment
+// before found none that held its commits.
 type devStandingMemo struct {
-	mu     sync.Mutex
-	dev    string
-	latest string
-	answer contract.UpdateDevStanding
+	mu      sync.Mutex
+	dev     string
+	latest  string
+	answer  *contract.UpdateDevStanding
+	reading bool
 }
 
 // withDevStanding adds `dev` to a release install's status while it runs a
-// dev build and the latest release names its commit.
+// dev build and the latest release names its commit, once it is known.
 func (s *Server) withDevStanding(st contract.UpdateStatus) contract.UpdateStatus {
 	v, err := release.ParseVersion(st.Running.Version)
 	if err != nil || !v.IsDev() || st.Latest.Stamp == "" || st.Running.Stamp == "" {
 		return st
 	}
+	dev, latest := st.Running.Stamp, st.Latest.Stamp
 	m := &s.devStanding
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.dev != st.Running.Stamp || m.latest != st.Latest.Stamp || m.answer.Relation == contract.UpdateDevRelationUnknown {
-		ctx, cancel := context.WithTimeout(context.Background(), updater.FetchTimeoutSecondsLimit*time.Second)
-		repos := s.placeRepositories(ctx)
-		m.answer = devStandingIn(ctx, repos, st.Running.Stamp, st.Latest.Stamp)
-		cancel()
-		m.dev, m.latest = st.Running.Stamp, st.Latest.Stamp
+	if m.dev != dev || m.latest != latest {
+		m.dev, m.latest, m.answer = dev, latest, nil
 	}
-	answer := m.answer
-	st.Dev = &answer
+	if m.answer != nil {
+		answer := *m.answer
+		st.Dev = &answer
+	}
+	known := m.answer != nil && m.answer.Relation != contract.UpdateDevRelationUnknown
+	if !known && !m.reading {
+		m.reading = true
+		go s.readDevStanding(dev, latest)
+	}
 	return st
+}
+
+// readDevStanding is one background reading, kept only if the pair it was for
+// is still the one asked about.
+func (s *Server) readDevStanding(dev, latest string) {
+	ctx, cancel := context.WithTimeout(context.Background(), updater.FetchTimeoutSecondsLimit*time.Second)
+	defer cancel()
+	answer := devStandingIn(ctx, s.placeRepositories(ctx), dev, latest)
+	m := &s.devStanding
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.reading = false
+	if m.dev == dev && m.latest == latest {
+		m.answer = &answer
+	}
 }
 
 // placeRepositories is the top of every repository a known Project is in, once.
