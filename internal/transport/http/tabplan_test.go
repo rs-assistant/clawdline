@@ -47,7 +47,7 @@ func TestTheTabPlanNamesThisTasksRule(t *testing.T) {
 			contract.BrokerTabRuleChildLinger, true, "closed about 180 seconds after it ends", end.Add(linger).Unix()},
 		{"it timed out", ended(orchestrator.Record{}, orchestrator.StateTimeout), linger,
 			contract.BrokerTabRuleUnfinishedLeftOpen, false, "left open", 0},
-		{"its schedule says close_tab: always", ended(scheduled, orchestrator.StateTimeout), linger,
+		{"its schedule says close_tab: always", ended(scheduled, orchestrator.StateFailure), linger,
 			contract.BrokerTabRuleScheduleAlways, true, "closed as soon as it is at rest", end.Unix()},
 	}
 	answers := map[contract.BrokerTabRule]bool{}

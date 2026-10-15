@@ -108,6 +108,9 @@ type ScheduleBook struct {
 	// ImportsEnabled is `schedule_imports_enabled`; nil or false keeps the
 	// import route shut.
 	ImportsEnabled func() bool
+	// Conversations matches a run to the conversation its child had, so a
+	// finished run can be resumed (schedule_resume.go). Zero answers none.
+	Conversations RunConversations
 
 	// mu is the one lane every dispatch goes through, timer and manual alike,
 	// so the "is a run from this schedule still working" question and the
@@ -382,11 +385,23 @@ func (b *ScheduleBook) Detail(ctx context.Context, id string) (map[string]any, b
 		out["runs_may_be_truncated"] = true
 	}
 	records := make([]map[string]any, 0, len(runs))
+	conversations := b.runConversations(runs)
 	for _, r := range runs {
 		rec := map[string]any{"task_id": r.TaskID, "state": r.State, "assistant": r.Assistant,
 			"project_dir": r.ProjectDir, "created": r.Created.Unix()}
 		if r.Summary != "" {
 			rec["summary"] = r.Summary
+		}
+		// The tab, while it is on the Session list, is opened rather than a
+		// second process started; the console asks the list whether it is.
+		if r.TerminalID != "" {
+			rec["terminal_id"] = r.TerminalID
+		}
+		if id := conversations[r.TaskID]; id != "" {
+			rec["session_id"] = id
+		}
+		if !r.FinishedAt.IsZero() {
+			rec["finished_at"] = r.FinishedAt.Unix()
 		}
 		records = append(records, rec)
 	}

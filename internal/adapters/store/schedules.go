@@ -275,6 +275,15 @@ type ScheduleRun struct {
 	Assistant  string
 	ProjectDir string
 	Summary    string
+	// What the broker's record says of the run's child, read from the same
+	// row: the tab it opened, the conversation a reading bound in that tab
+	// (orchestrator.Record.ChildConversationID), where the child worked
+	// ("none" is the project directory itself) and when the run ended.
+	// Empty when the record does not say.
+	TerminalID     string
+	ConversationID string
+	Isolation      string
+	FinishedAt     time.Time
 }
 
 // RecordScheduleRun links a task to the schedule that made it. Written before
@@ -312,7 +321,11 @@ func (s *Store) ScheduleRuns(ctx context.Context, scheduleID string) ([]Schedule
 	// no state — the Swift registry's "record gone", which is not working.
 	q := `SELECT r.task_id, r.schedule_id, r.created_at, r.fire_at, r.how,
 	             COALESCE(t.state, ''), COALESCE(t.assistant, ''), COALESCE(t.project, ''),
-	             COALESCE(x.body, '')
+	             COALESCE(x.body, ''),
+	             COALESCE(CASE WHEN json_valid(t.record) THEN json_extract(t.record, '$.child_terminal_id') END, ''),
+	             COALESCE(CASE WHEN json_valid(t.record) THEN json_extract(t.record, '$.child_conversation_id') END, ''),
+	             COALESCE(CASE WHEN json_valid(t.record) THEN json_extract(t.record, '$.isolation') END, ''),
+	             COALESCE(CASE WHEN json_valid(t.record) THEN json_extract(t.record, '$.finished_at') END, '')
 	      FROM schedule_runs r
 	      LEFT JOIN broker_tasks t ON t.id = r.task_id
 	      LEFT JOIN broker_task_texts x ON x.task_id = r.task_id AND x.field = '` + TextSummary + `'`
@@ -330,12 +343,17 @@ func (s *Store) ScheduleRuns(ctx context.Context, scheduleID string) ([]Schedule
 	for rows.Next() {
 		var r ScheduleRun
 		var created, fire int64
+		var finished string
 		if err := rows.Scan(&r.TaskID, &r.ScheduleID, &created, &fire, &r.How,
-			&r.State, &r.Assistant, &r.ProjectDir, &r.Summary); err != nil {
+			&r.State, &r.Assistant, &r.ProjectDir, &r.Summary,
+			&r.TerminalID, &r.ConversationID, &r.Isolation, &finished); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		r.Created, r.Fire = fromUnix(created), fromUnix(fire)
+		if at, err := time.Parse(time.RFC3339Nano, finished); err == nil && at.Year() > 1 {
+			r.FinishedAt = at
+		}
 		out = append(out, r)
 	}
 	err = rows.Err()

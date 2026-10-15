@@ -176,6 +176,7 @@ func (b *Broker) pass(ctx context.Context, number int64) Pulse {
 			p.SpawnFail++
 			continue
 		}
+		r = b.noteChildConversation(ctx, rd, r)
 		if b.runClocks(ctx, rd, r, &p) {
 			continue
 		}
@@ -493,7 +494,9 @@ func (b *Broker) runClocks(ctx context.Context, rd reading, r Record, p *Pulse) 
 			}
 		}
 	}
-	if deadline := r.Deadline(); !deadline.IsZero() && now.After(deadline) {
+	// A scheduled run still at work in its tab is not ended by its clock
+	// (scheduled_run.go): only its own result.json ends it then.
+	if deadline := r.Deadline(); !deadline.IsZero() && now.After(deadline) && !scheduledRunStillWorking(rd, r) {
 		if _, err := b.Settle(ctx, r.ID, StateTimeout,
 			"The task passed its timeout without writing a result.", nil); err == nil {
 			p.TimedOut++

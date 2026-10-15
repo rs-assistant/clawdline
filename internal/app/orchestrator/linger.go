@@ -95,7 +95,7 @@ const (
 	TabRuleCancelled = "cancelled_closed"
 	// The three a scheduled task's `close_tab` names, the Swift app's
 	// `scheduledCloseAt`: closed as soon as it may be, after a success only,
-	// after any end, or never.
+	// after any end the child reported (a timeout is left open), or never.
 	TabRuleScheduleOnSuccess = "schedule_on_success"
 	TabRuleScheduleAlways    = "schedule_always"
 	TabRuleScheduleNever     = "schedule_never"
@@ -196,7 +196,10 @@ func tabPolicy(r Record, end State, linger time.Duration) TabPlan {
 		case closeTabNever:
 			return TabPlan{Rule: TabRuleScheduleNever}
 		case closeTabAlways:
-			return TabPlan{Rule: TabRuleScheduleAlways, Close: true}
+			// "Always" is every end the run reported. A timeout is not one:
+			// the child never said it was done, and may still be at work or
+			// waiting on the person (scheduled_run.go).
+			return TabPlan{Rule: TabRuleScheduleAlways, Close: end != StateTimeout}
 		}
 		return TabPlan{Rule: TabRuleScheduleOnSuccess, Close: end == StateSuccess}
 	}

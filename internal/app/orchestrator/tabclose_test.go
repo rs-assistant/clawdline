@@ -137,7 +137,8 @@ func TestTheTabPolicyIsOneTable(t *testing.T) {
 		{"on_success after a success", sched("on_success"), StateSuccess, linger, TabPlan{TabRuleScheduleOnSuccess, true, 0}},
 		{"on_success after a failure", sched("on_success"), StateFailure, linger, TabPlan{TabRuleScheduleOnSuccess, false, 0}},
 		{"no close_tab is on_success", sched(""), StateSuccess, -1, TabPlan{TabRuleScheduleOnSuccess, true, 0}},
-		{"always after a timeout", sched("always"), StateTimeout, linger, TabPlan{TabRuleScheduleAlways, true, 0}},
+		{"always leaves a timeout open", sched("always"), StateTimeout, linger, TabPlan{TabRuleScheduleAlways, false, 0}},
+		{"on_success leaves a timeout open", sched("on_success"), StateTimeout, linger, TabPlan{TabRuleScheduleOnSuccess, false, 0}},
 		{"always after a failure", sched("always"), StateFailure, -1, TabPlan{TabRuleScheduleAlways, true, 0}},
 		{"never after a success", sched("never"), StateSuccess, linger, TabPlan{TabRuleScheduleNever, false, 0}},
 		{"a cancel closes even a never", sched("never"), StateCancelled, linger, TabPlan{TabRuleCancelled, true, 0}},
@@ -177,7 +178,7 @@ func TestOneTasksTabPolicyNamesTheRuleThatApplied(t *testing.T) {
 			TabRuleLinger, true, end.Add(linger), TabSettingLinger, "180"},
 		{"it timed out", ended(Record{}, StateTimeout), linger,
 			TabRuleUnfinished, false, time.Time{}, TabSettingLinger, "180"},
-		{"its schedule says close_tab: always", ended(sched(closeTabAlways), StateTimeout), linger,
+		{"its schedule says close_tab: always", ended(sched(closeTabAlways), StateFailure), linger,
 			TabRuleScheduleAlways, true, end, TabSettingCloseTab, closeTabAlways},
 		{"its schedule says close_tab: never", ended(sched(closeTabNever), StateSuccess), linger,
 			TabRuleScheduleNever, false, time.Time{}, TabSettingCloseTab, closeTabNever},
@@ -354,7 +355,7 @@ func TestAScheduledRunFollowsItsCloseTab(t *testing.T) {
 		{"7ab00011-0000-4000-8000-000000000011", "on_success", StateFailure, false},
 		{"7ab00012-0000-4000-8000-000000000012", "on_success", StateSuccess, true},
 		{"7ab00013-0000-4000-8000-000000000013", "", StateSuccess, true},
-		{"7ab00014-0000-4000-8000-000000000014", "always", StateTimeout, true},
+		{"7ab00014-0000-4000-8000-000000000014", "always", StateTimeout, false},
 		{"7ab00015-0000-4000-8000-000000000015", "always", StateFailure, true},
 	}
 	for i, c := range cases {

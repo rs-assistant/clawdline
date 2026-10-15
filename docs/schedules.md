@@ -330,7 +330,7 @@ fires.
 | orchestrator token 的拒絕句 | 最後一句教人去手寫檔案路徑 | 拿掉那半句 | 這裡對應手寫檔的是匯入路由，預設關 |
 | 第一次看見的時間 | — | 無條件進位到下一秒 | 存的是秒；09:00:00.4 看見的列存成 09:00:00 會讓 09:00 那次「不早於看見」而當場發射 |
 | 開了分頁但第一句打不進去 | — | 算這個排程的一次 run（不記 `spawn_failed`），回應帶 `warnings` | 分頁真的在；記成沒開會讓它不算「還在跑」，也不會寫 `fired_at` |
-| 一個排程的 run 還沒結束 | 由 broker 的心跳推進 | 同樣由 broker 的 beat 推進（收 `result.json`、跑逾時）；「還在跑嗎」直接讀 broker 那一列的 state | 一個不寫 result 的 run 在自己的逾時到時結束，放行下一次（D53） |
+| 一個排程的 run 還沒結束 | 由 broker 的心跳推進 | 同樣由 broker 的 beat 推進（收 `result.json`、跑逾時）；「還在跑嗎」直接讀 broker 那一列的 state | 一個不寫 result 的 run 在自己的逾時到時結束，放行下一次（D53）——**但分頁還在工作或在等人回答時不算**（2026-10-15，見下方「逾時不打斷還在工作的 run」） |
 | webhook 綁定與投遞 | Cloud 指令在 app 內處理 | 同樣的綁定帳本；機器憑證啟用 hook，持久 claim／lease／receipt journal 再走既有 broker | 收到但尚未回 receipt 或已派工但尚未記 receipt 時重啟，都以同一 task id 重播，不重複開 Agent |
 
 ## Which machine a schedule is on, and moving it (2026-09-26)
@@ -509,6 +509,37 @@ changed (`TestTheSchedulePermissionFieldRoundTrips`, `TestAnAgentMayNotSetOrChan
 - 推播：missed 與派工被拒（`refused`）時會推播（`internal/app/scheduler.go`）；run 以
   failure／timeout／spawn_failed **結束**時的推播這次沒有查證，照舊列為未確認。
 - 範本裡 broker 還不支援的欄位（`serialize`、`graph`）會在發射時被具名拒絕（`bad_task`）。
-- **執行紀錄的 `terminal_id`／`session_id`、`finished_at`**：這次沒有查證，照舊列著。
+- ~~執行紀錄的 `terminal_id`／`session_id`、`finished_at`~~：2026-10-15 補上，見下方「執行紀錄可以接回去」。
 - 搬移只能從表單做，一次一個；表單沒有「只跑一次」的日期欄位，所以只跑一次的排程搬移時帶著原本的 `on`，
   但無法在搬移時改它。
+
+## 逾時不打斷還在工作的 run（2026-10-15）
+
+排程的 run 沒有 root 在等它（D07），結束它的只有它自己的 `result.json`，或沒寫的話就是逾時。之前逾時只看牆上時鐘，
+而且從**排進佇列**那一刻算：等機器等了 17 分鐘的 run 只剩 13 分鐘（`407f8814`，2026-09-28）；brief 又跟 child 說
+「你有 30 分鐘」，child 就在第 30 分鐘匆忙收尾回報，接著 `on_success` 關掉分頁（2026-10-15 的 Augur 研究佇列，
+回報時距離 deadline 只剩 3 秒）。規則改成：
+
+- **排程 run 過了逾時，只要分頁還在、而且在工作（`working`）或在等人回答（`waiting`），就不結束**——
+  只有它自己回報交付或失敗才結束（`scheduledRunStillWorking`，`internal/app/orchestrator/scheduled_run.go`）。
+  分頁不見了，或閒置在提示字元，才照舊記成 `timeout`，放行下一次。一般派工的 task 不受影響。
+- **逾時不關排程的分頁**：`close_tab: always` 指的是 child 自己回報的結束（成功或失敗），逾時一律留著（`tabPolicy`）。
+- 排程 child 的 brief 不再說「你有 N 分鐘」，改成「預計 N 分鐘，不是 deadline，做完再回報」。
+
+`TestAScheduledRunAtWorkIsNotEndedByItsClock`、`TestAScheduledBriefingSaysTheClockIsNotADeadline`。
+
+## 執行紀錄可以接回去（2026-10-15）
+
+`GET …/schedules/:id` 的每一筆 run 現在帶 `terminal_id`（分頁還在 Session 清單上時，Web 直接打開它）、`finished_at`，
+以及結束後還能接回去時的 `session_id`。之前 Go daemon 沒記 child 的對話，所以歷史面板的每一列都按不下去。
+
+對話有兩個來源：broker 在 run 還在跑時，從讀數裡 child 分頁綁到的對話記下 `child_conversation_id`
+（`noteChildConversation`）；更早的 Claude run 則看 transcript 的第一則使用者訊息——那是 broker 打進分頁的
+`You are a Clawdline CHILD agent for task <id>`（`projects.ChildFirstLinePrefix`），只有這一行算數，其他 session
+只是「提到」這個 task 不算。只有已結束、在專案目錄本身跑（`isolation: none`）、transcript 還在磁碟上的 run 才給
+`session_id`。`POST /v1/places/:id/resume/…` 在專案歷史找不到這個對話時，再問 `ScheduleBook.ScheduledConversation`：
+同一個專案、同一個 assistant、已結束的排程 run 的對話才放行，接回去是一個普通的互動 Session。每次查詢最多開
+256 個 transcript、每個讀前 64 KiB（`schedule.run_transcripts_probed`、`schedule.run_transcript_head`）。
+Codex 的舊 run 不回補，只有新的 run 從讀數記下對話。
+
+`TestAFinishedRunIsResumedByItsChildsConversation`、`TestAChildConversationIsFoundByItsFirstLine`。
