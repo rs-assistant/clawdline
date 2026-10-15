@@ -2,6 +2,8 @@ package http
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -76,7 +78,11 @@ func (s *Server) withDevStanding(st contract.UpdateStatus) contract.UpdateStatus
 func (s *Server) readDevStanding(dev, latest string) {
 	ctx, cancel := context.WithTimeout(context.Background(), updater.FetchTimeoutSecondsLimit*time.Second)
 	defer cancel()
-	answer := devStandingIn(ctx, s.placeRepositories(ctx), dev, latest)
+	repos := s.placeRepositories(ctx)
+	answer := devStandingIn(ctx, repos, dev, latest)
+	if answer.Relation == contract.UpdateDevRelationUnknown {
+		log.Printf("update: how dev build %.7s stands against release %.7s is not known: %s", dev, latest, answer.Reason)
+	}
 	m := &s.devStanding
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -151,5 +157,9 @@ func devStandingIn(ctx context.Context, repos []string, dev, latest string) cont
 		}
 		return standing
 	}
-	return unknown("no Project on this machine holds both the dev build's commit and the release's")
+	why := fmt.Sprintf("no Project on this machine holds both the dev build's commit and the release's (%d repositories looked in)", len(repos))
+	if err := ctx.Err(); err != nil {
+		why += "; the reading ran out of time: " + err.Error()
+	}
+	return unknown(why)
 }
