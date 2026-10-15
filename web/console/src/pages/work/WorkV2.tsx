@@ -446,7 +446,10 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
         }
         setCreating(false)
         setCreatedItem(created)
-      })
+      // The item is open for assignment as soon as the machine has it. The
+      // Board, Session and decision reads behind it can take seconds through
+      // Cloud, and while they ran every control on the new card was disabled.
+      }, true)
     }} />}
     {createdItem && <CreatedWorkModal item={createdItem} sessions={sessions} decisions={decisionsForWorkItem(decisions, createdItem.id)} decisionAnswers={decisionAnswers} busy={busy} failure={failure}
       detailLoading={false} detailError="" retryDetail={() => void readWorkV2Item(createdItem.id).then((answer) => setCreatedItem([...answeredDecisionIDs.current].reduce(withoutAnsweredWait, answer.item))).catch((error: unknown) => setFailure(failureWords(error)))}
