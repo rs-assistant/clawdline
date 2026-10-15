@@ -156,6 +156,9 @@
 | `personas.text_bytes` | 8192 | `bytes` | `refuse` | `diagnostics` | — |
 | `places.git_config_bytes` | 65536 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `places.registered` | 512 | `rows` | `refuse` | `diagnostics, notice, health` | — |
+| `places.repo_lookups` | 40 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `places.repo_readers` | 4 | `rows` | `refuse` | `diagnostics` | — |
+| `places.repo_wait_seconds` | 1 | `seconds` | `refuse` | `diagnostics` | — |
 | `planreview.blocking_listed` | 8 | `rows` | `coalesce` | `diagnostics, sender` | — |
 | `projectfiles.file_bytes` | 131072 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `projectfiles.list` | 128 | `rows` | `refuse` | `diagnostics, sender` | — |
