@@ -366,6 +366,24 @@ test("a send uses the machine's fresh execution when the retained Session row is
     { request: "send-fresh", execution_generation: current, text: "hello", images: [] })
 })
 
+test("a machine that predates the fresh list is asked for its plain list before a send", async () => {
+  const client = new FakeClient()
+  const current = "abcdef0123456789abcdef0123456789"
+  client.rows = [row("s1")]
+  const asked: unknown[] = []
+  client.listPresentationsForMachine = async (_machine, _signal, options) => {
+    asked.push(options)
+    if (options?.fresh) throw Object.assign(new Error("This Cloud read is malformed."), { code: "malformed_read" })
+    return { sessions: [{ id: "s1", execution_generation: current }] }
+  }
+  const { reader } = seam(client)
+  const res = await reader.fetch("/v1/sessions/s1/send", post({ text: "hello" }, { "Idempotency-Key": "send-older" }))
+  assert.equal(res.status, 200)
+  assert.deepEqual(asked, [{ fresh: true }, undefined])
+  assert.deepEqual(client.calls[0]?.[3],
+    { request: "send-older", execution_generation: current, text: "hello", images: [] })
+})
+
 test("an unreadable fresh Session list never falls back to a retained send target", async () => {
   const client = new FakeClient()
   client.rows = [row("s1")]
