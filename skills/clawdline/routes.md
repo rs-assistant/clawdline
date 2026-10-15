@@ -5,8 +5,8 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | Method | Registered route | Since API level | Agent guide | Human goal |
 | --- | --- | ---: | --- | --- |
 | `*` | `/reports/` | 1 | `clawdline guide report` | `docs/user/sessions.md` |
-| `*` | `/v1/artifacts/images` | 1 | `clawdline guide note` | `docs/user/sessions.md` |
-| `*` | `/v1/artifacts/images/` | 1 | `clawdline guide note` | `docs/user/sessions.md` |
+| `*` | `/v1/artifacts/images` | 1 | `clawdline guide send` | `docs/user/sessions.md` |
+| `*` | `/v1/artifacts/images/` | 1 | `clawdline guide send` | `docs/user/sessions.md` |
 | `*` | `/v1/auth/` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/board` | 1 | `clawdline guide board` | `docs/user/board.md` |
 | `*` | `/v1/board/tracks` | 1 | `clawdline guide board` | `docs/user/board.md` |

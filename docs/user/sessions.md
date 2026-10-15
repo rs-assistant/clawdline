@@ -60,10 +60,14 @@ The **⋯** menu (**Session 快捷動作**) holds the rest:
 - **Pictures:** press **+** (**附一張圖**, attach a picture), paste one anywhere on the page, or drag
   it onto the session. Tap the thumbnail to open **標記要修改的地方** (mark what to change) and circle
   things with **紅筆** (red pen) before sending.
-- **Pictures from the Agent:** an Agent can publish a result picture in its own reply. Open its
-  thumbnail in the transcript to inspect it. The picture is stored on the Session's machine for
-  a limited time; an expired one stays visible as an expired tile. A paired Cloud browser needs
-  read permission. [How the image marker works](../messages.md#the-marker-a-session-writes-in-its-own-reply).
+- <a id="pictures-from-the-agent"></a>**Pictures from the Agent:** an Agent shows you a picture — a
+  screenshot, a design, a chart — by running `clawdline image send <picture>` in its Session. The
+  picture appears under the reply that sent it; open its thumbnail to inspect it. An Agent that has
+  loaded the Clawdline skill knows the command; asking for "the screenshot" or 「傳圖片給我」 is enough.
+  The picture is stored on the Session's machine for 24 hours; an expired one stays visible as an
+  expired tile. A paired Cloud browser needs read permission. If an Agent says it sent one and you
+  see nothing, see [Troubleshooting](troubleshooting.md#sessions).
+  [How a picture finds its reply](../messages.md#pictures-a-session-shows-the-person).
 - **Snippets** (**常用句**) are text you send often. Create them with **新增常用句**, for this project
   or every project. Pressing one only fills the box; you still send it.
 - **Workflows** hold a complete launch message. Open the Workflow tab, select one, then press

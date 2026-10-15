@@ -3534,6 +3534,14 @@ export interface ImageStoreRequest {
 export interface ImageStoreResult {
   artifacts: StoredImage[]
   at: number
+
+  /**
+   * Present when the request named no `terminal`: the pictures are stored and shown
+   * nowhere until a reply carries their marker, which a model may summarise away.
+   * Name the Session's terminal (`clawdline image send` does) to have them shown
+   * under its reply.
+   */
+  note?: string
   ok: boolean
 
   /**
