@@ -178,6 +178,9 @@ The incident behind each of these is in `docs/working-rules.md`.
 
 For a concrete choice the person must make, read `clawdline guide note`, create one `answer` Note
 with complete suggested replies, then ask briefly in chat and wait for the person's sent message.
+Ask each question in one place: a question already put through the assistant's own question screen
+(Claude Code's `AskUserQuestion`, Codex's built-in prompt) gets no Note as well, or the person
+answers it twice.
 
 ## The single pages
 
