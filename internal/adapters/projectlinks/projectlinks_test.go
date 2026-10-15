@@ -371,6 +371,25 @@ func TestHealthTakesItsEndpointFromTheRegistry(t *testing.T) {
 	}
 }
 
+// TestAHealthRowOpensTheSiteRatherThanTheProbe: `url` is what gets polled and
+// `site` is where a click should go instead, so a project that names both
+// puts its front page on the chip and keeps its JSON endpoint for the check.
+func TestAHealthRowOpensTheSiteRatherThanTheProbe(t *testing.T) {
+	cwd := "/projects/widgets"
+	r, dir := reader(t, remote{err: git.ErrNoRemote}, 1000)
+	r.Registry = func(string) map[string]any {
+		return map[string]any{"health": map[string]any{
+			"url": "https://example.invalid/api/health", "site": "https://example.invalid/",
+			"label": "prod"}}
+	}
+	write(t, dir, "health-"+DirectoryKey(cwd)+".json", map[string]any{
+		"state": "ok", "url": "https://example.invalid/api/health"})
+	rows := r.Read(context.Background(), cwd).Links
+	if len(rows) != 1 || rows[0].URL != "https://example.invalid/" || rows[0].Label != "prod" {
+		t.Fatalf("the chip opens the site, not the endpoint it polls: %+v", rows)
+	}
+}
+
 // TestAServerRowIsOnlyAsSureAsWhatWasAsked. Nothing here runs a project's
 // commands, so a process with no declared port has no state at all, and says
 // which kind of nothing it is.
