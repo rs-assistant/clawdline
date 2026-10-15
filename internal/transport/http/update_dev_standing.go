@@ -22,8 +22,12 @@ import (
 
 // devStandingMemo holds one answer. Two commits' histories never change, so
 // the answer for a pair stands until the running build or the latest release
-// is another commit; an unknown one is kept too, so a machine where no Project
-// holds the commits does not run git on every read of GET /v1/update.
+// is another commit. An unknown answer is not kept: right after a start the
+// daemon has not listed its Projects yet, and the first read of a dev build
+// that had just been installed answered "no Project holds both commits" and
+// kept saying so with the clawdline checkout, holding both, listed a moment
+// later. A machine with no such Project asks git again on each read, which
+// GET /v1/update's readers do every ten minutes.
 type devStandingMemo struct {
 	mu     sync.Mutex
 	dev    string
@@ -41,7 +45,7 @@ func (s *Server) withDevStanding(st contract.UpdateStatus) contract.UpdateStatus
 	m := &s.devStanding
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.dev != st.Running.Stamp || m.latest != st.Latest.Stamp {
+	if m.dev != st.Running.Stamp || m.latest != st.Latest.Stamp || m.answer.Relation == contract.UpdateDevRelationUnknown {
 		ctx, cancel := context.WithTimeout(context.Background(), updater.FetchTimeoutSecondsLimit*time.Second)
 		repos := s.placeRepositories(ctx)
 		m.answer = devStandingIn(ctx, repos, st.Running.Stamp, st.Latest.Stamp)

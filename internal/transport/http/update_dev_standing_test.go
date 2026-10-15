@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/contract"
 )
 
@@ -14,16 +15,7 @@ import (
 // say which, since every dev build sorts before its release.
 func TestADevBuildIsPlacedAgainstTheReleaseByAncestry(t *testing.T) {
 	repo := t.TempDir()
-	git := func(args ...string) string {
-		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid",
-			"-c", "commit.gpgsign=false"}, args...)...)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-		return strings.TrimSpace(string(out))
-	}
+	git := gitAt(t, repo)
 	commit := func(msg string) string {
 		git("commit", "-q", "--allow-empty", "-m", msg)
 		return git("rev-parse", "HEAD")
@@ -35,7 +27,23 @@ func TestADevBuildIsPlacedAgainstTheReleaseByAncestry(t *testing.T) {
 	ahead2 := commit("dev 2")
 	git("checkout", "-q", "-b", "side", older)
 	side := commit("side")
+	devStandingCases(t, repo, older, release, ahead1, ahead2, side)
+}
 
+func gitAt(t *testing.T, repo string) func(args ...string) string {
+	return func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.invalid",
+			"-c", "commit.gpgsign=false"}, args...)...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+}
+
+func devStandingCases(t *testing.T, repo, older, release, ahead1, ahead2, side string) {
 	ctx := context.Background()
 	for _, c := range []struct {
 		name, dev     string
@@ -56,5 +64,32 @@ func TestADevBuildIsPlacedAgainstTheReleaseByAncestry(t *testing.T) {
 	missing := strings.Repeat("0", 40)
 	if got := devStandingIn(ctx, []string{repo}, missing, release); got.Relation != contract.UpdateDevRelationUnknown || got.Reason == "" {
 		t.Errorf("a commit no Project holds: %+v, want unknown with a reason", got)
+	}
+}
+
+// Right after a start the daemon has not listed its Projects yet. The first
+// read then finds no repository holding the commits; that is not kept, and the
+// next read, with the checkout listed, places the dev build.
+func TestAnUnknownStandingIsAskedAgain(t *testing.T) {
+	repo := t.TempDir()
+	git := gitAt(t, repo)
+	git("init", "-q", "-b", "main")
+	git("commit", "-q", "--allow-empty", "-m", "release")
+	release := git("rev-parse", "HEAD")
+	git("commit", "-q", "--allow-empty", "-m", "dev")
+	dev := git("rev-parse", "HEAD")
+
+	var listed []projects.Place
+	s := &Server{squadPlaces: func(context.Context) []projects.Place { return listed }}
+	st := contract.UpdateStatus{
+		Running: contract.BuildStamp{Stamp: dev, Version: "v1.0.7-dev." + dev[:7]},
+		Latest:  contract.BuildStamp{Stamp: release, Version: "v1.0.7"},
+	}
+	if got := s.withDevStanding(st).Dev; got == nil || got.Relation != contract.UpdateDevRelationUnknown {
+		t.Fatalf("with no Project listed: %+v, want unknown", got)
+	}
+	listed = []projects.Place{{Path: repo}}
+	if got := s.withDevStanding(st).Dev; got == nil || got.Relation != contract.UpdateDevRelationAhead || got.Ahead != 1 {
+		t.Fatalf("with the checkout listed a moment later: %+v, want ahead by 1", got)
 	}
 }
