@@ -226,7 +226,7 @@ func codexDeveloperArgs(instructions ...string) []string {
 	return []string{"-c", ShellQuoted("developer_instructions=" + TOMLString(strings.Join(instructions, "\n\n")))}
 }
 
-const codexNoteInstruction = "When you need the person to choose between concrete options in a Clawdline Session, read `clawdline guide note` and create one answer Note with the question and complete suggested replies before asking in chat. Wait for the person's sent message before acting on the choice."
+const codexNoteInstruction = "When you need the person to choose between concrete options in a Clawdline Session, read `clawdline guide note` and create one answer Note with the question and complete suggested replies before asking in chat. Wait for the person's sent message before acting on the choice. If you ask through Codex's own question prompt instead, do not also create a Note for the same question: the person would have to answer it twice."
 
 // TOMLString is value as a TOML basic string: quoted, with the backslash, the
 // double quote and every control character escaped.
