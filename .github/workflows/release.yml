@@ -101,8 +101,19 @@ jobs:
             tools/release/tmux/build.sh darwin "$arch" "$tmux_dir/darwin-$arch"
           done
 
+      # Every macOS binary and the app are signed with the release's code
+      # signing certificate (tools/release/codesign.sh), so an update keeps the
+      # identity the person granted Dropbox, the local network and the
+      # keychain to. The .p12 is written to the runner's temporary directory
+      # and removed with it.
       - name: Build every artifact
+        env:
+          CODESIGN_P12_BASE64: ${{ secrets.CLAWDLINE_CODESIGN_P12_BASE64 }}
+          CLAWDLINE_CODESIGN_PASSWORD: ${{ secrets.CLAWDLINE_CODESIGN_PASSWORD }}
         run: |
+          [ -n "$CODESIGN_P12_BASE64" ] || { echo "the release environment has no CLAWDLINE_CODESIGN_P12_BASE64" >&2; exit 1; }
+          export CLAWDLINE_CODESIGN_P12="$RUNNER_TEMP/codesign.p12"
+          printf '%s' "$CODESIGN_P12_BASE64" | base64 --decode >"$CLAWDLINE_CODESIGN_P12"
           channel=stable
           [[ "$VERSION" == *-beta.* ]] && channel=beta
           args=(--channel "$channel" --skip-tests --tmux-from "$RUNNER_TEMP/tmux")

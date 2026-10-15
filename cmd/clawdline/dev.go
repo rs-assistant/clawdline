@@ -131,6 +131,13 @@ func devInstall(stdout, stderr io.Writer, rev string, port int, r runner) int {
 	// It waits in place for the compile slot: a person ran this and is
 	// watching it, so it is not handed to a callback.
 	os.Setenv("HEAVY_HANDOFF", "0")
+	// Signed with this machine's copy of the release certificate when it has
+	// one, so a dev build and a release are one program to macOS and switching
+	// between them asks for nothing again (tools/release/codesign.sh).
+	if p12, password, ok := devCodesign(config.Dir()); ok {
+		os.Setenv("CLAWDLINE_CODESIGN_P12", p12)
+		os.Setenv("CLAWDLINE_CODESIGN_PASSWORD", password)
+	}
 	if err := r.run(src, stdout, stderr, filepath.Join(src, "tools", "heavy.sh"), append([]string{"bash"}, build...)...); err != nil {
 		return fail(cliCopy("ops", "dev.build_failed", "the build failed, and nothing was changed: %v"), err)
 	}
@@ -202,4 +209,23 @@ func gitOutput(dir string, args ...string) (string, error) {
 		return "", fmt.Errorf("%v: %s", err, strings.TrimSpace(errb.String()))
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// devCodesign is this machine's code-signing certificate for dev builds:
+// <state dir>/signing/codesign.p12 and the password beside it in
+// codesign.password (docs/releasing.md, The code-signing certificate). A
+// machine without them builds ad hoc.
+func devCodesign(dir string) (p12, password string, ok bool) {
+	if runtime.GOOS != "darwin" || dir == "" {
+		return "", "", false
+	}
+	p12 = filepath.Join(dir, "signing", "codesign.p12")
+	if st, err := os.Stat(p12); err != nil || !st.Mode().IsRegular() {
+		return "", "", false
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "signing", "codesign.password"))
+	if err != nil {
+		return "", "", false
+	}
+	return p12, strings.TrimSpace(string(raw)), true
 }

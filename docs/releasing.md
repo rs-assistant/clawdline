@@ -73,6 +73,31 @@ go run ./tools/release sign -key /somewhere/outside/the/repo/test.key /tmp/rel/v
 `-test.N` version, the workflow refuses such a version, and `--no-app` is required, so no
 published binary trusts a key that is not in `keys.go`.
 
+## The code-signing certificate
+
+Every macOS binary of a release — the daemon in each darwin archive, the tmux beside it, and the
+app with the daemon and tmux inside it — is signed with one self-signed code-signing certificate
+(`tools/release/codesign.sh`), not ad hoc. An ad hoc signature's identity is its cdhash, so each
+build was another program to macOS: after a reinstall or an update the person was asked again to
+let Clawdline read a Dropbox folder, reach the local network, and use the keychain item WebKit keeps
+the Cloud console's keys under ("Clawdline Next WebCrypto Master Key"), measured 2026-10-16. Signed
+with the certificate, the designated requirement is `identifier … and certificate leaf = H"…"`,
+the same for every build, so what was allowed once stays allowed.
+
+- **It is not the release key.** It proves only that two builds are the same program to macOS; the
+  Ed25519 key below is what an install trusts an update by.
+- **Untrusted is enough.** codesign signs with it from a private keychain on the search list, and
+  macOS checks the requirement without trusting the certificate. Gatekeeper is not involved: the
+  installer does not quarantine what it downloads.
+- **Where it lives**: the `release` environment's `CLAWDLINE_CODESIGN_P12_BASE64` and
+  `CLAWDLINE_CODESIGN_PASSWORD` secrets, which the Release workflow requires; and, on the
+  maintainer's Mac, `<state dir>/signing/codesign.p12` with `codesign.password` beside it (mode
+  0600 in a 0700 directory), which `clawdline dev install` signs dev builds with so a dev build
+  and a release stay one program. Keep an offline copy of the .p12 and its password.
+- **Without it**, a build signs ad hoc as before: a clone builds and runs with no one's certificate.
+- **Replacing it** changes the identity once: every machine is asked once more after the update
+  that carries the new certificate.
+
 ## The signing key
 
 - **Where it lives**: the base64 Ed25519 seed is the `CLAWDLINE_RELEASE_KEY` secret of the GitHub

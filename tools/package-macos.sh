@@ -108,7 +108,10 @@ cleanup() {
   [ "$PROMOTION" = "$BUILD" ] || rm -rf "$PROMOTION"
   exit "$rc"
 }
-trap cleanup EXIT
+# shellcheck source=tools/release/codesign.sh
+. "$(dirname "$0")/release/codesign.sh"
+# The build's own exit status reaches cleanup, which reads it first.
+trap 's=$?; codesign_end; ( exit "$s" ); cleanup' EXIT
 
 # running_pids: the processes whose executable is inside the requested install
 # target — the shell and `clawdline serve` alike. A worktree build names the
@@ -266,12 +269,14 @@ for bin in "$BUILD/Contents/MacOS/$NAME" "$BUILD/Contents/MacOS/clawdline" "$BUI
   fi
 done
 
-# Signed ad hoc, as one bundle. The linker signs each binary on its own, but
-# launch at login (SMAppService) asks about the application, and an unsigned
-# bundle is one it may refuse.
-codesign --force --sign - "$BUILD/Contents/MacOS/clawdline"
-codesign --force --sign - "$BUILD/Contents/Helpers/tmux"
-codesign --force --sign - "$BUILD"
+# Signed as one bundle. The linker signs each binary on its own, but launch at
+# login (SMAppService) asks about the application, and an unsigned bundle is
+# one it may refuse. With a certificate (tools/release/codesign.sh) the
+# bundle keeps one identity across updates, so what the person allowed —
+# Dropbox, the local network, the keychain item WebKit keeps the Cloud keys
+# under — is not asked again; without one it is signed ad hoc, as before.
+codesign_begin
+codesign_path "$BUILD/Contents/MacOS/clawdline" "$BUILD/Contents/Helpers/tmux" "$BUILD"
 
 echo "built $BUILD ($(du -sh "$BUILD" | cut -f1))"
 
