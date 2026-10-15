@@ -37,11 +37,12 @@ const KeyEnter = "enter"
 // A nil error means Enter reached the tty. Whether the assistant took the turn
 // is the transcript's to say.
 func (a Actions) SubmitTyped(ctx context.Context, id, typed string) (session.Session, error) {
+	ctx = ports.Asked(ctx)
 	s, err := a.Find(ctx, id)
 	if err != nil {
 		return session.Session{}, err
 	}
-	h, err := a.host(s)
+	h, err := a.host(ctx, s)
 	if err != nil {
 		return session.Session{}, err
 	}

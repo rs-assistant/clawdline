@@ -535,3 +535,44 @@ func TestTheITermRevealRefusesATTYItDoesNotHold(t *testing.T) {
 		}
 	}
 }
+
+// A row only the process table saw is named by its tty, and iTerm2 never uses
+// a tty as a session id. Every script an action runs finds that session by the
+// pty it holds — the send, the type, the key, the capture a send checks its
+// input line with, and the reveal — so a hand-opened tab can be replied to
+// with iTerm2's listing switched off. A tty iTerm2 holds no session on finds
+// nothing and writes nothing.
+func TestEveryITermActionFindsAProcessTableRowByItsTTY(t *testing.T) {
+	if run := runInModel(t, itermSendScript, []string{"ttys031", "hello"}); run.Answer["ok"] != true ||
+		len(run.Writes) != 2 || run.Writes[0].ID != "GUID-A" || run.Writes[1].Text != "\r" {
+		t.Fatalf("send: %+v", run)
+	}
+	if run := runInModel(t, itermTypeScript, []string{"ttys032", "hello"}); run.Answer["ok"] != true ||
+		len(run.Writes) != 1 || run.Writes[0].ID != "GUID-C" {
+		t.Fatalf("type: %+v", run)
+	}
+	if run := runInModel(t, itermKeyScript, []string{"key", "ttys032", "27"}); run.Answer["ok"] != true ||
+		len(run.Writes) != 1 || run.Writes[0].ID != "GUID-C" || run.Writes[0].Text != "\x1b" {
+		t.Fatalf("key: %+v", run)
+	}
+	if run := runInModel(t, itermKeyScript, []string{"capture", "ttys031"}); run.Answer["ok"] != true ||
+		run.Answer["text"] != "> " {
+		t.Fatalf("capture: %+v", run)
+	}
+	if run := runInModel(t, itermRevealScript, []string{"reveal", "ttys032", "0"}); run.Answer["ok"] != true ||
+		len(run.Selects) != 1 || run.Selects[0] != "GUID-C" {
+		t.Fatalf("reveal: %+v", run)
+	}
+	for _, script := range []string{itermSendScript, itermTypeScript} {
+		if run := runInModel(t, script, []string{"ttys999", "hello"}); run.Answer["ok"] != false || len(run.Writes) != 0 {
+			t.Fatalf("a tty iTerm2 holds nothing on answered %+v", run)
+		}
+	}
+	// The pty is matched whole: its directory is not part of a row's name, and
+	// an id is still matched as an id, never as a tty.
+	for _, id := range []string{"/dev/ttys031", "GUID-ttys031"} {
+		if run := runInModel(t, itermTypeScript, []string{id, "hello"}); run.Answer["ok"] != false || len(run.Writes) != 0 {
+			t.Fatalf("%q matched a session: %+v", id, run)
+		}
+	}
+}

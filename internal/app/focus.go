@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
+	"github.com/sainteye/clawdline/internal/app/ports"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
@@ -32,11 +33,12 @@ import (
 // neither, and 409 rather than a failure: attaching and asking again is the
 // remedy.
 func (a Actions) Focus(ctx context.Context, id string) (session.Session, error) {
+	ctx = ports.Asked(ctx)
 	s, err := a.Find(ctx, id)
 	if err != nil {
 		return session.Session{}, err
 	}
-	h, err := a.host(s)
+	h, err := a.host(ctx, s)
 	if err != nil {
 		return session.Session{}, err
 	}

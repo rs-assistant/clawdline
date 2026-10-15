@@ -80,7 +80,7 @@ function run(argv) {
   }
   const walk = itermEach(it, function (s, win, tab) {
     if (cmd === "reveal") {
-      if (String(s.id()) !== want) return false;
+      if (!itermIs(s, want)) return false;
     } else if (cmd === "revealtty") {
       if (bareTTY(s) !== want) return false;
     } else {

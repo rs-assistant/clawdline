@@ -20,7 +20,7 @@ function run(argv) {
   if (!it.running()) return JSON.stringify({ ok: false, error: "iTerm2 is not running" });
   let done = false;
   const walk = itermEach(it, function (s) {
-    if (String(s.id()) !== id) return false;
+    if (!itermIs(s, id)) return false;
     const ESC = String.fromCharCode(27);
     s.write({ text: ESC + "[200~" + text + ESC + "[201~", newline: false });
     done = true;
@@ -35,7 +35,7 @@ func (i *ITerm) Type(ctx context.Context, s session.Session, text string) error 
 	if text == "" {
 		return nil
 	}
-	if !ITermScan() {
+	if !itermMayAct(ctx) {
 		return ITermScanOff{Op: "type into that iTerm2 session"}
 	}
 	return itermCall(ctx, "type", itermTypeScript, 6*time.Second, s.ID, text)
