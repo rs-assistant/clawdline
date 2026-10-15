@@ -18,6 +18,13 @@ const skillTitle = workflowSourceTitle
 const launchTextFor = (file: ProjectFile) => workflowSourceText(file,
   document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en")
 
+function GlobalMark() {
+  return <svg className="workflow-global-mark" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+    <circle cx="12" cy="12" r="9" />
+    <path d="M3 12h18M12 3c-2.5 2.4-4 5.6-4 9s1.5 6.6 4 9M12 3c2.5 2.4 4 5.6 4 9s-1.5 6.6-4 9" />
+  </svg>
+}
+
 /** An independent Workflow owns its launch text; a linked one uses source-derived text. */
 function WorkflowPage({ shown }: { shown: boolean }) {
   const [places, setPlaces] = useState<ProjectPlace[]>([])
@@ -265,11 +272,11 @@ function WorkflowPage({ shown }: { shown: boolean }) {
     <header className="workflow-head"><div><h1 tabIndex={-1}>Workflow</h1><p>{W("intro")}</p></div>
       <div className="workflow-head-tools"><div className="workflow-project" ref={projectPicker}><span>{W("scopeLabel")}</span>
         <button type="button" className="workflow-project-trigger" aria-label={`${W("scopeLabel")}: ${globalView ? W("global") : place?.label || place?.path || ""}`} aria-expanded={projectOpen}
-          onClick={() => setProjectOpen(!projectOpen)}>{globalView ? <span className="workflow-global-mark" aria-hidden="true">◎</span> : place && <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} />}
+          onClick={() => setProjectOpen(!projectOpen)}>{globalView ? <GlobalMark /> : place && <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} />}
           <span>{globalView ? W("global") : place?.label || place?.path || W("projectLabel")}</span><span aria-hidden="true">⌄</span></button>
         {projectOpen && <div className="workflow-project-menu"><button type="button" aria-current={globalView ? "true" : undefined} onClick={() => {
           setDraft(null); setGlobalView(true); setProjectOpen(false)
-        }}><span className="workflow-global-mark" aria-hidden="true">◎</span><span>{W("global")}</span>{globalView && <span aria-hidden="true">✓</span>}</button>
+        }}><GlobalMark /><span>{W("global")}</span>{globalView && <span aria-hidden="true">✓</span>}</button>
           {places.map((row) => <button
           type="button" aria-current={!globalView && row.id === place?.id ? "true" : undefined} key={row.id} onClick={() => {
             setDraft(null); setPlace(row); setGlobalView(false); setProjectOpen(false)
