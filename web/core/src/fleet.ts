@@ -3,6 +3,7 @@ import type { ClawdlineClient } from "./client.js"
 import { routes } from "./routes.js"
 import type { StreamHandle, StreamTransport } from "./stream.js"
 import { taskListFrame } from "./task-frame.js"
+import { acceptSnapshot } from "./fleet-accept.js"
 
 export { taskListFrame }
 
@@ -108,36 +109,10 @@ export class FleetStore {
     }
   }
 
-  /**
-   * Takes a snapshot, unless it is older than the one already held.
-   *
-   * Generation only orders readings from the same process, so epoch is checked
-   * first: after a restart the counter starts over, and a client that compared
-   * generations alone would refuse every reading from the new daemon.
-   */
+  /** Takes a snapshot, unless it is older than the one already held (`fleet-accept.ts`). */
   private accept(next: SessionsSnapshot): void {
-    const held = this.state.snapshot
-    if (held && held.scan.epoch === next.scan.epoch && next.scan.generation < held.scan.generation) {
-      return
-    }
-    if (held && held.scan.epoch === next.scan.epoch && !next.scan.complete) {
-      const present = new Set(next.sessions.map((row) => row.id))
-      const completeSources = new Set(next.scan.sources?.filter((source) => source.complete).map((source) => source.source) ?? [])
-      const retained = held.sessions.filter((row) => !present.has(row.id) && !completeSources.has(row.source?.provenance ?? ""))
-        .map((row) => {
-          const reasons = row.closeability.reasons.some((reason) => reason.code === "session_inventory_stale")
-            ? row.closeability.reasons
-            : [...row.closeability.reasons,
-                { code: "session_inventory_stale", kind: "evidence", mover: { kind: "broker", person_needed: false, self: false } }]
-          return { ...row,
-            source: { freshness: "unverified" as const, observed_at: row.source?.observed_at ?? held.at,
-              provenance: row.source?.provenance ?? held.scan.provenance },
-            closeability: { ...row.closeability, state: "unknown" as const, attestation_id: null, reasons },
-          }
-        })
-      next = { ...next, sessions: [...next.sessions, ...retained] }
-    }
-    this.set({ snapshot: next, loaded: true, error: null })
+    const accepted = acceptSnapshot(this.state.snapshot, next)
+    if (accepted) this.set({ snapshot: accepted, loaded: true, error: null })
   }
 
   private set(patch: Partial<FleetState>): void {
