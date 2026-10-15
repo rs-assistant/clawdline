@@ -208,6 +208,11 @@ func (r *Reader) Read(ctx context.Context, cwd string) Reading {
 		if status.Health != nil && status.Health.URL == "" {
 			status.Health.URL = address(str(registry, "url"))
 		}
+		// `url` is what gets polled; `site` is where a click should go
+		// instead, so a JSON endpoint is never the page the chip opens.
+		if site := address(str(registry, "site")); status.Health != nil && site != "" {
+			status.Health.URL = site
+		}
 		if status.Health != nil && status.Health.Label == "health" {
 			if named := label(str(registry, "label"), "health"); named != "health" {
 				status.Health.Label = named
