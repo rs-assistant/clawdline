@@ -987,6 +987,20 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
           <section className="sidebar-group" aria-label={nextWord("sidebarMain")}>
             <h2>{nextWord("sidebarMain")}</h2>
             {sidebarPages.filter((p) => p.id === "sessions" || p.id === "projects").map(sidebarPage)}
+            <button
+              className="sidebar-item"
+              id="nav-archive"
+              type="button"
+              data-page-to="archive"
+              aria-current={page === "archive" ? "page" : undefined}
+              disabled={!offered("archive")}
+              onClick={() => go("archive")}
+              title={tooOldTitle("archive")}
+            >
+              <SidebarIcon name="archive" />
+              {nextWord("archiveNav")}
+              {tooOldMark("archive")}
+            </button>
           </section>
           <section className="sidebar-group" aria-label={nextWord("sidebarWork")}>
             <h2>{nextWord("sidebarWork")}</h2>
@@ -1044,25 +1058,9 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
               onClick={() => go("peer-access")}>
               <SidebarIcon name="devices" />{nextWord("cloudPeerAccessNav")}
             </button>}
-            {sidebarPages.filter((p) => p.id === "notifications" || p.id === "settings").map(sidebarPage)}
-          </section>
-          <section className="sidebar-group" aria-label={nextWord("sidebarMore")}>
-            <h2>{nextWord("sidebarMore")}</h2>
+            {sidebarPages.filter((p) => p.id === "notifications").map(sidebarPage)}
             {sidebarPages.filter((p) => p.id === "plan").map(sidebarPage)}
-            <button
-              className="sidebar-item"
-              id="nav-archive"
-              type="button"
-              data-page-to="archive"
-              aria-current={page === "archive" ? "page" : undefined}
-              disabled={!offered("archive")}
-              onClick={() => go("archive")}
-              title={tooOldTitle("archive")}
-            >
-              <SidebarIcon name="archive" />
-              {nextWord("archiveNav")}
-              {tooOldMark("archive")}
-            </button>
+            {sidebarPages.filter((p) => p.id === "settings").map(sidebarPage)}
           </section>
           <div className="sidebar-version" role="status">
             {!focusCloudSessions && machineVersion.version
