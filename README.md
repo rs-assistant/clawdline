@@ -7,176 +7,43 @@
 
 **See which Claude Code and Codex Sessions need you, then open one to respond or leave a to-do.**
 
+Illustrative demo based on the console:
+
 <img src="docs/assets/cloud-sessions-demo.gif" width="390" alt="Sample Cloud console: a Session list shows one waiting for you; opening it reveals its to-do.">
 
 <img src="docs/assets/agent-picture-demo.png" width="390" alt="Sample Session view: an Agent sends a picture in its reply, with a thumbnail that opens for inspection.">
 
-**Install on macOS 13+ or Linux:**
+## What you can do
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
-```
+- **Follow Sessions:** See what is working or waiting, read the conversation, view pictures from Agents, and reply with text, voice, or a marked-up picture. [Sessions](docs/user/sessions.md)
+- **Keep work moving:** Leave [to-dos](docs/user/board.md#session-to-dos), answer [Agent notes](docs/user/sessions.md#attention-notes-from-agents), and get [notifications](docs/user/notifications.md).
+- **Work in a terminal:** Open a live [terminal](https://clawdline.com/docs/shells/#terminals) beside your Sessions.
+- **Delegate and track delivery:** [Dispatch](docs/user/clawdfather-and-dispatch.md) to another Session, verify that its work landed, and follow larger work on the optional [Board](docs/user/board.md).
+- **Run work later:** Queue long commands with [callbacks](docs/user/clawdfather-and-dispatch.md#callbacks-for-long-commands) or start tasks with [schedules](docs/user/schedules.md). Cloud Pro adds webhook triggers.
+- **Bring your projects together:** [Register projects](docs/user/projects.md), share rules and skills across Claude Code and Codex with [unify](docs/project-files.md#unify), and see [usage](docs/user/usage.md).
+- **Use another device:** Open the console through [remote access](docs/user/remote-access.md), including optional end-to-end encrypted Clawdline Cloud.
 
-This installs the verified release and opens the local console. To see a Session, install and sign
-in to Claude Code or Codex separately. [Install and first run](docs/user/install.md)
-
-Work does not have to occupy one long turn. A Session can leave a long-running command with the
-daemon and return when it finishes; an Agent can leave a concrete request for you in the Session's
-attention panel; and you can save future work as a Session to-do without interrupting its current
-turn.
-
-New here? Follow [your first Session](docs/user/first-session.md), or choose a job in the
-[user guide](docs/user/README.md). Agents should read the
-[guide compiled into the current machine](docs/agent-contract.md).
-
-## What it does
-
-**Basics — every day**
-
-- **See every session.** Each row shows its project, assistant and state: working, waiting for
-  you, idle, or unreadable — never guessed idle. Read the real transcript, answer, send text or a
-  marked-up picture, dictate, start a session, stop a turn, close one safely, or archive it and
-  bring it back later. [Sessions](docs/user/sessions.md)
-- **Live terminals.** Open a terminal beside the session list and type in it, on this machine or
-  from app.clawdline.com once that browser has Cloud terminal permission; it switches to a direct
-  connection when the machine is reachable. [Terminals](https://clawdline.com/docs/shells/#terminals)
-- **Your phone, with notifications.** The same console works in any browser, with separate read
-  and send permissions, over an SSH forward, your own free cloudflared tunnel, or Cloud. Web Push
-  tells you when a session has waited ten minutes, an agent calls for you, or a schedule fails;
-  tapping one opens that session.
-  [Remote access](docs/user/remote-access.md) · [Notifications](docs/user/notifications.md)
-- **Usage at a glance.** Context, token spend per session and Board item, and how much of each
-  assistant's plan is left. [Usage](docs/user/usage.md)
-
-**Coordinate work — what sets it apart**
-
-The screenshots below show the current console with sample data.
-
-- **Owned dispatch with landing evidence.** A session sends bounded work to a child session,
-  gets the result back, or hands its whole line of work to a successor. Claims stop overlapping
-  writes, and Clawdline records whether the work actually reached the branch, not only that the
-  child finished. [Dispatch and landing](docs/user/clawdfather-and-dispatch.md)
-- **Callbacks for heavy work.** A Session can queue a long-running build, test suite, CI check or
-  deployment with the daemon and end its turn. The daemon waits for the Heavy Work slot, runs the
-  command, and sends a completion notice; the Session then reads the result and continues. That
-  avoids spending repeated Agent turns polling an idle command. It can reduce waiting tokens,
-  especially late in a large-context Session, but the amount saved depends on the provider's
-  context caching and pricing. The completion still needs one follow-up; a callback does not start
-  a child Session. [Callbacks](docs/user/clawdfather-and-dispatch.md#callbacks-for-long-commands)
-
-  ```mermaid
-  flowchart LR
-    A["Agent queues build, CI or deploy"] --> B["Heavy Work queue"]
-    B --> C["Daemon runs command"]
-    C --> D["Completion notice"]
-    D --> E["Session reads result once"]
-  ```
-
-- **Notes when a person is needed.** An Agent can leave a concrete question or action in a
-  Session's attention panel, with suggested replies when there is a choice. You can answer from
-  there; the Agent continues independent work in the meantime. [Attention notes](docs/user/sessions.md#attention-notes-from-agents)
-
-  <img src="docs/assets/attention-note-en.png" width="760" alt="A sample Agent note requesting a decision, with suggested replies in the Session attention panel.">
-
-- **To-dos for later.** Add a direct to-do to a Session while it is busy. The row stays there for
-  the Session to pick up later; adding it does not send a message or wake the Session.
-  [Session to-dos](docs/user/board.md#session-to-dos)
-
-  <img src="docs/assets/session-todo-en.png" width="390" alt="A sample Session to-do recorded for later, without interrupting the current turn.">
-
-- **A Board that follows delivery.** Assign a Feature, Issue or Epic to a session and follow it
-  through implementation, verification, merge and deployment, each phase with evidence. Planning
-  is on by default: Features need observable acceptance criteria. A plan and independent review
-  are required when you turn on **Needs independent review**. Epics require a reviewed plan.
-  Questions for you appear on the card. The Board itself is off until you turn it on in Settings.
-  [Board](docs/user/board.md)
-
-  <img src="docs/assets/board-item-en.png" width="760" alt="A sample Board feature with its description, review option, and Session assignment controls.">
-
-- **Agent squad and roles.** Start a session as a built-in role — architect, reviewer, technical writer and more —
-  with its own handbook and skills. [Roles](docs/personas.md)
-
-  <img src="docs/assets/agent-squad-en.png" width="760" alt="A sample Agent squad showing role cards, definitions, handbooks, and skill settings.">
-
-- **Schedules and webhooks.** Save a task that a session runs on the local clock or by hand, with
-  catch-up, timeouts and failure alerts. Cloud Pro also starts it from a webhook.
-  [Schedules](docs/user/schedules.md)
-
-  <img src="docs/assets/schedule-webhook-en.png" width="680" alt="The schedule editor with webhook or manual triggering selected; webhook activation requires Cloud Pro.">
-
-**Projects and machines**
-
-- **Add a local project by hand.** On the machine that holds an existing directory, run
-  `clawdline project add` from that directory, or pass a relative or absolute path, while its daemon is running. The command
-  succeeds only after that daemon registers the directory. `clawdline project list` reads the same
-  list; the open session start sheet refreshes automatically, and **Projects** can be reopened to see it. The console has
-  no Add Project button. Each Project row has **Remove from list**, which keeps its directory and sessions. [Add a project](docs/user/projects.md#add-a-project)
-- **Projects across machines.** Give a second machine the same project names, icons and untracked
-  skills, matched by git origin, with or without Cloud. [Projects](docs/user/projects.md)
-- **One set of rules and skills for Claude and Codex.** `clawdline project unify` shows how to give
-  a project's Claude Code and Codex sessions the same `AGENTS.md` and skills, and changes files only
-  when you apply that plan. It never commits. [Unify](docs/project-files.md#unify)
-- **Optional encrypted Cloud.** Pair a phone or several machines through Clawdline Cloud's
-  end-to-end encrypted relay. Off by default; a preview. [Remote access](docs/user/remote-access.md)
+Clawdline runs the daemon and console on your machine and works with Claude Code and Codex Sessions you already use. Cloud is optional; its relay carries encrypted data. [How it works](docs/architecture.md)
 
 ## Install
 
-On macOS 13+ or Linux, with Claude Code or Codex (each release carries its own tmux, used when you
-have none):
+On macOS 13+ or Linux, install Claude Code or Codex, then run:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh | sh
 ```
 
-It installs the latest signed release for your system as a per-user service that starts at login
-(no `sudo`, no Go or Node.js), adds the menu-bar app on a Mac, and opens the console in your
-browser. On a server, add `-s -- --headless` after `sh`. Run `claude` or `codex` inside tmux
-(`clawdline tmux new -s work` when setup said it uses the carried one), and the session appears in
-the list.
+The installer verifies the release, starts a per-user service, and opens the console. Start a Session there or run `claude` or `codex` in tmux; the release includes tmux if needed. [Install and first run](docs/user/install.md) · [First Session](docs/user/first-session.md)
 
-Each step with a check that it worked, every option, removal, and building from source are in
-[Install and first run](docs/user/install.md). A release updates itself from the console's Settings
-page or with `clawdline update --apply`, and rolls back by itself if it does not come up
-([Updates](docs/updates.md)).
+## Availability
 
-## Limits
+- Local use is free and needs no Clawdline account. Cloud offers Free and Pro plans.
+- Windows runs the daemon and console but cannot yet list Sessions or open terminals. [Platforms](docs/user/platforms.md)
+- This is a pre-1.0 release; features may change. The console supports nine languages, with English fallback for newer untranslated copy. [Localization](docs/localization.md)
 
-- **Pre-1.0**: expect changes between releases.
-- The console supports **English, Traditional Chinese, Simplified Chinese, Japanese, Korean,
-  Spanish, Brazilian Portuguese, French and German**. Newer copy missing from a secondary
-  translation falls back to English ([Localization](docs/localization.md)).
-- **Windows** runs the daemon and console but cannot list sessions or open terminals. Linux runs
-  headless under `systemd --user`; macOS has an optional native app ([Platforms](docs/user/platforms.md)).
-- Claude's **5h/7d plan percentages** need a Claude Code status line that writes
-  `~/.claude/statusline-cache/rate-limits.json` ([Usage](docs/user/usage.md)).
-- Everything on your machine is free and needs no account. Cloud has a Free plan and a Pro plan.
+## Guides
 
-## How it compares
-
-[T3 Code](https://github.com/pingdotgg/t3code) is a full control surface with desktop and mobile
-apps and native version-control flows. [Herdr](https://github.com/herdrdev/herdr) is a
-terminal-first agent multiplexer. [Orca](https://github.com/stablyai/orca) is an agent development
-environment with an editor and diff review. Clawdline is not an IDE and does not replace Claude Code
-or Codex: it operates the sessions you already start — dispatch, landing evidence, the Board and
-schedules — when the hard part is running several agents reliably over time.
-
-## Documentation
-
-- Start: [Install and first run](docs/user/install.md) · [Platforms](docs/user/platforms.md) ·
-  [Troubleshooting](docs/user/troubleshooting.md) ·
-  [When an agent on Linux cannot take a screenshot](docs/linux-headless-browser.md)
-- Basics: [Sessions](docs/user/sessions.md) · [Keyboard shortcuts](docs/user/keyboard-shortcuts.md) ·
-  [Remote access](docs/user/remote-access.md) · [Notifications](docs/user/notifications.md) ·
-  [Usage](docs/user/usage.md)
-- Coordinate work: [Dispatch and landing](docs/user/clawdfather-and-dispatch.md) ·
-  [Callbacks](docs/user/clawdfather-and-dispatch.md#callbacks-for-long-commands) ·
-  [Attention notes](docs/user/sessions.md#attention-notes-from-agents) ·
-  [Session to-dos](docs/user/board.md#session-to-dos) · [Board](docs/user/board.md) ·
-  [Schedules](docs/user/schedules.md)
-- Projects and machines: [Projects](docs/user/projects.md) · [Updates](docs/updates.md)
-- Website guides: [clawdline.com/docs](https://clawdline.com/docs/)
-- Building on it: [architecture.md](docs/architecture.md), [AGENTS.md](AGENTS.md),
-  [docs/README.md](docs/README.md)
+[User guide](docs/user/README.md) · [Agent guide](docs/agent-contract.md) · [Build from source](docs/user/install.md) · [Troubleshooting](docs/user/troubleshooting.md) · [Developer docs](docs/README.md)
 
 ## License
 
