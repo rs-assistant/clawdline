@@ -127,12 +127,14 @@ func (s *Server) imageRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 // imagesRoute is POST /v1/artifacts/images: a live session stores pictures to
-// show in its own reply, and is handed back the marker to write there.
+// show the person, and is handed back their markers.
 //
 // Only this machine's orchestrator token may, as in the Swift app. A session
 // cannot type into its own terminal — that would be handing itself an
-// instruction — so this route only stores, and the session's own CLI writes
-// the marker into its own transcript, where it is read back like any turn.
+// instruction — so this route only stores. With `terminal`, the store keeps
+// where the pictures were shown, and the transcript route shows them under
+// that Session's next reply (images_shown.go); without it, a picture appears
+// only where a reply carries its marker, which a model may summarise away.
 func (s *Server) imagesRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "pictures are stored with POST")
@@ -148,8 +150,14 @@ func (s *Server) imagesRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var fields map[string]json.RawMessage
-	if json.Unmarshal(body, &fields) != nil || len(fields) != 1 || fields["images"] == nil {
-		writeRefusal(w, http.StatusBadRequest, "bad_request", "The closed body needs only images.")
+	if json.Unmarshal(body, &fields) != nil || fields["images"] == nil || len(fields) > 2 ||
+		(len(fields) == 2 && fields["terminal"] == nil) {
+		writeRefusal(w, http.StatusBadRequest, "bad_request", "The closed body takes images, and a terminal.")
+		return
+	}
+	var session string
+	if raw := fields["terminal"]; raw != nil && (json.Unmarshal(raw, &session) != nil || session == "") {
+		writeRefusal(w, http.StatusBadRequest, "bad_request", "terminal is a Session's terminal id.")
 		return
 	}
 	policy := s.pictures.store.Policy
@@ -160,13 +168,29 @@ func (s *Server) imagesRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
+	var shown artifacts.Shown
+	if session != "" {
+		item, err := s.actions().FindForRead(ctx, session)
+		if err != nil {
+			writeRefusal(w, http.StatusNotFound, "session_not_found", "No Session on this machine has that terminal id.")
+			return
+		}
+		record := recordPath(item)
+		offset, ok := recordEnd(record)
+		if !ok {
+			writeRefusal(w, http.StatusConflict, "session_has_no_record",
+				"That Session has no conversation record yet, so there is no reply to show the pictures under.")
+			return
+		}
+		shown = artifacts.Shown{Record: record, Offset: offset}
+	}
 	now := time.Now()
-	stored, err := s.pictures.store.ImportPaths(ctx, paths, now)
+	stored, err := s.pictures.store.ImportShown(ctx, paths, now, shown)
 	if err != nil {
 		writePictureRefusal(w, err)
 		return
 	}
-	out := contract.ImageStoreResult{OK: true, At: time.Now().Unix(), Artifacts: []contract.StoredImage{}}
+	out := contract.ImageStoreResult{OK: true, At: time.Now().Unix(), Artifacts: []contract.StoredImage{}, Terminal: session}
 	for _, item := range stored {
 		a := item.Artifact
 		marker := artifacts.Marker(a.ID)

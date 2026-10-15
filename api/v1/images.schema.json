@@ -33,12 +33,13 @@
       }
     },
     "ImageStoreRequest": {
-      "description": "POST /v1/artifacts/images, with this machine's orchestrator token only: 1…6 local pictures a session wants to show in its own reply. Each is decoded, bounded and stored as PNG before any is kept.",
+      "description": "POST /v1/artifacts/images, with this machine's orchestrator token only: 1…6 local pictures a session wants to show in its own reply. Each is decoded, bounded and stored as PNG before any is kept. With `terminal` they are shown under that Session's next reply with no marker in it; without it, only where a reply carries their marker.",
       "type": "object",
       "additionalProperties": false,
       "required": ["images"],
       "properties": {
-        "images": { "type": "array", "items": { "$ref": "#/$defs/ImagePath" } }
+        "images": { "type": "array", "items": { "$ref": "#/$defs/ImagePath" } },
+        "terminal": { "description": "The terminal id of the Session showing the pictures (`clawdline image send` sends its own). Refused `session_not_found` when no Session has that id, and `session_has_no_record` when it has no conversation record to show them in.", "type": "string" }
       }
     },
     "StoredImage": {
@@ -63,7 +64,8 @@
       "properties": {
         "artifacts": { "type": "array", "items": { "$ref": "#/$defs/StoredImage" } },
         "at": { "type": "integer" },
-        "ok": { "type": "boolean" }
+        "ok": { "type": "boolean" },
+        "terminal": { "description": "The terminal id of the Session the pictures are shown in, when the request named one: they appear under the first reply it writes after this answer. Stored is not seen — GET /v1/transcript?session=… shows them in that reply's `artifacts` once it is written.", "type": "string" }
       }
     }
   }

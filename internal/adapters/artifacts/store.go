@@ -36,6 +36,10 @@ type Store struct {
 	evictedBytes int64
 	evictedAt    time.Time
 	stored       func()
+	// shown is the last listing ShownIn read, and the directory's
+	// modification time it was read at.
+	shown   []metadata
+	shownAt time.Time
 }
 
 // Evicted is the reason a tombstone gives when the picture was let go to make
@@ -110,6 +114,14 @@ type metadata struct {
 	// `evicted`. The Swift app's records have no such field; this daemon's
 	// store is its own directory, and a record without it reads as before.
 	Reason string `json:"reason,omitempty"`
+	// Record and Offset say where the picture was shown (shown.go): a
+	// Session's conversation record, and the start of the first row written
+	// after it was stored. Anchor is the row of the reply it is shown under,
+	// once that row has been found. A picture stored only for its marker has
+	// none of the three.
+	Record string `json:"record,omitempty"`
+	Offset int64  `json:"offset,omitempty"`
+	Anchor *int64 `json:"anchor,omitempty"`
 }
 
 // metadataLimit bounds one record. A real one is under 300 bytes.
@@ -141,6 +153,12 @@ func PathsFrom(raw json.RawMessage, p Policy) ([]string, error) {
 // picture cannot leave a first one behind, and every refusal happens before
 // anything crosses an API boundary.
 func (s *Store) ImportPaths(ctx context.Context, paths []string, now time.Time) ([]Stored, error) {
+	return s.ImportShown(ctx, paths, now, Shown{})
+}
+
+// ImportShown is ImportPaths for pictures shown in a Session: each is kept
+// with where (Shown), so ShownIn finds it without a marker in any reply.
+func (s *Store) ImportShown(ctx context.Context, paths []string, now time.Time, shown Shown) ([]Stored, error) {
 	p := s.Policy
 	if len(paths) == 0 || len(paths) > p.MaxImagesPerMessage {
 		return nil, Refusal{Status: http.StatusBadRequest, Code: "bad_request",
@@ -183,7 +201,7 @@ func (s *Store) ImportPaths(ctx context.Context, paths []string, now time.Time) 
 		file := s.imagePath(a)
 		err := WritePrivate(file, item.Data)
 		if err == nil {
-			err = s.writeMetadata(metadata{Artifact: a, CreatedAt: seconds(now)})
+			err = s.writeMetadata(metadata{Artifact: a, CreatedAt: seconds(now), Record: shown.Record, Offset: shown.Offset})
 			if err != nil {
 				_ = os.Remove(file)
 			}

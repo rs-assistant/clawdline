@@ -3516,16 +3516,33 @@ export interface ImagePath {
 /**
  * POST /v1/artifacts/images, with this machine's orchestrator token only: 1…6
  * local pictures a session wants to show in its own reply. Each is decoded, bounded
- * and stored as PNG before any is kept.
+ * and stored as PNG before any is kept. With `terminal` they are shown under that
+ * Session's next reply with no marker in it; without it, only where a reply carries
+ * their marker.
  */
 export interface ImageStoreRequest {
   images: ImagePath[]
+
+  /**
+   * The terminal id of the Session showing the pictures (`clawdline image send`
+   * sends its own). Refused `session_not_found` when no Session has that id, and
+   * `session_has_no_record` when it has no conversation record to show them in.
+   */
+  terminal?: string
 }
 
 export interface ImageStoreResult {
   artifacts: StoredImage[]
   at: number
   ok: boolean
+
+  /**
+   * The terminal id of the Session the pictures are shown in, when the request
+   * named one: they appear under the first reply it writes after this answer.
+   * Stored is not seen — GET /v1/transcript?session=… shows them in that
+   * reply's `artifacts` once it is written.
+   */
+  terminal?: string
 }
 
 export interface IntentDraft {

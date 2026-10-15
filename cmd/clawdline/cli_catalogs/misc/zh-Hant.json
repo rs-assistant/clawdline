@@ -255,5 +255,13 @@
   "coordination.timed_out": "等候租約期間未取得授權；指令沒有執行。",
   "coordination.release_failed": "無法確認租約已釋放；執行下一個獨占操作前，請檢查持有者。",
   "tmux.passed": "  （%s）\n",
-  "tmux.none": "clawdline tmux：這台機器沒有 tmux，這個版本也沒有內附"
+  "tmux.none": "clawdline tmux：這台機器沒有 tmux，這個版本也沒有內附",
+  "image.usage": "用法：clawdline image send <picture> [<picture>…] [--target <terminal id>] [--from <conversation id>] [--port n]",
+  "image.usage_detail": "  一到六個 PNG、JPEG 或 GIF 檔；會出現在這個 Session 下一則回覆底下",
+  "image.no_conversation": "clawdline image send：%s 沒有送出任何東西。\n",
+  "image.name_a_session": "clawdline image send：請在 Session 裡執行，或用 --target 指定一個。沒有送出任何東西。",
+  "image.failed": "clawdline image send：",
+  "image.whoami_no_terminal": "clawdline image send：whoami 的回答沒有 terminal id。沒有送出任何東西。",
+  "image.stored_shown": "已存好 %d 張圖，給 Session %s。它們會出現在這個 Session 下一則回覆底下，回覆裡不需要寫任何東西。\n",
+  "image.check": "存好不等於看到：那則回覆寫出後，GET /v1/transcript?session=%s 會在它的 artifacts 裡列出這些圖。\n"
 }

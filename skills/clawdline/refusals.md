@@ -196,7 +196,8 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `session_actor_required` | `internal/transport/http/squad_actor.go`, `internal/transport/http/squad_events.go` |
 | `session_cannot_create_item` | `internal/transport/http/work_v2.go` |
 | `session_cannot_decide` | `internal/transport/http/work.go` |
-| `session_not_found` | `internal/transport/http/actions.go` |
+| `session_has_no_record` | `internal/transport/http/images.go` |
+| `session_not_found` | `internal/transport/http/actions.go`, `internal/transport/http/images.go` |
 | `session_required` | `internal/transport/http/proposals.go`, `internal/transport/http/work_v2_session_name.go` |
 | `session_unavailable` | `internal/transport/http/work_v2_session_todos.go` |
 | `session_unresolved` | `internal/transport/http/human_interventions.go`, `internal/transport/http/work_v2_agent.go` |
