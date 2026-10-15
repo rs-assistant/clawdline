@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -157,4 +158,21 @@ func settledStanding(t *testing.T, s *Server, st contract.UpdateStatus) contract
 	}
 	t.Fatal("the standing was never read")
 	return contract.UpdateDevStanding{}
+}
+
+// ~/Library is not looked in: cloud-storage folders live there, and a git
+// process started there can make a privacy prompt name Clawdline.
+func TestPlacesUnderLibraryAreNotLookedIn(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	inside := filepath.Join(home, "Library", "CloudStorage", "Dropbox", "work")
+	beside := filepath.Join(home, "LibraryNotes")
+	s := &Server{squadPlaces: func(context.Context) []projects.Place {
+		return []projects.Place{{Path: inside}, {Path: beside}, {Path: filepath.Join(home, "code", "app")}}
+	}}
+	got := s.placeDirectories(context.Background())
+	want := []string{beside, filepath.Join(home, "code", "app")}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("placeDirectories = %v, want %v", got, want)
+	}
 }
