@@ -39,7 +39,7 @@ The installer verifies the release, starts a per-user service, and opens the con
 
 - Local use is free and needs no Clawdline account. Cloud offers Free and Pro plans.
 - Windows runs the daemon and console but cannot yet list Sessions or open terminals. [Platforms](docs/user/platforms.md)
-- This is a pre-1.0 release; features may change. The console supports nine languages, with English fallback for newer untranslated copy. [Localization](docs/localization.md)
+- Version 1.0 and later can update macOS and Linux release installs in place. The console supports nine languages, with English fallback for newer untranslated copy. [Updates](docs/updates.md) · [Localization](docs/localization.md)
 
 ## Guides
 

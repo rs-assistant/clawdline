@@ -4183,7 +4183,7 @@
   "next.updateFailed": "更新到 {to} 沒有成功，什麼都沒變，{from} 仍在執行。",
   "next.updateHealthy": "已更新到 {to}。",
   "next.updateIsAhead": "這台機器執行的版本比最新正式版還新。",
-  "next.updateIsAvailable": "有新版本 {latest} 可以安裝。更新時 Clawdline 會重新啟動幾秒；tmux 裡的 Session 會繼續執行。",
+  "next.updateIsAvailable": "有新版本 {latest} 可以安裝。切換前會先驗證下載內容；更新時 Clawdline 會重新啟動幾秒，若新版無法啟動會自動退回舊版。tmux 裡的 Session 會繼續執行。",
   "next.updateIsCurrent": "這台機器已是最新版本。",
   "next.updateIsUnknown": "目前無法和最新版本比對，稍後會自動再檢查。",
   "next.updateKindUnknown": "無法判斷這台機器的安裝方式。請在機器上執行 clawdline update 查看能怎麼更新。",

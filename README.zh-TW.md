@@ -39,7 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/sainteye/clawdline/main/install.sh 
 
 - 本機功能免費，不需要 Clawdline 帳號；Cloud 有 Free 與 Pro 方案。
 - Windows 可執行常駐服務與主控台，但目前不能列出 Session 或開終端機。[平台](docs/user/platforms.md)
-- 目前未到 1.0，功能可能變動。主控台支援九種語言；新文案尚無翻譯時會顯示英文。[語系機制](docs/localization.md)
+- 1.0 起，macOS 與 Linux 的正式安裝版可直接更新。主控台支援九種語言；新文案尚無翻譯時會顯示英文。[更新方式](docs/updates.md)・[語系機制](docs/localization.md)
 
 ## 指南
 

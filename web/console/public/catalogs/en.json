@@ -4183,7 +4183,7 @@
   "next.updateFailed": "The update to {to} did not succeed and nothing changed; {from} still runs.",
   "next.updateHealthy": "Updated to {to}.",
   "next.updateIsAhead": "This machine runs a newer build than the latest release.",
-  "next.updateIsAvailable": "Version {latest} can be installed. Clawdline restarts for a few seconds while it updates; sessions in tmux keep running.",
+  "next.updateIsAvailable": "Version {latest} can be installed. Clawdline checks the download before switching, restarts for a few seconds, and returns to the previous version if the new one does not start. Sessions in tmux keep running.",
   "next.updateIsCurrent": "This machine runs the latest version.",
   "next.updateIsUnknown": "Could not compare with the latest version right now; Clawdline checks again by itself later.",
   "next.updateKindUnknown": "How this machine was installed is not known. Run clawdline update on the machine to see what it can do.",
