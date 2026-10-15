@@ -7,7 +7,7 @@ import { localizePinnedProjectStatus, projectOpenLabel } from "./projects/projec
 import { decoratePinnedWorktree } from "./projects/pinned-worktree-copy.js"
 import { useLayoutEffect, useRef, useState } from "react"
 import type { PageModule } from "./types.js"
-import { bindProjects, latestProjectReadRefusal, latestWorktreeReadRefusal, removeLandedWorktree, worktreeSourceRow, type ProjectsPage } from "../legacy/projects-bridge.js"
+import { bindProjects, latestProjectReadRefusal, latestWorktreeReadRefusal, removeWorktree, worktreeSourceRow, type ProjectsPage } from "../legacy/projects-bridge.js"
 import { machineWording } from "../legacy/machine-copy.js"
 import { ActionConfirm, Info, requestPage, shown as overlayShown } from "../overlays/index.js"
 import sectionMarkup from "./projects/section.html?raw"
@@ -70,7 +70,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   const [removeBusy, setRemoveBusy] = useState(false)
   const [removeError, setRemoveError] = useState("")
   const removeDialog = useRef<HTMLDialogElement>(null)
-  const [worktreeTarget, setWorktreeTarget] = useState<{ id: string; path: string; project: ProjectTarget; canRemove: boolean } | null>(null)
+  const [worktreeTarget, setWorktreeTarget] = useState<{ id: string; path: string; project: ProjectTarget; atRisk: boolean } | null>(null)
   const [worktreeBusy, setWorktreeBusy] = useState(false)
   const [worktreeError, setWorktreeError] = useState("")
   const worktreeDialog = useRef<HTMLDialogElement>(null)
@@ -115,11 +115,11 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   }, [worktreeTarget])
 
   async function confirmWorktreeRemove() {
-    if (!worktreeTarget?.canRemove || worktreeBusy) return
+    if (!worktreeTarget || worktreeBusy) return
     setWorktreeBusy(true)
     setWorktreeError("")
     try {
-      await removeLandedWorktree(worktreeTarget.project.projectId || worktreeTarget.project.id, worktreeTarget.id)
+      await removeWorktree(worktreeTarget.project.projectId || worktreeTarget.project.id, worktreeTarget.id)
       const project = worktreeTarget.project
       setWorktreeTarget(null)
       await page.current?.openLifecycle(project)
@@ -218,10 +218,10 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       if (!project || !row?.worktreeId || !row.path) return
       const clean = row.status?.complete === true && row.status.staged === 0
         && row.status.modified === 0 && row.status.untracked === 0
-      const canRemove = row.cleanup?.eligible === true && clean
-        && row.classifications?.includes("landed_identical_residue") === true
+      // The person decides; the dialog only says what deleting would lose.
+      const atRisk = !(clean && row.classifications?.includes("landed_identical_residue") === true)
       setWorktreeError("")
-      setWorktreeTarget({ id: row.worktreeId, path: row.path, project, canRemove })
+      setWorktreeTarget({ id: row.worktreeId, path: row.path, project, atRisk })
     }
     const observer = new MutationObserver(decorate)
     observer.observe(lifecycle, { childList: true, subtree: true })
@@ -413,11 +413,11 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       onClose={() => { if (!worktreeBusy) setWorktreeTarget(null) }}>
       <h2>{nextWord("worktreeRemoveTitle")}</h2>
       <p>{nextWord("worktreeRemoveDescription", { path: worktreeTarget?.path || "" })}</p>
-      {worktreeTarget && !worktreeTarget.canRemove && <p className="project-remove-error" role="status">{nextWord("worktreeRemoveUnavailable")}</p>}
+      {worktreeTarget?.atRisk && <p className="project-remove-error" role="status">{nextWord("worktreeRemoveRisk")}</p>}
       {worktreeError && <p className="project-remove-error" role="alert">{worktreeError}</p>}
       <div className="project-remove-actions">
         <button type="button" disabled={worktreeBusy} onClick={() => setWorktreeTarget(null)}>{nextWord("projectsRemoveCancel")}</button>
-        <button type="button" disabled={worktreeBusy || !worktreeTarget?.canRemove} onClick={() => void confirmWorktreeRemove()}>{worktreeBusy ? nextWord("worktreeRemoveBusy") : nextWord("worktreeRemoveConfirm")}</button>
+        <button type="button" disabled={worktreeBusy} onClick={() => void confirmWorktreeRemove()}>{worktreeBusy ? nextWord("worktreeRemoveBusy") : nextWord("worktreeRemoveConfirm")}</button>
       </div>
     </dialog>
     </>

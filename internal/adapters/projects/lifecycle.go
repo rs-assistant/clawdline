@@ -382,10 +382,13 @@ func (l *Lifecycle) Refresh(id string) (*Snapshot, error) {
 	return encode(obs, now), nil
 }
 
-// RemoveLanded removes one checkout after a fresh observation. A cached row is
-// only a hint for the button; it never authorizes deletion. Git removes without
-// --force, and the branch and its commits remain in the repository.
-func (l *Lifecycle) RemoveLanded(id, worktreeID string) (*Snapshot, error) {
+// Remove deletes one checkout because the person asked for it. The machine
+// still observes again to resolve the id to a registered path, and refuses only
+// the repository's main checkout, which Git cannot remove. Landed state, dirty
+// files, locks and live Sessions are the person's call, not a veto: the dialog
+// says what will be lost, and Git removes with --force twice. The branch and its
+// commits remain in the repository.
+func (l *Lifecycle) Remove(id, worktreeID string) (*Snapshot, error) {
 	project, err := l.Resolve(id)
 	if err != nil {
 		return nil, err
@@ -396,9 +399,6 @@ func (l *Lifecycle) RemoveLanded(id, worktreeID string) (*Snapshot, error) {
 	l.observe_.Lock()
 	defer l.observe_.Unlock()
 	obs := l.observe(project)
-	if obs.err != nil || obs.truncated {
-		return nil, &Refusal{409, "worktree_evidence_incomplete", "The Project's worktrees could not be observed completely; refresh and try again."}
-	}
 	var candidate *row
 	for i := range obs.rows {
 		if obs.rows[i].worktreeID == worktreeID {
@@ -407,31 +407,18 @@ func (l *Lifecycle) RemoveLanded(id, worktreeID string) (*Snapshot, error) {
 		}
 	}
 	if candidate == nil {
+		if obs.err != nil || obs.truncated {
+			return nil, &Refusal{409, "worktree_evidence_incomplete", "The Project's worktrees could not be observed completely; refresh and try again."}
+		}
 		return nil, &Refusal{404, "worktree_not_found", "That worktree is not registered for this Project."}
 	}
 	r := candidate
-	landed := false
-	for _, class := range r.classifications {
-		if class == classLandedResidue {
-			landed = true
-		}
-	}
-	if !landed || len(r.blockers) != 0 || r.owner.kind != "task" || r.isMain || !r.exists ||
-		!r.statusComplete || len(r.dirty) != 0 || r.ignored != 0 || r.active == nil || *r.active ||
-		r.aheadOfTarget == nil || *r.aheadOfTarget != 0 || r.head == "" {
-		return nil, &Refusal{409, "worktree_not_removable", "This worktree is no longer proved landed, clean, and unused; refresh its status."}
-	}
-	if l.ports.Live != nil {
-		fresh := *r
-		fresh.active, fresh.activeEvidence = nil, nil
-		resolveActivity(&fresh, l.ports.Live())
-		if fresh.active == nil || *fresh.active {
-			return nil, &Refusal{409, "worktree_in_use", "A Session may be using this worktree; it was kept."}
-		}
+	if r.isMain {
+		return nil, &Refusal{409, "worktree_is_main", "This is the Project's main checkout; Git cannot remove it."}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), observationBudget)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "-C", project.CanonicalPath, "worktree", "remove", "--", r.path)
+	cmd := exec.CommandContext(ctx, "git", "-C", project.CanonicalPath, "worktree", "remove", "--force", "--force", "--", r.path)
 	cmd.Env = append(os.Environ(), "GIT_LITERAL_PATHSPECS=1", "LC_ALL=C", "GIT_TERMINAL_PROMPT=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		_ = out

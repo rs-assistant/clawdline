@@ -25,12 +25,14 @@ The exact broker task record is ownership evidence. A location under a worktree 
 is why a checkout made by another session, including one under a familiar temporary directory,
 stays `unknown` unless the broker actually associates it with this task.
 
-The Projects worktree page offers **Delete worktree** only for a task-owned checkout that the
-machine reports as landed, clean, and unused. The DELETE route observes the repository and live
-sessions again; a stale button cannot authorize removal. Git removes the checkout without
-`--force`, leaving the branch and commits intact. Dirty, active, foreign, and uncertain rows have
-no delete button and the route refuses them if called directly. The browser can request this
-through Clawdline Cloud; the owning machine makes the final decision.
+The Projects worktree page offers **Delete worktree** on every checkout except the repository's main
+one. A person who presses it means it: the machine does not veto an unlanded, dirty, locked or
+in-use checkout. When the row is not reported landed and clean, the dialog says that uncommitted
+files and a Session's work there will be lost, and the button stays available. The DELETE route
+observes the repository again only to resolve the id to a registered path; it refuses the main
+checkout, then runs `git worktree remove --force --force`, which leaves the branch and its commits
+intact. The browser can request this through Clawdline Cloud. The classifications above still
+govern every automatic cleanup, including `tools/check-worktrees.sh --apply`.
 
 ## Commands and exit status
 
