@@ -36,7 +36,8 @@ deploying the hosted console does not require quitting the local app or restarti
 2. After the signed release is public, let the installed Clawdline discover it. Use **立即更新** in
    the local console, or enable **自動更新** and let its idle-session rule choose when to apply it.
    Do not substitute `clawdline setup`, a manual bundle replacement, or a service restart for this
-   update path. When verifying an update button, press that button and observe its result.
+   update path. When a person wants to experience the prompt, verify that the button appears and
+   leave the install action for that person to initiate.
 3. Read the updater's result. Confirm `apply.state: healthy`, the running version and served
    `BUILD.json`, `GET /` returning 200, and that existing sessions remain available. If it reports
    `failed` or `rolled_back`, preserve the previous running release and record the error code;
@@ -229,6 +230,13 @@ Its **立即更新** button rechecks the signed release source, starts the updat
 progress and the final result in the same place. A withdrawn release or an unavailable source
 cannot be installed from an old banner. Dismissing the banner is remembered per version in that
 browser. Settings retains the full version check, release notes, and update controls.
+
+The Cloud console's **All machines** Session list also checks each paired online machine for a
+fresh signed release. It names the machine and available version in a banner, including when this
+page is shown inside the Mac app's Cloud tab. Its button switches to that machine's console, where
+the person can choose **立即更新**; the banner itself never starts an update. An offline, unpaired,
+unanswered, or rolled-back machine cannot produce this prompt. The local Mac app and its Cloud tab
+remain open while the release is prepared and while the prompt is shown.
 
 On a release install, the fresh route rereads the signed manifest. A 404 clears a withdrawn release;
 an unreachable or invalid source produces `unknown` instead of showing a cached version as

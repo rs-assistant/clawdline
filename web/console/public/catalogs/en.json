@@ -4372,6 +4372,8 @@
   "next.cloudMachinesNoneNext": "On a machine with Clawdline installed, open Settings → Remote and turn on Cloud. Then pair this browser from that machine.",
   "next.cloudMachinesRecovery": "Recover the machine list",
   "next.screenITermScanOff": "This session's iTerm2 screen cannot be read while ‘Read iTerm2 tabs’ is off in Settings. Turn it on to view the screen here.",
+  "next.cloudFleetUpdateNotice": "Clawdline {version} is available for {machine}.",
+  "next.cloudFleetUpdateOpen": "View update on this machine",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

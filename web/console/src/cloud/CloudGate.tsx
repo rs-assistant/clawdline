@@ -46,6 +46,7 @@ import {
 } from "./pair-pending.js"
 import { PairPanel, type PairRequest } from "./PairPanel.js"
 import { FleetUpdateRow } from "./FleetUpdateRow.js"
+import { FleetUpdateNotice } from "./FleetUpdateNotice.js"
 import type { PairAgentProgress, PairAgentReply } from "./pair-agent.js"
 import { DeviceLimitPanel } from "./DeviceLimitPanel.js"
 import { readThroughRelay, setCloudConnectionRetry } from "./install.js"
@@ -1703,7 +1704,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             onFleetActionIntentHandled={() => setFleetActionIntent(null)}
             fleetCloseIntent={fleetCloseIntent}
             onFleetCloseIntentHandled={() => setFleetCloseIntent(null)}
-            fleetList={fleetScope ? (filter, onFilter) => <FleetSessionList
+            fleetList={fleetScope ? (filter, onFilter) => <><div className="cloud-fleet-update-notices">
+              {quickMachines.map((machine) => <FleetUpdateNotice key={machine.id} client={client.current}
+                machine={machine} onChoose={switchMachine} />)}
+            </div><FleetSessionList
             machines={quickMachines.map((machine) => ({
               id: machine.id, name: machine.name || machine.label || machine.id,
               platform: platformWord(machineIdentityFacts(machine).platform), freshness: machine.freshness,
@@ -1720,7 +1724,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             onCloseRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title }) }}
             onArchiveRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title, kind: "archive" }) }}
             onMachineAction={runMachineTool}
-          /> : undefined} />
+          /></> : undefined} />
           <CloudSessionSheets machineID={reading ?? chosen.id}
             machines={quickMachines.map((machine) => machine.id)}
             source={liveSessionSource}

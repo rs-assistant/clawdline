@@ -9,10 +9,10 @@ import { buildName, classifyUpdateRead, type UpdateRead } from "../machine/updat
  * "update" word. The chosen-machine fetch seam cannot answer for another row.
  * A refused or unanswered read stays distinct from an older daemon.
  */
-export async function readFleetUpdate(client: CloudReadClient, machine: string, signal?: AbortSignal): Promise<UpdateRead> {
+export async function readFleetUpdate(client: CloudReadClient, machine: string, signal?: AbortSignal, fresh = false): Promise<UpdateRead> {
   if (typeof client._machineRequest !== "function") return { kind: "refused" }
   try {
-    const parsed = await client._machineRequest(machine, "update", {}, "read", undefined, signal ? { signal } : undefined)
+    const parsed = await client._machineRequest(machine, fresh ? "update-fresh" : "update", {}, "read", undefined, signal ? { signal } : undefined)
     return classifyUpdateRead({ transport: "answered", status: 200, parsed })
   } catch (error) {
     const failure = error as { code?: unknown; status?: unknown }
