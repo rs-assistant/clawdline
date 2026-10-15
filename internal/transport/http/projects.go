@@ -32,6 +32,7 @@ import (
 // the observation a refresh made.
 type projectReaders struct {
 	places    *projects.Places
+	repos     *projects.RepoLookup
 	registry  *projects.PlaceRegistry
 	catalog   *projects.Catalog
 	lifecycle *projects.Lifecycle
@@ -68,6 +69,7 @@ func (s *Server) projectReaders() *projectReaders {
 	}
 	r := &projectReaders{
 		places:   places,
+		repos:    projects.NewRepoLookup(projects.OriginRepo),
 		registry: registry,
 		catalog:  projects.NewCatalog(),
 		busy:     make(chan struct{}, 4),
@@ -202,12 +204,13 @@ func (s *Server) placesRoute(w http.ResponseWriter, r *http.Request) {
 	}
 	readers := s.projectReaders()
 	list := readers.places.List(s.liveDirectories(r.Context()), 40)
+	repos := readers.repos.Resolve(list)
 	out := contract.StartPlaceList{At: time.Now().Unix(), Assistants: installedAssistants(),
 		Places: make([]contract.StartPlace, 0, len(list))}
 	for _, p := range list {
 		// `repo` is what a schedule moving here from another machine finds its
 		// project by (docs/schedules.md): the id is a digest of this path.
-		repo := projects.OriginRepo(p.Path)
+		repo := repos[p.Path]
 		grid, iconSource := s.icons.Resolve(p.Path)
 		var projectID string
 		if canonical, ok := projects.CanonicalProjectKey(p.Path); ok {

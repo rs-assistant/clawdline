@@ -2375,6 +2375,30 @@ func Register() []Entry {
 			Sources: []string{"internal/adapters/projects.MaxGitConfigBytes"},
 		},
 		{
+			// GET /v1/places remembers at most forty optional repository
+			// lookups. A blocked filesystem read keeps its slot so a new request
+			// cannot multiply it; completed lookups outside the current list
+			// are discarded first.
+			Name: "places.repo_lookups", Class: Cache, Unit: Rows,
+			Limit: 40, AtLimit: EvictOldest, Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/projects.MaxRepoLookups"},
+		},
+		{
+			// No more than four Git config reads run together for Project
+			// origins, even if one waits on a macOS file permission prompt.
+			Name: "places.repo_readers", Class: Buffer, Unit: Rows,
+			Limit: 4, AtLimit: Refuse, Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/projects.MaxRepoReaders", "internal/adapters/projects.NewRepoLookup:chan(MaxRepoReaders)"},
+		},
+		{
+			// The first list waits one second for optional repository
+			// metadata; after that it answers the places it knows. The next
+			// request reads completed results without waiting on an old stall.
+			Name: "places.repo_wait_seconds", Class: Buffer, Unit: Seconds,
+			Limit: 1, AtLimit: Refuse, Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/projects.MaxRepoWaitSeconds"},
+		},
+		{
 			Name: "projectsync.path_bytes", Class: Buffer, Unit: Bytes,
 			Limit: 512, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/domain/projectsync.MaxPathBytes"},
