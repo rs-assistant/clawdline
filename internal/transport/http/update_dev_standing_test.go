@@ -4,7 +4,9 @@ import (
 	"context"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/contract"
@@ -68,28 +70,91 @@ func devStandingCases(t *testing.T, repo, older, release, ahead1, ahead2, side s
 }
 
 // Right after a start the daemon has not listed its Projects yet. The first
-// read then finds no repository holding the commits; that is not kept, and the
-// next read, with the checkout listed, places the dev build.
+// reading then finds no repository holding the commits; that is not kept, and
+// a later read, with the checkout listed, places the dev build.
 func TestAnUnknownStandingIsAskedAgain(t *testing.T) {
-	repo := t.TempDir()
+	repo, dev, release := devAndRelease(t)
+	var mu sync.Mutex
+	var listed []projects.Place
+	s := &Server{squadPlaces: func(context.Context) []projects.Place {
+		mu.Lock()
+		defer mu.Unlock()
+		return listed
+	}}
+	st := standingStatus(dev, release)
+	if got := settledStanding(t, s, st); got.Relation != contract.UpdateDevRelationUnknown {
+		t.Fatalf("with no Project listed: %+v, want unknown", got)
+	}
+	mu.Lock()
+	listed = []projects.Place{{Path: repo}}
+	mu.Unlock()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if got := s.withDevStanding(st).Dev; got != nil && got.Relation == contract.UpdateDevRelationAhead && got.Ahead == 1 {
+			return
+		} else if time.Now().After(deadline) {
+			t.Fatalf("with the checkout listed a moment later: %+v, want ahead by 1", got)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+// Listing Projects reads every live Session and can take minutes. GET
+// /v1/update does not wait for it: a read while the listing is stuck answers
+// at once, without `dev`.
+func TestReadingTheStandingNeverHoldsTheRoute(t *testing.T) {
+	_, dev, release := devAndRelease(t)
+	stuck := make(chan struct{})
+	defer close(stuck)
+	s := &Server{squadPlaces: func(ctx context.Context) []projects.Place {
+		select {
+		case <-stuck:
+		case <-ctx.Done():
+		}
+		return nil
+	}}
+	st := standingStatus(dev, release)
+	for i := 0; i < 3; i++ {
+		done := make(chan contract.UpdateStatus, 1)
+		go func() { done <- s.withDevStanding(st) }()
+		select {
+		case got := <-done:
+			if got.Dev != nil {
+				t.Fatalf("read %d answered %+v before anything was read", i, got.Dev)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("read %d waited on the Project listing", i)
+		}
+	}
+}
+
+func devAndRelease(t *testing.T) (repo, dev, release string) {
+	repo = t.TempDir()
 	git := gitAt(t, repo)
 	git("init", "-q", "-b", "main")
 	git("commit", "-q", "--allow-empty", "-m", "release")
-	release := git("rev-parse", "HEAD")
+	release = git("rev-parse", "HEAD")
 	git("commit", "-q", "--allow-empty", "-m", "dev")
-	dev := git("rev-parse", "HEAD")
+	return repo, git("rev-parse", "HEAD"), release
+}
 
-	var listed []projects.Place
-	s := &Server{squadPlaces: func(context.Context) []projects.Place { return listed }}
-	st := contract.UpdateStatus{
+func standingStatus(dev, release string) contract.UpdateStatus {
+	return contract.UpdateStatus{
 		Running: contract.BuildStamp{Stamp: dev, Version: "v1.0.7-dev." + dev[:7]},
 		Latest:  contract.BuildStamp{Stamp: release, Version: "v1.0.7"},
 	}
-	if got := s.withDevStanding(st).Dev; got == nil || got.Relation != contract.UpdateDevRelationUnknown {
-		t.Fatalf("with no Project listed: %+v, want unknown", got)
+}
+
+// settledStanding reads until the background reading has answered.
+func settledStanding(t *testing.T, s *Server, st contract.UpdateStatus) contract.UpdateDevStanding {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if got := s.withDevStanding(st).Dev; got != nil {
+			return *got
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	listed = []projects.Place{{Path: repo}}
-	if got := s.withDevStanding(st).Dev; got == nil || got.Relation != contract.UpdateDevRelationAhead || got.Ahead != 1 {
-		t.Fatalf("with the checkout listed a moment later: %+v, want ahead by 1", got)
-	}
+	t.Fatal("the standing was never read")
+	return contract.UpdateDevStanding{}
 }
