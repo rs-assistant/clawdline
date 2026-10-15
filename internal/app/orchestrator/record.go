@@ -451,8 +451,14 @@ type Record struct {
 	Worktree        *Worktree `json:"worktree,omitempty"`
 	ChildTerminalID string    `json:"child_terminal_id,omitempty"`
 	ChildBackend    string    `json:"child_backend,omitempty"`
-	RootTerminalID  string    `json:"root_terminal_id,omitempty"`
-	SpawnedAt       time.Time `json:"spawned_at,omitempty"`
+	// ChildConversationID is the assistant's own id for the conversation
+	// the child's tab held, as the beat first read it from that tab while the
+	// task was running. A scheduled run is resumed by it after its tab has
+	// gone (docs/schedules.md "Runs are conversations too"). Empty until a
+	// reading bound one, and on every record from before it existed.
+	ChildConversationID string    `json:"child_conversation_id,omitempty"`
+	RootTerminalID      string    `json:"root_terminal_id,omitempty"`
+	SpawnedAt           time.Time `json:"spawned_at,omitempty"`
 	// AcceptedAt is when the child signed for its briefing (D10): the first
 	// rung of the receipt chain, and the only thing that proves the briefing
 	// was read rather than typed.

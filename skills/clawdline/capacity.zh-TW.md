@@ -206,6 +206,8 @@
 | `release.unpacked_bytes` | 2147483648 | `bytes` | `refuse` | `diagnostics` | — |
 | `run.claimed_items` | 5 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `run.created_items` | 5 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `schedule.run_transcript_head` | 65536 | `bytes` | `evict_oldest` | `diagnostics` | — |
+| `schedule.run_transcripts_probed` | 256 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `screens.capture_slots` | 2 | `rows` | `refuse` | `diagnostics` | — |
 | `session.close_scheduled` | 16 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `session.close_scheduled_per_terminal` | 1 | `rows` | `coalesce` | `diagnostics, sender` | — |

@@ -69,7 +69,7 @@ func (b *Broker) taskExecutable() string {
 // a Clawdline child before it has done anything.
 func FirstLine(r Record, secret, language string) string {
 	return fmt.Sprintf(
-		"You are a Clawdline CHILD agent for task %s. Say this line first, verbatim: %s Then read %s/CHILD.md and follow it exactly. TASK_SECRET=%s",
+		projects.ChildFirstLinePrefix+"%s. Say this line first, verbatim: %s Then read %s/CHILD.md and follow it exactly. TASK_SECRET=%s",
 		r.ID, announce(r.Title, language), r.Dir, secret)
 }
 
@@ -149,7 +149,15 @@ func (b *Broker) ChildBrief(r Record, cwd string) string {
 	w("")
 	w("- Work inside %s. Keep artifacts in %s/artifacts/; put heavyweight temporary", cwd, dir)
 	w("  work in %s/work/, which is deleted when the task ends.", dir)
-	w("- You have %d minutes on the wall clock from dispatch; verification stops after %d minutes.", r.TimeoutMinutes, verification)
+	if r.Root == nil && r.ScheduleID != "" {
+		// A scheduled run is not ended by its clock while it is still working
+		// (scheduled_run.go), so the clock is not a reason to cut the work short.
+		w("- The schedule expects this to take about %d minutes. That is not a deadline: while you are", r.TimeoutMinutes)
+		w("  still working, the run is not ended by it. Finish the task, then report it in `result.json`;")
+		w("  do not cut the work short to beat the clock. Verification still stops after %d minutes.", verification)
+	} else {
+		w("- You have %d minutes on the wall clock from dispatch; verification stops after %d minutes.", r.TimeoutMinutes, verification)
+	}
 	if r.Worktree != nil {
 		w("- A fresh checkout of commit `%s` on branch `%s`.", r.Worktree.Base, r.Worktree.Branch)
 		if r.Assistant == "claude" {

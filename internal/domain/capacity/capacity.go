@@ -405,6 +405,10 @@ const (
 	// SessionsShellOutputBytes is the most of one background command's
 	// output GET /v1/sessions/{id}/shells/{shell} sends.
 	SessionsShellOutputBytes = "sessions.shell_output_bytes"
+	// A finished scheduled run matched to its child's conversation by
+	// transcript (adapters/projects/child_transcript.go).
+	ScheduleRunTranscriptsProbed = "schedule.run_transcripts_probed"
+	ScheduleRunTranscriptHead    = "schedule.run_transcript_head"
 	// The sentence-to-draft planner: admitted bytes, queued turns and the
 	// longest one turn may hold its queue slot.
 	IntentRequestBytes     = "intent.request_bytes"
@@ -927,6 +931,28 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics},
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/adapters/transcript.MaxShellOutput"},
+		},
+		{
+			// The Claude transcripts of one project opened, newest first, to
+			// match finished scheduled runs to their children's conversations
+			// for the history sheet and the resume route. Asked of a request,
+			// never retained: past it the older transcripts are not opened,
+			// and a run among them offers no resume.
+			Name: ScheduleRunTranscriptsProbed, Class: Observation, Unit: Rows,
+			Limit: 256, AtLimit: EvictOldest,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/projects.MaxChildTranscriptsProbed"},
+		},
+		{
+			// How much of one transcript is read to find its first message.
+			// The file is Claude Code's and stays whole; a first message past
+			// this is not found, and that run offers no resume.
+			Name: ScheduleRunTranscriptHead, Class: Observation, Unit: Bytes,
+			Limit: 64 << 10, AtLimit: EvictOldest,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/projects.MaxChildTranscriptHead"},
 		},
 		{
 			// The screens one event stream has been told moved and has not
