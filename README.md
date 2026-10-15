@@ -7,7 +7,7 @@
 
 **See which Claude Code and Codex Sessions need you, then open one to respond or leave a to-do.**
 
-Sample screens from the console:
+Illustrative demo based on the console:
 
 <img src="docs/assets/cloud-sessions-demo.gif" width="390" alt="Sample Cloud console: a Session list shows one waiting for you; opening it reveals its to-do.">
 
@@ -15,15 +15,13 @@ Sample screens from the console:
 
 ## What you can do
 
-| | |
-| --- | --- |
-| **Follow Sessions** | See what is working or waiting; read the conversation and reply with text, voice, or a marked-up picture. [Sessions](docs/user/sessions.md) |
-| **Keep work moving** | Leave [to-dos](docs/user/board.md#session-to-dos), answer [Agent notes](docs/user/sessions.md#attention-notes-from-agents), and get [notifications](docs/user/notifications.md). |
-| **Work in a terminal** | Open a live [terminal](https://clawdline.com/docs/shells/#terminals) beside your Sessions. |
-| **Delegate and track delivery** | [Dispatch](docs/user/clawdfather-and-dispatch.md) to another Session, verify that its work landed, and follow larger work on the optional [Board](docs/user/board.md). |
-| **Run work later** | Queue long commands with [callbacks](docs/user/clawdfather-and-dispatch.md#callbacks-for-long-commands) or start tasks with [schedules](docs/user/schedules.md). Cloud Pro adds webhook triggers. |
-| **Bring your projects together** | [Register projects](docs/user/projects.md), share rules and skills across Claude Code and Codex with [unify](docs/project-files.md#unify), and see [usage](docs/user/usage.md). |
-| **Use another device** | Open the console through [remote access](docs/user/remote-access.md), including optional end-to-end encrypted Clawdline Cloud. |
+- **Follow Sessions:** See what is working or waiting, read the conversation, view pictures from Agents, and reply with text, voice, or a marked-up picture. [Sessions](docs/user/sessions.md)
+- **Keep work moving:** Leave [to-dos](docs/user/board.md#session-to-dos), answer [Agent notes](docs/user/sessions.md#attention-notes-from-agents), and get [notifications](docs/user/notifications.md).
+- **Work in a terminal:** Open a live [terminal](https://clawdline.com/docs/shells/#terminals) beside your Sessions.
+- **Delegate and track delivery:** [Dispatch](docs/user/clawdfather-and-dispatch.md) to another Session, verify that its work landed, and follow larger work on the optional [Board](docs/user/board.md).
+- **Run work later:** Queue long commands with [callbacks](docs/user/clawdfather-and-dispatch.md#callbacks-for-long-commands) or start tasks with [schedules](docs/user/schedules.md). Cloud Pro adds webhook triggers.
+- **Bring your projects together:** [Register projects](docs/user/projects.md), share rules and skills across Claude Code and Codex with [unify](docs/project-files.md#unify), and see [usage](docs/user/usage.md).
+- **Use another device:** Open the console through [remote access](docs/user/remote-access.md), including optional end-to-end encrypted Clawdline Cloud.
 
 Clawdline runs the daemon and console on your machine and works with Claude Code and Codex Sessions you already use. Cloud is optional; its relay carries encrypted data. [How it works](docs/architecture.md)
 
