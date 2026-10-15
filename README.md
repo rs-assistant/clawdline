@@ -150,7 +150,7 @@ page or with `clawdline update --apply`, and rolls back by itself if it does not
 
 ## Limits
 
-- **Pre-1.0**: expect changes between releases.
+- **1.0**: macOS and Linux release installs can update in place; Windows terminal support remains limited.
 - The console supports **English, Traditional Chinese, Simplified Chinese, Japanese, Korean,
   Spanish, Brazilian Portuguese, French and German**. Newer copy missing from a secondary
   translation falls back to English ([Localization](docs/localization.md)).

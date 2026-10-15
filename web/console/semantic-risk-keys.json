@@ -2,7 +2,7 @@
   "version": 1,
   "englishKeys": 5258,
   "counts": {
-    "negation": 1507,
+    "negation": 1508,
     "state": 724,
     "permission": 333,
     "deletion": 111,
@@ -1348,6 +1348,7 @@
       "next.updateCheckFailed",
       "next.updateCopyFailed",
       "next.updateFailed",
+      "next.updateIsAvailable",
       "next.updateIsUnknown",
       "next.updateKindUnknown",
       "next.updateRefused",
