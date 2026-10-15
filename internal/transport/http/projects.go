@@ -19,6 +19,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
+	"github.com/sainteye/clawdline/internal/domain/icon"
 )
 
 // The Projects page's routes: the start places, the Board store's Project
@@ -33,6 +34,7 @@ import (
 type projectReaders struct {
 	places    *projects.Places
 	repos     *projects.RepoLookup
+	setups    *setupLookup
 	registry  *projects.PlaceRegistry
 	catalog   *projects.Catalog
 	lifecycle *projects.Lifecycle
@@ -70,6 +72,7 @@ func (s *Server) projectReaders() *projectReaders {
 	r := &projectReaders{
 		places:   places,
 		repos:    projects.NewRepoLookup(projects.OriginRepo),
+		setups:   newSetupLookup(projectSetup),
 		registry: registry,
 		catalog:  projects.NewCatalog(),
 		busy:     make(chan struct{}, 4),
@@ -205,20 +208,30 @@ func (s *Server) placesRoute(w http.ResponseWriter, r *http.Request) {
 	readers := s.projectReaders()
 	list := readers.places.List(s.liveDirectories(r.Context()), 40)
 	repos := readers.repos.Resolve(list)
+	keys := make([]setupLookupKey, 0, len(list))
+	icons := make(map[string]icon.Grid, len(list))
+	sources := make(map[string]icon.Source, len(list))
+	for _, p := range list {
+		grid, source := s.icons.Resolve(p.Path)
+		icons[p.Path] = grid
+		sources[p.Path] = source
+		keys = append(keys, setupLookupKey{path: p.Path, repo: repos[p.Path], icon: source})
+	}
+	setups := readers.setups.Resolve(keys)
 	out := contract.StartPlaceList{At: time.Now().Unix(), Assistants: installedAssistants(),
 		Places: make([]contract.StartPlace, 0, len(list))}
 	for _, p := range list {
 		// `repo` is what a schedule moving here from another machine finds its
 		// project by (docs/schedules.md): the id is a digest of this path.
 		repo := repos[p.Path]
-		grid, iconSource := s.icons.Resolve(p.Path)
+		grid := icons[p.Path]
 		var projectID string
 		if canonical, ok := projects.CanonicalProjectKey(p.Path); ok {
 			projectID = projects.ProjectID(canonical)
 		}
 		out.Places = append(out.Places, contract.StartPlace{ID: p.ID, Label: p.Label, Path: p.Path,
 			At: p.At.Unix(), Icon: wireIcon(grid), Repo: repo, ProjectID: projectID,
-			Setup: projectSetup(p.Path, repo, iconSource)})
+			Setup: setups[setupLookupKey{path: p.Path, repo: repo, icon: sources[p.Path]}]})
 	}
 	writeJSON(w, out)
 }
