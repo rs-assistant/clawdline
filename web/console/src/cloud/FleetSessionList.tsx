@@ -9,6 +9,7 @@ import type { OrderHold } from "../session/order.js"
 import { SessionToolbar } from "../session/SessionToolbar.js"
 import { ScheduleSection, scheduleMachineReady } from "../pages/schedules.js"
 import { destinationKey, displayedPresentationStatus, fleetRowTitle, presentationPass, projectionRefreshAt, settleProjection,
+  shownDestinationKeys,
   type MachineSessionProjection, type ProjectionProblem, type SessionDestination,
   type SessionListPresentation, type SessionProjectionSource, type FleetMachine,
   type ProjectedSession } from "./all-machine-sessions.js"
@@ -224,10 +225,9 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   const passesKey = presentationMachines.map(({ machineID, pass }) => machineID + ":" + pass).join("\0")
   useEffect(() => {
     if (!source?.readMachinePresentations) return
-    const currentKeys = new Set(machines.flatMap((machine) => {
+    const currentKeys = shownDestinationKeys(machines.map((machine) => {
       const reading = readings[machine.id]
-      return reading?.phase === "settled" && reading.value.kind === "ready"
-        ? reading.value.rows.map((row) => destinationKey(row.destination)) : []
+      return reading?.phase === "settled" ? reading.value : undefined
     }))
     for (const [key, value] of presentations.current) {
       if (!currentKeys.has(key))

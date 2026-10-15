@@ -4,7 +4,7 @@ import type { SessionRow } from "@clawdline/contract"
 import {
   afterEventGap, checkedProjection, destinationAvailable, destinationFragment, destinationFromFragment,
   displayedPresentationStatus, fleetRowTitle, identifyOpenedFleetRow, withConfirmedFleetTitle,
-  destinationKey, prependOlderPage, projectionRefreshAt, settleProjection, SessionDetailCache,
+  destinationKey, prependOlderPage, projectionRefreshAt, settleProjection, SessionDetailCache, shownDestinationKeys,
   supersedingDestination,
   type MachineSessionProjection, type ProjectedSession,
 // @ts-expect-error -- node's type-stripping runner resolves the source .ts file.
@@ -117,6 +117,14 @@ test("an event gap marks only its machine unknown until an authoritative reread"
   assert.equal(gap.observedAt, 1000)
   assert.equal(destinationAvailable(row("one", "s", "1").destination, gap), "waiting")
   assert.equal(destinationAvailable(row("two", "s", "1").destination, ready("two", [row("two", "s", "1")])), "ready")
+})
+
+test("a list that went stale keeps its rows' titles, and only rows nothing shows lose them", () => {
+  const previous = ready("one", [row("one", "s", "1")])
+  const stale = settleProjection("one", previous, { kind: "unavailable", reason: "unknown" })
+  const offline = settleProjection("two", undefined, { kind: "unavailable", reason: "offline" })
+  assert.deepEqual([...shownDestinationKeys([stale, offline, undefined])],
+    [destinationKey(row("one", "s", "1").destination)])
 })
 
 test("a partial next status pass keeps the prior rows visible but disables their actions", () => {
