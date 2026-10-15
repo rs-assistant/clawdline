@@ -6,10 +6,14 @@
 # usage: tools/release/build.sh <version> <out-dir> [--channel stable|beta|dev]
 #          [--base-url URL] [--min-version vX.Y.Z] [--no-app] [--skip-tests]
 #          [--test-key <base64 public key>] [--tmux-from <dir>] [--host-only]
+#          [--tmux-installed]
 #
 # --channel dev is a dev build (`clawdline dev install`, docs/updates.md): a
 # vX.Y.Z-dev.<commit> version, unsigned, installed only on the machine that
-# built it. --host-only builds this machine's os/arch alone.
+# built it. --host-only builds this machine's os/arch alone. --tmux-installed,
+# for a dev build only, says the --tmux-from binaries are the ones an
+# installed release carries: signed ad hoc after their tmux.json was written,
+# so their hash is not the one it records. They must still be the pinned tmux.
 #
 # <out-dir> must not exist. It ends up holding:
 #   clawdline_<v>_<os>_<arch>.tar.gz   `clawdline`, `dist/`, and the tmux the
@@ -36,7 +40,7 @@ die() { echo "release build: $*" >&2; exit 2; }
 [ "$#" -ge 2 ] || die "usage: tools/release/build.sh <version> <out-dir> [options]"
 version=$1 out=$2
 shift 2
-channel=stable base_url="" min_version="" app=1 tests=1 test_key="" tmux_from="" host_only=0
+channel=stable base_url="" min_version="" app=1 tests=1 test_key="" tmux_from="" host_only=0 tmux_installed=0
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --channel) channel=${2:?}; shift ;;
@@ -47,6 +51,7 @@ while [ "$#" -gt 0 ]; do
     --test-key) test_key=${2:?}; shift ;;
     --tmux-from) tmux_from=${2:?}; shift ;;
     --host-only) host_only=1 ;;
+    --tmux-installed) tmux_installed=1 ;;
     *) die "unknown option $1" ;;
   esac
   shift
@@ -57,6 +62,8 @@ case "$channel" in stable|beta|dev) ;; *) die "--channel is stable, beta or dev"
 [ "$channel" = stable ] && [[ "$version" == *-* ]] && die "a pre-release version belongs on the beta channel"
 [ "$channel" = dev ] && [[ ! "$version" =~ -dev\.[0-9a-f]+$ ]] && die "a dev build is vX.Y.Z-dev.<commit>"
 [ "$channel" != dev ] && [[ "$version" =~ -dev\. ]] && die "a -dev. version is built with --channel dev"
+[ "$tmux_installed" = 1 ] && { [ "$channel" = dev ] && [ -n "$tmux_from" ]; } || [ "$tmux_installed" = 0 ] ||
+  die "--tmux-installed is for a dev build with --tmux-from"
 if [ -n "$test_key" ]; then
   [[ "$version" =~ -test\.[0-9]+$ ]] || die "--test-key is only for a vX.Y.Z-test.N version"
 fi
@@ -123,7 +130,7 @@ carry_tmux() {
   # binary its tmux.json was written for.
   local got
   got=$(shasum -a 256 "$built/tmux" | cut -d' ' -f1)
-  grep -q "\"binary_sha256\": \"$got\"" "$built/tmux.json" ||
+  [ "$tmux_installed" = 1 ] || grep -q "\"binary_sha256\": \"$got\"" "$built/tmux.json" ||
     die "$built/tmux is $got, not the binary its tmux.json describes"
   mkdir -p "$stage/libexec" "$stage/licenses"
   cp "$built/tmux" "$stage/libexec/tmux"

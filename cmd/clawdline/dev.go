@@ -120,7 +120,7 @@ func devInstall(stdout, stderr io.Writer, rev string, port int, r runner) int {
 	build := []string{filepath.Join("tools", "release", "build.sh"), version, out,
 		"--channel", "dev", "--base-url", "file://" + out, "--skip-tests", "--host-only"}
 	if tmux := devTmux(env.Layout.ReleaseDir(running), filepath.Join(scratch, "tmux")); tmux != "" {
-		build = append(build, "--tmux-from", tmux)
+		build = append(build, "--tmux-from", tmux, "--tmux-installed")
 	}
 	if runtime.GOOS != "darwin" {
 		build = append(build, "--no-app")
@@ -157,8 +157,10 @@ func devInstall(stdout, stderr io.Writer, rev string, port int, r runner) int {
 
 // devTmux lays out the running release's tmux the way build.sh --tmux-from
 // takes it, so a dev build carries the tmux already running instead of
-// building one. "" when the release carries none; build.sh then builds it,
-// and refuses one that is not the pinned tmux.
+// building one. "" when the release carries none; build.sh then builds it.
+// That tmux was signed ad hoc after its tmux.json was written, so build.sh is
+// told so (--tmux-installed) and checks only that it is the pinned tmux: on
+// 2026-10-15 the first dev install stopped on its hash.
 func devTmux(release, scratch string) string {
 	dir := filepath.Join(scratch, runtime.GOOS+"-"+runtime.GOARCH)
 	if err := os.MkdirAll(filepath.Join(dir, "licenses"), 0o755); err != nil {
