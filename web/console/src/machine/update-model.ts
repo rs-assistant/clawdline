@@ -544,8 +544,13 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
 
   const apply = status.apply
   const moving = !restarting && applyMoving(status)
-  const to = apply?.to || latestName
-  const from = apply?.from || buildName(status.running)
+  // A dev build is named as its commit, not as v1.0.7-dev.4c41b18.
+  const named = (version: string) => {
+    const commit = devCommit({ version })
+    return commit ? say("updateRunningDev", { commit }) : version
+  }
+  const to = named(apply?.to || latestName)
+  const from = named(apply?.from || buildName(status.running))
   if (restarting) view.progress = say("updateRestarting")
   else if (input.sending) view.progress = say("updateSending")
   else if (moving && apply) {
@@ -560,7 +565,7 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
   // console, and after one auto-update installed overnight — for as long as
   // it is the machine's last.
   if (!moving && !restarting && apply?.state === "healthy" && apply.from) {
-    const installed = apply.to || buildName(status.running)
+    const installed = named(apply.to || buildName(status.running))
     view.done = say("updateReady", { to: installed })
   } else if (!view.progress && apply?.state === "healthy" && input.following) {
     view.progress = say("updateHealthy", { to: buildName(status.running) || to })

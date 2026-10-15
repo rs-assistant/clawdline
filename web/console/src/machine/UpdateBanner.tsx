@@ -125,25 +125,33 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
 
   return (
     <div className="update-banner" id={embedded ? undefined : "update-banner"} role="status" aria-busy={busy} data-version={version || target}>
-      {version && !sending && !following && !completed && !problem ? (
-        <span className="update-banner-say" lang={catalogWordLanguage("next", "updateBanner")}>{dev
-          ? nextWord("updateBannerDev", { commit: dev }) : nextWord("updateBanner", { version })}</span>
-      ) : null}
-      {message ? <span className="update-banner-say" aria-live="polite">
-        {busy ? <span className="update-banner-spinner" aria-hidden="true" /> : null}
-        {message}
+      {/* The banner sits in the session list's column, which is narrow on a
+          wide window: words above, actions below, never side by side. */}
+      <div className="update-banner-body">
+        {version && !sending && !following && !completed && !problem ? (
+          <span className="update-banner-say" lang={catalogWordLanguage("next", "updateBanner")}>{dev
+            ? nextWord("updateBannerDev", { commit: dev }) : nextWord("updateBanner", { version })}</span>
+        ) : null}
+        {message ? <span className="update-banner-say" aria-live="polite">
+          {busy ? <span className="update-banner-spinner" aria-hidden="true" /> : null}
+          {message}
+        </span> : null}
         {view.staged ? <small className="update-banner-staged">{view.staged}</small> : null}
-      </span> : null}
-      {pressOlder ? <code className="update-command">{INSTALL_COMMAND}</code> : null}
-      {canPress && !checkFailed ? (
-        <button className="chip update-banner-go" type="button" onClick={() => void press()}>
-          {view.press.label}
-        </button>
-      ) : null}
-      {restartVersion && canRestartStagedApp() ? (
-        <button className="chip update-banner-go" type="button" onClick={() => restartStagedApp(restartVersion)}>
-          {nextWord("updateRestartApp")}
-        </button>
+        {pressOlder ? <code className="update-command">{INSTALL_COMMAND}</code> : null}
+      </div>
+      {(canPress && !checkFailed) || (restartVersion && canRestartStagedApp()) ? (
+        <div className="update-banner-actions">
+          {canPress && !checkFailed ? (
+            <button className="chip update-banner-go" type="button" onClick={() => void press()}>
+              {view.press.label}
+            </button>
+          ) : null}
+          {restartVersion && canRestartStagedApp() ? (
+            <button className="chip update-banner-also" type="button" onClick={() => restartStagedApp(restartVersion)}>
+              {nextWord("updateRestartApp")}
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {!sending && !following ? (
         <button className="x" type="button" aria-label={nextWord("updateBannerDismiss")} title={nextWord("updateBannerDismiss")} onClick={dismiss}>×</button>

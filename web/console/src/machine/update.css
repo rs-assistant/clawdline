@@ -49,37 +49,48 @@
 .settings-update .update-auto strong { font-size: 12.5px; font-weight: 600; color: var(--ink); }
 .settings-update .update-auto .say { margin: 4px 0 0; }
 
+/* The session list's column is narrow however wide the window is, so the
+   banner never lays its words beside its buttons: a grid of words (and the
+   close button beside them) over a row of actions that wraps. It wears the
+   list's own card: the accent tint, its edge, its radius. */
 .update-banner {
-    --update-orange: #ee9b35;
-    display: flex; align-items: center; gap: 10px;
-    margin: 8px 10px 6px 10px; padding: 8px 8px 8px 12px;
-    background: rgba(238, 155, 53, .13); font-size: 12.5px; color: var(--ink);
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "body x" "actions actions";
+    align-items: start; gap: 10px 4px;
+    margin: 8px 10px 6px 10px; padding: 12px 6px 12px 14px;
+    background: var(--accent-in); border: 1px solid var(--accent-ed); border-radius: var(--radius);
+    font-size: 12.5px; line-height: 1.5; color: var(--ink);
 }
-.update-banner-say { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.update-banner-body { grid-area: body; min-width: 0; display: grid; gap: 4px; padding-top: 2px; }
+.update-banner-say { min-width: 0; overflow-wrap: break-word; text-wrap: pretty; }
+.update-banner-actions { grid-area: actions; display: flex; flex-wrap: wrap; gap: 8px; padding-right: 8px; }
 .update-banner-spinner {
     display: inline-block; width: 12px; height: 12px; margin-right: 8px;
     vertical-align: -1px; border: 2px solid currentColor; border-right-color: transparent;
     border-radius: 50%; animation: update-banner-spin .8s linear infinite;
 }
 @keyframes update-banner-spin { to { transform: rotate(360deg); } }
-.update-banner-staged { display: block; margin-top: 3px; color: var(--dim); font-size: 11.5px; line-height: 1.4; }
+.update-banner-staged { display: block; color: var(--dim); font-size: 11.5px; line-height: 1.45; }
 @media (prefers-reduced-motion: reduce) {
     .update-banner-spinner { animation: none; border-right-color: currentColor; }
 }
-.update-banner .update-banner-go {
-    flex: 0 0 auto; color: #17110e; background: var(--update-orange);
-    border-color: var(--update-orange); font-weight: 650; white-space: nowrap;
+.update-banner .update-banner-go,
+.update-banner .update-banner-also {
+    flex: 0 1 auto; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     display: inline-flex; align-items: center; justify-content: center;
-    height: 32px; padding: 0 10px; line-height: 1;
+    height: 30px; padding: 0 12px; line-height: 1; font-size: 12.5px; font-weight: 600;
 }
-.update-banner .update-banner-go:hover:not(:disabled) { background: #ffc16d; border-color: #ffc16d; color: #17110e; }
+.update-banner .update-banner-go { color: #17110e; background: var(--accent); border-color: var(--accent); }
+.update-banner .update-banner-go:hover:not(:disabled) { filter: brightness(1.08); color: #17110e; }
+.update-banner .update-banner-also { color: var(--ink); background: transparent; border-color: var(--accent-ed); }
+.update-banner .update-banner-also:hover:not(:disabled) { background: var(--accent-in); border-color: var(--accent); }
 .update-banner .update-command {
-    flex: 1 1 100%; overflow-wrap: anywhere; user-select: all;
+    overflow-wrap: anywhere; user-select: all;
     font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .update-banner .x {
-    flex: 0 0 auto; color: var(--faint); font-size: 15px; line-height: 1;
-    min-width: 44px; min-height: 44px; margin: -6px -4px -6px 0;
+    grid-area: x; color: var(--faint); font-size: 15px; line-height: 1;
+    min-width: 44px; min-height: 44px; margin: -12px -2px -12px 0;
     display: inline-flex; align-items: center; justify-content: center;
     border-radius: 10px; background: none; border: 0; cursor: pointer;
 }
@@ -91,5 +102,4 @@
     .settings-update .update-auto { align-items: start; grid-template-columns: 1fr; gap: 0; }
     .settings-update .update-auto .settings-switch { justify-self: start; }
     .settings-update .update-now { min-height: 44px; }
-    .update-banner { flex-wrap: wrap; }
 }
