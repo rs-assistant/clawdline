@@ -44,6 +44,18 @@ export function fleetRowTitle(row: ProjectedSession, presentation: SessionListPr
   return row.machineScope ? "Clawdfather" : confirmedTitle ?? (presentation?.title || unavailableWord)
 }
 
+/**
+ * The rows whose titles the fleet list still has a use for.
+ *
+ * A reading that went stale or unknown keeps its rows on screen, so it keeps
+ * their titles too. Counting only `ready` readings dropped every title the
+ * moment a phone came back from the background with five-minute-old status,
+ * and the whole list read "Unknown" until the machine answered again.
+ */
+export function shownDestinationKeys(readings: readonly (MachineSessionProjection | undefined)[]): Set<string> {
+  return new Set(readings.flatMap((reading) => reading?.rows?.map((row) => destinationKey(row.destination)) ?? []))
+}
+
 /** Keep a prior list reading for the same execution, unless fresh ss/ contradicts its state. */
 /**
  * The key one machine's pinned list is re-read on.
