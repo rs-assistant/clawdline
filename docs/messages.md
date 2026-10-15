@@ -122,7 +122,9 @@ that Session and the start of the first row written after it (`artifacts.Shown`)
 route reads forward from there to the first assistant entry, keeps that row as the picture's
 anchor, and draws the picture under that entry on every page (`images_shown.go`). The model's text
 is not involved. A row still being written is left out of the offset, so it always meets a row's
-start. The request body has `images`, with 1…6 local files, each as an object with exactly one
+start. Measured on 2026-10-16 with Opus 5.5: the picture was drawn under the very message whose tool
+call ran `clawdline image send`, because Claude Code wrote that message's row after the command
+had started; when that row is already in the record, it is the next reply. The request body has `images`, with 1…6 local files, each as an object with exactly one
 absolute `path`, and optionally `terminal`. Each file must be a plain file no larger than 12 MiB or
 12,000 px on a side. A local path printed in the reply is not a phone-readable picture.
 

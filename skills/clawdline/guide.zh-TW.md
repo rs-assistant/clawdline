@@ -70,7 +70,7 @@ Swift app 已於 2026-09-19 退役：它被停掉、取消了登入時啟動，p
 | `clawdline send --to <terminal> "…"` | 把一則訊息轉進另一個 session（§8） |
 | `clawdline notify --title "…" --body "…"` | 推播一則通知給使用者（§9） |
 | `clawdline note create --body-file <JSON> [--target <terminal>]` | 在 Session 上方留下需要人處理的便條（§9a） |
-| `clawdline image send <picture>…` | 把圖片顯示在這個 Session 下一則回覆底下給使用者看（§8） |
+| `clawdline image send <picture>…` | 把圖片顯示在這個 Session 的回覆底下給使用者看（§8） |
 | `clawdline assistants` | 每個助理的帳號還剩多少額度 |
 | `clawdline landings` | 這台機器上所有還欠著的 landing；`--work-id <item id>`：一個看板項目所有已記錄的 landing |
 | `clawdline leases [--json]` | 編譯名額與每個 landing lease 目前由誰持有、誰在後面排隊 |
@@ -1006,13 +1006,14 @@ envelope。
 clawdline image send /absolute/path.png [more.png …]
 ```
 
-它會把圖片存成「在你自己的 Session 裡顯示」，console 會把它們畫在**你的 Session 下一則寫出的回覆**底下。
+它會把圖片存成「在你自己的 Session 裡顯示」，console 會把它們畫在**圖片存好之後、你的 Session 第一則寫進紀錄的
+回覆**底下——通常就是執行這個指令的那則訊息（Claude Code 在指令開始後才把它寫進紀錄），不然就是下一則。
 回覆裡不需要寫任何東西。它就是 `POST /v1/artifacts/images`，body 為
 `{"images": [{"path": …}], "terminal": "<你的 terminal id>"}`。
 
-- **存好不等於看到。** 指令有回應，不代表使用者已經看到圖。圖會在你下一則回覆寫出後出現；之後
+- **存好不等於看到。** 指令有回應，不代表使用者已經看到圖。圖會在那則回覆寫進紀錄後出現；之後
   `GET /v1/transcript?session=<terminal id>` 會在那則回覆的 `artifacts` 裡列出它們。要在談到這些圖
-  的回覆之前送，不是之後。
+  的那則訊息裡送，或在它之前。
 - 不要依賴寫在文字裡的 `<clawdline-image id="…">` marker。較新的模型只會把兩次工具呼叫之間寫的文字
   存成摘要，marker 也跟著消失：上傳回 200、回覆也寫了，使用者卻什麼都沒看到。回覆保留 marker 的地方
   它仍然有效，但已經不是顯示圖片的方法。

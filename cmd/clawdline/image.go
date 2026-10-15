@@ -38,7 +38,7 @@ func imageCommand(args []string) {
 
 func imageUsage() {
 	fmt.Fprintln(os.Stderr, cliCopy("misc", "image.usage", "usage: clawdline image send <picture> [<picture>…] [--target <terminal id>] [--from <conversation id>] [--port n]"))
-	fmt.Fprintln(os.Stderr, cliCopy("misc", "image.usage_detail", "  one to six PNG, JPEG or GIF files; they appear under the next reply this Session writes"))
+	fmt.Fprintln(os.Stderr, cliCopy("misc", "image.usage_detail", "  one to six PNG, JPEG or GIF files; they appear under the reply that ran this command, or the next one"))
 	os.Exit(2)
 }
 
@@ -98,7 +98,7 @@ func sendImages(stdout, stderr io.Writer, b *broker, target, from string, paths 
 	for _, art := range out.Artifacts {
 		fmt.Fprintln(stdout, art.ID)
 	}
-	fmt.Fprintf(stdout, cliCopy("misc", "image.stored_shown", "Stored %d picture(s) for Session %s. They appear under the next reply this Session writes; nothing has to be written into it.\n"), len(out.Artifacts), target)
+	fmt.Fprintf(stdout, cliCopy("misc", "image.stored_shown", "Stored %d picture(s) for Session %s. They appear under the first reply this Session records after them, usually the message that ran this command; nothing has to be written into it.\n"), len(out.Artifacts), target)
 	fmt.Fprintf(stdout, cliCopy("misc", "image.check", "Stored is not seen: GET /v1/transcript?session=%s lists them in that reply's artifacts once it is written.\n"), url.QueryEscape(target))
 	return 0
 }
