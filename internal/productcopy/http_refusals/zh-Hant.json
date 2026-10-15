@@ -1158,6 +1158,7 @@
   "http.ef21e013a7e28737": "「待確認」區的提案數量已達這台機器的待處理上限；未記錄任何內容。工作仍留在其待辦事項中。",
   "http.ef8d99884d439f25": "--no-landing-reason 僅是移至 deploying 階段的依據。",
   "http.efc9a1b51b8e755e": "排程權限由當事人在主控台排程表單中設定。這台機器的協調器權杖，或帶有當事人訊息的 Session，只能保留排程現有的 permission_mode，不能設定或變更它：請省略 permission_mode。",
+  "http.efed4153748e5e18": "已認出這個服務程式的 X-Clawdline-Orchestrator 權杖，但這條路由不接受它：只有已配對裝置的權杖可以呼叫。clawdline 命令只會呼叫這個權杖開放的路由。",
   "http.f04319c28c00907b": "這台機器正在處理的終端機寫入已達上限；未記錄或開啟任何內容。",
   "http.f0eb186f67eb8211": "該團隊權限不屬於目前的任何 Session。",
   "http.f0f2063a4e456e56": "沒有這個 Session。",

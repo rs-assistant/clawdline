@@ -24,6 +24,33 @@ up.
   pre-release, and wait until no assistant session is working
   ([Automatic updates](#automatic-updates)).
 
+## Release-day procedure for an installed Mac
+
+The homepage's one-line installer is for the first installation. Once this Mac is a release
+install, use Clawdline's built-in updater for subsequent releases. Publishing a GitHub release or
+deploying the hosted console does not require quitting the local app or restarting its service.
+
+1. Keep the installed app and service running while the new release is built, signed, reviewed,
+   published, and checked. Do not run the installer again, install a locally built app over it,
+   quit the app, kill its process, or restart its LaunchAgent to prepare for a release.
+2. After the signed release is public, let the installed Clawdline discover it. Use **立即更新** in
+   the local console, or enable **自動更新** and let its idle-session rule choose when to apply it.
+   Do not substitute `clawdline setup`, a manual bundle replacement, or a service restart for this
+   update path. When a person wants to experience the prompt, verify that the button appears and
+   leave the install action for that person to initiate.
+3. Read the updater's result. Confirm `apply.state: healthy`, the running version and served
+   `BUILD.json`, `GET /` returning 200, and that existing sessions remain available. If it reports
+   `failed` or `rolled_back`, preserve the previous running release and record the error code;
+   investigate before trying again.
+4. On macOS, a healthy daemon update can leave the app bundle staged while the app remains open.
+   `apply.staged_app` records that state. Leave the app open; Clawdline installs that bundle after
+   the app next quits on its own. Report the running daemon version and the app bundle version
+   separately until they agree. Do not force the app to quit merely to clear `staged_app`.
+
+This procedure keeps the existing console available through the release approval and download
+period. The updater itself performs the brief service restart in step 5 below, with its health
+check and rollback; a release operator does not start that restart independently.
+
 ## Release installs
 
 A machine set up from a release (`install_kind: release`) learns of new releases from a signed
@@ -189,7 +216,9 @@ The panel shows the running and latest version (a short commit for a source buil
   The seconds in which the daemon restarts and no read answers show as restarting, not as a
   failure; when the new daemon serves a different console, the page reloads itself.
 - `rolled_back` and `failed` show `apply.error.code` and `detail` and say the previous release still
-  runs. `staged_app` says the app is replaced once it is quit.
+  runs. The session-list banner animates while an update is checking or moving, keeps the completed
+  result visible after a page reload until dismissed, and shows `staged_app` beside that result: the
+  daemon has updated, while the open Mac app keeps its old bundle until the person next quits it.
 - **自動更新** writes `update_auto_apply` through `/v1/settings`. Over Cloud it is shown but disabled,
   with a sentence saying to change it on the machine: the settings route takes only the machine's
   own token.
@@ -203,6 +232,13 @@ Its **立即更新** button rechecks the signed release source, starts the updat
 progress and the final result in the same place. A withdrawn release or an unavailable source
 cannot be installed from an old banner. Dismissing the banner is remembered per version in that
 browser. Settings retains the full version check, release notes, and update controls.
+
+The Cloud console's **All machines** Session list also checks each paired online machine for a
+fresh signed release. It names the machine and available version in a banner, including when this
+page is shown inside the Mac app's Cloud tab. Its button switches to that machine's console, where
+the person can choose **立即更新**; the banner itself never starts an update. An offline, unpaired,
+unanswered, or rolled-back machine cannot produce this prompt. The local Mac app and its Cloud tab
+remain open while the release is prepared and while the prompt is shown.
 
 On a release install, the fresh route rereads the signed manifest. A 404 clears a withdrawn release;
 an unreachable or invalid source produces `unknown` instead of showing a cached version as

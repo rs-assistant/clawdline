@@ -345,7 +345,9 @@ func TestHealthAndDiagnostics(t *testing.T) {
 	}{
 		{"no token", nil, http.StatusUnauthorized},
 		{"a paired device", map[string]string{"Authorization": "Bearer " + f.send}, http.StatusForbidden},
-		{"the machine token", map[string]string{"X-Clawdline-Orchestrator": f.machine}, http.StatusUnauthorized},
+		// A good machine token on a device's route: refused, and told it is the
+		// wrong credential rather than a missing one.
+		{"the machine token", map[string]string{"X-Clawdline-Orchestrator": f.machine}, http.StatusForbidden},
 		{"this machine's token", map[string]string{"Authorization": "Bearer " + f.local}, http.StatusOK},
 	} {
 		rec := call{method: http.MethodGet, path: "/v1/diagnostics", headers: tc.headers}.do(h)
@@ -470,5 +472,31 @@ func TestReadablePath(t *testing.T) {
 		if got := readablePath(tc.path); got != tc.want {
 			t.Errorf("readablePath(%q) = %v, want %v", tc.path, got, tc.want)
 		}
+	}
+}
+
+// The orchestrator token on a route it does not open is a good credential in
+// the wrong place, and it is told so. The one sentence for every 401 used to
+// say the token was "missing or is not this daemon's", and on 2026-10-15 that
+// sent a session looking for a stale token file when the token was fine and
+// /v1/diagnostics takes a device's credential. A token this daemon does not
+// hold is still the 401 it always was.
+func TestAGoodMachineTokenOnADeviceRouteIsToldItIsTheWrongCredential(t *testing.T) {
+	f, h := newGateFixture(t)
+	rec := call{method: http.MethodGet, path: "/v1/diagnostics",
+		headers: map[string]string{machineHeader: f.machine}}.do(h)
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "was recognised") {
+		t.Fatalf("the orchestrator token on a device route: %d %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "reached") {
+		t.Fatal("the orchestrator token reached a device route")
+	}
+	if !strings.Contains(rec.Body.String(), `"detail_key":"http.`) {
+		t.Fatalf("the refusal carries no catalog key, so it cannot be translated: %s", rec.Body.String())
+	}
+	rec = call{method: http.MethodGet, path: "/v1/diagnostics",
+		headers: map[string]string{machineHeader: "not-it"}}.do(h)
+	if rec.Code != http.StatusUnauthorized || strings.Contains(rec.Body.String(), "was recognised") {
+		t.Fatalf("a token this daemon does not hold: %d %s", rec.Code, rec.Body.String())
 	}
 }

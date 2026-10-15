@@ -295,6 +295,14 @@ func (g *gate) wrap(next http.Handler) http.Handler {
 					"The device store could not be read, so nothing behind the gate is answered.")
 				return
 			}
+			// A token this daemon does hold, on a route it does not open, is
+			// not "missing or not this daemon's": saying so sent a session on
+			// 2026-10-15 looking for a stale token file when the token was
+			// fine and /v1/diagnostics simply takes a device's credential.
+			if !device && g.verifyMachine(r.Header.Get(machineHeader)) {
+				writeAuthRefusal(w, http.StatusForbidden, "forbidden", machineScopeMessage)
+				return
+			}
 			writeAuthRefusal(w, http.StatusUnauthorized, "unauthorized", unauthorizedMessage)
 			return
 		}
@@ -834,6 +842,12 @@ const unauthorizedMessage = "No valid credential came with this request: the X-C
 	"missing or is not this daemon's, or the device is not paired. A script on this machine sends the contents of " +
 	"the orchestrator-token file in Clawdline's directory, as every clawdline command does; a token from another " +
 	"directory or an older install is refused. See which directory and port the CLI uses: `clawdline doctor`."
+
+// machineScopeMessage is the 403 for the orchestrator token on a route that is
+// not machineScoped: the credential is good and the route is a device's.
+const machineScopeMessage = "This daemon's X-Clawdline-Orchestrator token was recognised, but this route does " +
+	"not accept it: only a paired device's token may call it. Every clawdline command calls only routes that " +
+	"token opens."
 
 // writeAuthRefusal sends the Swift app's error envelope, which is what its
 // page reads: `{"error":{"code","message","request_id"}}`.

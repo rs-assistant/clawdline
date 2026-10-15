@@ -33,3 +33,20 @@ test("fleet updates ask only the named machine and preserve typed outcomes", asy
   assert.equal(fleetUpdateFacts({ pairing: "not_paired", freshness: "current" }, undefined, null).compatibility, "unpaired")
   assert.equal(fleetUpdateFacts({ pairing: "paired", freshness: "current" }, undefined, null).compatibility, "unknown")
 })
+
+test("the all-machine prompt asks the selected machine for a fresh release without applying it", async () => {
+  const calls: Array<[string, string, string]> = []
+  const client = {
+    events: () => () => {},
+    sessions: async () => ({ sessions: [], at: 0, scan: {} }),
+    transcript: async () => ({}),
+    _machineRequest: async (machine: string, word: string, _body: object, mode: string) => {
+      calls.push([machine, word, mode])
+      return { state: "update_available", install_kind: "release",
+        running: { version: "v1.0.1" }, latest: { version: "v1.0.2" } }
+    },
+  }
+  const answer = await readFleetUpdate(client, "mac-a", undefined, true)
+  assert.equal(answer.kind, "status")
+  assert.deepEqual(calls, [["mac-a", "update-fresh", "read"]])
+})
