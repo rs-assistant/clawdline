@@ -2015,8 +2015,20 @@ export class RelayWriter {
     let reply: unknown
     try {
       reply = await client.listPresentationsForMachine!(this.host.machine, new AbortController().signal, { fresh: true })
-    } catch {
-      throw failure("execution_check_unavailable", "The machine's current Session list could not be read.", 503)
+    } catch (error) {
+      // A daemon from before `fresh` refuses the whole read as malformed. Its
+      // plain list is still the machine's own answer, and its send admission
+      // rechecks the generation, so a stale tick is refused there rather than
+      // delivered. Measured on 2026-10-15: every single-machine send to such a
+      // daemon stopped here while the same Session sent from All machines.
+      if ((error as { code?: unknown } | null)?.code !== "malformed_read") {
+        throw failure("execution_check_unavailable", "The machine's current Session list could not be read.", 503)
+      }
+      try {
+        reply = await client.listPresentationsForMachine!(this.host.machine, new AbortController().signal)
+      } catch {
+        throw failure("execution_check_unavailable", "The machine's current Session list could not be read.", 503)
+      }
     }
     const sessions = (reply as { sessions?: unknown } | null)?.sessions
     if (!Array.isArray(sessions)) {
