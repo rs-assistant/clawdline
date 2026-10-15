@@ -467,6 +467,24 @@ test("phone: the Project row opens the same settings dialog as its gear", () =>
     assert.equal(await tab.run(`document.querySelector("#projects-detail-view")?.hidden`), true)
   }))
 
+test("desk: opening the settings again shows one 共用 block, below the readiness card", () =>
+  inTab(DESK, async (tab) => {
+    reset()
+    const order = `[...document.querySelector(".project-setup-dialog-body").children].map(c => c.className.split(" ")[0]).filter(c => c === "project-readiness-list" || c === "project-unify" || c === "project-files")`
+    await openGear(tab)
+    for (let i = 0; i < 3; i++) {
+      if (i > 0) {
+        await tab.run(`document.querySelector('button.project-row-settings[data-place-id="fixture-place"]').click()`)
+        await tab.until("the settings dialog opens again", `document.querySelector(".project-setup-dialog")?.open`)
+      }
+      await tab.until("the readiness card and the 共用 block both render", `!!document.querySelector(".project-setup-dialog .project-readiness-list") && !!document.querySelector(".project-setup-dialog .project-unify")`)
+      assert.deepEqual(await tab.run(order), ["project-readiness-list", "project-unify", "project-files"], `opening ${i + 1}`)
+      await tab.run(`document.querySelector(".project-setup-dialog").close()`)
+      await tab.until("the settings dialog closes", `document.querySelector(".project-setup-dialog")?.open === false`)
+      await tab.until(`closing ${i + 1} removes the 共用 block`, `document.querySelectorAll(".project-setup-dialog .project-unify").length === 0`)
+    }
+  }))
+
 test("desk: a failed read says 無法判斷, the preview shows both columns, and apply after a changed plan reaches 已共用", () =>
   inTab(DESK, async (tab) => {
     reset()

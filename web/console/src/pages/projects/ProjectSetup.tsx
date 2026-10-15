@@ -253,9 +253,9 @@ export function ProjectSetup({ shown, ref }: { shown: boolean; ref?: Ref<Project
         {!loading && !error && visiblePlaces.length > 0 && <ol className="project-readiness-list">
           {visiblePlaces.map(place => <ProjectReadiness key={place.id} place={place} select={select} openUnify={openUnify} />)}
         </ol>}
-        {projectPath && visiblePlaces[0] && <ProjectUnify key={visiblePlaces[0].id} place={visiblePlaces[0]}
+        {projectPath && visiblePlaces[0] && <ProjectUnify key={`unify:${visiblePlaces[0].id}`} place={visiblePlaces[0]}
           openRequest={unifyRequest.place === visiblePlaces[0].id ? unifyRequest.count : 0} />}
-        {projectPath && visiblePlaces[0] && <ProjectFiles key={visiblePlaces[0].id} place={visiblePlaces[0]} onState={updateFilesState} />}
+        {projectPath && visiblePlaces[0] && <ProjectFiles key={`files:${visiblePlaces[0].id}`} place={visiblePlaces[0]} onState={updateFilesState} />}
         {!loading && !error && visiblePlaces.length === 0 && <p className="project-setup-empty" role="status">{projectPath ? catalogWord("literal", "0e8fb42d973e") : <>{catalogWord("inline", "76d12ea59749")} <code>{catalogWord("inline", "fa482be8fef0")}</code>{catalogWord("inline", "7aa0955db160")}</>}</p>}
         {error && <p role="alert">{error}</p>}
         <button className="project-setup-refresh" type="button" disabled={loading} onClick={() => void load()}>{catalogWord("inline", "358a13c304aa")}</button>
