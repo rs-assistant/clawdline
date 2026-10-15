@@ -131,4 +131,3 @@ func devReleaseAssignment(dir, commit string, v release.Version) orchestrator.Ro
 		},
 	}
 }
-
