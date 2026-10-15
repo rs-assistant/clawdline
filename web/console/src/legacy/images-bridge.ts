@@ -21,6 +21,8 @@ import {
   reconcileArtifactTiles as reconcileArtifactTilesOriginal,
   releaseArtifactTile as releaseArtifactTileOriginal,
 } from "./js/view/transcript-images.js"
+import { nextWord } from "../next-strings.js"
+import { attachLightboxSteps } from "../session/lightbox-steps.js"
 
 /** One picture as a transcript entry carries it (`ImageArtifact`). */
 export interface ArtifactRef {
@@ -147,7 +149,19 @@ function imageLightbox(): Lightbox {
   const image = dialog.querySelector<HTMLImageElement>("#image-lightbox-image")!
   title.textContent = T.webImagePreview
   close.textContent = T.webImageClose
-  lightbox = createImageLightbox(dialog, image, close, document)
+  const preview = createImageLightbox(dialog, image, close, document)
+  const steps = attachLightboxSteps(dialog, image, {
+    previous: nextWord("imagePreviewPrevious"),
+    next: nextWord("imagePreviewNext"),
+    position: (index, count) => nextWord("imagePreviewPosition", { index, count }),
+  })
+  lightbox = {
+    open: (trigger, src, failed) => {
+      preview.open(trigger, src, failed)
+      steps.opened(trigger)
+    },
+    close: preview.close,
+  }
   return lightbox
 }
 

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5279,
+  "englishContentKeys": 5282,
   "riskKeys": 2332,
-  "nonRiskCount": 2947,
+  "nonRiskCount": 2950,
   "groups": [
     {
       "name": "bar / other",
@@ -1910,7 +1910,7 @@
     },
     {
       "name": "next / image",
-      "count": 10,
+      "count": 13,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1924,7 +1924,10 @@
         "next.imageMarkupTools",
         "next.imageMarkupZoom",
         "next.imageMarkupZoomIn",
-        "next.imageMarkupZoomOut"
+        "next.imageMarkupZoomOut",
+        "next.imagePreviewNext",
+        "next.imagePreviewPosition",
+        "next.imagePreviewPrevious"
       ]
     },
     {
