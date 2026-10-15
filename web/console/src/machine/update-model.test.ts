@@ -309,17 +309,17 @@ test("after a rollback, a newer release than the one that failed is offered as a
   assert.equal(view.press.label, nextWord("updateNow"))
 })
 
-test("a finished update stays said with when and from what, after a reload and after an overnight auto-update", () => {
+test("a finished update stays visible without a timestamp after a reload or overnight auto-update", () => {
   const healthy = release("current", { state: "healthy", from: "v0.10.0", to: "v0.11.0", at: "2026-10-07T03:12:00Z" }, {
     running: { stamp: "4b7c3f8d9e0f1a2b3c4d", version: "v0.11.0" },
   })
   // Not following: the page reloaded into the new console, or nobody watched.
   const view = panel({ read: answered(healthy) })
-  assert.equal(view.done, nextWord("updateDoneAt", { when: "at 2026-10-07T03:12:00Z", from: "v0.10.0", to: "v0.11.0" }))
+  assert.equal(view.done, nextWord("updateReady", { to: "v0.11.0" }))
   assert.equal(view.progress, null)
   assert.equal(view.problem, null)
   const noTime = panel({ read: answered({ ...healthy, apply: { state: "healthy", from: "v0.10.0", to: "v0.11.0" } }) })
-  assert.equal(noTime.done, nextWord("updateDone", { from: "v0.10.0", to: "v0.11.0" }))
+  assert.equal(noTime.done, nextWord("updateReady", { to: "v0.11.0" }))
   // A healthy record that does not say what it replaced says nothing of it.
   assert.equal(panel({ read: answered({ ...healthy, apply: { state: "healthy", to: "v0.11.0" } }) }).done, null)
   // A moving update is not a finished one.
@@ -361,7 +361,7 @@ test("only an address that asks for the update panel lands on it", () => {
   assert.equal(asksForUpdatePanel(""), false)
 })
 
-test("a healthy update with a staged app says it is replaced when the app quits", () => {
+test("a healthy update with a staged app tells the person to reopen it", () => {
   const view = panel({
     read: answered(release("current", { state: "healthy", from: "v0.10.0", to: "v0.11.0", staged_app: "/x/Clawdline.app" }, {
       running: { stamp: "4b7c3f8d9e0f1a2b3c4d", version: "v0.11.0" },
@@ -369,7 +369,7 @@ test("a healthy update with a staged app says it is replaced when the app quits"
     following: true,
   })
   assert.equal(view.staged, nextWord("updateStagedApp"))
-  assert.equal(view.done, nextWord("updateDone", { from: "v0.10.0", to: "v0.11.0" }))
+  assert.equal(view.done, nextWord("updateReady", { to: "v0.11.0" }))
   assert.equal(view.progress, null, "said once, as what was done")
   assert.equal(view.press.shown, false)
 })

@@ -370,7 +370,7 @@ export interface UpdatePanelView {
   stateLine: string | null
   /** What a failed check or an unknown comparison said, folded under the state line. */
   stateDetails: UpdateDetails | null
-  /** The last update that finished, with when: 「{時間} 已從 {from} 更新到 {to}。」 */
+  /** The last completed update, described without a timestamp. */
   done: string | null
   /** `below`: the button follows the problem it retries, not the facts. */
   press: { shown: boolean; enabled: boolean; label: string; below: boolean }
@@ -518,9 +518,7 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
   // it is the machine's last.
   if (!moving && !restarting && apply?.state === "healthy" && apply.from) {
     const installed = apply.to || buildName(status.running)
-    view.done = apply.at
-      ? say("updateDoneAt", { when: when(apply.at), from: apply.from, to: installed })
-      : say("updateDone", { from: apply.from, to: installed })
+    view.done = say("updateReady", { to: installed })
   } else if (!view.progress && apply?.state === "healthy" && input.following) {
     view.progress = say("updateHealthy", { to: buildName(status.running) || to })
   }
