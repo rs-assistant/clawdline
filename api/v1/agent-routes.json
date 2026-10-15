@@ -9,12 +9,12 @@
     {
       "method": "*",
       "pattern": "/v1/artifacts/images",
-      "guide": "note"
+      "guide": "send"
     },
     {
       "method": "*",
       "pattern": "/v1/artifacts/images/",
-      "guide": "note"
+      "guide": "send"
     },
     {
       "method": "*",

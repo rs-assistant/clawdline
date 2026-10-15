@@ -191,6 +191,11 @@ func (s *Server) imagesRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := contract.ImageStoreResult{OK: true, At: time.Now().Unix(), Artifacts: []contract.StoredImage{}, Terminal: session}
+	if session == "" {
+		// An agent that called this route the old way is told, in the answer it
+		// reads, that a 200 here has shown the person nothing.
+		out.Note = unshownNote
+	}
 	for _, item := range stored {
 		a := item.Artifact
 		marker := artifacts.Marker(a.ID)
@@ -212,6 +217,11 @@ func (s *Server) imagesRoute(w http.ResponseWriter, r *http.Request) {
 	s.recordPictures(ctx, len(stored))
 	writeJSON(w, out)
 }
+
+// unshownNote is the answer's word to a request that named no Session.
+const unshownNote = "Stored, and shown nowhere yet: no terminal was named, so these pictures appear only where a reply " +
+	"carries their marker, and a model may keep that prose only as a summary without it. Run `clawdline image send <picture>` " +
+	"from the Session instead, or send `terminal` with its terminal id; they then appear under its reply with no marker."
 
 func (s *Server) recordPictures(ctx context.Context, n int) {
 	raw, _ := json.Marshal(map[string]any{"images": n})

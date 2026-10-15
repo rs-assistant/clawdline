@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"image"
 	"image/png"
 	"net/http"
@@ -194,5 +195,32 @@ func TestTheImagesBodyTakesASessionAndNothingElse(t *testing.T) {
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("%s: %d %s, want 400", body, w.Code, w.Body.String())
 		}
+	}
+}
+
+// An upload that names no Session is told, in the answer it reads, that the
+// pictures are shown nowhere yet and how to show them: a 200 used to be the
+// only thing an agent saw, and it said nothing of the sort.
+func TestAnUploadThatNamesNoSessionIsToldItShowedNothing(t *testing.T) {
+	s := &Server{pictures: pictures{store: artifacts.NewStore(t.TempDir())}}
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 4, 3)))
+	src := filepath.Join(t.TempDir(), "shot.png")
+	if err := os.WriteFile(src, buf.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/artifacts/images", strings.NewReader(`{"images":[{"path":"`+src+`"}]}`))
+	req = req.WithContext(context.WithValue(req.Context(), accessKey{}, access{machine: true}))
+	w := httptest.NewRecorder()
+	s.imagesRoute(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("%d %s", w.Code, w.Body.String())
+	}
+	var out contract.ImageStoreResult
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Terminal != "" || !strings.Contains(out.Note, "shown nowhere yet") || !strings.Contains(out.Note, "clawdline image send") {
+		t.Fatalf("answer %+v; want a note that nothing is shown and how to show it", out)
 	}
 }

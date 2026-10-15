@@ -3032,7 +3032,13 @@ type ImageStoreRequest struct {
 type ImageStoreResult struct {
 	Artifacts []StoredImage `json:"artifacts"`
 	At        int64         `json:"at"`
-	OK        bool          `json:"ok"`
+
+	// Present when the request named no `terminal`: the pictures are stored and shown
+	// nowhere until a reply carries their marker, which a model may summarise away.
+	// Name the Session's terminal (`clawdline image send` does) to have them shown
+	// under its reply.
+	Note string `json:"note,omitempty"`
+	OK   bool   `json:"ok"`
 
 	// The terminal id of the Session the pictures are shown in, when the request named
 	// one: they appear under the first reply it writes after this answer. Stored is
