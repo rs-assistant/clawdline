@@ -640,14 +640,15 @@ func (p *Publisher) StateRow(ctx context.Context, sender, id string) (cloudops.S
 }
 
 // stateRow forgets that one row was sent, so the fresh pass sends it again,
-// and answers with it named only if the reading had it.
+// and answers with it named only if the reading had it. Both of its rows: the
+// list a page draws beside the opened pane reads the ss/ one, and a page that
+// missed its last ss/ row would otherwise hear nothing until the row changed.
 func (p *Publisher) stateRow(ctx context.Context, ask rowAsk) {
 	if p.Look != nil {
 		p.Look(ask.id)
 	}
-	delete(p.published, ask.id)
-	delete(p.sent, ask.id)
-	delete(p.steady, ask.id)
+	p.forget(ask.id)
+	p.forget(statusRowKey(ask.id))
 	p.unsent = 0
 	p.fresh = true
 	_, reading, ok := p.pass(ctx)

@@ -39,20 +39,26 @@ export function statusProjection(client: StatusProjectionClient | null, machine:
   let stale = outsideFreshWindow(Number(marker.at) * 1000, nowMs)
   const rows: ProjectedSession[] = []
   let unknownTargets = 0
+  // A gap makes the set uncertain, not each row: the rows that did arrive are
+  // still the newest word on their own Session. They go back as `latest`, so a
+  // list holding its previous set can redraw each of its Sessions from them.
+  let gap = false
   for (const session of ids as string[]) {
     const entry = held(client, machine, session)
-    if (!entry) return { kind: "unavailable", reason: "event_gap", observedAt: Number(marker.at) * 1000 }
+    if (!entry) {
+      gap = true
+      continue
+    }
     const data = record(entry.payload)
     const source = record(data?.source)
     if (!data || data.machine_id !== machine || data.session_id !== session || data.inventory_complete !== true ||
       !["working", "waiting", "idle", "unknown"].includes(String(data.state)) ||
       !Number.isFinite(data.projected_at) || !Number.isFinite(source?.observed_at) ||
       !["current", "unverified", "missing"].includes(String(source?.freshness))) {
+      if (gap) continue
       return { kind: "unavailable", reason: "bad_projection" }
     }
-    if (data.snapshot_generation !== marker.snapshot_generation) {
-      return { kind: "unavailable", reason: "event_gap", observedAt: Number(marker.at) * 1000 }
-    }
+    if (data.snapshot_generation !== marker.snapshot_generation) gap = true
     const rowStale = outsideFreshWindow(Number(data.projected_at) * 1000, nowMs) ||
       (source!.freshness === "current" && outsideFreshWindow(Number(source!.observed_at) * 1000, nowMs))
     stale ||= rowStale
@@ -86,6 +92,8 @@ export function statusProjection(client: StatusProjectionClient | null, machine:
         ? Number(data.failed_agent_count) : undefined,
     })
   }
+  if (gap) return { kind: "unavailable", reason: "event_gap", observedAt: Number(marker.at) * 1000,
+    latest: rows.map((row) => ({ ...row, freshness: "stale" })) }
   if (stale) return { kind: "unavailable", reason: "stale", complete: true,
     observedAt: Number(marker.at) * 1000, snapshotGeneration: marker.snapshot_generation as string,
     rows: rows.map((row) => ({ ...row, freshness: "stale" })), unknownTargets }

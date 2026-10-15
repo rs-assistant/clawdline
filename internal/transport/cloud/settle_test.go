@@ -98,6 +98,42 @@ func TestOneSessionRowIsStatedNowEvenUnchanged(t *testing.T) {
 	<-done
 }
 
+// Opening a Session asks for its row so the list beside the pane agrees with
+// it. The list is drawn from the content-free ss/ row, which, unchanged, no
+// pass sends again; an ask that restated only the s/ row left a list that had
+// missed the last ss/ row saying "waiting for you" next to a finished pane.
+func TestAnAskedRowRestatesItsStatusRowToo(t *testing.T) {
+	out := &collector{}
+	body := scanBody(t, true, map[string]bool{"ps": true, "tmux": true, "iterm": true},
+		scanRow{id: "%19", tty: "ttys001", backend: "tmux"},
+		scanRow{id: "%20", tty: "ttys002", backend: "tmux"})
+	publisher := newPublisher(&fixedRouter{body: body}, out)
+	publisher.Every = time.Hour
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { _ = publisher.Run(ctx); close(done) }()
+	waitFor(t, "the first status pass", func() bool {
+		return strings.Contains(strings.Join(out.channels(), " "), "ss/mac-01/%2519")
+	})
+	out.reset()
+
+	if _, refusal := publisher.StateRow(ctx, "viewer-01", "%19"); refusal != nil {
+		t.Fatalf("refused: %+v", *refusal)
+	}
+	var status []string
+	for _, channel := range out.channels() {
+		if strings.HasPrefix(channel, "ss/") {
+			status = append(status, channel)
+		}
+	}
+	if got := strings.Join(status, " "); got != "ss/mac-01/%2519" {
+		t.Fatalf("the ask restated status rows %q; want only the asked Session's", got)
+	}
+	cancel()
+	<-done
+}
+
 // A page asks for a waiting row because its question has not come. On
 // 2026-10-14 the phone reported `rich_state=waiting rich_options=0` five times:
 // the row it was sent had been built from a screen held from before the

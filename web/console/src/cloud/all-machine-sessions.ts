@@ -139,7 +139,13 @@ export type MachineSessionProjection =
   | { kind: "ready"; complete: boolean; observedAt: number; snapshotGeneration?: string; presentationGeneration?: string;
       rows: ProjectedSession[]; unknownTargets?: number }
   | { kind: "unavailable"; reason: ProjectionProblem; observedAt?: number; rows?: ProjectedSession[]; retryAt?: number;
-      complete?: true; snapshotGeneration?: string; unknownTargets?: number }
+      complete?: true; snapshotGeneration?: string; unknownTargets?: number
+      /**
+       * An `event_gap`'s rows that did arrive. They never decide which
+       * Sessions are listed — the gap means that is not known — only what a
+       * Session already on the list now says (`afterEventGap`).
+       */
+      latest?: ProjectedSession[] }
 
 /** A selected status row for optional actions outside the original composer. */
 export interface DetailActionContext {
@@ -264,11 +270,20 @@ export function supersedingDestination(destination: SessionDestination,
   return rows.length === 1 ? rows[0].destination : null
 }
 
-export function afterEventGap(before: MachineSessionProjection | undefined, retryAt?: number): MachineSessionProjection {
+export function afterEventGap(before: MachineSessionProjection | undefined, retryAt?: number,
+  latest?: readonly ProjectedSession[]): MachineSessionProjection {
+  // The previous set stays, because a gap cannot say which Sessions left. What
+  // each of them says does: a row held from before the gap kept a Session that
+  // had been answered and finished reading "waiting for you" until the next
+  // whole pass, beside an open pane that showed it done.
+  const newer = new Map((latest ?? []).map((row) => [destinationKey(row.destination), row]))
   return {
     kind: "unavailable", reason: "event_gap",
     ...(retryAt === undefined ? {} : { retryAt }),
-    rows: before?.rows?.map((row) => ({ ...row, freshness: "stale" })),
+    rows: before?.rows?.map((row) => {
+      const fresh = newer.get(destinationKey(row.destination))
+      return { ...(fresh && fresh.observedAt >= row.observedAt ? fresh : row), freshness: "stale" }
+    }),
     observedAt: before?.observedAt,
     snapshotGeneration: before?.snapshotGeneration,
   }
@@ -285,7 +300,7 @@ export function settleProjection(machineID: string, before: MachineSessionProjec
     ? { ...checkedReply, retryAt: Date.now() + unknownRetryMs } : checkedReply
   if (checked.kind !== "unavailable" || checked.rows ||
     !["event_gap", "unknown", "unresponsive", "stale", "offline"].includes(checked.reason)) return checked
-  if (checked.reason === "event_gap") return afterEventGap(before, checked.retryAt)
+  if (checked.reason === "event_gap") return afterEventGap(before, checked.retryAt, checked.latest)
   return before?.rows?.length ? {
     kind: "unavailable", reason: checked.reason,
     rows: before.rows.map((row) => ({ ...row, freshness: "stale" })),

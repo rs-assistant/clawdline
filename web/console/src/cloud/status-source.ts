@@ -45,6 +45,24 @@ function reportListFailure(client: StatusClient, machineID: string, reason: stri
   } catch { /* diagnostics cannot fail a Session read */ }
 }
 
+/**
+ * The list is holding its previous set because the ss/ pass has a gap. Sent
+ * once per machine and pass, so the machine's log can say which row the page
+ * was missing and for how long, without asking the person what they saw.
+ */
+function reportGap(client: StatusClient, machineID: string, projection: MachineSessionProjection): void {
+  if (projection.kind !== "unavailable" || projection.reason !== "event_gap") return
+  try {
+    const missing = statusGapTarget(client, machineID)
+    const now = client.now?.() ?? Date.now()
+    client.viewerEvents?.record?.("cloud.status_list.gap", { machine: machineID,
+      missing: missing?.sessionID ?? null, transition: statusPassTransition(client, machineID),
+      latest: projection.latest?.length ?? 0,
+      marker_age_s: Number.isFinite(projection.observedAt) ? Math.round((now - projection.observedAt!) / 1000) : null },
+    ["cloud.status_list.gap", machineID, missing?.snapshotGeneration ?? ""].join("|"))
+  } catch { /* diagnostics cannot fail a Session read */ }
+}
+
 function channels(destination: SessionDestination): string[] {
   const suffix = channelSegment(destination.machineID) + "/" + channelSegment(destination.sessionID)
   return ["s/" + suffix, "t/" + suffix]
@@ -294,6 +312,7 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         if (projection.kind === "unavailable" && projection.reason === "event_gap") {
           const retryAt = attempts.sessions.get(missing.sessionID)?.retryAt ??
             (client.now?.() ?? Date.now()) + STATUS_GAP_RETRY_MS
+          reportGap(client, machineID, projection)
           return { ...projection, retryAt }
         }
       }
@@ -303,6 +322,7 @@ export function statusSource(current: () => StatusClient | null): SessionProject
         const until = directLists.get(machineID)?.until
         if (until) return { ...projection, retryAt: until }
       }
+      reportGap(client, machineID, projection)
       return projection
     }
     const answer = await client.machines()

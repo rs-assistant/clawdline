@@ -130,6 +130,25 @@ test("a partial next status pass keeps the prior rows visible but disables their
   assert.equal(destinationAvailable(row("one", "s", "2").destination, next), "ready")
 })
 
+test("a gap keeps the listed Sessions but draws each from its newest row", () => {
+  // The set is uncertain during a gap; what a listed Session says is not. An
+  // answered Session must not keep saying "waiting" because another row is late.
+  const previous = ready("one", [{ ...row("one", "s", "1"), state: "waiting" }, row("one", "t", "1")])
+  const answered = { ...row("one", "s", "1"), state: "idle", needsAttention: false, observedAt: 1500, freshness: "stale" as const }
+  const older = { ...row("one", "t", "1"), state: "idle", observedAt: 900, freshness: "stale" as const }
+  const newcomer = { ...row("one", "u", "1"), freshness: "stale" as const }
+  const gap = settleProjection("one", previous, { kind: "unavailable", reason: "event_gap", observedAt: 1200,
+    latest: [answered, older, newcomer] })
+  assert.deepEqual(gap.rows?.map((item) => item.destination.sessionID), ["s", "t"], "a gap never adds or drops a Session")
+  assert.equal(gap.rows?.[0].state, "idle")
+  assert.equal(gap.rows?.[0].needsAttention, false)
+  assert.equal(gap.rows?.[1].state, "working", "an older row never replaces a newer one")
+  assert.ok(gap.rows?.every((item) => item.freshness === "stale"), "nothing in a gap authorizes an action")
+  const restarted = settleProjection("one", previous, { kind: "unavailable", reason: "event_gap", observedAt: 1200,
+    latest: [{ ...answered, destination: row("one", "s", "2").destination }] })
+  assert.equal(restarted.rows?.[0].state, "waiting", "another execution's row never speaks for this one")
+})
+
 test("a temporary status read failure retains the last list without making its rows actionable", () => {
   const previous = ready("one", [row("one", "s", "1")])
   for (const reason of ["unknown", "unresponsive", "stale", "offline"] as const) {

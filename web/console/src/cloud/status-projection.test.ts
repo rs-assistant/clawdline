@@ -149,3 +149,19 @@ test("an expired pass with a missing or mismatched row still reports a gap", () 
   assert.equal(gap.kind === "unavailable" && gap.reason, "event_gap")
   assert.equal(gap.rows, undefined)
 })
+
+test("a gap still hands back every row that did arrive, as stale", () => {
+  const source = fleet("a", ["one", "two"], passOne, "two")
+  const reading = statusProjection(source, "a", 2000)
+  assert.equal(reading.kind === "unavailable" && reading.reason, "event_gap")
+  assert.equal(reading.rows, undefined, "a gap never decides the set")
+  const latest = reading.kind === "unavailable" ? reading.latest : undefined
+  assert.deepEqual(latest?.map((row) => row.destination.sessionID), ["one"])
+  assert.equal(latest?.[0].freshness, "stale")
+  const moved = fleet("a", ["one"])
+  const marker = moved.statusSnapshots.get(JSON.stringify(["a", INVENTORY])) as { payload: { snapshot_generation: string } }
+  marker.payload.snapshot_generation = passTwo
+  const behind = statusProjection(moved, "a", 2000)
+  assert.equal(behind.kind === "unavailable" && behind.reason, "event_gap")
+  assert.equal(behind.kind === "unavailable" && behind.latest?.[0].state, "waiting")
+})
