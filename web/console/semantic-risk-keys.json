@@ -3,7 +3,7 @@
   "englishKeys": 5279,
   "counts": {
     "negation": 1512,
-    "state": 728,
+    "state": 727,
     "permission": 334,
     "deletion": 111,
     "uncertainty": 155
@@ -2121,7 +2121,6 @@
       "next.updateAutoFailed",
       "next.updateIsAvailable",
       "next.updateRunning",
-      "next.updateStagedApp",
       "projects.editDone",
       "projects.folderGo",
       "projects.folderTruncated",

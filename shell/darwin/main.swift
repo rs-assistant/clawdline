@@ -198,6 +198,8 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
     lazy var inputBar = BarController(home: home)
     /// Pairing codes, heard on the daemon's local-only stream.
     private let pairing = PairingWatcher(base: home)
+    /// Puts a newer app the daemon staged in place by itself. StagedAppWatcher.swift.
+    private let stagedApp = StagedAppWatcher(home: home)
     private var readings = MenuReadings()
     /// The app that was in front when the window was summoned, so a hotkey
     /// dismissal can hand the front back — the Swift panel's `previousApp`.
@@ -319,12 +321,34 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
         // put away, a launch — at login above all — stays quiet until the Dock,
         // the menu or the hotkey asks. The page loads either way, so the menu
         // bar mark is live and the window is ready when it is asked for.
-        if !IntroductionStore().isCurrent {
+        if let reopen = ReopenArgument.requested {
+            // A restart that put a newer app in place, with the window on
+            // screen before it: back where it was, in front only if it was.
+            shellLog("window: reopened for an update (\(reopen))")
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                if reopen == ReopenArgument.console {
+                    self.showConsole()
+                } else {
+                    self.placeOnPointerScreen()
+                    self.window.orderFront(nil)
+                }
+            }
+        } else if !IntroductionStore().isCurrent {
             DispatchQueue.main.async { [weak self] in self?.showConsole() }
         } else {
             shellLog("window: introduced before; launching quietly")
         }
         launchFinishedAt = Date()
+
+        stagedApp.inUse = { [weak self] in
+            NSApp.isActive || self?.inputBar.isVisible == true
+        }
+        stagedApp.consoleOnScreen = { [weak self] in
+            guard let window = self?.window else { return false }
+            return window.isVisible && !window.isMiniaturized
+        }
+        stagedApp.start()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

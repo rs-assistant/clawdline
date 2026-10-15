@@ -43,12 +43,18 @@ deploying the hosted console does not require quitting the local app or restarti
    `failed` or `rolled_back`, preserve the previous running release and record the error code;
    investigate before trying again.
 4. On macOS, a healthy daemon update can leave the app bundle staged while the app remains open.
-   `apply.staged_app` records that state. The installed Mac app offers **Restart app now** in its
-   update banner and Settings panel; only the person's press closes it, waits for the staged bundle
-   to replace the old one, and opens it again. They can also leave it open and use the new bundle
-   after their next ordinary quit. Report the running daemon version and the app bundle version
-   separately until they agree. An older app shell without this button needs one ordinary quit
-   and reopen after its first update; a newly served web page cannot add a native action to an
+   `apply.staged_app` records that state. The app puts the staged bundle in place by itself
+   (`shell/darwin/StagedAppWatcher.swift`): it reads `GET /v1/update` 3 s after launching and every
+   30 s after, and when a bundle is staged for a version other than its own it restarts into it —
+   at once within a minute of launching, otherwise only while it is not in front and its input bar
+   is closed. A restart the person did not ask for reopens behind other apps (`open -g`), and a
+   window that was on screen comes back. One version is tried at most once every 30 minutes, so a
+   failing swap cannot become an app that keeps restarting. **Restart app now** in the update banner
+   and Settings panel does the same at once. On 2026-10-15, before this, the installed app stayed
+   at 1.0.1 through four releases: closing the window does not quit a menu bar app, and a quick
+   quit-and-reopen started the old bundle again. Report the running daemon version and the app
+   bundle version separately until they agree. An app older than this watcher needs one ordinary
+   quit and reopen after its first update; a newly served web page cannot add a native action to an
    already running old shell. Do not force the app to quit merely to clear `staged_app`.
 
 This procedure keeps the existing console available through the release approval and download
@@ -222,8 +228,8 @@ The panel shows the running and latest version (a short commit for a source buil
 - `rolled_back` and `failed` show `apply.error.code` and `detail` and say the previous release still
   runs. The session-list banner animates while an update is checking or moving, keeps the completed
   result visible after a page reload until dismissed, and shows `staged_app` beside that result: the
-  daemon has updated, while the open Mac app keeps its old bundle until the person presses
-  **Restart app now** in the installed Mac app or next quits it.
+  daemon has updated, while the open Mac app keeps its old bundle until it restarts into the new
+  one by itself, the person presses **Restart app now**, or it next quits.
 - **自動更新** writes `update_auto_apply` through `/v1/settings`. Over Cloud it is shown but disabled,
   with a sentence saying to change it on the machine: the settings route takes only the machine's
   own token.
