@@ -553,6 +553,11 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/update/dev-release",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/update/fresh",
       "guide": "connect"
     },

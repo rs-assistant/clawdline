@@ -9435,6 +9435,35 @@ export type UpdateApplyState =
 export const UpdateApplyStateValues: readonly UpdateApplyState[] = ["idle", "downloading", "verifying", "staged", "restarting", "healthy", "rolled_back", "failed"] as const
 
 /**
+ * POST /v1/update/dev-release, on a machine running a dev build (`clawdline dev
+ * install`): the Root Session opened in the Project that holds the running commit,
+ * to cut a release of it by docs/releasing.md. Answered 202. The same commit asked
+ * again answers the Root already opened. Refused 409 `not_a_dev_build`,
+ * `dev_project_not_found`, or `dev_commit_not_on_main`.
+ */
+export interface UpdateDevReleaseResult {
+  /**
+   * The running dev build's full commit.
+   */
+  commit: string
+
+  /**
+   * The Root Session's label.
+   */
+  label: string
+
+  /**
+   * The repository the Root works in.
+   */
+  project_dir: string
+
+  /**
+   * The Root Assignment opened, GET /v1/orchestrator/root-assignments/<id>.
+   */
+  root_assignment_id: string
+}
+
+/**
  * What kind of installation the running daemon belongs to (docs/updates.md).
  * `release`: a signed release in the install layout; the updater owns it.
  * `source_deploy`: a commit deployed from a source checkout into the layout.

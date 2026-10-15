@@ -273,6 +273,27 @@ export function devCommit(build: { version?: string } | undefined): string | nul
   return /-dev\.([0-9a-f]+)$/.exec(build?.version ?? "")?.[1] ?? null
 }
 
+/** What POST /v1/update/dev-release answered. */
+export type DevReleaseAnswer =
+  | { kind: "opened"; label: string }
+  | { kind: "refused"; code: string; detail: string }
+  | { kind: "unanswered" }
+
+export function classifyDevReleaseAnswer(answer: Answer): DevReleaseAnswer {
+  if (answer.transport === "failed") return { kind: "unanswered" }
+  const label = (answer.parsed as { label?: unknown } | null)?.label
+  if (answer.status === 202 && typeof label === "string" && label) return { kind: "opened", label }
+  return { kind: "refused", code: refusalCode(answer.parsed), detail: refusalDetail(answer.parsed) }
+}
+
+/** The sentence a dev release press ends with. */
+export function devReleaseSentence(answer: DevReleaseAnswer, say: Say): string {
+  if (answer.kind === "opened") return say("updateDevReleaseOpened", { label: answer.label })
+  if (answer.kind === "refused" && answer.code === "dev_commit_not_on_main") return say("updateDevReleaseNotOnMain")
+  if (answer.kind === "refused" && answer.code === "dev_project_not_found") return say("updateDevReleaseNoProject")
+  return say("updateDevReleaseFailed")
+}
+
 /**
  * The older daemon's one line, or null: only `update_available` and
  * `differs` speak, and a machine that is current, ahead, or could not tell
@@ -396,6 +417,11 @@ export interface UpdatePanelView {
    * only stable releases.
    */
   auto: { shown: boolean; on: boolean; enabled: boolean; state: string; beta: string | null; note: string | null }
+  /**
+   * "Release this version", beside the way back, while a dev build runs. Only
+   * on the machine's own console: Cloud does not carry the route.
+   */
+  devRelease: { shown: boolean; commit: string }
   /** How soon the panel should read again. */
   everyMs: number
   /** The daemon is between the old release and the new one. */
@@ -436,6 +462,7 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
     staged: null,
     sourceNote: null,
     auto: { shown: false, on: false, enabled: false, state: "", beta: null, note: null },
+    devRelease: { shown: false, commit: "" },
     everyMs: UPDATE_READ_EVERY_MS,
     restarting: false,
   }
@@ -497,6 +524,7 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
     view.stateLine = say(dev ? "updateDevBack" : "updateIsAvailable", { latest: latestName })
     if (dev) view.press.label = say("updateToVersion", { latest: latestName })
   }
+  if (dev && !input.overCloud) view.devRelease = { shown: true, commit: dev }
   else if (status.state === "unknown") {
     view.stateLine = say("updateIsUnknown")
     view.stateDetails = details("", status.reason || status.error)

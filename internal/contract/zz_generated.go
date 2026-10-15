@@ -7792,6 +7792,25 @@ const (
 // UpdateApplyStateValues is every value the contract allows, in contract order.
 var UpdateApplyStateValues = []UpdateApplyState{UpdateApplyStateIdle, UpdateApplyStateDownloading, UpdateApplyStateVerifying, UpdateApplyStateStaged, UpdateApplyStateRestarting, UpdateApplyStateHealthy, UpdateApplyStateRolledBack, UpdateApplyStateFailed}
 
+// POST /v1/update/dev-release, on a machine running a dev build (`clawdline dev
+// install`): the Root Session opened in the Project that holds the running
+// commit, to cut a release of it by docs/releasing.md. Answered 202. The same
+// commit asked again answers the Root already opened. Refused 409
+// `not_a_dev_build`, `dev_project_not_found`, or `dev_commit_not_on_main`.
+type UpdateDevReleaseResult struct {
+	// The running dev build's full commit.
+	Commit string `json:"commit"`
+
+	// The Root Session's label.
+	Label string `json:"label"`
+
+	// The repository the Root works in.
+	ProjectDir string `json:"project_dir"`
+
+	// The Root Assignment opened, GET /v1/orchestrator/root-assignments/<id>.
+	RootAssignmentID string `json:"root_assignment_id"`
+}
+
 // What kind of installation the running daemon belongs to (docs/updates.md).
 // `release`: a signed release in the install layout; the updater owns it.
 // `source_deploy`: a commit deployed from a source checkout into the layout.

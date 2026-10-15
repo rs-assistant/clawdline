@@ -458,6 +458,9 @@ func (s *Server) routeTable() []route {
 		// Installing a newer release on a release install (update.go). This
 		// machine's token, or a device that may send.
 		{Route{"*", "/v1/update/apply"}, s.updateApplyRoute},
+		// A machine running a dev build opens a Root to release that commit
+		// (update_dev_release.go). This machine's token, or a device that may send.
+		{Route{"*", "/v1/update/dev-release"}, s.updateDevReleaseRoute},
 		// What the line to app.clawdline.com is doing (cloud.go). This machine's
 		// own token only.
 		{Route{"*", "/v1/cloud/status"}, s.cloudStatusRoute},

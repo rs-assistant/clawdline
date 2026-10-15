@@ -6,6 +6,7 @@ import {
   classifyApplyAnswer,
   createUpdateReadStore,
   detailsText,
+  devReleaseSentence,
   INSTALL_COMMAND,
   classifyUpdateRead,
   settleUpdateRead,
@@ -518,4 +519,15 @@ test("a dev build names its commit and offers the release it went over by name",
   assert.match(view.stateLine ?? "", /dev build for testing\. v0\.11\.0 is the current release/)
   // An ordinary release keeps its words.
   assert.equal(panel({ read: answered(release("update_available")) }).press.label, "Update now")
+})
+
+test("only a dev build on its own machine offers to release itself, and says how the press ended", () => {
+  const dev = release("update_available", undefined, {
+    running: { stamp: "4c41b18ae9f0ecd4daccc1b55dc044fe7b792f80", version: "v0.11.0-dev.4c41b18" } })
+  assert.deepEqual(panel({ read: answered(dev) }).devRelease, { shown: true, commit: "4c41b18" })
+  assert.equal(panel({ read: answered(dev), overCloud: true }).devRelease.shown, false)
+  assert.equal(panel({ read: answered(release("update_available")) }).devRelease.shown, false)
+  assert.match(devReleaseSentence({ kind: "opened", label: "Release 4c41b18" }, nextWord), /Opened “Release 4c41b18”/)
+  assert.match(devReleaseSentence({ kind: "refused", code: "dev_commit_not_on_main", detail: "" }, nextWord), /not on main yet/)
+  assert.match(devReleaseSentence({ kind: "unanswered" }, nextWord), /did not open/)
 })

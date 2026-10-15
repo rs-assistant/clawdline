@@ -8,13 +8,14 @@ import { writeSettings } from "../pages/settings/api.js"
 import { Switch } from "../pages/settings/Switch.js"
 import { useMachineVersion } from "./NeedsUpdate.js"
 import { needsUpdateWords } from "./needs-update-model.js"
-import { applyUpdate, currentUpdateRead, publishUpdateRead, refreshUpdate, servedConsoleChanged, subscribeUpdate } from "./update.js"
+import { applyUpdate, currentUpdateRead, publishUpdateRead, refreshUpdate, requestDevRelease, servedConsoleChanged, subscribeUpdate } from "./update.js"
 import { canRestartStagedApp, restartStagedApp } from "./restart-app.js"
 import {
   applyMoving,
   asksForUpdatePanel,
   buildName,
   detailsText,
+  devReleaseSentence,
   shouldLookForNewConsole,
   updatePanel,
   type UpdateDetails,
@@ -100,6 +101,8 @@ export function UpdatePanel({ shown }: { shown: boolean }) {
   const [sending, setSending] = useState(false)
   const [pressRefused, setPressRefused] = useState<{ code: string; detail: string } | null>(null)
   const [pressOlder, setPressOlder] = useState(false)
+  const [releasing, setReleasing] = useState(false)
+  const [releaseSaid, setReleaseSaid] = useState("")
   const [autoSaving, setAutoSaving] = useState(false)
   const [autoFailed, setAutoFailed] = useState("")
   const [reloading, setReloading] = useState(false)
@@ -177,6 +180,16 @@ export function UpdatePanel({ shown }: { shown: boolean }) {
     })
   }
 
+  const pressRelease = () => {
+    if (releasing) return
+    setReleasing(true)
+    setReleaseSaid(nextWord("updateDevReleaseSending", { commit: view.devRelease.commit }))
+    void requestDevRelease().then((answer) => {
+      setReleasing(false)
+      setReleaseSaid(devReleaseSentence(answer, nextWord))
+    })
+  }
+
   const toggleAuto = () => {
     if (autoSaving || !view.auto.enabled) return
     const next = !view.auto.on
@@ -214,12 +227,22 @@ export function UpdatePanel({ shown }: { shown: boolean }) {
 
   const running = last.current ? buildName(last.current.running) : ""
   const restartVersion = view.staged ? last.current?.apply?.to || "" : ""
-  const pressButton = view.press.shown ? (
-    <div className="row">
-      <button className="chip update-now" id="settings-update-now" type="button" disabled={!view.press.enabled} onClick={press}>
-        {view.press.label}
-      </button>
-    </div>
+  const pressButton = view.press.shown || view.devRelease.shown ? (
+    <>
+      <div className="row">
+        {view.press.shown ? (
+          <button className="chip update-now" id="settings-update-now" type="button" disabled={!view.press.enabled} onClick={press}>
+            {view.press.label}
+          </button>
+        ) : null}
+        {view.devRelease.shown ? (
+          <button className="chip" id="settings-dev-release" type="button" disabled={releasing} onClick={pressRelease}>
+            {nextWord("updateDevRelease")}
+          </button>
+        ) : null}
+      </div>
+      {releaseSaid ? <p className="said calm" role="status" aria-live="polite">{releaseSaid}</p> : null}
+    </>
   ) : null
   const problem = view.problem
   return (
