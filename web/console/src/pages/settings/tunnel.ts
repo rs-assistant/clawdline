@@ -1,5 +1,7 @@
 import type { TunnelStatus } from "@clawdline/contract"
 import { client } from "../../client.js"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { remoteReading, type MachineOnly } from "./remote-reading.ts"
 
 /**
  * `/v1/tunnel`, what this daemon's cloudflared is doing (api/v1/tunnel.schema.json).
@@ -11,13 +13,12 @@ import { client } from "../../client.js"
  *
  * A refusal is null rather than a throw, as `readCloudStatus` answers it.
  */
-export async function readTunnelStatus(): Promise<TunnelStatus | null> {
+export async function readTunnelStatus(): Promise<TunnelStatus | MachineOnly | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 10_000)
   try {
     const res = await fetch(client.url("/v1/tunnel"), { signal: controller.signal, cache: "no-store" })
-    if (!res.ok) return null
-    return (await res.json()) as TunnelStatus
+    return await remoteReading<TunnelStatus>(res)
   } catch {
     return null
   } finally {

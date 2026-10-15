@@ -4593,6 +4593,7 @@
   "settings.webCloudStatusMac": "機器 {machine}",
   "settings.webCloudStatusNoDrops": "自 {at} 起這台機器沒有丟棄任何指令。",
   "settings.webCloudStatusReadFailed": "讀不到這台機器的狀態。",
+  "settings.webRemoteMachineOnly": "這個瀏覽器不能管理 Cloud 與通道，只有這台機器本身的登入可以。請改用這台機器上 Clawdline App 的設定，或在這台機器的終端機執行 clawdline cloud login 與 clawdline tunnel。",
   "settings.webCloudStatusToken": "機器憑證到期：{at}",
   "settings.webFailMacWritesOff": "這台機器目前不接受來自 Cloud 的指令。",
   "settings.cloudSetupTitle": "連接這台機器到 Cloud",

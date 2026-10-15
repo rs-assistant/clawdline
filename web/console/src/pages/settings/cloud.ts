@@ -1,6 +1,10 @@
 // @ts-expect-error -- Node's strip-types test runner needs the source extension.
 import { catalogFormat } from "../../catalog.ts"
 import { client } from "../../client.js"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { remoteReading, type MachineOnly } from "./remote-reading.ts"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+export { MACHINE_ONLY, type MachineOnly } from "./remote-reading.ts"
 import { RefusalError, isRefusal } from "@clawdline/core"
 
 /**
@@ -107,13 +111,12 @@ export type CloudLogin = {
  * settings window that throws on a tab nobody has opened yet is worse than one
  * that says nothing about Cloud.
  */
-export async function readCloudStatus(): Promise<CloudStatus | null> {
+export async function readCloudStatus(): Promise<CloudStatus | MachineOnly | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 10_000)
   try {
     const res = await fetch(client.url("/v1/cloud/status"), { signal: controller.signal })
-    if (!res.ok) return null
-    return (await res.json()) as CloudStatus
+    return await remoteReading<CloudStatus>(res)
   } catch {
     return null
   } finally {
