@@ -381,6 +381,20 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		"places.repo_wait_seconds": func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-new-lookup wait; no retained buffer"}
 		},
+		"places.setup_lookups": func() capacity.Reading {
+			entries, _ := s.projectReaders().setups.Counts()
+			return capacity.Reading{Known: true, Used: entries}
+		},
+		"places.setup_readers": func() capacity.Reading {
+			_, readers := s.projectReaders().setups.Counts()
+			return capacity.Reading{Known: true, Used: readers}
+		},
+		"places.setup_wait_seconds": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-new-lookup wait; no retained buffer"}
+		},
+		"places.setup_age_seconds": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "completed setup cache refresh age"}
+		},
 		"projectsync.entry_bytes": func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-request byte guard"} },
 		"icons.side":              func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-icon dimension guard"} },
 		"icons.request_bytes":     func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-request byte guard"} },

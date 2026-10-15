@@ -2399,6 +2399,33 @@ func Register() []Entry {
 			Sources: []string{"internal/adapters/projects.MaxRepoWaitSeconds"},
 		},
 		{
+			// Optional Project readiness rows may open repository files. A
+			// blocked read keeps its slot; completed rows outside the current
+			// place list are evicted first.
+			Name: "places.setup_lookups", Class: Cache, Unit: Rows,
+			Limit: 40, AtLimit: EvictOldest, Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.MaxProjectSetupLookups"},
+		},
+		{
+			Name: "places.setup_readers", Class: Buffer, Unit: Rows,
+			Limit: 4, AtLimit: Refuse, Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.MaxProjectSetupReaders", "internal/transport/http.newSetupLookup:chan(MaxProjectSetupReaders)"},
+		},
+		{
+			// One request waits at most this long for new optional setup
+			// reads, then returns the available rows.
+			Name: "places.setup_wait_seconds", Class: Buffer, Unit: Seconds,
+			Limit: 1, AtLimit: Refuse, Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.MaxProjectSetupWaitSeconds"},
+		},
+		{
+			// Completed setup rows refresh after this age, so local
+			// Project configuration changes eventually appear on the list.
+			Name: "places.setup_age_seconds", Class: Cache, Unit: Seconds,
+			Limit: 60, AtLimit: EvictOldest, Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.MaxProjectSetupAgeSeconds"},
+		},
+		{
 			Name: "projectsync.path_bytes", Class: Buffer, Unit: Bytes,
 			Limit: 512, AtLimit: Refuse, Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/domain/projectsync.MaxPathBytes"},

@@ -159,6 +159,10 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `places.repo_lookups` | 40 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `places.repo_readers` | 4 | `rows` | `refuse` | `diagnostics` | — |
 | `places.repo_wait_seconds` | 1 | `seconds` | `refuse` | `diagnostics` | — |
+| `places.setup_age_seconds` | 60 | `seconds` | `evict_oldest` | `diagnostics` | — |
+| `places.setup_lookups` | 40 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `places.setup_readers` | 4 | `rows` | `refuse` | `diagnostics` | — |
+| `places.setup_wait_seconds` | 1 | `seconds` | `refuse` | `diagnostics` | — |
 | `planreview.blocking_listed` | 8 | `rows` | `coalesce` | `diagnostics, sender` | — |
 | `projectfiles.file_bytes` | 131072 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `projectfiles.list` | 128 | `rows` | `refuse` | `diagnostics, sender` | — |

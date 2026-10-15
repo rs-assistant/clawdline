@@ -153,14 +153,14 @@ row's 檢視共用 opens that Project's settings view and, once its plan is read
 plan that cannot be read leaves the preview shut and moves focus to the block's status line, which
 says why.
 
-It is computed inline rather than lazily. `Plan` reads two rules files, three Claude-only paths and
-the two skills directories, and is bounded by `MaxScanEntries` per skill tree. Measured on this
-repository on 2026-10-07 with `placesRoute` called directly (21 runs each, median): one place
-0.22 ms before and 0.47 ms after; forty places inside this repository 3.29 ms before and 7.56 ms
-after — about 0.1 ms per place, on a route the console reads when the health check opens. This
-repository has no skills directories, so the number is the rules-file cost; a repository with large
-skill trees costs more, up to the bound. If that becomes noticeable, the field can move to a
-per-Project read the way the unify block reads its plan.
+`Plan` reads two rules files, three Claude-only paths and the two skills directories, and limits
+each skill tree to `MaxScanEntries`. The start-place route now reads Project setup in a bounded
+background lookup: at most four readers run, the response waits at most one second for new reads,
+and a blocked filesystem open does not hold the place list or the installer's first-session check.
+An unfinished setup is omitted, so the console treats that row as unknown. Completed values are
+reused and refreshed after sixty seconds; a later list request can show setup that finished after
+the first response. This bound was added after the v1.0.1 installer still timed out while
+`projectfiles.Plan` waited in `os.OpenRoot` on one checkout.
 
 The paired Cloud console carries both words (`web/console/src/cloud/carry.ts`):
 `project-unify-plan`, a read available to a paired device, and `project-unify-apply`, which carries the
