@@ -215,6 +215,11 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 			"attention_count": row["attention_count"], "owed": row["owed"],
 			"acceptance": row["acceptance"], "disposition": row["disposition"],
 			"coordination": row["coordination"],
+			// What the list titles the row by. A new child's label and
+			// Project can settle a pass after the Session first appears;
+			// without them here the list never learned to read its title
+			// again and kept drawing "Claude Session" with no icon.
+			"label": row["label"], "cwd": row["cwd"], "icon": row["icon"],
 		}
 		displays = append(displays, display)
 		steadyDisplays = append(steadyDisplays, volatileFree(display))

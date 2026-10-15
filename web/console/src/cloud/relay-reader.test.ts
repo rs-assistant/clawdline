@@ -16,6 +16,8 @@ import { CatalogCloudClient } from "./refusal-client.js"
 import japanese from "../../public/catalogs/ja.json" with { type: "json" }
 // @ts-expect-error -- Node runs the source test with type stripping.
 import { activateCatalog, catalogRefusalDetail, resetCatalogForTest } from "../catalog.ts"
+// @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
+import { acceptSnapshot } from "../../../core/src/fleet-accept.ts"
 
 test("a failed send can queue a private-free phone diagnostic while reconnecting", () => {
   const reader = new RelayReader("mac-a")
@@ -1844,4 +1846,94 @@ test("read again asks the machine for just that row", async () => {
   ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements = () => "unknown"
   await r.fetch("/v1/sessions?look=%2519")
   assert.equal(client.reads.at(-1)?.word, "sessions.snapshot", "an older machine is asked to restate everything")
+})
+
+/**
+ * The single-machine page after a Session ended on the machine: the fleet's
+ * held pass, taken before, still lists it; the retained ss/ marker, taken
+ * after, does not. On 2026-10-15 the list kept the closed Session and opening
+ * it said "could not read the transcript" (`cond=not_listed`).
+ */
+function closedOnMachine() {
+  const client = new FakeClient()
+  const execution = "a".repeat(32)
+  const rows = ["s1", "s2"].map((sessionID) => ({
+    destination: { machineID: "mac-a", sessionID, executionGeneration: execution },
+    state: "idle", freshness: "current" as const, observedAt: 100_000,
+  }))
+  const clock = { now: 100_000 }
+  client.statusSnapshots = markerOnly("mac-a", "c".repeat(32), 100, "s1", "s2")
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => clock.now,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: 100_000,
+      snapshotGeneration: "b".repeat(32), rows }),
+    listPresentations: async () => rows.map((row) => ({
+      destination: row.destination, title: row.destination.sessionID, status: { state: "idle" }, projection: row,
+    })),
+  })
+  r.attach(client)
+  const end = () => {
+    clock.now = 130_000
+    client.statusSnapshots = markerOnly("mac-a", "d".repeat(32), 130, "s1")
+  }
+  return { r, end, client }
+}
+
+test("a Session the machine's newer marker leaves out leaves the single-machine list though the held pass still has it", async () => {
+  const { r, end } = closedOnMachine()
+  let list = acceptSnapshot(null, await r.snapshot())!
+  assert.deepEqual(list.sessions.map((row: { id: string }) => row.id), ["s1", "s2"])
+  end()
+  list = acceptSnapshot(list, await r.snapshot()) ?? list
+  assert.deepEqual(list.sessions.map((row: { id: string }) => row.id), ["s1"])
+})
+
+test("opening a Session the marker no longer lists reads the list again", async () => {
+  const { r, end, client } = closedOnMachine()
+  const frames: string[][] = []
+  const handle = r.stream().open("/v1/events", {
+    onFrame: (_event: string, data: string) => frames.push((JSON.parse(data) as SessionsSnapshot).sessions.map((row) => row.id)),
+    onOpen: () => {}, onError: () => {},
+  })
+  client.emit({ type: "sessions", identity: { machine: "mac-a", session: "s1" } })
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  assert.deepEqual(frames.at(-1), ["s1", "s2"])
+  const before = frames.length
+  end()
+  const read = r.fetch("/v1/transcript?session=s2")
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  assert.equal(frames.length, before + 1, "the refusal asked for a new list frame")
+  assert.deepEqual(frames.at(-1), ["s1"])
+  await read.catch(() => {})
+  handle.close()
+})
+
+test("a held title of a closed Session does not stand in for a new child's title", async () => {
+  const client = new FakeClient()
+  client.sessions = async () => { throw new Error("the rich snapshot must not gate the list") }
+  const execution = "a".repeat(32)
+  const projected = ["s1", "child"].map((sessionID) => ({
+    destination: { machineID: "mac-a", sessionID, executionGeneration: execution },
+    state: "working", freshness: "current" as const, observedAt: 1000,
+  }))
+  let now = 1000, reads = 0
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+    machineProjection: async () => ({ kind: "ready", complete: true, observedAt: now,
+      snapshotGeneration: "b".repeat(32), presentationGeneration: "c".repeat(32), rows: projected }),
+    // The first answer is two rows, as many as asked, but one is a Session
+    // that closed; the child's title arrives on the next read.
+    listPresentations: async () => {
+      reads++
+      return ["s1", reads === 1 ? "closed" : "child"].map((sessionID) => ({
+        destination: { machineID: "mac-a", sessionID, executionGeneration: execution },
+        title: "Title " + sessionID, status: { state: "working" },
+      }))
+    },
+  })
+  r.attach(client)
+  const first = await r.snapshot()
+  assert.equal(first.sessions.find((row) => row.id === "child")?.label, "child")
+  now += 5_001
+  const next = await r.snapshot()
+  assert.equal(reads, 2, "the missing title was asked for again")
+  assert.equal(next.sessions.find((row) => row.id === "child")?.label, "Title child")
 })

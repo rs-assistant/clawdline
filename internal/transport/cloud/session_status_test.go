@@ -180,6 +180,36 @@ func TestStatusNotifiesOneMachineListReadWhenOnlyItsWorkLineChanges(t *testing.T
 	}
 }
 
+// A Session a webhook schedule opened appeared on the one-machine list as
+// "Claude Session" with no Project, and opening it did not help: its title and
+// directory settled after its first pass, and nothing told the list to read
+// them again.
+func TestStatusNotifiesOneMachineListReadWhenItsTitleSettles(t *testing.T) {
+	c := &collector{}
+	p := &Publisher{MachineID: "mac_a", published: map[string][32]byte{}, sent: map[string]time.Time{}, Publish: c.publish}
+	row := map[string]any{"id": "%19", "state": "working"}
+	reading := sessionReading{sessions: []map[string]any{row}, at: json.RawMessage(`100`), complete: true}
+	p.publishStatuses(context.Background(), reading, []string{"%19"})
+	first := c.payload(t, "ss/mac_a/"+InventorySessionID)
+	row["label"] = "private settled title"
+	row["cwd"] = "/private/project"
+	p.publishStatuses(context.Background(), reading, []string{"%19"})
+	if got := c.channels(); len(got) != 3 || got[2] != "ss/mac_a/"+InventorySessionID {
+		t.Fatalf("a settled title did not refresh only the machine list: %v", got)
+	}
+	next := c.payload(t, "ss/mac_a/"+InventorySessionID)
+	if next["presentation_generation"] == first["presentation_generation"] ||
+		next["snapshot_generation"] != first["snapshot_generation"] {
+		t.Fatalf("a settled title did not move only the presentation: %v -> %v", first, next)
+	}
+	for _, channel := range c.channels() {
+		body, err := json.Marshal(c.payload(t, channel))
+		if err != nil || strings.Contains(string(body), "private") {
+			t.Fatalf("status channel %s copied the title: %s (%v)", channel, body, err)
+		}
+	}
+}
+
 func TestStatusNotifiesOneMachineListReadWhenItsRoleAppears(t *testing.T) {
 	c := &collector{}
 	p := &Publisher{MachineID: "mac_a", published: map[string][32]byte{}, sent: map[string]time.Time{}, Publish: c.publish}

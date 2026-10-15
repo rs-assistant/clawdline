@@ -441,6 +441,8 @@ export const ROW_RESTATE_MS = 5_000
 
 /** How old a rich row's question may be and still be drawn: the status freshness window (`status-projection.ts`). */
 const RICH_MENU_FRESH_MS = 300_000
+/** How old an ss/ marker may be and still speak for the set (`status-projection.ts`, `STATUS_FRESH_MS`). */
+const STATUS_MARKER_FRESH_S = 300
 
 /**
  * How often an opened waiting Session with no question in hand asks the machine
@@ -585,7 +587,8 @@ export interface RelayReaderOptions {
   /** A newer, authenticated fleet batch keeps an older ss/ replay from shrinking the list. */
   fleetPresentations?: (machineID: string) => MachineListPresentation[]
   /** The same bounded, pinned machine list used by the fleet when rich rows are missing. */
-  listPresentations?: (machineID: string, expectedCount: number | null) => Promise<MachineListPresentation[] | null>
+  listPresentations?: (machineID: string, expectedCount: number | null,
+    expected?: readonly PresentationWant[] | null) => Promise<MachineListPresentation[] | null>
   /** The fleet's verified per-machine Session set; the classic list reads this first. */
   machineProjection?: (machineID: string, fresh?: boolean) => Promise<MachineSessionProjection>
   /** Resolve an exact execution through the verified status source if ss/ replay is missing. */
@@ -634,6 +637,8 @@ export class RelayReader {
   private readonly epoch: number
   private generation = 0
   private readonly streams = new Set<OpenStream>()
+  /** The last disagreement `listDisagrees` read the list again for. */
+  private listDisagreement = ""
   /** The first fleet read waits for the inventory receipt before it paints. */
   private initialSnapshotDelivered = false
   private initialSnapshotFlight: Promise<SessionsSnapshot> | null = null
@@ -1582,11 +1587,12 @@ export class RelayReader {
     })
   }
 
-  private presentationsForPass(pass: string, expectedCount: number | null): Promise<MachineListPresentation[] | null> {
+  private presentationsForPass(pass: string, expectedCount: number | null,
+    expected: readonly PresentationWant[] | null = null): Promise<MachineListPresentation[] | null> {
     const now = this.now()
     const held = this.presentationRead
     if (held?.pass === pass && held.until > now) return held.promise
-    const promise = Promise.resolve().then(() => this.options.listPresentations?.(this.machine, expectedCount) ?? null)
+    const promise = Promise.resolve().then(() => this.options.listPresentations?.(this.machine, expectedCount, expected) ?? null)
       .catch(() => null)
     const reading = { pass, until: now + 60_000, promise }
     this.presentationRead = reading
@@ -1594,7 +1600,10 @@ export class RelayReader {
       // Without a signed marker there is no count to certify a partial read.
       // Keep checking while the person is on this machine; one row is not the
       // whole list merely because it was the first row to arrive.
-      if (this.presentationRead === reading && (!rows || expectedCount === null || rows.length < expectedCount))
+      // A count is not the set: rows held for a Session that has since closed
+      // made up the number while a newly opened one had no title at all.
+      if (this.presentationRead === reading && (!rows || expectedCount === null || rows.length < expectedCount ||
+        !presentsEvery(rows, expected)))
         reading.until = this.now() + 5_000
     })
     return promise
@@ -1609,7 +1618,9 @@ export class RelayReader {
     const pass = String(projection.snapshotGeneration ?? "") + ":" +
       String(projection.kind === "ready" ? projection.presentationGeneration ?? "" : "")
     const presentations = projectedRows.length && this.options.listPresentations
-      ? await this.presentationsForPass(pass, projectedRows.length) : null
+      ? await this.presentationsForPass(pass, projectedRows.length,
+        projectedRows.map((row) => ({ sessionID: row.destination.sessionID, executionGeneration: row.destination.executionGeneration })))
+      : null
     const byExecution = new Map((presentations ?? []).map((row) =>
       [this.machine + "\u0000" + row.destination.sessionID + "\u0000" + row.destination.executionGeneration, row]))
     const missingTitles = projectedRows.some((row) => !byExecution.has(this.machine + "\u0000" +
@@ -1634,15 +1645,20 @@ export class RelayReader {
           observed_at: row.observedAt / 1000 } }
     })
     const whole = projection.kind === "ready" && projection.complete && !missingTitles
+    const absence = this.absence(client)
     const sessions = machineRows.filter((row) => {
       const id = String(row.session ?? row.id ?? "")
+      const source = row.source as { freshness: string; observed_at: number }
+      // The held fleet pass can be up to `STATUS_FRESH_MS` older than the
+      // marker this page holds, and a Session closed since is still in it.
+      if (absence.leftOut(id, source.observed_at)) return false
       const closedAt = this.closedAt.get(id)
       if (closedAt === undefined) return true
-      const source = row.source as { freshness: string; observed_at: number }
       if (source.freshness === "current" && source.observed_at > closedAt) {
         this.closedAt.delete(id)
         return true
       }
+      absence.closed.push(id)
       return false
     }).map((row) => consoleRow(this.withOpenedMenu(client, row)))
     if (whole) {
@@ -1655,6 +1671,7 @@ export class RelayReader {
       scan: { complete: whole, completed: { complete: whole, sequence: this.generation },
         emptyAuthoritative: whole, epoch: this.epoch, generation: this.generation, provenance: "cloud" },
       sessions,
+      ...absence.claims(),
     }
     if (whole) {
       if (this.listRetryTimer) clearTimeout(this.listRetryTimer)
@@ -1668,6 +1685,36 @@ export class RelayReader {
       }, this.listRetryMs)
     }
     return { snapshot, settled: sessions.length > 0 || whole }
+  }
+
+  /**
+   * What this page can say about absence beside a reading's rows
+   * (`AbsenceClaims`, `core/src/fleet-accept.ts`): the fresh, complete ss/
+   * marker's Session set and when the machine took it, and the Sessions this
+   * page closed. A list keeps a row a partial or older reading leaves out;
+   * these are what take a closed Session off it anyway.
+   */
+  private absence(client: CloudReadClient): {
+    leftOut(id: string, observedAt: unknown): boolean
+    closed: string[]
+    claims(): { inventory?: { at: number; sessions: string[] }; closed?: string[] }
+  } {
+    const marker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+      | { payload?: { at?: unknown; complete?: unknown; inventory?: { version?: unknown; sessions?: unknown } } } | undefined
+    const meta = marker?.payload
+    const ids = meta?.inventory?.sessions
+    const at = Number(meta?.at)
+    const inventory = meta?.complete === true && meta.inventory?.version === 1 && Array.isArray(ids) &&
+      ids.every((id) => typeof id === "string" && !!id) && Number.isFinite(at) &&
+      Math.abs(this.now() / 1000 - at) <= STATUS_MARKER_FRESH_S
+      ? { at, sessions: ids as string[] } : undefined
+    const closed: string[] = []
+    return {
+      closed,
+      leftOut: (id, observedAt) => !!inventory && !inventory.sessions.includes(id) &&
+        !(typeof observedAt === "number" && observedAt > inventory.at),
+      claims: () => ({ ...(inventory ? { inventory } : {}), ...(closed.length ? { closed } : {}) }),
+    }
   }
 
   private async snapshotReading(fresh = false): Promise<{ snapshot: SessionsSnapshot; settled: boolean }> {
@@ -1752,7 +1799,8 @@ export class RelayReader {
       (!expected || machineRows.length < expected.size)) {
       const pass = String(statusMarker?.payload?.snapshot_generation ?? "") + ":" +
         String((statusMarker?.payload as { presentation_generation?: unknown } | undefined)?.presentation_generation ?? "")
-      const presentations = await this.presentationsForPass(pass, expected?.size ?? null)
+      const presentations = await this.presentationsForPass(pass, expected?.size ?? null,
+        expected ? [...expected].map((key) => ({ sessionID: key.slice(this.machine.length + 1) })) : null)
       if (!expected && presentations?.length) {
         expected = new Set(presentations.map((row) => this.machine + "\u0000" + row.destination.sessionID))
       }
@@ -1831,6 +1879,7 @@ export class RelayReader {
     }))
     const hasEveryRow = expected === null ? !this.options.classicStatus : [...expected].every((key) => heldKeys.has(key))
     const whole = hasInventory && hasEveryRow && !newerFleetRows && !recovering && !failed
+    const absence = this.absence(client)
     const sessions = machineRows.filter((row) => {
       const id = typeof row.session === "string" ? row.session : typeof row.id === "string" ? row.id : ""
       const closedAt = this.closedAt.get(id)
@@ -1844,6 +1893,7 @@ export class RelayReader {
         this.closedAt.delete(id)
         return true
       }
+      absence.closed.push(id)
       return false
     }).map((row) => consoleRow(this.withOpenedMenu(client, row)))
     if (whole) {
@@ -1864,6 +1914,7 @@ export class RelayReader {
         provenance: "cloud",
       },
       sessions,
+      ...absence.claims(),
     }
     // The original page can show verified rich rows as they arrive. The ss/
     // marker remains the deletion barrier; a gap never claims an empty list.
@@ -2357,6 +2408,7 @@ export class RelayReader {
       : !fresh(data.projected_at) ? "row_stale"
       : !fresh(data.source?.observed_at) ? "observed_stale"
       : null
+    if (condition === "not_listed") this.listDisagrees(session, condition, meta?.snapshot_generation)
     if (condition !== null || !data) throw Object.assign(new Error("The Session execution is no longer current"), {
       code: "execution_generation_changed", status: 409, condition: condition ?? "no_row",
     })
@@ -2364,11 +2416,28 @@ export class RelayReader {
     const intended = this.options.fleetTarget?.()
     if (intended && (intended.machineID !== target.machineID || intended.sessionID !== target.sessionID ||
       intended.executionGeneration !== target.executionGeneration)) {
+      this.listDisagrees(session, "target_changed", meta?.snapshot_generation)
       throw Object.assign(new Error("The opened Session execution has changed"), {
         code: "execution_generation_changed", status: 409, condition: "target_changed",
       })
     }
     return target
+  }
+
+  /**
+   * The opened Session's read found the machine's set disagreeing with the row
+   * the list drew it from: the marker no longer lists it, or names another
+   * execution of it. Read the list again now rather than leave a closed
+   * Session on it until some later pass — on 2026-10-15 the page said "could
+   * not read the transcript" under a Session the machine had already ended.
+   * Once per Session, reason and marker pass, since every transcript poll
+   * would otherwise ask again.
+   */
+  private listDisagrees(session: string, condition: string, pass: unknown): void {
+    const key = session + "\u0000" + condition + "\u0000" + String(pass ?? "")
+    if (this.listDisagreement === key) return
+    this.listDisagreement = key
+    for (const stream of this.streams) this.queueFrame(stream)
   }
 
   /**
@@ -2926,6 +2995,17 @@ function taskList(answer: CloudTasks, machine: string, at: number): TaskList {
     source: { observed_at: at, provenance: "relay", freshness: "stale" },
     tasks: rows as unknown as TaskRow[],
   }
+}
+
+/** One Session a presentation read must title; an execution, when the reader knows it. */
+export interface PresentationWant { sessionID: string; executionGeneration?: string }
+
+/** Whether `rows` title every wanted Session (always, when nothing is named). */
+export function presentsEvery(rows: readonly { destination: SessionDestination }[],
+  expected: readonly PresentationWant[] | null | undefined): boolean {
+  if (!expected) return true
+  return expected.every((want) => rows.some((row) => row.destination.sessionID === want.sessionID &&
+    (want.executionGeneration === undefined || row.destination.executionGeneration === want.executionGeneration)))
 }
 
 /** A transcript answer as `/v1/transcript` would give it. */

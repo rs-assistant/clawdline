@@ -60,7 +60,7 @@ import { CloudAccountContext } from "./account-context.js"
 import { machinesByCapability } from "./machine-access.js"
 import { answerSchedulePresence, publishScheduleFleet, type ScheduleMachine } from "./schedule-machines.js"
 import { bundledCatalog, catalogURL } from "./strings.js"
-import { RelayReader, machineApp } from "./relay-reader.js"
+import { RelayReader, machineApp, presentsEvery } from "./relay-reader.js"
 import { OPENED_ROW_QUIET_MS, openedRowShow } from "./opened-row.js"
 import { FleetSessionList, type MachineToolbarAction } from "./FleetSessionList.js"
 import { CarrierDot } from "./CarrierDot.js"
@@ -613,14 +613,17 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         }
         return liveSessionSource.readMachine(machineID, new AbortController().signal)
       },
-      listPresentations: async (machineID, expectedCount) => {
+      listPresentations: async (machineID, expectedCount, expected) => {
         // Reuse the fleet's already verified rows, even if a newer
         // presentation pass has only delivered its first title. A partial
         // batch remains visibly partial until the signed set catches up.
         const held = heldFleetRows(machineID)
         // A partial fleet replay must not become the classic list's permanent
         // answer. Ask the machine for the missing display rows.
-        if (held.length && (expectedCount === null || held.length >= expectedCount))
+        // By identity, not by count: a held row of a Session closed within
+        // the last `STATUS_FRESH_MS` made the number while a child a webhook
+        // schedule had just opened stayed "Claude Session" with no Project.
+        if (held.length && (expectedCount === null || held.length >= expectedCount) && presentsEvery(held, expected))
           return held as MachineListPresentation[]
         const fresh = await liveSessionSource.readMachinePresentations?.(
           machineID, new AbortController().signal) ?? null
