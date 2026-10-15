@@ -111,9 +111,20 @@ type directMessage struct {
 	FrameSeq   uint64          `json:"frame_seq,omitempty"`
 }
 
-// directAPI builds the WebRTC API once per link: UDP only, mDNS names from a
-// browser resolved but never published, and the timeouts this file's bounds
-// promise.
+// directAPI builds the WebRTC API once per link: UDP only, no mDNS at all,
+// and the timeouts this file's bounds promise.
+//
+// **Nothing here sends to the local network.** macOS asks the person before a
+// process reaches a device on it, and the dialog names Clawdline: on
+// 2026-10-15 opening a Session on Cloud asked "allow clawdline to find
+// devices on your local network", because a viewer's offer carried its
+// private address and this machine sent connectivity checks there, and
+// resolving a `.local` name is itself a multicast query. The direct path is
+// for getting the bytes off the relay; it uses the public addresses STUN
+// finds. A viewer on the same network reaches this machine through the
+// router's public address, or the relay carries it as before. Gathering still
+// binds the local interfaces — that asks nothing — because the public address
+// is learned through them.
 func (l *Link) directAPI() *webrtc.API {
 	l.directMu.Lock()
 	defer l.directMu.Unlock()
@@ -121,7 +132,7 @@ func (l *Link) directAPI() *webrtc.API {
 		return l.directWebRTC
 	}
 	se := webrtc.SettingEngine{}
-	se.SetICEMulticastDNSMode(ice.MulticastDNSModeQueryOnly)
+	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
 	se.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4, webrtc.NetworkTypeUDP6})
 	se.SetICETimeouts(4*time.Second, 8*time.Second, time.Second)
 	if !l.directLoopback {
@@ -134,18 +145,24 @@ func (l *Link) directAPI() *webrtc.API {
 }
 
 // directAddressAllowed is the rule for every address this machine will
-// gather on or send a connectivity check to: not loopback, link-local,
-// multicast or unspecified. A viewer with send permission still chooses the
-// private addresses a check goes to, a few per offer within the offer rate;
-// docs/design-decisions.md records that.
+// gather on: not loopback, link-local, multicast or unspecified. What it
+// sends to is narrower still (directRemoteAllowed).
 func directAddressAllowed(ip net.IP) bool {
 	return ip != nil && !ip.IsLoopback() && !ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast() &&
 		!ip.IsMulticast() && !ip.IsUnspecified() && !ip.IsInterfaceLocalMulticast()
 }
 
+// directRemoteAllowed is the rule for an address this machine sends to: one
+// directAddressAllowed admits that is also not on a private network (RFC 1918,
+// unique-local IPv6). See directAPI.
+func directRemoteAllowed(ip net.IP) bool {
+	return directAddressAllowed(ip) && !ip.IsPrivate()
+}
+
 // filterDirectOffer keeps the offer's UDP candidates whose address passes
-// directAddressAllowed (or is an mDNS name), and refuses an offer with more
-// candidate lines than the bound.
+// directRemoteAllowed — never an mDNS name, which would be resolved by a
+// multicast query — and refuses an offer with more candidate lines than the
+// bound.
 func (l *Link) filterDirectOffer(sdp string) (string, error) {
 	lines := strings.Split(sdp, "\n")
 	out := make([]string, 0, len(lines))
@@ -164,18 +181,35 @@ func (l *Link) filterDirectOffer(sdp string) (string, error) {
 		if len(fields) < 8 || !strings.EqualFold(fields[2], "udp") {
 			continue
 		}
-		address := fields[4]
-		if strings.HasSuffix(address, ".local") {
-			out = append(out, line)
-			continue
-		}
-		ip := net.ParseIP(address)
-		if ip == nil || (!directAddressAllowed(ip) && !(l.directLoopback && ip.IsLoopback())) {
+		ip := net.ParseIP(fields[4])
+		if ip == nil || (!directRemoteAllowed(ip) && !(l.directLoopback && ip.IsLoopback())) {
 			continue
 		}
 		out = append(out, line)
 	}
 	return strings.Join(out, "\n"), nil
+}
+
+// filterDirectAnswer leaves this machine's own private and link-local host
+// addresses out of the answer, so the viewer has no local address to send
+// to; the public address STUN found stays.
+func (l *Link) filterDirectAnswer(sdp string) string {
+	lines := strings.Split(sdp, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSuffix(line, "\r")
+		if strings.HasPrefix(trimmed, "a=candidate:") {
+			fields := strings.Fields(strings.TrimPrefix(trimmed, "a=candidate:"))
+			if len(fields) >= 5 {
+				ip := net.ParseIP(fields[4])
+				if ip == nil || (!directRemoteAllowed(ip) && !(l.directLoopback && ip.IsLoopback())) {
+					continue
+				}
+			}
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
 }
 
 // openDirectOffer decrypts a `direct_offer` body under the connection key.
@@ -335,7 +369,7 @@ func (l *Link) answerDirectOffer(viewer, owner string, carrier bool, sdp string)
 			l.closeDirectPeer(peer, "the data channel did not open in time")
 		}
 	})
-	return local.SDP, nil
+	return l.filterDirectAnswer(local.SDP), nil
 }
 
 // releaseDirectReservation gives back a viewer's place when no peer was made.

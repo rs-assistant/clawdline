@@ -512,28 +512,43 @@ func TestDirectOfferRefusals(t *testing.T) {
 		// Built rather than written, so that no address literal outside the
 		// documentation ranges sits in the repository.
 		linkLocal, multicast := net.IPv4(169, 254, 1, 1).String(), net.IPv4(224, 0, 0, 1).String()
+		// The private addresses and the mDNS name are what made macOS ask for
+		// the local network: a check sent to one, or the multicast query that
+		// resolves the other (directAPI).
+		home, office, ula := net.IPv4(192, 168, 1, 20).String(), net.IPv4(10, 0, 0, 5).String(), "fd00::1"
 		sdp := strings.Join([]string{
 			"v=0",
 			"a=candidate:1 1 udp 1 127.0.0.1 5000 typ host",
 			"a=candidate:2 1 udp 1 " + linkLocal + " 5000 typ host",
 			"a=candidate:3 1 tcp 1 192.0.2.7 5001 typ host",
 			"a=candidate:4 1 udp 1 " + multicast + " 5000 typ host",
-			"a=candidate:5 1 udp 1 192.0.2.7 5000 typ host",
+			"a=candidate:5 1 udp 1 192.0.2.7 5000 typ srflx raddr 0.0.0.0 rport 0",
 			"a=candidate:6 1 udp 1 0f1e2d3c.local 5000 typ host",
+			"a=candidate:7 1 udp 1 " + home + " 5000 typ host",
+			"a=candidate:8 1 udp 1 " + office + " 5000 typ host",
+			"a=candidate:9 1 udp 1 " + ula + " 5000 typ host",
 		}, "\r\n")
 		got, err := f.l.filterDirectOffer(sdp)
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, gone := range []string{"127.0.0.1", linkLocal, " tcp ", multicast} {
+		for _, gone := range []string{"127.0.0.1", linkLocal, " tcp ", multicast, ".local", home, office, ula} {
 			if strings.Contains(got, gone) {
 				t.Errorf("kept %s", gone)
 			}
 		}
-		for _, kept := range []string{"192.0.2.7 5000", ".local"} {
-			if !strings.Contains(got, kept) {
-				t.Errorf("dropped %s", kept)
-			}
+		if !strings.Contains(got, "192.0.2.7 5000") {
+			t.Error("dropped the public address")
+		}
+		answer := f.l.filterDirectAnswer(strings.Join([]string{
+			"v=0",
+			"a=candidate:1 1 udp 1 " + home + " 6000 typ host",
+			"a=candidate:2 1 udp 1 198.51.100.4 6000 typ srflx raddr " + home + " rport 6000",
+			"a=end-of-candidates",
+		}, "\r\n"))
+		if strings.Contains(answer, home+" 6000 typ host") || !strings.Contains(answer, "198.51.100.4 6000 typ srflx") ||
+			!strings.Contains(answer, "a=end-of-candidates") {
+			t.Errorf("the answer kept a private host address or lost the public one:\n%s", answer)
 		}
 		many := []string{"v=0"}
 		for i := 0; i <= CloudTerminalDirectCandidatesLimit; i++ {
