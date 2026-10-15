@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -78,8 +80,7 @@ func (s *Server) withDevStanding(st contract.UpdateStatus) contract.UpdateStatus
 func (s *Server) readDevStanding(dev, latest string) {
 	ctx, cancel := context.WithTimeout(context.Background(), updater.FetchTimeoutSecondsLimit*time.Second)
 	defer cancel()
-	repos := s.placeRepositories(ctx)
-	answer := devStandingIn(ctx, repos, dev, latest)
+	answer := devStandingIn(ctx, s.placeDirectories(ctx), dev, latest)
 	if answer.Relation == contract.UpdateDevRelationUnknown {
 		log.Printf("update: how dev build %.7s stands against release %.7s is not known: %s", dev, latest, answer.Reason)
 	}
@@ -92,19 +93,24 @@ func (s *Server) readDevStanding(dev, latest string) {
 	}
 }
 
-// placeRepositories is the top of every repository a known Project is in, once.
-func (s *Server) placeRepositories(ctx context.Context) []string {
-	var tops []string
-	seen := map[string]bool{}
+// placeDirectories is the directory of every Place a dev build's commit is
+// looked for in, leaving out ~/Library: cloud-storage folders live there (a
+// Dropbox folder listed as a Place answered no git command for twenty seconds
+// on 2026-10-15), and a git process the daemon starts there can make a macOS
+// privacy prompt name Clawdline. A clawdline checkout is not kept there.
+func (s *Server) placeDirectories(ctx context.Context) []string {
+	library := ""
+	if home, err := os.UserHomeDir(); err == nil {
+		library = filepath.Join(home, "Library") + string(filepath.Separator)
+	}
+	var dirs []string
 	for _, place := range s.squadListedPlaces(ctx) {
-		top, err := gitIn(ctx, place.Path, "rev-parse", "--show-toplevel")
-		if err != nil || seen[top] {
+		if library != "" && strings.HasPrefix(filepath.Clean(place.Path)+string(filepath.Separator), library) {
 			continue
 		}
-		seen[top] = true
-		tops = append(tops, top)
+		dirs = append(dirs, place.Path)
 	}
-	return tops
+	return dirs
 }
 
 func gitIn(ctx context.Context, dir string, args ...string) (string, error) {
@@ -112,54 +118,78 @@ func gitIn(ctx context.Context, dir string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
-// devStandingIn is how dev stands against latest in the first of repos that
-// holds both commits. It does not fetch: the dev build was built from a
+// devStandingIn is how dev stands against latest in a repository, among dirs,
+// that holds both commits. It does not fetch: the dev build was built from a
 // checkout here, and a release commit that checkout has never seen is
 // reported unknown rather than waited for.
-func devStandingIn(ctx context.Context, repos []string, dev, latest string) contract.UpdateDevStanding {
+//
+// **Every directory is asked at once.** Asked one after another, the first
+// version spent its whole time on a Place in a cloud-storage folder whose git
+// never answered, and never reached the clawdline checkout listed after it.
+// The first directory that holds both commits is used and the others are
+// stopped.
+func devStandingIn(ctx context.Context, dirs []string, dev, latest string) contract.UpdateDevStanding {
 	unknown := func(why string) contract.UpdateDevStanding {
 		return contract.UpdateDevStanding{Relation: contract.UpdateDevRelationUnknown, Reason: why}
 	}
 	if dev == latest {
 		return contract.UpdateDevStanding{Relation: contract.UpdateDevRelationSame}
 	}
-	for _, repo := range repos {
-		if _, err := gitIn(ctx, repo, "cat-file", "-e", dev+"^{commit}"); err != nil {
-			continue
-		}
-		if _, err := gitIn(ctx, repo, "cat-file", "-e", latest+"^{commit}"); err != nil {
-			continue
-		}
-		// Left is the release's own commits, right the dev build's.
-		out, err := gitIn(ctx, repo, "rev-list", "--left-right", "--count", latest+"..."+dev)
-		if err != nil {
-			return unknown("git rev-list did not answer in " + repo + ": " + err.Error())
-		}
-		fields := strings.Fields(out)
-		if len(fields) != 2 {
-			return unknown("git rev-list answered " + strconv.Quote(out) + " in " + repo)
-		}
-		behind, err1 := strconv.ParseInt(fields[0], 10, 64)
-		ahead, err2 := strconv.ParseInt(fields[1], 10, 64)
-		if err1 != nil || err2 != nil {
-			return unknown("git rev-list answered " + strconv.Quote(out) + " in " + repo)
-		}
-		standing := contract.UpdateDevStanding{Ahead: ahead, Behind: behind}
-		switch {
-		case ahead == 0 && behind == 0:
-			standing.Relation = contract.UpdateDevRelationSame
-		case behind == 0:
-			standing.Relation = contract.UpdateDevRelationAhead
-		case ahead == 0:
-			standing.Relation = contract.UpdateDevRelationBehind
-		default:
-			standing.Relation = contract.UpdateDevRelationDiverged
-		}
-		return standing
+	ask, stop := context.WithCancel(ctx)
+	defer stop()
+	// Unbuffered: a directory found after the first waits on stop and leaves.
+	holders := make(chan string)
+	var wg sync.WaitGroup
+	for _, dir := range dirs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := gitIn(ask, dir, "cat-file", "-e", dev+"^{commit}"); err != nil {
+				return
+			}
+			if _, err := gitIn(ask, dir, "cat-file", "-e", latest+"^{commit}"); err != nil {
+				return
+			}
+			select {
+			case holders <- dir:
+			case <-ask.Done():
+			}
+		}()
 	}
-	why := fmt.Sprintf("no Project on this machine holds both the dev build's commit and the release's (%d repositories looked in)", len(repos))
-	if err := ctx.Err(); err != nil {
-		why += "; the reading ran out of time: " + err.Error()
+	go func() { wg.Wait(); close(holders) }()
+	repo, found := <-holders
+	stop()
+	if !found {
+		why := fmt.Sprintf("no Project on this machine holds both the dev build's commit and the release's (%d looked in)", len(dirs))
+		if err := ctx.Err(); err != nil {
+			why += "; the reading ran out of time: " + err.Error()
+		}
+		return unknown(why)
 	}
-	return unknown(why)
+	// Left is the release's own commits, right the dev build's.
+	out, err := gitIn(ctx, repo, "rev-list", "--left-right", "--count", latest+"..."+dev)
+	if err != nil {
+		return unknown("git rev-list did not answer in " + repo + ": " + err.Error())
+	}
+	fields := strings.Fields(out)
+	if len(fields) != 2 {
+		return unknown("git rev-list answered " + strconv.Quote(out) + " in " + repo)
+	}
+	behind, err1 := strconv.ParseInt(fields[0], 10, 64)
+	ahead, err2 := strconv.ParseInt(fields[1], 10, 64)
+	if err1 != nil || err2 != nil {
+		return unknown("git rev-list answered " + strconv.Quote(out) + " in " + repo)
+	}
+	standing := contract.UpdateDevStanding{Ahead: ahead, Behind: behind}
+	switch {
+	case ahead == 0 && behind == 0:
+		standing.Relation = contract.UpdateDevRelationSame
+	case behind == 0:
+		standing.Relation = contract.UpdateDevRelationAhead
+	case ahead == 0:
+		standing.Relation = contract.UpdateDevRelationBehind
+	default:
+		standing.Relation = contract.UpdateDevRelationDiverged
+	}
+	return standing
 }
