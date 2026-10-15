@@ -476,7 +476,8 @@ func (s *Server) actions() app.Actions {
 // closeActions is actions for a person's close: a forced one first takes the
 // session off the Board items it owns that nobody has started, through the
 // same operation the Board's own unassign route runs, in the person's name;
-// every one takes it off the items waiting on the person to deploy.
+// every one takes it off the items waiting on the person to deploy, and
+// stops the heavy commands it handed to the daemon once it is gone.
 func (s *Server) closeActions(r *http.Request) app.Actions {
 	return s.closeActionsAs(personPrincipal(r))
 }
@@ -493,6 +494,9 @@ func (s *Server) closeActionsAs(actor string) app.Actions {
 	}
 	a.ReleaseAwaitingDeploy = func(ctx context.Context, sess session.Session) error {
 		return s.releaseAwaitingDeploy(ctx, sess.ConversationID, actor)
+	}
+	a.StopHeavyCallbacks = func(ctx context.Context, sess session.Session) {
+		s.stopHeavyCallbacks(ctx, sess, actor)
 	}
 	return a
 }

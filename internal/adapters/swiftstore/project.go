@@ -799,6 +799,13 @@ func (s Snapshot) obligations(l Live) []contract.CloseReason {
 			continue
 		}
 		if !isTerminalState(t.State) {
+			// A callback is the Session's own command, waiting for the machine
+			// or for a result, not an agent with work of its own: closing the
+			// Session stops a heavy one and leaves a wait to finish
+			// (transport/http stopHeavyCallbacks), so neither holds it open.
+			if t.CallbackIntent != "" {
+				continue
+			}
 			m := moverTask(t.ID)
 			if t.ChildTerminal != nil {
 				m = moverOther(*t.ChildTerminal)

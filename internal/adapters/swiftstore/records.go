@@ -56,6 +56,12 @@ type Task struct {
 	FinishedAt       *Seconds `json:"finished_at"`
 	ResultVerifiedAt *Seconds `json:"result_verified_at"`
 
+	// CallbackIntent is set only on this daemon's own callback records
+	// (orchestrator.Record.Callback): a command the root handed to the daemon
+	// so it could end its turn, not an agent it dispatched. The retired store
+	// never held one.
+	CallbackIntent string `json:"-"`
+
 	RootSession   *string `json:"root_session"`
 	RootAssistant *string `json:"root_assistant"`
 	RootLabel     *string `json:"root_label"`

@@ -124,6 +124,31 @@ func TestOwnRecordsAloneDrawTheRow(t *testing.T) {
 	}
 }
 
+// A queued `clawdline heavy --handoff` is the root's own command, not a child:
+// the root still reads as waiting on it, but it does not hold the root open.
+// The control is the same record without its callback intent, which does.
+func TestARootsOwnCallbackDoesNotHoldItOpen(t *testing.T) {
+	base := Snapshot{Source: SourceDisabled, CoordinatorKnown: true}
+	for _, intent := range []string{"heavy", "wait"} {
+		queued := Task{ID: "callback1", State: "queued", Kind: "callback", Title: "Queued heavy command finished",
+			Assistant: "claude", Created: 990, CallbackIntent: intent,
+			RootSession: strp("conv-root"), RootAssistant: strp("claude")}
+		snap := base.With(Own{Tasks: []Task{queued}})
+		if w := snap.Work(ownRootLive, "idle"); w.State != "waiting_session" {
+			t.Fatalf("%s: a root with a queued callback reads %s", intent, w.State)
+		}
+		if c := snap.Closeability(ownCloseInput(ownRootLive)); c.State != "safe" {
+			t.Fatalf("%s: a root's own queued callback holds it open: %s %v", intent, c.State, c.Reasons)
+		}
+
+		queued.CallbackIntent = ""
+		control := base.With(Own{Tasks: []Task{queued}})
+		if c := control.Closeability(ownCloseInput(ownRootLive)); c.State != "blocked" {
+			t.Fatalf("control: the same live task without a callback intent is %s", c.State)
+		}
+	}
+}
+
 func TestAgentNamedBoardConversationOutranksTaskFromReusedTerminal(t *testing.T) {
 	live := Live{TerminalID: "%5", Assistant: "codex", ConversationID: "new-conversation"}
 	old := Task{ID: "old-task", State: "success", Title: "Old task title", ChildTerminal: strp("%5")}

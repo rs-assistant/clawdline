@@ -67,6 +67,12 @@ type Actions struct {
 	// close ends it, forced or not; the decision stays open
 	// (docs/work-system.md). Nil releases nothing.
 	ReleaseAwaitingDeploy func(ctx context.Context, s session.Session) error
+	// StopHeavyCallbacks cancels the heavy commands the session handed to the
+	// daemon, queued or running, once the session is gone: their only reader
+	// was that session, and a queued one would otherwise still take the
+	// machine's compile slot for nobody. It runs after the close and cannot
+	// undo it, so a failure is the hook's to log. Nil stops nothing.
+	StopHeavyCallbacks func(ctx context.Context, s session.Session)
 }
 
 // CloseReleaseFailed: a close could not take the session off the Board items
@@ -764,6 +770,9 @@ func (a Actions) ClosePinned(ctx context.Context, id string, force bool, pid int
 		a.Reading.Forget(s)
 	}
 	a.Restore.Closed(ctx, s)
+	if a.StopHeavyCallbacks != nil {
+		a.StopHeavyCallbacks(ctx, s)
+	}
 	a.record(ctx, "session.closed", s.ID, map[string]any{"forced": force, "owed": len(c.Reasons)})
 	return s, nil
 }
