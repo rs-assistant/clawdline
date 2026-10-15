@@ -5,8 +5,8 @@
 | 方法 | 已註冊路由 | 起始 API 等級 | Agent 指南 | 使用者目標 |
 | --- | --- | ---: | --- | --- |
 | `*` | `/reports/` | 1 | `clawdline guide report` | `docs/user/sessions.md` |
-| `*` | `/v1/artifacts/images` | 1 | `clawdline guide note` | `docs/user/sessions.md` |
-| `*` | `/v1/artifacts/images/` | 1 | `clawdline guide note` | `docs/user/sessions.md` |
+| `*` | `/v1/artifacts/images` | 1 | `clawdline guide send` | `docs/user/sessions.md` |
+| `*` | `/v1/artifacts/images/` | 1 | `clawdline guide send` | `docs/user/sessions.md` |
 | `*` | `/v1/auth/` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/board` | 1 | `clawdline guide board` | `docs/user/board.md` |
 | `*` | `/v1/board/tracks` | 1 | `clawdline guide board` | `docs/user/board.md` |
