@@ -191,7 +191,15 @@ export function pinnedQuestion(client: Pick<StatusClient, "detailSnapshots">, de
 }
 
 /** Reads current client per call so token renewal does not strand the fleet page. */
-export function statusSource(current: () => StatusClient | null): SessionProjectionSource {
+/**
+ * `clientChanged` is told each time `current()` starts answering a different
+ * client. A token renewal builds a whole new client and puts it there
+ * (`cloud-boot.js`), and a subscription left listening to the one it replaced
+ * hears nothing again: a Session that a schedule opened on the machine, with
+ * no press on this page to read it, stayed off the list until a reload.
+ */
+export function statusSource(current: () => StatusClient | null,
+  clientChanged?: (listener: () => void) => () => void): SessionProjectionSource {
   let attemptedClient: StatusClient | null = null
   const gapAttempts = new Map<string, { generation: string;
     sessions: Map<string, { promise: Promise<boolean>; retryAt: number }> }>()
@@ -441,42 +449,69 @@ export function statusSource(current: () => StatusClient | null): SessionProject
       return pinnedQuestion(client, destination)
     },
     subscribe(listener) {
-      const client = current()
+      let client: StatusClient | null = null
+      let stop: (() => void) | undefined
       const transitions = new Map<string, ReturnType<typeof setTimeout>>()
       const clearTransition = (machineID: string) => {
         const timer = transitions.get(machineID)
         if (timer) clearTimeout(timer)
         transitions.delete(machineID)
       }
-      const stop = client?.events((event) => {
-        if ((event.type === "machine_reachability" || event.type === "orchestrator") &&
-          typeof event.machine === "string") {
-          listener({ machineID: event.machine, kind: event.type === "orchestrator" ? "access_changed" : "changed" })
-          return
+      const detach = () => {
+        stop?.()
+        stop = undefined
+        for (const machineID of transitions.keys()) clearTransition(machineID)
+        client?.cancelStatusRecoveries?.()
+      }
+      const attach = (): boolean => {
+        const next = current()
+        if (next === client) return false
+        detach()
+        client = next
+        stop = next?.events((event) => {
+          if ((event.type === "machine_reachability" || event.type === "orchestrator") &&
+            typeof event.machine === "string") {
+            listener({ machineID: event.machine, kind: event.type === "orchestrator" ? "access_changed" : "changed" })
+            return
+          }
+          if (event.type === "sessions" && event.identity?.machine && event.identity?.session &&
+            event.identity.session !== "__clawdline_inventory_v1__") {
+            listener({ machineID: event.identity.machine, sessionID: event.identity.session, kind: "detail_changed" })
+            return
+          }
+          if (event.type !== "session_status" || !event.identity?.machine) return
+          const machineID = event.identity.machine
+          const projection = statusProjection(next, machineID)
+          if (projection.kind === "unavailable" && projection.reason === "event_gap" &&
+            statusPassTransition(next, machineID)) {
+            if (!transitions.has(machineID)) transitions.set(machineID, setTimeout(() => {
+              transitions.delete(machineID)
+              listener({ machineID, kind: "gap" })
+            }, next?.readTimeoutMs ?? STATUS_FRESH_MS))
+            return
+          }
+          clearTransition(machineID)
+          listener({ machineID, sessionID: event.identity.session === "__clawdline_inventory_v1__"
+            ? undefined : event.identity.session,
+          kind: projection.kind === "unavailable" && projection.reason === "event_gap" ? "gap" : "changed" })
+        })
+        return true
+      }
+      attach()
+      const unwatch = clientChanged?.(() => {
+        if (!attach() || !client?.statusSnapshots) return
+        // Whatever arrived while the two clients handed over was heard by
+        // nobody here, so every machine the new client holds is read again.
+        const machines = new Set<string>()
+        for (const key of client.statusSnapshots.keys()) {
+          try {
+            const [machineID] = JSON.parse(key) as unknown[]
+            if (typeof machineID === "string" && machineID) machines.add(machineID)
+          } catch { /* a key this page did not write names no machine */ }
         }
-        if (event.type === "sessions" && event.identity?.machine && event.identity?.session &&
-          event.identity.session !== "__clawdline_inventory_v1__") {
-          listener({ machineID: event.identity.machine, sessionID: event.identity.session, kind: "detail_changed" })
-          return
-        }
-        if (event.type !== "session_status" || !event.identity?.machine) return
-        const machineID = event.identity.machine
-        const projection = statusProjection(client, machineID)
-        if (projection.kind === "unavailable" && projection.reason === "event_gap" &&
-          statusPassTransition(client, machineID)) {
-          if (!transitions.has(machineID)) transitions.set(machineID, setTimeout(() => {
-            transitions.delete(machineID)
-            listener({ machineID, kind: "gap" })
-          }, client?.readTimeoutMs ?? STATUS_FRESH_MS))
-          return
-        }
-        clearTransition(machineID)
-        listener({ machineID, sessionID: event.identity.session === "__clawdline_inventory_v1__"
-          ? undefined : event.identity.session,
-        kind: projection.kind === "unavailable" && projection.reason === "event_gap" ? "gap" : "changed" })
+        for (const machineID of machines) listener({ machineID, kind: "changed" })
       })
-      return () => { stop?.(); for (const machineID of transitions.keys()) clearTransition(machineID)
-        client?.cancelStatusRecoveries?.() }
+      return () => { unwatch?.(); detach() }
     },
     async readDetail(destination, signal): Promise<SessionContent> {
       const client = current()
