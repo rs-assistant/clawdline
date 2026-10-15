@@ -92,8 +92,26 @@
         "install_kind": { "$ref": "#/$defs/UpdateInstallKind" },
         "channel": { "description": "The release channel a release install follows: `stable` or `beta`.", "type": "string" },
         "auto_apply": { "description": "Whether this machine installs a newer stable release by itself when no session it started is busy (the setting `update_auto_apply`).", "type": "boolean" },
-        "apply": { "$ref": "#/$defs/UpdateApply" }
+        "apply": { "$ref": "#/$defs/UpdateApply" },
+        "dev": { "$ref": "#/$defs/UpdateDevStanding" }
       }
+    },
+    "UpdateDevStanding": {
+      "description": "On a release install running a dev build (`clawdline dev install`): how its commit stands against `latest`'s, read from git in a Project on this machine that holds both commits. `ahead`: the release's commit is an ancestor of the dev build's, which has `ahead` more commits. `behind`: the dev build's commit is an ancestor of the release's, which has `behind` more. `same`: one commit. `diverged`: each has commits the other lacks. `unknown`: no Project here holds both commits, or git did not answer; `reason` says which.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relation"],
+      "properties": {
+        "relation": { "$ref": "#/$defs/UpdateDevRelation" },
+        "ahead": { "description": "Commits the dev build has that the release does not.", "type": "integer" },
+        "behind": { "description": "Commits the release has that the dev build does not.", "type": "integer" },
+        "reason": { "description": "Why the relation is `unknown`.", "type": "string" }
+      }
+    },
+    "UpdateDevRelation": {
+      "description": "How a dev build's commit stands against the release it would go back to. See UpdateDevStanding.",
+      "type": "string",
+      "enum": ["ahead", "behind", "same", "diverged", "unknown"]
     },
     "SchedulerPulse": {
       "description": "What the clock says about its own last pass. A pass that fired nothing and a scheduler that stopped are both silence from outside, so the clock reports itself the way a scan does.",

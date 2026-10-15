@@ -295,6 +295,47 @@ export function devReleaseSentence(answer: DevReleaseAnswer, say: Say): string {
 }
 
 /**
+ * The session list's strip while a dev build runs: always there, one line.
+ * `standing` is how the dev build's commit stands against the release it would
+ * go back to (GET /v1/update's `dev`, read from git on the machine); `back` is
+ * the button that installs that release, named for what it does — going back
+ * when the dev build is past the release or beside it, updating when the
+ * release is newer; `release` offers to release this commit, only where that
+ * could make sense and only on the machine's own console.
+ */
+export interface DevStrip {
+  commit: string
+  relation: "ahead" | "behind" | "diverged" | "same" | "unknown"
+  standing: string
+  back: string | null
+  release: boolean
+}
+
+export function devStrip(status: UpdateStatus | null, overCloud: boolean, say: Say): DevStrip | null {
+  if (!status || status.install_kind !== "release") return null
+  const commit = devCommit(status.running)
+  if (!commit) return null
+  const latest = buildName(status.latest)
+  const relation = status.dev?.relation ?? "unknown"
+  const strip: DevStrip = { commit, relation, standing: "", back: null, release: !overCloud }
+  if (!latest) return strip
+  const ahead = status.dev?.ahead ?? 0
+  const behind = status.dev?.behind ?? 0
+  strip.standing =
+    relation === "ahead" ? say("updateDevAhead", { latest, count: ahead })
+      : relation === "behind" ? say("updateDevBehind", { latest, count: behind })
+        : relation === "diverged" ? say("updateDevDiverged", { latest, ahead, behind })
+          : relation === "same" ? say("updateDevSame", { latest })
+            : say("updateDevAgainst", { latest })
+  if (status.state === "update_available") {
+    strip.back = relation === "behind" ? say("updateToVersion", { latest }) : say("updateDevGoBack", { latest })
+  }
+  // An older commit than the release, or the release's own, is not a release.
+  if (relation === "behind" || relation === "same") strip.release = false
+  return strip
+}
+
+/**
  * The older daemon's one line, or null: only `update_available` and
  * `differs` speak, and a machine that is current, ahead, or could not tell
  * says nothing. This is what a daemon from before release installs gets,
@@ -341,7 +382,7 @@ export interface UpdatePanelInput {
 }
 
 export interface UpdateFact {
-  key: "running" | "latest" | "checked" | "channel"
+  key: "running" | "standing" | "latest" | "checked" | "channel"
   label: string
   value: string
   /** The release notes, beside the latest version. */
@@ -522,10 +563,12 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
   else if (status.state === "ahead") view.stateLine = say("updateIsAhead")
   else if (status.state === "update_available" && latestName) {
     view.stateLine = say(dev ? "updateDevBack" : "updateIsAvailable", { latest: latestName })
-    if (dev) view.press.label = say("updateToVersion", { latest: latestName })
   }
-  if (dev && !input.overCloud) view.devRelease = { shown: true, commit: dev }
-  else if (status.state === "unknown") {
+  const strip = dev ? devStrip(status, input.overCloud, say) : null
+  if (strip?.back) view.press.label = strip.back
+  if (strip?.standing) view.facts.splice(1, 0, { key: "standing", label: say("updateDevStanding"), value: strip.standing })
+  if (strip?.release) view.devRelease = { shown: true, commit: strip.commit }
+  if (status.state === "unknown") {
     view.stateLine = say("updateIsUnknown")
     view.stateDetails = details("", status.reason || status.error)
   }
@@ -564,7 +607,7 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
   // A finished update stays said — after the page reloads into the new
   // console, and after one auto-update installed overnight — for as long as
   // it is the machine's last.
-  if (!moving && !restarting && apply?.state === "healthy" && apply.from) {
+  if (!moving && !restarting && apply?.state === "healthy" && apply.from && !devCommit({ version: apply.to })) {
     const installed = named(apply.to || buildName(status.running))
     view.done = say("updateReady", { to: installed })
   } else if (!view.progress && apply?.state === "healthy" && input.following) {
@@ -636,6 +679,8 @@ export const UPDATE_BANNER_DISMISSED_KEY = "clawdline.update-banner.dismissed"
 export function updateBannerVersion(status: UpdateStatus | null, dismissed: string | null): string | null {
   if (!status || status.install_kind !== "release" || status.state !== "update_available") return null
   if (applyMoving(status)) return null
+  // A dev build reads its release as available; the dev strip offers it.
+  if (devCommit(status.running)) return null
   const version = buildName(status.latest)
   if (!version || version === dismissed) return null
   // A rollback leaves the failed release in the manifest. The Settings panel

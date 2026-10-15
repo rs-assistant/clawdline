@@ -3,9 +3,9 @@ import type { UpdateStatus } from "@clawdline/contract"
 import { catalogWordLanguage } from "../catalog.js"
 import { nextWord } from "../next-strings.js"
 import { followsRelay } from "../client.js"
-import { applyUpdate, checkUpdateNow, currentUpdateRead, publishUpdateRead, refreshUpdate, subscribeUpdate } from "./update.js"
+import { applyUpdate, checkUpdateNow, currentUpdateRead, publishUpdateRead, refreshUpdate, requestDevRelease, subscribeUpdate } from "./update.js"
 import { canRestartStagedApp, restartStagedApp } from "./restart-app.js"
-import { INSTALL_COMMAND, UPDATE_BANNER_DISMISSED_KEY, buildName, canStartUpdateAfterFresh, devCommit, updateBannerVersion, updatePanel } from "./update-model.js"
+import { INSTALL_COMMAND, UPDATE_BANNER_DISMISSED_KEY, buildName, canStartUpdateAfterFresh, devReleaseSentence, devStrip, updateBannerVersion, updatePanel } from "./update-model.js"
 import "./update.css"
 
 function dismissedVersion(): string | null {
@@ -16,7 +16,12 @@ function dismissedVersion(): string | null {
   }
 }
 
-/** The session list can start an update directly, then stay to show its result. */
+/**
+ * One line at the top of the session list: a newer release, with the press
+ * that installs it, or — always, while a dev build runs — which commit this
+ * is, how it stands against the release, and the ways on from it. It starts an
+ * update directly and stays to say how it went; the words wrap only then.
+ */
 export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) {
   const read = useSyncExternalStore(subscribeUpdate, currentUpdateRead, currentUpdateRead)
   const [dismissed, setDismissed] = useState(dismissedVersion)
@@ -28,6 +33,8 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
   const [checkFailed, setCheckFailed] = useState(false)
   const [pressRefused, setPressRefused] = useState<{ code: string; detail: string } | null>(null)
   const [pressOlder, setPressOlder] = useState(false)
+  const [releasing, setReleasing] = useState(false)
+  const [releaseSaid, setReleaseSaid] = useState("")
   const last = useRef<UpdateStatus | null>(null)
   if (read?.kind === "status") last.current = read.status
 
@@ -98,7 +105,9 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
   }
 
   const finishedVersion = last.current?.apply?.state === "healthy" ? last.current.apply.to : ""
-  const visible = Boolean(version || sending || following || (!dismissedResult && (
+  const overCloud = followsRelay()
+  const dev = devStrip(read?.kind === "status" ? read.status : last.current, overCloud, nextWord)
+  const visible = Boolean(dev || version || sending || following || releaseSaid || (!dismissedResult && (
     completed || checkFailed || pressRefused || pressOlder || problem || view.progress || (view.done && dismissed !== finishedVersion)
   )))
   if (!visible) return null
@@ -113,48 +122,73 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
     setCheckFailed(false)
     setPressRefused(null)
     setPressOlder(false)
+    setReleaseSaid("")
   }
-  const dev = read?.kind === "status" && read.status.install_kind === "release" ? devCommit(read.status.running) : null
+  const pressRelease = () => {
+    if (releasing || !dev) return
+    setReleasing(true)
+    setReleaseSaid(nextWord("updateDevReleaseSending", { commit: dev.commit }))
+    void requestDevRelease().then((answer) => {
+      setReleasing(false)
+      setReleaseSaid(devReleaseSentence(answer, nextWord))
+    })
+  }
   const canPress = read?.kind === "status" && (Boolean(version) || view.press.shown) && !sending && !following && !completed
-  const busy = Boolean(sending || following || view.progress)
+  const busy = Boolean(sending || following || view.progress || releasing)
   const restartVersion = view.staged ? last.current?.apply?.to || "" : ""
   const message = checkFailed ? nextWord("updateIsUnknown")
-    : dismissedResult ? null : problem?.sentence || view.progress || (sending ? nextWord("updateVerifying", { to: target }) : null)
+    : releaseSaid || (dismissedResult ? null : problem?.sentence || view.progress || (sending ? nextWord("updateVerifying", { to: target }) : null)
       || (completed ? view.done || nextWord("updateHealthy", { to: target }) : null)
-      || (view.done && dismissed !== finishedVersion ? view.done : null)
+      || (view.done && dismissed !== finishedVersion ? view.done : null))
+  const offer = !message && !sending && !following && !completed && !problem
+  const notes = version && read?.kind === "status" ? read.status.latest.notes_url : undefined
+  // After a failure or a rollback the press retries, beside the sentence that says what went wrong.
+  const pressLabel = problem ? view.press.label : dev?.back || (version ? nextWord("updateNow") : view.press.label)
+  const pressShown = canPress && !checkFailed && (!message || Boolean(problem)) &&
+    Boolean(problem ? view.press.shown : dev ? dev.back : version)
+  // A dev build's line stays; a release's and a result's can be put away.
+  const closable = !sending && !following && !releasing && (Boolean(message) || !dev)
 
   return (
-    <div className="update-banner" id={embedded ? undefined : "update-banner"} role="status" aria-busy={busy} data-version={version || target}>
-      {/* The banner sits in the session list's column, which is narrow on a
-          wide window: words above, actions below, never side by side. */}
-      <div className="update-banner-body">
-        {version && !sending && !following && !completed && !problem ? (
-          <span className="update-banner-say" lang={catalogWordLanguage("next", "updateBanner")}>{dev
-            ? nextWord("updateBannerDev", { commit: dev }) : nextWord("updateBanner", { version })}</span>
-        ) : null}
-        {message ? <span className="update-banner-say" aria-live="polite">
+    <div className={"update-strip" + (message ? " is-saying" : "") + (embedded ? " is-embedded" : "")} id={embedded ? undefined : "update-banner"} role="status"
+      aria-busy={busy} data-version={version || target} data-dev={dev?.relation}>
+      {dev ? (
+        <span className={"update-strip-tag" + (dev.relation === "behind" ? " is-behind" : "")} title={nextWord("updateBannerDev", { commit: dev.commit })}
+          lang={catalogWordLanguage("next", "updateStripTagDev")}>{nextWord("updateStripTagDev")}</span>
+      ) : version && offer ? (
+        <span className="update-strip-tag is-new" lang={catalogWordLanguage("next", "updateStripTagNew")}>{nextWord("updateStripTagNew")}</span>
+      ) : null}
+      <span className="update-strip-say" aria-live={message ? "polite" : undefined}>
+        {message ? <>
           {busy ? <span className="update-banner-spinner" aria-hidden="true" /> : null}
           {message}
-        </span> : null}
-        {view.staged ? <small className="update-banner-staged">{view.staged}</small> : null}
-        {pressOlder ? <code className="update-command">{INSTALL_COMMAND}</code> : null}
-      </div>
-      {(canPress && !checkFailed) || (restartVersion && canRestartStagedApp()) ? (
-        <div className="update-banner-actions">
-          {canPress && !checkFailed ? (
-            <button className="chip update-banner-go" type="button" onClick={() => void press()}>
-              {view.press.label}
-            </button>
-          ) : null}
-          {restartVersion && canRestartStagedApp() ? (
-            <button className="chip update-banner-also" type="button" onClick={() => restartStagedApp(restartVersion)}>
-              {nextWord("updateRestartApp")}
-            </button>
-          ) : null}
-        </div>
+          {view.staged ? <small className="update-banner-staged">{view.staged}</small> : null}
+          {pressOlder ? <code className="update-command">{INSTALL_COMMAND}</code> : null}
+        </> : dev ? <>
+          <b className="update-strip-commit">{dev.commit}</b>
+          {dev.standing ? <> · {dev.standing}</> : null}
+        </> : version ? (
+          <span lang={catalogWordLanguage("next", "updateBanner")}>{nextWord("updateBanner", { version })}</span>
+        ) : null}
+      </span>
+      {dev?.release && !message ? (
+        <button className="update-strip-link is-go" type="button" disabled={releasing} title={nextWord("updateDevRelease")}
+          onClick={pressRelease}>{nextWord("updateStripRelease")}</button>
       ) : null}
-      {!sending && !following ? (
-        <button className="x" type="button" aria-label={nextWord("updateBannerDismiss")} title={nextWord("updateBannerDismiss")} onClick={dismiss}>×</button>
+      {pressShown ? (
+        <button className={"update-strip-link" + (dev && dev.relation !== "behind" ? "" : " is-go")} type="button"
+          onClick={() => void press()}>{pressLabel}</button>
+      ) : null}
+      {notes && offer ? (
+        <a className="update-strip-link" href={notes} target="_blank" rel="noreferrer">{nextWord("updateNotes")}</a>
+      ) : null}
+      {restartVersion && canRestartStagedApp() ? (
+        <button className="update-strip-link is-go" type="button" onClick={() => restartStagedApp(restartVersion)}>
+          {nextWord("updateRestartApp")}
+        </button>
+      ) : null}
+      {closable ? (
+        <button className="update-strip-x" type="button" aria-label={nextWord("updateBannerDismiss")} title={nextWord("updateBannerDismiss")} onClick={dismiss}>×</button>
       ) : null}
     </div>
   )

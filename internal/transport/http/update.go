@@ -62,7 +62,7 @@ func (s *Server) freshUpdateStatus(request context.Context) contract.UpdateStatu
 				status.Reason = "the release manifest could not be read: " + check.Err.Error()
 			}
 		}
-		return status
+		return s.withDevStanding(status)
 	}
 	s.update.Refresh(ctx)
 	status := s.updateStatus()
@@ -76,7 +76,7 @@ func (s *Server) freshUpdateStatus(request context.Context) contract.UpdateStatu
 func (s *Server) updateStatus() contract.UpdateStatus {
 	s.updateChecker()
 	if s.releaseUpdate != nil {
-		return s.releaseUpdate.Status()
+		return s.withDevStanding(s.releaseUpdate.Status())
 	}
 	st := s.update.Status()
 	st.InstallKind = s.installKind()
