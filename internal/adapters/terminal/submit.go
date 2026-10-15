@@ -144,33 +144,59 @@ type shownInput struct {
 // first rule under it, which is the frame Claude Code draws, or to the bottom.
 // A screen with no caret on it, a shell's, answers its bottom screenLines
 // lines, not found.
+//
+// **A composer framed above and below comes first, wherever it is.** While
+// subagents run, Claude Code draws a list of them under its footer, and the
+// list's highlighted row begins with the same "❯" ("❯ ⏺ main"). Read from the
+// bottom, that row is the lowest caret, so a paste that arrived in the composer
+// above it was never seen, Enter was held back, and the phone's own Enter was
+// refused as input_moved. The list also pushes the composer past screenLines
+// once there are more than a few agents in it. Nothing else Claude Code draws
+// puts a caret directly under a rule and another rule under that.
 func inputLine(screen string) shownInput {
 	lines := strings.Split(strings.TrimRightFunc(screen, unicode.IsSpace), "\n")
+	for i := len(lines) - 1; i > 0; i-- {
+		if !isFrame(lines[i-1]) {
+			continue
+		}
+		if in, ok := caretAt(lines, i); ok && in.framed {
+			return in
+		}
+	}
 	top := len(lines) - screenLines
 	if top < 0 {
 		top = 0
 	}
 	for i := len(lines) - 1; i >= top; i-- {
-		head := strings.TrimLeftFunc(lines[i], func(r rune) bool {
-			return unicode.IsSpace(r) || r == '│' || r == '┃' || r == '|'
-		})
-		for _, caret := range append(inputCarets, framedCarets...) {
-			if !strings.HasPrefix(head, caret) {
-				continue
-			}
-			end := i + 1
-			for end < len(lines) && !isFrame(lines[end]) {
-				end++
-			}
-			framed := end < len(lines)
-			if slices.Contains(framedCarets, caret) && !(framed && i > 0 && isFrame(lines[i-1])) {
-				continue
-			}
-			typed := strings.TrimPrefix(head, caret) + strings.Join(lines[i+1:end], "")
-			return shownInput{text: squeeze(typed), found: true, framed: framed, caret: caret}
+		if in, ok := caretAt(lines, i); ok {
+			return in
 		}
 	}
 	return shownInput{text: squeeze(strings.Join(lines[top:], ""))}
+}
+
+// caretAt reads line i as an input line, if it begins with a caret: what it
+// holds down to the first rule under it, and whether there is one.
+func caretAt(lines []string, i int) (shownInput, bool) {
+	head := strings.TrimLeftFunc(lines[i], func(r rune) bool {
+		return unicode.IsSpace(r) || r == '│' || r == '┃' || r == '|'
+	})
+	for _, caret := range append(inputCarets, framedCarets...) {
+		if !strings.HasPrefix(head, caret) {
+			continue
+		}
+		end := i + 1
+		for end < len(lines) && !isFrame(lines[end]) {
+			end++
+		}
+		framed := end < len(lines)
+		if slices.Contains(framedCarets, caret) && !(framed && i > 0 && isFrame(lines[i-1])) {
+			continue
+		}
+		typed := strings.TrimPrefix(head, caret) + strings.Join(lines[i+1:end], "")
+		return shownInput{text: squeeze(typed), found: true, framed: framed, caret: caret}, true
+	}
+	return shownInput{}, false
 }
 
 // isFrame is a line of nothing but box-drawing, four or more: the rule a
@@ -268,20 +294,30 @@ function isFrame(line) {
   for (let i = 0; i < r.length; i++) if ("─━═╌┄┈╭╮╰╯│┌┐└┘".indexOf(r[i]) < 0) return false;
   return r.length >= 4;
 }
+function caretAt(lines, i) {
+  const head = lines[i].replace(/^[\s│┃|]+/, "");
+  for (let c = 0; c < INPUT_CARETS.length; c++) {
+    if (head.indexOf(INPUT_CARETS[c]) !== 0) continue;
+    let end = i + 1;
+    while (end < lines.length && !isFrame(lines[end])) end++;
+    const framed = end < lines.length;
+    if (FRAMED_CARETS.indexOf(INPUT_CARETS[c]) >= 0 && !(framed && i > 0 && isFrame(lines[i - 1]))) continue;
+    const typed = head.slice(INPUT_CARETS[c].length) + lines.slice(i + 1, end).join("");
+    return { text: squeeze(typed), found: true, framed: framed };
+  }
+  return null;
+}
 function inputLine(screen) {
   const lines = String(screen || "").replace(/\s+$/, "").split("\n");
+  for (let i = lines.length - 1; i > 0; i--) {
+    if (!isFrame(lines[i - 1])) continue;
+    const framedIn = caretAt(lines, i);
+    if (framedIn && framedIn.framed) return framedIn;
+  }
   const top = Math.max(0, lines.length - %d);
   for (let i = lines.length - 1; i >= top; i--) {
-    const head = lines[i].replace(/^[\s│┃|]+/, "");
-    for (let c = 0; c < INPUT_CARETS.length; c++) {
-      if (head.indexOf(INPUT_CARETS[c]) !== 0) continue;
-      let end = i + 1;
-      while (end < lines.length && !isFrame(lines[end])) end++;
-      const framed = end < lines.length;
-      if (FRAMED_CARETS.indexOf(INPUT_CARETS[c]) >= 0 && !(framed && i > 0 && isFrame(lines[i - 1]))) continue;
-      const typed = head.slice(INPUT_CARETS[c].length) + lines.slice(i + 1, end).join("");
-      return { text: squeeze(typed), found: true, framed: framed };
-    }
+    const at = caretAt(lines, i);
+    if (at) return at;
   }
   return { text: squeeze(lines.slice(top).join("")), found: false, framed: false };
 }

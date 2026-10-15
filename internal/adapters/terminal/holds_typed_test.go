@@ -29,6 +29,8 @@ func TestAnEnterFromElsewhereIsPressedOnlyAtTheWordsItNames(t *testing.T) {
 		{"a shell prompt drawn with claude's caret", "❯ please read CHILD.md", "please read CHILD.md", false},
 		{"a shell", "user@host ~ % please read CHILD.md", "please read CHILD.md", false},
 		{"a chooser", "❯ No, exit\n  Yes, I trust this folder\nEnter to confirm", "No, exit", false},
+		{"claude's composer above its list of subagents", subagentsScreen(), subagentsDraft, true},
+		{"an empty composer above its list of subagents", subagentsScreen("❯\u00a0"), subagentsDraft, false},
 		{"nothing to name and nothing pasted", composerScreen("draft"), "", false},
 	}
 	for _, c := range cases {
