@@ -248,6 +248,34 @@ for (const width of [320, 375, 390, 1280]) {
     }
   })
 }
+test("opening a Session repairs a stale list attention count from its verified note read", async () => {
+  const { targetId } = await browser.send("Target.createTarget", { url: "about:blank" })
+  const { sessionId: id } = await browser.send("Target.attachToTarget", { targetId, flatten: true })
+  const run = async (expression: string) => {
+    const { result, exceptionDetails } = await browser.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }, id)
+    if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text)
+    return result.value
+  }
+  try {
+    await fetch(origin + "/__fixture/reset")
+    await browser.send("Page.enable", {}, id); await browser.send("Runtime.enable", {}, id)
+    await browser.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }, id)
+    const mark = browser.loadCount; await browser.send("Page.navigate", { url: origin + "/" }, id); await browser.loaded(id, mark)
+    const until = async (expression: string) => {
+      const deadline = Date.now() + 8000
+      while (!(await run(expression))) {
+        if (Date.now() > deadline) assert.fail("attention did not settle: " + expression)
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+    }
+    await until(`document.querySelector('.row[data-id="${SESSION}"] .session-attention')?.textContent?.includes('待處理 1')`)
+    await fetch(origin + "/__fixture/quiet-resolve")
+    await run(`document.querySelector('.row[data-id="${SESSION}"]').click()`)
+    await until(`document.querySelector('.human-interventions-head')?.textContent?.includes('關注')`)
+    await until(`!document.querySelector('.row[data-id="${SESSION}"] .session-attention')`)
+  } finally { await browser.send("Target.closeTarget", { targetId }) }
+})
+
 const snapshot = () => ({ at: Date.now(), scan: { complete: true, completed: { complete: true, sequence: 1 },
   emptyAuthoritative: true, epoch: 1, generation: 1, provenance: "fixture" },
   sessions: [{ ...row, ...(listAttentionCount < 0 ? {} : { attention_count: listAttentionCount }),
@@ -279,6 +307,7 @@ function fixture(): Server {
     if (path === "/__fixture/send-delay") { sendDelay = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("ms")) || 0; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/list-waiting") { listWaiting = new URL(req.url ?? "/", "http://fixture").searchParams.get("on") === "1"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/list-count") { listAttentionCount = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("value")); publish(); return json(res, 200, { ok: true }) }
+    if (path === "/__fixture/quiet-resolve") { resolvedAt = now; listAttentionCount = 0; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/count") { noteCount = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("value")) || 1; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/options") { showOptions = new URL(req.url ?? "/", "http://fixture").searchParams.get("on") !== "0"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/single-option") { singleOption = true; return json(res, 200, { ok: true }) }

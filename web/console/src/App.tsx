@@ -6,6 +6,7 @@ import { client, followsRelay } from "./client.js"
 import { BRAND_MARK } from "./brand-mark.js"
 import { connectionLightState, connectionLightWords, type ConnectionLight } from "./connection-state.js"
 import { useFleet, usePoll } from "./useFleet.js"
+import { onAttentionRead } from "./session/attention-changed.js"
 import { healthPace, publishHealth } from "./health-feed.js"
 import { SessionsPage } from "./Sessions.js"
 import { toggleOrder } from "./session/Transcript.js"
@@ -233,6 +234,10 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   confirmedTitle?: string
 } = {}) {
   const fleet = useFleet(client)
+  useEffect(() => {
+    if (fleetList) return
+    return onAttentionRead(() => fleet.refresh())
+  }, [fleetList, fleet.refresh])
   const light = useConnectionLight(fleet.live, fleet.refresh)
   const machineVersion = useMachineVersion()
   // A page this machine reports too low a route level for is offered disabled

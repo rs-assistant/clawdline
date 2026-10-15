@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { nextWord } from "../next-strings.js"
 import * as L from "../legacy/bridge.js"
 import { ProjectedRow } from "../session/List.js"
+import { onAttentionRead } from "../session/attention-changed.js"
 import { Swipes, archivable } from "../session/swipe.js"
 import { useSwipeToEnd } from "../session/use-swipe.js"
 import type { OrderHold } from "../session/order.js"
@@ -63,6 +64,13 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
     // the list and open detail. A refused or interrupted read leaves them as is.
     void source.refreshSessionStatus(target, abort.signal).catch(() => undefined)
     return () => abort.abort()
+  }, [source, target && destinationKey(target)])
+  useEffect(() => {
+    if (!target || !source?.refreshSessionStatus) return
+    return onAttentionRead((sessionID) => {
+      if (sessionID !== target.sessionID) return
+      void source.refreshSessionStatus!(target, new AbortController().signal).catch(() => undefined)
+    })
   }, [source, target && destinationKey(target)])
   const refreshList = () => {
     presentationPasses.current.clear()
