@@ -13,6 +13,13 @@ import { catalogWord } from "./catalog.ts"
 
 const words = {
   en: {
+    sidebarMain: "Main",
+    sidebarWork: "Work",
+    sidebarManage: "Manage",
+    sidebarMore: "More",
+    sidebarServiceVersion: "Machine service v{version}",
+    sidebarAppStaged: "App v{version} awaiting replacement",
+    sidebarVersionUnknown: "Machine version unavailable",
     sessionPairToSend: "Pair this browser",
     secretHandoffName: "Secret Handoff",
     secretHandoffLabel: "Secret value",
@@ -1391,6 +1398,13 @@ const words = {
     signedInCapsSendTerminal: "Read, send and open a shell",
   },
   "zh-Hant": {
+    sidebarMain: "主要",
+    sidebarWork: "工作",
+    sidebarManage: "管理",
+    sidebarMore: "其他",
+    sidebarServiceVersion: "機器服務 v{version}",
+    sidebarAppStaged: "App v{version} 等待替換",
+    sidebarVersionUnknown: "機器版本未提供",
     secretHandoffName: "機密交付",
     secretHandoffLabel: "機密值",
     secretHandoffPlaceholder: "貼上所需的密碼或金鑰",

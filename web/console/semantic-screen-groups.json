@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5261,
-  "riskKeys": 2325,
-  "nonRiskCount": 2936,
+  "englishContentKeys": 5268,
+  "riskKeys": 2326,
+  "nonRiskCount": 2942,
   "groups": [
     {
       "name": "bar / other",
@@ -1941,7 +1941,7 @@
     },
     {
       "name": "next / other",
-      "count": 157,
+      "count": 163,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2047,6 +2047,12 @@
         "next.sessionTrySendingAgain",
         "next.sessionWriteDisabled",
         "next.sessionsListWaitTitle",
+        "next.sidebarAppStaged",
+        "next.sidebarMain",
+        "next.sidebarManage",
+        "next.sidebarMore",
+        "next.sidebarServiceVersion",
+        "next.sidebarWork",
         "next.smartTitleAction",
         "next.smartTitleButton",
         "next.smartTitleConfirmTitle",

@@ -1,5 +1,5 @@
 import { catalogWord } from "./catalog.js"
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { SessionRow } from "@clawdline/contract"
 import { ClawdlineClient } from "@clawdline/core"
 import { client, followsRelay } from "./client.js"
@@ -16,6 +16,7 @@ import type { PageModule } from "./pages/types.js"
 import { drawerEntries, pageNeedsUpdate, pageReady } from "./pages/registry.js"
 import { publishMachineVersion, useMachineVersion } from "./machine/NeedsUpdate.js"
 import { machineVersionFromHealth } from "./machine/needs-update-model.js"
+import { currentUpdateRead, subscribeUpdate } from "./machine/update.js"
 import { pageFromHash } from "./page-route.js"
 import { workWord } from "./pages/work/words.js"
 import { verifyWord } from "./pages/verify/words.js"
@@ -69,7 +70,8 @@ type Page = "sessions" | "devices" | "projects" | "workflow" | "timeline" | "pla
 /** What became of a session the address asked for: see `openAsked`. */
 type Asked = "none" | "waiting" | "opened" | "gone"
 
-// The drawer's rows as `index.html` has them: its order and its ids. Pages
+// The drawer's page registry keeps its ids. The shell groups the entries by
+// what a person is trying to do rather than by when each page was added. Pages
 // whose backend this daemon does not own stay on screen and
 // disabled rather than missing, so what is not here can be seen.
 //
@@ -77,12 +79,12 @@ type Asked = "none" | "waiting" | "opened" | "gone"
 // reached from that item on the work page.
 const PAGES: { id: Page; nav: string; icon: SidebarIconName; key?: string; text?: string; ready: boolean }[] = [
   { id: "sessions", nav: "nav-sessions", icon: "sessions", key: "webSessions", ready: true },
-  { id: "devices", nav: "nav-devices", icon: "devices", key: "webDevices", ready: false },
   { id: "projects", nav: "nav-projects", icon: "projects", key: "webProjects", ready: false },
   { id: "workflow", nav: "nav-workflow", icon: "workflow", text: "Workflow", ready: false },
   { id: "plan", nav: "nav-plan", icon: "plan", key: "webPlan", ready: false },
-  { id: "settings", nav: "nav-settings", icon: "settings", key: "webSettings", ready: false },
+  { id: "devices", nav: "nav-devices", icon: "devices", key: "webDevices", ready: false },
   { id: "notifications", nav: "nav-notifications", icon: "notifications", ready: false },
+  { id: "settings", nav: "nav-settings", icon: "settings", key: "webSettings", ready: false },
 ]
 
 /**
@@ -240,6 +242,9 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   }, [fleetList, fleet.refresh])
   const light = useConnectionLight(fleet.live, fleet.refresh)
   const machineVersion = useMachineVersion()
+  const updateRead = useSyncExternalStore(subscribeUpdate, currentUpdateRead, currentUpdateRead)
+  const stagedAppVersion = updateRead?.kind === "status" && updateRead.status.apply?.staged_app
+    ? updateRead.status.apply.to : null
   // A page this machine reports too low a route level for is offered disabled
   // and says why, rather than missing (pages/registry.ts `pageNeedsUpdate`).
   const tooOld = (id: string) => pageNeedsUpdate(id, PAGE_MODULES, machineVersion.apiLevel)
@@ -907,6 +912,25 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
     return () => document.removeEventListener("keydown", listener)
   }, [])
 
+  const sidebarPage = (p: typeof PAGES[number]) => (
+    <button
+      key={p.id}
+      className="sidebar-item"
+      id={p.nav}
+      type="button"
+      data-page-to={p.id}
+      aria-current={page === p.id ? "page" : undefined}
+      disabled={!offered(p.id)}
+      onClick={() => go(p.id)}
+      title={tooOldTitle(p.id)}
+    >
+      <SidebarIcon name={p.icon} />
+      {p.id === "notifications" ? nextWord("notificationNav") : p.key ? T[p.key] : p.text}
+      {tooOldMark(p.id)}
+    </button>
+  )
+  const sidebarPages = drawerEntries(PAGES, PAGE_MODULES)
+
   return (
     <>
       <header className="top">
@@ -960,47 +984,43 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         }}
       >
         <div className="sidebar-panel" id="sidebar-panel">
-          {drawerEntries(PAGES, PAGE_MODULES).map((p) => (
+          <section className="sidebar-group" aria-label={nextWord("sidebarMain")}>
+            <h2>{nextWord("sidebarMain")}</h2>
+            {sidebarPages.filter((p) => p.id === "sessions" || p.id === "projects").map(sidebarPage)}
+          </section>
+          <section className="sidebar-group" aria-label={nextWord("sidebarWork")}>
+            <h2>{nextWord("sidebarWork")}</h2>
             <button
-              key={p.id}
               className="sidebar-item"
-              id={p.nav}
+              id="nav-work"
               type="button"
-              data-page-to={p.id}
-              aria-current={page === p.id ? "page" : undefined}
-              disabled={!offered(p.id)}
-              onClick={() => go(p.id)}
-              title={tooOldTitle(p.id)}
+              data-page-to="work"
+              aria-current={page === "work" ? "page" : undefined}
+              disabled={!offered("work")}
+              onClick={() => go("work")}
+              title={tooOldTitle("work")}
             >
-              <SidebarIcon name={p.icon} />
-              {p.id === "notifications" ? nextWord("notificationNav") : p.key ? T[p.key] : p.text}
-              {tooOldMark(p.id)}
+              <SidebarIcon name="work" />
+              {workWord("nav")}
+              {tooOldMark("work")}
             </button>
-          ))}
-          {cloudPeerAccess && <button className="sidebar-item" id="nav-peer-access" type="button"
-            data-page-to="peer-access" aria-current={page === "peer-access" ? "page" : undefined}
-            onClick={() => go("peer-access")}>
-            <SidebarIcon name="devices" />{nextWord("cloudPeerAccessNav")}
-          </button>}
-          {/* The work system (design-decisions T6): not one of the retired app's
-              pages, so it remains a row of its own at the end. */}
-          <button
-            className="sidebar-item"
-            id="nav-work"
-            type="button"
-            data-page-to="work"
-            aria-current={page === "work" ? "page" : undefined}
-            disabled={!offered("work")}
-            onClick={() => go("work")}
-            title={tooOldTitle("work")}
-          >
-            <SidebarIcon name="work" />
-            {workWord("nav")}
-            {tooOldMark("work")}
-          </button>
-          {/* 驗收 (docs/verifications.md): what was changed and waits for
-              someone to look again by a date. This is where a verdict is
-              written down. */}
+            {sidebarPages.filter((p) => p.id === "workflow").map(sidebarPage)}
+            <button
+              className="sidebar-item"
+              id="nav-squad"
+              type="button"
+              data-page-to="squad"
+              aria-current={page === "squad" ? "page" : undefined}
+              disabled={!offered("squad")}
+              onClick={() => go("squad")}
+              title={tooOldTitle("squad")}
+            >
+              <SidebarIcon name="squad" />{catalogWord("inline", "a6971f01832f")}
+              {tooOldMark("squad")}
+            </button>
+            {/* 驗收 (docs/verifications.md): what was changed and waits for
+                someone to look again by a date. This is where a verdict is
+                written down. */}
           <button
             className="sidebar-item"
             id="nav-verify"
@@ -1015,35 +1035,42 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
             {verifyWord("nav")}
             {tooOldMark("verify")}
           </button>
-          <button
-            className="sidebar-item"
-            id="nav-squad"
-            type="button"
-            data-page-to="squad"
-            aria-current={page === "squad" ? "page" : undefined}
-            disabled={!offered("squad")}
-            onClick={() => go("squad")}
-            title={tooOldTitle("squad")}
-          >
-            <SidebarIcon name="squad" />{catalogWord("inline", "a6971f01832f")}
-            {tooOldMark("squad")}
-          </button>
-          {/* 封存 (docs/session-archive.md): the Sessions archived from the
-              list's swipe, each with the way back. */}
-          <button
-            className="sidebar-item"
-            id="nav-archive"
-            type="button"
-            data-page-to="archive"
-            aria-current={page === "archive" ? "page" : undefined}
-            disabled={!offered("archive")}
-            onClick={() => go("archive")}
-            title={tooOldTitle("archive")}
-          >
-            <SidebarIcon name="archive" />
-            {nextWord("archiveNav")}
-            {tooOldMark("archive")}
-          </button>
+          </section>
+          <section className="sidebar-group" aria-label={nextWord("sidebarManage")}>
+            <h2>{nextWord("sidebarManage")}</h2>
+            {sidebarPages.filter((p) => p.id === "devices").map(sidebarPage)}
+            {cloudPeerAccess && <button className="sidebar-item" id="nav-peer-access" type="button"
+              data-page-to="peer-access" aria-current={page === "peer-access" ? "page" : undefined}
+              onClick={() => go("peer-access")}>
+              <SidebarIcon name="devices" />{nextWord("cloudPeerAccessNav")}
+            </button>}
+            {sidebarPages.filter((p) => p.id === "notifications" || p.id === "settings").map(sidebarPage)}
+          </section>
+          <section className="sidebar-group" aria-label={nextWord("sidebarMore")}>
+            <h2>{nextWord("sidebarMore")}</h2>
+            {sidebarPages.filter((p) => p.id === "plan").map(sidebarPage)}
+            <button
+              className="sidebar-item"
+              id="nav-archive"
+              type="button"
+              data-page-to="archive"
+              aria-current={page === "archive" ? "page" : undefined}
+              disabled={!offered("archive")}
+              onClick={() => go("archive")}
+              title={tooOldTitle("archive")}
+            >
+              <SidebarIcon name="archive" />
+              {nextWord("archiveNav")}
+              {tooOldMark("archive")}
+            </button>
+          </section>
+          <div className="sidebar-version" role="status">
+            {!focusCloudSessions && machineVersion.version
+              ? nextWord("sidebarServiceVersion", { version: machineVersion.version.replace(/^v/i, "") })
+              : nextWord("sidebarVersionUnknown")}
+            {!focusCloudSessions && stagedAppVersion
+              ? <span>{nextWord("sidebarAppStaged", { version: stagedAppVersion.replace(/^v/i, "") })}</span> : null}
+          </div>
         </div>
       </nav>
 
