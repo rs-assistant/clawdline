@@ -225,9 +225,22 @@ clawdline dev install [--rev <commit>]     # inside a clawdline checkout
   `BeginLocal` refuses a version that is not `-dev.` (`not_a_dev_build`).
 - **The way back.** `v1.0.7-dev.4c41b18` sorts before `v1.0.7`, and a dev build follows the stable
   channel (`ChannelFor`), so the release it went over reads as available: the ordinary signed
-  update installs it. The panel names it — the running fact says `dev <commit>`, the button
-  **Update to v1.0.7** — and so does the session-list banner. Automatic updates never take a dev
-  build away (`dev_build_running`); the person chooses when to go back.
+  update installs it. Automatic updates never take a dev build away (`dev_build_running`); the
+  person chooses when to go back.
+- **Past the release or short of it.** Versions cannot say which, so GET `/v1/update` carries `dev`
+  (`UpdateDevStanding`): `git rev-list --left-right --count <release>...<dev>` in the first Project
+  repository on this machine that holds both commits — `ahead`, `behind`, `diverged`, `same`, or
+  `unknown` with a reason when none does. It does not fetch, and it is computed once per pair of
+  commits (`update_dev_standing.go`). The panel shows it beside the running fact, and the press is
+  named for what it does: **Back to v1.0.7** when the dev build is past the release or beside it,
+  **Update to v1.0.7** when the release is newer. **Release this version** is not offered for a
+  dev build that is behind the release or is its commit.
+- **The session list's line.** While a dev build runs, the top of the session list carries one
+  30 px line that cannot be dismissed: `DEV`, the commit, its standing, and the same presses as
+  words (`UpdateBanner.tsx`). A newer release on an ordinary install takes the same line, with
+  `NEW`, a press that installs it, the release notes and a close button; so does the Cloud list's
+  notice for each machine. Installing a dev build is not announced as a finished update: the line
+  already says what runs.
 - **Releasing it.** Beside the way back, the machine's own console shows **Release this version**.
   It posts `/v1/update/dev-release`, which finds the Project whose repository holds the running
   commit, fetches `main`, refuses a commit that is not on `origin/main`

@@ -7,6 +7,7 @@ import {
   createUpdateReadStore,
   detailsText,
   devReleaseSentence,
+  devStrip,
   INSTALL_COMMAND,
   classifyUpdateRead,
   settleUpdateRead,
@@ -515,7 +516,8 @@ test("a dev build names its commit and offers the release it went over by name",
   const view = panel({ read: answered(dev) })
   assert.equal(view.facts.find((fact) => fact.key === "running")?.value, "dev 4c41b18")
   assert.equal(view.press.shown, true)
-  assert.equal(view.press.label, "Update to v0.11.0")
+  // Not knowing how the commits stand, the press is the way back.
+  assert.equal(view.press.label, "Back to v0.11.0")
   assert.match(view.stateLine ?? "", /dev build for testing\. v0\.11\.0 is the current release/)
   // An ordinary release keeps its words.
   assert.equal(panel({ read: answered(release("update_available")) }).press.label, "Update now")
@@ -530,4 +532,39 @@ test("only a dev build on its own machine offers to release itself, and says how
   assert.match(devReleaseSentence({ kind: "opened", label: "Release 4c41b18" }, nextWord), /Opened “Release 4c41b18”/)
   assert.match(devReleaseSentence({ kind: "refused", code: "dev_commit_not_on_main", detail: "" }, nextWord), /not on main yet/)
   assert.match(devReleaseSentence({ kind: "unanswered" }, nextWord), /did not open/)
+})
+
+test("a dev build says how it stands against the release, and its presses follow from that", () => {
+  const dev = (standing?: UpdateStatus["dev"]) => release("update_available", undefined, {
+    running: { stamp: "4c41b18ae9f0ecd4daccc1b55dc044fe7b792f80", version: "v0.11.0-dev.4c41b18" }, dev: standing })
+  const ahead = devStrip(dev({ relation: "ahead", ahead: 12 }), false, nextWord)
+  assert.deepEqual(ahead, { commit: "4c41b18", relation: "ahead", standing: "ahead of v0.11.0 (+12)",
+    back: "Back to v0.11.0", release: true })
+  // Older than the release: installing it is an update, and there is nothing to release.
+  const behind = devStrip(dev({ relation: "behind", behind: 5 }), false, nextWord)
+  assert.deepEqual(behind, { commit: "4c41b18", relation: "behind", standing: "behind v0.11.0 (−5)",
+    back: "Update to v0.11.0", release: false })
+  assert.equal(panel({ read: answered(dev({ relation: "behind", behind: 5 })) }).press.label, "Update to v0.11.0")
+  assert.equal(panel({ read: answered(dev({ relation: "behind", behind: 5 })) }).devRelease.shown, false)
+  assert.equal(devStrip(dev({ relation: "diverged", ahead: 3, behind: 2 }), false, nextWord)?.standing,
+    "diverged from v0.11.0 (+3 −2)")
+  assert.equal(devStrip(dev({ relation: "same" }), false, nextWord)?.release, false)
+  // A daemon from before `dev` existed, or one that could not tell.
+  assert.equal(devStrip(dev(), false, nextWord)?.standing, "the release is v0.11.0")
+  assert.equal(devStrip(dev({ relation: "ahead", ahead: 1 }), true, nextWord)?.release, false, "Cloud does not carry the release route")
+  // The panel names the standing beside the running build.
+  const facts = panel({ read: answered(dev({ relation: "ahead", ahead: 12 })) }).facts
+  assert.deepEqual(facts.slice(0, 2).map((fact) => fact.value), ["dev 4c41b18", "ahead of v0.11.0 (+12)"])
+  // An ordinary release has no dev line, and a dev build is not announced as a new release.
+  assert.equal(devStrip(release("update_available"), false, nextWord), null)
+  assert.equal(updateBannerVersion(dev({ relation: "behind", behind: 5 }), null), null)
+})
+
+test("installing a dev build is not reported as a finished update; its line says it", () => {
+  const installed = release("update_available", { state: "healthy", from: "v0.11.0", to: "v0.11.0-dev.4c41b18" }, {
+    running: { stamp: "4c41b18ae9f0ecd4daccc1b55dc044fe7b792f80", version: "v0.11.0-dev.4c41b18" } })
+  assert.equal(panel({ read: answered(installed) }).done, null)
+  const back = release("current", { state: "healthy", from: "v0.11.0-dev.4c41b18", to: "v0.11.0" }, {
+    running: { stamp: "4b7c3f8d9e0f1a2b3c4d", version: "v0.11.0" } })
+  assert.match(panel({ read: answered(back) }).done ?? "", /v0\.11\.0/)
 })

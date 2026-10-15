@@ -156,7 +156,7 @@
 .cloud-all-list-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px 12px 24px; }
 .cloud-all-groups { display: grid; gap: 16px; }
 .cloud-fleet-update-notices:empty { display: none; }
-.cloud-fleet-update-notice { margin: 0 10px 10px; }
+.cloud-fleet-update-notice { margin: 0; }
 .cloud-all-group { min-width: 0; }
 .cloud-all-status-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 10px; }
 .cloud-all-status-filter { padding: 5px 10px; border: 1px solid var(--line);

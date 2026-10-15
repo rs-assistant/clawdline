@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5292,
+  "englishKeys": 5303,
   "counts": {
     "negation": 1515,
-    "state": 730,
+    "state": 731,
     "permission": 334,
     "deletion": 110,
     "uncertainty": 155
   },
-  "unionCount": 2336,
+  "unionCount": 2337,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -2126,6 +2126,7 @@
       "next.updateDevReleaseFailed",
       "next.updateIsAvailable",
       "next.updateRunning",
+      "next.updateStripOpen",
       "next.worktreeRemoveRisk",
       "projects.editDone",
       "projects.folderGo",
@@ -4892,6 +4893,7 @@
     "next.updateSourceCheckout",
     "next.updateSourceDeploy",
     "next.updateStagedApp",
+    "next.updateStripOpen",
     "next.updateUnknownVersion",
     "next.worktreeRemoveBusy",
     "next.worktreeRemoveButton",

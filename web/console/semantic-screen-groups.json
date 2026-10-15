@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5292,
-  "riskKeys": 2336,
-  "nonRiskCount": 2956,
+  "englishContentKeys": 5303,
+  "riskKeys": 2337,
+  "nonRiskCount": 2966,
   "groups": [
     {
       "name": "bar / other",
@@ -1944,7 +1944,7 @@
     },
     {
       "name": "next / other",
-      "count": 171,
+      "count": 181,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2098,9 +2098,16 @@
         "next.updateCopied",
         "next.updateCopy",
         "next.updateDetails",
+        "next.updateDevAgainst",
+        "next.updateDevAhead",
+        "next.updateDevBehind",
+        "next.updateDevDiverged",
+        "next.updateDevGoBack",
         "next.updateDevRelease",
         "next.updateDevReleaseOpened",
         "next.updateDevReleaseSending",
+        "next.updateDevSame",
+        "next.updateDevStanding",
         "next.updateDone",
         "next.updateDoneAt",
         "next.updateDownloading",
@@ -2117,6 +2124,9 @@
         "next.updateRunningDev",
         "next.updateSending",
         "next.updateStaged",
+        "next.updateStripRelease",
+        "next.updateStripTagDev",
+        "next.updateStripTagNew",
         "next.updateTitle",
         "next.updateToVersion",
         "next.updateVerifying"

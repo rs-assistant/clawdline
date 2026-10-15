@@ -293,8 +293,9 @@ export function SessionsPage({
         hidden={!onScreen}
       >
         <section className="pane pane-list">
-          {/* A newer release for this machine, and the way to Settings where
-              it is one press (machine/UpdateBanner.tsx). */}
+          {/* One line: a newer release for this machine and the press that
+              installs it, or the dev build running here and the ways on from
+              it (machine/UpdateBanner.tsx). */}
           {fleetList ?? <><UpdateBanner />
           <SessionToolbar onFilter={onFilter} terminalMode={terminalMode}
             onSessions={() => chooseTerminalMode(false)} onTerminals={() => chooseTerminalMode(true)}

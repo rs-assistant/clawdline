@@ -54,12 +54,14 @@ export function FleetUpdateNotice({ client, machine, onChoose }: {
   const version = updateBannerVersion(read?.kind === "status" ? read.status : null, dismissed)
   if (!version) return null
   const name = machine.name || machine.label || machine.id
-  return <div className="update-banner cloud-fleet-update-notice" role="status" data-machine={machine.id} data-version={version}>
-    <span className="update-banner-say">{nextWord("cloudFleetUpdateNotice", { machine: name, version })}</span>
-    <button className="chip update-banner-go" type="button" onClick={() => onChoose(machine)}>
-      {nextWord("cloudFleetUpdateOpen")}
+  return <div className="update-strip cloud-fleet-update-notice" role="status" data-machine={machine.id} data-version={version}>
+    <span className="update-strip-tag is-new">{nextWord("updateStripTagNew")}</span>
+    <span className="update-strip-say">{nextWord("cloudFleetUpdateNotice", { machine: name, version })}</span>
+    <button className="update-strip-link is-go" type="button" title={nextWord("cloudFleetUpdateOpen")}
+      aria-label={nextWord("cloudFleetUpdateOpen")} onClick={() => onChoose(machine)}>
+      {nextWord("updateStripOpen")}
     </button>
-    <button className="x" type="button" aria-label={nextWord("updateBannerDismiss")} title={nextWord("updateBannerDismiss")}
+    <button className="update-strip-x" type="button" aria-label={nextWord("updateBannerDismiss")} title={nextWord("updateBannerDismiss")}
       onClick={() => {
         setDismissed(version)
         try { sessionStorage.setItem(dismissedKey(machine.id), version) } catch { /* this view only */ }

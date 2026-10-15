@@ -165,7 +165,10 @@ type Server struct {
 	// releaseUpdate is set, on the same first use, when this daemon runs
 	// from a release install: it then answers GET /v1/update instead of
 	// update, and POST /v1/update/apply installs releases (update.go).
-	releaseUpdate    *updater.Daemon
+	releaseUpdate *updater.Daemon
+	// devStanding is the last answer of update_dev_standing.go, for the one
+	// pair of commits it was asked about.
+	devStanding      devStandingMemo
 	usage            *machineusage.Sampler
 	reclaimSummaryMu sync.Mutex
 	reclaimSummaryAt time.Time

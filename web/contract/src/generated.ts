@@ -9435,6 +9435,19 @@ export type UpdateApplyState =
 export const UpdateApplyStateValues: readonly UpdateApplyState[] = ["idle", "downloading", "verifying", "staged", "restarting", "healthy", "rolled_back", "failed"] as const
 
 /**
+ * How a dev build's commit stands against the release it would go back to. See
+ * UpdateDevStanding.
+ */
+export type UpdateDevRelation =
+    "ahead"
+  | "behind"
+  | "same"
+  | "diverged"
+  | "unknown"
+
+export const UpdateDevRelationValues: readonly UpdateDevRelation[] = ["ahead", "behind", "same", "diverged", "unknown"] as const
+
+/**
  * POST /v1/update/dev-release, on a machine running a dev build (`clawdline dev
  * install`): the Root Session opened in the Project that holds the running commit,
  * to cut a release of it by docs/releasing.md. Answered 202. The same commit asked
@@ -9461,6 +9474,33 @@ export interface UpdateDevReleaseResult {
    * The Root Assignment opened, GET /v1/orchestrator/root-assignments/<id>.
    */
   root_assignment_id: string
+}
+
+/**
+ * On a release install running a dev build (`clawdline dev install`): how its
+ * commit stands against `latest`'s, read from git in a Project on this machine that
+ * holds both commits. `ahead`: the release's commit is an ancestor of the dev
+ * build's, which has `ahead` more commits. `behind`: the dev build's commit is an
+ * ancestor of the release's, which has `behind` more. `same`: one commit.
+ * `diverged`: each has commits the other lacks. `unknown`: no Project here holds
+ * both commits, or git did not answer; `reason` says which.
+ */
+export interface UpdateDevStanding {
+  /**
+   * Commits the dev build has that the release does not.
+   */
+  ahead?: number
+
+  /**
+   * Commits the release has that the dev build does not.
+   */
+  behind?: number
+
+  /**
+   * Why the relation is `unknown`.
+   */
+  reason?: string
+  relation: UpdateDevRelation
 }
 
 /**
@@ -9521,6 +9561,7 @@ export interface UpdateStatus {
    * Absent before the first success.
    */
   checked_at?: string
+  dev?: UpdateDevStanding
 
   /**
    * What the most recent check said when it failed after the last success.
