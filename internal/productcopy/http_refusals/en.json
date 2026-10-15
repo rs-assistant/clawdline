@@ -1158,6 +1158,7 @@
   "http.ef21e013a7e28737": "The \"to confirm\" area holds as many proposals as this machine keeps waiting; nothing was recorded. The work stays with its to-dos.",
   "http.ef8d99884d439f25": "--no-landing-reason is evidence for moving to deploying only.",
   "http.efc9a1b51b8e755e": "A schedule's permission is set by a person, from the schedule form in the console. This machine's orchestrator token, and a session carrying a person's message, may keep the permission_mode a schedule already has, not set or change it: leave permission_mode out.",
+  "http.efed4153748e5e18": "This daemon's X-Clawdline-Orchestrator token was recognised, but this route does not accept it: only a paired device's token may call it. Every clawdline command calls only routes that token opens.",
   "http.f04319c28c00907b": "This machine already has as many terminal writes in hand as it admits; nothing was recorded or opened.",
   "http.f0eb186f67eb8211": "That squad capability is not a current Session's.",
   "http.f0f2063a4e456e56": "No such session.",
