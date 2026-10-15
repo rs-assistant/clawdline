@@ -5,7 +5,7 @@ import { nextWord } from "../next-strings.js"
 import { followsRelay } from "../client.js"
 import { applyUpdate, checkUpdateNow, currentUpdateRead, publishUpdateRead, refreshUpdate, subscribeUpdate } from "./update.js"
 import { canRestartStagedApp, restartStagedApp } from "./restart-app.js"
-import { INSTALL_COMMAND, UPDATE_BANNER_DISMISSED_KEY, buildName, canStartUpdateAfterFresh, updateBannerVersion, updatePanel } from "./update-model.js"
+import { INSTALL_COMMAND, UPDATE_BANNER_DISMISSED_KEY, buildName, canStartUpdateAfterFresh, devCommit, updateBannerVersion, updatePanel } from "./update-model.js"
 import "./update.css"
 
 function dismissedVersion(): string | null {
@@ -114,6 +114,7 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
     setPressRefused(null)
     setPressOlder(false)
   }
+  const dev = read?.kind === "status" && read.status.install_kind === "release" ? devCommit(read.status.running) : null
   const canPress = read?.kind === "status" && (Boolean(version) || view.press.shown) && !sending && !following && !completed
   const busy = Boolean(sending || following || view.progress)
   const restartVersion = view.staged ? last.current?.apply?.to || "" : ""
@@ -125,7 +126,8 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
   return (
     <div className="update-banner" id={embedded ? undefined : "update-banner"} role="status" aria-busy={busy} data-version={version || target}>
       {version && !sending && !following && !completed && !problem ? (
-        <span className="update-banner-say" lang={catalogWordLanguage("next", "updateBanner")}>{nextWord("updateBanner", { version })}</span>
+        <span className="update-banner-say" lang={catalogWordLanguage("next", "updateBanner")}>{dev
+          ? nextWord("updateBannerDev", { commit: dev }) : nextWord("updateBanner", { version })}</span>
       ) : null}
       {message ? <span className="update-banner-say" aria-live="polite">
         {busy ? <span className="update-banner-spinner" aria-hidden="true" /> : null}

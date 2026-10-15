@@ -507,3 +507,15 @@ test("a rolled-back release stops nagging in the session list while a newer one 
   })
   assert.equal(updateBannerVersion(newer, null), "v0.12.0")
 })
+
+test("a dev build names its commit and offers the release it went over by name", () => {
+  const dev = release("update_available", undefined, {
+    running: { stamp: "4c41b18ae9f0ecd4daccc1b55dc044fe7b792f80", version: "v0.11.0-dev.4c41b18" } })
+  const view = panel({ read: answered(dev) })
+  assert.equal(view.facts.find((fact) => fact.key === "running")?.value, "dev 4c41b18")
+  assert.equal(view.press.shown, true)
+  assert.equal(view.press.label, "Update to v0.11.0")
+  assert.match(view.stateLine ?? "", /dev build for testing\. v0\.11\.0 is the current release/)
+  // An ordinary release keeps its words.
+  assert.equal(panel({ read: answered(release("update_available")) }).press.label, "Update now")
+})

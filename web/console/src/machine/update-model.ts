@@ -266,6 +266,14 @@ export function buildName(build: { stamp?: string; version?: string } | undefine
 }
 
 /**
+ * The commit of a dev build (`clawdline dev install`, docs/updates.md), or
+ * null: its version is v<x.y.z>-dev.<commit>, the release it went over.
+ */
+export function devCommit(build: { version?: string } | undefined): string | null {
+  return /-dev\.([0-9a-f]+)$/.exec(build?.version ?? "")?.[1] ?? null
+}
+
+/**
  * The older daemon's one line, or null: only `update_available` and
  * `differs` speak, and a machine that is current, ahead, or could not tell
  * says nothing. This is what a daemon from before release installs gets,
@@ -464,7 +472,11 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
   view.kind = "panel"
   const release = status.install_kind === "release"
   const latestName = buildName(status.latest)
-  view.facts.push({ key: "running", label: say("updateRunning"), value: buildName(status.running) || say("updateUnknownVersion") })
+  // A dev build sorts before the release it went over, so that release reads
+  // as available: here it is the way back, and the button names it.
+  const dev = release ? devCommit(status.running) : null
+  view.facts.push({ key: "running", label: say("updateRunning"),
+    value: dev ? say("updateRunningDev", { commit: dev }) : buildName(status.running) || say("updateUnknownVersion") })
   if (latestName) {
     const fact: UpdateFact = { key: "latest", label: say("updateLatest"), value: latestName }
     if (release && status.latest.notes_url) {
@@ -481,7 +493,10 @@ export function updatePanel(input: UpdatePanelInput, say: Say, when: (iso: strin
 
   if (status.state === "current") view.stateLine = say("updateIsCurrent")
   else if (status.state === "ahead") view.stateLine = say("updateIsAhead")
-  else if (status.state === "update_available" && latestName) view.stateLine = say("updateIsAvailable", { latest: latestName })
+  else if (status.state === "update_available" && latestName) {
+    view.stateLine = say(dev ? "updateDevBack" : "updateIsAvailable", { latest: latestName })
+    if (dev) view.press.label = say("updateToVersion", { latest: latestName })
+  }
   else if (status.state === "unknown") {
     view.stateLine = say("updateIsUnknown")
     view.stateDetails = details("", status.reason || status.error)
