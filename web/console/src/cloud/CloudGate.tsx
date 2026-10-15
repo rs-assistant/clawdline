@@ -457,7 +457,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const client = useRef<CloudClientHandle | null>(null)
   const currentActionClient = useCallback(() => client.current, [])
   const [clientEpoch, setClientEpoch] = useState(0)
-  const liveSessionSource = useMemo(() => sessionSource ?? statusSource(() => client.current), [sessionSource])
+  // A renewal replaces the client; the source moves its listeners to the new one.
+  const clientChanges = useRef(new Set<() => void>())
+  const liveSessionSource = useMemo(() => sessionSource ?? statusSource(() => client.current, (listener) => {
+    clientChanges.current.add(listener)
+    return () => { clientChanges.current.delete(listener) }
+  }), [sessionSource])
   /**
    * Which road this page's reads of one machine take, read while the row is
    * drawn rather than held in state: the carrier opens and closes on its own,
@@ -972,6 +977,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         case "connected": {
           const next = update.client
           client.current = next
+          for (const listener of [...clientChanges.current]) listener()
           setClientEpoch((epoch) => epoch + 1)
           setWho({ account: next.account ?? "", device: next.deviceID ?? "" })
           // The Devices page reads the account's machines through this, and

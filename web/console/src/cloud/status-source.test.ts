@@ -89,6 +89,32 @@ test("a status row event names the Session whose list title should refresh", () 
   stop()
 })
 
+test("a renewed client keeps the Session list hearing new Sessions", () => {
+  // A token renewal puts a new client in place. A Session a schedule opened
+  // afterwards arrives only on the new one, and nothing on the page asks for it.
+  const before = clientFixture()
+  const after = clientFixture()
+  let stopped = 0
+  const events_ = before.client.events
+  before.client.events = (listener) => { const stop = events_(listener); return () => { stopped += 1; stop() } }
+  let current: unknown = before.client
+  const changes = new Set<() => void>()
+  const events: unknown[] = []
+  const stop = statusSource(() => current as never, (listener: () => void) => {
+    changes.add(listener)
+    return () => { changes.delete(listener) }
+  }).subscribe((event) => events.push(event))
+  current = after.client
+  for (const listener of changes) listener()
+  assert.deepEqual(events, [{ machineID, kind: "changed" }])
+  events.length = 0
+  assert.equal(stopped, 1)
+  after.emit({ type: "session_status", identity: { machine: machineID, session: sessionID } })
+  assert.deepEqual(events, [{ machineID, sessionID, kind: "changed" }])
+  stop()
+  assert.equal(changes.size, 0)
+})
+
 test("a new browser replays a missing status marker once and recovers the Session list", async () => {
   const { client } = clientFixture()
   client.readContentCapabilities.delete(machineID)
