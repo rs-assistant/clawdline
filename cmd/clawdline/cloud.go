@@ -30,6 +30,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -196,9 +198,29 @@ func cloudSwitchCommand(on bool) {
 	}
 	if on {
 		fmt.Printf(cliCopy("cloud", "switch.on", "cloud on   %s\n"), parts.file.Path())
-		return
+	} else {
+		fmt.Printf(cliCopy("cloud", "switch.off", "cloud off  %s\n"), parts.file.Path())
 	}
-	fmt.Printf(cliCopy("cloud", "switch.off", "cloud off  %s\n"), parts.file.Path())
+	applyCloudSwitch(on)
+}
+
+// applyCloudSwitch asks the running daemon to take the switch now, through the
+// route the Settings switch uses. Writing the file alone left a service-run
+// daemon on its old line until somebody restarted it, and nothing said so: on
+// 2026-10-16 a fresh Linux machine sat unconnected after `cloud on`.
+func applyCloudSwitch(on bool) {
+	err := cloudDaemonJSON(http.MethodPost, "/v1/cloud/enabled", map[string]bool{"enabled": on}, nil)
+	var unreachable *url.Error
+	switch {
+	case err == nil:
+		fmt.Print(cliCopy("cloud", "switch.applied", "           the running daemon applied it\n"))
+	case errors.As(err, &unreachable):
+		fmt.Print(cliCopy("cloud", "switch.no_daemon", "           no daemon answered; it applies when Clawdline starts\n"))
+	default:
+		fmt.Fprintf(os.Stderr, cliCopy("cloud", "switch.not_applied",
+			"clawdline: the running daemon did not apply it (%s). Restart the service with `clawdline setup`, which applies the file.\n"), err)
+		os.Exit(1)
+	}
 }
 
 // cloudCommandsCommand is the remote-write switch, which is a separate
@@ -304,7 +326,7 @@ func cloudLoginCommand(args []string) {
 		cloudFail(err)
 	}
 	fmt.Printf(cliCopy("cloud", "login.verified", "verified   the control plane issued a device token (expires %s)\n"), token.ExpiresAt.Local().Format(time.RFC3339))
-	fmt.Print(cliCopy("cloud", "login.next", "next       clawdline cloud on, then restart the daemon\n"))
+	fmt.Print(cliCopy("cloud", "login.next", "next       clawdline cloud on, then clawdline cloud pair to pair a phone\n"))
 }
 
 // cloudFail prints a failure by its name and what to do about it, and exits.

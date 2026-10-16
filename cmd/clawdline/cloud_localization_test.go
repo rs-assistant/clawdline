@@ -36,8 +36,8 @@ func captureCloudStream(t *testing.T, stream **os.File, fn func()) string {
 func TestCloudCatalogHasCompleteNineLanguageCopy(t *testing.T) {
 	for _, language := range []string{"en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"} {
 		translated, total := cliCatalogCoverage("cloud", language)
-		if total != 88 || translated != total {
-			t.Errorf("cloud coverage %s = %d/%d, want 88/88", language, translated, total)
+		if total != 94 || translated != total {
+			t.Errorf("cloud coverage %s = %d/%d, want 94/94", language, translated, total)
 		}
 	}
 }

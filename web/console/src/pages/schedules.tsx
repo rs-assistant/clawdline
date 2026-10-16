@@ -413,8 +413,11 @@ const Schedules = (() => {
     lastRefreshAt = Date.now()
     const requestedMachines = machineKey()
     if (!lastAnswer) { readState = "loading"; paintReadState() }
+    // One machine on screen asks that machine only. Asked of nobody in
+    // particular, the read fans out to every machine on the account, and one
+    // offline machine elsewhere made this machine's list "could not be read".
     scheduleApi
-      .schedules()
+      .schedules(scheduleFleet()?.current || undefined)
       .then((data) => {
         if (requestedMachines !== machineKey()) return
         const schedules = (data && data.schedules) || []

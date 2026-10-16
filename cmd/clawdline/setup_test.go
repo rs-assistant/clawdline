@@ -392,7 +392,7 @@ func TestTheInstallEndsWithWhatToDoNext(t *testing.T) {
 		"Clawdline v0.10.0 is running at http://127.0.0.1:7800\n",
 		"\nNext:\n  1. Sign in: open this address in a browser on this computer (it contains a key; don't share it)\n       http://127.0.0.1:7800/v1/auth/open#t=k\n",
 		"No browser here? On your laptop run   ssh -L 7800:127.0.0.1:7800 someone@myhost\n     then open the same address there.",
-		"  2. Start an assistant inside tmux:   tmux new -s work   then run   claude\n",
+		"  2. Start an assistant inside tmux:   ~/.local/bin/clawdline tmux new -s work   then run   claude\n",
 		"Starts at login. Turn off: ~/.local/bin/clawdline setup --no-autostart --port 7800   Remove: ~/.local/bin/clawdline setup --uninstall --port 7800\n",
 	} {
 		if !strings.Contains(out, want) {

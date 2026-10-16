@@ -48,3 +48,8 @@ internal/adapters/tunnel/tunnel_test.go	"  Mac.Example.com "
 # machine it names really is a Mac; every other sentence around it is neutral.
 web/console/src/next-strings.ts	"Hand it to this Mac's AI"
 web/console/src/next-strings.ts	"交給這台 Mac 的 AI"
+
+# The Clawdline app runs only on macOS, so "a Mac with the app" names exactly
+# the machines where Cloud is managed from the app's settings window.
+web/console/public/catalogs/en.json	settings.webCloudManagedElsewhere = "Clawdline Cloud, which lets your phone and other machines reach this one, is not managed from a browser. On a Mac with the app, open Settings from the Clawdline menu bar icon and choose Remote. Anywhere else, run clawdline cloud login and then clawdline cloud on in a terminal on this machine; clawdline cloud pair shows a pairing link and QR code."
+web/console/public/catalogs/zh-Hant.json	settings.webCloudManagedElsewhere = "Clawdline Cloud（讓手機與其他機器連到這台）不在瀏覽器裡管理。有 App 的 Mac：從選單列的 Clawdline 圖示打開「設定」，選「遠端」。其他機器：在這台機器的終端機執行 clawdline cloud login，再執行 clawdline cloud on；clawdline cloud pair 會顯示配對連結與 QR 碼。"

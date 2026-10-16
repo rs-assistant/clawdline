@@ -237,6 +237,10 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
     /// that never activates the app — at login it may not — leaves the next
     /// one, whenever it is, to be an ordinary switch.
     private var launchFinishedAt: Date?
+    /// Set once the app has been asked to quit (the menu, a logout, SIGTERM).
+    /// Windows that close on the way out were not put away by the person, so
+    /// they must not count as having seen the introduction.
+    private var terminating = false
     private var launchActivationPassed = false
     private static let launchActivationWindow: TimeInterval = 5
 
@@ -300,7 +304,10 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
         }
         applyConfiguredHotKey(alertOnFailure: true)
 
-        termination = quitOnSIGTERM { NSApp.terminate(nil) }
+        termination = quitOnSIGTERM { [weak self] in
+            self?.terminating = true
+            NSApp.terminate(nil)
+        }
         startBundledDaemon()
         // Somebody, somewhere, is asking to pair. The code is shown here and
         // nowhere else — it is never in the reply the asker got — so finishing
@@ -406,6 +413,11 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
     // Closing the window leaves the app, the menu bar item and the hotkey.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        terminating = true
+        return .terminateNow
     }
 
     // The daemon this shell started is this shell's to stop, and it is waited
@@ -560,7 +572,7 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
         // Putting the window away is what the Swift app records when Home is
         // dismissed: from now on a launch does not open it by itself.
         let store = IntroductionStore()
-        if !store.isCurrent, store.record() {
+        if !terminating, !store.isCurrent, store.record() {
             shellLog("window: closed for the first time; later launches stay quiet")
         }
         // Still visible while it closes; ask once it has gone.

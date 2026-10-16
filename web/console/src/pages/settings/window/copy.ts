@@ -29,6 +29,8 @@ const ownWords = {
     webCloudStatusReadFailed: "Could not read this machine's status.",
     webRemoteMachineOnly:
       "This browser cannot manage Cloud or the tunnel; only this machine's own sign-in can. Use the Clawdline app's settings on this machine, or run clawdline cloud login and clawdline tunnel in a terminal on this machine.",
+    webCloudManagedElsewhere:
+      "Clawdline Cloud, which lets your phone and other machines reach this one, is not managed from a browser. On a Mac with the app, open Settings from the Clawdline menu bar icon and choose Remote. Anywhere else, run clawdline cloud login and then clawdline cloud on in a terminal on this machine; clawdline cloud pair shows a pairing link and QR code.",
     webCloudStatusToken: "Machine credential expires: {at}",
     webCloudStatusKey: "Machine key: {key}",
     webCloudStatusMachine: "Machine {machine}",
@@ -95,6 +97,8 @@ const ownWords = {
     webCloudStatusReadFailed: "讀不到這台機器的狀態。",
     webRemoteMachineOnly:
       "這個瀏覽器不能管理 Cloud 與通道，只有這台機器本身的登入可以。請改用這台機器上 Clawdline App 的設定，或在這台機器的終端機執行 clawdline cloud login 與 clawdline tunnel。",
+    webCloudManagedElsewhere:
+      "Clawdline Cloud（讓手機與其他機器連到這台）不在瀏覽器裡管理。有 App 的 Mac：從選單列的 Clawdline 圖示打開「設定」，選「遠端」。其他機器：在這台機器的終端機執行 clawdline cloud login，再執行 clawdline cloud on；clawdline cloud pair 會顯示配對連結與 QR 碼。",
     webCloudStatusToken: "機器憑證到期：{at}",
     webCloudStatusKey: "機器金鑰：{key}",
     webCloudStatusMachine: "機器 {machine}",
@@ -310,6 +314,7 @@ const baseW = {
   cloudPairPermission: ownWord("cloudPairPermission"),
   webCloudStatusReadFailed: ownWord("webCloudStatusReadFailed"),
   webRemoteMachineOnly: ownWord("webRemoteMachineOnly"),
+  webCloudManagedElsewhere: ownWord("webCloudManagedElsewhere"),
   webCloudStatusConnection: "連線：{state}",
   webCloudStatusClosed: "上次關閉：{code}",
   webCloudStatusToken: ownWord("webCloudStatusToken"),

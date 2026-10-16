@@ -155,7 +155,11 @@ func (s *Server) refreshSnapshotIcons(snapshot *sessionsSnapshotWire) error {
 	if err := s.icons.Refresh(); err != nil {
 		return err
 	}
-	rows := append([]sessionRowWire(nil), snapshot.Sessions...)
+	// A copy that stays a list when it is empty: appending nothing to a nil
+	// slice gives nil, which went out as `"sessions": null`, and a machine with
+	// no sessions then read as one still loading (the header waited forever).
+	rows := make([]sessionRowWire, len(snapshot.Sessions))
+	copy(rows, snapshot.Sessions)
 	for i := range rows {
 		rows[i].Icon = wireIcon(s.icons.For(rows[i].CWD))
 	}

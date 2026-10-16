@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5304,
+  "englishKeys": 5305,
   "counts": {
-    "negation": 1515,
-    "state": 731,
-    "permission": 334,
+    "negation": 1516,
+    "state": 732,
+    "permission": 335,
     "deletion": 110,
     "uncertainty": 155
   },
-  "unionCount": 2337,
+  "unionCount": 2338,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1414,6 +1414,7 @@
       "settings.voiceLanguageDetectBare",
       "settings.voiceLanguageNobody",
       "settings.voiceWhyCatalog",
+      "settings.webCloudManagedElsewhere",
       "settings.webCloudPairCodeHint",
       "settings.webCloudPairFailed",
       "settings.webCloudPairGaveUp",
@@ -2154,6 +2155,7 @@
       "settings.settingsSessionTerminalHint",
       "settings.settingsSmartNotificationsHint",
       "settings.settingsVoiceLanguageHint",
+      "settings.webCloudManagedElsewhere",
       "settings.webCloudPairCancel",
       "settings.webCloudPairCodeHint",
       "settings.webCloudPairExpired",
@@ -2571,6 +2573,7 @@
       "settings.voiceLanguageDetect",
       "settings.voiceLanguageDetectBare",
       "settings.voiceLanguageNobody",
+      "settings.webCloudManagedElsewhere",
       "settings.webCloudPair",
       "settings.webCloudPairCodeHead",
       "settings.webCloudPairCodeHint",
@@ -4987,6 +4990,7 @@
     "settings.voiceLanguageDetectBare",
     "settings.voiceLanguageNobody",
     "settings.voiceWhyCatalog",
+    "settings.webCloudManagedElsewhere",
     "settings.webCloudPair",
     "settings.webCloudPairCancel",
     "settings.webCloudPairCodeHead",

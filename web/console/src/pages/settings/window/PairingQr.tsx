@@ -25,9 +25,9 @@ import { QR_QUIET, encodeQr, qrPath, type QrCode } from "./qr.js"
  *
  * ## Why it renews itself
  *
- * The control plane gives an invitation three minutes, and on an iPhone the
- * honest order — install, open from the Home Screen, sign in, scan — easily
- * takes longer than that. So a code that runs out while this window is on
+ * The control plane gives an invitation ten minutes (three before 2026-10-16),
+ * and on an iPhone the honest order — install, open from the Home Screen, sign
+ * in, scan — can still take longer than that. So a code that runs out while this window is on
  * screen is replaced by a fresh one, a few times, and then the card stops and
  * offers a button: an unattended window must not keep drawing invitations
  * nobody will scan.
@@ -39,7 +39,7 @@ const INLINE_MODULE_MIN = 3
 
 /**
  * How many expired codes in a row are replaced without anybody asking. Three
- * renewals is about twelve minutes of a scannable code, which covers the whole
+ * renewals is about forty minutes of a scannable code, which covers the whole
  * iPhone install-and-sign-in path; past that the window waits for a click.
  */
 export const AUTO_RENEW_LIMIT = 3
