@@ -160,7 +160,10 @@ function CapacityRow({ row }: { row: CapacityEntry }) {
   const [explaining, setExplaining] = useState(false)
   const pct = row.ratio == null ? null : Math.min(100, Math.floor(row.ratio * 100))
   const counted = counters(row)
-  const why = row.error ?? row.note
+  const help = capacityExplanation(row)
+  // A failed reading is said on the row; the daemon's own note is a detail in
+  // its words, so it waits inside the explanation when there is one.
+  const why = row.error ?? (help ? undefined : row.note)
   return (
     <li className="cap" data-state={row.state}>
       <div className="cap-line">
@@ -181,13 +184,15 @@ function CapacityRow({ row }: { row: CapacityEntry }) {
         {counted && <span>{counted}</span>}
       </div>
       {why && <p className="cap-note">{why}</p>}
-      <div className="cap-help-control">
+      {help && <div className="cap-help-control">
         <button type="button" className="cap-info" aria-label={catalogFormat("capacityHelp", "open", [row.name])}
           aria-expanded={explaining} aria-controls={`capacity-help-${row.name}`}
           onClick={() => setExplaining((open) => !open)}>i</button>
-      </div>
-      {explaining && <div className="cap-help" id={`capacity-help-${row.name}`}>
-        {capacityExplanation(row).map((sentence, index) => <p key={index}>{sentence}</p>)}
+      </div>}
+      {help && explaining && <div className="cap-help" id={`capacity-help-${row.name}`}>
+        <p><b>{catalogWord("capacityHelp", "whatLabel")}</b>{help.what}</p>
+        <p><b>{catalogWord("capacityHelp", "fullLabel")}</b>{help.full}</p>
+        {!row.error && row.note && <p className="cap-help-note">{catalogWord("capacityHelp", "noteLabel")}{row.note}</p>}
       </div>}
     </li>
   )
