@@ -74,7 +74,7 @@
     "js/input/schedule-run.js": "4a7213cac6954c85",
     "js/door/door.js": "712ba04a6d7323fd",
     "js/net/cloud-viewer-events.js": "bdedb8d818f0000a",
-    "js/net/cloud-client.js": "02e0cffa77bce6c1",
+    "js/net/cloud-client.js": "5e6af218fc1d4a52",
     "js/net/cloud-pairing.js": "9a93a640b43c0cb0",
     "js/net/cloud-onboarding.js": "ef4044a53fb313f6",
     "js/net/cloud-boot.js": "d3104910f1280046"

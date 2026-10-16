@@ -977,3 +977,22 @@ test("an answered Session row is taken only when nothing newer came", () => {
   assert.equal(gone._applyAnsweredSessionRow("m", "s", payload, 0), false)
   assert.equal(gone.sessionSnapshots.size, 0)
 })
+
+// A short-lived viewer token makes a new socket and a new client every few
+// minutes. The page holds the machine's descriptor across that renewal, so the
+// new client does not ask for it again — and it must therefore carry it, or
+// the version the sidebar reads from it reads as still coming, forever.
+test("a renewed client carries the descriptor it will not ask for again", () => {
+  const options = { relayURL: "https://relay.test", deviceToken: "t", account: "acct", deviceID: "dev" }
+  const prior = new StatusCloudClient(options)
+  const descriptor = { app: { version: "v1.0.9", api_level: 7 }, machine: { commands: ["transcript"] } }
+  prior.orchestratorSnapshots.set("mac-a", descriptor)
+  prior.orchestratorReceived.add("mac-a")
+  prior.orchestratorSnapshots.set("linux-b", { schedules: [] })
+  const next = new StatusCloudClient({ ...options, resumeFrom: prior })
+  assert.equal(next._holdsOrchestrator("mac-a"), true, "the descriptor is not asked for again")
+  assert.equal(next.orchestratorSnapshots.get("mac-a"), descriptor, "so it is carried")
+  assert.ok(next.orchestratorReceived.has("mac-a"))
+  assert.equal(next._holdsOrchestrator("linux-b"), false, "a schedules entry is still not a descriptor")
+  assert.equal(next.orchestratorSnapshots.has("linux-b"), false)
+})

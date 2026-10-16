@@ -496,7 +496,7 @@ export class CloudClient {
         // Machines whose `orch/` snapshot this page holds, whichever client of the same viewer heard
         // it: what `sessions.snapshot` needs to know before it adds `orchestrator` (`_holdsOrchestrator`).
         this.orchestratorHeld = new Set(sameViewer ? prior.orchestratorHeld : []);
-        if (sameViewer) receivedOrchestrators(prior).forEach(function (machine) { this.orchestratorHeld.add(machine); }, this);
+        if (sameViewer) this._carryOrchestrators(prior);
         // This is evidence of the last authenticated envelope seen from a machine, not a
         // presence lease.  Carry it across a viewer-token renewal just like the retained
         // Session rows: it decides whether the picker may take the one-machine fast path, while
@@ -869,7 +869,7 @@ export class CloudClient {
         if (this.resumedFrom) {
             var prior = this.resumedFrom;
             this.resumedFrom = null;
-            receivedOrchestrators(prior).forEach(function (machine) { this.orchestratorHeld.add(machine); }, this);
+            this._carryOrchestrators(prior);
             // A renewal: the socket this one replaces is still up — it heard a frame after the ping
             // sent when this client began connecting — so nothing published since then was lost; it
             // went to that socket. Take what it heard meanwhile. A socket left half-open by a network
@@ -1809,6 +1809,23 @@ export class CloudClient {
             self._setSessionRecovery(machine, { state: "failed", code: SESSION_ROWS_MISSING, attempt: 0,
                 expected: null, timer: null });
         }, Math.max(0, deadline - this.now()));
+    }
+
+    /**
+     * Takes over the `orch/` descriptors `prior` opened that this client has not. Being held, they
+     * are not asked for again (`_holdsOrchestrator`), so the descriptor itself must come too: a
+     * renewed client that kept only the mark had no `app`, and the sidebar read "正在讀取機器版本……"
+     * from the first viewer-token renewal on (2026-10-16). A newer envelope still replaces it.
+     */
+    _carryOrchestrators(prior) {
+        receivedOrchestrators(prior).forEach(function (machine) {
+            this.orchestratorHeld.add(machine);
+            if (this.orchestratorReceived.has(machine)) return;
+            var snapshot = prior.orchestratorSnapshots && prior.orchestratorSnapshots.get(machine);
+            if (!snapshot) return;
+            this.orchestratorSnapshots.set(machine, snapshot);
+            this.orchestratorReceived.add(machine);
+        }, this);
     }
 
     /** Whether this page holds `machine`'s `orch/` snapshot, from this client or one it resumed from. */
