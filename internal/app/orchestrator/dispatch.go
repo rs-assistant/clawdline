@@ -1075,7 +1075,7 @@ func (b *Broker) brief(ctx context.Context, r Record, secret string) error {
 		select {
 		case <-ctx.Done():
 			return unbriefed{ctx.Err()}
-		case <-time.After(2 * time.Second):
+		case <-time.After(b.screenReadEvery()):
 		}
 	}
 	switch {

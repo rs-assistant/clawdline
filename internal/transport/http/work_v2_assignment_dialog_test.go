@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/sainteye/clawdline/internal/adapters/taskdir"
@@ -55,8 +56,9 @@ func dialogServer(t *testing.T) (*Server, *pane, app.WorkV2View, *sync.Mutex, *s
 	shown := orchestratorScreen(t, "codex-update")
 	dir := s.broker.Dir
 	s.broker = &orchestrator.Broker{Store: s.store, Tasks: taskdir.New(dir), Dir: dir,
-		Launcher: oneTmuxPane{pane: p.s.ID},
-		Live:     func(context.Context) []session.Session { return []session.Session{p.s} },
+		ScreenReadEvery: 10 * time.Millisecond,
+		Launcher:        oneTmuxPane{pane: p.s.ID},
+		Live:            func(context.Context) []session.Session { return []session.Session{p.s} },
 		Screen: func(_ context.Context, id string) (string, bool) {
 			mu.Lock()
 			defer mu.Unlock()

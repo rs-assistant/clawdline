@@ -192,7 +192,7 @@ func (b *Broker) waitComposer(ctx context.Context, terminalID, assistant string,
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(2 * time.Second):
+		case <-time.After(b.screenReadEvery()):
 		}
 	}
 	if last == nil {
