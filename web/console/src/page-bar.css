@@ -19,7 +19,6 @@
 .board-page { --page-bar-lift: 24px; }
 .projects { --page-bar-lift: clamp(16px, 3vw, 34px); }
 .documents-page { --page-bar-lift: 22px; }
-.timeline-page { --page-bar-lift: max(1rem, env(safe-area-inset-top)); }
 @media (max-width: 640px) { .board-page { --page-bar-lift: 16px; } }
 @media (max-width: 560px) { .documents-page { --page-bar-lift: 12px; } }
 

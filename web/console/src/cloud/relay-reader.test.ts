@@ -11,11 +11,6 @@ import { documentIdentityForSession } from "../legacy/js/net/document-links.js"
 import { arrangeSessions } from "../session/order.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { RelayReader, headerReadDiagnostics, ROW_RESTATE_MS, TRANSCRIPT_LINE_REREAD_MS, TRANSCRIPT_MAX_REUSE_MS, type CloudEvent, type CloudIdentity, type CloudReadClient, type CloudRow, type CloudSchedules, type CloudSnippets } from "./relay-reader.ts"
-import { failureFromMac } from "../legacy/js/net/cloud-failure.js"
-import { CatalogCloudClient } from "./refusal-client.js"
-import japanese from "../../public/catalogs/ja.json" with { type: "json" }
-// @ts-expect-error -- Node runs the source test with type stripping.
-import { activateCatalog, catalogRefusalDetail, resetCatalogForTest } from "../catalog.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { acceptSnapshot } from "../../../core/src/fleet-accept.ts"
 
@@ -824,6 +819,36 @@ test("a waiting row on the one-machine page draws the question its held rich row
     "a row nobody has open asks the machine for nothing")
 })
 
+// 2026-10-16: a Session answered one question and stopped on the next while
+// the page missed the s/ row carrying it. The status row said it moved after
+// the held rich row was read; the card drew the old question's options anyway.
+test("a held question older than the Session's last movement is not drawn as its question", async () => {
+  const draw = async (movedAt: number) => {
+    const client = new FakeClient()
+    const execution = "a".repeat(32)
+    const now = 1_000_000
+    const rows = [{ destination: { machineID: "mac-a", sessionID: "s1", executionGeneration: execution },
+      state: "waiting", freshness: "current" as const, observedAt: now }]
+    const menu = { question: "Proceed?", options: [{ n: 1, label: "Yes", can: true }] }
+    ;(client as unknown as { sessionSnapshots: Map<string, unknown> }).sessionSnapshots = new Map([["mac-a\u0000s1",
+      { machine: "mac-a", session: "s1", execution_generation: execution, state: "waiting", menu,
+        activity: { at: 900, known: true }, screen_reading: "read",
+        source: { freshness: "current", observed_at: now / 1000 } }]])
+    client.statusSnapshots = new Map([[JSON.stringify(["mac-a", "s1"]),
+      { payload: { execution_generation: execution, last_movement_at: movedAt } }]])
+    const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+      machineProjection: async () => ({ kind: "ready", complete: true, observedAt: now,
+        snapshotGeneration: "a".repeat(32), presentationGeneration: "a", rows }),
+      listPresentations: async () => rows.map((row) => ({
+        destination: row.destination, title: "Title", status: { state: "waiting" }, projection: row })),
+    })
+    r.attach(client)
+    return ((await r.snapshot()).sessions[0] as { menu?: { question?: string } }).menu?.question
+  }
+  assert.equal(await draw(900), "Proceed?", "the question the Session last moved to is drawn")
+  assert.equal(await draw(960), undefined, "a question from before the last movement is not")
+})
+
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {
   const client = new FakeClient()
   const pass = "c".repeat(32)
@@ -1213,39 +1238,6 @@ test("the machine's refusal stays typed; a timeout is nobody answering", async (
   assert.equal((await body<{ error: string }>(refused)).error, "not_found")
   client.answer = () => Promise.reject(Object.assign(new Error("the machine did not answer this read"), { code: "cloud_read_timeout" }))
   await assert.rejects(r.fetch("/v1/transcript?session=slow"), /cloud_read_timeout/)
-})
-
-test("a signed Cloud read keeps its explicit detail key without trusting raw lookalikes", async () => {
-  const message = "A timeline is one Project's; name it with ?project=."
-  const key = "http.e5a8008cc3310596"
-  const verified = new CatalogCloudClient({ relayURL: "wss://relay.example.test/v1/connect", deviceToken: "fixture" })
-  let signed: Error | null = null
-  verified.events((event: { type?: string; error?: Error }) => { if (event.type === "read") signed = event.error ?? null })
-  verified._applySnapshot({ kind: "transcript", machine: "mac-a", session: "s1" }, {
-    read: "read:timeline", status: 400,
-    error: { code: "project_required", layer: "mac_route", message, detail_key: key },
-  }, { seq: 5, ts: "2026-10-07T00:00:00Z" }, false)
-  assert.ok(signed, "the copied CloudClient emitted its parsed refusal")
-  const client = new FakeClient()
-  client.readAnswer = async () => { throw signed }
-  const r = reader(client, { t: 1000 })
-  const keyed = await body<{ error: string; detail: string; detail_key?: string }>(await r.fetch("/v1/timeline?upcoming=true"))
-  assert.deepEqual([keyed.error, keyed.detail, keyed.detail_key], ["project_required", message, key])
-  const oldDocument = globalThis.document
-  Object.defineProperty(globalThis, "document", { configurable: true, value: { documentElement: { lang: "en", dir: "ltr", setAttribute() {} } } })
-  try {
-    assert.equal(activateCatalog(japanese, "ja"), "ja")
-    assert.deepEqual(catalogRefusalDetail(keyed), { text: japanese[key], lang: "ja" })
-  } finally {
-    resetCatalogForTest()
-    Object.defineProperty(globalThis, "document", { configurable: true, value: oldDocument })
-  }
-
-  const raw = failureFromMac({ code: "project_required", layer: "mac_route", message }, 400, null)
-  ;(raw as Error & { detailKey?: string }).detailKey = key
-  client.readAnswer = async () => { throw raw }
-  const untrusted = await body<{ detail_key?: string }>(await r.fetch("/v1/timeline?upcoming=true"))
-  assert.equal(untrusted.detail_key, undefined)
 })
 
 // The Mac's channel filled and the answer could not leave. What the page gets
@@ -1677,19 +1669,9 @@ const CARRIED_READS: [string, string, Record<string, unknown>][] = [
     "board.items",
     { project: "p1", audience: "agent", cursor: 60, limit: 90 },
   ],
-  [
-    "/v1/timeline?project=clawdline-go&upcoming=false",
-    "timeline",
-    { project: "clawdline-go", entry: "", cursor: "", environment: "", category: "", upcoming: false },
-  ],
-  [
-    "/v1/timeline?project=clawdline-go&environment=staging&category=feature&upcoming=true",
-    "timeline",
-    { project: "clawdline-go", entry: "", cursor: "", environment: "staging", category: "feature", upcoming: true },
-  ],
 ]
 
-test("the work system, the projects and the timeline reach the machine as their own words", async () => {
+test("the work system and projects reach the machine as their own words", async () => {
   for (const [path, word, sent] of CARRIED_READS) {
     const client = new FakeClient()
     const r = reader(client, { t: 1000 })
@@ -1792,21 +1774,6 @@ test("a client with no generic read refuses each word by name rather than throwi
   }
 })
 
-test("a refusal from the machine's own route stays that route's refusal", async () => {
-  const client = new FakeClient()
-  client.readAnswer = async () => {
-    throw Object.assign(new Error("A timeline is one Project's; name it with ?project=."), {
-      code: "project_required",
-      status: 400,
-    })
-  }
-  const r = reader(client, { t: 1000 })
-  const res = await r.fetch("/v1/timeline?upcoming=true")
-  assert.equal(res.status, 400, "the machine's own status is what the page sees")
-  const refusal = await body<{ error: string }>(res)
-  assert.equal(refusal.error, "project_required", "a route's refusal is not turned into a seam refusal")
-})
-
 test("squad reads carry exact scope, binding and cursor fields to the chosen machine", async () => {
   const client = new FakeClient()
   const r = reader(client, { t: 1000 })
@@ -1846,6 +1813,36 @@ test("read again asks the machine for just that row", async () => {
   ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements = () => "unknown"
   await r.fetch("/v1/sessions?look=%2519")
   assert.equal(client.reads.at(-1)?.word, "sessions.snapshot", "an older machine is asked to restate everything")
+})
+
+// 2026-10-16: the machine read the menu whole after "read again" and put it on
+// an s/ channel this page did not hold at that moment (`fanout=0`). The answer
+// carries the row, and the page takes it — unless an s/ envelope for the row
+// arrived while the ask was out, which is newer than the answer's copy.
+test("read again takes the row its answer carries", async () => {
+  const client = new FakeClient()
+  ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements =
+    (_machine, word) => word === "sessions.row" ? "yes" : "unknown"
+  const row = { session: { id: "%19", state: "waiting", menu: { options: [{ n: 1, label: "Yes" }] } }, at: 1, scan: {} }
+  client.readAnswer = async () => ({ sessions: ["%19"], complete: true, row })
+  const applied: { machine: string; session: string; payload: unknown; mark: number }[] = []
+  let mark = 7
+  const c = client as unknown as {
+    _sessionRowMark(machine: string, session: string): number
+    _applyAnsweredSessionRow(machine: string, session: string, payload: unknown, mark: number): boolean
+  }
+  c._sessionRowMark = () => mark
+  c._applyAnsweredSessionRow = (machine, session, payload, at) => { applied.push({ machine, session, payload, mark: at }); return true }
+  const r = reader(client, { t: 10_000 })
+  const res = await r.fetch("/v1/sessions?look=%2519")
+  assert.equal(res.status, 200)
+  assert.deepEqual(applied, [{ machine: "mac-a", session: "%19", payload: row, mark: 7 }],
+    "the mark is read before the ask, so a row delivered meanwhile wins")
+  // An older machine's answer names the row and carries none: nothing to take.
+  client.readAnswer = async () => ({ sessions: ["%19"], complete: true })
+  mark = 8
+  await r.fetch("/v1/sessions?look=%2519")
+  assert.equal(applied.length, 1)
 })
 
 /**

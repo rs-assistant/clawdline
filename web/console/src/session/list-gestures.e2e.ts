@@ -2131,6 +2131,28 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
     assert.equal(await tab.run(`document.querySelector('.workflow-picker-toolbar, .workflow-reload')`), null)
     assert.match(await tab.run(`document.querySelector('.workflow-picker-row')?.textContent`), /Daily release/)
     assert.match(await tab.run(`document.querySelector('.workflow-picker-group .snippet-group-title')?.textContent`), /全域|Global/)
+    await tab.press('#snippets-new')
+    assert.equal(await tab.run(`document.querySelector('#workflow-quick-editor [role="dialog"]') !== null`), true)
+    assert.equal(await tab.run(`document.activeElement?.id === 'workflow-quick-name'`), false)
+    await tab.run(`(() => {
+      const name = document.querySelector('#workflow-quick-name')
+      const message = document.querySelector('#workflow-quick-message')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(name, 'Session checklist')
+      name.dispatchEvent(new Event('input', { bubbles: true }))
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(message, 'Check this Project.')
+      message.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    await tab.press('#workflow-quick-editor .confirm-go')
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        if (!document.querySelector('#workflow-quick-editor') && document.querySelector('.workflow-picker')?.textContent?.includes('Session checklist')) return resolve(true)
+        if (Date.now() > deadline) return reject(new Error('new Workflow did not appear in its Session'))
+        setTimeout(look, 25)
+      }; look()
+    })`)
+    assert.equal(workflowRecords.find((record) => record.title === 'Session checklist')?.scope, 'workflow')
+    assert.equal(workflowRecords.find((record) => record.title === 'Session checklist')?.project, '/tmp/fixture')
   }))
 
 test("the Global Workflow list survives unavailable Project files and an empty Project inventory", () =>

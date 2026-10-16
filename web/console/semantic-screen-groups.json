@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5307,
-  "riskKeys": 2339,
-  "nonRiskCount": 2968,
+  "englishContentKeys": 5306,
+  "riskKeys": 2341,
+  "nonRiskCount": 2965,
   "groups": [
     {
       "name": "bar / other",
@@ -311,16 +311,6 @@
       ]
     },
     {
-      "name": "Console / timeline",
-      "count": 1,
-      "sources": [
-        "src/pages/timeline.tsx"
-      ],
-      "keys": [
-        "inline.da2fd084302a"
-      ]
-    },
-    {
       "name": "count / other",
       "count": 10,
       "sources": [
@@ -367,7 +357,7 @@
     },
     {
       "name": "http / other",
-      "count": 561,
+      "count": 560,
       "sources": [
         "internal/productcopy/http_refusals/en.json"
       ],
@@ -867,7 +857,6 @@
         "http.e425c5298ea812db",
         "http.e4ca525b8a681e38",
         "http.e512823df80025f0",
-        "http.e5a8008cc3310596",
         "http.e5b41e1699a2fd7a",
         "http.e69f26ffa1c51e5a",
         "http.e73ca8ce4e1263b4",
@@ -2049,6 +2038,7 @@
         "next.sessionLastActivity",
         "next.sessionStop",
         "next.sessionTrySendingAgain",
+        "next.sessionWaitHeavyQueued",
         "next.sessionWriteDisabled",
         "next.sessionsListWaitTitle",
         "next.sidebarAppStaged",
@@ -2073,7 +2063,6 @@
         "next.swipeArchiveLabel",
         "next.swipeCloseAction",
         "next.swipeEndLabel",
-        "next.timelineSetPerProject",
         "next.todosRetrying",
         "next.transcriptJumpLatest",
         "next.transcriptJumpNew",
@@ -3366,7 +3355,7 @@
     },
     {
       "name": "work / other",
-      "count": 65,
+      "count": 64,
       "sources": [
         "src/pages/work/words.ts"
       ],
@@ -3431,7 +3420,6 @@
         "work.tabBoard",
         "work.tasks",
         "work.tasksLanded",
-        "work.timeline",
         "work.toConfirm",
         "work.todosTitle",
         "work.workCatalogPartial",

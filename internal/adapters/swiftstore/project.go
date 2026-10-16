@@ -121,6 +121,10 @@ type Work struct {
 	PersonNeeded *bool
 	Owed         *contract.WorkOwed
 	Disposition  *contract.WorkDisposition
+	// Waiting is the live tasks that made a broker-decided waiting_session,
+	// in store order; nil for every other state and for a declared or
+	// coordination wait.
+	Waiting []*Task
 }
 
 type workInputs struct {
@@ -242,14 +246,18 @@ func (s Snapshot) Work(l Live, terminalState string) Work {
 	if delivery != nil && verifiedSessionLanding(delivery.Landing) {
 		landing = delivery.Landing
 	}
-	outstanding := false
-	for _, t := range s.Tasks {
+	// The tasks that make this Session wait are collected by the pass that
+	// decides it waits, so a row can never say it waits on nothing, or name
+	// work that did not count.
+	var outstanding []*Task
+	for i := range s.Tasks {
+		t := &s.Tasks[i]
 		if isTerminalState(t.State) {
 			continue
 		}
 		if own != nil && t.ParentTask != nil && *t.ParentTask == own.ID {
-			outstanding = true
-			break
+			outstanding = append(outstanding, t)
+			continue
 		}
 		if l.ConversationID == "" || t.RootSession == nil || *t.RootSession != l.ConversationID {
 			continue
@@ -260,8 +268,7 @@ func (s Snapshot) Work(l Live, terminalState string) Work {
 			ra = *t.RootAssistant
 		}
 		if ra == l.Assistant {
-			outstanding = true
-			break
+			outstanding = append(outstanding, t)
 		}
 	}
 	self := s.selfState(l)
@@ -283,7 +290,7 @@ func (s Snapshot) Work(l Live, terminalState string) Work {
 		assignmentAbsent:    l.Assistant == "",
 		hasSessionDelivery:  delivery != nil,
 		hasSessionLanding:   landing != nil,
-		hasOutstandingChild: outstanding,
+		hasOutstandingChild: len(outstanding) > 0,
 	}
 	withoutClaim := projectWorkState(in)
 	if self != nil {
@@ -291,6 +298,9 @@ func (s Snapshot) Work(l Live, terminalState string) Work {
 	}
 	state := projectWorkState(in)
 	out := Work{State: state, Provenance: "broker", Owed: owed}
+	if state == "waiting_session" && state == withoutClaim && !in.hasWait {
+		out.Waiting = outstanding
+	}
 
 	if state != "milestone_complete" && state != "work_complete" {
 		if self != nil && self.Claim != nil && state != withoutClaim {

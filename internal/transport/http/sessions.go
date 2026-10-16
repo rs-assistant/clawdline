@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -117,6 +116,13 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 			Acceptance       *contract.SessionAcceptance   `json:"acceptance,omitempty"`
 			Disposition      *contract.WorkDisposition     `json:"disposition,omitempty"`
 			Coordination     *contract.SessionCoordination `json:"coordination,omitempty"`
+			// The signed ss/ rows carry these two; this list stands in for
+			// them while ss/ has a gap, and without them the machine's
+			// Clawdfather was drawn as an ordinary Session under its own title.
+			MachineScope      bool                         `json:"machine_scope,omitempty"`
+			CoordinatorBound  bool                         `json:"coordinator_bound,omitempty"`
+			WaitingFor        []contract.SessionWaitTarget `json:"waiting_for,omitempty"`
+			WaitingForOmitted int64                        `json:"waiting_for_omitted,omitempty"`
 		}
 		type presentation struct {
 			ID                  string         `json:"id"`
@@ -136,7 +142,9 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 					HeavyWork: row.HeavyWork, Source: row.Source, Activity: row.Activity,
 					Identity: row.Identity, AttentionCount: row.AttentionCount,
 					Owed: row.Owed, Acceptance: row.Acceptance,
-					Disposition: row.Disposition, Coordination: row.Coordination}})
+					Disposition: row.Disposition, Coordination: row.Coordination,
+					MachineScope: row.MachineScope, CoordinatorBound: row.Coordinator != nil,
+					WaitingFor: row.WaitingFor, WaitingForOmitted: row.WaitingForOmitted}})
 		}
 		_ = json.NewEncoder(w).Encode(struct {
 			At       int64          `json:"at"`
@@ -206,6 +214,9 @@ type sessionRowWire struct {
 	// Menu shadows the generated field for the same reason: a multi-select's
 	// unticked row is `checked: false`, which the generated bool would drop.
 	Menu *menuWire `json:"menu,omitempty"`
+	// waiting is the work projection's live tasks behind a broker-decided
+	// waiting_session, turned into `waiting_for` once labels are known.
+	waiting []*swiftstore.Task
 }
 
 // sessionsSnapshotWire is contract.SessionsSnapshot with those rows.
@@ -275,7 +286,7 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 			conversationMatches[item.ConversationID]++
 		}
 	}
-	heavySession, heavyWork := s.runningHeavyCallback(records)
+	heavySession, heavyWork, heavyPlaces := s.runningHeavyCallback(records)
 	// One database read for the entire fleet. An error leaves the count
 	// unknown on every row, rather than turning it into zero.
 	attentionCounts, attentionErr := s.store.OpenHumanInterventionCounts(records)
@@ -389,10 +400,10 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 			latestDelivery:      deliveries[item.ID],
 			latestDeliveryErr:   deliveriesErr,
 		})
-		// The light Cloud list has no task collection. Carry the names of live
-		// child Sessions with a broker peer wait so its hourglass can name them.
+		// Every list reads what a Session waits for from the row, never from a
+		// task collection of its own: the Cloud lists do not have one.
 		if row.WorkState == contract.WorkStateWaitingSession && row.WorkProvenance == contract.WorkProvenanceBroker {
-			row.WorkNote = waitingChildNames(item, lives[i], swift, labels)
+			row.WaitingFor, row.WaitingForOmitted = s.waitTargets(records, row.waiting, labels, heavyPlaces)
 		}
 		if attentionErr == nil && item.ConversationID != "" && conversationMatches[item.ConversationID] == 1 &&
 			row.Source != nil && row.Source.Freshness == contract.SourceFreshnessCurrent &&
@@ -894,6 +905,7 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		row.WorkSince = work.Since
 		row.WorkMovedBy = work.MovedBy
 		out.WorkPersonNeeded = work.PersonNeeded
+		out.waiting = work.Waiting
 		row.Owed = work.Owed
 		row.Disposition = work.Disposition
 		if work.Disposition != nil && work.Disposition.Scope == "session" {
@@ -1034,38 +1046,6 @@ func wireObservation(obs session.Observation) *contract.BearingsSource {
 }
 
 var errSwiftUnknown = errors.New("the Swift store could not be read")
-
-// waitingChildNames names only live children tied to this exact root conversation.
-// A title of the task is not the identity of the Session doing it.
-func waitingChildNames(root session.Session, live swiftstore.Live, snapshot swiftstore.Snapshot, labels map[string]string) string {
-	parent := snapshot.OwnTask(live)
-	var names []string
-	seen := map[string]bool{}
-	for _, t := range snapshot.Tasks {
-		if !t.Live() {
-			continue
-		}
-		direct := root.ConversationID != "" && t.RootSession != nil && *t.RootSession == root.ConversationID &&
-			((t.RootAssistant == nil && root.Assistant == session.AssistantClaude) ||
-				(t.RootAssistant != nil && *t.RootAssistant == string(root.Assistant)))
-		child := parent != nil && t.ParentTask != nil && *t.ParentTask == parent.ID
-		if !direct && !child {
-			continue
-		}
-		name := ""
-		if t.ChildTerminal != nil {
-			name = labels[*t.ChildTerminal]
-		}
-		if name == "" && t.ChildSession != nil {
-			name = *t.ChildSession
-		}
-		if name != "" && !seen[name] {
-			seen[name] = true
-			names = append(names, name)
-		}
-	}
-	return strings.Join(names, " · ")
-}
 
 // ownWaitingOnPeer is this daemon's own record of a session parked on another.
 func ownWaitingOnPeer(item session.Session, owed []task.Obligation) bool {

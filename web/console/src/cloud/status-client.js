@@ -235,13 +235,27 @@ export class StatusCloudClient extends CatalogCloudClient {
   disableClassicSessionView() {
     for (const [channel, timer] of this.classicSessionReads) {
       this.clearTimeout(timer)
-      this.unsubscribe([channel])
+      this._releaseClassicRead(channel)
     }
     this.classicSessionReads.clear()
     this.classicSessionAttempted.clear()
     this.classicSessionPass = null
     this.classicSessionMachine = null
     this.classicSessionTarget = null
+  }
+
+  /**
+   * Let go of a channel the list's row recovery subscribed, unless something
+   * else holds it. The recovery and an opened detail ask for the same s/
+   * channel when the Session open is one the list has not read yet; letting go
+   * of it unconditionally dropped the opened detail's subscription the moment
+   * its row arrived. On 2026-10-16 the machine's log showed that Session's s/
+   * row going out with `fanout=0` and `fanout=1` by turns while the page stayed
+   * open on it, and a "read again" that landed in a gap never reached the card.
+   */
+  _releaseClassicRead(channel) {
+    if (this.openedDetails?.has(channel) || this.subscriptionHolds?.has(channel)) return
+    this.unsubscribe([channel])
   }
 
   _recoverClassicSessionRows() {
@@ -262,7 +276,7 @@ export class StatusCloudClient extends CatalogCloudClient {
       if (expected.has(id)) continue
       this.clearTimeout(timer)
       this.classicSessionReads.delete(channel)
-      this.unsubscribe([channel])
+      this._releaseClassicRead(channel)
     }
     // The copied client already owns the eight-channel budget and releases idle
     // channels before subscribing. Counting its occupied slots here stranded the
@@ -287,7 +301,7 @@ export class StatusCloudClient extends CatalogCloudClient {
         this.classicSessionAttempted.set(channel, status.execution_generation)
         const timer = this.setTimeout(() => {
           this.classicSessionReads.delete(channel)
-          this.unsubscribe([channel])
+          this._releaseClassicRead(channel)
           this._recoverClassicSessionRows()
         }, this.readTimeoutMs)
         this.classicSessionReads.set(channel, timer)
@@ -876,7 +890,7 @@ export class StatusCloudClient extends CatalogCloudClient {
       if (timer !== undefined) {
         this.clearTimeout(timer)
         this.classicSessionReads.delete(channel)
-        this.unsubscribe([channel])
+        this._releaseClassicRead(channel)
         this._recoverClassicSessionRows()
       }
     }

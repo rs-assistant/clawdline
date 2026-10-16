@@ -99,7 +99,8 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 | [broker-design.md](broker-design.md) | Internal migration record | Chinese | The analysis of which parts of the old broker to port and which to redesign |
 | [broker-design-challenge.md](broker-design-challenge.md) | Internal migration record | Chinese | A deliberate challenge to that analysis: which ports were only history |
 | [board-design.md](board-design.md) | Internal migration record | Chinese | The analysis of the old board. Still the reference for the read-only view of its cards |
-| [timeline-design.md](timeline-design.md) | Internal migration record | Chinese | The analysis of the old project timeline, which this generation has not ported |
+| [timeline-design.md](timeline-design.md) | Internal migration record | Chinese | Historical analysis of the retired project timeline |
+| [records/unused-code-audit-2026-10-16.md](records/unused-code-audit-2026-10-16.md) | Internal audit | English | Reachability audit and removal of the Project Timeline |
 
 ## What is still owed
 

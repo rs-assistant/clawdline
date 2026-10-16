@@ -640,7 +640,7 @@ func (p *Publisher) StateRow(ctx context.Context, sender, id string) (cloudops.S
 }
 
 // stateRow forgets that one row was sent, so the fresh pass sends it again,
-// and answers with it named only if the reading had it. Both of its rows: the
+// and answers with it named, and carried, only if the reading had it. Both of its rows: the
 // list a page draws beside the opened pane reads the ss/ one, and a page that
 // missed its last ss/ row would otherwise hear nothing until the row changed.
 func (p *Publisher) stateRow(ctx context.Context, ask rowAsk) {
@@ -662,6 +662,11 @@ func (p *Publisher) stateRow(ctx context.Context, ask rowAsk) {
 	for _, id := range reading.ids {
 		if id == ask.id {
 			stated.IDs = []string{id}
+			// The bytes the s/ channel was just given, so a page that held no
+			// subscription to it at that moment still has the question.
+			if held, ok := p.held[id]; ok {
+				stated.Row = append(json.RawMessage(nil), held.body...)
+			}
 			break
 		}
 	}

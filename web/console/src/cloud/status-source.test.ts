@@ -779,3 +779,31 @@ test("an opened rich row names only the same execution and current question", as
   rich.identity.machine = "other"
   assert.equal(pinnedQuestion(client, destination), null)
 })
+
+test("a status gap keeps the machine's Clawdfather while the direct list stands in", async () => {
+  const { client, row } = clientFixture()
+  Object.assign(row, { machine_scope: true, coordinator_bound: true })
+  // The marker names a Session whose row has not arrived: an event gap.
+  const marker = client.statusSnapshots.get(JSON.stringify([machineID, inventory])) as {
+    payload: { inventory: { sessions: string[] } } }
+  marker.payload.inventory.sessions.push("late")
+  const reading = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.ok(reading.snapshotGeneration?.startsWith("direct:"), "the direct list answered")
+  assert.equal(reading.rows?.[0]?.machineScope, true, "an older machine's list leaves the flag out")
+  assert.equal(reading.rows?.[0]?.coordinatorBound, true)
+})
+
+test("a direct list names the Clawdfather without any held status row", async () => {
+  const { client } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
+  const list = client.listPresentationsForMachine
+  client.listPresentationsForMachine = async (machine) => {
+    const reply = await list(machine)
+    return { ...reply, sessions: reply.sessions.map((row) => ({ ...row,
+      status: { ...row.status, machine_scope: true, coordinator_bound: true } })) }
+  }
+  const reading = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.ok(reading.snapshotGeneration?.startsWith("direct:"))
+  assert.equal(reading.rows?.[0]?.machineScope, true)
+  assert.equal(reading.rows?.[0]?.coordinatorBound, true)
+})

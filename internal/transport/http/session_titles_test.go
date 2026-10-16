@@ -14,6 +14,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
 	"github.com/sainteye/clawdline/internal/adapters/planner"
+	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
 	"github.com/sainteye/clawdline/internal/config"
@@ -49,6 +50,29 @@ func TestMachineListUsesTheSingleMachineSnapshotAndItsRowStatus(t *testing.T) {
 	if status == nil || status["line"] != "private work detail" || status["work_state"] == nil ||
 		status["sessionId"] != "conversation-41" || status["persona"] != "product-manager" {
 		t.Fatalf("machine list dropped the original status line: %v", row)
+	}
+}
+
+// The Cloud list stands in for the signed status rows during a gap, so it
+// names the machine's Clawdfather the way they do.
+func TestMachineListNamesTheMachineWorkspaceSession(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "clawdline-next")
+	item := session.Session{ID: "%42", Backend: session.BackendTmux, Assistant: session.AssistantClaude,
+		State: session.StateIdle, Label: "Its own title", CWD: projects.MachineWorkspace(dir)}
+	s := paneServer(t, &pane{s: item})
+	s.cfg = config.Config{Dir: dir}
+	rec := httptest.NewRecorder()
+	s.sessions(rec, httptest.NewRequest(http.MethodGet, "/v1/sessions?parts=list", nil))
+	var payload struct {
+		Sessions []struct {
+			Status map[string]any `json:"status"`
+		} `json:"sessions"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil || len(payload.Sessions) != 1 {
+		t.Fatalf("machine list payload: %v %s", err, rec.Body)
+	}
+	if payload.Sessions[0].Status["machine_scope"] != true {
+		t.Fatalf("machine list lost the Clawdfather's scope: %s", rec.Body)
 	}
 }
 

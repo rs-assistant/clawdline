@@ -106,7 +106,8 @@ export const STATUS_MARKER_RETRY_MS = 60_000
 type DirectList = { projection: Extract<MachineSessionProjection, { kind: "ready" }>; reply: Record<string, unknown> }
 
 /** A pinned machine reply is a complete, authenticated fallback while ss/ replays a missing row. */
-function directList(machineID: string, reply: unknown, nowMs: number, inventoryIDs: readonly string[] | null): DirectList | null {
+function directList(machineID: string, reply: unknown, nowMs: number, inventoryIDs: readonly string[] | null,
+  held: MachineSessionProjection): DirectList | null {
   const body = record(reply)
   if (!body || (body.complete !== true && body.complete !== false) || !Number.isFinite(body.at) ||
     Math.abs(nowMs - Number(body.at) * 1000) > STATUS_FRESH_MS ||
@@ -130,15 +131,23 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
   const complete = body.complete === true || !!inventoryIDs && ids.length === inventoryIDs.length &&
     ids.every((id) => inventoryIDs.includes(id))
   const snapshotGeneration = "direct:" + nowMs
+  // A machine from before the list named the Clawdfather leaves both flags
+  // out. The same execution's signed row, held from before this gap, still
+  // knows; without it the machine's Clawdfather showed its own title and icon.
+  const known = new Map((held.rows ?? (held.kind === "unavailable" ? held.latest : undefined) ?? []).map((row) =>
+    [row.destination.sessionID + "\u0000" + row.destination.executionGeneration, row]))
   return { reply: body, projection: { kind: "ready", complete, observedAt: nowMs,
     snapshotGeneration,
     rows: sessions.map((row: Record<string, unknown> | null) => {
       const status = record(row!.status)!
       const ownerConversation = record(status.epic_parent)?.owner_session_id
       const parentSessionID = typeof ownerConversation === "string" ? byConversation.get(ownerConversation) : null
+      const before = known.get(String(row!.id) + "\u0000" + String(row!.execution_generation))
       return { destination: { machineID, sessionID: String(row!.id),
         executionGeneration: String(row!.execution_generation) }, state: String(status.state),
       parentSessionID: parentSessionID && parentSessionID !== row!.id ? parentSessionID : undefined,
+      machineScope: status.machine_scope === true || before?.machineScope === true,
+      coordinatorBound: status.coordinator_bound === true || before?.coordinatorBound === true,
       freshness: "current" as const, observedAt: nowMs, snapshotGeneration }
     }) } }
 }
@@ -242,7 +251,7 @@ export function statusSource(current: () => StatusClient | null,
         const promise = client.listPresentationsForMachine(machineID, new AbortController().signal)
           .then((reply) => {
             const value = directList(machineID, reply, client.now?.() ?? Date.now(),
-              statusInventoryIDs(client, machineID, client.now?.() ?? Date.now()))
+              statusInventoryIDs(client, machineID, client.now?.() ?? Date.now()), statusProjection(client, machineID))
             if (!value) reportListFailure(client, machineID, reason, "invalid_reply",
               (client.now?.() ?? Date.now()) - started, failures + 1)
             return value

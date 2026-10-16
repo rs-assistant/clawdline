@@ -6930,6 +6930,20 @@ export interface SessionRow {
   tty?: string
 
   /**
+   * The live broker work that makes a broker-projected `waiting_session` row wait,
+   * collected by the same pass that decided the state. Present only on such rows;
+   * at most `session.waiting_for` entries, with `waiting_for_omitted` counting the
+   * rest. Both Cloud list scopes and the local list describe a wait from this field
+   * alone.
+   */
+  waiting_for?: SessionWaitTarget[]
+
+  /**
+   * Live waited-on tasks left out of `waiting_for` by its bound.
+   */
+  waiting_for_omitted?: number
+
+  /**
    * Who the declaring session said will move it — a session id, or a person.
    */
   work_moved_by?: string
@@ -7188,6 +7202,25 @@ export interface SessionTitleReply {
  */
 export interface SessionTitleRequest {
   title: string
+}
+
+/**
+ * One unit of work a Session waits on. `session`: a dispatched child whose Session
+ * is known; `label` is its visible name. `heavy`: a declared-heavy callback;
+ * `label` is the command's declared reason and `phase` says whether it holds the
+ * compile slot or is in line. `callback`: another daemon callback; `label` is its
+ * title. `task`: a dispatched task with no child Session yet; `label` is its title.
+ */
+export interface SessionWaitTarget {
+  kind: string
+  label: string
+
+  /**
+   * Only for `heavy`: `running` holds the compile slot, `queued` is in line for it.
+   * Absent when the slot could not be read.
+   */
+  phase?: string
+  task_id: string
 }
 
 export interface SessionsSnapshot {
@@ -8848,192 +8881,6 @@ export type TerminalStatus =
   | "unreachable"
 
 export const TerminalStatusValues: readonly TerminalStatus[] = ["running", "exited", "closed", "unreachable"] as const
-
-/**
- * The entry bound, on the wire where a reader can see it (timeline-design A4). What
- * is dropped at the bound is the oldest, and it is a projection of records this
- * daemon still holds, so nothing is lost by dropping it.
- */
-export interface TimelineCapacity {
-  entryCount: number
-  entryLimit: number
-}
-
-/**
- * What kind of work an entry was. `feature` for ordinary delivery, `operation` for
- * a task whose write set was only tooling or documentation.
- */
-export type TimelineCategory =
-    "feature"
-  | "operation"
-
-export const TimelineCategoryValues: readonly TimelineCategory[] = ["feature", "operation"] as const
-
-/**
- * How far one Project's history has been read. It is derived on every read and
- * stored nowhere, so it can never freeze the way a saved cursor did.
- */
-export interface TimelineCheckpoint {
-  historyStatus: TimelineHistoryStatus
-  projectId: string
-}
-
-/**
- * One delivery. The id is the broker task's, because the task is the thing that was
- * delivered and an id of this projection's own invention would be a second name for
- * it.
- */
-export interface TimelineEntry {
-  /**
-   * The work items this delivery is on, as the task's own `work_id` names them.
-   */
-  boardItemIds: string[]
-  events: TimelineEvent[]
-  id: string
-
-  /**
-   * The task's own title, never a summary written for it.
-   */
-  originalTitle: string
-  primaryCategory: TimelineCategory
-  projectId: string
-  projection: TimelineProjection
-  sourceRevisions: TimelineRevision[]
-
-  /**
-   * The delivery's own one-paragraph account of itself, cut to a length the card
-   * can hold. Absent when the task wrote none.
-   */
-  summary?: string
-}
-
-export interface TimelineEnvelope {
-  timeline: TimelineSnapshot
-}
-
-/**
- * One piece of evidence under an entry, and who said it. `authority` is what wrote
- * it down — `broker` for this daemon's own landing record — because an event
- * with no authority is an assertion.
- */
-export interface TimelineEvent {
-  authority: string
-
-  /**
-   * Unix seconds: when the thing happened. Absent when only the observation time is
-   * known.
-   */
-  effectiveAt?: number
-  kind: string
-
-  /**
-   * Unix seconds: when this Mac learned of it.
-   */
-  observedAt: number
-  result: string
-}
-
-/**
- * How far back this Project's coverage reaches. `unknown` is the honest answer
- * while no history importer exists; `capacity` is the entry bound reached, and what
- * was retained is never removed to make room.
- */
-export type TimelineHistoryStatus =
-    "complete"
-  | "capacity"
-  | "unknown"
-
-export const TimelineHistoryStatusValues: readonly TimelineHistoryStatus[] = ["complete", "capacity", "unknown"] as const
-
-export interface TimelineProject {
-  id: string
-
-  /**
-   * The repository's own name. Never a reconstruction of one this Mac no longer
-   * holds.
-   */
-  label: string
-  name?: string
-}
-
-/**
- * What the events below add up to. `availableTargets` is how many targets this
- * entry is proved available on, which on this daemon is always zero: there is no
- * deployment evidence producer, and a required target nothing can answer is not the
- * same as a failure.
- */
-export interface TimelineProjection {
-  availableTargets: number
-
-  /**
-   * Unix seconds. Absent when nothing under this entry carried one.
-   */
-  effectiveAt?: number
-  observedAt: number
-  requiredTargets: number
-  status: TimelineStatus
-}
-
-/**
- * One commit an entry rests on, as the landing record proved it. `githubUrl` only
- * when the repository is a GitHub one this daemon can name with certainty.
- */
-export interface TimelineRevision {
-  commit: string
-  githubUrl?: string
-  repositoryId: string
-  shortCommit: string
-}
-
-export interface TimelineSnapshot {
-  capacity: TimelineCapacity
-  checkpoints: TimelineCheckpoint[]
-  enabled: boolean
-  entries: TimelineEntry[]
-
-  /**
-   * A keyset cursor — the last entry's time and id — not an offset, so a page
-   * that arrives while records are being written cannot skip an entry
-   * (timeline-design A5). Absent on the last page.
-   */
-  nextCursor?: string
-  project: TimelineProject
-
-  /**
-   * The reading's own counter. It changes when the records under it do; nothing
-   * writes to this projection, so it is never a compare-and-set token.
-   */
-  revision: number
-  selected?: TimelineEntry
-
-  /**
-   * `current`, or `partial` when one of the sources under this reading could not be
-   * read — never an empty list drawn as a quiet Project.
-   */
-  status: string
-  viewer: TimelineViewer
-}
-
-/**
- * What this Mac can prove about one entry. Only the three this daemon can reach are
- * here: the Swift app's other nine name deployment outcomes, and a word no producer
- * can ever write is a promise the screen cannot keep (design-decisions X25).
- */
-export type TimelineStatus =
-    "landed_to_git"
-  | "upcoming"
-  | "unknown"
-
-export const TimelineStatusValues: readonly TimelineStatus[] = ["landed_to_git", "upcoming", "unknown"] as const
-
-export interface TimelineViewer {
-  /**
-   * False on this daemon, always: the Timeline is a projection of records it
-   * already keeps, so there is no switch to turn it off and nothing a viewer could
-   * manage.
-   */
-  canManage: boolean
-}
 
 export interface TranscriptAction {
   command?: string

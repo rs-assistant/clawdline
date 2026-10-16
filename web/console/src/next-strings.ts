@@ -174,6 +174,9 @@ const words = {
       "State unknown",
     sessionWaitingOnSession: "Waiting for another Session",
     sessionWaitingOnNamedSession: "Waiting for Session: {session}",
+    sessionWaitingOnWork: "Waiting for: {work}",
+    sessionWaitHeavyQueued: "{command} (queued)",
+    sessionWaitHeavyRunning: "{command} (running)",
     proposalNeedsYourDecision:
       "The system has no to-do it can reassess. Finishing work will not withdraw this proposal; answer it, or it will wait until expiry.",
     proposalNotNow: "Not now",
@@ -242,7 +245,6 @@ const words = {
     scheduleTriggerOnlyNext: "Runs only by webhook or by hand",
     scheduleForceRunConfirmation:
       "“{title}” already has work running. Start another run anyway? Both tasks will keep running. If they would write to the same place, or session capacity is full, the new run will still be refused.",
-    timelineSetPerProject: "Set per project",
     fontScaleTitle: "Text size",
     fontScaleHint: "Change the words in this browser in steps, like browser zoom. The choice is kept when you reopen it.",
     fontScaleSmaller: "Make text smaller",
@@ -1599,6 +1601,9 @@ const words = {
     sessionStateUnrecognizedList: "無法辨認狀態",
     sessionWaitingOnSession: "等待其他 Session",
     sessionWaitingOnNamedSession: "等待 Session：{session}",
+    sessionWaitingOnWork: "等待：{work}",
+    sessionWaitHeavyQueued: "{command}（排隊中）",
+    sessionWaitHeavyRunning: "{command}（執行中）",
     sessionStateUnrecognizedDetail: "Clawdline 已讀到畫面，但無法辨認狀態。決定下一步前，請查看下方對話。",
     sessionCountNotStarted: "{n} 個還沒開始對話",
     transcriptTechnicalDetails: "技術細節",
@@ -1628,7 +1633,6 @@ const words = {
     scheduleTriggerOnlyNext: "只由 webhook 或手動執行",
     scheduleForceRunConfirmation:
       "「{title}」已有一個執行中的工作。仍要強制再執行一次嗎？兩個工作都會繼續執行；如果它們會寫到同一個地方，或 Session 容量已滿，新工作仍會被擋下。",
-    timelineSetPerProject: "依專案設定",
     fontScaleTitle: "文字大小",
     fontScaleHint: "像瀏覽器縮放一樣分段調整這個瀏覽器裡的文字；重新開啟後仍會保留。",
     fontScaleSmaller: "縮小文字",
