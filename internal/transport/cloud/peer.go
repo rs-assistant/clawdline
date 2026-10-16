@@ -100,7 +100,7 @@ func (l *Link) runPeer(ctx context.Context) {
 
 func (l *Link) recordPeerAck(ctx context.Context, raw []byte) {
 	var ack peerAck
-	if json.Unmarshal(raw, &ack) != nil || ack.Type != "peer_ack" || ack.RequestID == "" ||
+	if json.Unmarshal(raw, &ack) != nil || ack.RequestID == "" ||
 		(ack.Status != "delivered" && ack.Status != "machine_offline" && ack.Status != "unknown") {
 		return
 	}
@@ -109,9 +109,93 @@ func (l *Link) recordPeerAck(ctx context.Context, raw []byte) {
 		return
 	}
 	defer st.Close()
-	if err := st.MarkOutbox(ctx, ack.RequestID, "accepted", ack.Status); err != nil {
-		l.logf("cloud peer: could not record ack for %s: %v", ack.RequestID, err)
+	switch ack.Type {
+	case "peer_ack":
+		if err := st.MarkOutbox(ctx, ack.RequestID, "accepted", ack.Status); err != nil {
+			l.logf("cloud peer: could not record ack for %s: %v", ack.RequestID, err)
+		}
+	case "peer_task_start_ack":
+		item, err := st.TaskStartOutboxByRequest(ctx, ack.RequestID)
+		if err != nil {
+			l.logf("cloud peer task start: could not find ack request %s: %v", ack.RequestID, err)
+			return
+		}
+		if err := st.MarkTaskStartOutbox(ctx, item.Start.TaskID, ack.Status); err != nil {
+			l.logf("cloud peer task start: could not record ack for %s: %v", ack.RequestID, err)
+		}
 	}
+}
+
+// TaskStartSubmission is source-side evidence only. A socket write cannot
+// establish relay acceptance or target execution.
+type TaskStartSubmission struct {
+	TaskID           string `json:"task_id"`
+	RequestID        string `json:"request_id"`
+	RelayAccepted    string `json:"relay_accepted"`
+	RelayDelivered   string `json:"relay_delivered"`
+	MachineExecution string `json:"machine_execution"`
+}
+
+func (l *Link) PublishTaskStart(ctx context.Context, start peercontract.TaskStart, body []byte) (TaskStartSubmission, error) {
+	answer := TaskStartSubmission{TaskID: start.TaskID, RequestID: start.RequestID,
+		RelayAccepted: "unknown", RelayDelivered: "unknown", MachineExecution: "unknown"}
+	if l.transport == nil || l.keys == nil || start.Source.MachineID != l.identity.MachineID ||
+		l.opts.PeerAdmitTarget == nil || !l.allowCommands() {
+		return answer, errors.New("peer_task_start_unavailable")
+	}
+	if err := peercontract.ValidateTaskStart(start, body); err != nil {
+		return answer, err
+	}
+	if err := l.opts.PeerAdmitTarget(ctx, start.Source.MachineID,
+		start.Source.SessionID, start.Source.ExecutionGeneration); err != nil {
+		return answer, err
+	}
+	st, err := peerstore.Open(l.keys.Dir())
+	if err != nil {
+		return answer, err
+	}
+	defer st.Close()
+	pair, err := st.Pair(ctx, start.PairID)
+	if err != nil || pair.SourceMachineID != l.identity.MachineID ||
+		pair.TargetMachineID != start.TargetMachineID || pair.TargetSignature == "" ||
+		!pair.RevokedAt.IsZero() || !l.opts.Now().Before(pair.ExpiresAt) {
+		return answer, errors.New("peer_pair_inactive")
+	}
+	key, found, err := l.keys.DeviceKey()
+	if err != nil || !found || !key.Valid() || key.Fingerprint() != pair.SourceFingerprint {
+		return answer, errors.New("peer_signer_changed")
+	}
+	auth, err := adaptercloud.NewAccountClient(l.settings.APIBase).AuthorizePeerTaskStart(ctx,
+		l.identity.MachineCredential, start, pair.SourcePublicKey)
+	if err != nil || !auth.Authorized || auth.SourcePublicKey != pair.SourcePublicKey ||
+		auth.SourceKeyFingerprint != pair.SourceFingerprint ||
+		auth.TargetMachineID != start.TargetMachineID || auth.PairID != start.PairID {
+		return answer, errors.New("peer_authority_unavailable")
+	}
+	private, err := ecdh.X25519().NewPrivateKey(pair.LocalPrivateKey)
+	if err != nil {
+		return answer, err
+	}
+	envelope, err := peercontract.SealTaskStart(start, body, pairKeys(pair), private,
+		ed25519.NewKeyFromSeed(key.Seed()))
+	if err != nil {
+		return answer, err
+	}
+	frame, err := json.Marshal(struct {
+		Type string `json:"type"`
+		peercontract.TaskStartEnvelope
+	}{Type: "peer_task_start_publish", TaskStartEnvelope: envelope})
+	if err != nil {
+		return answer, err
+	}
+	if err := st.SaveTaskStartOutbox(ctx, peerstore.TaskStartOutboxItem{Start: start,
+		RelayAccepted: "unknown", RelayDelivered: "unknown", At: l.opts.Now()}); err != nil {
+		return answer, err
+	}
+	if err := l.transport.PublishPeerTaskStart(frame); err != nil {
+		return answer, err
+	}
+	return answer, nil
 }
 
 func (l *Link) receivePeerTaskStart(ctx context.Context, raw []byte) {

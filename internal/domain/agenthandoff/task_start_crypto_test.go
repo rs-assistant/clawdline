@@ -17,6 +17,14 @@ func TestTaskStartEnvelopeBindsMachineProjectAndBody(t *testing.T) {
 		t.Fatal(err)
 	}
 	start, body := validTaskStart()
+	canonical, err := canonicalTaskStart(start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"body_digest":"` + start.BodyDigest + `","pair_id":"pair-1","request_id":"request-1","source":{"execution_generation":"0123456789abcdef0123456789abcdef","machine_id":"mac-1","session_id":"session-1"},"target_machine_id":"linux-1","target_project_id":"clawdline","task_id":"task-1"}`
+	if string(canonical) != want {
+		t.Fatalf("task start canonical header = %s", canonical)
+	}
 	pair := PairKeys{PairID: start.PairID, SourceMachineID: start.Source.MachineID,
 		TargetMachineID:     start.TargetMachineID,
 		SourceEncryptionKey: "e06Qm75//kTEZaIgA31gjuNYl9Me+XLwf3SJLLD3PxM=",

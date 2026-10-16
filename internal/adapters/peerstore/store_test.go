@@ -117,6 +117,58 @@ func TestPeerPinsGrantsAndReceiptsSurviveRestartAndLocalRevoke(t *testing.T) {
 	}
 }
 
+func TestTaskStartOutboxKeepsRelayEvidenceSeparateFromTargetExecution(t *testing.T) {
+	ctx := context.Background()
+	dir := filepath.Join(t.TempDir(), "private-peers")
+	st, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := agenthandoff.TaskStart{TaskID: "task-1", RequestID: "request-1",
+		Source: agenthandoff.Endpoint{MachineID: "machine-a", SessionID: "session-a",
+			ExecutionGeneration: "11111111111111111111111111111111"},
+		TargetMachineID: "machine-b", TargetProjectID: "project-b", PairID: "pair-1",
+		BodyDigest: "a" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	item := TaskStartOutboxItem{Start: start, RelayAccepted: "unknown", RelayDelivered: "unknown", At: time.Now()}
+	if err := st.SaveTaskStartOutbox(ctx, item); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveTaskStartOutbox(ctx, item); err != nil {
+		t.Fatalf("identical replay: %v", err)
+	}
+	changed := item
+	changed.Start.TargetProjectID = "project-c"
+	if err := st.SaveTaskStartOutbox(ctx, changed); err == nil {
+		t.Fatal("same task ID changed its Project")
+	}
+	changed = item
+	changed.Start.TaskID = "task-2"
+	if err := st.SaveTaskStartOutbox(ctx, changed); err == nil {
+		t.Fatal("request ID was reused for another task")
+	}
+	if err := st.MarkTaskStartOutbox(ctx, start.TaskID, "delivered"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MarkTaskStartOutbox(ctx, start.TaskID, "machine_offline"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	st, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	saved, err := st.TaskStartOutboxByRequest(ctx, start.RequestID)
+	if err != nil || saved.Start != start || saved.RelayDelivered != "unknown" || !saved.RelayConflict {
+		t.Fatalf("outbox after restart: %+v, %v", saved, err)
+	}
+	if usage, err := ReadUsage(ctx, dir); err != nil || usage.Outbox != 1 {
+		t.Fatalf("task start outbox usage: %+v, %v", usage, err)
+	}
+}
+
 func TestPeerInboxPagePinsExecutionAndBoundsTheCloudReply(t *testing.T) {
 	ctx := context.Background()
 	st, err := Open(filepath.Join(t.TempDir(), "private-peers"))
