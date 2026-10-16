@@ -71,9 +71,14 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   const [removeError, setRemoveError] = useState("")
   const removeDialog = useRef<HTMLDialogElement>(null)
   const [worktreeTarget, setWorktreeTarget] = useState<{ id: string; path: string; project: ProjectTarget; atRisk: boolean } | null>(null)
-  const [worktreeBusy, setWorktreeBusy] = useState(false)
+  // Ids being deleted. Closing the dialog stops the wait, not the deletion, so
+  // a press outlives the dialog that made it.
+  const [worktreeRemoving, setWorktreeRemoving] = useState<readonly string[]>([])
   const [worktreeError, setWorktreeError] = useState("")
   const worktreeDialog = useRef<HTMLDialogElement>(null)
+  const worktreeShown = useRef<string | null>(null)
+  worktreeShown.current = worktreeTarget?.id ?? null
+  const worktreeBusy = !!worktreeTarget && worktreeRemoving.includes(worktreeTarget.id)
 
   useLayoutEffect(() => {
     const button = document.getElementById("projects-add")
@@ -115,18 +120,24 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   }, [worktreeTarget])
 
   async function confirmWorktreeRemove() {
-    if (!worktreeTarget || worktreeBusy) return
-    setWorktreeBusy(true)
+    const target = worktreeTarget
+    if (!target || worktreeBusy) return
+    setWorktreeRemoving(ids => [...ids, target.id])
     setWorktreeError("")
     try {
-      await removeWorktree(worktreeTarget.project.projectId || worktreeTarget.project.id, worktreeTarget.id)
-      const project = worktreeTarget.project
-      setWorktreeTarget(null)
-      await page.current?.openLifecycle(project)
+      await removeWorktree(target.project.projectId || target.project.id, target.id)
+      if (worktreeShown.current === target.id) setWorktreeTarget(null)
+      await page.current?.openLifecycle(target.project)
     } catch (error) {
-      setWorktreeError(failureSentence(error, nextWord("worktreeRemoveFailed")))
+      // A person who closed the dialog stopped waiting; the list still
+      // answers whether the checkout is gone.
+      if (worktreeShown.current === target.id) {
+        setWorktreeError(failureSentence(error, nextWord("worktreeRemoveFailed")))
+      } else {
+        void page.current?.openLifecycle(target.project)
+      }
     } finally {
-      setWorktreeBusy(false)
+      setWorktreeRemoving(ids => ids.filter(id => id !== target.id))
     }
   }
 
@@ -409,15 +420,18 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       </div>
     </dialog>
     <dialog className="project-remove-dialog" ref={worktreeDialog}
-      onCancel={(event) => { if (worktreeBusy) event.preventDefault() }}
-      onClose={() => { if (!worktreeBusy) setWorktreeTarget(null) }}>
+      onClose={() => setWorktreeTarget(null)}>
       <h2>{nextWord("worktreeRemoveTitle")}</h2>
       <p>{nextWord("worktreeRemoveDescription", { path: worktreeTarget?.path || "" })}</p>
       {worktreeTarget?.atRisk && <p className="project-remove-error" role="status">{nextWord("worktreeRemoveRisk")}</p>}
+      {worktreeBusy && <p className="worktree-remove-waiting" role="status">{nextWord("worktreeRemoveWaiting")}</p>}
       {worktreeError && <p className="project-remove-error" role="alert">{worktreeError}</p>}
       <div className="project-remove-actions">
-        <button type="button" disabled={worktreeBusy} onClick={() => setWorktreeTarget(null)}>{nextWord("projectsRemoveCancel")}</button>
-        <button type="button" disabled={worktreeBusy} onClick={() => void confirmWorktreeRemove()}>{worktreeBusy ? nextWord("worktreeRemoveBusy") : nextWord("worktreeRemoveConfirm")}</button>
+        <button type="button" onClick={() => setWorktreeTarget(null)}>{worktreeBusy ? nextWord("worktreeRemoveClose") : nextWord("projectsRemoveCancel")}</button>
+        <button type="button" disabled={worktreeBusy} aria-busy={worktreeBusy} onClick={() => void confirmWorktreeRemove()}>
+          {worktreeBusy && <span className="worktree-remove-spinner" aria-hidden="true" />}
+          {worktreeBusy ? nextWord("worktreeRemoveBusy") : nextWord("worktreeRemoveConfirm")}
+        </button>
       </div>
     </dialog>
     </>
