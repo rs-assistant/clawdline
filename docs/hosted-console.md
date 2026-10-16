@@ -30,12 +30,20 @@ From a **disposable worktree**, never the shared checkout: packaging reads the w
 somebody else's uncommitted files ship with it.
 
 ```sh
-git worktree add -f <scratch>/hosted HEAD
-cd <scratch>/hosted/web && npm install
-rm -rf console/dist            # a stale BUILD.json survived a build once and lied about the stamp
-VITE_HOSTED_CONSOLE='{"v":1,"app_origin":"https://app.clawdline.com","api_origin":"https://api.clawdline.com","relay_url":"wss://relay.clawdline.com/v1/connect"}' \
+hosted=/absolute/path/to/new/hosted-worktree
+stamp=$(git rev-parse HEAD)
+test ! -e "$hosted"
+git worktree add -f "$hosted" "$stamp"
+cd "$hosted/web"
+test ! -e console/dist          # use a new worktree; never reuse an old build's BUILD.json
+../tools/heavy.sh env VITE_HOSTED_CONSOLE='{"v":1,"app_origin":"https://app.clawdline.com","api_origin":"https://api.clawdline.com","relay_url":"wss://relay.clawdline.com/v1/connect"}' \
   npm run build
 ```
+
+Wait for the build to finish before writing `BUILD.json`; if `heavy.sh` queues it and exits 76,
+read its callback result first. `npm run build` prepares this worktree's web dependencies. Keep
+`VITE_HOSTED_CONSOLE` inside the heavy command so a queued build receives it. Keep the
+`hosted` path for the deploy callback below.
 
 The three endpoints are the production ones in `internal/adapters/cloud/settings.go`. Write a
 `BUILD.json` into `console/dist` carrying the commit sha as `stamp` and its committer time as
@@ -46,43 +54,74 @@ this build ([updates.md](updates.md)) — but see below for what it does and doe
 stamp=$(git rev-parse HEAD)
 committed_at=$(TZ=UTC git show -s --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ "$stamp")
 printf '{"stamp":"%s","committed_at":"%s"}\n' "$stamp" "$committed_at" >console/dist/BUILD.json
+rg -l CloudGate console/dist/assets/main-*.js
 ```
+
+The last command must name the locally built main bundle. If it does not, the hosted build did
+not take the Cloud branch; stop before deployment.
 
 ## Deploy
 
 Cloudflare Pages, project `clawdline-app`, production branch `main`. The credentials belong to
-the person and live in the cloud service's own checkout, not in this repository and not in git;
-the account that has them knows where. From that checkout:
-
-```sh
-( set -a; . ./.env.pages.local; set +a
-  ./relay/node_modules/.bin/wrangler pages deploy <scratch>/hosted/web/console/dist \
-    --project-name=clawdline-app --branch=main --commit-hash=<sha> )
-```
+the person and live in the private Cloud service checkout, not in this repository or git.
+Run Wrangler from that checkout as `./relay/node_modules/.bin/wrangler`, through
+`scripts/with-deploy-env.py`. Its ignored `.env.pages.local` must be a regular file owned by the
+current user with mode 0600. Do not source the file or print its values.
 
 **Deploy only a commit that descends from what production serves, and check it immediately
 before the deploy, not when you started.** Several sessions land and deploy from the same `main`.
 On 2026-09-26 a session read production as its merge's parent, spent a few minutes rebuilding the
 app, and deployed; in that gap another session had deployed a newer `main` that already
-contained the change, and the deploy put production back twelve commits. So, in the same shell
-as the deploy:
-
-```sh
-live=$(curl -s https://app.clawdline.com/BUILD.json | python3 -c 'import json,sys; print(json.load(sys.stdin)["stamp"])')
-git merge-base --is-ancestor "$live" <sha> || { echo "production is at $live, not behind <sha>: do not deploy"; exit 1; }
-```
+contained the change, and the deploy put production back twelve commits. Check ancestry in the
+product worktree, where both commits must be available, in the same shell as the deploy.
 
 When it refuses and `<sha>` is already an ancestor of `$live`, production already carries the
 change: there is nothing to deploy.
 
-**Do not wait for the deploy in your turn.** Pages takes minutes to serve a new build. Run the
-deploy, then the wait and the check below, as one callback. End the turn, and read the result when
-its notice arrives (`clawdline guide`, §5a):
+**Do not wait for the deploy in your turn.** Pages takes minutes to serve a new build. From the
+product checkout, start one callback for the ancestor check, deploy, and wait. Supply the absolute
+paths of the built product worktree and private Cloud service checkout. Read the callback
+result when its notice arrives (`clawdline guide`, §5a):
 
 ```sh
-clawdline callback --title "The hosted console serves <sha>" --timeout 20m -- \
-  sh -c '<the deploy above> && tools/wait-hosted-console.sh <sha>'
+hosted=/absolute/path/to/built/hosted-worktree
+cloud=/absolute/path/to/private-cloud-checkout
+stamp=$(git -C "$hosted" rev-parse HEAD)
+clawdline callback --title "The hosted console serves $stamp" --timeout 20m -- \
+  sh -c '
+    set -eu
+    hosted=$1
+    cloud=$2
+    stamp=$(git -C "$hosted" rev-parse HEAD)
+    test "$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[\"stamp\"])" \
+      "$hosted/web/console/dist/BUILD.json")" = "$stamp"
+    cd "$cloud"
+    CLAWDLINE_DEPLOY_ENV_FILE="$PWD/.env.pages.local" \
+      python3 scripts/with-deploy-env.py --check
+    CLAWDLINE_DEPLOY_ENV_FILE="$PWD/.env.pages.local" \
+      python3 scripts/with-deploy-env.py ./relay/node_modules/.bin/wrangler \
+      pages deployment list --project-name=clawdline-app
+    live=$(curl -fsS https://app.clawdline.com/BUILD.json |
+      python3 -c "import json,sys; print(json.load(sys.stdin)[\"stamp\"])")
+    git -C "$hosted" merge-base --is-ancestor "$live" "$stamp" || {
+      echo "production is at $live, not behind $stamp: do not deploy" >&2
+      exit 1
+    }
+    if [ "$live" = "$stamp" ]; then
+      echo "production already serves $stamp; nothing to deploy"
+      exit 0
+    fi
+    CLAWDLINE_DEPLOY_ENV_FILE="$PWD/.env.pages.local" \
+      python3 scripts/with-deploy-env.py ./relay/node_modules/.bin/wrangler \
+      pages deploy "$hosted/web/console/dist" \
+      --project-name=clawdline-app --branch=main --commit-hash="$stamp"
+    cd "$hosted"
+    tools/wait-hosted-console.sh "$stamp"
+  ' sh "$hosted" "$cloud"
 ```
+
+Record the current production deployment id from the list before deploying, so rollback has an
+exact target. A failed ancestry check stops the callback before deployment.
 
 `tools/wait-hosted-console.sh <sha> [--deadline 15m] [--strict-catalogs]` polls `BUILD.json` until its stamp is
 `<sha>` or descends from it. Then it runs the three steps below and exits 0 only when the served
@@ -98,9 +137,10 @@ current key complete in all nine languages.
 ## The check that answers the right question
 
 ```sh
-curl -s https://app.clawdline.com/BUILD.json                            # 1
-curl -s https://app.clawdline.com/ | grep -o 'assets/main-[^"]*\.js'    # 2
-curl -s https://app.clawdline.com/<that main.js> | grep -c CloudGate    # 3 — must be > 0
+curl -fsS https://app.clawdline.com/BUILD.json                         # 1
+bundle=$(curl -fsS https://app.clawdline.com/ | grep -o 'assets/main-[^"]*\.js' | head -n 1)
+printf '%s\n' "$bundle"                                                   # 2
+curl -fsS "https://app.clawdline.com/$bundle" | grep -c CloudGate     # 3 — must be > 0
 ```
 
 **Three is the one that matters.** One says a file changed, not that the right file went up — a
@@ -122,15 +162,18 @@ the rollback below is read before deploying, not after.
 
 ## Rollback
 
-`wrangler pages deployment list --project-name=clawdline-app` names every deployment with its
+`pages deployment list --project-name=clawdline-app` names every deployment with its
 source commit. Note the current production id **before** deploying. Wrangler 4 has no
 `pages deployment rollback` (it answers "Unknown arguments"); the rollback is the Pages API's,
 with the same credentials:
 
 ```sh
-( set -a; . ./.env.pages.local; set +a       # same checkout as the deploy above
-  curl -s -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-    "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/clawdline-app/deployments/<id>/rollback" )
+cd /absolute/path/to/private-cloud-checkout
+CLAWDLINE_DEPLOY_ENV_FILE="$PWD/.env.pages.local" \
+  python3 scripts/with-deploy-env.py sh -c '
+    curl -fsS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+      "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/clawdline-app/deployments/<id>/rollback"
+  '
 ```
 
 It answers `"success": true` with the restored deployment's id; then run the three checks above.
