@@ -824,6 +824,36 @@ test("a waiting row on the one-machine page draws the question its held rich row
     "a row nobody has open asks the machine for nothing")
 })
 
+// 2026-10-16: a Session answered one question and stopped on the next while
+// the page missed the s/ row carrying it. The status row said it moved after
+// the held rich row was read; the card drew the old question's options anyway.
+test("a held question older than the Session's last movement is not drawn as its question", async () => {
+  const draw = async (movedAt: number) => {
+    const client = new FakeClient()
+    const execution = "a".repeat(32)
+    const now = 1_000_000
+    const rows = [{ destination: { machineID: "mac-a", sessionID: "s1", executionGeneration: execution },
+      state: "waiting", freshness: "current" as const, observedAt: now }]
+    const menu = { question: "Proceed?", options: [{ n: 1, label: "Yes", can: true }] }
+    ;(client as unknown as { sessionSnapshots: Map<string, unknown> }).sessionSnapshots = new Map([["mac-a\u0000s1",
+      { machine: "mac-a", session: "s1", execution_generation: execution, state: "waiting", menu,
+        activity: { at: 900, known: true }, screen_reading: "read",
+        source: { freshness: "current", observed_at: now / 1000 } }]])
+    client.statusSnapshots = new Map([[JSON.stringify(["mac-a", "s1"]),
+      { payload: { execution_generation: execution, last_movement_at: movedAt } }]])
+    const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+      machineProjection: async () => ({ kind: "ready", complete: true, observedAt: now,
+        snapshotGeneration: "a".repeat(32), presentationGeneration: "a", rows }),
+      listPresentations: async () => rows.map((row) => ({
+        destination: row.destination, title: "Title", status: { state: "waiting" }, projection: row })),
+    })
+    r.attach(client)
+    return ((await r.snapshot()).sessions[0] as { menu?: { question?: string } }).menu?.question
+  }
+  assert.equal(await draw(900), "Proceed?", "the question the Session last moved to is drawn")
+  assert.equal(await draw(960), undefined, "a question from before the last movement is not")
+})
+
 test("a Session whose status row has not come is asked for, not called a changed execution", async () => {
   const client = new FakeClient()
   const pass = "c".repeat(32)
