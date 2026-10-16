@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5329,
-  "riskKeys": 2350,
-  "nonRiskCount": 2979,
+  "englishContentKeys": 5336,
+  "riskKeys": 2351,
+  "nonRiskCount": 2985,
   "groups": [
     {
       "name": "bar / other",
@@ -43,6 +43,21 @@
         "capacityHelp.limit",
         "capacityHelp.log",
         "capacityHelp.open"
+      ]
+    },
+    {
+      "name": "clawdfatherMenu / other",
+      "count": 6,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "clawdfatherMenu.edit",
+        "clawdfatherMenu.editing",
+        "clawdfatherMenu.message",
+        "clawdfatherMenu.mine",
+        "clawdfatherMenu.name",
+        "clawdfatherMenu.new"
       ]
     },
     {

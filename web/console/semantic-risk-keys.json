@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5329,
+  "englishKeys": 5336,
   "counts": {
     "negation": 1522,
     "state": 739,
     "permission": 336,
-    "deletion": 113,
+    "deletion": 114,
     "uncertainty": 155
   },
-  "unionCount": 2350,
+  "unionCount": 2351,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -2617,6 +2617,7 @@
       "capacityHelp.images",
       "capacityHelp.person",
       "capacityHelp.timeline",
+      "clawdfatherMenu.limitReached",
       "http.26d554c47eb3ebc1",
       "http.419cca48c2e35b93",
       "http.688ad40f43c980ea",
@@ -2902,6 +2903,7 @@
     "capacityHelp.person",
     "capacityHelp.stall",
     "capacityHelp.timeline",
+    "clawdfatherMenu.limitReached",
     "count.pendingInterventions",
     "count.skillFoldersSkipped",
     "count.unsyncedProjects",
