@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5312,
-  "riskKeys": 2342,
-  "nonRiskCount": 2970,
+  "englishContentKeys": 5328,
+  "riskKeys": 2350,
+  "nonRiskCount": 2978,
   "groups": [
     {
       "name": "bar / other",
@@ -26,6 +26,23 @@
         "bar.placeholder",
         "bar.scanning",
         "bar.sessionAgents"
+      ]
+    },
+    {
+      "name": "capacityHelp / other",
+      "count": 8,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "capacityHelp.action_disconnect",
+        "capacityHelp.action_evict_oldest",
+        "capacityHelp.action_expire",
+        "capacityHelp.action_rotate",
+        "capacityHelp.action_summarize",
+        "capacityHelp.limit",
+        "capacityHelp.log",
+        "capacityHelp.open"
       ]
     },
     {
