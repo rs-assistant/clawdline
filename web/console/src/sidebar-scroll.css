@@ -1,0 +1,7 @@
+/* Keep the pinned legacy stylesheet intact. Let iOS Safari handle the drawer's
+   momentum and edge rebound instead of suppressing overscroll at its edge. */
+.sidebar-panel {
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}

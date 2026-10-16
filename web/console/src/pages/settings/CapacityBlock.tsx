@@ -17,6 +17,7 @@ import {
   words,
 } from "./capacity.js"
 import "./capacity.css"
+import { capacityExplanation } from "./capacity-help.js"
 
 /** How often an open Settings page reads the register again. */
 const POLL_MS = 15_000
@@ -156,6 +157,7 @@ export function CapacityBlock({ shown }: { shown: boolean }) {
 }
 
 function CapacityRow({ row }: { row: CapacityEntry }) {
+  const [explaining, setExplaining] = useState(false)
   const pct = row.ratio == null ? null : Math.min(100, Math.floor(row.ratio * 100))
   const counted = counters(row)
   const why = row.error ?? row.note
@@ -179,6 +181,14 @@ function CapacityRow({ row }: { row: CapacityEntry }) {
         {counted && <span>{counted}</span>}
       </div>
       {why && <p className="cap-note">{why}</p>}
+      <div className="cap-help-control">
+        <button type="button" className="cap-info" aria-label={catalogFormat("capacityHelp", "open", [row.name])}
+          aria-expanded={explaining} aria-controls={`capacity-help-${row.name}`}
+          onClick={() => setExplaining((open) => !open)}>i</button>
+      </div>
+      {explaining && <div className="cap-help" id={`capacity-help-${row.name}`}>
+        {capacityExplanation(row).map((sentence, index) => <p key={index}>{sentence}</p>)}
+      </div>}
     </li>
   )
 }

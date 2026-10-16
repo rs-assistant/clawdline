@@ -5306,5 +5306,21 @@
   "next.cloudPeerAccessTargetMachine": "目標機器",
   "next.cloudPeerAccessTargetSession": "目標 Session",
   "next.cloudPeerAccessUnpaired": "這個瀏覽器尚未與此機器配對。請先從機器切換器完成配對。",
-  "next.cloudPeerAccessUnread": "讀不到這台機器的 Session（{code}）。"
+  "next.cloudPeerAccessUnread": "讀不到這台機器的 Session（{code}）。",
+  "capacityHelp.open": "說明 {arg0}",
+  "capacityHelp.general": "這項容量監看「{arg0}」。設置上限是為了避免 Clawdline 的這部分資料無限制增長。",
+  "capacityHelp.limit": "設定上限為 {arg0} {arg1}。上方數字顯示目前用量與上限的比較。",
+  "capacityHelp.person": "額滿時會保留既有資料，由使用者決定刪除哪些內容；否則新的寫入會被拒絕。",
+  "capacityHelp.action_refuse": "額滿時會拒絕新工作，直到有可用空間。",
+  "capacityHelp.action_evict_oldest": "額滿時，daemon 會移除最舊的項目以騰出空間。",
+  "capacityHelp.action_expire": "額滿時，超過有效期限的項目會失效。",
+  "capacityHelp.action_rotate": "額滿時，daemon 會輪替舊紀錄，並移除保留範圍外的舊分段。",
+  "capacityHelp.action_coalesce": "額滿時，較新的更新會取代等待中的舊更新，讀取者會收到最新狀態。",
+  "capacityHelp.action_disconnect": "額滿時，跟不上的讀取者會斷線，可重新連線讀取最新狀態。",
+  "capacityHelp.action_summarize": "額滿時，較舊的內容會被摘要，以騰出空間。",
+  "capacityHelp.action_none": "這一列用來回報用量；目前沒有自動執行的額滿處理。",
+  "capacityHelp.timeline": "這是單次讀取專案時間軸時，最多顯示的事件筆數。時間軸會從已儲存的紀錄重新建立，因此縮短顯示清單不會刪除原始歷史。",
+  "capacityHelp.images": "這是 Clawdline 回覆中可顯示的已儲存圖片數量。上限用來防止圖片儲存空間無限增長；額滿時會移除最舊的圖片。",
+  "capacityHelp.stall": "這些是在 iTerm2 停止回應時留下的診斷報告。保留少量近期報告有助於查明反覆卡住的原因，同時避免診斷檔案不斷累積。",
+  "capacityHelp.log": "這是 daemon 目前的診斷日誌檔案大小。日誌記錄執行事件與錯誤；達到上限時，daemon 會建立新分段並保留近期分段。"
 }
