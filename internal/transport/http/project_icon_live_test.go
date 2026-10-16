@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -97,6 +98,15 @@ func TestProjectAndSessionIconReadLiveOverride(t *testing.T) {
 	}
 	if stale.Sessions[0].Icon.Accent != "#123456" {
 		t.Fatalf("held Session snapshot: %+v", stale.Sessions[0].Icon)
+	}
+	// An empty machine's list stays a list: it went out as `"sessions": null`
+	// and the header read that as still loading.
+	empty := sessionsSnapshotWire{Sessions: []sessionRowWire{}}
+	if err := s.refreshSnapshotIcons(&empty); err != nil {
+		t.Fatal(err)
+	}
+	if wire, _ := json.Marshal(empty); !strings.Contains(string(wire), `"sessions":[]`) {
+		t.Fatalf("empty snapshot: %s", wire)
 	}
 	if err := os.WriteFile(file, []byte("{"), 0600); err != nil {
 		t.Fatal(err)

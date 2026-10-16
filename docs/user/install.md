@@ -118,14 +118,15 @@ The daemon also finds sessions already running in tmux (and iTerm2 on a Mac). To
 terminal instead:
 
 ```sh
-tmux new -s work
+clawdline tmux new -s work
 cd ~/code/my-app
 claude            # or: codex
 ```
 
-If setup said it uses the tmux the release carries, type `clawdline tmux` where this says `tmux`:
-`clawdline tmux new -s work`, and later `clawdline tmux attach -t work`. That reaches the server
-the daemon lists. `clawdline tmux which` shows which tmux that is. If you install tmux 3.0 or later
+`clawdline tmux` is your own tmux when you have one and the tmux the release carries when you do
+not, so the same line works everywhere; `clawdline tmux attach -t work` returns to it later. A shell
+with no AI tool running in it is not listed; to use a plain shell from the console or a phone, open
+one from the console's Terminals tab, which needs no AI tool. `clawdline tmux which` shows which tmux that is. If you install tmux 3.0 or later
 afterwards, the daemon keeps using the carried one until the sessions on its server have ended, so
 none of them disappears from the list; then it switches to yours.
 

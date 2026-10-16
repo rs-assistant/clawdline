@@ -2,8 +2,8 @@
 
 Clawdline Cloud lets a paired browser see Sessions on your machines through an encrypted relay. Your machine needs to be connected for a fresh view. This walkthrough starts after [your first local Session](first-session.md) is visible.
 
-1. On the machine you want to reach, open Clawdline's Cloud settings and sign in, turn Cloud on, then restart Clawdline so the setting takes effect.
-2. In the browser or phone at app.clawdline.com, sign in to the same account and pair that browser with the machine. The pairing instructions appear on the machine or in its settings.
+1. On the machine you want to reach, sign it in to Cloud and turn Cloud on: in the Mac app's own Settings window (menu bar icon → Settings → Remote), or in a terminal with `clawdline cloud login` and then `clawdline cloud on`. Both take effect at once; nothing needs restarting.
+2. In the browser or phone at app.clawdline.com, sign in to the same account and pair that browser with the machine. On a machine with a screen, the app's Settings → Remote shows a pairing QR code; on a machine you reach over SSH, `clawdline cloud pair` prints one in the terminal. On an iPhone, scan it from inside the Home Screen app, not with the Camera.
 3. Select that machine in the hosted console, then open its Session list.
 
 **Success:** the machine shows connected and its Session rows appear. Pairing lets the browser read. To send messages or act from Cloud, enable Cloud commands for that machine in its Remote settings. A read-only view is still useful when you want to check progress.

@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/devices"
+	"github.com/sainteye/clawdline/internal/adapters/qrcode"
 	"github.com/sainteye/clawdline/internal/config"
 	cloudtransport "github.com/sainteye/clawdline/internal/transport/cloud"
 )
@@ -149,6 +150,16 @@ func cloudPairCommand(args []string) {
 	if err := cloudPairJSON(http.MethodPost, "/v1/cloud/pairing", nil, &state); err != nil {
 		fail(err)
 	}
+	// The code first: on an iPhone the pairing has to happen inside the Home
+	// Screen app, and a link opened from a message or a notification lands in
+	// Safari, whose storage that app does not share. Scanning this code from
+	// the app's "Scan the QR on the machine" keeps it in the app.
+	if code, err := qrcode.Encode(state.Link); err == nil {
+		fmt.Println(cliCopy("cloud", "pair.scan", "On an iPhone or iPad, open Clawdline from the Home Screen and scan this code:"))
+		fmt.Println()
+		fmt.Print(code.Terminal())
+		fmt.Println()
+	}
 	fmt.Println(cliCopy("cloud", "pair.open_1", "Open this on the browser you want to pair, signed in to the same"))
 	fmt.Println(cliCopy("cloud", "pair.open_2", "Clawdline Cloud account:"))
 	fmt.Println()
@@ -157,7 +168,11 @@ func cloudPairCommand(args []string) {
 	fmt.Printf(cliCopy("cloud", "pair.machine_key", "This machine's key is %s. The browser shows the same one when it finishes.\n"),
 		state.MachineFingerprint)
 	if state.ExpiresAt > 0 {
-		fmt.Printf(cliCopy("cloud", "pair.link_expires", "The link stops working at %s.\n"), time.Unix(state.ExpiresAt, 0).Format(time.Kitchen))
+		// Local time with its zone, and the minutes left: a bare "3:43AM" read
+		// on a server in UTC looked like the middle of the night elsewhere.
+		until := time.Unix(state.ExpiresAt, 0)
+		fmt.Printf(cliCopy("cloud", "pair.link_expires_in", "The link stops working at %s (in %d minutes).\n"),
+			until.Local().Format("15:04 MST"), int(time.Until(until).Round(time.Minute)/time.Minute))
 	}
 	fmt.Println()
 	fmt.Println(cliCopy("cloud", "pair.waiting", "Waiting… (Ctrl-C stops waiting; the link keeps working until it expires)"))
@@ -212,13 +227,16 @@ func cloudDevicesCommand() {
 		fmt.Println(cliCopy("cloud", "devices.pair_hint", "run `clawdline cloud pair` to show one a link"))
 		return
 	}
+	accountOnly := false
 	for _, device := range status.Devices {
-		source := cliCopy("cloud", "devices.roster_only", "roster only")
+		source := cliCopy("cloud", "devices.roster_only", "account only")
 		switch {
 		case device.Revoked:
 			source = cliCopy("cloud", "devices.revoked_here", "revoked here")
 		case device.Pinned:
-			source = cliCopy("cloud", "devices.pinned_here", "pinned here")
+			source = cliCopy("cloud", "devices.pinned_here", "paired here")
+		default:
+			accountOnly = true
 		}
 		name := device.Name
 		if name == "" {
@@ -228,6 +246,13 @@ func cloudDevicesCommand() {
 		if len(device.Caps) > 0 {
 			fmt.Printf("%-24s %s\n", "", strings.Join(device.Caps, " "))
 		}
+	}
+	// A fresh machine lists every browser on the account; without this line
+	// the ones it never paired read like strangers that got in.
+	if accountOnly {
+		fmt.Println()
+		fmt.Println(cliCopy("cloud", "devices.account_only_legend",
+			"account only: a browser on your Clawdline Cloud account that was paired with another of your machines, not this one. It is admitted here too; `clawdline cloud revoke <device-id>` refuses it on this machine."))
 	}
 }
 

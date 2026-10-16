@@ -64,12 +64,16 @@ type Assistant struct {
 	Name    string
 	Command string
 	Install string
+	// Needs is what Install itself needs that a fresh machine may lack, said
+	// beside the command: a new Ubuntu server has no npm, and a bare
+	// `npm install` there only answers "command not found".
+	Needs string
 }
 
 // Assistants are the assistants setup looks for.
 var Assistants = []Assistant{
 	{Name: "Claude Code", Command: "claude", Install: "curl -fsSL https://claude.ai/install.sh | bash"},
-	{Name: "Codex", Command: "codex", Install: "npm install -g @openai/codex"},
+	{Name: "Codex", Command: "codex", Install: "npm install -g @openai/codex", Needs: "Node.js and npm"},
 }
 
 // Prereqs is what setup found.
@@ -142,7 +146,11 @@ func (p Prereqs) Check(goos string) Report {
 		if len(missing) < len(Assistants) {
 			r.Lines = append(r.Lines, "note: "+a.Name+" is not installed (optional while "+other(a).Name+" is). To add it:")
 		}
-		r.Lines = append(r.Lines, "    "+a.Install+"    # "+a.Name)
+		comment := a.Name
+		if a.Needs != "" {
+			comment += " (needs " + a.Needs + ")"
+		}
+		r.Lines = append(r.Lines, "    "+a.Install+"    # "+comment)
 	}
 	return r
 }

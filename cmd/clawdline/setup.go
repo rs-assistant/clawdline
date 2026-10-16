@@ -20,10 +20,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/cloud"
 	"github.com/sainteye/clawdline/internal/adapters/install"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/release"
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
+	"github.com/sainteye/clawdline/internal/adapters/terminal/owned"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
@@ -313,10 +315,22 @@ func runSetup(h setupHost, o setupOptions) int {
 	} else {
 		fmt.Fprintln(h.out, cliCopy("setup", "tmux_found", "✓ tmux found"))
 	}
+	// Each AI tool that is here gets its ✓ like tmux does: the install page
+	// promises a ✓ per check, and a Mac with Claude Code said nothing at all.
+	for _, a := range install.Assistants {
+		if _, ok := found[a.Command]; ok {
+			fmt.Fprintf(h.out, cliCopy("setup", "assistant_found", "✓ %s found\n"), a.Name)
+		}
+	}
 	for _, line := range report.Found {
 		o.detail(h, "  %s\n", line)
 	}
 	shell := h.getenv("SHELL")
+	if shell == "" {
+		if me, err := user.Current(); err == nil {
+			shell = owned.AccountShell(context.Background(), me.Username)
+		}
+	}
 	if shell == "" {
 		shell = "/bin/sh"
 	}
@@ -416,9 +430,9 @@ func runSetup(h setupHost, o setupOptions) int {
 		var r *install.Refusal
 		log := tilde(h, filepath.Join(place.stateDir, "logs", "daemon.log"))
 		if errors.As(err, &r) && r.Code == install.CodeSessionCheck {
-			fmt.Fprintf(h.errOut, cliCopy("setup", "terminal_check_failed", "Clawdline is running, but could not start a test terminal in tmux. See why: %s doctor (log: %s)\n"), command, log)
+			fmt.Fprintf(h.errOut, cliCopy("setup", "terminal_check_failed", "Clawdline is running, but could not start a test terminal in tmux. The reason follows (daemon log: %[2]s). To install without this check: %[1]s setup --no-session-check\n"), command, log)
 		} else {
-			fmt.Fprintf(h.errOut, cliCopy("setup", "start_timeout", "Clawdline was installed but did not start within %d seconds. See why: %s doctor (log: %s)\n"),
+			fmt.Fprintf(h.errOut, cliCopy("setup", "start_timeout", "Clawdline was installed but did not start within %[1]d seconds. Its log says why: %[3]s \u2014 %[2]s doctor shows the port and directory it uses.\n"),
 				setupHealthSeconds, command, log)
 		}
 		return setupRefuse(h, err)
@@ -533,11 +547,11 @@ func printNext(h setupHost, o setupOptions, n nextStep) {
 	case !claude && !codex:
 		assistant = "claude   (or codex), once one of them is installed"
 	}
-	if n.tmuxCarried {
-		fmt.Fprintf(w, cliCopy("setup", "next_assistant_carried", "  2. Start an assistant inside tmux:   %s tmux new -s work   then run   %s\n"), n.command, assistant)
-	} else {
-		fmt.Fprintf(w, cliCopy("setup", "next_assistant", "  2. Start an assistant inside tmux:   tmux new -s work   then run   %s\n"), assistant)
-	}
+	// Always `clawdline tmux`: it is the machine's own tmux when there is one
+	// and the carried one otherwise, so one spelling works on every machine and
+	// matches the documentation, where a bare `tmux` differed between a Mac and
+	// a fresh Linux machine.
+	fmt.Fprintf(w, cliCopy("setup", "next_assistant_carried", "  2. Start an assistant inside tmux:   %s tmux new -s work   then run   %s\n"), n.command, assistant)
 	fmt.Fprintln(w, cliCopy("setup", "next_assistant_appears", "     It appears in the console within a few seconds."))
 	fmt.Fprintln(w)
 	if o.noAutostart {
@@ -1126,6 +1140,9 @@ func runUninstall(h setupHost, o setupOptions) int {
 	if err != nil {
 		return setupRefuse(h, err)
 	}
+	// Asked before anything is removed: --purge takes the identity with it.
+	_, idErr := os.Stat(filepath.Join(place.stateDir, "cloud", cloud.IdentityFile))
+	onCloud := idErr == nil
 	removed, kept := uninstall(h, place)
 	if o.purge {
 		// The terminals the daemon started outlive it, and their tmux server
@@ -1152,6 +1169,12 @@ func runUninstall(h setupHost, o setupOptions) int {
 	}
 	for _, k := range kept {
 		fmt.Fprintf(h.out, cliCopy("setup", "kept", "kept %s\n"), k)
+	}
+	// Uninstalling stops this machine's line; it does not take the machine off
+	// the account, where it keeps a machine slot until it is removed there.
+	if onCloud {
+		fmt.Fprintln(h.out, cliCopy("setup", "uninstall_cloud_machine",
+			"This machine is still on your Clawdline Cloud account. To remove it, open app.clawdline.com, open the machine list at the top, and choose Remove from account on its row."))
 	}
 	return 0
 }

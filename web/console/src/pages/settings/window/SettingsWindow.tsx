@@ -1100,6 +1100,11 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
         <div className="sw-column">
           {!embedded && cloud !== undefined && cloud !== null && cloudSetupBlock()}
           {!embedded && cloudBlock()}
+          {embedded && (
+            <Block label={W.webCloudStatus}>
+              <Note dot="idle">{W.webCloudManagedElsewhere}</Note>
+            </Block>
+          )}
           {!embedded && cloudPairingBlock()}
           <Row label={W.settingsTunnel} hint={W.settingsTunnelHint} first>
             <PopUp
