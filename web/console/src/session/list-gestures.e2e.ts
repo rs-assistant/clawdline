@@ -108,7 +108,7 @@ function blockedCloseability(): Row {
     mover: { kind: "session", self: false, session_id: BLOCKED },
     reasons: [{ code: "terminal_working", kind: "obligation", mover: { kind: "session", self: false, session_id: BLOCKED } }],
     state: "blocked",
-    version: "cl1_blocked",
+    version: staleCloseOnce === "changed" ? "cl1_blocked_changed" : "cl1_blocked",
   }
 }
 
@@ -333,6 +333,7 @@ const openedLooks: string[] = []
 let workProjectReads: string[] = []
 /** `POST /v1/sessions/{id}/close`, with the Idempotency-Key each arrived under. */
 let closes: { id: string; key: string; force: unknown; version: unknown }[] = []
+let staleCloseOnce: "off" | "first" | "changed" = "off"
 let sessionWorkReads = 0
 let machineStarts: { path: string; key: string }[] = []
 /** Explicit reminder presses received from an assigned Board item detail. */
@@ -801,6 +802,10 @@ function daemon(): Server {
           force,
           version,
         })
+        if (decodeURIComponent(closing[1]) === BLOCKED && staleCloseOnce === "first") {
+          staleCloseOnce = "changed"
+          return json(res, 409, { error: "close_not_proven", detail: "The Session changed since it was shown." })
+        }
         if (decodeURIComponent(closing[1]) === BLOCKED && force !== true) {
           return json(res, 409, {
             error: "close_blocked",
@@ -3099,6 +3104,29 @@ test("a refused close explains what is owed, then still close overrides that dis
     assert.equal(closes[1].force, true, "only the explicit still-close decision overrides the gate")
     assert.equal(closes[1].version, closes[0].version, "the override stays bound to the displayed decision")
     assert.notEqual(closes[1].key, closes[0].key, "the override is a new decision, not a retry")
+  }))
+
+test("a changed Session asks again against a fresh reading before a forced close", () =>
+  inTab(async (tab) => {
+    staleCloseOnce = "first"
+    try {
+      await list(tab)
+      await swipeOpen(tab, BLOCKED)
+      await tab.press("li.row[data-swipe='open'] > .swipe-end")
+      await tab.until("the first confirmation has checked Board work", (s) => s.sheet !== null && s.confirmDisabled === false)
+      await tab.press("#action-confirm-go")
+      const asked = await tab.until("the changed reading is shown", (s) =>
+        s.sheet !== null && s.confirmAction === "仍要關閉" && s.confirmDisabled === false &&
+        (s.sheetSay ?? "").includes("在上次確認後已有變動"))
+      assert.match(asked.sheetSay ?? "", /還有未完成項目/)
+      assert.equal(closes.at(-1)?.force, false)
+      await tab.press("#action-confirm-go")
+      await tab.until("the new decision reaches the daemon", () => closes.at(-1)?.force === true)
+      assert.equal(closes.at(-1)?.version, "cl1_blocked_changed")
+      assert.notEqual(closes.at(-1)?.key, closes.at(-2)?.key)
+    } finally {
+      staleCloseOnce = "off"
+    }
   }))
 
 test("an unknown row keeps saying unknown while its swipe remains an action", () =>

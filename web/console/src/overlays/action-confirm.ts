@@ -90,6 +90,8 @@ interface Pending {
   processOnly: boolean
   /** A process no terminal reaches (`processRecovery`): one warning, one forced press. */
   recovery: boolean
+  /** A changed closeability reading was fetched after close_not_proven. */
+  reconfirmed: boolean
   /** The decision's own id, which is the close's `Idempotency-Key`. */
   request: string
 }
@@ -222,7 +224,7 @@ export const ActionConfirm = {
    * `ask` is for a caller that owns its own destructive action: its two
    * sentences and a function whose promise the sheet waits for.
    */
-  open(kind: string, sessionID?: string | null, opener?: HTMLElement | null, ask?: Ask, asked?: Asked): void {
+  open(kind: string, sessionID?: string | null, opener?: HTMLElement | null, ask?: Ask, asked?: Asked, freshRow?: Record<string, unknown>): void {
     const id = sessionID || host.openId()
     const overlay = node("action-confirm")
     const sheet = node("action-confirm-sheet")
@@ -231,7 +233,7 @@ export const ActionConfirm = {
     if (!id || !host.writable() || !overlay || !sheet || !title || !go) return
     const action = kind === "end" ? T.webEndSession : kind === "archive" ? nextWord("archiveGo") : kind
     const returnFocus = opener || node("detail-actions-trigger")
-    const row = byId(id)
+    const row = freshRow ?? byId(id)
     // What the close would take, at the only moment it can still change the outcome.
     const lost = closes(kind) ? lostIfClosed(id) : []
     // Why the broker cannot yet say it is safe, and which one thing moves each of those.
@@ -257,6 +259,7 @@ export const ActionConfirm = {
       closeabilityVersion: pinned,
       workState: closes(kind) && !unstartedCodex && !recovery ? "loading" : "ready", workTruncated: false,
       release, force: release.length > 0 || recovery, processOnly: /^(tty|pts\/)/.test(id), recovery,
+      reconfirmed: false,
       request: mintRequest(),
     }
     this.busy = false
@@ -321,6 +324,12 @@ export const ActionConfirm = {
     lede.className = "end-work-lede"
     lede.textContent = pending.kind === "archive" ? nextWord("archiveSay") : T.webConfirmEndSay
     say.appendChild(lede)
+    if (pending.reconfirmed) {
+      const changed = document.createElement("p")
+      changed.className = "end-work-status is-warning"
+      changed.textContent = nextWord("endWorkChangedConfirm")
+      say.appendChild(changed)
+    }
 
     if (pending.recovery) {
       const status = document.createElement("p")
@@ -591,6 +600,29 @@ export const ActionConfirm = {
     this.sync()
   },
 
+  /** A stale close is a new decision about a fresh reading, never a retry of the old press. */
+  async reopenEndNotProven(id: string, kind: CloseKind): Promise<void> {
+    try {
+      const snapshot = await client.sessions()
+      const row = snapshot.sessions.find((candidate) => candidate.id === id) as Record<string, unknown> | undefined
+      const reading = row?.closeability as { state?: unknown; version?: unknown } | undefined
+      if (!row || !reading || (reading.state !== "blocked" && reading.state !== "safe") ||
+          typeof reading.version !== "string" || !reading.version) throw new Error("no confirmable reading")
+      this.open(kind, id, undefined, undefined, undefined, row)
+      const pending = this.pending
+      if (!pending) return
+      pending.reconfirmed = true
+      pending.force = true
+      this.renderEnd(pending)
+      this.sync()
+      node<HTMLButtonElement>("action-confirm-cancel")?.focus({ preventScroll: true })
+    } catch (error) {
+      host.refresh()
+      if (error instanceof RefusalError) toastFailure(error, nextWord("endWorkCloseUnknown"))
+      else toast(nextWord("endWorkCloseUnknown"), true)
+    }
+  },
+
   close(restore: boolean): void {
     const overlay = node("action-confirm")
     if (!overlay || overlay.hidden || this.busy) return
@@ -659,7 +691,9 @@ export const ActionConfirm = {
       const recordedWorkClear = this.pending?.workState === "ready" &&
         this.pending.work.length === 0 && !this.pending.directTodos.some((todo) => !todo.completed_at)
       const archiving = this.pending?.kind === "archive"
-      go.textContent = this.pending?.release.length
+      go.textContent = this.pending?.reconfirmed
+        ? archiving ? nextWord("archiveAnyway") : T.webConfirmEndAnyway
+        : this.pending?.release.length
         ? archiving ? nextWord("endWorkReleaseAndArchive") : nextWord("endWorkReleaseAndClose")
         : help
         ? archiving
@@ -746,6 +780,11 @@ function finishEnd(id: string, ticket: number, ok: boolean, error?: unknown): vo
     if (!ok && error instanceof RefusalError && error.code === "close_blocked") {
       endWasOpen = false
       void ActionConfirm.reopenEndBlocked(id, error.reasons, endKind, attemptedVersion)
+      return
+    }
+    if (!ok && error instanceof RefusalError && error.code === "close_not_proven") {
+      endWasOpen = false
+      void ActionConfirm.reopenEndNotProven(id, endKind)
       return
     }
     const open = host.openId()
