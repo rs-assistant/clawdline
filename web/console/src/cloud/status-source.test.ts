@@ -484,6 +484,22 @@ test("opening and leaving an exact detail subscribes, reads pinned content, and 
     "transcript:" + executionGeneration, "unsubscribe:s/one/same,t/one/same"])
 })
 
+test("a transient roster refusal keeps its code and the same detail can recover", async () => {
+  const { client } = clientFixture()
+  const readInfo = client.infoForGeneration
+  let attempts = 0
+  client.infoForGeneration = async (destination) => {
+    if (attempts++ === 0) throw Object.assign(new Error("roster unreadable"), { code: "command_roster_unreadable" })
+    return readInfo(destination)
+  }
+  const source = statusSource(() => client as never)
+  const destination = { machineID, sessionID, executionGeneration }
+  assert.deepEqual(await source.readDetail(destination, new AbortController().signal),
+    { kind: "unavailable", reason: "unknown", code: "command_roster_unreadable" })
+  assert.equal((await source.readDetail(destination, new AbortController().signal)).kind, "ready")
+  source.closeDetail?.(destination)
+})
+
 test("an abandoned first detail read still reports which Session was waiting", async () => {
   const { client } = clientFixture()
   const timings: { event: string; data: Record<string, unknown> }[] = []

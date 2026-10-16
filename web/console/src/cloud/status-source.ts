@@ -584,7 +584,7 @@ export function statusSource(current: () => StatusClient | null,
       } catch (error) {
         outcome = typeof (error as { code?: unknown } | null)?.code === "string"
           ? String((error as { code: string }).code) : "failed"
-        return { kind: "unavailable", reason: contentFailure(error) }
+        return { kind: "unavailable", reason: contentFailure(error), code: outcome }
       } finally {
         // One content-free timing row per opened detail distinguishes waiting
         // for info from waiting for the transcript on a real phone. Subsequent

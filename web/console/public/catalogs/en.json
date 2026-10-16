@@ -3522,6 +3522,7 @@
   "next.cloudAllOlderOldVersion": "This machine version cannot load earlier messages. The messages already shown are still available.",
   "next.cloudAllConversation": "Conversation",
   "next.cloudAllContentUnknown": "This Session’s conversation could not be read. Try opening it again.",
+  "next.cloudAllContentRecovering": "{machine} cannot check paired devices right now. Reconnecting to this Session automatically…",
   "next.cloudAllDataAt": "Read at {time}",
   "next.cloudAllNoContent": "This Session has no messages yet.",
   "next.cloudAllLede": "Status from each paired machine appears as it arrives. Conversation content is read only after you open a Session.",

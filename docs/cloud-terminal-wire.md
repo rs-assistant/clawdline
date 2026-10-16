@@ -81,6 +81,8 @@ The machine's terminal authority check has three answers, and only one of them i
 
 A failed roster read is dated from its completion and read again on the first check `CloudTerminalRosterRetrySecondsLimit` later, rather than holding terminals closed for a whole refresh interval. Reads stay single-flight. The machine logs the first failure of a streak, with its error, and the first success after one.
 
+For a deadline-bound authority read, the first `GET /v1/devices` uses half of the existing two-second deadline. A transport failure or interrupted body gets one retry on a fresh HTTP connection with the time remaining. HTTP refusals and malformed rosters are not retried. Both attempts share the original deadline; if neither produces a valid roster, terminal and Session content access remain unverified and fail closed. This recovers a stalled pooled connection without extending the revocation window or treating an old roster as current. It does not grant access during a sustained control-plane outage.
+
 The hosted console follows the same split. The terminal list reads a machine again by itself after 1, 2 and 4 seconds while every failure is retryable (`terminal_busy`, `terminal_unreachable`, a receipt or subscription timeout, a relay `rate_limited` or `over_capacity`), and the terminal page reattaches on the same schedule; both say they are retrying meanwhile and offer a manual retry once the attempts are spent. Only `forbidden`, `terminal_forbidden` and `terminal_access_revoked` ask the person to pair again.
 
 ## Direct carrier
@@ -205,6 +207,7 @@ Measured the same way, three hours apart, on the same page and Session; every sa
 | `CloudTerminalRosterRefreshLimit` | 2 s a successful roster read is trusted, from its start, for terminal authority and for a Session content read | machine |
 | `CloudTerminalRosterDeadlineLimit` | 2 s for a terminal roster read, or for a check waiting on one | machine |
 | `CloudTerminalRosterRetrySecondsLimit` | 1 s after a failed roster read before the next check reads again | machine |
+| `RosterShortReadAttemptsLimit` | 2 total requests for a deadline-bound authority read; the second uses a fresh connection | machine |
 | `CloudTerminalUnverifiedRetireSecondsLimit` | 10 s a connection stays paused while not verified before it is retired without a notice | machine |
 | `CloudTerminalTypeAheadSecondsLimit` | 8 s a key typed during a brief pause waits for typing to resume | browser |
 | `CloudTerminalRenewRetrySecondsLimit` | 2 s before asking again for a lease renewal that went unanswered, unsent, or was refused for load | browser |
