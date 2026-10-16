@@ -3404,6 +3404,14 @@ export interface Health {
    * feature needs a newer one. Absent when the reading could not learn it.
    */
   version?: string
+
+  /**
+   * Set only by a Cloud console's relay reader, which answers this route itself:
+   * true while the chosen machine's own descriptor (`orch/`), which carries its
+   * version, has not arrived yet. `version` is then not known yet, not missing; a
+   * page says it is still reading.
+   */
+  version_pending?: boolean
 }
 
 /**

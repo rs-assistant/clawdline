@@ -46,3 +46,18 @@ export function onHealth(fn: HealthListener): () => void {
     listeners.delete(fn)
   }
 }
+
+let asker: (() => void) | null = null
+
+/** The connection light's poll registers how to read health at once. */
+export function setHealthAsker(ask: (() => void) | null): void {
+  asker = ask
+}
+
+/**
+ * Read health now rather than at the next tick: what the sidebar asks when it
+ * opens on a machine whose version this page has not read yet.
+ */
+export function askHealthNow(): void {
+  asker?.()
+}

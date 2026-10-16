@@ -4416,6 +4416,7 @@
   "next.updateStripTagNew": "NEW",
   "next.updateStripOpen": "Open",
   "next.updateStripRelease": "Release",
+  "next.sidebarVersionReading": "Reading the machine's version…",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

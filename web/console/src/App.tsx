@@ -7,7 +7,7 @@ import { BRAND_MARK } from "./brand-mark.js"
 import { connectionLightState, connectionLightWords, type ConnectionLight } from "./connection-state.js"
 import { useFleet, usePoll } from "./useFleet.js"
 import { onAttentionRead } from "./session/attention-changed.js"
-import { healthPace, publishHealth } from "./health-feed.js"
+import { askHealthNow, healthPace, publishHealth, setHealthAsker } from "./health-feed.js"
 import { SessionsPage } from "./Sessions.js"
 import { toggleOrder } from "./session/Transcript.js"
 import { conversationNotStarted } from "./session/readiness.js"
@@ -346,6 +346,12 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
     if (held) brandRef.current?.focus({ preventScroll: true })
     setMenu(false)
   }, [])
+
+  // Opening the drawer on a machine whose version is not read yet asks again
+  // now, rather than at the next tick of the health poll.
+  useEffect(() => {
+    if (menu && !machineVersion.version) askHealthNow()
+  }, [menu, machineVersion.version])
 
   // `Sidebar.open`: the current page's row takes the keyboard, so a screen
   // reader is told where it is.
@@ -1067,7 +1073,9 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
               ? nextWord("sidebarChooseMachineVersion")
               : machineVersion.version
                 ? nextWord("sidebarServiceVersion", { version: machineVersion.version.replace(/^v/i, "") })
-                : nextWord("sidebarVersionUnknown")}
+                : machineVersion.pending
+                  ? nextWord("sidebarVersionReading")
+                  : nextWord("sidebarVersionUnknown")}
             {!focusCloudSessions && stagedAppVersion
               ? <span>{nextWord("sidebarAppStaged", { version: stagedAppVersion.replace(/^v/i, "") })}</span> : null}
           </div>
@@ -1241,7 +1249,11 @@ function useConnectionLight(live: boolean, onRetry: () => void): ConnectionLight
   // drops. A pace read before the first answer is the fifteen seconds.
   const [answered, setAnswered] = useState(false)
   const relayed = followsRelay() || !!import.meta.env.VITE_HOSTED_CONSOLE
-  const { data, error: healthError } = usePoll(read, healthPace({ live, answered, relayed }))
+  const { data, error: healthError, poke } = usePoll(read, healthPace({ live, answered, relayed }))
+  useEffect(() => {
+    setHealthAsker(poke)
+    return () => setHealthAsker(null)
+  }, [poke])
   useEffect(() => { if (data !== null) setAnswered(true) }, [data])
   // The stream says the browser's line is open; health says the selected host
   // answered. In Cloud those are different subjects, so the relay opening

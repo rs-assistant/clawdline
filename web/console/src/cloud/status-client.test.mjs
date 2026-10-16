@@ -869,3 +869,23 @@ test("a missing retained row stays a gap after the bounded wait", async () => {
   assert.equal(await recovery, false)
   assert.equal(client.socketSubscriptions.size, 0)
 })
+
+// A schedules read keeps its rows in the snapshot map before any orch/
+// envelope has come. That entry is not the descriptor: the page still asks the
+// machine for it, which is where its version is. Taking the entry for the
+// snapshot left a Linux machine on v1.0.9 reading "version not provided".
+test("a schedules read does not stand in for the machine's own descriptor", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  client.retired = false
+  client.now = () => 1_700_000
+  client.orchestratorSnapshots = new Map()
+  client.orchestratorReceived = new Set()
+  client.orchestratorHeld = new Set()
+  client._machinesFor = () => ({ rows: [{ id: "linux-b" }], capable: [{ id: "linux-b" }], pairable: [] })
+  client._machineRequest = async () => ({ schedules: [{ id: "daily" }], at: 1_700 })
+  await client.schedules({ fresh: true, machine: "linux-b" })
+  assert.ok(client.orchestratorSnapshots.has("linux-b"), "the rows are kept")
+  assert.equal(client._holdsOrchestrator("linux-b"), false, "the descriptor is still asked for")
+  client.orchestratorReceived.add("linux-b")
+  assert.equal(client._holdsOrchestrator("linux-b"), true)
+})

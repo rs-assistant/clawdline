@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5303,
+  "englishContentKeys": 5304,
   "riskKeys": 2337,
-  "nonRiskCount": 2966,
+  "nonRiskCount": 2967,
   "groups": [
     {
       "name": "bar / other",
@@ -1944,7 +1944,7 @@
     },
     {
       "name": "next / other",
-      "count": 181,
+      "count": 182,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2056,6 +2056,7 @@
         "next.sidebarManage",
         "next.sidebarMore",
         "next.sidebarServiceVersion",
+        "next.sidebarVersionReading",
         "next.sidebarWork",
         "next.smartTitleAction",
         "next.smartTitleButton",

@@ -1937,3 +1937,28 @@ test("a held title of a closed Session does not stand in for a new child's title
   assert.equal(reads, 2, "the missing title was asked for again")
   assert.equal(next.sessions.find((row) => row.id === "child")?.label, "Title child")
 })
+
+// The version rides on the machine's own orch/ descriptor. Before that has
+// arrived the version is pending, which a page says as "still reading"; after
+// it, a machine that publishes no version is simply unknown.
+test("health says a version is still coming until the machine's descriptor arrives", async () => {
+  const client = new FakeClient() as FakeClient & {
+    orchestratorSnapshots: Map<string, unknown>; orchestratorReceived: Set<string>
+  }
+  client.orchestratorSnapshots = new Map([["mac-a", { schedules: [] }]])
+  client.orchestratorReceived = new Set()
+  const r = reader(client, { t: 12_000 })
+  const before = await body<{ version?: string; version_pending?: boolean }>(await r.fetch("/v1/health"))
+  assert.equal(before.version, undefined)
+  assert.equal(before.version_pending, true, "a schedules read's entry is not the descriptor")
+
+  client.orchestratorSnapshots.set("mac-a", { app: { version: "v1.0.9", api_level: 10 } })
+  client.orchestratorReceived.add("mac-a")
+  const after = await body<{ version?: string; version_pending?: boolean }>(await r.fetch("/v1/health"))
+  assert.equal(after.version, "v1.0.9")
+  assert.equal(after.version_pending, undefined)
+
+  client.orchestratorSnapshots.set("mac-a", { machine: { platform: "linux" } })
+  const none = await body<{ version?: string; version_pending?: boolean }>(await r.fetch("/v1/health"))
+  assert.equal(none.version_pending, undefined, "a descriptor without a version is not pending")
+})
