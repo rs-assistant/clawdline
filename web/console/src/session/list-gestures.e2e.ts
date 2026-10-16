@@ -2133,6 +2133,7 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
     assert.match(await tab.run(`document.querySelector('.workflow-picker-group .snippet-group-title')?.textContent`), /全域|Global/)
     await tab.press('#snippets-new')
     assert.equal(await tab.run(`document.querySelector('#workflow-quick-editor [role="dialog"]') !== null`), true)
+    assert.equal(await tab.run(`document.activeElement?.id === 'workflow-quick-name'`), false)
     await tab.run(`(() => {
       const name = document.querySelector('#workflow-quick-name')
       const message = document.querySelector('#workflow-quick-message')
