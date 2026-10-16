@@ -13,7 +13,7 @@ import (
 )
 
 func taskStartFixture() (contract.TaskStart, []byte, contract.Principal, contract.TaskStartFacts) {
-	body := []byte("Read-only disk inventory")
+	body := []byte(`{"assistant":"claude","title":"Disk inventory","instructions":"Inspect disk usage without deleting files."}`)
 	sum := sha256.Sum256(body)
 	start := contract.TaskStart{TaskID: "task-1", RequestID: "request-1",
 		Source: contract.Endpoint{MachineID: "mac-1", SessionID: "session-1",

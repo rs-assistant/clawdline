@@ -7,7 +7,7 @@ import (
 )
 
 func validTaskStart() (TaskStart, []byte) {
-	body := []byte("Read-only disk inventory")
+	body := []byte(`{"assistant":"claude","title":"Disk inventory","instructions":"Inspect disk usage without deleting files."}`)
 	sum := sha256.Sum256(body)
 	return TaskStart{
 		TaskID: "task-1", RequestID: "request-1",

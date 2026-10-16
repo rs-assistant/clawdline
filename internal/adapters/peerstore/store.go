@@ -92,6 +92,18 @@ type TaskStartOutboxItem struct {
 	At             time.Time              `json:"at"`
 }
 
+// RemoteTask is the target machine's local task record. A claimed task whose
+// opening is unknown is never started again merely because its sender retries.
+type RemoteTask struct {
+	Start            agenthandoff.TaskStart `json:"start"`
+	Body             string                 `json:"body"`
+	State            string                 `json:"state"`
+	TargetSessionID  string                 `json:"target_session_id,omitempty"`
+	TargetGeneration string                 `json:"target_generation,omitempty"`
+	Result           string                 `json:"result,omitempty"`
+	At               time.Time              `json:"at"`
+}
+
 type Store struct{ db *sql.DB }
 
 func Open(dir string) (*Store, error) {
@@ -131,6 +143,7 @@ func Open(dir string) (*Store, error) {
 		"CREATE INDEX IF NOT EXISTS peer_inbox_target ON peer_inbox(target_session)",
 		"CREATE TABLE IF NOT EXISTS peer_outbox (id TEXT PRIMARY KEY, body BLOB NOT NULL)",
 		"CREATE TABLE IF NOT EXISTS peer_task_starts (id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, body BLOB NOT NULL)",
+		"CREATE TABLE IF NOT EXISTS peer_remote_tasks (id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, body BLOB NOT NULL)",
 	} {
 		if _, err := db.Exec(statement); err != nil {
 			db.Close()
@@ -162,7 +175,7 @@ func ReadUsage(ctx context.Context, dir string) (Usage, error) {
 	var usage Usage
 	err = st.db.QueryRowContext(ctx, `SELECT
 		(SELECT COUNT(*) FROM peer_pairs), (SELECT COUNT(*) FROM peer_grants),
-		(SELECT COUNT(*) FROM peer_inbox),
+		(SELECT COUNT(*) FROM peer_inbox) + (SELECT COUNT(*) FROM peer_remote_tasks),
 		(SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts)`).
 		Scan(&usage.Pairs, &usage.Grants, &usage.Inbox, &usage.Outbox)
 	return usage, err
@@ -373,7 +386,8 @@ func (s *Store) PutInbox(ctx context.Context, item InboxItem) error {
 	}
 	defer tx.Rollback()
 	var count int
-	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM peer_inbox").Scan(&count); err != nil {
+	if err := tx.QueryRowContext(ctx,
+		"SELECT (SELECT COUNT(*) FROM peer_inbox) + (SELECT COUNT(*) FROM peer_remote_tasks)").Scan(&count); err != nil {
 		return err
 	}
 	if count >= InboxLimit {
@@ -567,6 +581,98 @@ func (s *Store) MarkTaskStartOutbox(ctx context.Context, id, delivered string) e
 		item.RelayDelivered = delivered
 	}
 	return s.replace(ctx, "peer_task_starts", id, item)
+}
+
+// SaveRemoteTask claims a target task before any Session is opened. It shares
+// the inbox capacity and refuses a request ID reused for another task.
+func (s *Store) SaveRemoteTask(ctx context.Context, task RemoteTask) error {
+	if task.Start.TaskID == "" || task.Start.RequestID == "" || task.At.IsZero() ||
+		task.State != "accepted" || task.TargetSessionID != "" || task.TargetGeneration != "" ||
+		task.Result != "" || agenthandoff.ValidateTaskStart(task.Start, []byte(task.Body)) != nil {
+		return errors.New("peer_remote_task_invalid")
+	}
+	prior, err := s.RemoteTask(ctx, task.Start.TaskID)
+	if err == nil {
+		if prior.Start == task.Start && prior.Body == task.Body {
+			return nil
+		}
+		return errors.New("peer_remote_task_conflict")
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return err
+	}
+	encoded, err := json.Marshal(task)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var count int
+	if err := tx.QueryRowContext(ctx,
+		"SELECT (SELECT COUNT(*) FROM peer_inbox) + (SELECT COUNT(*) FROM peer_remote_tasks)").Scan(&count); err != nil {
+		return err
+	}
+	if count >= InboxLimit {
+		return ErrFull
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO peer_remote_tasks(id,request_id,body) VALUES(?,?,?)",
+		task.Start.TaskID, task.Start.RequestID, encoded); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) RemoteTask(ctx context.Context, id string) (RemoteTask, error) {
+	var task RemoteTask
+	err := s.db.QueryRowContext(ctx, "SELECT body FROM peer_remote_tasks WHERE id=?", id).
+		Scan(&pairBody{into: &task})
+	if errors.Is(err, sql.ErrNoRows) {
+		return RemoteTask{}, ErrNotFound
+	}
+	return task, err
+}
+
+// MarkRemoteTaskOpened records the exact target execution. A second opening
+// cannot overwrite it, even when its Session ID happens to be the same.
+func (s *Store) MarkRemoteTaskOpened(ctx context.Context, id, sessionID, generation string) error {
+	if sessionID == "" || generation == "" {
+		return errors.New("peer_remote_execution_invalid")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var raw []byte
+	err = tx.QueryRowContext(ctx, "SELECT body FROM peer_remote_tasks WHERE id=?", id).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	var task RemoteTask
+	if err := json.Unmarshal(raw, &task); err != nil {
+		return err
+	}
+	if task.State == "opened" && task.TargetSessionID == sessionID && task.TargetGeneration == generation {
+		return nil
+	}
+	if task.State != "accepted" {
+		return errors.New("peer_remote_task_already_opened")
+	}
+	task.State, task.TargetSessionID, task.TargetGeneration = "opened", sessionID, generation
+	encoded, err := json.Marshal(task)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE peer_remote_tasks SET body=? WHERE id=?", encoded, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) insert(ctx context.Context, table string, limit int, id, pairID string, value any) error {

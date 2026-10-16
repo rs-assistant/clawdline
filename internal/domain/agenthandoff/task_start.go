@@ -75,6 +75,9 @@ func ValidateTaskStart(start TaskStart, body []byte) error {
 		!digest.MatchString(start.BodyDigest) || start.BodyDigest != hex.EncodeToString(sum[:]) {
 		return InvalidRequest
 	}
+	if _, err := ParseTaskBody(body); err != nil {
+		return InvalidRequest
+	}
 	return nil
 }
 
