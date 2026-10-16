@@ -74,6 +74,7 @@ import {
   type MoveWrites,
 } from "../cloud/schedule-move.js"
 import "./schedules/machines.css"
+import "./schedules/history.css"
 import overlaysMarkup from "./schedules/overlays.html?raw"
 
 /**
@@ -1845,7 +1846,7 @@ const ScheduleHistory = (() => {
       webhookOpen = !webhookOpen
       drawWebhook()
     })
-    title.insertAdjacentElement("afterend", toggle)
+    ;(title.closest("h3") || title).insertAdjacentElement("afterend", toggle)
     panel.dataset.collapsed = "true"
   }
 
@@ -1904,10 +1905,19 @@ const ScheduleHistory = (() => {
     panel.dataset.collapsed = webhookOpen ? "false" : "true"
     const panelToggle = webhookNode("schedule-webhook-panel-toggle")
     if (panelToggle) {
-      panelToggle.textContent = webhookOpen ? words.hideDetails : words.showDetails
+      // The row already names the webhook, so the button says only Details or
+      // Hide; the full phrase stays its accessible name.
+      panelToggle.textContent = nextWord(webhookOpen ? "scheduleWebhookDetailsHide" : "scheduleWebhookDetailsShow")
+      panelToggle.setAttribute("aria-label", webhookOpen ? words.hideDetails : words.showDetails)
       panelToggle.setAttribute("aria-expanded", webhookOpen ? "true" : "false")
     }
     webhookNode("schedule-webhook-title")!.textContent = words.title
+    const state = webhookNode("schedule-webhook-state")
+    if (state) {
+      state.hidden = !hook
+      state.dataset.state = hook && hook.state === "active" ? "on" : "off"
+      state.textContent = hook ? nextWord(hook.state === "active" ? "scheduleWebhookStateOn" : "scheduleWebhookStateOff") : ""
+    }
     webhookNode("schedule-webhook-note")!.textContent = ephemeralURL ? words.once : words.idempotency
     const managementContext = {
       bindingAvailability: record && record.webhook_binding_availability,
@@ -2091,9 +2101,9 @@ const ScheduleHistory = (() => {
         ? new Date(record.next_fire * 1000).toLocaleString()
         : ""
     el("schedule-history-meta").textContent = [path, next].filter(Boolean).join(" · ")
-    el("schedule-history-runs-label").textContent = T().webResumePick
+    el("schedule-history-runs-label").textContent = nextWord("scheduleRunsHeading")
     el("schedule-run-rows").innerHTML = scheduleRunsHTML(runs, Date.now() / 1000, terminalIsOpen)
-    el("schedule-history-empty").textContent = T().webResumeEmpty
+    el("schedule-history-empty").textContent = nextWord("scheduleRunsEmpty")
     el("schedule-history-empty").hidden = loading || started || runs.length > 0 || !!el("schedule-history-said").textContent
     el("schedule-history-capped").textContent = T().webResumeCapped
     el("schedule-history-capped").hidden = !(record && record.runs_may_be_truncated)

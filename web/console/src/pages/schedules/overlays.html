@@ -6,11 +6,13 @@
                 <h2 id="schedule-history-title">Schedule</h2>
                 <p id="schedule-history-meta"></p>
             </div>
-            <button class="chip" id="schedule-history-edit" type="button">Edit schedule</button>
+            <div class="schedule-history-actions">
+                <button class="chip" id="schedule-history-edit" type="button">Edit schedule</button>
+            </div>
         </div>
         <p class="said" id="schedule-history-said" role="status" aria-live="polite"></p>
         <section class="schedule-webhook" id="schedule-webhook" hidden>
-            <h3 id="schedule-webhook-title">Cloud webhook</h3>
+            <h3><span id="schedule-webhook-title">Cloud webhook</span><span class="schedule-webhook-state" id="schedule-webhook-state" hidden></span></h3>
             <p id="schedule-webhook-note"></p>
             <p class="schedule-webhook-warning" id="schedule-webhook-warning"></p>
             <div class="buttons">
@@ -22,7 +24,7 @@
             <p id="schedule-webhook-status" role="status" aria-live="polite"></p>
             <ol class="schedule-webhook-timeline" id="schedule-webhook-timeline"></ol>
         </section>
-        <h3 id="schedule-history-runs-label">Which conversation?</h3>
+        <h3 id="schedule-history-runs-label">Runs</h3>
         <ul class="schedule-run-rows" id="schedule-run-rows"></ul>
         <p class="schedule-history-empty" id="schedule-history-empty" hidden></p>
         <p class="schedule-history-capped" id="schedule-history-capped" hidden></p>

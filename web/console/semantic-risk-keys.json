@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5306,
+  "englishKeys": 5312,
   "counts": {
-    "negation": 1517,
+    "negation": 1518,
     "state": 734,
     "permission": 336,
     "deletion": 110,
     "uncertainty": 155
   },
-  "unionCount": 2341,
+  "unionCount": 2342,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1231,6 +1231,7 @@
       "next.schedulePermissionFull",
       "next.schedulePermissionFullWarning",
       "next.schedulePlacesUnanswered",
+      "next.scheduleRunsEmpty",
       "next.scheduleTriggerOnly",
       "next.scheduleUnreadable",
       "next.scheduleUnreadableJSON",
@@ -4708,6 +4709,7 @@
     "next.scheduleRunOpenThis",
     "next.scheduleRunStartedOpen",
     "next.scheduleRunStartedWaiting",
+    "next.scheduleRunsEmpty",
     "next.scheduleTriggerOnly",
     "next.scheduleUnreadable",
     "next.scheduleUnreadableJSON",

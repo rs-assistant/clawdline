@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5306,
-  "riskKeys": 2341,
-  "nonRiskCount": 2965,
+  "englishContentKeys": 5312,
+  "riskKeys": 2342,
+  "nonRiskCount": 2970,
   "groups": [
     {
       "name": "bar / other",
@@ -2195,7 +2195,7 @@
     },
     {
       "name": "next / schedule",
-      "count": 19,
+      "count": 24,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2215,9 +2215,14 @@
         "next.schedulePermissionDefault",
         "next.schedulePermissionEdits",
         "next.scheduleRunStartedTitle",
+        "next.scheduleRunsHeading",
         "next.scheduleTriggerOnlyNext",
         "next.scheduleUntitled",
         "next.scheduleWebhookCopied",
+        "next.scheduleWebhookDetailsHide",
+        "next.scheduleWebhookDetailsShow",
+        "next.scheduleWebhookStateOff",
+        "next.scheduleWebhookStateOn",
         "next.scheduleWebhookUrlLabel"
       ]
     },
