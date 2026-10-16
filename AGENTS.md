@@ -125,39 +125,61 @@ undone. Numbers come from a run, not from memory.
 When a root Session has finished and verified a turn, including any required commit, run
 `clawdline session report --summary "One concrete sentence about what was delivered."` as the
 last action before the final answer. Confirm that the command succeeded; the final answer and the
-two status lines below do not create the Session delivery receipt. If the command is refused,
+status lines below do not create the Session delivery receipt. If the command is refused,
 say that the Session status was not updated and give the refusal reason. Do not report a turn that
 is unfinished, only diagnostic, blocked, or waiting for the person, and never report a child's turn.
 Read `clawdline guide` for the current command and receipt semantics before using it.
 
-The final response for every task ends with exactly two unbulleted status lines, in this order,
-with no text, heading, code fence or other content after them. Choose the GitHub line and the
-Build/Cloud line independently from the evidence for the current delivery.
+The final response for every task ends with exactly five unbulleted status paragraphs in this order:
+GitHub, `app.clawdline.com`, this machine's dev install, public Release, and `clawdline.com`.
+Put each item on its own line **with a blank line between items** so Markdown renders five
+separate rows, never one wrapped paragraph. Start each with its emoji. Add no text, heading,
+code fence, or other content after the five items. Choose each status independently for this
+delivery; a newer commit in one place does not establish the state of another place. Use these
+meanings:
 
-Use exactly one of these GitHub lines:
+- `✅` — the required action is complete and its destination has been verified.
+- `➖` — this delivery requires no action at that destination. Say why briefly; do not use this
+  merely because the action has not been attempted.
+- `🕰️` — an action is required or underway, or its required verification is still pending.
+- `❔` — the evidence needed to decide is unavailable. Name what could not be checked.
+
+Use these line labels and concise, specific details, including a commit or version when relevant:
 
 ```text
-✅ 已經 commit, push 更新到 github
-🕰️ 還未 commit, push
+✅ GitHub：<本次 commit 已在 origin/main；或寫明待推送／無需變更／無法確認>
+
+✅ app.clawdline.com：<已上線並驗證；或寫明待部署／不需更新／無法確認>
+
+✅ 這台 Mac 的 dev：<正在運行哪個 dev commit；或寫明待安裝／不需更新／無法確認>
+
+✅ Release：<已發布哪個公開版本及其 commit；或寫明待發版／暫不需發版／無法確認>
+
+✅ clawdline.com：<官網已更新並驗證；或寫明待更新／不需更新／無法確認>
 ```
 
-The GitHub line is complete only when the delivery is committed and that commit is reachable from
-the current `origin/main`. A local commit, an unpushed merge or a pending/rejected push uses the
-pending line.
+Replace each example `✅` with the emoji warranted by that line's evidence. For GitHub, `✅`
+requires this delivery's commit to be reachable from current `origin/main`; a local commit, an
+unpushed merge, or a pending/rejected push is `🕰️`. For `app.clawdline.com`, `✅` requires the
+production `BUILD.json` to name the delivered commit or a descendant and the served main bundle
+to pass the `CloudGate` check in `docs/hosted-console.md`. A queued build, preview deployment,
+stale stamp, or skipped online check is `🕰️` when a deployment is required. An unrelated change
+that does not need a hosted-console deployment is `➖`.
 
-Use exactly one of these Build/Cloud lines:
+For this Mac's dev install, compare the intended dev commit with the version actually running on
+this machine, not just a built or installed artifact; see `docs/updates.md`. Use `➖` when this
+delivery does not call for a dev install, including after a deliberate return to the stable
+release. For Release, compare the intended public version and commit with the published signed
+release, not with the hosted console's stamp; see `docs/releasing.md`. A dev build ahead of the
+public release does not by itself mean a release is due. Before release acceptance, mark a
+dependent website download update as `🕰️` if it is already known to be required, and say it
+follows the release. For `clawdline.com`, use the website's own deployed version or visible page
+and its acceptance evidence; neither this repository's commit nor the hosted console stamp proves
+that website was updated. Use `❔` rather than guessing when that evidence is unavailable.
 
-```text
-✅ 已經更新 build & Cloud 到最新版本
-🕰️ 還未更新 build & Cloud 到最新版本
-```
-
-The Build/Cloud line is complete only when production `BUILD.json` names the delivered commit and
-the served main bundle passes the `CloudGate` check from `docs/hosted-console.md`. A queued build,
-a preview deployment, a stale production stamp or a skipped verification uses the pending line.
-
-Any required review-residue statement, including `Fixed but not yet released (awaiting review)`,
-goes before these two lines so the status pair always remains the final two lines of the response.
+If a delivery changes Cloud API or relay, report their deployment separately before these final
+five lines; the hosted console's status does not cover them. Any required review-residue statement,
+including `Fixed but not yet released (awaiting review)`, also goes before the final five lines.
 
 ## What a child does not do
 
