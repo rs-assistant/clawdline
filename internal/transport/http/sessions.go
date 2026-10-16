@@ -117,6 +117,11 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 			Acceptance       *contract.SessionAcceptance   `json:"acceptance,omitempty"`
 			Disposition      *contract.WorkDisposition     `json:"disposition,omitempty"`
 			Coordination     *contract.SessionCoordination `json:"coordination,omitempty"`
+			// The signed ss/ rows carry these two; this list stands in for
+			// them while ss/ has a gap, and without them the machine's
+			// Clawdfather was drawn as an ordinary Session under its own title.
+			MachineScope     bool `json:"machine_scope,omitempty"`
+			CoordinatorBound bool `json:"coordinator_bound,omitempty"`
 		}
 		type presentation struct {
 			ID                  string         `json:"id"`
@@ -136,7 +141,8 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 					HeavyWork: row.HeavyWork, Source: row.Source, Activity: row.Activity,
 					Identity: row.Identity, AttentionCount: row.AttentionCount,
 					Owed: row.Owed, Acceptance: row.Acceptance,
-					Disposition: row.Disposition, Coordination: row.Coordination}})
+					Disposition: row.Disposition, Coordination: row.Coordination,
+					MachineScope: row.MachineScope, CoordinatorBound: row.Coordinator != nil}})
 		}
 		_ = json.NewEncoder(w).Encode(struct {
 			At       int64          `json:"at"`
