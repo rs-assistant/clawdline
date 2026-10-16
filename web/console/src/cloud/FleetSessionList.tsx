@@ -3,7 +3,7 @@ import { nextWord } from "../next-strings.js"
 import * as L from "../legacy/bridge.js"
 import { ProjectedRow } from "../session/List.js"
 import { onAttentionRead } from "../session/attention-changed.js"
-import { Swipes, archivable } from "../session/swipe.js"
+import { Swipes, sessionSwipeActions } from "../session/swipe.js"
 import { useSwipeToEnd } from "../session/use-swipe.js"
 import type { OrderHold } from "../session/order.js"
 import { SessionToolbar } from "../session/SessionToolbar.js"
@@ -434,6 +434,8 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
                   const presentation = presentations.current.get(destinationKey(row.destination))
                   const title = fleetRowTitle(row, presentation, nextWord("cloudAllUnknown"),
                     confirmedTitles?.get(destinationKey(row.destination)))
+                  const actions = sessionSwipeActions(row.freshness,
+                    displayedPresentationStatus(row, presentation)?.sessionId)
                   return <ProjectedRow key={destinationKey(row.destination)}
                     title={title} icon={presentation?.icon} cwd={presentation?.cwd}
                     machineScope={row.machineScope === true} coordinatorBound={row.coordinatorBound === true}
@@ -448,11 +450,10 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
                     selectionKey={destinationKey(row.destination)}
                     swiped={swiped === destinationKey(row.destination)}
                     consumePress={() => swipe.tookRowPress(destinationKey(row.destination))}
-                    onClose={row.freshness === "current" && machine.freshness === "current"
+                    onClose={actions.close
                       ? () => { swipe.closeOpen(); thawOrder(); onCloseRequest(row.destination,
                         title) } : undefined}
-                    onArchive={row.freshness === "current" && machine.freshness === "current" &&
-                      archivable(displayedPresentationStatus(row, presentation)?.sessionId)
+                    onArchive={actions.archive
                       ? () => { swipe.closeOpen(); thawOrder(); onArchiveRequest(row.destination,
                         title) } : undefined}
                     onOpen={() => onOpen(row.destination)} />

@@ -6,7 +6,7 @@ import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
 import { detailSessionName, projectedSessionIdentity, sessionCoordinatorBound, sessionMark } from "../brand-mark.js"
 import { requestConfirm } from "../overlays/events.js"
-import { ACTION_WIDTH, actionWidth, archivable, revealFor, swipes, type Reveal } from "./swipe.js"
+import { ACTION_WIDTH, actionWidth, archivable, revealFor, richSessionSwipeActions, swipes, type Reveal } from "./swipe.js"
 import { conversationNotStarted } from "./readiness.js"
 import { retainedStateWords, sessionReadingChinese } from "../session-reading.js"
 import { rowPersonaLine } from "../personas.js"
@@ -41,13 +41,13 @@ function RowActivity({ at }: { at?: number }) {
   return word ? <span className="session-activity">{word}</span> : null
 }
 
-function SwipeAction({ kind, title, hidden, onClick, word, closeability }: {
+function SwipeAction({ kind, title, hidden, onClick, word, closeability, disabled = false }: {
   kind: "archive" | "close"; title: string; hidden: boolean; onClick: (button: HTMLButtonElement) => void; word?: string
-  closeability?: string
+  closeability?: string; disabled?: boolean
 }) {
   const label = nextWord(kind === "archive" ? "swipeArchiveLabel" : "swipeEndLabel", { session: title })
   return <button className={kind === "archive" ? "swipe-archive" : "swipe-end"} type="button" hidden={hidden}
-    data-closeability={closeability}
+    data-closeability={closeability} disabled={disabled}
     aria-label={label} title={label} onClick={(event) => { event.stopPropagation(); onClick(event.currentTarget) }}>
     <span className="word">{word ?? nextWord(kind === "archive" ? "swipeArchiveAction" : "swipeCloseAction")}</span>
   </button>
@@ -431,6 +431,7 @@ export function Row({
   const reveal = swipeReveal(row)
   const name = detailSessionName(row)
   // 封存 only where there is a conversation to bring back (`swipe.ts`).
+  const actions = richSessionSwipeActions(row)
   const canArchive = archivable(row.sessionId)
   // A gesture that moved the row, or a press on its uncovered body, must not
   // open the Session (`swipe.ts`, `tookRowPress`).
@@ -506,8 +507,10 @@ export function Row({
           Not drawn for a row with no conversation id, which the daemon would
           refuse. */}
       {canArchive ? <SwipeAction kind="archive" title={name} hidden={!swiped}
+        disabled={!actions.archive}
         onClick={(button) => requestConfirm({ kind: "archive", id: row.id, opener: button, subject: name, focus: "cancel" })} /> : null}
       <SwipeAction kind="close" title={name} hidden={!swiped} word={reveal.word} closeability={reveal.state}
+        disabled={!actions.close}
         onClick={(button) => requestConfirm({ kind: "end", id: row.id, opener: button, subject: name, focus: "cancel" })} />
     </SessionRowLayout>
   )

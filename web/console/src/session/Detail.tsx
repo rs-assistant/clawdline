@@ -38,7 +38,7 @@ import { hostedConsole, openTerminal, TerminalRequestError } from "../pages/term
 import { firstSize } from "../pages/terminal/TerminalProjectList.js"
 import { openNewTerminal, openTerminalPage } from "../pages/terminal/navigate.js"
 import { terminalRefusalWords } from "../pages/terminal/words.js"
-import { archivable } from "./swipe.js"
+import { richSessionSwipeActions } from "./swipe.js"
 import { BRAND_MARK, detailSessionName, sessionCoordinatorBound } from "../brand-mark.js"
 import { headPersona, type HeadPersona } from "../personas.js"
 import { PersonaBot, usePersonas } from "./PersonaBot.js"
@@ -506,6 +506,7 @@ function Tools({
 }) {
   const T = L.strings
   const steward = !!row && !!(row.machine_scope || row.coordinator)
+  const actions = richSessionSwipeActions(row)
   const [open, setOpen] = useState(false)
   const [more, setMore] = useState(false)
   const [openingTerminal, setOpeningTerminal] = useState(false)
@@ -831,7 +832,7 @@ function Tools({
                 id="session-end"
                 type="button"
                 role="menuitem"
-                disabled={!row || ending}
+                disabled={!row || ending || !actions.close}
                 onClick={() => {
                   if (!row) return
                   closeMenu(false)
@@ -923,7 +924,7 @@ function Tools({
                 id="session-archive"
                 type="button"
                 role="menuitem"
-                disabled={!row || ending || !archivable(row.sessionId)}
+                disabled={!row || ending || !actions.archive}
                 onClick={() => {
                   if (!row) return
                   closeMenu(false)
