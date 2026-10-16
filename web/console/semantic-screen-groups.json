@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5328,
+  "englishContentKeys": 5329,
   "riskKeys": 2350,
-  "nonRiskCount": 2978,
+  "nonRiskCount": 2979,
   "groups": [
     {
       "name": "bar / other",
@@ -2212,7 +2212,7 @@
     },
     {
       "name": "next / schedule",
-      "count": 24,
+      "count": 25,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2228,6 +2228,7 @@
         "next.scheduleMoveWebhookMoved",
         "next.scheduleMoved",
         "next.scheduleMoving",
+        "next.scheduleOnceOn",
         "next.schedulePermissionAsk",
         "next.schedulePermissionDefault",
         "next.schedulePermissionEdits",

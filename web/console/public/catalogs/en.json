@@ -4425,6 +4425,7 @@
   "next.updateStripOpen": "Open",
   "next.updateStripRelease": "Release",
   "next.sidebarVersionReading": "Reading the machine's version…",
+  "next.scheduleOnceOn": "Once, on {date}",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

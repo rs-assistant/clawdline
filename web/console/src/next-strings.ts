@@ -243,6 +243,7 @@ const words = {
     scheduleInvalidStatus: "Invalid",
     scheduleTriggerOnly: "No time — runs only by webhook or by hand",
     scheduleTriggerOnlyNext: "Runs only by webhook or by hand",
+    scheduleOnceOn: "Once, on {date}",
     scheduleForceRunConfirmation:
       "“{title}” already has work running. Start another run anyway? Both tasks will keep running. If they would write to the same place, or session capacity is full, the new run will still be refused.",
     fontScaleTitle: "Text size",
@@ -1637,6 +1638,7 @@ const words = {
     scheduleInvalidStatus: "無效",
     scheduleTriggerOnly: "不設時間——只由 webhook 或手動執行",
     scheduleTriggerOnlyNext: "只由 webhook 或手動執行",
+    scheduleOnceOn: "只在 {date} 執行一次",
     scheduleForceRunConfirmation:
       "「{title}」已有一個執行中的工作。仍要強制再執行一次嗎？兩個工作都會繼續執行；如果它們會寫到同一個地方，或 Session 容量已滿，新工作仍會被擋下。",
     fontScaleTitle: "文字大小",

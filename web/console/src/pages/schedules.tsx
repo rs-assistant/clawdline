@@ -692,6 +692,9 @@ const Schedule = (() => {
   let triggerOnly = false
   // The schedule being edited runs once; it stays once, so the no-time switch is not offered.
   let editingOnce = false
+  // Its date. A save sends it back in place of days: the daemon refuses a save
+  // that would turn a one-shot into a repeating schedule.
+  let editingOn = ""
   let closeTab = "on_success"
   let enabled = true
   let notify = true
@@ -887,6 +890,15 @@ const Schedule = (() => {
   function drawDays(): void {
     const row = el("schedule-days")
     row.innerHTML = ""
+    // A one-shot has a date, not days; chips here would show "Daily" for it.
+    if (editingOn) {
+      const once = document.createElement("span")
+      once.className = "note"
+      once.textContent = nextWord("scheduleOnceOn", { date: editingOn })
+      row.appendChild(once)
+      paint()
+      return
+    }
     const daily = document.createElement("button")
     daily.type = "button"
     const dailyOn = days === "daily" && !daysGuessed
@@ -1145,6 +1157,7 @@ const Schedule = (() => {
     daysGuessed = false
     triggerOnly = false
     editingOnce = false
+    editingOn = ""
     closeTab = "on_success"
     enabled = true
     notify = true
@@ -1258,6 +1271,7 @@ const Schedule = (() => {
     daysGuessed = false
     triggerOnly = isTriggerOnly(record)
     editingOnce = !triggerOnly && (record.once === true || !!when.on)
+    editingOn = editingOnce && typeof when.on === "string" ? when.on : ""
     el<HTMLTextAreaElement>("schedule-instructions").value = task.instructions || ""
     enabled = record.enabled !== false
     closeTab = record.close_tab && CLOSE_VALUES.indexOf(record.close_tab) >= 0 ? record.close_tab : "on_success"
@@ -1397,7 +1411,7 @@ const Schedule = (() => {
       title: el<HTMLInputElement>("schedule-title").value.trim(),
       time_zone: scheduleTimeZone(editRecord?.time_zone, Intl.DateTimeFormat().resolvedOptions().timeZone),
       // A time and its days, or `trigger_only` with neither.
-      ...scheduleWhenFields(triggerOnly, el<HTMLInputElement>("schedule-at").value, days),
+      ...scheduleWhenFields(triggerOnly, el<HTMLInputElement>("schedule-at").value, days, editingOn),
       place_id: chosenPlace,
       assistant: chosenAssistant,
       model: chosenModel,
