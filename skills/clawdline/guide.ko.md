@@ -870,6 +870,10 @@ clawdline item assign <child id> (--terminal <terminal id> | --new [--assistant 
 
 **임대.** 자원은 두 가지입니다. `heavy_compile`은 컴퓨터 전체의 단일 컴파일 슬롯이고, `landing`은 체크아웃마다 하나입니다.
 
+`daemon_restart`를 획득하기 전에 빌드를 마치세요. `clawdline dev install`이나 `heavy_compile`을 요청하는 명령을 이 래퍼 안에서 실행하지 마세요. 재시작 임대가 컴파일 슬롯을 막습니다. 유지보수 시간을 조정한 뒤 `clawdline dev install`을 직접 실행하세요. 빌드 후 전환합니다. `clawdline update --apply`도 직접 실행하여 다운로드, 전환, 상태 확인, 롤백을 업데이트 절차에 맡기세요. 이 래퍼는 빌드하지 않는 별도 재시작 명령에만 사용합니다。
+
+작업 전 `clawdline coordination status`로 상태를 확인합니다. 안전한 일시 중지는 `clawdline coordination pause --wake lease:heavy_compile`로 요청하고, 수신자는 `clawdline coordination observed`와 `clawdline coordination safe`로 확인합니다. 별도 재시작 명령만 `clawdline coordination run --resource daemon_restart -- <command>`로 감싸세요. 메인 브랜치 병합은 `clawdline coordination run --resource landing --checkout /absolute/checkout -- <command>`를 사용합니다.
+
 **빌드나 테스트 묶음은 직접 실행하지 말고 `clawdline heavy -- <command>`를 사용하세요.** 이 명령은 `heavy_compile`을 대기하고 컴퓨터에 메모리가 충분해지면(전체의 4분의 1, 최대 1 GB 사용 가능, 메모리 정체 10% 이하) 명령을 낮은 우선순위로 실행합니다. Linux에서는 메모리가 부족할 때 커널이 가장 먼저 종료할 대상으로도 지정합니다. 실행 중 임대를 갱신하고 끝나면 해제하며 원래 명령의 종료 코드를 유지합니다. 데몬이 없거나 알 수 없는 거부 때문에 빌드를 포기하지는 않습니다. 이때는 stderr에 설명 한 줄을 쓰고 명령을 그대로 실행합니다. 슬롯과 메모리를 얻기 전에 `--max-wait`(기본 30분)이 지나면 대기열에서 빠지고 명령은 실행하지 않은 채 **75**로 끝납니다. 이 코드를 명령 자체의 실패로 오해하지 마세요. 나중에 다시 실행합니다. 대기 시작과 종료에만 각각 한 줄을 출력하며 중간에는 아무것도 출력하지 않습니다. §2처럼 한 번 길게 기다리세요. `heavy` 안에서 호출한 `heavy`는 바로 실행됩니다. `--min-available 1500M`은 더 많은 메모리를 요구하고 `--no-slot`은 메모리만 검사합니다. 저장소에 `tools/heavy.sh <command>`가 있다면 바이너리를 대신 찾아 줍니다.
 
 - `POST /v1/orchestrator/leases` — `{"request_id": "<uuid>", "resource", "checkout" (landing only), "holder", "reason", "session_id", "pid"}`를 받습니다. `granted` 또는 `position`과 `retry_after_seconds`가 포함된 `queued`로 응답합니다. 대기 중이면 같은 `request_id`로 다시 요청합니다.

@@ -132,7 +132,12 @@ func runCoordinatedOperation(stdout, stderr io.Writer, b *broker, opts coordinat
 			}
 		}
 	}()
-	code, runErr := run(argv, nil)
+	childEnv := []string(nil)
+	if opts.resource == "daemon_restart" {
+		// Heavy compile cannot be granted while this wrapper holds the restart lease.
+		childEnv = []string{"CLAWDLINE_DAEMON_RESTART_HELD=1"}
+	}
+	code, runErr := run(argv, childEnv)
 	cancel()
 	wg.Wait()
 	owner.Phase = ""

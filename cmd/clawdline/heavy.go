@@ -199,6 +199,10 @@ func runHeavy(opts heavyOptions, argv []string, d heavyDeps) int {
 	say := func(format string, a ...any) {
 		fmt.Fprintf(d.stderr, cliCopy("misc", "heavy.clawdline_heavy.a7592dd3", "clawdline heavy: ")+format+"\n", a...)
 	}
+	if !opts.noSlot && d.getenv("CLAWDLINE_DAEMON_RESTART_HELD") != "" {
+		say(cliCopy("misc", "heavy.restart_lease_conflict", "cannot build while daemon_restart is held by this command; build first, then run only the restart step under daemon_restart"))
+		return 2
+	}
 	if held := d.getenv(heavyEnv); held != "" {
 		// The parent holds the slot and checked memory already.
 		code, err := d.run(argv, []string{heavyEnv + "=" + held})

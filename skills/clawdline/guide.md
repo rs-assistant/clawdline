@@ -1936,6 +1936,8 @@ message, not a lock or a file watch.
 **Leases.** Three resources: `heavy_compile` (the machine's one compile slot), `landing` (one per
 checkout), and `daemon_restart` (one machine-wide restart window).
 
+Build before taking `daemon_restart`. Never put `clawdline dev install` or another command that requests `heavy_compile` inside that wrapper: the restart lease blocks the compile slot. Run `clawdline dev install` directly after arranging the maintenance window; it builds before switching. Run `clawdline update --apply` directly too: it performs its own download, switch, health check and rollback. Use the wrapper only for a separate restart command that does not build.
+
 **Run a build or a test suite through `clawdline heavy -- <command>`**, not bare. It queues for
 `heavy_compile`, waits until the machine has memory available (a quarter of it, at most 1 GB, and
 no memory stall above 10%), runs the command at a lower priority — on Linux also as the first

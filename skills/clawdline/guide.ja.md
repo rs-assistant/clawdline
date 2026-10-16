@@ -874,6 +874,10 @@ clawdline item assign <child id> (--terminal <terminal id> | --new [--assistant 
 
 **リース。** 2 つのリソース: `heavy_compile` (マシンの 1 つのコンパイル スロット) と `landing` (チェックアウトごとに 1 つ)。
 
+`daemon_restart` を取得する前にビルドを終えてください。`clawdline dev install` や `heavy_compile` を要求するコマンドをこのラッパーに入れないでください。再起動リースがコンパイル枠を塞ぎます。保守時間を調整してから `clawdline dev install` を直接実行します。ビルド後に切り替わります。`clawdline update --apply` も直接実行し、ダウンロード、切り替え、確認、ロールバックを更新処理に任せます。このラッパーはビルドしない独立した再起動だけに使います。
+
+操作前に `clawdline coordination status` で状態を確認します。安全な停止を頼むには `clawdline coordination pause --wake lease:heavy_compile`、受け取った側の確認には `clawdline coordination observed` と `clawdline coordination safe` を使います。独立した再起動だけを `clawdline coordination run --resource daemon_restart -- <command>` で包みます。主系統への反映には `clawdline coordination run --resource landing --checkout /absolute/checkout -- <command>` を使います。
+
 **ビルドやテスト スイートは `clawdline heavy -- <command>` 経由で実行します。** `heavy_compile` のキューに入り、マシンに十分なメモリができるまで待ちます。条件はメモリの 4 分の 1 (最大 1 GB) が空いており、メモリ ストールが 10% 以下であることです。コマンドは低い優先度で実行され、Linux ではメモリ不足時にカーネルが最初に終了させる対象にもなります。実行中はリースを更新し、終了後に解放します。コマンドの終了ステータスはそのまま保持します。デーモンが見つからない場合や未知の拒否が返った場合でも、ビルドは拒否せず、stderr に説明を出してコマンドを実行します。スロットとメモリの確保前に `--max-wait` (デフォルトは 30m) を過ぎると、キューから離れ、コマンドを実行せずに **75** で終了します。このコードはコマンド自体の失敗と区別できます。後で再実行してください。待機の開始時と終了時にそれぞれ 1 行だけ出力されます。途中は出力されないため、長い待機を 1 回行います (§2「長いコマンドの待機」)。`heavy` 内から呼ばれた `heavy` は直接実行されます。`--min-available 1500M` は必要メモリを増やし、`--no-slot` はメモリだけを確認します。リポジトリに `tools/heavy.sh <command>` があれば、それがバイナリを見つけます。
 
 - `POST /v1/orchestrator/leases` — `{"request_id": "<uuid>", "resource", "checkout" (landing only), "holder", "reason", "session_id", "pid"}`。 `granted`、または `queued` を `position` および `retry_after_seconds` で答えます。キューに入れられたリクエストは、同じ `request_id` で再度要求します。

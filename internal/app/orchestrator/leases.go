@@ -335,6 +335,10 @@ func (b *Broker) Acquire(ctx context.Context, req LeaseRequest) (LeaseAnswer, er
 		waiters := make([]store.LeaseRow, 0, len(st.Waiters)+1)
 		mine := -1
 		for _, w := range st.Waiters {
+			if w.RequestID != req.RequestID && proofs[w.RequestID].verdict == "gone" {
+				change.DropWaiters = append(change.DropWaiters, w.RequestID)
+				continue
+			}
 			if w.RequestID != req.RequestID && now.Sub(w.AskedAt) > waiterForgotten {
 				change.DropWaiters = append(change.DropWaiters, w.RequestID)
 				continue
@@ -413,6 +417,11 @@ func (b *Broker) leaseProofs(ctx context.Context, resource, key string, now time
 	out := map[string]proof{}
 	if h := st.Holder; h != nil {
 		out[h.RequestID] = b.livenessOf(*h, h.RenewedAt, now)
+	}
+	for _, w := range st.Waiters {
+		if w.PID > 0 && b.processProof(w.PID, w.ProcessStart) == "gone" {
+			out[w.RequestID] = proof{"gone", "process_gone"}
+		}
 	}
 	return out, nil
 }
@@ -545,6 +554,11 @@ func (b *Broker) viewOf(st store.LeaseState, now time.Time) LeaseView {
 	}
 	position := 0
 	for _, w := range st.Waiters {
+		// A stopped wrapper cannot renew or cancel. Hide its stale row at once;
+		// the next acquire removes it from the store before ranking askers.
+		if w.PID > 0 && b.processProof(w.PID, w.ProcessStart) == "gone" {
+			continue
+		}
 		proving := now.Sub(w.AskedAt) <= waiterSilence
 		row := LeaseWaiter{RequestID: w.RequestID, Holder: w.Holder, Reason: w.Reason, Session: w.Session, CallbackTaskID: w.CallbackTaskID,
 			PID: w.PID, RequestedAt: w.RequestedAt, Waited: int(now.Sub(w.RequestedAt) / time.Second), Proving: proving}

@@ -1647,6 +1647,8 @@ clawdline item assign <child id> (--terminal <terminal id> | --new [--assistant 
 
 **Lease。** 三種資源：`heavy_compile`（整台機器唯一的重度編譯名額）、`landing`（每份 checkout 一個）與 `daemon_restart`（整台機器唯一的重新啟動時段）。
 
+取得 `daemon_restart` 前先完成建置。不要把 `clawdline dev install` 或其他會要求 `heavy_compile` 的指令包進此 wrapper：重新啟動租約會擋住編譯名額。安排好維護時段後直接執行 `clawdline dev install`；它會先建置再切換。`clawdline update --apply` 也直接執行，由更新程序自行下載、切換、檢查與回復。此 wrapper 只用於不會建置的獨立重新啟動指令。
+
 **編譯或跑測試套件時，用 `clawdline heavy -- <指令>` 包起來，不要直接跑。** 它會先排 `heavy_compile`，等機器有足夠的可用記憶體（機器的四分之一，最多 1 GB，且記憶體等待不超過 10%），再以較低優先權執行；在 Linux 上，記憶體真的不夠時，核心會先砍它而不是互動中的 session。執行期間續租，結束後釋放，並保留指令本身的 exit code。daemon 沒回應、或被它看不懂的理由拒絕時，它不會因此不編譯：照樣執行指令，並在 stderr 說明。等超過 `--max-wait`（預設 30 分鐘）還沒拿到編譯位置和記憶體時，它會放棄排隊、不執行指令，以 **75** 結束——這個代碼不會跟指令本身的失敗混在一起；晚點再跑一次。等待期間只在開始等時印一行、等完時印一行，中間什麼都不印：等它就一次等久一點（§2「等一個跑很久的指令」）。`heavy` 裡面再呼叫 `heavy` 會直接執行。`--min-available 1500M` 可要求更多記憶體，`--no-slot` 只檢查記憶體。repository 裡有 `tools/heavy.sh` 的話，用 `tools/heavy.sh <指令>` 就會自動找到執行檔。
 
 Root 的 `heavy` 預設在需要等待時啟動 callback，並以 **76** 結束，印出 callback ID 與已知的排隊位置。這時結束這個 turn，等待通知。`tools/check.sh` 預設啟用；child、缺少 conversation ID、callback 被拒絕或 daemon 無法連線時，仍在原處等待。

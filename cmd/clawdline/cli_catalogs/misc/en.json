@@ -250,6 +250,7 @@
   "coordination.unreadable": "Coordination status was unreadable.",
   "coordination.header": "TARGET\tSTATE\tREASON\tWAKE CONDITION\tERROR",
   "coordination.identity": "This command needs the caller's conversation ID from its Session environment.",
+  "heavy.restart_lease_conflict": "cannot build while daemon_restart is held by this command; build first, then run only the restart step under daemon_restart",
   "coordination.run_usage": "usage: clawdline coordination run --resource landing --checkout /repo [--handoff] -- <command> [args…]; or --resource daemon_restart",
   "coordination.waiting": "Waiting for %s, position %d.\n",
   "coordination.timed_out": "The lease wait ended before a grant; the command did not run.",

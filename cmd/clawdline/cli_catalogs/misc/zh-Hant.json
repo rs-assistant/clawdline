@@ -250,6 +250,7 @@
   "coordination.unreadable": "無法讀取協調狀態。",
   "coordination.header": "目標\t狀態\t原因\t喚醒條件\t錯誤",
   "coordination.identity": "此指令需要從目前 Session 環境取得呼叫者的對話 ID。",
+  "heavy.restart_lease_conflict": "此指令持有 daemon_restart 時不能建置；先完成建置，再只將重新啟動步驟包在 daemon_restart 中",
   "coordination.run_usage": "用法：clawdline coordination run --resource landing --checkout /repo [--handoff] -- <指令> [參數…]；或 --resource daemon_restart",
   "coordination.waiting": "等待 %s，目前候位第 %d 位。\n",
   "coordination.timed_out": "等候租約期間未取得授權；指令沒有執行。",
