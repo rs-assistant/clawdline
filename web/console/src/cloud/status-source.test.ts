@@ -322,6 +322,29 @@ test("a stale retained status pass recovers from one pinned machine list without
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 })
 
+test("a direct fallback refreshes its presentation after the short gap window", async () => {
+  const { client, calls } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
+  let now = Date.now()
+  client.now = () => now
+  let workNote = "Waiting for another Session"
+  client.listPresentationsForMachine = async (machine: string) => {
+    calls.push("sessions.list:" + machine)
+    return { at: Math.floor(now / 1000), complete: true,
+      sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title", assistant: "claude",
+        status: { state: "idle", work_state: "waiting_session", work_note: workNote,
+          work_provenance: "broker", persona: "" } }] }
+  }
+  const source = statusSource(() => client as never)
+  assert.equal((await source.readMachinePresentations?.(machineID, new AbortController().signal))?.[0]?.status?.work_note,
+    workNote)
+  workNote = "Queued heavy command finished"
+  now += STATUS_GAP_RETRY_MS
+  assert.equal((await source.readMachinePresentations?.(machineID, new AbortController().signal))?.[0]?.status?.work_note,
+    workNote)
+  assert.deepEqual(calls, ["sessions.list:" + machineID, "sessions.list:" + machineID])
+})
+
 test("a stale marker cannot turn an incomplete direct list into a complete one", async () => {
   const { client, row } = clientFixture()
   row.projected_at -= 600

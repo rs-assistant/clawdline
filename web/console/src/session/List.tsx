@@ -225,7 +225,8 @@ function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape
   // enough to deserve words, they ride beside the normal state as a quiet,
   // single-line annotation. A conversation that has not started says
   // neither: there is nothing yet to have a state.
-  const workSaid = notStarted ? "" : L.workStateHTML(row)
+  const workSaid = notStarted || !useLocalTasks && work.state === "waiting_session"
+    ? "" : L.workStateHTML(row)
 
   const waitShape = [
     ...waitingOn.map((wait) => [wait.id || "wait", wait.ownerLabel || wait.ownerSessionId || "", wait.releaseCondition || ""].join(":")),

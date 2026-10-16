@@ -354,7 +354,12 @@ export function statusSource(current: () => StatusClient | null,
       try {
         const direct = before.snapshotGeneration?.startsWith("direct:") ? directLists.get(machineID) : null
         const held = direct?.client === client ? direct.value : null
-        const reply = held && held.projection.snapshotGeneration === before.snapshotGeneration
+        // A direct status fallback may be reused for a minute. Reuse its list
+        // only briefly; otherwise a fresh fleet presentation would keep the
+        // old work note after the local machine list had already moved on.
+        const heldAt = Number(held?.projection.snapshotGeneration?.slice("direct:".length))
+        const reply = held && held.projection.snapshotGeneration === before.snapshotGeneration &&
+          Number.isFinite(heldAt) && (client.now?.() ?? Date.now()) - heldAt < STATUS_GAP_RETRY_MS
           ? held.reply : record(await client.listPresentationsForMachine(machineID, signal))
         const after = await readMachine(machineID, signal)
         if (signal.aborted || current() !== client || after.kind !== "ready" ||
