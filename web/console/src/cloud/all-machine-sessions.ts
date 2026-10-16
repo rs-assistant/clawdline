@@ -173,7 +173,8 @@ export type SessionContent =
       entries: TranscriptEntry[];
       nextBefore?: number;
       question: { text?: string; fingerprint: string; options: { key: string; label: string }[]; observedAt: number } | null }
-  | { kind: "unavailable"; reason: "no_permission" | "old_version" | "unknown" | "offline" | "stale" | "changed" | "unconfirmed" }
+  | { kind: "unavailable"; reason: "no_permission" | "old_version" | "unknown" | "offline" | "stale" | "changed" | "unconfirmed";
+      code?: string }
 
 export type SessionOlderPage =
   | { kind: "ready"; destination: SessionDestination; before: number;

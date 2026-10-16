@@ -92,9 +92,8 @@ import overlaysMarkup from "./schedules/overlays.html?raw"
  * `#root` the first time the section is drawn, which is where the original
  * has them: at body level, after the app. React owns none of them.
  *
- * What fills them is `input/schedule.js` and `input/schedule-history.js`,
- * followed line by line; `legacy/schedules-bridge.ts` says why they cannot be
- * imported. `net/schedules.js`'s lane is here too, for the same reason: it
+ * React fills the form and run-history sheets here. Their retired Swift source
+ * copies have been removed. `net/schedules.js`'s lane is here too: it
  * reads `api` and `S.arrived` and draws through `renderSchedules`, which looks
  * its elements up at import. The pure parts of those files — the rows of a
  * schedule's runs, the project labels, the places cache, Run now's words and

@@ -312,7 +312,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     window.addEventListener("hashchange", followNotification)
     return () => window.removeEventListener("hashchange", followNotification)
   }, [])
-  const [fleetDetailProblem, setFleetDetailProblem] = useState<{ key: string } & FleetDetailProblem | null>(null)
+  const [fleetDetailProblem, setFleetDetailProblem] = useState<({ key: string; retryable?: boolean } & FleetDetailProblem) | null>(null)
+  const fleetDetailRetry = useRef({ key: "", failures: 0 })
   // A detail read that failed for a reason that may pass — a capability not
   // published yet, a status reading still settling — is read again on a press.
   // Without this the first answer was the last one until the whole page was
@@ -1295,7 +1296,11 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     const target = fleetTarget
     const machine = machineNames.current.get(target.machineID) ?? target.machineID
     void liveSessionSource.readDetail(target, abort.signal).then(async (answer) => {
-      if (abort.signal.aborted || answer.kind !== "unavailable") return
+      if (abort.signal.aborted) return
+      if (answer.kind !== "unavailable") {
+        fleetDetailRetry.current = { key, failures: 0 }
+        return
+      }
       // An assistant that restarts keeps its terminal and takes a new
       // generation, so a read pinned to the old one refuses — correctly. What
       // was missing is the way out, so a refused-as-replaced read asks the
@@ -1305,9 +1310,16 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         ? await liveSessionSource.readMachine(target.machineID, abort.signal).catch(() => null)
         : null
       if (abort.signal.aborted) return
-      setFleetDetailProblem({ key, ...fleetDetailAnswer(answer.reason, machine,
-        replaced ? supersedingDestination(target, replaced) : null,
-        { open: openFleetSession, close: closeFleetTarget, again: () => setFleetReadAgain((count) => count + 1) }) })
+      const retryable = answer.code === "command_roster_unreadable"
+      if (retryable) {
+        fleetDetailRetry.current = { key, failures: fleetDetailRetry.current.key === key ? fleetDetailRetry.current.failures + 1 : 1 }
+      }
+      setFleetDetailProblem({ key, retryable, ...(retryable
+        ? { text: nextWord("cloudAllContentRecovering", { machine }),
+          action: { label: nextWord("cloudAllTryAgain"), run: () => setFleetReadAgain((count) => count + 1) } }
+        : fleetDetailAnswer(answer.reason, machine,
+          replaced ? supersedingDestination(target, replaced) : null,
+          { open: openFleetSession, close: closeFleetTarget, again: () => setFleetReadAgain((count) => count + 1) })) })
     }, (error: unknown) => {
       if (!abort.signal.aborted) setFleetDetailProblem({ key, text: L.failureSentence(error, nextWord("cloudAllContentUnknown")) })
     })
@@ -1317,6 +1329,24 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     }
   }, [fleetScope, fleetTarget && destinationKey(fleetTarget), clientEpoch, consoleUp, liveSessionSource, pointAt,
     fleetReadAgain])
+  useEffect(() => {
+    if (!fleetDetailProblem?.retryable || !fleetScope || !fleetTarget ||
+      fleetDetailProblem.key !== destinationKey(fleetTarget)) return
+    const failures = fleetDetailRetry.current.failures
+    const delay = Math.min(30_000, 3_000 * 2 ** Math.min(failures - 1, 4))
+    let timer: number | undefined
+    const retry = () => {
+      if (document.visibilityState === "visible") setFleetReadAgain((count) => count + 1)
+    }
+    const visible = () => {
+      if (document.visibilityState !== "visible") return
+      window.clearTimeout(timer)
+      retry()
+    }
+    timer = window.setTimeout(retry, delay)
+    document.addEventListener("visibilitychange", visible)
+    return () => { window.clearTimeout(timer); document.removeEventListener("visibilitychange", visible) }
+  }, [fleetDetailProblem, fleetScope, fleetTarget && destinationKey(fleetTarget)])
   // A row that has not come is news, not a longer wait. The conversation is
   // read and held by then; what is missing is the Session's own rich row, and
   // only the machine can send it, so the sentence names that machine and the
