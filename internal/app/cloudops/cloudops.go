@@ -274,6 +274,13 @@ func IsRead(plaintext []byte) bool {
 type SessionsStated struct {
 	IDs      []string
 	Complete bool
+	// Row is the s/ payload a `sessions.row` pass published for the Session
+	// asked about, carried in the answer too. On 2026-10-16 a phone pressed
+	// "read again" on a waiting Session, the machine read the menu whole, and
+	// the card kept saying its choices were on their way: the row went out on
+	// s/ while the page held no subscription to it (`fanout=0`), and the
+	// answer only said the row had been asked for. Nil for every other word.
+	Row json.RawMessage
 }
 
 // Vocabulary is every operation word this bridge knows, sorted. It is what a
@@ -525,13 +532,18 @@ func (b Bridge) stateSessions(ctx context.Context, cmd Command, parsed body, p p
 	return b.statedAnswer(cmd, p, stated)
 }
 
-// statedAnswer is `{"sessions":[ids],"complete":bool}`, after the rows went out.
+// statedAnswer is `{"sessions":[ids],"complete":bool}`, after the rows went
+// out, with `"row"` beside them when a `sessions.row` pass had the Session.
 func (b Bridge) statedAnswer(cmd Command, p plan, stated SessionsStated) Answer {
 	ids := stated.IDs
 	if ids == nil {
 		ids = []string{}
 	}
-	body, err := json.Marshal(map[string]any{"sessions": ids, "complete": stated.Complete})
+	answer := map[string]any{"sessions": ids, "complete": stated.Complete}
+	if len(stated.Row) > 0 {
+		answer["row"] = stated.Row
+	}
+	body, err := json.Marshal(answer)
 	if err != nil {
 		return b.publish(cmd, p, Refusal{Status: 502, Code: "read_failed",
 			Message: "This read could not be answered.", fixedCopy: true, Layer: layerRoute}, nil)
