@@ -124,7 +124,7 @@ func TestTaskStartOutboxKeepsRelayEvidenceSeparateFromTargetExecution(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	start := agenthandoff.TaskStart{TaskID: "task-1", RequestID: "request-1",
+	start := agenthandoff.TaskStart{TaskID: "11111111-1111-4111-8111-111111111111", RequestID: "request-1",
 		Source: agenthandoff.Endpoint{MachineID: "machine-a", SessionID: "session-a",
 			ExecutionGeneration: "11111111111111111111111111111111"},
 		TargetMachineID: "machine-b", TargetProjectID: "project-b", PairID: "pair-1",
@@ -142,7 +142,7 @@ func TestTaskStartOutboxKeepsRelayEvidenceSeparateFromTargetExecution(t *testing
 		t.Fatal("same task ID changed its Project")
 	}
 	changed = item
-	changed.Start.TaskID = "task-2"
+	changed.Start.TaskID = "22222222-2222-4222-8222-222222222222"
 	if err := st.SaveTaskStartOutbox(ctx, changed); err == nil {
 		t.Fatal("request ID was reused for another task")
 	}
@@ -178,7 +178,7 @@ func TestRemoteTaskClaimSurvivesRestartAndCannotSwitchExecution(t *testing.T) {
 	}
 	instructions := `{"assistant":"claude","title":"Disk inventory","instructions":"Inspect disk usage without deleting files."}`
 	digest := sha256.Sum256([]byte(instructions))
-	start := agenthandoff.TaskStart{TaskID: "task-1", RequestID: "request-1",
+	start := agenthandoff.TaskStart{TaskID: "11111111-1111-4111-8111-111111111111", RequestID: "request-1",
 		Source: agenthandoff.Endpoint{MachineID: "machine-a", SessionID: "session-a",
 			ExecutionGeneration: "11111111111111111111111111111111"},
 		TargetMachineID: "machine-b", TargetProjectID: "project-b", PairID: "pair-1",
@@ -191,7 +191,7 @@ func TestRemoteTaskClaimSurvivesRestartAndCannotSwitchExecution(t *testing.T) {
 		t.Fatalf("identical replay: %v", err)
 	}
 	changed := task
-	changed.Start.TaskID = "task-2"
+	changed.Start.TaskID = "22222222-2222-4222-8222-222222222222"
 	if err := st.SaveRemoteTask(ctx, changed); err == nil {
 		t.Fatal("same request ID started another task")
 	}

@@ -10,7 +10,7 @@ func validTaskStart() (TaskStart, []byte) {
 	body := []byte(`{"assistant":"claude","title":"Disk inventory","instructions":"Inspect disk usage without deleting files."}`)
 	sum := sha256.Sum256(body)
 	return TaskStart{
-		TaskID: "task-1", RequestID: "request-1",
+		TaskID: "11111111-1111-4111-8111-111111111111", RequestID: "request-1",
 		Source: Endpoint{MachineID: "mac-1", SessionID: "session-1",
 			ExecutionGeneration: "0123456789abcdef0123456789abcdef"},
 		TargetMachineID: "linux-1", TargetProjectID: "clawdline",

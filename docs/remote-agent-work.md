@@ -31,6 +31,11 @@ one target Session. A repeat with identical bytes returns the same task and
 target Session; a repeat with changed bytes is refused. If a claim was made but
 the effect cannot be proved, the outcome is unknown and is not run again.
 
+The task ID is a lowercase UUID. The encrypted body is a closed JSON object
+with `assistant`, `title`, and `instructions`; it cannot supply a target path.
+The target writes a private brief under its own state directory, resolves the
+Project locally, and records the target execution before accepting a finish.
+
 The target records its terminal ID, conversation ID and execution generation.
 Every subsequent message names the task ID and both current executions. A
 replaced source or target execution refuses an old request. Machine pairing
