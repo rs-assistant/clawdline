@@ -1,22 +1,14 @@
 // The schedules' part of the bridge.
 //
-// Six files under `js/` are the Swift app's, byte for byte: `view/schedules.js`
+// Four files under `js/` are the Swift app's, byte for byte: `view/schedules.js`
 // (the list's rows and a schedule's retained runs), `net/schedules.js` (the
 // list's one-minute lane and the project labels), `net/schedule-webhooks.js`
 // (the Cloud webhook panel's words and helpers), `input/schedule-run.js`
-// (Run now's words), `input/schedule.js` (the form) and
-// `input/schedule-history.js` (the run-history sheet).
+// (Run now's words).
 //
-// The last two are here as the text `pages/schedules.tsx` follows line by
-// line — not imported. They cannot be: they bind every listener at import
-// through `core/dom.js`, which looks every id up once, before React has drawn
-// any of them, and they read the page-wide `api` and `S.write` that this
-// console does not set (`net/api.js` stays null here, and setting it for them
-// would change what every other copied module that asks `typeof api.X` sees).
-// `schedule-history.js` also imports `session/open.js` and `input/start.js`,
-// which import the whole page. The copies are kept under the guard so a change
-// to the original turns `tools/check-legacy-css.sh` red and the page is read
-// again.
+// React owns the schedule form and run-history sheet in `pages/schedules.tsx`.
+// Their retired Swift copies were text references during the port and have
+// since been removed.
 //
 // What is imported touches no DOM when it is called: the run rows'
 // renderer and the place lookup (`view/schedules.js` — its three

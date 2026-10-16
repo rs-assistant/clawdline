@@ -492,6 +492,7 @@ const (
 	CloudTerminalRosterRefresh        = "cloud.terminal_roster_refresh_seconds"
 	CloudTerminalRosterDeadline       = "cloud.terminal_roster_deadline_seconds"
 	CloudTerminalRosterRetry          = "cloud.terminal_roster_retry_seconds"
+	CloudRosterShortReadAttempts      = "cloud.roster_short_read_attempts"
 	CloudTerminalUnverifiedRetire     = "cloud.terminal_unverified_retire_seconds"
 	CloudTerminalConnections          = "cloud.terminal_connections"
 	CloudTerminalViewerConnections    = "cloud.terminal_viewer_connections"
@@ -3074,6 +3075,15 @@ func Register() []Entry {
 			Limit: 2, AtLimit: Expire,
 			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/transport/cloud.CloudTerminalRosterDeadlineLimit"},
+		},
+		{
+			// A short authority read may recover one stalled network path
+			// through a fresh connection within the same two-second deadline.
+			// Further failures keep content and terminal access closed.
+			Name: CloudRosterShortReadAttempts, Class: Buffer, Unit: Rows,
+			Limit: 2, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/cloud.RosterShortReadAttemptsLimit"},
 		},
 		{
 			// A failed terminal roster read is read again on the first check

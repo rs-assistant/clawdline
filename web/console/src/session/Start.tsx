@@ -17,10 +17,9 @@ import { removeProjectPlace } from "../pages/work/api.js"
 import { catalogWord } from "../catalog.js"
 
 /**
- * Starting a session, and picking one back up — `input/start.js`, function for
- * function, against the `div#start` sheet below and the `div#starting` band in
- * ./Starting.tsx. The copy it follows is `legacy/js/input/start.js`; see
- * `legacy/start-bridge.ts` for why it is followed rather than imported.
+ * Starting a session, and picking one back up, against the `div#start` sheet
+ * below and the `div#starting` band in ./Starting.tsx. This follows the
+ * retired Swift Start sheet's behavior; that source copy has been removed.
  *
  * It is imperative because the original is: every row, chip and sentence is
  * written into markup React draws once and never redraws, so there is nothing

@@ -4,9 +4,73 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 )
+
+func TestShortRosterReadRetriesAStalledConnectionWithinAuthorityDeadline(t *testing.T) {
+	var reads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if reads.Add(1) == 1 {
+			<-r.Context().Done()
+			return
+		}
+		_, _ = w.Write([]byte(`{"devices":[]}`))
+	}))
+	defer server.Close()
+	roster := NewRoster(server.URL, "machine-credential", time.Now)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := roster.Refresh(ctx); err != nil {
+		t.Fatalf("a fresh connection did not recover the read: %v", err)
+	}
+	if got := reads.Load(); got != 2 {
+		t.Fatalf("roster reads = %d, want two", got)
+	}
+	if readable, _ := roster.Readable(); !readable {
+		t.Fatal("successful retry did not establish a readable roster")
+	}
+}
+
+func TestShortRosterReadStillFailsClosedWhenBothConnectionsStall(t *testing.T) {
+	var reads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reads.Add(1)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	roster := NewRoster(server.URL, "machine-credential", time.Now)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := roster.Refresh(ctx); err == nil {
+		t.Fatal("two stalled connections admitted an unreadable roster")
+	}
+	if got := reads.Load(); got != 2 {
+		t.Fatalf("roster reads = %d, want two bounded attempts", got)
+	}
+	if readable, _ := roster.Readable(); readable {
+		t.Fatal("a failed retry made the roster readable")
+	}
+}
+
+func TestShortRosterReadDoesNotRetryAnHTTPRefusal(t *testing.T) {
+	var reads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		reads.Add(1)
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer server.Close()
+	roster := NewRoster(server.URL, "machine-credential", time.Now)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := roster.Refresh(ctx); err == nil {
+		t.Fatal("a refusal was accepted")
+	}
+	if got := reads.Load(); got != 1 {
+		t.Fatalf("an HTTP refusal caused %d requests, want one", got)
+	}
+}
 
 // The roster is what stands between "this device is paired" and every inbound
 // envelope being counted `unknown_sender`, so what it does with each shape of
