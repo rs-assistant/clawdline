@@ -129,7 +129,8 @@ func TestTaskStartOutboxKeepsRelayEvidenceSeparateFromTargetExecution(t *testing
 			ExecutionGeneration: "11111111111111111111111111111111"},
 		TargetMachineID: "machine-b", TargetProjectID: "project-b", PairID: "pair-1",
 		BodyDigest: "a" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-	item := TaskStartOutboxItem{Start: start, RelayAccepted: "unknown", RelayDelivered: "unknown", At: time.Now()}
+	item := TaskStartOutboxItem{Start: start, Frame: []byte(`{"sealed":"first"}`),
+		RelayAccepted: "unknown", RelayDelivered: "unknown", At: time.Now()}
 	if err := st.SaveTaskStartOutbox(ctx, item); err != nil {
 		t.Fatal(err)
 	}
@@ -140,6 +141,11 @@ func TestTaskStartOutboxKeepsRelayEvidenceSeparateFromTargetExecution(t *testing
 	changed.Start.TargetProjectID = "project-c"
 	if err := st.SaveTaskStartOutbox(ctx, changed); err == nil {
 		t.Fatal("same task ID changed its Project")
+	}
+	changed = item
+	changed.Frame = []byte(`{"sealed":"different"}`)
+	if err := st.SaveTaskStartOutbox(ctx, changed); err == nil {
+		t.Fatal("same task ID changed its signed frame")
 	}
 	changed = item
 	changed.Start.TaskID = "22222222-2222-4222-8222-222222222222"
@@ -161,7 +167,8 @@ func TestTaskStartOutboxKeepsRelayEvidenceSeparateFromTargetExecution(t *testing
 	}
 	defer st.Close()
 	saved, err := st.TaskStartOutboxByRequest(ctx, start.RequestID)
-	if err != nil || saved.Start != start || saved.RelayDelivered != "unknown" || !saved.RelayConflict {
+	if err != nil || saved.Start != start || string(saved.Frame) != string(item.Frame) ||
+		saved.RelayDelivered != "delivered" || saved.RelayConflict {
 		t.Fatalf("outbox after restart: %+v, %v", saved, err)
 	}
 	if usage, err := ReadUsage(ctx, dir); err != nil || usage.Outbox != 1 {

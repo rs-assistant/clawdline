@@ -155,6 +155,14 @@ func (l *Link) PublishTaskStart(ctx context.Context, start peercontract.TaskStar
 		return answer, err
 	}
 	defer st.Close()
+	if prior, err := st.TaskStartOutbox(ctx, start.TaskID); err == nil {
+		if prior.Start != start {
+			return answer, errors.New("peer_task_start_outbox_conflict")
+		}
+		return l.RetryTaskStart(ctx, start.TaskID)
+	} else if !errors.Is(err, peerstore.ErrNotFound) {
+		return answer, err
+	}
 	pair, err := st.Pair(ctx, start.PairID)
 	if err != nil || pair.SourceMachineID != l.identity.MachineID ||
 		pair.TargetMachineID != start.TargetMachineID || pair.TargetSignature == "" ||
@@ -189,13 +197,60 @@ func (l *Link) PublishTaskStart(ctx context.Context, start peercontract.TaskStar
 		return answer, err
 	}
 	if err := st.SaveTaskStartOutbox(ctx, peerstore.TaskStartOutboxItem{Start: start,
-		RelayAccepted: "unknown", RelayDelivered: "unknown", At: l.opts.Now()}); err != nil {
+		Frame: frame, RelayAccepted: "unknown", RelayDelivered: "unknown", At: l.opts.Now()}); err != nil {
 		return answer, err
 	}
 	if err := l.transport.PublishPeerTaskStart(frame); err != nil {
 		return answer, err
 	}
 	return answer, nil
+}
+
+// RetryTaskStart resends the same signed ciphertext after checking the source
+// execution and the pair again. It never creates a second task or request ID.
+func (l *Link) RetryTaskStart(ctx context.Context, taskID string) (TaskStartSubmission, error) {
+	answer := TaskStartSubmission{TaskID: taskID, RelayAccepted: "unknown",
+		RelayDelivered: "unknown", MachineExecution: "unknown"}
+	if l.transport == nil || l.keys == nil || l.opts.PeerAdmitTarget == nil || !l.allowCommands() {
+		return answer, errors.New("peer_task_start_unavailable")
+	}
+	st, err := peerstore.Open(l.keys.Dir())
+	if err != nil {
+		return answer, err
+	}
+	defer st.Close()
+	item, err := st.TaskStartOutbox(ctx, taskID)
+	if err != nil {
+		return answer, err
+	}
+	start := item.Start
+	answer.RequestID = start.RequestID
+	answer.RelayAccepted, answer.RelayDelivered = item.RelayAccepted, item.RelayDelivered
+	if len(item.Frame) == 0 || start.Source.MachineID != l.identity.MachineID {
+		return answer, errors.New("peer_task_start_frame_unavailable")
+	}
+	if err := l.opts.PeerAdmitTarget(ctx, start.Source.MachineID,
+		start.Source.SessionID, start.Source.ExecutionGeneration); err != nil {
+		return answer, err
+	}
+	pair, err := st.Pair(ctx, start.PairID)
+	if err != nil || pair.SourceMachineID != l.identity.MachineID ||
+		pair.TargetMachineID != start.TargetMachineID || pair.TargetSignature == "" ||
+		!pair.RevokedAt.IsZero() || !l.opts.Now().Before(pair.ExpiresAt) {
+		return answer, errors.New("peer_pair_inactive")
+	}
+	key, found, err := l.keys.DeviceKey()
+	if err != nil || !found || !key.Valid() || key.Fingerprint() != pair.SourceFingerprint {
+		return answer, errors.New("peer_signer_changed")
+	}
+	auth, err := adaptercloud.NewAccountClient(l.settings.APIBase).AuthorizePeerTaskStart(ctx,
+		l.identity.MachineCredential, start, pair.SourcePublicKey)
+	if err != nil || !auth.Authorized || auth.SourcePublicKey != pair.SourcePublicKey ||
+		auth.SourceKeyFingerprint != pair.SourceFingerprint ||
+		auth.TargetMachineID != start.TargetMachineID || auth.PairID != start.PairID {
+		return answer, errors.New("peer_authority_unavailable")
+	}
+	return answer, l.transport.PublishPeerTaskStart(item.Frame)
 }
 
 func (l *Link) receivePeerTaskStart(ctx context.Context, raw []byte) {

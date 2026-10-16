@@ -86,6 +86,7 @@ type OutboxItem struct {
 // does not claim that the target machine opened a Session or observed work.
 type TaskStartOutboxItem struct {
 	Start          agenthandoff.TaskStart `json:"start"`
+	Frame          []byte                 `json:"frame"`
 	RelayAccepted  string                 `json:"relay_accepted"`
 	RelayDelivered string                 `json:"relay_delivered"`
 	RelayConflict  bool                   `json:"relay_conflict,omitempty"`
@@ -511,7 +512,7 @@ func (s *Store) SaveTaskStartOutbox(ctx context.Context, item TaskStartOutboxIte
 	}
 	prior, err := s.TaskStartOutbox(ctx, item.Start.TaskID)
 	if err == nil {
-		if prior.Start == item.Start {
+		if prior.Start == item.Start && string(prior.Frame) == string(item.Frame) {
 			return nil
 		}
 		return errors.New("peer_task_start_outbox_conflict")
@@ -574,10 +575,9 @@ func (s *Store) MarkTaskStartOutbox(ctx context.Context, id, delivered string) e
 		return errors.New("peer_task_start_outbox_status_invalid")
 	}
 	item.RelayAccepted = "accepted"
-	if item.RelayConflict || item.RelayDelivered != "unknown" && item.RelayDelivered != delivered {
-		item.RelayDelivered = "unknown"
-		item.RelayConflict = true
-	} else {
+	// A later successful retry establishes that at least one socket delivery
+	// occurred. A later offline attempt cannot erase that earlier evidence.
+	if delivered == "delivered" || item.RelayDelivered != "delivered" {
 		item.RelayDelivered = delivered
 	}
 	return s.replace(ctx, "peer_task_starts", id, item)
