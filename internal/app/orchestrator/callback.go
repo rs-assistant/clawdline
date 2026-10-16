@@ -110,6 +110,10 @@ func CallbackEnvNames() []string {
 
 // Callback is the command a callback runs and what became of it.
 type Callback struct {
+	// CallingSessionID is the terminal Session that handed this command to the
+	// daemon. Root.SessionID identifies its conversation, which can later be
+	// opened in another terminal; keep the original Session for coordination.
+	CallingSessionID string `json:"calling_session_id,omitempty"`
 	// Intent is declared when the callback is created. An older callback with
 	// no intent is treated as a wait, never as proof of heavy work.
 	Intent string            `json:"intent,omitempty"`
@@ -316,6 +320,7 @@ func (b *Broker) StartCallback(ctx context.Context, req CallbackRequest) (Dispat
 		return Dispatched{}, err
 	}
 	record.RootTerminalID = rootTerminal
+	record.Callback.CallingSessionID = rootTerminal
 
 	live, err := b.liveTasks(ctx)
 	if err != nil {

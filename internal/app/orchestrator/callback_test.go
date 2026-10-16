@@ -78,7 +78,13 @@ func TestACallbackSettlesOnItsExitAndOwesItsRootANotice(t *testing.T) {
 				out.Record.Kind != TaskKindCallback || out.Record.Callback.Intent != CallbackIntentWait {
 				t.Fatalf("started as %+v", out.Record)
 			}
+			if out.Record.Callback.CallingSessionID == "" || out.Record.Callback.CallingSessionID != out.Record.RootTerminalID {
+				t.Fatalf("callback caller %q, resolved session %q", out.Record.Callback.CallingSessionID, out.Record.RootTerminalID)
+			}
 			r := settledWithin(t, b, ctx, id, 10*time.Second)
+			if r.Callback.CallingSessionID != out.Record.Callback.CallingSessionID {
+				t.Fatalf("stored callback caller %q, want %q", r.Callback.CallingSessionID, out.Record.Callback.CallingSessionID)
+			}
 			if r.State != tc.state {
 				t.Fatalf("state %s, want %s: %s", r.State, tc.state, r.Verdict)
 			}
