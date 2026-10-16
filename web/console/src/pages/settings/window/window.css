@@ -288,47 +288,6 @@
 /* SwitchView is in switch.css, which controls.tsx loads with it: the console's
    Settings pages draw the same switch. */
 
-/* ChoicePopUp: sized to its contents, then clamped between 130 and 210. */
-.sw-popup {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.sw-popup select {
-  appearance: none;
-  min-width: 130px;
-  max-width: 210px;
-  height: 25px;
-  padding: 0 24px 0 9px;
-  border-radius: 6px;
-  border: 1px solid var(--sw-chip-edge);
-  background: var(--sw-chip-fill);
-  color: var(--sw-label);
-  font: 12px/1 inherit;
-  cursor: pointer;
-  text-overflow: ellipsis;
-}
-.sw-popup select:disabled {
-  opacity: 0.36;
-  cursor: default;
-}
-.sw-popup select:focus-visible {
-  outline: 1px solid rgba(217, 119, 87, 0.55);
-  outline-offset: 2px;
-}
-.sw-popup option {
-  background: var(--sw-ink);
-  color: var(--sw-label);
-}
-.sw-popup-mark {
-  position: absolute;
-  right: 8px;
-  width: 8px;
-  height: 10px;
-  color: var(--sw-soft);
-  pointer-events: none;
-}
-
 /* ValueSlider: a 142pt track and a 56pt right-aligned readout, 206 in all. */
 .sw-slider {
   display: inline-flex;
