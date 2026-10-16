@@ -82,6 +82,16 @@ type OutboxItem struct {
 	At             time.Time            `json:"at"`
 }
 
+// TaskStartOutboxItem records source-side submission and relay evidence. It
+// does not claim that the target machine opened a Session or observed work.
+type TaskStartOutboxItem struct {
+	Start          agenthandoff.TaskStart `json:"start"`
+	RelayAccepted  string                 `json:"relay_accepted"`
+	RelayDelivered string                 `json:"relay_delivered"`
+	RelayConflict  bool                   `json:"relay_conflict,omitempty"`
+	At             time.Time              `json:"at"`
+}
+
 type Store struct{ db *sql.DB }
 
 func Open(dir string) (*Store, error) {
@@ -120,6 +130,7 @@ func Open(dir string) (*Store, error) {
 		"CREATE TABLE IF NOT EXISTS peer_inbox (id TEXT PRIMARY KEY, target_session TEXT NOT NULL, body BLOB NOT NULL)",
 		"CREATE INDEX IF NOT EXISTS peer_inbox_target ON peer_inbox(target_session)",
 		"CREATE TABLE IF NOT EXISTS peer_outbox (id TEXT PRIMARY KEY, body BLOB NOT NULL)",
+		"CREATE TABLE IF NOT EXISTS peer_task_starts (id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, body BLOB NOT NULL)",
 	} {
 		if _, err := db.Exec(statement); err != nil {
 			db.Close()
@@ -151,7 +162,8 @@ func ReadUsage(ctx context.Context, dir string) (Usage, error) {
 	var usage Usage
 	err = st.db.QueryRowContext(ctx, `SELECT
 		(SELECT COUNT(*) FROM peer_pairs), (SELECT COUNT(*) FROM peer_grants),
-		(SELECT COUNT(*) FROM peer_inbox), (SELECT COUNT(*) FROM peer_outbox)`).
+		(SELECT COUNT(*) FROM peer_inbox),
+		(SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts)`).
 		Scan(&usage.Pairs, &usage.Grants, &usage.Inbox, &usage.Outbox)
 	return usage, err
 }
@@ -478,6 +490,85 @@ func (s *Store) MarkOutbox(ctx context.Context, id, accepted, delivered string) 
 	return s.replace(ctx, "peer_outbox", id, item)
 }
 
+func (s *Store) SaveTaskStartOutbox(ctx context.Context, item TaskStartOutboxItem) error {
+	if item.Start.TaskID == "" || item.Start.RequestID == "" || item.At.IsZero() ||
+		item.RelayAccepted != "unknown" || item.RelayDelivered != "unknown" {
+		return errors.New("peer_task_start_outbox_invalid")
+	}
+	prior, err := s.TaskStartOutbox(ctx, item.Start.TaskID)
+	if err == nil {
+		if prior.Start == item.Start {
+			return nil
+		}
+		return errors.New("peer_task_start_outbox_conflict")
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return err
+	}
+	encoded, err := json.Marshal(item)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var count int
+	if err := tx.QueryRowContext(ctx,
+		"SELECT (SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts)").Scan(&count); err != nil {
+		return err
+	}
+	if count >= OutboxLimit {
+		return ErrFull
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO peer_task_starts(id,request_id,body) VALUES(?,?,?)",
+		item.Start.TaskID, item.Start.RequestID, encoded); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) TaskStartOutbox(ctx context.Context, id string) (TaskStartOutboxItem, error) {
+	var item TaskStartOutboxItem
+	err := s.db.QueryRowContext(ctx, "SELECT body FROM peer_task_starts WHERE id=?", id).
+		Scan(&pairBody{into: &item})
+	if errors.Is(err, sql.ErrNoRows) {
+		return TaskStartOutboxItem{}, ErrNotFound
+	}
+	return item, err
+}
+
+func (s *Store) TaskStartOutboxByRequest(ctx context.Context, requestID string) (TaskStartOutboxItem, error) {
+	var item TaskStartOutboxItem
+	err := s.db.QueryRowContext(ctx, "SELECT body FROM peer_task_starts WHERE request_id=?", requestID).
+		Scan(&pairBody{into: &item})
+	if errors.Is(err, sql.ErrNoRows) {
+		return TaskStartOutboxItem{}, ErrNotFound
+	}
+	return item, err
+}
+
+func (s *Store) MarkTaskStartOutbox(ctx context.Context, id, delivered string) error {
+	item, err := s.TaskStartOutbox(ctx, id)
+	if err != nil {
+		return err
+	}
+	switch delivered {
+	case "delivered", "machine_offline", "unknown":
+	default:
+		return errors.New("peer_task_start_outbox_status_invalid")
+	}
+	item.RelayAccepted = "accepted"
+	if item.RelayConflict || item.RelayDelivered != "unknown" && item.RelayDelivered != delivered {
+		item.RelayDelivered = "unknown"
+		item.RelayConflict = true
+	} else {
+		item.RelayDelivered = delivered
+	}
+	return s.replace(ctx, "peer_task_starts", id, item)
+}
+
 func (s *Store) insert(ctx context.Context, table string, limit int, id, pairID string, value any) error {
 	encoded, err := json.Marshal(value)
 	if err != nil {
@@ -489,7 +580,11 @@ func (s *Store) insert(ctx context.Context, table string, limit int, id, pairID 
 	}
 	defer tx.Rollback()
 	var count int
-	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+table).Scan(&count); err != nil {
+	countQuery := "SELECT COUNT(*) FROM " + table
+	if table == "peer_outbox" {
+		countQuery = "SELECT (SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts)"
+	}
+	if err := tx.QueryRowContext(ctx, countQuery).Scan(&count); err != nil {
 		return err
 	}
 	if count >= limit {

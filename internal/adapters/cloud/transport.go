@@ -62,8 +62,10 @@ type Options struct {
 	DirectInbound func(cloud.Envelope, []byte, ed25519.PublicKey)
 	// PeerInbound receives opaque machine-to-machine frames. It must enqueue
 	// rather than perform a Cloud authorization read on the socket reader.
-	PeerInbound func([]byte)
-	PeerAck     func([]byte)
+	PeerInbound          func([]byte)
+	PeerAck              func([]byte)
+	PeerTaskStartInbound func([]byte)
+	PeerTaskStartAck     func([]byte)
 	// OnDisconnect invalidates terminal connection registrations tied to this socket.
 	OnDisconnect func()
 	// OnSettled receives the correlated relay outcome after the spool settles it.
@@ -501,6 +503,16 @@ func (t *Transport) handle(conn *Conn, data []byte) error {
 			t.opts.PeerInbound(data)
 		}
 		return nil
+	case "peer_task_start_envelope":
+		if t.opts.PeerTaskStartInbound != nil {
+			t.opts.PeerTaskStartInbound(data)
+		}
+		return nil
+	case "peer_task_start_ack":
+		if t.opts.PeerTaskStartAck != nil {
+			t.opts.PeerTaskStartAck(data)
+		}
+		return nil
 	case "peer_ack":
 		if t.opts.PeerAck != nil {
 			t.opts.PeerAck(data)
@@ -775,11 +787,19 @@ func (t *Transport) Publish(envelope []byte) error {
 const PeerFrameBytesLimit = 1 << 20
 
 func (t *Transport) PublishPeer(frame []byte) error {
+	return t.publishPeerFrame(frame, "peer_publish")
+}
+
+func (t *Transport) PublishPeerTaskStart(frame []byte) error {
+	return t.publishPeerFrame(frame, "peer_task_start_publish")
+}
+
+func (t *Transport) publishPeerFrame(frame []byte, expectedType string) error {
 	if len(frame) == 0 || len(frame) > PeerFrameBytesLimit || !json.Valid(frame) {
 		return errors.New("peer_frame_invalid")
 	}
 	var header frameHeader
-	if json.Unmarshal(frame, &header) != nil || header.Type != "peer_publish" {
+	if json.Unmarshal(frame, &header) != nil || header.Type != expectedType {
 		return errors.New("peer_frame_invalid")
 	}
 	t.mu.Lock()

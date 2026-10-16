@@ -28,6 +28,8 @@ The account roster and the machine's local pinned-device record are distinct evi
 
 Machine-to-machine Agent messages and work handoffs require a signed, revocable machine pair in each allowed direction. A Cloud account or viewer pairing alone does not grant one machine authority to act as another machine's Agent. Each request still names exact source and target Session executions; the receiver checks the current execution before applying work. The admission and receipt contract is in [cross-machine Agent handoff](cross-machine-agent-handoff.md).
 
+An Agent-owned cross-machine task also needs a machine-targeted start before a target Session exists and a durable result path back to the source Session. Its contract and acceptance scenario are in [remote Agent work](remote-agent-work.md).
+
 The hosted Console's **Cross-machine access** sidebar page lists the machines and one switch per machine pair. Turning it on establishes signed pairs in both directions, allowing all current Sessions on those two machines to exchange Agent messages and hand off work. Turning it off revokes both directions. The page reads both machines and shows a connection only when their fresh, locally pinned records agree; a partial result has a recovery action. An offline, unpaired, unreadable, or write-disabled machine cannot be changed from the page. Pairing this browser as a viewer remains a separate prerequisite in the machine switcher. Legacy Session grants are retained for in-flight compatibility but are not part of this setting flow.
 
 ## Publications, reads and commands

@@ -191,6 +191,10 @@ type LinkOptions struct {
 	PeerReceipts    peerapp.Receipts
 	PeerAdmitTarget func(context.Context, string, string, string) error
 	PeerExecute     func(context.Context, peercontract.Request, []byte) error
+	// PeerTaskStartFacts and PeerTaskStartOpen are target-owned seams. Without
+	// both, machine-targeted starts remain closed even if the relay delivers one.
+	PeerTaskStartFacts func(context.Context, peercontract.TaskStart, peercontract.Principal) (peercontract.TaskStartFacts, error)
+	PeerTaskStartOpen  func(context.Context, peercontract.TaskStart, []byte) (string, string, error)
 	// Authorize stamps the credential the gate judges an in-process request by.
 	Authorize func(*http.Request)
 	// Version is this build, for the machine registration record.
@@ -698,21 +702,23 @@ func (l *Link) wire() error {
 			Client:     adaptercloud.NewAccountClient(settings.APIBase),
 			Credential: identity.MachineCredential,
 		},
-		Identity:      identity,
-		Signer:        key,
-		Spool:         spool,
-		Status:        status,
-		Replay:        domaincloud.NewReplayWindow(0),
-		Inbound:       l.relay.Deliver,
-		DirectInbound: l.relay.DeliverDirect,
-		PeerInbound:   l.enqueuePeer,
-		PeerAck:       l.enqueuePeerAck,
-		OnDisconnect:  l.closeAllTerminalConnections,
-		OnSettled:     l.terminalReceiptSettled,
-		PublicKeyFor:  l.publicKeyFor,
-		ContentKey:    secret,
-		Log:           func(line string) { l.logf("%s", line) },
-		Now:           opts.Now,
+		Identity:             identity,
+		Signer:               key,
+		Spool:                spool,
+		Status:               status,
+		Replay:               domaincloud.NewReplayWindow(0),
+		Inbound:              l.relay.Deliver,
+		DirectInbound:        l.relay.DeliverDirect,
+		PeerInbound:          l.enqueuePeer,
+		PeerAck:              l.enqueuePeerAck,
+		PeerTaskStartInbound: l.enqueuePeer,
+		PeerTaskStartAck:     l.enqueuePeerAck,
+		OnDisconnect:         l.closeAllTerminalConnections,
+		OnSettled:            l.terminalReceiptSettled,
+		PublicKeyFor:         l.publicKeyFor,
+		ContentKey:           secret,
+		Log:                  func(line string) { l.logf("%s", line) },
+		Now:                  opts.Now,
 	})
 	if err != nil {
 		return err
