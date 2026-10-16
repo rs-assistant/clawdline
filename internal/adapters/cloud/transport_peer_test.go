@@ -12,6 +12,7 @@ func TestPeerFramesNeverEnterViewerEnvelopeCallback(t *testing.T) {
 	var ingress, ack []byte
 	var taskIngress, taskAck []byte
 	var probeIngress, probeAck []byte
+	var eventIngress, eventAck []byte
 	transport := &Transport{opts: Options{
 		PeerInbound:          func(frame []byte) { ingress = append([]byte(nil), frame...) },
 		PeerAck:              func(frame []byte) { ack = append([]byte(nil), frame...) },
@@ -19,6 +20,8 @@ func TestPeerFramesNeverEnterViewerEnvelopeCallback(t *testing.T) {
 		PeerTaskStartAck:     func(frame []byte) { taskAck = append([]byte(nil), frame...) },
 		PeerTaskProbeInbound: func(frame []byte) { probeIngress = append([]byte(nil), frame...) },
 		PeerTaskProbeAck:     func(frame []byte) { probeAck = append([]byte(nil), frame...) },
+		PeerTaskEventInbound: func(frame []byte) { eventIngress = append([]byte(nil), frame...) },
+		PeerTaskEventAck:     func(frame []byte) { eventAck = append([]byte(nil), frame...) },
 		Inbound: func(_ domaincloud.Envelope, _ []byte, _ ed25519.PublicKey) {
 			t.Fatal("machine peer traffic entered the viewer envelope lane")
 		},
@@ -48,5 +51,13 @@ func TestPeerFramesNeverEnterViewerEnvelopeCallback(t *testing.T) {
 	probeReceipt := []byte(`{"type":"peer_task_probe_ack","status":"delivered"}`)
 	if err := transport.handle(nil, probeReceipt); err != nil || !bytes.Equal(probeAck, probeReceipt) {
 		t.Fatalf("probe ack = %q, %v", probeAck, err)
+	}
+	event := []byte(`{"type":"peer_task_event_envelope","event":{}}`)
+	if err := transport.handle(nil, event); err != nil || !bytes.Equal(eventIngress, event) {
+		t.Fatalf("event ingress = %q, %v", eventIngress, err)
+	}
+	eventReceipt := []byte(`{"type":"peer_task_event_ack","status":"delivered"}`)
+	if err := transport.handle(nil, eventReceipt); err != nil || !bytes.Equal(eventAck, eventReceipt) {
+		t.Fatalf("event ack = %q, %v", eventAck, err)
 	}
 }

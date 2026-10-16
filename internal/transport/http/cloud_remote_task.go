@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -71,4 +72,30 @@ func (s *Server) PeerTaskStartOpen(ctx context.Context, start agenthandoff.TaskS
 		return "", "", err
 	}
 	return terminalID, generation, nil
+}
+
+// PeerTaskNotice wakes the exact source execution with an idempotent broker
+// message. It carries only a task ID; the Agent reads the durable result from
+// the local daemon before reporting anything to the person.
+func (s *Server) PeerTaskNotice(ctx context.Context, start agenthandoff.TaskStart) error {
+	if s.broker == nil || start.Source.MachineID != s.executionMachine() {
+		return errors.New("peer_task_notice_unavailable")
+	}
+	if err := s.AdmitExecutionTarget(ctx, start.Source.MachineID,
+		start.Source.SessionID, start.Source.ExecutionGeneration); err != nil {
+		return err
+	}
+	body, err := json.Marshal(struct {
+		Protocol string `json:"protocol"`
+		Kind     string `json:"kind"`
+		TaskID   string `json:"task_id"`
+		ReadWith string `json:"read_with"`
+	}{Protocol: "clawdline.remote_notice", Kind: "finished", TaskID: start.TaskID,
+		ReadWith: "clawdline remote show " + start.TaskID})
+	if err != nil {
+		return err
+	}
+	_, err = s.broker.RemoteTaskNotice(ctx, start.Source.SessionID,
+		string(body), "remote-task-finish-"+start.TaskID)
+	return err
 }

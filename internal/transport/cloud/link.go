@@ -197,6 +197,7 @@ type LinkOptions struct {
 	PeerTaskStartFacts func(context.Context, peercontract.TaskStart, peercontract.Principal) (peercontract.TaskStartFacts, error)
 	PeerTaskStartOpen  func(context.Context, peercontract.TaskStart, []byte) (string, string, error)
 	PeerTaskProject    func(context.Context, string) (string, bool)
+	PeerTaskNotice     func(context.Context, peercontract.TaskStart) error
 	// Authorize stamps the credential the gate judges an in-process request by.
 	Authorize func(*http.Request)
 	// Version is this build, for the machine registration record.
@@ -720,6 +721,8 @@ func (l *Link) wire() error {
 		PeerTaskStartAck:     l.enqueuePeerAck,
 		PeerTaskProbeInbound: l.enqueuePeer,
 		PeerTaskProbeAck:     l.enqueuePeerAck,
+		PeerTaskEventInbound: l.enqueuePeer,
+		PeerTaskEventAck:     l.enqueuePeerAck,
 		OnDisconnect:         l.closeAllTerminalConnections,
 		OnSettled:            l.terminalReceiptSettled,
 		PublicKeyFor:         l.publicKeyFor,
@@ -910,6 +913,9 @@ func (l *Link) runOnce(ctx context.Context) error {
 	go func() { defer close(taskDone); l.runTaskStarts(peerCtx) }()
 	go func() { defer close(probeDone); l.runTaskProbes(peerCtx) }()
 	defer func() { stopPeer(); <-taskDone; <-probeDone }()
+	noticeDone := make(chan struct{})
+	go func() { defer close(noticeDone); l.runTaskNotices(peerCtx) }()
+	defer func() { stopPeer(); <-noticeDone }()
 	l.terminalRequests = make(chan Inbound, CloudTerminalIngressLimit)
 	l.terminalLists = make(chan Inbound, CloudTerminalListIngressLimit)
 	l.terminalRefusals = make(chan Inbound, CloudTerminalRefusalsLimit)

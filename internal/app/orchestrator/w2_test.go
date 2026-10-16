@@ -70,6 +70,24 @@ func typedLines(t *testing.T, dir string) int {
 	return strings.Count(string(body), "\n")
 }
 
+func TestRemoteTaskCompletionWakesItsOwnSourceExactlyOnce(t *testing.T) {
+	dir := t.TempDir()
+	b, st := w2Broker(t, dir)
+	defer st.Close()
+	ctx := context.Background()
+	if _, err := b.Relay(ctx, Message{From: w2Source, To: w2Source, Text: "ordinary"}, "ordinary"); refusalCode(err) != "same_session" {
+		t.Fatalf("ordinary self-send refusal: %v", err)
+	}
+	first, err := b.RemoteTaskNotice(ctx, w2Source, "task finished", "remote-task-finish-task-1")
+	if err != nil || first.Replayed {
+		t.Fatalf("first completion wake: %+v, %v", first, err)
+	}
+	second, err := b.RemoteTaskNotice(ctx, w2Source, "task finished", "remote-task-finish-task-1")
+	if err != nil || !second.Replayed || typedLines(t, dir) != 1 {
+		t.Fatalf("retry completion wake: %+v, %v; typed %d", second, err, typedLines(t, dir))
+	}
+}
+
 // TestW2HelperProcess is not a test. It is the process ② kills: it relays one
 // message with the fault seam set to kill it at the point named, and never
 // returns normally.

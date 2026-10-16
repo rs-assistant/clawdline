@@ -68,6 +68,8 @@ type Options struct {
 	PeerTaskStartAck     func([]byte)
 	PeerTaskProbeInbound func([]byte)
 	PeerTaskProbeAck     func([]byte)
+	PeerTaskEventInbound func([]byte)
+	PeerTaskEventAck     func([]byte)
 	// OnDisconnect invalidates terminal connection registrations tied to this socket.
 	OnDisconnect func()
 	// OnSettled receives the correlated relay outcome after the spool settles it.
@@ -520,6 +522,16 @@ func (t *Transport) handle(conn *Conn, data []byte) error {
 			t.opts.PeerTaskProbeAck(data)
 		}
 		return nil
+	case "peer_task_event_envelope":
+		if t.opts.PeerTaskEventInbound != nil {
+			t.opts.PeerTaskEventInbound(data)
+		}
+		return nil
+	case "peer_task_event_ack":
+		if t.opts.PeerTaskEventAck != nil {
+			t.opts.PeerTaskEventAck(data)
+		}
+		return nil
 	case "peer_task_start_ack":
 		if t.opts.PeerTaskStartAck != nil {
 			t.opts.PeerTaskStartAck(data)
@@ -808,6 +820,10 @@ func (t *Transport) PublishPeerTaskStart(frame []byte) error {
 
 func (t *Transport) PublishPeerTaskProbe(frame []byte) error {
 	return t.publishPeerFrame(frame, "peer_task_probe_publish")
+}
+
+func (t *Transport) PublishPeerTaskEvent(frame []byte) error {
+	return t.publishPeerFrame(frame, "peer_task_event_publish")
 }
 
 func (t *Transport) publishPeerFrame(frame []byte, expectedType string) error {

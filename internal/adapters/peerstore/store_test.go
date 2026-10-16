@@ -176,6 +176,64 @@ func TestTaskStartOutboxKeepsRelayEvidenceSeparateFromTargetExecution(t *testing
 	}
 }
 
+func TestTaskEventsSurviveRestartAndCannotSwitchTheTargetExecution(t *testing.T) {
+	ctx := context.Background()
+	dir := filepath.Join(t.TempDir(), "private-peers")
+	st, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := agenthandoff.TaskStart{TaskID: "11111111-1111-4111-8111-111111111111", RequestID: "request-1",
+		Source: agenthandoff.Endpoint{MachineID: "source", SessionID: "source-session",
+			ExecutionGeneration: "11111111111111111111111111111111"},
+		TargetMachineID: "target", TargetProjectID: "project", PairID: "pair",
+		BodyDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	item := TaskStartOutboxItem{Start: start, Frame: []byte(`{"sealed":"start"}`),
+		RelayAccepted: "unknown", RelayDelivered: "unknown", At: time.Now()}
+	if err := st.SaveTaskStartOutbox(ctx, item); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MarkTaskStartOpened(ctx, start.TaskID, "target-session", "22222222222222222222222222222222"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MarkTaskStartOpened(ctx, start.TaskID, "target-session", "33333333333333333333333333333333"); err == nil {
+		t.Fatal("a second target execution replaced the first")
+	}
+	body := "Inventory complete."
+	sum := sha256.Sum256([]byte(body))
+	event := agenthandoff.TaskEvent{Start: start, RequestID: "finish-1", Kind: agenthandoff.TaskEventFinish,
+		Sender: agenthandoff.Endpoint{MachineID: "target", SessionID: "target-session",
+			ExecutionGeneration: "22222222222222222222222222222222"},
+		Recipient: start.Source, BodyDigest: hex.EncodeToString(sum[:])}
+	record := TaskEventRecord{Event: event, Direction: "in", Body: body, At: time.Now()}
+	if err := st.SaveTaskEvent(ctx, record); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveTaskEvent(ctx, record); err != nil {
+		t.Fatalf("identical retry: %v", err)
+	}
+	changed := record
+	changed.Body = "different result"
+	if err := st.SaveTaskEvent(ctx, changed); err == nil {
+		t.Fatal("one request ID changed its result")
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	st, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	rows, err := st.TaskEvents(ctx, start.TaskID)
+	if err != nil || len(rows) != 1 || rows[0].Body != body {
+		t.Fatalf("task result after restart: %+v, %v", rows, err)
+	}
+	if usage, err := ReadUsage(ctx, dir); err != nil || usage.Inbox != 1 || usage.Outbox != 1 {
+		t.Fatalf("event capacity usage: %+v, %v", usage, err)
+	}
+}
+
 func TestRemoteTaskClaimSurvivesRestartAndCannotSwitchExecution(t *testing.T) {
 	ctx := context.Background()
 	dir := filepath.Join(t.TempDir(), "private-peers")
