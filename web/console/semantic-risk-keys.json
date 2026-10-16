@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5322,
+  "englishKeys": 5320,
   "counts": {
     "negation": 1517,
     "state": 736,
-    "permission": 340,
+    "permission": 338,
     "deletion": 110,
     "uncertainty": 155
   },
-  "unionCount": 2347,
+  "unionCount": 2345,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -2558,8 +2558,6 @@
       "next.terminalRefusalAccessRevoked",
       "next.terminalRefusalCloudNotSupported",
       "next.terminalRefusalForbidden",
-      "plan.devicesMany",
-      "plan.devicesOne",
       "plan.fine",
       "plan.machinesMany",
       "plan.machinesOne",
@@ -4917,8 +4915,6 @@
     "next.worktreeRemoveFailed",
     "next.worktreeRemoveRisk",
     "next.worktreeRemoveTitle",
-    "plan.devicesMany",
-    "plan.devicesOne",
     "plan.fine",
     "plan.machinesMany",
     "plan.machinesOne",

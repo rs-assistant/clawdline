@@ -5317,10 +5317,8 @@
   "plan.freePitch": "Control one machine from your phone, free.",
   "plan.machinesOne": "{arg0} paired machine",
   "plan.machinesMany": "Up to {arg0} paired machines",
-  "plan.devicesOne": "{arg0} paired phone or browser",
-  "plan.devicesMany": "{arg0} paired phones or browsers",
   "plan.control": "View and control Sessions from your phone",
   "plan.push": "Browser push notifications",
   "plan.webhooks": "Start saved schedules by webhook",
-  "plan.fine": "Local Sessions, the Board and built-in roles need no account and are always free. A paired device keeps its slot while it is offline. Cloud provides the connection, not the compute: an offline machine runs nothing on either plan. Lemon Squeezy is the seller of record; cancel any time from the billing portal."
+  "plan.fine": "Local Sessions, the Board and built-in roles need no account and are always free. Both plans pair up to 5 phones or browsers, and a paired device keeps its slot while it is offline. Cloud provides the connection, not the compute: an offline machine runs nothing on either plan. Lemon Squeezy is the seller of record; cancel any time from the billing portal."
 }

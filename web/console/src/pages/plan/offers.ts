@@ -6,7 +6,9 @@ import { T, fill } from "../../legacy/js/core/i18n.js"
  * The two plans on sale, drawn as cards.
  *
  * Only Free and Pro are offered; Max and Team stay in the Cloud tier table and are
- * not advertised. These are the same limits the pricing page prints and the Cloud
+ * not advertised. Viewer devices are not a line on either card: both plans allow
+ * the same number, an abuse bound rather than something Pro sells, and the fine
+ * print says it once. These are the same limits the pricing page prints and the Cloud
  * API enforces at pairing. The current tier's own numbers are taken from
  * `/v1/entitlements` when the account has answered, so the card the person is on
  * never disagrees with the server; the other card is the listing.
@@ -15,18 +17,16 @@ export type OfferTier = "free" | "pro"
 
 export interface Offer {
   machines: number
-  devices: number
   webhooks: boolean
 }
 
 export const OFFERS: Record<OfferTier, Offer> = {
-  free: { machines: 1, devices: 2, webhooks: false },
-  pro: { machines: 5, devices: 5, webhooks: true },
+  free: { machines: 1, webhooks: false },
+  pro: { machines: 5, webhooks: true },
 }
 
 export interface Entitlements {
   max_machines?: number | null
-  max_viewer_devices?: number | null
   schedule_webhooks?: boolean
 }
 
@@ -36,7 +36,6 @@ export function offerFor(tier: OfferTier, current: OfferTier | null, entitlement
   if (tier !== current || !entitlements) return listed
   return {
     machines: Number.isSafeInteger(entitlements.max_machines) ? entitlements.max_machines! : listed.machines,
-    devices: Number.isSafeInteger(entitlements.max_viewer_devices) ? entitlements.max_viewer_devices! : listed.devices,
     webhooks: typeof entitlements.schedule_webhooks === "boolean" ? entitlements.schedule_webhooks : listed.webhooks,
   }
 }
@@ -47,9 +46,6 @@ export function offerFeatures(offer: Offer): string[] {
     offer.machines === 1
       ? catalogFormat("plan", "machinesOne", [offer.machines])
       : catalogFormat("plan", "machinesMany", [offer.machines]),
-    offer.devices === 1
-      ? catalogFormat("plan", "devicesOne", [offer.devices])
-      : catalogFormat("plan", "devicesMany", [offer.devices]),
     catalogWord("plan", "control"),
     catalogWord("plan", "push"),
   ]

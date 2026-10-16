@@ -5317,10 +5317,8 @@
   "plan.freePitch": "用手機操控一台機器，也免費。",
   "plan.machinesOne": "可配對 {arg0} 台機器",
   "plan.machinesMany": "最多 {arg0} 台機器",
-  "plan.devicesOne": "可配對 {arg0} 個手機／瀏覽器",
-  "plan.devicesMany": "可配對 {arg0} 個手機／瀏覽器",
   "plan.control": "用手機查看、控制 Session",
   "plan.push": "瀏覽器推播通知",
   "plan.webhooks": "用 Webhook 啟動已儲存的排程",
-  "plan.fine": "本機的 Session、看板與內建角色不需要帳號，永遠免費。已配對的裝置即使離線也占一個名額。Cloud 提供連線，不提供運算：機器離線時，兩種方案都無法執行工作。Lemon Squeezy 是正式賣方，可隨時在帳務入口取消訂閱。"
+  "plan.fine": "本機的 Session、看板與內建角色不需要帳號，永遠免費。兩種方案都能配對 5 個手機或瀏覽器，已配對的裝置即使離線也占一個名額。Cloud 提供連線，不提供運算：機器離線時，兩種方案都無法執行工作。Lemon Squeezy 是正式賣方，可隨時在帳務入口取消訂閱。"
 }
