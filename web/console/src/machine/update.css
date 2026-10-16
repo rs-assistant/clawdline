@@ -54,9 +54,11 @@
    list's header, not a card: while a dev build runs it is always there, so it
    takes 30 px and reads as a status line. Its presses are words, not filled
    buttons; the one that moves forward wears the accent. Only a result or a
-   problem lets the line wrap. */
+   problem lets the line wrap. It never gives up height to the list below it:
+   the pane is a column, and a wrapped result squeezed back to 30 px drew its
+   second line over the toolbar. */
 .update-strip {
-    display: flex; align-items: center; gap: 8px; min-height: 30px;
+    flex: 0 0 auto; display: flex; align-items: center; gap: 8px; min-height: 30px;
     padding: 4px 6px 4px 14px; border-bottom: 1px solid var(--line);
     font-size: 12px; line-height: 1.45; color: var(--dim); white-space: nowrap;
 }
