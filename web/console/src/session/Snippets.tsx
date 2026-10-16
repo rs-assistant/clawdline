@@ -33,10 +33,12 @@ import {
 import {
   SNIPPET_CONTROLS,
   createSnippet,
+  createWorkflow,
   deleteSnippet,
   orderSnippets,
   readSnippets,
   readWorkflowProject,
+  SnippetFailure,
   updateSnippet,
 } from "./snippets-api.js"
 import { createDirectTodoV2, directTodoActionV2 } from "../pages/work/api.js"
@@ -159,6 +161,9 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   const [selectedWorkflow, setSelectedWorkflow] = useState<Snippet | null>(null)
   const [startingWorkflow, setStartingWorkflow] = useState(false)
   const [workflowError, setWorkflowError] = useState("")
+  const [workflowDraft, setWorkflowDraft] = useState<{ title: string; body: string; global: boolean } | null>(null)
+  const [workflowSaveError, setWorkflowSaveError] = useState("")
+  const [workflowSaving, setWorkflowSaving] = useState(false)
   const [workflowSourceStatus, setWorkflowSourceStatus] = useState<"checking" | "ready" | "unavailable" | "scope">("checking")
   const [workflowPreview, setWorkflowPreview] = useState<{ id: string; body: string; name: string; version: string } | null>(null)
   const [projectUnresolved, setProjectUnresolved] = useState(false)
@@ -257,7 +262,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       setWorkflowError(W("startUnknown"))
     } finally { setStartingWorkflow(false) }
   }
-  const editorOpen = !!draft
+  const editorOpen = !!draft || !!workflowDraft
 
   const refresh = (options: { keepScroll?: boolean } = {}) => {
     const ticket = ++reading.current
@@ -291,6 +296,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
         setError("")
         setLoading(false)
         if (!options.keepScroll && list.current) list.current.scrollTop = 0
+        return true
       })
       .catch((failure: unknown) => {
         if (!alive.current || ticket !== reading.current) return
@@ -299,6 +305,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
         // (`core/failure-text.js`): `cloud_not_carried` is the Cloud not
         // carrying this route, and that is the words a hosted reader gets.
         setError(snippetSentence(failure, T.webRequestFailed))
+        return false
       })
   }
 
@@ -319,7 +326,8 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       if (event.key !== "Escape") return
       event.preventDefault()
       event.stopPropagation()
-      if (editorOpen) closeEditor()
+      if (workflowDraft) setWorkflowDraft(null)
+      else if (editorOpen) closeEditor()
       else onClose()
     }
     document.addEventListener("keydown", onKey, true)
@@ -478,6 +486,25 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
     closeButton.current?.focus({ preventScroll: true })
   }
 
+  const saveWorkflow = async () => {
+    if (!workflowDraft || workflowSaving) return
+    const title = workflowDraft.title.trim()
+    const body = workflowDraft.body.trim()
+    if (!title || !body) { setWorkflowSaveError(W("needsText")); return }
+    if (new TextEncoder().encode(title).length > 200 || new TextEncoder().encode(body).length > 4000) {
+      setWorkflowSaveError(W("tooLong")); return
+    }
+    if (!workflowDraft.global && (!projectKey || projectUnresolved)) { setWorkflowSaveError(W("projectResolveUnavailable")); return }
+    setWorkflowSaving(true); setWorkflowSaveError("")
+    try {
+      await createWorkflow(machine ?? "", workflowDraft.global ? "" : projectKey, title, body)
+      if (await refresh({ keepScroll: true })) setWorkflowDraft(null)
+    } catch (cause) {
+      setWorkflowSaveError(cause instanceof SnippetFailure && cause.code === "snippet_limit_reached" ? W("limitReached")
+        : cause instanceof SnippetFailure && cause.status !== null && cause.status < 500 ? W("saveRefused") : W("saveUnknown"))
+    } finally { setWorkflowSaving(false) }
+  }
+
   const save = () => {
     if (!draft) return
     const problem = snippetDraftProblem(draft)
@@ -597,10 +624,10 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
             id="snippets-new"
             type="button"
             ref={newButton}
-            hidden={tab !== "snippet" || !may.create || loading || !!error}
-            aria-label={T.webSnippetNew}
-            title={T.webSnippetNew}
-            onClick={() => openEditor(null)}
+            hidden={!may.create || loading || !!error || (tab === "workflow" && !!currentWorkflow)}
+            aria-label={tab === "workflow" ? W("new") : T.webSnippetNew}
+            title={tab === "workflow" ? W("new") : T.webSnippetNew}
+            onClick={() => tab === "workflow" ? (setWorkflowSaveError(""), setWorkflowDraft({ title: "", body: "", global: !projectKey || projectUnresolved })) : openEditor(null)}
           >
             ＋
           </button>
@@ -793,6 +820,26 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
           </div>
         </div>
       ) : null}
+      {workflowDraft && <div className="overlay" id="workflow-quick-editor" onClick={() => setWorkflowDraft(null)}>
+        <div className="sheet snippet-editor-sheet" role="dialog" aria-modal="true" aria-labelledby="workflow-quick-title" onClick={(event) => event.stopPropagation()}>
+          <h2 id="workflow-quick-title">{W("new")}</h2>
+          <div className="block"><label className="field-label" htmlFor="workflow-quick-name">{W("name")}</label>
+            <input className="find" id="workflow-quick-name" type="text" maxLength={200} autoFocus value={workflowDraft.title}
+              onChange={(event) => setWorkflowDraft({ ...workflowDraft, title: event.target.value })} /></div>
+          <div className="block"><label className="field-label" htmlFor="workflow-quick-message">{W("message")}</label>
+            <textarea className="find" id="workflow-quick-message" rows={6} maxLength={4000} value={workflowDraft.body}
+              onChange={(event) => setWorkflowDraft({ ...workflowDraft, body: event.target.value })} /></div>
+          <div className="block"><span className="field-label">{W("availability")}</span><div className="row">
+            {!!projectKey && !projectUnresolved && <button type="button" className={"chip" + (!workflowDraft.global ? " on" : "")}
+              aria-pressed={!workflowDraft.global} onClick={() => setWorkflowDraft({ ...workflowDraft, global: false })}>{W("projectOnly")}</button>}
+            <button type="button" className={"chip" + (workflowDraft.global ? " on" : "")}
+              aria-pressed={workflowDraft.global} onClick={() => setWorkflowDraft({ ...workflowDraft, global: true })}>{W("global")}</button>
+          </div></div>
+          {workflowSaveError && <p className="said" role="alert">{workflowSaveError}</p>}
+          <div className="buttons"><button className="chip" type="button" onClick={() => setWorkflowDraft(null)}>{W("cancel")}</button>
+            <button className="chip confirm-go" type="button" disabled={workflowSaving} onClick={() => void saveWorkflow()}>{W("save")}</button></div>
+        </div>
+      </div>}
     </>
   )
 }
