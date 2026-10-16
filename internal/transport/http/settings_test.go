@@ -59,6 +59,11 @@ func TestBrowserSettingsKeepInputBarAndHotkeyUnavailable(t *testing.T) {
 	if read.Code != http.StatusOK || !strings.Contains(read.Body.String(), `"language":"en"`) {
 		t.Fatalf("saved browser setting: %d %s", read.Code, read.Body)
 	}
+	for _, body := range []string{`{"mascot":"clawd"}`, `{"notch":false}`, `{"voice_language":"zh-Hant-TW"}`} {
+		if rec := call(body); rec.Code != http.StatusOK {
+			t.Fatalf("machine setting %s: %d %s", body, rec.Code, rec.Body)
+		}
+	}
 }
 
 func defaultModelsCall(t *testing.T, s *Server, method, contentType, body string) *httptest.ResponseRecorder {

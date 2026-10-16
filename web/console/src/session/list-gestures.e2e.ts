@@ -1612,10 +1612,11 @@ test("machine registration remains visible after a fresh Session read and clears
     }
   }))
 
-test("machine dashboard opens the existing Clawdfather and its icon offers draft suggestions", () =>
+test("Clawdfather's icon opens the Snippet / Workflow sheet on its own tab, and the person can add actions", () =>
   inTab(async (tab) => {
     try {
       readingScenario = "machine-bound"
+      workflowRecords = []
       await tab.go("/")
       await tab.until("the machine Session arrives", (s) => s.order.join() === RETAINED)
       await tab.press("#counts")
@@ -1625,37 +1626,54 @@ test("machine dashboard opens the existing Clawdfather and its icon offers draft
       assert.equal(await tab.run(`document.getElementById('start')?.hidden`), true)
       assert.match(await tab.run(`document.getElementById('detail-snippets')?.getAttribute('aria-label')`), /Clawdfather/)
       await tab.press("#detail-snippets")
-      await tab.shot("clawdfather-suggestions-phone")
-      assert.equal(await tab.run(`document.querySelector('#snippets:not([hidden])') === null`), true)
-      assert.equal(await tab.run(`document.querySelectorAll('#clawdfather-suggestions .clawdfather-suggestions-list button').length`), 5)
-      const icons = await tab.run(`(() => [...document.querySelectorAll('#clawdfather-suggestions .clawdfather-suggestions-list button')].map((button) => ({
+      await tab.shot("clawdfather-sheet-phone")
+      assert.equal(await tab.run(`document.getElementById('snippets')?.hidden`), false)
+      assert.deepEqual(await tab.run(`[...document.querySelectorAll('#snippets [role=tab]')].map((t) => [t.textContent, t.getAttribute('aria-selected')])`),
+        [["Clawdfather", "true"], ["Snippet", "false"], ["Workflow", "false"]])
+      const rows = `#clawdfather-actions .clawdfather-suggestions-list > button`
+      const icons = await tab.run(`(() => [...document.querySelectorAll('${rows}')].map((button) => ({
         title: button.textContent.trim(),
         svg: button.querySelector('svg')?.outerHTML || '',
-        shape: [...button.querySelectorAll('svg path, svg rect, svg circle')].map((part) => part.outerHTML).join(''),
       })))()`)
       assert.deepEqual(icons.map((icon: { title: string }) => icon.title), [
-        "整理 Session 進度", "檢查機器狀況", "檢視 Clawdline 設定", "匯入或匯出專案設定", "建立看板項目並派工",
+        "協調 Session 資源", "整理 Session 進度", "檢查機器狀況", "檢視 Clawdline 設定", "匯入或匯出專案設定", "建立看板項目並派工",
       ])
-      assert.equal(new Set(icons.map((icon: { shape: string }) => icon.shape)).size, 5)
-      for (const icon of icons) {
-        assert.match(icon.svg, /class="sidebar-icon"/)
-        assert.match(icon.svg, /aria-hidden="true"/)
-        assert.match(icon.svg, /focusable="false"/)
-        assert.ok(icon.shape)
-      }
+      for (const icon of icons) assert.match(icon.svg, /class="sidebar-icon"/)
+      // The shipped actions are the console's: none of them carries a menu.
+      assert.equal(await tab.run(`document.querySelectorAll('#clawdfather-actions .snippet-more').length`), 0)
+
+      // The ＋ on this tab adds a Clawdfather action, not a snippet.
+      await tab.press("#snippets-new")
+      assert.equal(await tab.run(`document.getElementById('clawdfather-editor-title')?.textContent`), "新增 Clawdfather 動作")
+      await tab.run(`(() => {
+        const name = document.getElementById('clawdfather-editor-title-field')
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(name, 'Nightly sweep')
+        name.dispatchEvent(new Event('input', { bubbles: true }))
+        const body = document.getElementById('clawdfather-editor-body')
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(body, 'Clean every landed worktree.')
+        body.dispatchEvent(new Event('input', { bubbles: true }))
+      })()`)
+      await tab.press("#clawdfather-editor-save")
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const look = () => document.querySelector('.clawdfather-custom') ? resolve(true)
+          : Date.now() > deadline ? reject(new Error('the added action never appeared')) : setTimeout(look, 50)
+        look()
+      })`)
+      assert.equal(workflowRecords[0]?.scope, "clawdfather")
+      assert.equal(workflowRecords[0]?.project, undefined)
+      assert.equal(await tab.run(`document.querySelector('.clawdfather-custom-group .snippet-group-title')?.textContent`), "自己加的")
+      assert.equal(await tab.run(`document.querySelectorAll('#clawdfather-actions .snippet-more').length`), 1)
+      await tab.shot("clawdfather-sheet-with-custom-phone")
+
       const geometry = () => tab.run(`(() => {
-        const sheet = document.querySelector('#clawdfather-suggestions .sheet')
-        const list = sheet.querySelector('.clawdfather-suggestions-list')
+        const sheet = document.querySelector('#snippets .sheet')
+        const list = document.getElementById('clawdfather-actions')
         return { viewport: innerWidth, sheetRight: sheet.getBoundingClientRect().right,
           sheetOverflow: sheet.scrollWidth - sheet.clientWidth, listOverflow: list.scrollWidth - list.clientWidth,
           rows: [...list.querySelectorAll('button')].map((button) => {
             const box = button.getBoundingClientRect()
-            const icon = button.querySelector('svg').getBoundingClientRect()
-            const label = button.querySelector('span').getBoundingClientRect()
-            return { left: box.left, right: box.right, height: box.height, overflow: button.scrollWidth - button.clientWidth,
-              iconLeft: icon.left, iconRight: icon.right, iconMiddle: (icon.top + icon.bottom) / 2,
-              labelLeft: label.left, labelMiddle: (label.top + label.bottom) / 2,
-              color: getComputedStyle(button).color, iconColor: getComputedStyle(button.querySelector('svg')).color }
+            return { left: box.left, right: box.right, height: box.height, overflow: button.scrollWidth - button.clientWidth }
           }) }
       })()`)
       for (const width of [390, 320]) {
@@ -1665,77 +1683,38 @@ test("machine dashboard opens the existing Clawdfather and its icon offers draft
         assert.ok(layout.sheetRight <= width + 1)
         assert.ok(layout.sheetOverflow <= 1 && layout.listOverflow <= 1)
         for (const row of layout.rows) {
-          assert.ok(row.height >= 48, `suggestion row is ${row.height}px high`)
+          assert.ok(row.height >= 44, `action row is ${row.height}px high`)
           assert.ok(row.overflow <= 1 && row.left >= -1 && row.right <= width + 1)
-          assert.ok(row.iconLeft >= row.left && row.iconRight < row.labelLeft)
-          assert.ok(Math.abs(row.iconMiddle - row.labelMiddle) <= 1)
-          assert.equal(row.iconColor, row.color)
         }
-        await tab.shot(`clawdfather-suggestions-${width}-dark`)
+        await tab.shot(`clawdfather-sheet-${width}-dark`)
       }
       await tab.desktop()
       const desktopLayout = await geometry()
-      assert.equal(desktopLayout.viewport, 1280)
       assert.ok(desktopLayout.sheetOverflow <= 1 && desktopLayout.listOverflow <= 1)
-      assert.ok(desktopLayout.rows.every((row: { overflow: number; height: number }) => row.overflow <= 1 && row.height >= 48))
-      await tab.shot("clawdfather-suggestions-desktop-dark")
-      // The Console currently ships a dark palette only. Exercise this sheet against light tokens
-      // so the icons' inherited color remains readable if a light palette is introduced.
-      await tab.run(`(() => {
-        const style = document.documentElement.style
-        for (const [name, value] of Object.entries({ '--card': '#ffffff', '--card-hi': '#f3f4f6',
-          '--line': '#d7d9df', '--ink': '#1b1d21', '--dim': '#4b5563' })) style.setProperty(name, value)
-      })()`)
-      const lightLayout = await geometry()
-      assert.ok(lightLayout.rows.every((row: { color: string; iconColor: string }) =>
-        row.color === "rgb(27, 29, 33)" && row.iconColor === row.color))
-      await tab.shot("clawdfather-suggestions-desktop-light-palette")
-      await tab.phoneWidth(320)
-      const lightPhone = await geometry()
-      assert.ok(lightPhone.sheetOverflow <= 1 && lightPhone.listOverflow <= 1)
-      assert.ok(lightPhone.rows.every((row: { overflow: number; iconRight: number; labelLeft: number }) =>
-        row.overflow <= 1 && row.iconRight < row.labelLeft))
-      await tab.shot("clawdfather-suggestions-320-light-palette")
-      assert.equal(await tab.run(`document.activeElement?.textContent?.trim()`), "整理 Session 進度")
-      await tab.key("Tab")
-      assert.equal(await tab.run(`document.activeElement?.textContent?.trim()`), "檢查機器狀況")
-      await tab.key("Tab", true)
-      assert.equal(await tab.run(`document.activeElement?.textContent?.trim()`), "整理 Session 進度")
-      await tab.run(`document.querySelectorAll('#clawdfather-suggestions .clawdfather-suggestions-list button')[1].focus()`)
-      pushSessions()
-      await tab.run(`new Promise((resolve) => setTimeout(resolve, 100))`)
-      assert.equal(await tab.run(`document.activeElement?.textContent?.trim()`), "檢查機器狀況")
-      await tab.press("#clawdfather-suggestions .clawdfather-suggestions-list button:first-child")
-      assert.equal(await tab.run(`document.getElementById('clawdfather-suggestions') === null`), true)
+      await tab.shot("clawdfather-sheet-desktop-dark")
+      await tab.phoneWidth(390)
+
+      // A press puts the words in the box and sends nothing.
+      await tab.press(".clawdfather-custom-pick")
+      assert.equal(await tab.run(`document.getElementById('snippets')?.hidden`), true)
+      assert.match(await tab.run(`document.getElementById('msg')?.textContent`), /Clean every landed worktree/)
+      await tab.press("#detail-snippets")
+      await tab.press(`${rows}:nth-child(2)`)
       assert.match(await tab.run(`document.getElementById('msg')?.textContent`), /整理這台機器目前各 Session/)
-      assert.equal(await tab.run(`document.activeElement?.id`), "msg")
+
+      // The other two tabs are the same ones every Session has; a Clawdfather action is not a snippet.
       await tab.press("#detail-snippets")
+      await tab.press("#snippet-tab")
+      assert.equal(await tab.run(`document.getElementById('snippets-title')?.textContent`), "常用句")
+      assert.doesNotMatch(await tab.run(`document.getElementById('snippet-list')?.textContent`), /Nightly sweep/)
+      await tab.press("#workflow-tab")
+      assert.doesNotMatch(await tab.run(`document.getElementById('workflow-picker')?.textContent`), /Nightly sweep/)
+      await tab.shot("clawdfather-sheet-workflow-tab")
       await tab.key("Escape")
-      assert.equal(await tab.run(`document.activeElement?.id`), "detail-snippets")
-      await tab.run(`document.documentElement.lang = 'en'`)
-      await tab.press("#detail-snippets")
-      assert.deepEqual(await tab.run(`([...document.querySelectorAll('#clawdfather-suggestions .clawdfather-suggestions-list button')].map((button) => button.textContent.trim()))`), [
-        "Summarize Sessions", "Check machine status", "Review Clawdline settings",
-        "Import or export project settings", "Create a Board item and delegate",
-      ])
-      assert.deepEqual(await tab.run(`([...document.querySelectorAll('#clawdfather-suggestions .clawdfather-suggestions-list button')].map((button) =>
-        [...button.querySelectorAll('svg path, svg rect, svg circle')].map((part) => part.outerHTML).join('')))`),
-      icons.map((icon: { shape: string }) => icon.shape))
-      const edge = (index: number, side: "left" | "right") => tab.run(`(() => {
-        const box = document.querySelectorAll('#clawdfather-suggestions .clawdfather-suggestions-list button')[${index}].getBoundingClientRect()
-        return { x: Math.round(${JSON.stringify(side)} === 'left' ? box.left + 3 : box.right - 3), y: Math.round(box.top + box.height / 2) }
-      })()`)
-      const left = await edge(0, "left")
-      await tab.tap(left.x, left.y)
-      assert.equal(await tab.run(`document.getElementById('clawdfather-suggestions') === null`), true)
-      assert.match(await tab.run(`document.getElementById('msg')?.textContent`), /Summarize the progress of Sessions/)
-      await tab.press("#detail-snippets")
-      const right = await edge(4, "right")
-      await tab.tap(right.x, right.y)
-      assert.equal(await tab.run(`document.getElementById('clawdfather-suggestions') === null`), true)
-      assert.match(await tab.run(`document.getElementById('msg')?.textContent`), /create a Board item/i)
+      assert.equal(await tab.run(`document.getElementById('snippets')?.hidden`), true)
     } finally {
       readingScenario = "normal"
+      workflowRecords = []
     }
   }))
 
@@ -1746,7 +1725,7 @@ test("an ordinary Session keeps the Snippets icon", () =>
     assert.match(await tab.run(`document.getElementById('detail-snippets')?.getAttribute('aria-label')`), /常用句|Snippets/)
     await tab.press("#detail-snippets")
     assert.equal(await tab.run(`document.getElementById('snippets')?.hidden`), false)
-    assert.equal(await tab.run(`document.getElementById('clawdfather-suggestions') === null`), true)
+    assert.equal(await tab.run(`document.getElementById('clawdfather-tab') === null`), true)
   }))
 
 test("a phone links a command with fixed text and replaces that text when linking a Skill", () =>

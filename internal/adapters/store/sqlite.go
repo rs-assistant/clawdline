@@ -16,6 +16,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -151,6 +152,8 @@ func Open(dir string) (*Store, error) {
 		return nil, err
 	}
 	path := filepath.Join(dir, DBFile)
+	_, statErr := os.Stat(path)
+	fresh := errors.Is(statErr, os.ErrNotExist)
 	// Every setting rides on the DSN, so it is applied to each connection the
 	// pool opens and not only to the first: a pragma run once with db.Exec is
 	// lost the day the pool replaces that connection. `_txlock=immediate`
@@ -172,6 +175,18 @@ func Open(dir string) (*Store, error) {
 	db.SetMaxOpenConns(1)
 	if err := db.Ping(); err != nil {
 		return nil, classify(err)
+	}
+	// A database this Open creates gets its schema without a sync per
+	// statement. Each CREATE commits on its own, and at synchronous=FULL the
+	// ~180 of them cost 325 ms a database (measured 2026-10-16), which every
+	// test that opens a store paid. Nothing is in the file yet, so nothing
+	// can be lost but the schema itself; durableAfterCreate puts FULL back and
+	// syncs it all before Open returns. An existing database is never opened
+	// this way: its migrations rewrite real rows.
+	if fresh {
+		if _, err := db.Exec("PRAGMA synchronous=OFF"); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := db.Exec(schema); err != nil {
 		return nil, err
@@ -254,6 +269,12 @@ func Open(dir string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if fresh {
+		if err := durableAfterCreate(db); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
 	rd, err := openReader(path)
 	if err != nil {
 		db.Close()
@@ -264,6 +285,18 @@ func Open(dir string) (*Store, error) {
 		log.Printf("store: the reference-image sweep at open failed: %v", err)
 	}
 	return s, nil
+}
+
+// durableAfterCreate ends the unsynced schema creation of a new database:
+// synchronous=FULL again on the one write connection, then a checkpoint that
+// syncs the WAL and the database file, so what Open made is on disk when it
+// returns, as it was when every statement synced itself.
+func durableAfterCreate(db *sql.DB) error {
+	if _, err := db.Exec("PRAGMA synchronous=FULL"); err != nil {
+		return err
+	}
+	_, err := db.Exec("PRAGMA wal_checkpoint(FULL)")
+	return err
 }
 
 // ReadConnectionsLimit is how many read-only connections a handle keeps for

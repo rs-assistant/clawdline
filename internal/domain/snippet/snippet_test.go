@@ -171,6 +171,26 @@ func TestGlobalWorkflowIsVisibleAcrossProjects(t *testing.T) {
 	}
 }
 
+func TestAClawdfatherActionIsMachineWideAndNamesNoProject(t *testing.T) {
+	fields, ref := ParseFields(map[string]any{"title": "Nightly sweep", "body": "Clean the landed worktrees.", "scope": "clawdfather"})
+	if ref != nil {
+		t.Fatal(ref)
+	}
+	created, ref := New("id", fields, 0, 1)
+	if ref != nil || created.Scope != Clawdfather || created.Project != "" {
+		t.Fatalf("clawdfather action not kept: %+v %v", created, ref)
+	}
+	for _, project := range []string{"", "/one", "/two"} {
+		if got := InScope([]Record{created}, project); len(got) != 1 || got[0].ID != created.ID {
+			t.Fatalf("project %q sees %+v", project, got)
+		}
+	}
+	withProject, _ := ParseFields(map[string]any{"title": "t", "body": "b", "scope": "clawdfather", "project": "/one"})
+	if _, ref := New("bad", withProject, 0, 1); ref == nil || ref.Code != CodeScopeMismatch {
+		t.Fatalf("clawdfather action filed under a project: %v", ref)
+	}
+}
+
 func TestAnEmptyTitleOrBodyIsRefused(t *testing.T) {
 	for _, body := range []map[string]any{
 		{"title": "  ", "body": "b", "scope": "global"},

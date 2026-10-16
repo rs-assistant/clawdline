@@ -20,15 +20,19 @@ export function isTriggerOnly(schedule: TriggerOnlyShape | null | undefined): bo
 
 /**
  * The `when` fields of a create or save body. A trigger-only schedule sends
- * `trigger_only: true` and none of `at`, `days` and `on`; a timed one sends its
- * time and days, which is also how a save turns a trigger-only schedule back.
+ * `trigger_only: true` and none of `at`, `days` and `on`; a schedule that runs
+ * once sends its time and its date, because a save may move a one-shot but not
+ * make it repeat; a repeating one sends its time and days, which is also how a
+ * save turns a trigger-only schedule back.
  */
 export function scheduleWhenFields(
   triggerOnly: boolean,
   at: string,
   days: string | string[],
-): { trigger_only: true } | { at: string; days: string | string[] } {
-  return triggerOnly ? { trigger_only: true } : { at, days }
+  on = "",
+): { trigger_only: true } | { at: string; on: string } | { at: string; days: string | string[] } {
+  if (triggerOnly) return { trigger_only: true }
+  return on ? { at, on } : { at, days }
 }
 
 /**

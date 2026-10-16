@@ -70,7 +70,7 @@ func (b *Broker) waitComposerOrDialog(ctx context.Context, terminalID, assistant
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(2 * time.Second):
+		case <-time.After(b.screenReadEvery()):
 		}
 	}
 	if last == nil {

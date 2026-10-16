@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5321,
-  "riskKeys": 2346,
-  "nonRiskCount": 2975,
+  "englishContentKeys": 5351,
+  "riskKeys": 2356,
+  "nonRiskCount": 2995,
   "groups": [
     {
       "name": "bar / other",
@@ -26,6 +26,38 @@
         "bar.placeholder",
         "bar.scanning",
         "bar.sessionAgents"
+      ]
+    },
+    {
+      "name": "capacityHelp / other",
+      "count": 8,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "capacityHelp.action_disconnect",
+        "capacityHelp.action_evict_oldest",
+        "capacityHelp.action_expire",
+        "capacityHelp.action_rotate",
+        "capacityHelp.action_summarize",
+        "capacityHelp.limit",
+        "capacityHelp.log",
+        "capacityHelp.open"
+      ]
+    },
+    {
+      "name": "clawdfatherMenu / other",
+      "count": 6,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "clawdfatherMenu.edit",
+        "clawdfatherMenu.editing",
+        "clawdfatherMenu.message",
+        "clawdfatherMenu.mine",
+        "clawdfatherMenu.name",
+        "clawdfatherMenu.new"
       ]
     },
     {
@@ -2195,7 +2227,7 @@
     },
     {
       "name": "next / schedule",
-      "count": 19,
+      "count": 25,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2211,13 +2243,19 @@
         "next.scheduleMoveWebhookMoved",
         "next.scheduleMoved",
         "next.scheduleMoving",
+        "next.scheduleOnceOn",
         "next.schedulePermissionAsk",
         "next.schedulePermissionDefault",
         "next.schedulePermissionEdits",
         "next.scheduleRunStartedTitle",
+        "next.scheduleRunsHeading",
         "next.scheduleTriggerOnlyNext",
         "next.scheduleUntitled",
         "next.scheduleWebhookCopied",
+        "next.scheduleWebhookDetailsHide",
+        "next.scheduleWebhookDetailsShow",
+        "next.scheduleWebhookStateOff",
+        "next.scheduleWebhookStateOn",
         "next.scheduleWebhookUrlLabel"
       ]
     },

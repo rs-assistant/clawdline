@@ -395,8 +395,9 @@ func TestMachineItemNewSessionDialogIsAwaitingUserNotAssigned(t *testing.T) {
 	s, machine, projectPane, project := registeredMachineItemServer(t)
 	dir := s.broker.Dir
 	s.broker = &orchestrator.Broker{Store: s.store, Tasks: taskdir.New(dir), Dir: dir,
-		Launcher: oneTmuxPane{pane: projectPane.s.ID},
-		Live:     func(context.Context) []session.Session { return []session.Session{machine.s, projectPane.s} },
+		ScreenReadEvery: 10 * time.Millisecond,
+		Launcher:        oneTmuxPane{pane: projectPane.s.ID},
+		Live:            func(context.Context) []session.Session { return []session.Session{machine.s, projectPane.s} },
 		Screen: func(_ context.Context, id string) (string, bool) {
 			return orchestratorScreen(t, "codex-update"), id == projectPane.s.ID
 		},

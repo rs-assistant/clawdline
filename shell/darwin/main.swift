@@ -164,10 +164,20 @@ func settingsWordsScript() -> String {
     ]
     let json = (try? JSONSerialization.data(withJSONObject: words, options: [.sortedKeys]))
         .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    let mascotsJSON = (try? JSONSerialization.data(withJSONObject: MascotPacks.available()))
+        .flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+    let dictation: [String: String]
+    switch DictationEngine.status() {
+    case .ready(let model): dictation = ["kind": "ready", "model": model]
+    case .noBinary: dictation = ["kind": "noBinary"]
+    case .noModel: dictation = ["kind": "noModel"]
+    }
+    let dictationJSON = (try? JSONSerialization.data(withJSONObject: dictation))
+        .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     return """
     (function () {
       var shell = window.__clawdlineShell || (window.__clawdlineShell = {});
-      shell.settings = { words: \(json) };
+      shell.settings = { words: \(json), mascots: \(mascotsJSON), dictation: \(dictationJSON) };
     })();
     """
 }

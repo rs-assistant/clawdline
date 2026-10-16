@@ -29,7 +29,6 @@ import { Todos } from "./Todos.js"
 import { interventionTarget, type InterventionTarget } from "./intervention-composer.js"
 import { UserMessages } from "./UserMessages.js"
 import { Snippets } from "./Snippets.js"
-import { ClawdfatherSuggestions } from "./ClawdfatherSuggestions.js"
 import { conversationNotStarted } from "./readiness.js"
 import { agentName, agentStateWord } from "./WorkTree.js"
 import { nextWord } from "../next-strings.js"
@@ -121,9 +120,7 @@ export function Detail({
   const [savedComposerDraft, setSavedComposerDraft] = useState<{ target: InterventionTarget; text: string } | null>(null)
   const [suggestedDraft, setSuggestedDraft] = useState<{ target: InterventionTarget; text: string; id: number } | null>(null)
   const suggestedDraftSerial = useRef(0)
-  const [suggestionsOpen, setSuggestionsOpen] = useState(false)
   useEffect(() => { setAgentId(null); setSavedComposerDraft(null); setSuggestedDraft(null) }, [row?.id])
-  useEffect(() => setSuggestionsOpen(false), [row?.id])
   const chooseAgent = (id: string | null) => {
     if (id && !agentId) {
       const target = interventionTarget(row)
@@ -250,8 +247,7 @@ export function Detail({
               // enabled and what it is called, and only says what it does.
               event.preventDefault()
               event.stopPropagation()
-              if (steward) setSuggestionsOpen(true)
-              else requestSnippets()
+              requestSnippets()
             }}
           >
             <span className="detail-identity">
@@ -297,7 +293,7 @@ export function Detail({
             triggerRef={actionsTrigger}
             onScreen={() => setScreenOpen(true)}
             onOpenGit={() => setGitOpen(true)}
-            onSuggestions={() => setSuggestionsOpen(true)}
+            onSuggestions={requestSnippets}
           />
         </div>
       </div>}
@@ -353,8 +349,7 @@ export function Detail({
           one is drawn into the body from here, because the `⋯` row that opens
           it is this component's. */}
       <UserMessages row={row} />
-      <Snippets row={steward ? null : row} />
-      {steward && suggestionsOpen ? <ClawdfatherSuggestions onClose={() => setSuggestionsOpen(false)} /> : null}
+      <Snippets row={row} steward={steward} />
     </DetailPane>
   )
 }

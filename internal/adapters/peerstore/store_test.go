@@ -157,23 +157,35 @@ func TestPeerAuthorityListsRefuseAnOversizedStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer st.Close()
-	for i := 0; i <= PairLimit; i++ {
-		id := fmt.Sprintf("pair-%d", i)
-		if _, err := st.db.ExecContext(ctx, "INSERT INTO peer_pairs(id,body) VALUES(?,?)",
-			id, []byte(fmt.Sprintf(`{"id":%q}`, id))); err != nil {
+	// One transaction for each fill: a commit per row synced 640 times and
+	// took 18 s, and the bound under test is the list's, not the insert's.
+	fill := func(n int, query string, args func(i int) []any) {
+		t.Helper()
+		tx, err := st.db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < n; i++ {
+			if _, err := tx.ExecContext(ctx, query, args(i)...); err != nil {
+				_ = tx.Rollback()
+				t.Fatal(err)
+			}
+		}
+		if err := tx.Commit(); err != nil {
 			t.Fatal(err)
 		}
 	}
+	fill(PairLimit+1, "INSERT INTO peer_pairs(id,body) VALUES(?,?)", func(i int) []any {
+		id := fmt.Sprintf("pair-%d", i)
+		return []any{id, []byte(fmt.Sprintf(`{"id":%q}`, id))}
+	})
 	if _, err := st.ListPairs(ctx); !errors.Is(err, ErrFull) {
 		t.Fatalf("oversized pair authority list: %v", err)
 	}
-	for i := 0; i <= GrantLimit; i++ {
+	fill(GrantLimit+1, "INSERT INTO peer_grants(id,pair_id,body) VALUES(?,?,?)", func(i int) []any {
 		id := fmt.Sprintf("grant-%d", i)
-		if _, err := st.db.ExecContext(ctx, "INSERT INTO peer_grants(id,pair_id,body) VALUES(?,?,?)",
-			id, "pair", []byte(fmt.Sprintf(`{"id":%q,"pair_id":"pair"}`, id))); err != nil {
-			t.Fatal(err)
-		}
-	}
+		return []any{id, "pair", []byte(fmt.Sprintf(`{"id":%q,"pair_id":"pair"}`, id))}
+	})
 	if _, err := st.ListGrants(ctx); !errors.Is(err, ErrFull) {
 		t.Fatalf("oversized grant authority list: %v", err)
 	}

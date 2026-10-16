@@ -28,6 +28,9 @@ func (w *WorkSystemV2) CreateDirectTodo(ctx context.Context, n NewDirectTodoV2, 
 	td := work.DirectTodoV2{ID: newWorkID(), SessionID: n.SessionID, Text: n.Text, CreatedBy: n.Actor,
 		CreatedAt: w.now(), Version: 1}
 	err := w.Store.WriteWorkV2(ctx, func(tx *store.WorkV2Tx) error {
+		if err := refuseSecondWorkflow(tx, td.SessionID, td.Text); err != nil {
+			return err
+		}
 		if err := tx.CreateDirectTodo(td); err != nil {
 			return err
 		}
@@ -373,6 +376,9 @@ func (w *WorkSystemV2) ReopenDirectTodo(ctx context.Context, id, session string,
 			}
 			return nil
 		}
+		if err := refuseSecondWorkflow(tx, session, prev.Text); err != nil {
+			return err
+		}
 		next := prev
 		next.CompletedAt, next.CompletedBy = time.Time{}, ""
 		if err := tx.PutDirectTodo(prev, next); err != nil {
@@ -407,4 +413,28 @@ func (w *WorkSystemV2) DeleteDirectTodo(ctx context.Context, id, session string,
 		return nil
 	})
 	return mapWorkV2Error(err)
+}
+
+// refuseSecondWorkflow keeps one Workflow running per Session. A second
+// launch message would reach the same assistant while it is still carrying
+// out the first, and the person sees two runs they cannot tell apart; the
+// usual cause is a Start pressed again after the first answer was lost on
+// the way back to a phone. A Workflow counts as running until its to-do is
+// completed. It is checked in the writing transaction, so two Starts that
+// race cannot both pass.
+func refuseSecondWorkflow(tx *store.WorkV2Tx, session, text string) error {
+	if _, ok := work.WorkflowRunTitle(text); !ok {
+		return nil
+	}
+	open, err := tx.OpenDirectTodoTexts(session)
+	if err != nil {
+		return err
+	}
+	for _, other := range open {
+		if title, ok := work.WorkflowRunTitle(other); ok {
+			return work.RefuseV2Raw("workflow_running", fmt.Sprintf(
+				"This Session is already running the Workflow %q. Mark it done before starting another.", title))
+		}
+	}
+	return nil
 }
