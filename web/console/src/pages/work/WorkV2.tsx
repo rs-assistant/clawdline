@@ -149,17 +149,10 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
       // Sessions can be the slowest inventory read. Start the independent
       // reads now; the Board waits only for the Project catalog it needs to
       // resolve the URL, never for those reads before it starts its own.
-      const supportRead = Promise.all([readSessionsForWorkV2(), readWorkV2Proposals(), readDecisions()])
-      // If the Project catalog fails first, these already-started reads still
-      // have a rejection handler; awaiting the same promise below keeps their
-      // real failure when the catalog succeeds.
-      void supportRead.catch(() => {})
+      const supportRead = Promise.allSettled([readSessionsForWorkV2(), readWorkV2Proposals(), readDecisions()])
       const projects = await readProjectPlaces()
       const selectedProject = workProjectID(routeProject, projects.places)
-      const [work, [live, suggestions, questions]] = await Promise.all([
-        readWorkV2(selectedProject || undefined, status, search), supportRead,
-      ])
-      const relatives = await readEpicFamily(selectedProject, status, search, work)
+      const work = await readWorkV2(selectedProject || undefined, status, search)
       if (generation !== loadGeneration.current) return
       setProject(selectedProject)
       const view = `${selectedProject}\n${status}\n${search}`
@@ -167,9 +160,24 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
       rearrange.current = false
       const rows = arrangeWorkItems(work.rows, kept)
       arrangement.current = { view, places: workItemPlaces(rows) }
-      setItems(rows.map((item) => [...answeredDecisionIDs.current].reduce(withoutAnsweredWait, item))); setNextCursor(work.next_cursor); setFamily(relatives); setLoaded(true); setLoading(false)
+      setItems(rows.map((item) => [...answeredDecisionIDs.current].reduce(withoutAnsweredWait, item))); setNextCursor(work.next_cursor); setLoaded(true); setLoading(false)
       loadedView.current = requestedView
-      setPlaces(projects.places); setSessions(live.sessions); setProposals(suggestions.rows); setDecisions(questions.rows.filter((row) => !answeredDecisionIDs.current.has(row.id))); setFailure("")
+      setPlaces(projects.places); setFailure("")
+      // Supporting reads must not hold a fresh Board page behind a failed or
+      // slow Session, proposal, decision, or Epic-family request.
+      void supportRead.then(([live, suggestions, questions]) => {
+        if (generation !== loadGeneration.current) return
+        if (live.status === "fulfilled") setSessions(live.value.sessions)
+        if (suggestions.status === "fulfilled") setProposals(suggestions.value.rows)
+        if (questions.status === "fulfilled") setDecisions(questions.value.rows.filter((row) => !answeredDecisionIDs.current.has(row.id)))
+        const failed = [live, suggestions, questions].find((result) => result.status === "rejected")
+        if (failed?.status === "rejected") setFailure(failureWords(failed.reason))
+      })
+      void readEpicFamily(selectedProject, status, search, work).then((relatives) => {
+        if (generation === loadGeneration.current) setFamily(relatives)
+      }).catch((error: unknown) => {
+        if (generation === loadGeneration.current) setFailure(failureWords(error))
+      })
       setCreatedItem((current) => current ? [...answeredDecisionIDs.current].reduce(withoutAnsweredWait, work.rows.find((item) => item.id === current.id) ?? current) : null)
       setOpenedItem((current) => {
         if (!current) return null
@@ -244,11 +252,19 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
   }), [])
   const refreshDetail = useCallback((id: string) => {
     setDetailLoading(true); setDetailError("")
-    void readWorkV2Item(id).then((answer) => setOpenedItem((current) => current?.id === id
-      ? [...answeredDecisionIDs.current].reduce(withoutAnsweredWait, answer.item) : current))
+    void readWorkV2Item(id).then((answer) => {
+      setOpenedItem((current) => current?.id === id
+        ? [...answeredDecisionIDs.current].reduce(withoutAnsweredWait, answer.item) : current)
+      setItems((current) => current.flatMap((listed) => {
+        if (listed.id !== id || listed.version >= answer.item.version) return [listed]
+        if (status === "open" && answer.item.closed_at) return []
+        if (status === "done" && answer.item.phase !== "done") return []
+        return [answer.item]
+      }))
+    })
       .catch((error: unknown) => setDetailError(failureWords(error)))
       .finally(() => setDetailLoading(false))
-  }, [])
+  }, [status])
   // Every request to open an item takes a ticket; a read that answers after a
   // later one was made is dropped rather than replacing what is now open.
   const openTicket = useRef(0)
