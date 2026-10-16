@@ -462,6 +462,7 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 			}
 			return s.agents.RowsReading()
 		},
+		capacity.SessionWaitingFor: waitTargetsReading,
 		capacity.CacheBackgroundAgents: func() capacity.Reading {
 			if s.agents == nil {
 				return capacity.Unmeasured("this server keeps no background-work cache")

@@ -115,6 +115,8 @@
         "backend": { "$ref": "common.schema.json#/$defs/Backend" },
         "closeability": { "$ref": "#/$defs/Closeability" },
         "coordination": { "$ref": "#/$defs/SessionCoordination" },
+		"waiting_for": { "description": "The live broker work that makes a broker-projected `waiting_session` row wait, collected by the same pass that decided the state. Present only on such rows; at most `session.waiting_for` entries, with `waiting_for_omitted` counting the rest. Both Cloud list scopes and the local list describe a wait from this field alone.", "type": "array", "items": { "$ref": "#/$defs/SessionWaitTarget" } },
+		"waiting_for_omitted": { "description": "Live waited-on tasks left out of `waiting_for` by its bound.", "type": "integer", "minimum": 0 },
 		"heavy_work": { "description": "Only the Session that started the declared-heavy callback currently holding and running in the machine's heavy_compile slot. Absent for queued work, wait callbacks, direct heavy commands and unreadable evidence.", "$ref": "#/$defs/SessionHeavyWork" },
         "coordinator": { "$ref": "#/$defs/SessionCoordinator" },
         "machine_scope": { "description": "This Session is in the daemon's machine workspace. It may still need role registration; the coordinator field is the registration receipt.", "type": "boolean" },
@@ -151,6 +153,18 @@
         "work_state": { "$ref": "#/$defs/WorkState" }
       }
     },
+	"SessionWaitTarget": {
+	  "description": "One unit of work a Session waits on. `session`: a dispatched child whose Session is known; `label` is its visible name. `heavy`: a declared-heavy callback; `label` is the command's declared reason and `phase` says whether it holds the compile slot or is in line. `callback`: another daemon callback; `label` is its title. `task`: a dispatched task with no child Session yet; `label` is its title.",
+	  "type": "object",
+	  "additionalProperties": false,
+	  "required": ["task_id", "kind", "label"],
+	  "properties": {
+	    "task_id": { "type": "string" },
+	    "kind": { "type": "string", "enum": ["session", "heavy", "callback", "task"] },
+	    "label": { "type": "string" },
+	    "phase": { "description": "Only for `heavy`: `running` holds the compile slot, `queued` is in line for it. Absent when the slot could not be read.", "type": "string", "enum": ["running", "queued"] }
+	  }
+	},
 	"SessionHeavyWork": {
 	  "type": "object",
 	  "additionalProperties": false,

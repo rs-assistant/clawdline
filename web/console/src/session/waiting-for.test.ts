@@ -1,0 +1,37 @@
+// What a waiting Session waits for: `node --test web/console/src/session/waiting-for.test.ts`.
+import { test } from "node:test"
+import assert from "node:assert/strict"
+// @ts-expect-error -- a `.ts` path, for node; see order.test.ts.
+import { waitingForWords } from "./waiting-for.ts"
+// @ts-expect-error -- a `.ts` path, for node; see order.test.ts.
+import { nextWord } from "../next-strings.ts"
+// @ts-expect-error -- a `.ts` path, for node; see order.test.ts.
+import { withCatalog } from "../catalog-testing.ts"
+
+withCatalog("zh-Hant")
+
+test("a Session waiting on heavy commands names each command and its place at the compile slot", () => {
+  const said = waitingForWords({ waiting_for: [
+    { task_id: "a", kind: "heavy", label: "go test ./...", phase: "queued" },
+    { task_id: "b", kind: "heavy", label: "npm run build" },
+  ] }, nextWord)
+  assert.equal(said.text, "等待：go test ./...（排隊中） · npm run build")
+  assert.equal(said.covered, false)
+})
+
+test("a Session waiting only on dispatched children names them as Sessions", () => {
+  const said = waitingForWords({ waiting_for: [{ task_id: "a", kind: "session", label: "Fix the list" }], waiting_for_omitted: 2 }, nextWord)
+  assert.equal(said.text, "等待 Session：Fix the list  +2")
+})
+
+test("the running heavy command its 🏗️ marker already shows is not said twice", () => {
+  const row = { heavy_work: { task_id: "a", reason: "go test ./..." },
+    waiting_for: [{ task_id: "a", kind: "heavy", label: "go test ./...", phase: "running" }] }
+  assert.deepEqual(waitingForWords(row, nextWord), { text: "", title: "", covered: true })
+  // Control: the same wait without the marker is said.
+  assert.equal(waitingForWords({ waiting_for: row.waiting_for }, nextWord).text, "等待：go test ./...（執行中）")
+})
+
+test("a row with nothing named says nothing, and the list falls back to its generic wait", () => {
+  assert.deepEqual(waitingForWords({}, nextWord), { text: "", title: "", covered: false })
+})

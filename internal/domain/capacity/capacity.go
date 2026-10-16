@@ -397,7 +397,9 @@ const (
 	// Provider-native work under a session: how many rows the fleet carries,
 	// and the immutable metadata/changing-tail cursors held to make a one-second
 	// reading cheap.
-	SessionsAgentRows     = "sessions.agent_rows"
+	SessionsAgentRows = "sessions.agent_rows"
+	// The waited-on tasks one Session row names (transport/http/session_wait_targets.go).
+	SessionWaitingFor     = "session.waiting_for"
 	CacheBackgroundAgents = "cache.background_agents"
 	// SessionsShellOutputBytes is the most of one background command's
 	// output GET /v1/sessions/{id}/shells/{shell} sends.
@@ -908,6 +910,15 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics},
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/adapters/subagents.MaximumShown"},
+		},
+		{
+			// The live tasks one waiting Session row names. The first ones in
+			// store order are kept; the row counts the rest it left out.
+			Name: SessionWaitingFor, Class: Observation, Unit: Rows,
+			Limit: 8, AtLimit: EvictOldest,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/transport/http.MaximumWaitTargets"},
 		},
 		{
 			// Claude sidecars, changing transcript tails and append cursors.

@@ -235,6 +235,7 @@
 | `session.title_request_bytes` | 16384 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `session.title_rows` | 200 | `rows` | `evict_oldest` | `diagnostics, notice` | — |
 | `session.todo_batch_rows` | 20 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `session.waiting_for` | 8 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `sessions.activity_reads` | 64 | `rows` | `refuse` | `diagnostics` | — |
 | `sessions.agent_rows` | 6 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `sessions.archive_restore_batch` | 20 | `rows` | `refuse` | `diagnostics, sender` | — |

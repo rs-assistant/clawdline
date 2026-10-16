@@ -6930,6 +6930,20 @@ export interface SessionRow {
   tty?: string
 
   /**
+   * The live broker work that makes a broker-projected `waiting_session` row wait,
+   * collected by the same pass that decided the state. Present only on such rows;
+   * at most `session.waiting_for` entries, with `waiting_for_omitted` counting the
+   * rest. Both Cloud list scopes and the local list describe a wait from this field
+   * alone.
+   */
+  waiting_for?: SessionWaitTarget[]
+
+  /**
+   * Live waited-on tasks left out of `waiting_for` by its bound.
+   */
+  waiting_for_omitted?: number
+
+  /**
    * Who the declaring session said will move it — a session id, or a person.
    */
   work_moved_by?: string
@@ -7188,6 +7202,25 @@ export interface SessionTitleReply {
  */
 export interface SessionTitleRequest {
   title: string
+}
+
+/**
+ * One unit of work a Session waits on. `session`: a dispatched child whose Session
+ * is known; `label` is its visible name. `heavy`: a declared-heavy callback;
+ * `label` is the command's declared reason and `phase` says whether it holds the
+ * compile slot or is in line. `callback`: another daemon callback; `label` is its
+ * title. `task`: a dispatched task with no child Session yet; `label` is its title.
+ */
+export interface SessionWaitTarget {
+  kind: string
+  label: string
+
+  /**
+   * Only for `heavy`: `running` holds the compile slot, `queued` is in line for it.
+   * Absent when the slot could not be read.
+   */
+  phase?: string
+  task_id: string
 }
 
 export interface SessionsSnapshot {
