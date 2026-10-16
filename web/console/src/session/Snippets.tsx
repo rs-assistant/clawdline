@@ -824,7 +824,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
         <div className="sheet snippet-editor-sheet" role="dialog" aria-modal="true" aria-labelledby="workflow-quick-title" onClick={(event) => event.stopPropagation()}>
           <h2 id="workflow-quick-title">{W("new")}</h2>
           <div className="block"><label className="field-label" htmlFor="workflow-quick-name">{W("name")}</label>
-            <input className="find" id="workflow-quick-name" type="text" maxLength={200} autoFocus value={workflowDraft.title}
+            <input className="find" id="workflow-quick-name" type="text" maxLength={200} value={workflowDraft.title}
               onChange={(event) => setWorkflowDraft({ ...workflowDraft, title: event.target.value })} /></div>
           <div className="block"><label className="field-label" htmlFor="workflow-quick-message">{W("message")}</label>
             <textarea className="find" id="workflow-quick-message" rows={6} maxLength={4000} value={workflowDraft.body}
