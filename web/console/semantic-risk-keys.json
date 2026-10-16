@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5306,
+  "englishKeys": 5308,
   "counts": {
-    "negation": 1517,
+    "negation": 1518,
     "state": 734,
     "permission": 336,
-    "deletion": 110,
+    "deletion": 111,
     "uncertainty": 155
   },
-  "unionCount": 2341,
+  "unionCount": 2342,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1365,6 +1365,7 @@
       "next.updateStagedApp",
       "next.worktreeRemoveFailed",
       "next.worktreeRemoveRisk",
+      "next.worktreeRemoveWaiting",
       "projects.activityNone",
       "projects.emptyAdd",
       "projects.folderAddFailed",
@@ -2697,6 +2698,7 @@
       "next.worktreeRemoveDescription",
       "next.worktreeRemoveFailed",
       "next.worktreeRemoveTitle",
+      "next.worktreeRemoveWaiting",
       "settings.settingsHooksLegacy",
       "settings.settingsHooksRemove",
       "settings.settingsScopeHint",
@@ -4912,6 +4914,7 @@
     "next.worktreeRemoveFailed",
     "next.worktreeRemoveRisk",
     "next.worktreeRemoveTitle",
+    "next.worktreeRemoveWaiting",
     "projects.activityNone",
     "projects.editDone",
     "projects.emptyAdd",
