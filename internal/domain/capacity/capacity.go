@@ -363,9 +363,6 @@ const (
 	CacheGitNotRepoRows = "cache.git_not_repo_rows"
 	// Minimum age before the machine dashboard refreshes grouped reclaim rows.
 	CacheReclaimSummary = "cache.reclaim_summary"
-	// The Project Timeline is a projection that stores nothing, so what is
-	// bounded is the read (limits §3.3).
-	TimelineEntries = "timeline.entries"
 	// When each session last moved: how many records one reading of the
 	// machine may read, and what the last reading of each one found.
 	SessionsActivityReads = "sessions.activity_reads"
@@ -400,7 +397,9 @@ const (
 	// Provider-native work under a session: how many rows the fleet carries,
 	// and the immutable metadata/changing-tail cursors held to make a one-second
 	// reading cheap.
-	SessionsAgentRows     = "sessions.agent_rows"
+	SessionsAgentRows = "sessions.agent_rows"
+	// The waited-on tasks one Session row names (transport/http/session_wait_targets.go).
+	SessionWaitingFor     = "session.waiting_for"
 	CacheBackgroundAgents = "cache.background_agents"
 	// SessionsShellOutputBytes is the most of one background command's
 	// output GET /v1/sessions/{id}/shells/{shell} sends.
@@ -493,6 +492,7 @@ const (
 	CloudTerminalRosterRefresh        = "cloud.terminal_roster_refresh_seconds"
 	CloudTerminalRosterDeadline       = "cloud.terminal_roster_deadline_seconds"
 	CloudTerminalRosterRetry          = "cloud.terminal_roster_retry_seconds"
+	CloudRosterShortReadAttempts      = "cloud.roster_short_read_attempts"
 	CloudTerminalUnverifiedRetire     = "cloud.terminal_unverified_retire_seconds"
 	CloudTerminalConnections          = "cloud.terminal_connections"
 	CloudTerminalViewerConnections    = "cloud.terminal_viewer_connections"
@@ -911,6 +911,15 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics},
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/adapters/subagents.MaximumShown"},
+		},
+		{
+			// The live tasks one waiting Session row names. The first ones in
+			// store order are kept; the row counts the rest it left out.
+			Name: SessionWaitingFor, Class: Observation, Unit: Rows,
+			Limit: 8, AtLimit: EvictOldest,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/transport/http.MaximumWaitTargets"},
 		},
 		{
 			// Claude sidecars, changing transcript tails and append cursors.
@@ -2128,20 +2137,6 @@ func Register() []Entry {
 			Sources:   []string{"internal/app.ScreenHeldLimit"},
 		},
 		{
-			// One Project's Timeline entries. The Swift app's equivalent
-			// refused new writes here and stopped recording for over a day
-			// with nobody told (timeline-design §0); this row cannot repeat
-			// that, because the Timeline stores nothing — every entry is
-			// re-derived from the broker's records on the next read, so the
-			// oldest going is a shorter answer and never a lost fact. The
-			// count and the limit are both on the wire (timeline-design A4).
-			Name: TimelineEntries, Class: Observation, Unit: Rows,
-			Limit: 500, AtLimit: EvictOldest,
-			Told:      []Channel{Diagnostics},
-			EvictedBy: Daemon,
-			Sources:   []string{"internal/transport/http.timelineEntryLimit"},
-		},
-		{
 			// How many sessions one reading of the machine may ask an
 			// activity time of (session.Activity). Each one is a stat of a
 			// file the assistant writes anyway, inside the one producer, so
@@ -3080,6 +3075,15 @@ func Register() []Entry {
 			Limit: 2, AtLimit: Expire,
 			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/transport/cloud.CloudTerminalRosterDeadlineLimit"},
+		},
+		{
+			// A short authority read may recover one stalled network path
+			// through a fresh connection within the same two-second deadline.
+			// Further failures keep content and terminal access closed.
+			Name: CloudRosterShortReadAttempts, Class: Buffer, Unit: Rows,
+			Limit: 2, AtLimit: Refuse,
+			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/cloud.RosterShortReadAttemptsLimit"},
 		},
 		{
 			// A failed terminal roster read is read again on the first check

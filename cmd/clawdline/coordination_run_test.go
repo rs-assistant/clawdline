@@ -33,6 +33,9 @@ func TestCoordinatedLandingRunsOnlyAfterGrantAndReleases(t *testing.T) {
 		},
 		func(argv, env []string) (int, error) {
 			ran = true
+			if len(env) != 0 {
+				t.Fatalf("landing unexpectedly changed child environment: %v", env)
+			}
 			if len(moves) != 1 {
 				t.Fatalf("command ran before grant: %v", moves)
 			}
@@ -40,6 +43,43 @@ func TestCoordinatedLandingRunsOnlyAfterGrantAndReleases(t *testing.T) {
 		})
 	if code != 0 || !ran || len(moves) != 2 || moves[1] != "/v1/orchestrator/leases/release" {
 		t.Fatalf("code %d, ran %v, moves %v, stderr %q", code, ran, moves, stderr.String())
+	}
+}
+
+func TestRestartWrapperMarksChildSoHeavyRefusesBeforeQueuing(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/orchestrator/leases" {
+			fmt.Fprint(w, `{"state":"granted"}`)
+		} else {
+			fmt.Fprint(w, `{"state":"released"}`)
+		}
+	}))
+	defer server.Close()
+	b := &broker{base: server.URL, token: "test", client: server.Client()}
+	var stdout, stderr bytes.Buffer
+	code := runCoordinatedOperation(&stdout, &stderr, b, coordinationRunOptions{resource: "daemon_restart", maxWait: time.Minute},
+		[]string{"clawdline", "heavy", "--", "go", "build"}, time.Now, time.Sleep,
+		func(key string) string {
+			if key == "CODEX_THREAD_ID" {
+				return "379d0000-0000-4000-8000-000000000001"
+			}
+			return ""
+		},
+		func(argv, env []string) (int, error) {
+			if len(env) != 1 || env[0] != "CLAWDLINE_DAEMON_RESTART_HELD=1" {
+				t.Fatalf("child env: %v", env)
+			}
+			deps := heavyDeps{getenv: func(key string) string {
+				if key == "CLAWDLINE_DAEMON_RESTART_HELD" {
+					return "1"
+				}
+				return ""
+			}, stderr: &stderr,
+				run: func([]string, []string) (int, error) { t.Fatal("heavy command ran"); return 0, nil }}
+			return runHeavy(heavyOptions{}, []string{"go", "build"}, deps), nil
+		})
+	if code != 2 || !bytes.Contains(stderr.Bytes(), []byte("daemon_restart")) {
+		t.Fatalf("code %d, stderr %q", code, stderr.String())
 	}
 }
 

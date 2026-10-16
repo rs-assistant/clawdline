@@ -27,6 +27,7 @@ import {
 } from "../legacy/bridge.js"
 import { loadPersonas, onPersonas, personaById, personaName, personasNow } from "../personas.js"
 import { toast } from "./toast.js"
+import { waitingForWords } from "../session/waiting-for.js"
 import { ActionConfirm } from "./action-confirm.js"
 import { RoleDetail } from "./role-detail.js"
 import "./info-next.css"
@@ -329,7 +330,7 @@ function statusHTML(s: Row | null): string {
     const waits = ((s.coordination || {}).waitingOn || []).map((wait: Record<string, string>) =>
       [wait.ownerLabel || wait.ownerSessionId, wait.releaseCondition].filter(Boolean).join(" · "),
     )
-    const waitingCopy = waits.join(" · ") || selfReportedPeerWaitCopy(s) || T.closeabilityMoverSession
+    const waitingCopy = waits.join(" · ") || selfReportedPeerWaitCopy(s) || waitingForWords(s, nextWord).text || T.closeabilityMoverSession
     workSaid =
       '<span class="session-work-copy" data-work-state="waiting_session">' + statusGlyphHTML("⏳", waitingCopy) + "</span>" + owedBadgeHTML(s)
   } else {

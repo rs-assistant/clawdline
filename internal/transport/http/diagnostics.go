@@ -462,6 +462,7 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 			}
 			return s.agents.RowsReading()
 		},
+		capacity.SessionWaitingFor: waitTargetsReading,
 		capacity.CacheBackgroundAgents: func() capacity.Reading {
 			if s.agents == nil {
 				return capacity.Unmeasured("this server keeps no background-work cache")
@@ -1103,17 +1104,6 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		capacity.WorkListPageRows: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-answer Board page; later rows remain behind next_cursor"}
 		},
-		// The Timeline stores nothing, so what is measured is what the next
-		// read would walk.
-		capacity.TimelineEntries: func() capacity.Reading {
-			entries, err := s.timelineReading()
-			if err != nil {
-				return capacity.Unmeasured(err.Error())
-			}
-			// The fullest single Project: a timeline is one Project's, so the
-			// row is at its limit when any one of them reaches it.
-			return capacity.Reading{Known: true, Used: entries}
-		},
 		capacity.CloudRelayQueue: func() capacity.Reading {
 			line, ok := cloudLines.Load(s.cfg.Dir)
 			if !ok {
@@ -1186,6 +1176,7 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		},
 		capacity.CloudTerminalRosterRefresh:        func() capacity.Reading { return s.terminalCapacity(capacity.CloudTerminalRosterRefresh) },
 		capacity.CloudTerminalRosterDeadline:       func() capacity.Reading { return s.terminalCapacity(capacity.CloudTerminalRosterDeadline) },
+		capacity.CloudRosterShortReadAttempts:      func() capacity.Reading { return s.terminalCapacity(capacity.CloudRosterShortReadAttempts) },
 		capacity.CloudTerminalRosterRetry:          func() capacity.Reading { return s.terminalCapacity(capacity.CloudTerminalRosterRetry) },
 		capacity.CloudTerminalUnverifiedRetire:     func() capacity.Reading { return s.terminalCapacity(capacity.CloudTerminalUnverifiedRetire) },
 		capacity.CloudTerminalConnections:          func() capacity.Reading { return s.terminalCapacity(capacity.CloudTerminalConnections) },

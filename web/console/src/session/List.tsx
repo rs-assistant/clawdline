@@ -8,6 +8,7 @@ import { detailSessionName, projectedSessionIdentity, sessionCoordinatorBound, s
 import { requestConfirm } from "../overlays/events.js"
 import { ACTION_WIDTH, actionWidth, archivable, revealFor, richSessionSwipeActions, swipes, type Reveal } from "./swipe.js"
 import { conversationNotStarted } from "./readiness.js"
+import { waitingForWords } from "./waiting-for.js"
 import { retainedStateWords, sessionReadingChinese } from "../session-reading.js"
 import { rowPersonaLine } from "../personas.js"
 import { usePersonas } from "./PersonaBot.js"
@@ -93,7 +94,7 @@ export function ProjectedRow({ title, sessionID, machineID, machineName, assista
       <RowActivity at={lastMovementAt ? lastMovementAt / 1000 : undefined} />
       {machineScope && coordinatorBound ? <span className="coordinator-chip" aria-hidden="true">Clawdfather</span> : null}</div>
     {status ? <StateLine row={{ ...status, id: sessionID, state } as SessionRow}
-      role={role} useLocalTasks={false} suffix={freshness} />
+      role={role} suffix={freshness} />
       : <div className="state">{state === "working" && <canvas className="spin" aria-hidden="true" />}
         <span>{stateLabel}</span>{freshness && <span className="session-activity">{freshness}</span>}
         {attention && <span className="session-attention"><span className="session-attention-dot" /></span>}</div>}
@@ -138,12 +139,11 @@ export function Mark({ icon, cellPx, id }: { icon: SessionRow["icon"]; cellPx: n
  * This console has no optimistic sends and no in-flight close, so `kind` is the
  * row's own state: the original's `closing` and `pending` branches never apply.
  */
-function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape: string } {
+function stateLine(row: SessionRow): { html: string; shape: string } {
   const T = L.strings
   const coordination = row.coordination
   const waitingOn = coordination?.waitingOn ?? []
   const waitedOnBy = coordination?.waitedOnBy ?? []
-  const roots = useLocalTasks ? L.tasksOfRoot(row.id) : []
   const callbackLabel = nextWord("sessionCallbackActive")
   const callbackDetail = [callbackLabel, row.heavy_work?.reason].filter(Boolean).join(" · ")
   const callbackSaid = row.heavy_work
@@ -180,26 +180,20 @@ function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape
     ? `<span class="coordination-wait" title="${L.escapeHTML(peerTitle)}">${L.glyphHTML("⏳", peerText)}</span>`
     : ""
 
-  // The pinned fleet list has the daemon's work state but does not load the
-  // local task collection used by projectSessionWorkState to prove a peer wait.
-  const work = !useLocalTasks && row.state === "idle" && row.work_state === "waiting_session"
-    ? { state: "waiting_session" } : L.workState(row)
+  // A broker-decided wait is the daemon's, proved by the tasks it names in
+  // `waiting_for`. No list re-proves it from a task collection of its own:
+  // the Cloud lists have none, and a second proof is how the scopes drifted.
+  const brokerWait = row.state === "idle" && row.work_state === "waiting_session" && row.work_provenance !== "self"
+  const work = brokerWait ? { state: "waiting_session" } : L.workState(row)
+  const waitingFor = waitingForWords(row, nextWord)
   if (work.state === "waiting_session" && !peerSaid) {
     if (row.work_provenance === "self" && row.work_note && row.work_moved_by && row.work_person_needed === false) {
       const declaredTitle = row.work_moved_by + " · " + row.work_note
       peerSaid = `<span class="coordination-wait" title="${L.escapeHTML(declaredTitle)}">${L.glyphHTML("⏳", L.selfReportedPeerWait(row))}</span>`
-    } else {
-      const liveRoots = roots.filter(L.taskLive)
-      if (liveRoots.length) {
-        const childWait = T.webTaskTasks + ": " + liveRoots.map((task) => task.title || task.id).join(" · ")
-        peerSaid = `<span class="coordination-wait" title="${L.escapeHTML(childWait)}">${L.glyphHTML("⏳", childWait)}</span>`
-      }
-    }
-    if (!peerSaid && !useLocalTasks) {
-      const waiting = row.work_provenance === "broker" && row.work_note
-        ? nextWord("sessionWaitingOnNamedSession", { session: row.work_note })
-        : nextWord("sessionWaitingOnSession")
-      peerSaid = `<span class="coordination-wait">${L.glyphHTML("⏳", waiting)}</span>`
+    } else if (waitingFor.text) {
+      peerSaid = `<span class="coordination-wait" title="${L.escapeHTML(waitingFor.title)}">${L.glyphHTML("⏳", waitingFor.text)}</span>`
+    } else if (!waitingFor.covered) {
+      peerSaid = `<span class="coordination-wait">${L.glyphHTML("⏳", nextWord("sessionWaitingOnSession"))}</span>`
     }
   }
 
@@ -225,15 +219,15 @@ function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape
   // enough to deserve words, they ride beside the normal state as a quiet,
   // single-line annotation. A conversation that has not started says
   // neither: there is nothing yet to have a state.
-  const workSaid = notStarted || !useLocalTasks && work.state === "waiting_session"
-    ? "" : L.workStateHTML(row)
+  const workSaid = notStarted ? "" : work.state === "waiting_session" ? L.owedBadgeHTML(row) : L.workStateHTML(row)
 
   const waitShape = [
     ...waitingOn.map((wait) => [wait.id || "wait", wait.ownerLabel || wait.ownerSessionId || "", wait.releaseCondition || ""].join(":")),
     ...waitedOnBy.map((wait) =>
       ["owed", wait.id || "wait", wait.waiterLabel || wait.waiterSessionId || "", wait.releaseCondition || ""].join(":"),
     ),
-    ...roots.filter(L.taskLive).map((task) => ["child", task.id || "", task.title || ""].join(":")),
+    ...(row.waiting_for ?? []).map((target) => ["for", target.task_id, target.kind, target.phase || "", target.label].join(":")),
+    ...(row.waiting_for_omitted ? ["for+" + String(row.waiting_for_omitted)] : []),
     ...(work.state === "waiting_session" && row.work_provenance === "self"
       ? [["declared", row.work_note || "", row.work_moved_by || "", String(row.work_person_needed)].join(":")]
       : []),
@@ -285,10 +279,10 @@ function stateLine(row: SessionRow, useLocalTasks = true): { html: string; shape
  * one, and then `stateLine`'s words. The role is written into the same markup
  * as the words so that it swipes with them and adds no line of its own.
  */
-function StateLine({ row, role, useLocalTasks = true, suffix = "" }: { row: SessionRow; role: ReturnType<typeof rowPersonaLine>;
-  useLocalTasks?: boolean; suffix?: string }) {
+function StateLine({ row, role, suffix = "" }: { row: SessionRow; role: ReturnType<typeof rowPersonaLine>;
+  suffix?: string }) {
   const ref = useRef<HTMLDivElement>(null)
-  const { html, shape } = stateLine(row, useLocalTasks)
+  const { html, shape } = stateLine(row)
   const statusHTML = html + (suffix ? '<span class="session-activity">' + L.escapeHTML(suffix) + "</span>" : "")
   const roleHTML = role
     ? '<span class="persona-state" title="' + L.escapeHTML(role.title) + '">' +

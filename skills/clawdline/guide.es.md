@@ -1926,6 +1926,10 @@ Es un registro y un mensaje, no un bloqueo ni una vigilancia de archivos.
 **Leases.** Dos recursos: `heavy_compile` (el único slot de compilación de la máquina) y `landing`
 (uno por checkout).
 
+Termine la compilación antes de adquirir `daemon_restart`. No coloque `clawdline dev install` ni otro comando que solicite `heavy_compile` dentro de este envoltorio: la reserva de reinicio bloquea la compilación. Tras coordinar la ventana de mantenimiento, ejecute `clawdline dev install` directamente; compila antes de cambiar. Ejecute también `clawdline update --apply` directamente: la actualización gestiona descarga, cambio, comprobación y reversión. Use el envoltorio solo para un reinicio independiente sin compilación.
+
+Antes de actuar, consulte `clawdline coordination status`. Solicite una pausa segura con `clawdline coordination pause --wake lease:heavy_compile`; el destinatario confirma con `clawdline coordination observed` y `clawdline coordination safe`. Envuelva solo un reinicio independiente con `clawdline coordination run --resource daemon_restart -- <command>`. Para integrar en la rama principal use `clawdline coordination run --resource landing --checkout /absolute/checkout -- <command>`.
+
 **Ejecuta un build o una batería de pruebas a través de `clawdline heavy -- <command>`**, no a
 pelo. Se pone en cola para `heavy_compile`, espera a que la máquina tenga memoria disponible (una
 cuarta parte, 1 GB como máximo, y sin atascos de memoria por encima del 10%), ejecuta el comando con

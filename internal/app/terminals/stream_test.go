@@ -98,15 +98,20 @@ func TestCloudFrameHeartbeatKeepsIdleShellFreshAndStopsOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer watch.Stop()
+	// The heartbeat is a parameter, so a short one proves the same thing as
+	// the production interval: a still screen is sent again on every beat.
+	// It stays above pollEvery, which is how often the screen is read.
+	const heartbeat = 300 * time.Millisecond
+	const beats = 4
 	events := make(chan Event, 32)
 	done := make(chan error, 1)
 	go func() {
-		done <- watch.RunWithFrameHeartbeat(ctx, 3*time.Second, func(e Event) error { events <- e; return nil })
+		done <- watch.RunWithFrameHeartbeat(ctx, heartbeat, func(e Event) error { events <- e; return nil })
 	}()
 	var first, last time.Time
 	frames := 0
-	deadline := time.After(34 * time.Second)
-	for frames < 11 {
+	deadline := time.After(10 * time.Second)
+	for frames < beats+1 {
 		select {
 		case e := <-events:
 			if e.Kind != EventFrame {
@@ -124,11 +129,11 @@ func TestCloudFrameHeartbeatKeepsIdleShellFreshAndStopsOffline(t *testing.T) {
 			last = e.Frame.At
 			frames++
 		case <-deadline:
-			t.Fatalf("idle shell yielded only %d frames in 34 seconds", frames)
+			t.Fatalf("idle shell yielded only %d frames in 10 seconds", frames)
 		}
 	}
-	if last.Sub(first) < 30*time.Second {
-		t.Fatalf("did not cover 30 idle seconds: %s", last.Sub(first))
+	if last.Sub(first) < beats*heartbeat {
+		t.Fatalf("did not cover %d heartbeats: %s", beats, last.Sub(first))
 	}
 	host.offline.Store(true)
 	offlineDeadline := time.After(5 * time.Second)
@@ -144,7 +149,7 @@ func TestCloudFrameHeartbeatKeepsIdleShellFreshAndStopsOffline(t *testing.T) {
 					if e.Kind == EventFrame {
 						t.Fatal("offline terminal emitted a heartbeat")
 					}
-				case <-time.After(3500 * time.Millisecond):
+				case <-time.After(4 * heartbeat):
 				}
 				cancel()
 				<-done

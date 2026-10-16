@@ -1,6 +1,7 @@
 package swiftstore
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -146,6 +147,36 @@ func TestARootsOwnCallbackDoesNotHoldItOpen(t *testing.T) {
 		if c := control.Closeability(ownCloseInput(ownRootLive)); c.State != "blocked" {
 			t.Fatalf("control: the same live task without a callback intent is %s", c.State)
 		}
+	}
+}
+
+// The tasks a waiting row names are the ones that made it wait: every live
+// task it counted, and none it did not. A row that is not waiting on tasks
+// names nothing, so no list can show a wait the state does not have.
+func TestAWaitingRootNamesExactlyTheTasksItCounted(t *testing.T) {
+	base := Snapshot{Source: SourceDisabled, CoordinatorKnown: true}
+	heavy := Task{ID: "heavy1", State: "queued", Kind: "callback", Title: "Queued heavy command finished",
+		Assistant: "claude", Created: 990, CallbackIntent: "heavy", RootSession: strp("conv-root"), RootAssistant: strp("claude")}
+	child := Task{ID: "child1", State: "briefed", Title: "Fix the list", Assistant: "codex", Created: 991,
+		RootSession: strp("conv-root"), RootAssistant: strp("claude")}
+	done := Task{ID: "done1", State: "success", Title: "Finished", Assistant: "codex", Created: 989,
+		RootSession: strp("conv-root"), RootAssistant: strp("claude")}
+	other := Task{ID: "other1", State: "briefed", Title: "Someone else's", Assistant: "codex", Created: 992,
+		RootSession: strp("conv-other"), RootAssistant: strp("claude")}
+	snap := base.With(Own{Tasks: []Task{heavy, child, done, other}})
+	w := snap.Work(ownRootLive, "idle")
+	var ids []string
+	for _, task := range w.Waiting {
+		ids = append(ids, task.ID)
+	}
+	if w.State != "waiting_session" || strings.Join(ids, ",") != "heavy1,child1" {
+		t.Fatalf("waiting root: state %s, names %v", w.State, ids)
+	}
+	if w := snap.Work(ownRootLive, "working"); w.Waiting != nil {
+		t.Fatalf("a working root names waits: %v", w.Waiting)
+	}
+	if w := base.With(Own{Tasks: []Task{done, other}}).Work(ownRootLive, "idle"); w.Waiting != nil || w.State == "waiting_session" {
+		t.Fatalf("control: a root with nothing live reads %s and names %v", w.State, w.Waiting)
 	}
 }
 

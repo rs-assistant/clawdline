@@ -664,6 +664,7 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/strings"}, s.strings},
 		{Route{"*", "/v1/settings"}, s.settingsRoute},
 		{Route{"*", "/v1/settings/browser"}, s.settingsRoute},
+		{Route{"*", "/v1/settings/dispatch-policy"}, s.dispatchPolicySettings},
 		{Route{"*", "/v1/notification-rules"}, s.notificationRulesRoute},
 		{Route{"*", "/v1/settings/notifications"}, s.notificationSettingsRoute},
 		{Route{"*", "/v1/settings/default-models"}, s.defaultModelsRoute},
@@ -688,8 +689,6 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/projects/"}, s.projectsRoute},
 		// Project settings a source machine offers and a mirror applies (project_sync.go).
 		{Route{"*", "/v1/project-sync/"}, s.projectSyncRoute},
-		// The Project Timeline reads this daemon's own history and stores nothing.
-		{Route{"*", "/v1/timeline"}, s.timelineRoute},
 		{Route{"*", "/v1/transcript"}, s.transcriptRoute},
 		// The token ledger, read by a person or a session (usage.go).
 		{Route{"*", "/v1/usage/"}, s.usageRoute},

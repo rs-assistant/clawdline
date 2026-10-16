@@ -161,6 +161,25 @@ func TestASilentWaiterAtTheHeadIsPassedOver(t *testing.T) {
 	}
 }
 
+func TestGoneWaiterDisappearsFromLeasesAndTheNextAskRemovesIt(t *testing.T) {
+	b, ctx := newTestBroker(t)
+	started := time.Unix(1_800_000_000, 0)
+	kernel := started
+	b.ProcessStart = func(int) time.Time { return kernel }
+	ask(t, b, ctx, LeaseRequest{Resource: ResourceCompile, RequestID: askA})
+	ask(t, b, ctx, LeaseRequest{Resource: ResourceCompile, RequestID: askB,
+		PID: os.Getpid(), ProcessStart: started})
+	kernel = started.Add(time.Hour) // PID was reused: the original waiter is gone.
+	views, err := b.Leases(ctx)
+	if err != nil || len(views) != 1 || len(views[0].Queue) != 0 {
+		t.Fatalf("gone waiter was shown in leases: %+v, %v", views, err)
+	}
+	got := ask(t, b, ctx, LeaseRequest{Resource: ResourceCompile, RequestID: askC})
+	if got.State != "queued" || got.Position != 1 || len(got.View.Queue) != 1 {
+		t.Fatalf("new waiter remained behind a dead PID: %+v", got)
+	}
+}
+
 // D20: two roots landing into the same checkout — the second does not get the
 // lease; a different checkout is a different lease.
 func TestTheLandingLeaseIsOneCheckoutsAndHoldsASecondRootBack(t *testing.T) {

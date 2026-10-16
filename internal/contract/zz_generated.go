@@ -5830,6 +5830,16 @@ type SessionRow struct {
 	State  SessionState    `json:"state"`
 	TTY    string          `json:"tty,omitempty"`
 
+	// The live broker work that makes a broker-projected `waiting_session` row wait,
+	// collected by the same pass that decided the state. Present only on such rows; at
+	// most `session.waiting_for` entries, with `waiting_for_omitted` counting the
+	// rest. Both Cloud list scopes and the local list describe a wait from this field
+	// alone.
+	WaitingFor []SessionWaitTarget `json:"waiting_for,omitempty"`
+
+	// Live waited-on tasks left out of `waiting_for` by its bound.
+	WaitingForOmitted int64 `json:"waiting_for_omitted,omitempty"`
+
 	// Who the declaring session said will move it — a session id, or a person.
 	WorkMovedBy string `json:"work_moved_by,omitempty"`
 
@@ -6026,6 +6036,22 @@ type SessionTitleReply struct {
 // whitespace-only string clears the name this Clawdline installation keeps.
 type SessionTitleRequest struct {
 	Title string `json:"title"`
+}
+
+// One unit of work a Session waits on. `session`: a dispatched child whose
+// Session is known; `label` is its visible name. `heavy`: a declared-heavy
+// callback; `label` is the command's declared reason and `phase` says whether
+// it holds the compile slot or is in line. `callback`: another daemon callback;
+// `label` is its title. `task`: a dispatched task with no child Session yet;
+// `label` is its title.
+type SessionWaitTarget struct {
+	Kind  string `json:"kind"`
+	Label string `json:"label"`
+
+	// Only for `heavy`: `running` holds the compile slot, `queued` is in line for it.
+	// Absent when the slot could not be read.
+	Phase  string `json:"phase,omitempty"`
+	TaskID string `json:"task_id"`
 }
 
 type SessionsSnapshot struct {
@@ -7325,164 +7351,6 @@ const (
 
 // TerminalStatusValues is every value the contract allows, in contract order.
 var TerminalStatusValues = []TerminalStatus{TerminalStatusRunning, TerminalStatusExited, TerminalStatusClosed, TerminalStatusUnreachable}
-
-// The entry bound, on the wire where a reader can see it (timeline-design A4).
-// What is dropped at the bound is the oldest, and it is a projection of records
-// this daemon still holds, so nothing is lost by dropping it.
-type TimelineCapacity struct {
-	EntryCount int64 `json:"entryCount"`
-	EntryLimit int64 `json:"entryLimit"`
-}
-
-// What kind of work an entry was. `feature` for ordinary delivery, `operation`
-// for a task whose write set was only tooling or documentation.
-type TimelineCategory string
-
-const (
-	TimelineCategoryFeature   TimelineCategory = "feature"
-	TimelineCategoryOperation TimelineCategory = "operation"
-)
-
-// TimelineCategoryValues is every value the contract allows, in contract order.
-var TimelineCategoryValues = []TimelineCategory{TimelineCategoryFeature, TimelineCategoryOperation}
-
-// How far one Project's history has been read. It is derived on every read and
-// stored nowhere, so it can never freeze the way a saved cursor did.
-type TimelineCheckpoint struct {
-	HistoryStatus TimelineHistoryStatus `json:"historyStatus"`
-	ProjectID     string                `json:"projectId"`
-}
-
-// One delivery. The id is the broker task's, because the task is the thing that
-// was delivered and an id of this projection's own invention would be a second
-// name for it.
-type TimelineEntry struct {
-	// The work items this delivery is on, as the task's own `work_id` names them.
-	BoardItemIds []string        `json:"boardItemIds"`
-	Events       []TimelineEvent `json:"events"`
-	ID           string          `json:"id"`
-
-	// The task's own title, never a summary written for it.
-	OriginalTitle   string             `json:"originalTitle"`
-	PrimaryCategory TimelineCategory   `json:"primaryCategory"`
-	ProjectID       string             `json:"projectId"`
-	Projection      TimelineProjection `json:"projection"`
-	SourceRevisions []TimelineRevision `json:"sourceRevisions"`
-
-	// The delivery's own one-paragraph account of itself, cut to a length the card can
-	// hold. Absent when the task wrote none.
-	Summary string `json:"summary,omitempty"`
-}
-
-type TimelineEnvelope struct {
-	Timeline TimelineSnapshot `json:"timeline"`
-}
-
-// One piece of evidence under an entry, and who said it. `authority` is what
-// wrote it down — `broker` for this daemon's own landing record — because
-// an event with no authority is an assertion.
-type TimelineEvent struct {
-	Authority string `json:"authority"`
-
-	// Unix seconds: when the thing happened. Absent when only the observation time is
-	// known.
-	EffectiveAt int64  `json:"effectiveAt,omitempty"`
-	Kind        string `json:"kind"`
-
-	// Unix seconds: when this Mac learned of it.
-	ObservedAt int64  `json:"observedAt"`
-	Result     string `json:"result"`
-}
-
-// How far back this Project's coverage reaches. `unknown` is the honest answer
-// while no history importer exists; `capacity` is the entry bound reached, and
-// what was retained is never removed to make room.
-type TimelineHistoryStatus string
-
-const (
-	TimelineHistoryStatusComplete TimelineHistoryStatus = "complete"
-	TimelineHistoryStatusCapacity TimelineHistoryStatus = "capacity"
-	TimelineHistoryStatusUnknown  TimelineHistoryStatus = "unknown"
-)
-
-// TimelineHistoryStatusValues is every value the contract allows, in contract order.
-var TimelineHistoryStatusValues = []TimelineHistoryStatus{TimelineHistoryStatusComplete, TimelineHistoryStatusCapacity, TimelineHistoryStatusUnknown}
-
-type TimelineProject struct {
-	ID string `json:"id"`
-
-	// The repository's own name. Never a reconstruction of one this Mac no longer
-	// holds.
-	Label string `json:"label"`
-	Name  string `json:"name,omitempty"`
-}
-
-// What the events below add up to. `availableTargets` is how many targets this
-// entry is proved available on, which on this daemon is always zero: there is
-// no deployment evidence producer, and a required target nothing can answer is
-// not the same as a failure.
-type TimelineProjection struct {
-	AvailableTargets int64 `json:"availableTargets"`
-
-	// Unix seconds. Absent when nothing under this entry carried one.
-	EffectiveAt     int64          `json:"effectiveAt,omitempty"`
-	ObservedAt      int64          `json:"observedAt"`
-	RequiredTargets int64          `json:"requiredTargets"`
-	Status          TimelineStatus `json:"status"`
-}
-
-// One commit an entry rests on, as the landing record proved it. `githubUrl`
-// only when the repository is a GitHub one this daemon can name with certainty.
-type TimelineRevision struct {
-	Commit       string `json:"commit"`
-	GithubUrl    string `json:"githubUrl,omitempty"`
-	RepositoryID string `json:"repositoryId"`
-	ShortCommit  string `json:"shortCommit"`
-}
-
-type TimelineSnapshot struct {
-	Capacity    TimelineCapacity     `json:"capacity"`
-	Checkpoints []TimelineCheckpoint `json:"checkpoints"`
-	Enabled     bool                 `json:"enabled"`
-	Entries     []TimelineEntry      `json:"entries"`
-
-	// A keyset cursor — the last entry's time and id — not an offset, so a page
-	// that arrives while records are being written cannot skip an entry
-	// (timeline-design A5). Absent on the last page.
-	NextCursor string          `json:"nextCursor,omitempty"`
-	Project    TimelineProject `json:"project"`
-
-	// The reading's own counter. It changes when the records under it do; nothing
-	// writes to this projection, so it is never a compare-and-set token.
-	Revision int64          `json:"revision"`
-	Selected *TimelineEntry `json:"selected,omitempty"`
-
-	// `current`, or `partial` when one of the sources under this reading could not be
-	// read — never an empty list drawn as a quiet Project.
-	Status string         `json:"status"`
-	Viewer TimelineViewer `json:"viewer"`
-}
-
-// What this Mac can prove about one entry. Only the three this daemon can reach
-// are here: the Swift app's other nine name deployment outcomes, and a word no
-// producer can ever write is a promise the screen cannot keep (design-decisions
-// X25).
-type TimelineStatus string
-
-const (
-	TimelineStatusLandedToGit TimelineStatus = "landed_to_git"
-	TimelineStatusUpcoming    TimelineStatus = "upcoming"
-	TimelineStatusUnknown     TimelineStatus = "unknown"
-)
-
-// TimelineStatusValues is every value the contract allows, in contract order.
-var TimelineStatusValues = []TimelineStatus{TimelineStatusLandedToGit, TimelineStatusUpcoming, TimelineStatusUnknown}
-
-type TimelineViewer struct {
-	// False on this daemon, always: the Timeline is a projection of records it already
-	// keeps, so there is no switch to turn it off and nothing a viewer could manage.
-	CanManage bool `json:"canManage"`
-}
 
 type TranscriptAction struct {
 	Command string `json:"command,omitempty"`

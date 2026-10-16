@@ -210,6 +210,41 @@ func TestStatusNotifiesOneMachineListReadWhenItsTitleSettles(t *testing.T) {
 	}
 }
 
+// A box ticked on a multi-select changed nothing the list was told about: the
+// waiting row's line names the question, its rows and the caret, not the
+// ticks, so the phone's card kept every box empty while the pane showed four
+// ticked (2026-10-16). Whatever the card draws from the menu wakes the list.
+func TestStatusNotifiesOneMachineListReadWhenABoxIsTicked(t *testing.T) {
+	c := &collector{}
+	p := &Publisher{MachineID: "mac_a", published: map[string][32]byte{}, sent: map[string]time.Time{}, Publish: c.publish}
+	menu := func(ticked bool) map[string]any {
+		return map[string]any{"question": "private question", "options": []any{
+			map[string]any{"n": float64(1), "label": "private alpha", "can": true, "selected": true, "checked": false},
+			map[string]any{"n": float64(2), "label": "private beta", "can": true, "selected": false, "checked": ticked},
+		}}
+	}
+	row := map[string]any{"id": "%19", "state": "waiting", "screen_reading": "read", "line": "private revision", "menu": menu(false)}
+	reading := sessionReading{sessions: []map[string]any{row}, at: json.RawMessage(`100`), complete: true}
+	p.publishStatuses(context.Background(), reading, []string{"%19"})
+	first := c.payload(t, "ss/mac_a/"+InventorySessionID)
+	row["menu"] = menu(true)
+	p.publishStatuses(context.Background(), reading, []string{"%19"})
+	if got := c.channels(); len(got) != 3 || got[2] != "ss/mac_a/"+InventorySessionID {
+		t.Fatalf("a ticked box did not refresh only the machine list: %v", got)
+	}
+	next := c.payload(t, "ss/mac_a/"+InventorySessionID)
+	if next["presentation_generation"] == first["presentation_generation"] ||
+		next["snapshot_generation"] != first["snapshot_generation"] {
+		t.Fatalf("a ticked box did not move only the presentation: %v -> %v", first, next)
+	}
+	for _, channel := range c.channels() {
+		body, err := json.Marshal(c.payload(t, channel))
+		if err != nil || strings.Contains(string(body), "private") {
+			t.Fatalf("status channel %s copied the menu: %s (%v)", channel, body, err)
+		}
+	}
+}
+
 func TestStatusNotifiesOneMachineListReadWhenItsRoleAppears(t *testing.T) {
 	c := &collector{}
 	p := &Publisher{MachineID: "mac_a", published: map[string][32]byte{}, sent: map[string]time.Time{}, Publish: c.publish}

@@ -290,7 +290,7 @@ const jsonFetch = makeJSONFetch({
  * and the Swift app wrote `{"error": {"code", "message"}}`. Every other bridge
  * here reads both (`git-bridge.ts`, `board-bridge.ts`, `projects-bridge.ts`,
  * `schedules-bridge.ts`, `start-bridge.ts`,
- * `timeline-bridge.ts`, `voice-bridge.ts`). This one read only the object, so
+ * `voice-bridge.ts`). This one read only the object, so
  * `error.code` on a string was `undefined` and every refusal the Documents page
  * ever showed arrived as `http_404`/`http_403`/`http_503` — none of which
  * `core/failure-text.js` has a sentence for, so `not_found`, `forbidden`,

@@ -1,12 +1,7 @@
 // The start sheet's part of the bridge.
 //
-// `js/input/start.js` is the Swift app's sheet, byte for byte, and it is here
-// as the text `session/Start.tsx` follows line by line — not imported. It
-// cannot be: it imports the whole page (`view/list.js`, `view/composer.js`,
-// `session/open.js`, `view/waits.js`), and it binds its listeners through
-// `core/dom.js`, which looks every id up once at import, before React has
-// drawn any of them. The copy is kept under the guard so a change to the
-// original turns `tools/check-legacy-css.sh` red and Start.tsx is read again.
+// React owns the Start sheet in `session/Start.tsx`. The retired Swift sheet
+// was a text reference during the port and has since been removed.
 //
 // `js/input/clawdfather.js` remains imported for compatibility with legacy
 // helpers. The React sheet has its own machine-workspace action.

@@ -204,7 +204,6 @@ export const CARRIED = {
   snippets: "GET /v1/snippets",
   "session-snippets": "GET /v1/workflow-project?session={id}",
   start: "POST /v1/places/{id}/start[/{assistant}[/{model}][/as/{persona}]]",
-  timeline: "GET /v1/timeline?project=&entry=&cursor=&environment=&category=&upcoming=",
   transcript: "GET /v1/transcript?session={id}",
   // The token bill (`pages/work/TokenBill.tsx`). Machine reads, not session
   // reads: a conversation id is the ledger's key and not a row this page holds.
@@ -436,7 +435,7 @@ export function uncarriedWordOf(method: string, path: string): string {
     return ""
   }
   const [head, a, b] = segments
-  // `/v1/snippets*`, `board`, `board-command`, `board.items` and `timeline` were all here until
+  // `/v1/snippets*`, `board`, `board-command`, `board.items` were all here until
   // this console began asking for them. What is carried is parsed once — by
   // the reader's own case and by `writeRoute` — and a second spelling of it
   // here would be a second thing to keep right. The Settings page's POST to

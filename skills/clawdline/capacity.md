@@ -43,6 +43,7 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `cloud.peer_pairs` | 128 | `rows` | `refuse` | `diagnostics, notice, health` | — |
 | `cloud.relay_queue` | 64 | `rows` | `refuse` | `diagnostics, notice, cloud_status, log, sender` | — |
 | `cloud.reload_stop_seconds` | 15 | `seconds` | `refuse` | `diagnostics, sender, log` | — |
+| `cloud.roster_short_read_attempts` | 2 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `cloud.session_row_asks` | 64 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `cloud.session_row_id_bytes` | 256 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `cloud.session_row_volatile_seconds` | 15 | `seconds` | `expire` | `diagnostics` | — |
@@ -235,6 +236,7 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `session.title_request_bytes` | 16384 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `session.title_rows` | 200 | `rows` | `evict_oldest` | `diagnostics, notice` | — |
 | `session.todo_batch_rows` | 20 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `session.waiting_for` | 8 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `sessions.activity_reads` | 64 | `rows` | `refuse` | `diagnostics` | — |
 | `sessions.agent_rows` | 6 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `sessions.archive_restore_batch` | 20 | `rows` | `refuse` | `diagnostics, sender` | — |
@@ -288,7 +290,6 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `terminal.paste_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `terminal.streams` | 16 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `terminal.viewers` | 8 | `rows` | `refuse` | `diagnostics, sender` | — |
-| `timeline.entries` | 500 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `update.apply_body_bytes` | 4096 | `bytes` | `refuse` | `diagnostics` | — |
 | `update.build_body_bytes` | 4096 | `bytes` | `refuse` | `diagnostics` | — |
 | `update.fetch_timeout_seconds` | 10 | `seconds` | `evict_oldest` | `diagnostics` | — |

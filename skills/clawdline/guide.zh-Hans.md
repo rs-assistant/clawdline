@@ -1761,6 +1761,10 @@ clawdline item assign <child id> (--terminal <terminal id> | --new [--assistant 
 **租约。** 有两种资源：`heavy_compile`（机器唯一的编译时段）和 `landing`
 （每个工作目录一个）。
 
+取得 `daemon_restart` 前先完成构建。不要把 `clawdline dev install` 或其他会请求 `heavy_compile` 的命令放进此包装命令：重启租约会阻止编译名额。安排好维护时段后直接运行 `clawdline dev install`；它先构建再切换。`clawdline update --apply` 也直接运行，由更新程序自行下载、切换、检查与回退。此包装命令只用于不构建的独立重启命令。
+
+操作前用 `clawdline coordination status` 查看状态。请求安全暂停用 `clawdline coordination pause --wake lease:heavy_compile`，接收方用 `clawdline coordination observed` 和 `clawdline coordination safe` 确认。只有独立的重启命令才放进 `clawdline coordination run --resource daemon_restart -- <command>`；主线合并用 `clawdline coordination run --resource landing --checkout /absolute/checkout -- <command>`。
+
 **建置或测试套件请透过 `clawdline heavy -- <command>` 执行**，不要直接执行。
 它会排队等候 `heavy_compile`，直到机器有足够内存（可用量至少四分之一、上限 1 GB，
 且内存停滞不超过 10%），再以较低优先顺序执行命令。

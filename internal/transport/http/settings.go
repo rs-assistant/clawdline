@@ -29,6 +29,7 @@ var settingsFiles sync.Map // dir -> *nextconfig.File
 // the shell's local-token route.
 var browserSettings = map[string]bool{
 	"language": true, "terminal": true,
+	"mascot": true, "notch": true, "voice_language": true,
 	"codex_auto_name": true, "auto_name_assistant": true,
 	"remote": true, "remote_tunnel": true, "remote_hostname": true,
 	"push_on_delivery": true, "push_on_fanout": true,

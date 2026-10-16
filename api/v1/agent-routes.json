@@ -453,6 +453,11 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/settings/dispatch-policy",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/settings/default-models",
       "guide": "connect"
     },
@@ -525,11 +530,6 @@
       "method": "*",
       "pattern": "/v1/terminals/",
       "guide": "connect"
-    },
-    {
-      "method": "*",
-      "pattern": "/v1/timeline",
-      "guide": "board"
     },
     {
       "method": "*",

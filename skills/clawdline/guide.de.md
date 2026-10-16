@@ -1868,6 +1868,10 @@ fertig ist.“ Er ist ein Datensatz und eine Nachricht, keine Sperre und keine D
 **Leases.** Zwei Ressourcen: `heavy_compile` (der einzige Compile-Slot des Rechners) und `landing` (eine
 pro Checkout).
 
+Schließen Sie den Build ab, bevor Sie `daemon_restart` belegen. Führen Sie `clawdline dev install` oder andere Befehle, die `heavy_compile` benötigen, nicht in diesem Wrapper aus: Die Neustart-Lease blockiert den Compile-Slot. Nach Abstimmung des Wartungsfensters führen Sie `clawdline dev install` direkt aus; es baut vor dem Wechsel. Führen Sie auch `clawdline update --apply` direkt aus; die Aktualisierung übernimmt Download, Wechsel, Prüfung und Rücknahme. Der Wrapper ist nur für einen getrennten Neustart ohne Build gedacht.
+
+Prüfen Sie vor dem Vorgang `clawdline coordination status`. Fordern Sie mit `clawdline coordination pause --wake lease:heavy_compile` eine sichere Pause an; der Empfänger bestätigt mit `clawdline coordination observed` und `clawdline coordination safe`. Umhüllen Sie nur einen getrennten Neustart mit `clawdline coordination run --resource daemon_restart -- <command>`. Für die Integration in den Hauptzweig verwenden Sie `clawdline coordination run --resource landing --checkout /absolute/checkout -- <command>`.
+
 **Führe einen Build oder eine Testsuite über `clawdline heavy -- <command>` aus**, nicht direkt. Er reiht
 sich für `heavy_compile` ein, wartet, bis der Rechner Speicher frei hat (ein Viertel davon, höchstens
 1 GB, und kein Speicherstau über 10 %), führt den Befehl mit niedrigerer Priorität aus – unter Linux auch

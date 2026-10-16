@@ -90,6 +90,13 @@ is the failure this field exists to prevent.
   claim). The row shows `自述` on self states, so a stated state can never dress as a proven one.
 - `work_note` — one line, the session's own words: *"RootSession fix landed; no open child or
   wait; can take new work"*.
+- `waiting_for` — on a broker-decided `waiting_session` (own live work), the tasks that made it
+  wait, collected by the same pass that decided the state: a dispatched child by its Session
+  name, a heavy callback by its command and whether it holds the compile slot or is queued,
+  anything else by its title. At most eight; `waiting_for_omitted` counts the rest. Every list
+  draws the ⏳ line from this field alone (`session/waiting-for.ts`), never from a task
+  collection of its own. `work_note` stays the session's own words and is never filled with
+  child names.
 - `work_since` — when the leading evidence was recorded. Self claims and debts carry clocks;
   live terminal observations honestly do not.
 - `work_moved_by` / `work_person_needed` — who or what will move this, and whether that mover is

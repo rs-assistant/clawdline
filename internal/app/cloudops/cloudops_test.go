@@ -788,17 +788,6 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: machine, name: "action:req-worktree-remove",
 		method: "DELETE", path: "/v1/projects/project-abc/worktrees/wt-0123456789abcdef01234567",
 	}, {
-		// `upcoming` travels on every read because both of its values mean
-		// something; the empty filters do not travel at all, because this
-		// route reads an absent parameter and an empty one differently.
-		word: "timeline",
-		body: map[string]any{"type": "timeline", "session": machine, "request": "req-timeline",
-			"project": "clawdline-go", "entry": "", "cursor": "", "environment": "",
-			"category": "", "upcoming": false},
-		session: machine, name: "read:req-timeline",
-		method: "GET", path: "/v1/timeline",
-		query: map[string]string{"project": "clawdline-go", "upcoming": "false"},
-	}, {
 		// The Settings page's capacity block, which every capacity push names:
 		// machine-wide and parameterless, as the local route is.
 		word:    "capacity",

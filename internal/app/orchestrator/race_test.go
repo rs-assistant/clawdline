@@ -31,6 +31,9 @@ func newTestBroker(t *testing.T) (*Broker, context.Context) {
 		Tasks: taskdir.New(dir),
 		Git:   git.New(),
 		Dir:   dir,
+		// The briefing waits step Clock; the pause between screen
+		// readings is real time, and 2 s of it was most of a dozen tests.
+		ScreenReadEvery: 10 * time.Millisecond,
 		Live: func(context.Context) []session.Session {
 			return []session.Session{{ID: "%1", Assistant: session.AssistantClaude, ConversationID: rootConversation}}
 		},

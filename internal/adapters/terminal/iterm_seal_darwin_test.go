@@ -5,6 +5,7 @@ package terminal
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"testing"
 
@@ -192,7 +193,15 @@ func TestAnUnreadableWindowReachesTheReadingWithItsIDOnIt(t *testing.T) {
 // It is skipped where iTerm2 is not running or cannot answer an Apple Event,
 // because the point of it is the real walk: once iTerm2 answers, its gaps must
 // keep the shape the seal reads. A failed event must still be incomplete.
+//
+// It asks the iTerm2 the person is using, so it runs only when
+// CLAWDLINE_LIVE_ITERM=1 asks for it: in the ordinary suite an iTerm2 that
+// did not answer held it for its whole 10 s Apple Event timeout before the
+// skip, and its outcome followed the machine rather than the code.
 func TestTheRealListingCarriesWhateverItCouldNotRead(t *testing.T) {
+	if os.Getenv("CLAWDLINE_LIVE_ITERM") != "1" {
+		t.Skip("set CLAWDLINE_LIVE_ITERM=1 to walk this machine's iTerm2")
+	}
 	it := NewITerm()
 	inv, err := it.Inventory(context.Background())
 	if err != nil {

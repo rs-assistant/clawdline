@@ -25,6 +25,7 @@ import { DefaultModelsBlock } from "./settings/DefaultModelsBlock.js"
 import { GateSettingsBlock } from "./settings/GateSettingsBlock.js"
 import { nextWord } from "../next-strings.js"
 import { BrowserLanguageControl } from "../ui-language/BrowserLanguageControl.js"
+import { Switch } from "./settings/Switch.js"
 import {
   DEFAULT_FONT_SCALE,
   FONT_SCALE_STEPS,
@@ -54,9 +55,6 @@ import {
  *   block and not the original's: the register's rows and the dead letters from
  *   `/v1/capacity`. Every capacity push names it, so it reads through Clawdline
  *   Cloud as well.
- * - **Project Timeline**: this settings page has no project context to read,
- *   so its permanently disabled toggle says that the setting belongs to each
- *   project instead of presenting an unfinished read.
  * - **Version**: the Mac's version from `/v1/health`, which this daemon's does
  *   not carry, so the line is empty and hidden by `.foot span:empty`.
  *
@@ -87,11 +85,6 @@ function notifySay(T: Record<string, string>, state: string): string {
     default:
       return ""
   }
-}
-
-/** `words(en, zh)` (`view/timeline.js`): the page's language decides. */
-function timelineWords(en: string, zh: string): string {
-  return /^zh(?:-|$)/i.test(String(document.documentElement.lang || "")) ? zh : en
 }
 
 function SettingsPage({ shown }: { shown: boolean }) {
@@ -293,22 +286,15 @@ function SettingsPage({ shown }: { shown: boolean }) {
             {notifySay(T, push.state)}
           </p>
           <div className="row">
-            <button
-              className={push.state === "on" ? "chip on" : "chip"}
+            {(push.state === "off" || push.state === "on") && <Switch
               id="settings-notify-go"
-              type="button"
-              hidden={!(push.state === "off" || push.state === "on")}
+              labelledBy="settings-notify-title"
+              describedBy="settings-notify-say"
+              on={push.state === "on"}
+              stateText={push.state === "on" ? catalogWord("literal", "09b410f51b19") : catalogWord("literal", "862364ba6811")}
               disabled={push.busy}
-              onClick={togglePush}
-            >
-              {push.state === "on"
-                ? push.busy
-                  ? T.webNotifyStopping
-                  : T.webNotifyStop
-                : push.busy
-                  ? T.webNotifyAsking
-                  : T.webNotifyGo}
-            </button>
+              onToggle={togglePush}
+            />}
             {/* Only offered where there is something subscribed for it to reach. */}
             <button
               className="chip"
@@ -449,24 +435,6 @@ function SettingsPage({ shown }: { shown: boolean }) {
             </div>
             <div className="settings-column">
         <GateSettingsBlock shown={shown && tab === 1} />
-        <div className="block" id="settings-timeline">
-          <b id="settings-timeline-title">{timelineWords("Enable Project Timeline", catalogWord("literal", "b593e064f518"))}</b>
-          <p className="say" id="settings-timeline-say">
-            {timelineWords("Keep a traceable history of deliveries and availability.", catalogWord("literal", "acc0b43a1d07"))}
-          </p>
-          <button className="chip" id="settings-timeline-toggle" type="button" aria-pressed="false" disabled>
-            {nextWord("timelineSetPerProject")}
-          </button>{" "}
-          <button
-            className="chip"
-            id="settings-timeline-history"
-            type="button"
-            onClick={() => goToPage("projects")}
-          >
-            {timelineWords("Open timeline", catalogWord("literal", "6f1c2c5c46b4"))}
-          </button>
-          <p className="say" id="settings-timeline-status" role="status"></p>
-        </div>
             </div>
           </div>
         </div>

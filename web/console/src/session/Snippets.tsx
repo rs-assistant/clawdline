@@ -41,11 +41,15 @@ import {
   SnippetFailure,
   updateSnippet,
 } from "./snippets-api.js"
+import { RefusalError } from "@clawdline/core"
 import { createDirectTodoV2, directTodoActionV2 } from "../pages/work/api.js"
 import { workflowTodoText } from "./workflow-run.js"
 import { workflowWord as W } from "../workflow-words.js"
 import { readProjectFile } from "../pages/projects/project-files-api.js"
 import { workflowSourceMatches, workflowSourceText, workflowSourceTitle } from "../workflow-source.js"
+import { ClawdfatherActions, clawdfatherWord } from "./ClawdfatherActions.js"
+import { ResourceCoordination } from "./ResourceCoordination.js"
+import { catalogWord } from "../catalog.js"
 import "./workflow.css"
 
 /**
@@ -115,7 +119,12 @@ function snippetSentence(failure: unknown, fallback: string): string {
   return failureSentence(failure, fallback)
 }
 
-export function Snippets({ row }: { row: SessionRow | null }) {
+/**
+ * `steward` is Clawdfather's own session. Its sheet gains a first tab of
+ * Clawdfather actions and opens on it; Clawdfather stands in no project, so its
+ * Snippet and Workflow tabs show the machine-wide groups only.
+ */
+export function Snippets({ row, steward = false }: { row: SessionRow | null; steward?: boolean }) {
   const [open, setOpen] = useState(false)
   const openedOn = useRef<string | null>(null)
 
@@ -138,7 +147,7 @@ export function Snippets({ row }: { row: SessionRow | null }) {
 
   return createPortal(
     <div className="overlay" id="snippets" hidden={!open} onClick={() => setOpen(false)}>
-      {open && row ? <Sheet row={row} onClose={() => setOpen(false)} /> : null}
+      {open && row ? <Sheet row={row} steward={steward} onClose={() => setOpen(false)} /> : null}
     </div>,
     document.body,
   )
@@ -155,9 +164,16 @@ const answered: Record<string, SnippetAnswer> = {}
 /** Same stretch the transcript pane reads, so "my last message" is the same turn. */
 const TRANSCRIPT_LIMIT = 200
 
-function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
+type SheetTab = "clawdfather" | "snippet" | "workflow"
+
+function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; onClose: () => void }) {
   const T = L.strings
-  const [tab, setTab] = useState<"snippet" | "workflow">("snippet")
+  const tabs: SheetTab[] = steward ? ["clawdfather", "snippet", "workflow"] : ["snippet", "workflow"]
+  const [tab, setTab] = useState<SheetTab>(tabs[0])
+  const [coordination, setCoordination] = useState(false)
+  const [clawdfatherDraft, setClawdfatherDraft] = useState<{ id: string; title: string; body: string } | null>(null)
+  const [clawdfatherSaid, setClawdfatherSaid] = useState("")
+  const [clawdfatherArmed, setClawdfatherArmed] = useState(false)
   const [selectedWorkflow, setSelectedWorkflow] = useState<Snippet | null>(null)
   const [startingWorkflow, setStartingWorkflow] = useState(false)
   const [workflowError, setWorkflowError] = useState("")
@@ -185,6 +201,8 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   // One write at a time: a second ↑ before the first has landed would send an
   // order built from rows the machine has already moved.
   const busy = useRef(false)
+  // The same for Start: a second tap can land before the disabled button is drawn.
+  const launching = useRef(false)
   // Which control the keyboard should be standing on after the next redraw.
   const pendingFocus = useRef<{ attribute: string; id: string; at: number } | null>(null)
   // Only the newest read may paint, the same rule the transcript reads under.
@@ -197,13 +215,15 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   // daemon's own `/v1/sessions` carries no such field — and that is the one
   // case where "whose snippets are these" has more than one answer.
   const machine = (row as { machine?: string }).machine ?? null
-  const model: SnippetModel = snippetGroups(answer, { machine, project: row.cwd ?? null })
+  const model: SnippetModel = snippetGroups(answer, { machine, project: steward ? null : row.cwd ?? null })
   const whose = machine ? L.machineFor(row).label : ""
   const shown = snippetOrder(model)
   const projectKey = model.project ? model.project.key : ""
   const workflows = (error ? [] : answer?.snippets ?? []).filter((item) => item.scope === "workflow" &&
     (!item.project || (!projectUnresolved && item.project === projectKey)) &&
     (!projectUnresolved || item.builtin !== "zero_review"))
+  const customs = (error ? [] : answer?.snippets ?? []).filter((item) => item.scope === "clawdfather")
+    .sort((a, b) => a.position - b.position || a.created_at - b.created_at)
   const currentWorkflow = workflows.find((item) => item.id === selectedWorkflow?.id) ?? null
   useEffect(() => {
     if (selectedWorkflow && !currentWorkflow) setSelectedWorkflow(null)
@@ -227,27 +247,28 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   }, [currentWorkflow])
 
   const startWorkflow = async () => {
-    if (error || !currentWorkflow || (projectUnresolved && (!!currentWorkflow.project || currentWorkflow.builtin === "zero_review")) || startingWorkflow) return
+    if (error || !currentWorkflow || (projectUnresolved && (!!currentWorkflow.project || currentWorkflow.builtin === "zero_review")) || launching.current) return
+    launching.current = true
     setStartingWorkflow(true); setWorkflowError("")
     let launchBody = currentWorkflow.body
     if (currentWorkflow.source) {
       if (!currentWorkflow.project && currentWorkflow.source.scope === "project") {
-        setWorkflowError(W("sourceScopeConflict")); setStartingWorkflow(false); return
+        setWorkflowError(W("sourceScopeConflict")); launching.current = false; setStartingWorkflow(false); return
       }
       try {
         const source = currentWorkflow.source
         const answer = await readProjectFile(source.place_id, source.file_id)
         if (!workflowSourceMatches({ source }, answer.file)) {
-          setWorkflowError(W("sourceStartUnavailable")); setStartingWorkflow(false); return
+          setWorkflowError(W("sourceStartUnavailable")); launching.current = false; setStartingWorkflow(false); return
         }
         launchBody = workflowSourceText(answer.file,
           document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en").body
         if (!workflowPreview || workflowPreview.id !== currentWorkflow.id || workflowPreview.body !== launchBody ||
             workflowPreview.name !== workflowSourceTitle(answer.file) || workflowPreview.version !== answer.version) {
           setWorkflowPreview({ id: currentWorkflow.id, name: workflowSourceTitle(answer.file), version: answer.version, body: launchBody })
-          setWorkflowError(W("sourceChangedReview")); setStartingWorkflow(false); return
+          setWorkflowError(W("sourceChangedReview")); launching.current = false; setStartingWorkflow(false); return
         }
-      } catch { setWorkflowError(W("sourceStartUnavailable")); setStartingWorkflow(false); return }
+      } catch { setWorkflowError(W("sourceStartUnavailable")); launching.current = false; setStartingWorkflow(false); return }
     }
     try {
       const text = workflowTodoText(currentWorkflow.id, currentWorkflow.title, launchBody)
@@ -255,20 +276,24 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       await directTodoActionV2(row.id, created.todo.id, "send")
       document.dispatchEvent(new CustomEvent("clawdline:workflow-started"))
       onClose()
-    } catch {
+    } catch (e) {
+      // The machine keeps one Workflow running per Session; nothing was written.
+      if (e instanceof RefusalError && e.code === "workflow_running") { setWorkflowError(W("alreadyRunning")); return }
       // A created row is durable even when the send was refused or its answer
       // was lost. The to-do fold shows it and offers Send without recreating it.
       document.dispatchEvent(new CustomEvent("clawdline:workflow-started"))
       setWorkflowError(W("startUnknown"))
-    } finally { setStartingWorkflow(false) }
+    } finally { launching.current = false; setStartingWorkflow(false) }
   }
-  const editorOpen = !!draft || !!workflowDraft
+  const editorOpen = !!draft || !!workflowDraft || !!clawdfatherDraft
 
   const refresh = (options: { keepScroll?: boolean } = {}) => {
     const ticket = ++reading.current
     return readSnippets(row.id)
-      .then(async (next) => {
-        if (next.project || !machine) {
+      .then(async (read) => {
+        // Clawdfather's cwd is where it runs, not a project of the person's.
+        const next = steward ? { ...read, project: undefined } : read
+        if (next.project || !machine || steward) {
           if (alive.current && ticket === reading.current) setProjectUnresolved(false)
           return next
         }
@@ -327,7 +352,9 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       event.preventDefault()
       event.stopPropagation()
       if (workflowDraft) setWorkflowDraft(null)
+      else if (clawdfatherDraft) closeClawdfatherEditor()
       else if (editorOpen) closeEditor()
+      else if (coordination) setCoordination(false)
       else onClose()
     }
     document.addEventListener("keydown", onKey, true)
@@ -486,6 +513,63 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
     closeButton.current?.focus({ preventScroll: true })
   }
 
+  /** A Clawdfather action, shipped or the person's: its words in the box, nothing sent. */
+  const pickClawdfather = (prompt: string) => {
+    onClose()
+    appendToComposer(prompt)
+    document.getElementById("msg")?.focus({ preventScroll: true })
+  }
+
+  const openClawdfatherEditor = (of: Snippet | null) => {
+    setClawdfatherDraft(of ? { id: of.id, title: of.title, body: of.body } : { id: "", title: "", body: "" })
+    setClawdfatherSaid("")
+    setClawdfatherArmed(false)
+  }
+
+  const closeClawdfatherEditor = () => {
+    setClawdfatherDraft(null)
+    setClawdfatherSaid("")
+    setClawdfatherArmed(false)
+    closeButton.current?.focus({ preventScroll: true })
+  }
+
+  const clawdfatherWrite = async (work: () => Promise<unknown>) => {
+    if (busy.current) return
+    busy.current = true
+    setClawdfatherSaid("")
+    try {
+      await work()
+      busy.current = false
+      closeClawdfatherEditor()
+      await refresh({ keepScroll: true })
+    } catch (failure) {
+      busy.current = false
+      setClawdfatherSaid(failure instanceof SnippetFailure && failure.code === "snippet_limit_reached"
+        ? clawdfatherWord("limitReached") : snippetSentence(failure, T.webRequestFailed))
+    }
+  }
+
+  const saveClawdfather = () => {
+    if (!clawdfatherDraft) return
+    const title = clawdfatherDraft.title.trim()
+    const body = clawdfatherDraft.body
+    if (!title || !body.trim()) { setClawdfatherSaid(T.webSnippetNeedsText); return }
+    if (new TextEncoder().encode(title).length > 200 || new TextEncoder().encode(body).length > 4000) {
+      setClawdfatherSaid(T.webSnippetTooLong); return
+    }
+    const id = clawdfatherDraft.id
+    void clawdfatherWrite(() => id
+      ? updateSnippet(row.id, id, { title, body })
+      : createSnippet(row.id, { title, body, scope: "clawdfather" }))
+  }
+
+  const removeClawdfather = () => {
+    if (!clawdfatherDraft?.id) return
+    if (!clawdfatherArmed) { setClawdfatherArmed(true); return }
+    const id = clawdfatherDraft.id
+    void clawdfatherWrite(() => deleteSnippet(row.id, id))
+  }
+
   const saveWorkflow = async () => {
     if (!workflowDraft || workflowSaving) return
     const title = workflowDraft.title.trim()
@@ -611,7 +695,8 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       >
         <div className="snippets-head">
           <div className="snippets-heading">
-            <h2 id="snippets-title">{tab === "snippet" ? T.webSnippets : "Workflow"}</h2>
+            <h2 id="snippets-title">{tab === "clawdfather" ? (coordination ? catalogWord("resourceCoordination", "title") : catalogWord("literal", "56aed5587136"))
+              : tab === "snippet" ? T.webSnippets : "Workflow"}</h2>
             <span className="snippets-where" id="snippets-where">
               {[whose, model.project ? model.project.label : ""].filter(Boolean).join(" · ")}
             </span>
@@ -624,28 +709,31 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
             id="snippets-new"
             type="button"
             ref={newButton}
-            hidden={!may.create || loading || !!error || (tab === "workflow" && !!currentWorkflow)}
-            aria-label={tab === "workflow" ? W("new") : T.webSnippetNew}
-            title={tab === "workflow" ? W("new") : T.webSnippetNew}
-            onClick={() => tab === "workflow" ? (setWorkflowSaveError(""), setWorkflowDraft({ title: "", body: "", global: !projectKey || projectUnresolved })) : openEditor(null)}
+            hidden={!may.create || loading || !!error || (tab === "workflow" && !!currentWorkflow) || (tab === "clawdfather" && coordination)}
+            aria-label={tab === "workflow" ? W("new") : tab === "clawdfather" ? clawdfatherWord("new") : T.webSnippetNew}
+            title={tab === "workflow" ? W("new") : tab === "clawdfather" ? clawdfatherWord("new") : T.webSnippetNew}
+            onClick={() => tab === "workflow" ? (setWorkflowSaveError(""), setWorkflowDraft({ title: "", body: "", global: !projectKey || projectUnresolved }))
+              : tab === "clawdfather" ? openClawdfatherEditor(null) : openEditor(null)}
           >
             ＋
           </button>
         </div>
-        {tab === "workflow" && currentWorkflow ? <div className="workflow-detail-nav"><button type="button" onClick={() => setSelectedWorkflow(null)}>← {W("backToWorkflows")}</button></div> : <div className="snippets-tabs" role="tablist" aria-label="Snippet / Workflow"
+        {tab === "clawdfather" && coordination ? null : tab === "workflow" && currentWorkflow ? <div className="workflow-detail-nav"><button type="button" onClick={() => setSelectedWorkflow(null)}>← {W("backToWorkflows")}</button></div> : <div className="snippets-tabs" role="tablist" aria-label={tabs.map(tabLabel).join(" / ")}
           onKeyDown={(event) => {
             if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
             event.preventDefault()
-            const next = tab === "snippet" ? "workflow" : "snippet"
+            const next = tabs[(tabs.indexOf(tab) + (event.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length]
             setTab(next)
             ;(event.currentTarget.querySelector(`#${next}-tab`) as HTMLButtonElement | null)?.focus()
           }}>
-          <button id="snippet-tab" type="button" role="tab" aria-controls="snippet-list" tabIndex={tab === "snippet" ? 0 : -1}
-            aria-selected={tab === "snippet"} onClick={() => setTab("snippet")}>Snippet</button>
-          <button id="workflow-tab" type="button" role="tab" aria-controls="workflow-picker" tabIndex={tab === "workflow" ? 0 : -1}
-            aria-selected={tab === "workflow"} onClick={() => setTab("workflow")}>Workflow</button>
+          {tabs.map((each) => <button key={each} id={`${each}-tab`} type="button" role="tab" aria-controls={tabPanel[each]} tabIndex={tab === each ? 0 : -1}
+            aria-selected={tab === each} onClick={() => setTab(each)}>{tabLabel(each)}</button>)}
         </div>}
-        {tab === "snippet" ? <div
+        {tab === "clawdfather" ? coordination
+          ? <ResourceCoordination onBack={() => setCoordination(false)} onAsk={() => pickClawdfather(catalogWord("resourceCoordination", "prompt"))} />
+          : <ClawdfatherActions customs={customs} mayEdit={may.update && !error} onPick={pickClawdfather}
+            onCoordination={() => setCoordination(true)} onEdit={openClawdfatherEditor} />
+        : tab === "snippet" ? <div
           className="snippet-list"
           id="snippet-list"
           role="tabpanel"
@@ -820,11 +908,31 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
           </div>
         </div>
       ) : null}
+      {clawdfatherDraft && <div className="overlay" id="clawdfather-editor" onClick={closeClawdfatherEditor}>
+        <div className="sheet snippet-editor-sheet" role="dialog" aria-modal="true" aria-labelledby="clawdfather-editor-title" onClick={(event) => event.stopPropagation()}>
+          <h2 id="clawdfather-editor-title">{clawdfatherWord(clawdfatherDraft.id ? "editing" : "new")}</h2>
+          <div className="block"><label className="field-label" htmlFor="clawdfather-editor-title-field">{clawdfatherWord("name")}</label>
+            <input className="find" id="clawdfather-editor-title-field" type="text" maxLength={200} autoComplete="off" value={clawdfatherDraft.title}
+              data-1p-ignore="" data-lpignore="true" data-bwignore="" autoFocus
+              onChange={(event) => { setClawdfatherArmed(false); setClawdfatherDraft({ ...clawdfatherDraft, title: event.target.value }) }} /></div>
+          <div className="block"><label className="field-label" htmlFor="clawdfather-editor-body">{clawdfatherWord("message")}</label>
+            <textarea className="find" id="clawdfather-editor-body" rows={6} maxLength={4000} spellCheck={false} value={clawdfatherDraft.body}
+              data-1p-ignore="" data-lpignore="true" data-bwignore=""
+              onChange={(event) => { setClawdfatherArmed(false); setClawdfatherDraft({ ...clawdfatherDraft, body: event.target.value }) }} /></div>
+          <p className="said" id="clawdfather-editor-said" role="status" aria-live="polite">{clawdfatherSaid}</p>
+          <div className="buttons">
+            {clawdfatherDraft.id && may.remove ? <button className="chip danger" id="clawdfather-editor-delete" type="button" onClick={removeClawdfather}>
+              {clawdfatherArmed ? T.webSnippetDeleteAsk : T.webSnippetDelete}</button> : null}
+            <button className="chip" type="button" onClick={closeClawdfatherEditor}>{T.webCancel}</button>
+            <button className="chip confirm-go" id="clawdfather-editor-save" type="button" onClick={saveClawdfather}>{T.webSnippetSave}</button>
+          </div>
+        </div>
+      </div>}
       {workflowDraft && <div className="overlay" id="workflow-quick-editor" onClick={() => setWorkflowDraft(null)}>
         <div className="sheet snippet-editor-sheet" role="dialog" aria-modal="true" aria-labelledby="workflow-quick-title" onClick={(event) => event.stopPropagation()}>
           <h2 id="workflow-quick-title">{W("new")}</h2>
           <div className="block"><label className="field-label" htmlFor="workflow-quick-name">{W("name")}</label>
-            <input className="find" id="workflow-quick-name" type="text" maxLength={200} autoFocus value={workflowDraft.title}
+            <input className="find" id="workflow-quick-name" type="text" maxLength={200} value={workflowDraft.title}
               onChange={(event) => setWorkflowDraft({ ...workflowDraft, title: event.target.value })} /></div>
           <div className="block"><label className="field-label" htmlFor="workflow-quick-message">{W("message")}</label>
             <textarea className="find" id="workflow-quick-message" rows={6} maxLength={4000} value={workflowDraft.body}
@@ -843,6 +951,9 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
     </>
   )
 }
+
+const tabPanel: Record<SheetTab, string> = { clawdfather: "clawdfather-actions", snippet: "snippet-list", workflow: "workflow-picker" }
+const tabLabel = (tab: SheetTab) => tab === "clawdfather" ? "Clawdfather" : tab === "snippet" ? "Snippet" : "Workflow"
 
 function SnippetSkeleton({ label }: { label: string }) {
   return <div className="snippet-skeleton" role="status" aria-label={label}>

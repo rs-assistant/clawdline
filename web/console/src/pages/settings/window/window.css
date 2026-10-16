@@ -288,6 +288,10 @@
 /* SwitchView is in switch.css, which controls.tsx loads with it: the console's
    Settings pages draw the same switch. */
 
+.sw-policy textarea { box-sizing: border-box; width: 100%; min-height: 240px; padding: 12px; resize: vertical; background: var(--sw-chip-fill); color: var(--sw-label); border: 1px solid var(--sw-chip-edge); border-radius: 8px; font: 13px/1.5 ui-monospace, monospace; }
+.sw-policy-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.sw-policy details pre { max-height: 480px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.5 ui-monospace, monospace; }
+
 /* ValueSlider: a 142pt track and a 56pt right-aligned readout, 206 in all. */
 .sw-slider {
   display: inline-flex;

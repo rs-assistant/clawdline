@@ -57,10 +57,12 @@ func TestManualRemovalDeletesWhatThePersonChoseAndKeepsTheBranch(t *testing.T) {
 		t.Fatal("project identity unavailable")
 	}
 	active := true
+	observations := 0
 	l := NewLifecycle(Ports{
 		ManagedWorktreeRoots: ManagedWorktreeRoots(own),
 		ProjectDirectories:   func() []string { return []string{repo} },
 		Tasks: func() TaskEvidence {
+			observations++
 			return TaskEvidence{Authoritative: true, Tasks: []Task{{
 				ID: testTask, State: "success", Worktree: &TaskWorktree{Path: checkout, Branch: branch, Base: base},
 			}}}
@@ -95,8 +97,21 @@ func TestManualRemovalDeletesWhatThePersonChoseAndKeepsTheBranch(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(checkout, "late.txt"), []byte("uncommitted\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := l.Remove(project.ID, id); err != nil {
+	before := observations
+	after, err := l.Remove(project.ID, id)
+	if err != nil {
 		t.Fatalf("an unlanded, dirty, in-use checkout the person chose to delete was kept: %v", err)
+	}
+	if observations != before {
+		t.Fatalf("removal ran %d full observations; each one walks every worktree", observations-before)
+	}
+	for _, row := range after.Rows {
+		if row.WorktreeID == id {
+			t.Fatalf("the answer still lists the removed checkout: %+v", row)
+		}
+	}
+	if len(after.Rows) != len(snap.Rows)-1 {
+		t.Fatalf("the answer has %d rows, want %d", len(after.Rows), len(snap.Rows)-1)
 	}
 	if _, err := os.Stat(checkout); !os.IsNotExist(err) {
 		t.Fatalf("checkout remains: %v", err)

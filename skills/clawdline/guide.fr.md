@@ -1631,6 +1631,10 @@ n'a pas encore été informé. `502 release_incomplete` liste les utilisateurs t
 **Baux.** Deux ressources : `heavy_compile` (un emplacement de compilation de la machine) et `landing` (une par
 extraction).
 
+Terminez la compilation avant de prendre `daemon_restart`. Ne placez pas `clawdline dev install` ni une commande qui demande `heavy_compile` dans cet enveloppe : le bail de redémarrage bloque la compilation. Après avoir convenu de la fenêtre de maintenance, lancez `clawdline dev install` directement ; il compile avant de basculer. Lancez aussi `clawdline update --apply` directement : la mise à jour gère le téléchargement, la bascule, la vérification et le retour arrière. Réservez cet enveloppe à un redémarrage distinct sans compilation.
+
+Avant toute opération, consultez `clawdline coordination status`. Demandez une pause sûre avec `clawdline coordination pause --wake lease:heavy_compile` ; le destinataire confirme avec `clawdline coordination observed` et `clawdline coordination safe`. N’entourez qu’un redémarrage distinct avec `clawdline coordination run --resource daemon_restart -- <command>`. Pour intégrer à la branche principale, utilisez `clawdline coordination run --resource landing --checkout /absolute/checkout -- <command>`.
+
 **Exécute une compilation ou une suite de tests via `clawdline heavy -- <command>`**, et non directement. Il met en file d'attente pour
 `heavy_compile`, attend que la machine dispose de mémoire disponible (un quart, au maximum 1 Go, et
 pas de blocage de mémoire au-delà de 10 %), exécute la commande à une priorité inférieure — sous Linux, c'est également la première chose que

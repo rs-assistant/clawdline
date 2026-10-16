@@ -409,11 +409,6 @@
 {"coverage": "covered", "excerpt_sha256": "d801196ceb9680db4686bb739c8bba69ec0cacda522c61a0207e87205687ccec", "kind": "fixed_human_copy", "site": "internal/transport/http/terminals.go:383"}
 {"coverage": "covered", "excerpt_sha256": "b749527b69b4d0c517a25f7428558cbacdc8c0322514dc309f5c8e02c977a2ef", "kind": "fixed_human_copy", "site": "internal/transport/http/terminals.go:385"}
 {"coverage": "covered", "excerpt_sha256": "fd2ceea255a6e2399b4f1cebb8a5f93b433143d3e26f1ef09501b46ef0bd8081", "kind": "fixed_human_copy", "site": "internal/transport/http/terminals.go:403"}
-{"coverage": "covered", "excerpt_sha256": "044a5e570bcc1db97cc9d6036c95c137e8f656bbc28dcfcd907855b66c6e84d1", "kind": "fixed_human_copy", "site": "internal/transport/http/timeline.go:72"}
-{"coverage": "covered", "excerpt_sha256": "989fc129a6f723f78e915d341b97654a8bec4b4dd5e287429a42624e973fe991", "kind": "dynamic_composition", "site": "internal/transport/http/timeline.go:78"}
-{"coverage": "covered", "excerpt_sha256": "a9a055cf1c1c1be9b20e30d17ac3ef96141942f5e5e9a04cee71c506ddb4688f", "kind": "dynamic_composition", "site": "internal/transport/http/timeline.go:84"}
-{"coverage": "covered", "excerpt_sha256": "2bef4a58fd5bdbc86f4446e3b79b6969aaf363f6dd85766ef9ffb71249e81b9e", "kind": "fixed_human_copy", "site": "internal/transport/http/timeline.go:90"}
-{"coverage": "covered", "excerpt_sha256": "e49899004cb08282c390c08239168952d71c5f1da1c341d4c7ece6e89828f0b5", "kind": "fixed_human_copy", "site": "internal/transport/http/timeline.go:99"}
 {"coverage": "covered", "excerpt_sha256": "646fff15385391faeff5c6ab4e00e498c409777bd505e5bc052faf6deef9e8f6", "kind": "fixed_human_copy", "site": "internal/transport/http/todos.go:88"}
 {"coverage": "covered", "excerpt_sha256": "7001de8c953530f53719dbf09947b15ae2ac2ee66cc93083c51b07ad4816274f", "kind": "fixed_human_copy", "site": "internal/transport/http/tracks.go:128"}
 {"coverage": "covered", "excerpt_sha256": "69df75bfdf16d4649f0ea90a4d2b366d21de000877277522ca3053e44ec64254", "kind": "fixed_human_copy", "site": "internal/transport/http/tracks.go:156"}

@@ -2,7 +2,7 @@
  * One record opened on a sidebar page, as an address: `#page=<page>&id=<id>`.
  *
  * A page that shows a list and one record of it at a time (驗收, Projects,
- * Timeline, Documents) used to hold the open record in its own state only, so
+ * Documents) used to hold the open record in its own state only, so
  * the browser's Back left the whole page, and a reload or a link could not name
  * the record. Opening one now adds one history step carrying its address, and
  * closing it from the page goes back over that step, so the page's own back
