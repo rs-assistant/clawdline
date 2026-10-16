@@ -130,7 +130,8 @@ func newFakeProduction(t *testing.T, identity Identity, publicKey ed25519.Public
 	fp.api.StartTLS()
 	t.Cleanup(fp.api.Close)
 
-	fp.relay = &fakeRelay{account: identity.AccountID, device: identity.MachineID, publicKey: publicKey, ackStatus: AckDelivered}
+	fp.relay = &fakeRelay{account: identity.AccountID, device: identity.MachineID, publicKey: publicKey,
+		ackStatus: AckDelivered, acceptedChanged: make(chan struct{})}
 	fp.relayServer = httptest.NewUnstartedServer(http.HandlerFunc(fp.serveRelay))
 	fp.relayServer.TLS = &tls.Config{Certificates: []tls.Certificate{leaf}}
 	fp.relayServer.StartTLS()
