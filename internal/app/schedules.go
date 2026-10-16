@@ -20,6 +20,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/domain/schedule"
+	"github.com/sainteye/clawdline/internal/domain/work"
 )
 
 // SchedulePlace is one row of `GET /v1/places`: a schedule names a project by
@@ -525,6 +526,16 @@ func (b *ScheduleBook) build(ctx context.Context, body map[string]any, id string
 		sort.Strings(unknown)
 		r := refusedScheduleRaw(400, "bad_request", "unknown field: "+strings.Join(unknown, ", "))
 		return nil, schedule.Schedule{}, &r
+	}
+	// The title becomes the title of every task the schedule dispatches, and a
+	// dispatch refuses a title that does not read as a result. Refused here, a
+	// person sees why while the form is still open; refused at dispatch, every
+	// run failed with only `bad_task` on the screen.
+	if title, isString := body["title"].(string); isString {
+		if reason := work.OutcomeTitleRefusal(title); reason != "" {
+			r := refusedSchedule(400, "bad_request", reason)
+			return nil, schedule.Schedule{}, &r
+		}
 	}
 	placeID, _ := body["place_id"].(string)
 	var place *SchedulePlace
