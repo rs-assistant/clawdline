@@ -382,12 +382,18 @@ func (l *Lifecycle) Refresh(id string) (*Snapshot, error) {
 	return encode(obs, now), nil
 }
 
-// Remove deletes one checkout because the person asked for it. The machine
-// still observes again to resolve the id to a registered path, and refuses only
-// the repository's main checkout, which Git cannot remove. Landed state, dirty
-// files, locks and live Sessions are the person's call, not a veto: the dialog
-// says what will be lost, and Git removes with --force twice. The branch and its
-// commits remain in the repository.
+// Remove deletes one checkout because the person asked for it. The id is
+// resolved against `git worktree list` alone, and only the repository's main
+// checkout — the first entry, which Git cannot remove — is refused. Landed
+// state, dirty files, locks and live Sessions are the person's call, not a
+// veto: the dialog says what will be lost, and Git removes with --force twice.
+// The branch and its commits remain in the repository.
+//
+// It does not run a full observation before or after. On a repository with 87
+// worktrees one observation took 80 s, so the two it used to run outlasted the
+// phone's 60 s wait and the dialog showed nothing until it gave up, while the
+// machine went on deleting. The answer is the cached observation without the
+// removed row; the other rows are as fresh as they were.
 func (l *Lifecycle) Remove(id, worktreeID string) (*Snapshot, error) {
 	project, err := l.Resolve(id)
 	if err != nil {
@@ -398,35 +404,49 @@ func (l *Lifecycle) Remove(id, worktreeID string) (*Snapshot, error) {
 	}
 	l.observe_.Lock()
 	defer l.observe_.Unlock()
-	obs := l.observe(project)
-	var candidate *row
-	for i := range obs.rows {
-		if obs.rows[i].worktreeID == worktreeID {
-			candidate = &obs.rows[i]
-			break
-		}
+	common := l.gitCommonDirectory(project.CanonicalPath)
+	listing, ok := l.gitText([]string{"worktree", "list", "--porcelain", "-z"}, project.CanonicalPath, defaultGitTimeout)
+	if common == "" || !ok {
+		return nil, &Refusal{409, "worktree_evidence_incomplete", "The Project's worktrees could not be listed; refresh and try again."}
 	}
-	if candidate == nil {
-		if obs.err != nil || obs.truncated {
-			return nil, &Refusal{409, "worktree_evidence_incomplete", "The Project's worktrees could not be observed completely; refresh and try again."}
+	reg := parseWorktreeList(listing)
+	path := ""
+	for i, entry := range reg {
+		if WorktreeID(common, entry.path) != worktreeID {
+			continue
 		}
+		if i == 0 {
+			return nil, &Refusal{409, "worktree_is_main", "This is the Project's main checkout; Git cannot remove it."}
+		}
+		path = entry.path
+		break
+	}
+	if path == "" {
 		return nil, &Refusal{404, "worktree_not_found", "That worktree is not registered for this Project."}
-	}
-	r := candidate
-	if r.isMain {
-		return nil, &Refusal{409, "worktree_is_main", "This is the Project's main checkout; Git cannot remove it."}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), observationBudget)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "-C", project.CanonicalPath, "worktree", "remove", "--force", "--force", "--", r.path)
+	cmd := exec.CommandContext(ctx, "git", "-C", project.CanonicalPath, "worktree", "remove", "--force", "--force", "--", path)
 	cmd.Env = append(os.Environ(), "GIT_LITERAL_PATHSPECS=1", "LC_ALL=C", "GIT_TERMINAL_PROMPT=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		_ = out
 		return nil, &Refusal{409, "worktree_remove_failed", "Git refused to remove this worktree; it was kept."}
 	}
-	updated := l.observe(project)
-	l.store(updated)
-	return encode(updated, l.ports.Now()), nil
+	l.stateMu.Lock()
+	cached, had := l.cache[project.ID]
+	l.stateMu.Unlock()
+	if !had {
+		return l.preview(project), nil
+	}
+	kept := make([]row, 0, len(cached.rows))
+	for _, r := range cached.rows {
+		if r.worktreeID != worktreeID {
+			kept = append(kept, r)
+		}
+	}
+	cached.rows = kept
+	l.store(cached)
+	return encode(cached, l.ports.Now()), nil
 }
 
 func (l *Lifecycle) store(obs observation) {
