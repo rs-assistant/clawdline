@@ -4,9 +4,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"regexp"
 	"time"
 	"unicode/utf8"
 )
+
+var taskIDShape = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // TaskStart is addressed to a machine because its target Session does not
 // exist yet. It must never be admitted through the Session-targeted Request
@@ -67,12 +70,25 @@ func AdmitTaskStart(start TaskStart, body []byte, facts TaskStartFacts) error {
 // mandatory; a target Session is deliberately absent.
 func ValidateTaskStart(start TaskStart, body []byte) error {
 	sum := sha256.Sum256(body)
-	if !validSegment(start.TaskID) || !validSegment(start.RequestID) ||
+	if ValidateTaskStartHeader(start) != nil ||
+		len(body) == 0 || len(body) > MaxBodyBytes || !utf8.Valid(body) ||
+		start.BodyDigest != hex.EncodeToString(sum[:]) {
+		return InvalidRequest
+	}
+	if _, err := ParseTaskBody(body); err != nil {
+		return InvalidRequest
+	}
+	return nil
+}
+
+// ValidateTaskStartHeader is also used by the signed source challenge, whose
+// receiver does not have the encrypted task body.
+func ValidateTaskStartHeader(start TaskStart) error {
+	if !taskIDShape.MatchString(start.TaskID) || !validSegment(start.RequestID) ||
 		!validEndpoint(start.Source) || !validSegment(start.TargetMachineID) ||
 		!validSegment(start.TargetProjectID) || !validSegment(start.PairID) ||
 		start.Source.MachineID == start.TargetMachineID ||
-		len(body) == 0 || len(body) > MaxBodyBytes || !utf8.Valid(body) ||
-		!digest.MatchString(start.BodyDigest) || start.BodyDigest != hex.EncodeToString(sum[:]) {
+		!digest.MatchString(start.BodyDigest) {
 		return InvalidRequest
 	}
 	return nil

@@ -85,11 +85,41 @@ type OutboxItem struct {
 // TaskStartOutboxItem records source-side submission and relay evidence. It
 // does not claim that the target machine opened a Session or observed work.
 type TaskStartOutboxItem struct {
-	Start          agenthandoff.TaskStart `json:"start"`
-	RelayAccepted  string                 `json:"relay_accepted"`
-	RelayDelivered string                 `json:"relay_delivered"`
-	RelayConflict  bool                   `json:"relay_conflict,omitempty"`
-	At             time.Time              `json:"at"`
+	Start            agenthandoff.TaskStart `json:"start"`
+	Frame            []byte                 `json:"frame"`
+	TargetSessionID  string                 `json:"target_session_id,omitempty"`
+	TargetGeneration string                 `json:"target_generation,omitempty"`
+	RelayAccepted    string                 `json:"relay_accepted"`
+	RelayDelivered   string                 `json:"relay_delivered"`
+	RelayConflict    bool                   `json:"relay_conflict,omitempty"`
+	At               time.Time              `json:"at"`
+}
+
+// RemoteTask is the target machine's local task record. A claimed task whose
+// opening is unknown is never started again merely because its sender retries.
+type RemoteTask struct {
+	Start            agenthandoff.TaskStart `json:"start"`
+	Body             string                 `json:"body"`
+	State            string                 `json:"state"`
+	TargetSessionID  string                 `json:"target_session_id,omitempty"`
+	TargetGeneration string                 `json:"target_generation,omitempty"`
+	Result           string                 `json:"result,omitempty"`
+	At               time.Time              `json:"at"`
+}
+
+// TaskEventRecord keeps an encrypted outbound frame for exact retry or a
+// decrypted inbound body for the owning Agent to read. Relay delivery alone
+// never marks the recipient Session as observed.
+type TaskEventRecord struct {
+	Event           agenthandoff.TaskEvent `json:"event"`
+	Direction       string                 `json:"direction"`
+	Body            string                 `json:"body,omitempty"`
+	Frame           []byte                 `json:"frame,omitempty"`
+	RelayDelivered  string                 `json:"relay_delivered,omitempty"`
+	NoticeDelivered bool                   `json:"notice_delivered,omitempty"`
+	ObservedAt      time.Time              `json:"observed_at,omitempty"`
+	AcknowledgedAt  time.Time              `json:"acknowledged_at,omitempty"`
+	At              time.Time              `json:"at"`
 }
 
 type Store struct{ db *sql.DB }
@@ -131,6 +161,10 @@ func Open(dir string) (*Store, error) {
 		"CREATE INDEX IF NOT EXISTS peer_inbox_target ON peer_inbox(target_session)",
 		"CREATE TABLE IF NOT EXISTS peer_outbox (id TEXT PRIMARY KEY, body BLOB NOT NULL)",
 		"CREATE TABLE IF NOT EXISTS peer_task_starts (id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, body BLOB NOT NULL)",
+		"CREATE TABLE IF NOT EXISTS peer_remote_tasks (id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, body BLOB NOT NULL)",
+		"CREATE TABLE IF NOT EXISTS peer_task_events (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, request_id TEXT NOT NULL UNIQUE, direction TEXT NOT NULL, kind TEXT NOT NULL, body BLOB NOT NULL)",
+		"CREATE INDEX IF NOT EXISTS peer_task_events_task ON peer_task_events(task_id)",
+		"CREATE UNIQUE INDEX IF NOT EXISTS peer_task_finish_once ON peer_task_events(task_id,direction,kind) WHERE kind='finish'",
 	} {
 		if _, err := db.Exec(statement); err != nil {
 			db.Close()
@@ -162,8 +196,10 @@ func ReadUsage(ctx context.Context, dir string) (Usage, error) {
 	var usage Usage
 	err = st.db.QueryRowContext(ctx, `SELECT
 		(SELECT COUNT(*) FROM peer_pairs), (SELECT COUNT(*) FROM peer_grants),
-		(SELECT COUNT(*) FROM peer_inbox),
-		(SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts)`).
+		(SELECT COUNT(*) FROM peer_inbox) + (SELECT COUNT(*) FROM peer_remote_tasks)
+			+ (SELECT COUNT(*) FROM peer_task_events WHERE direction='in'),
+		(SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts)
+			+ (SELECT COUNT(*) FROM peer_task_events WHERE direction='out')`).
 		Scan(&usage.Pairs, &usage.Grants, &usage.Inbox, &usage.Outbox)
 	return usage, err
 }
@@ -373,7 +409,8 @@ func (s *Store) PutInbox(ctx context.Context, item InboxItem) error {
 	}
 	defer tx.Rollback()
 	var count int
-	if err := tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM peer_inbox").Scan(&count); err != nil {
+	if err := tx.QueryRowContext(ctx,
+		"SELECT (SELECT COUNT(*) FROM peer_inbox) + (SELECT COUNT(*) FROM peer_remote_tasks) + (SELECT COUNT(*) FROM peer_task_events WHERE direction='in')").Scan(&count); err != nil {
 		return err
 	}
 	if count >= InboxLimit {
@@ -497,7 +534,7 @@ func (s *Store) SaveTaskStartOutbox(ctx context.Context, item TaskStartOutboxIte
 	}
 	prior, err := s.TaskStartOutbox(ctx, item.Start.TaskID)
 	if err == nil {
-		if prior.Start == item.Start {
+		if prior.Start == item.Start && string(prior.Frame) == string(item.Frame) {
 			return nil
 		}
 		return errors.New("peer_task_start_outbox_conflict")
@@ -516,7 +553,7 @@ func (s *Store) SaveTaskStartOutbox(ctx context.Context, item TaskStartOutboxIte
 	defer tx.Rollback()
 	var count int
 	if err := tx.QueryRowContext(ctx,
-		"SELECT (SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts)").Scan(&count); err != nil {
+		"SELECT (SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts) + (SELECT COUNT(*) FROM peer_task_events WHERE direction='out')").Scan(&count); err != nil {
 		return err
 	}
 	if count >= OutboxLimit {
@@ -560,13 +597,351 @@ func (s *Store) MarkTaskStartOutbox(ctx context.Context, id, delivered string) e
 		return errors.New("peer_task_start_outbox_status_invalid")
 	}
 	item.RelayAccepted = "accepted"
-	if item.RelayConflict || item.RelayDelivered != "unknown" && item.RelayDelivered != delivered {
-		item.RelayDelivered = "unknown"
-		item.RelayConflict = true
-	} else {
+	// A later successful retry establishes that at least one socket delivery
+	// occurred. A later offline attempt cannot erase that earlier evidence.
+	if delivered == "delivered" || item.RelayDelivered != "delivered" {
 		item.RelayDelivered = delivered
 	}
 	return s.replace(ctx, "peer_task_starts", id, item)
+}
+
+// MarkTaskStartOpened pins the first target execution. A conflicting opened
+// event cannot switch this task to another Session or process generation.
+func (s *Store) MarkTaskStartOpened(ctx context.Context, id, sessionID, generation string) error {
+	if sessionID == "" || generation == "" {
+		return errors.New("peer_remote_execution_invalid")
+	}
+	item, err := s.TaskStartOutbox(ctx, id)
+	if err != nil {
+		return err
+	}
+	if item.TargetSessionID != "" || item.TargetGeneration != "" {
+		if item.TargetSessionID == sessionID && item.TargetGeneration == generation {
+			return nil
+		}
+		return errors.New("peer_remote_execution_changed")
+	}
+	item.TargetSessionID, item.TargetGeneration = sessionID, generation
+	return s.replace(ctx, "peer_task_starts", id, item)
+}
+
+// SaveRemoteTask claims a target task before any Session is opened. It shares
+// the inbox capacity and refuses a request ID reused for another task.
+func (s *Store) SaveRemoteTask(ctx context.Context, task RemoteTask) error {
+	if task.Start.TaskID == "" || task.Start.RequestID == "" || task.At.IsZero() ||
+		task.State != "accepted" || task.TargetSessionID != "" || task.TargetGeneration != "" ||
+		task.Result != "" || agenthandoff.ValidateTaskStart(task.Start, []byte(task.Body)) != nil {
+		return errors.New("peer_remote_task_invalid")
+	}
+	prior, err := s.RemoteTask(ctx, task.Start.TaskID)
+	if err == nil {
+		if prior.Start == task.Start && prior.Body == task.Body {
+			return nil
+		}
+		return errors.New("peer_remote_task_conflict")
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return err
+	}
+	encoded, err := json.Marshal(task)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var count int
+	if err := tx.QueryRowContext(ctx,
+		"SELECT (SELECT COUNT(*) FROM peer_inbox) + (SELECT COUNT(*) FROM peer_remote_tasks) + (SELECT COUNT(*) FROM peer_task_events WHERE direction='in')").Scan(&count); err != nil {
+		return err
+	}
+	if count >= InboxLimit {
+		return ErrFull
+	}
+	if _, err := tx.ExecContext(ctx, "INSERT INTO peer_remote_tasks(id,request_id,body) VALUES(?,?,?)",
+		task.Start.TaskID, task.Start.RequestID, encoded); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) RemoteTask(ctx context.Context, id string) (RemoteTask, error) {
+	var task RemoteTask
+	err := s.db.QueryRowContext(ctx, "SELECT body FROM peer_remote_tasks WHERE id=?", id).
+		Scan(&pairBody{into: &task})
+	if errors.Is(err, sql.ErrNoRows) {
+		return RemoteTask{}, ErrNotFound
+	}
+	return task, err
+}
+
+// MarkRemoteTaskOpened records the exact target execution. A second opening
+// cannot overwrite it, even when its Session ID happens to be the same.
+func (s *Store) MarkRemoteTaskOpened(ctx context.Context, id, sessionID, generation string) error {
+	if sessionID == "" || generation == "" {
+		return errors.New("peer_remote_execution_invalid")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var raw []byte
+	err = tx.QueryRowContext(ctx, "SELECT body FROM peer_remote_tasks WHERE id=?", id).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	var task RemoteTask
+	if err := json.Unmarshal(raw, &task); err != nil {
+		return err
+	}
+	if task.State == "opened" && task.TargetSessionID == sessionID && task.TargetGeneration == generation {
+		return nil
+	}
+	if task.State != "accepted" {
+		return errors.New("peer_remote_task_already_opened")
+	}
+	task.State, task.TargetSessionID, task.TargetGeneration = "opened", sessionID, generation
+	encoded, err := json.Marshal(task)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE peer_remote_tasks SET body=? WHERE id=?", encoded, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) MarkRemoteTaskFinished(ctx context.Context, id, result string) error {
+	if result == "" || len(result) > agenthandoff.MaxBodyBytes {
+		return errors.New("peer_remote_result_invalid")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var raw []byte
+	if err := tx.QueryRowContext(ctx, "SELECT body FROM peer_remote_tasks WHERE id=?", id).Scan(&raw); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+		return err
+	}
+	var task RemoteTask
+	if err := json.Unmarshal(raw, &task); err != nil {
+		return err
+	}
+	if task.State == "finished" && task.Result == result {
+		return nil
+	}
+	if task.State != "opened" || task.Result != "" {
+		return errors.New("peer_remote_task_not_opened")
+	}
+	task.State, task.Result = "finished", result
+	encoded, err := json.Marshal(task)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, "UPDATE peer_remote_tasks SET body=? WHERE id=?", encoded, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func taskEventKey(event agenthandoff.TaskEvent) string {
+	return event.Start.TaskID + "/" + event.Sender.MachineID + "/" + event.RequestID
+}
+
+func (s *Store) SaveTaskEvent(ctx context.Context, record TaskEventRecord) error {
+	if record.At.IsZero() || (record.Direction != "in" && record.Direction != "out") ||
+		agenthandoff.ValidateTaskEventHeader(record.Event) != nil ||
+		agenthandoff.ValidateTaskEvent(record.Event, []byte(record.Body)) != nil && record.Direction == "in" ||
+		(record.Direction == "in" && (len(record.Frame) != 0 || record.RelayDelivered != "")) ||
+		(record.Direction == "out" && (len(record.Frame) == 0 || record.Body != "" ||
+			record.RelayDelivered != "unknown")) {
+		return errors.New("peer_task_event_invalid")
+	}
+	key := taskEventKey(record.Event)
+	prior, err := s.TaskEvent(ctx, record.Event)
+	if err == nil {
+		if prior.Event == record.Event && prior.Direction == record.Direction &&
+			prior.Body == record.Body && string(prior.Frame) == string(record.Frame) {
+			return nil
+		}
+		return errors.New("peer_task_event_conflict")
+	}
+	if !errors.Is(err, ErrNotFound) {
+		return err
+	}
+	encoded, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var count int
+	query := `SELECT (SELECT COUNT(*) FROM peer_inbox) + (SELECT COUNT(*) FROM peer_remote_tasks)
+		+ (SELECT COUNT(*) FROM peer_task_events WHERE direction='in')`
+	limit := InboxLimit
+	if record.Direction == "out" {
+		query = `SELECT (SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts)
+			+ (SELECT COUNT(*) FROM peer_task_events WHERE direction='out')`
+		limit = OutboxLimit
+	}
+	if err := tx.QueryRowContext(ctx, query).Scan(&count); err != nil {
+		return err
+	}
+	if count >= limit {
+		return ErrFull
+	}
+	if _, err := tx.ExecContext(ctx,
+		"INSERT INTO peer_task_events(id,task_id,request_id,direction,kind,body) VALUES(?,?,?,?,?,?)",
+		key, record.Event.Start.TaskID, record.Event.RequestID, record.Direction, record.Event.Kind, encoded); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (s *Store) TaskEvent(ctx context.Context, event agenthandoff.TaskEvent) (TaskEventRecord, error) {
+	var record TaskEventRecord
+	err := s.db.QueryRowContext(ctx, "SELECT body FROM peer_task_events WHERE id=?", taskEventKey(event)).
+		Scan(&pairBody{into: &record})
+	if errors.Is(err, sql.ErrNoRows) {
+		return TaskEventRecord{}, ErrNotFound
+	}
+	return record, err
+}
+
+func (s *Store) TaskEventByRequest(ctx context.Context, requestID string) (TaskEventRecord, error) {
+	var record TaskEventRecord
+	err := s.db.QueryRowContext(ctx, "SELECT body FROM peer_task_events WHERE request_id=?", requestID).
+		Scan(&pairBody{into: &record})
+	if errors.Is(err, sql.ErrNoRows) {
+		return TaskEventRecord{}, ErrNotFound
+	}
+	return record, err
+}
+
+func (s *Store) TaskEvents(ctx context.Context, taskID string) ([]TaskEventRecord, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT body FROM peer_task_events WHERE task_id=? ORDER BY rowid", taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var records []TaskEventRecord
+	for rows.Next() {
+		var record TaskEventRecord
+		if err := rows.Scan(&pairBody{into: &record}); err != nil {
+			return nil, err
+		}
+		records = append(records, record)
+	}
+	return records, rows.Err()
+}
+
+func (s *Store) PendingTaskFinishes(ctx context.Context) ([]TaskEventRecord, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT body FROM peer_task_events WHERE direction='in' ORDER BY rowid")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var records []TaskEventRecord
+	for rows.Next() {
+		var record TaskEventRecord
+		if err := rows.Scan(&pairBody{into: &record}); err != nil {
+			return nil, err
+		}
+		if record.Event.Kind == agenthandoff.TaskEventFinish && !record.NoticeDelivered &&
+			record.ObservedAt.IsZero() {
+			records = append(records, record)
+		}
+	}
+	return records, rows.Err()
+}
+
+func (s *Store) MarkTaskFinishNotified(ctx context.Context, event agenthandoff.TaskEvent) error {
+	return s.updateTaskFinish(ctx, event, func(record *TaskEventRecord) error {
+		record.NoticeDelivered = true
+		return nil
+	})
+}
+
+func (s *Store) MarkTaskFinishObserved(ctx context.Context, event agenthandoff.TaskEvent) error {
+	return s.updateTaskFinish(ctx, event, func(record *TaskEventRecord) error {
+		if record.ObservedAt.IsZero() {
+			record.ObservedAt = time.Now().UTC()
+		}
+		return nil
+	})
+}
+
+func (s *Store) MarkTaskFinishAcknowledged(ctx context.Context, event agenthandoff.TaskEvent) error {
+	return s.updateTaskFinish(ctx, event, func(record *TaskEventRecord) error {
+		if record.ObservedAt.IsZero() {
+			return errors.New("peer_task_finish_unobserved")
+		}
+		if record.AcknowledgedAt.IsZero() {
+			record.AcknowledgedAt = time.Now().UTC()
+		}
+		return nil
+	})
+}
+
+// Compare the original blob when advancing independent notice and Agent-read
+// rungs, so concurrent updates cannot silently erase each other.
+func (s *Store) updateTaskFinish(ctx context.Context, event agenthandoff.TaskEvent,
+	change func(*TaskEventRecord) error) error {
+	key := taskEventKey(event)
+	for attempt := 0; attempt < 8; attempt++ {
+		var original []byte
+		if err := s.db.QueryRowContext(ctx, "SELECT body FROM peer_task_events WHERE id=?", key).Scan(&original); err != nil {
+			return errors.New("peer_task_finish_missing")
+		}
+		var record TaskEventRecord
+		if json.Unmarshal(original, &record) != nil || record.Direction != "in" ||
+			record.Event != event || record.Event.Kind != agenthandoff.TaskEventFinish {
+			return errors.New("peer_task_finish_missing")
+		}
+		if err := change(&record); err != nil {
+			return err
+		}
+		updated, err := json.Marshal(record)
+		if err != nil {
+			return err
+		}
+		result, err := s.db.ExecContext(ctx, "UPDATE peer_task_events SET body=? WHERE id=? AND body=?", updated, key, original)
+		if err != nil {
+			return err
+		}
+		if n, err := result.RowsAffected(); err == nil && n == 1 {
+			return nil
+		}
+	}
+	return errors.New("peer_task_finish_update_conflict")
+}
+
+func (s *Store) MarkTaskEventDelivered(ctx context.Context, event agenthandoff.TaskEvent,
+	status string) error {
+	if status != "delivered" && status != "machine_offline" && status != "unknown" {
+		return errors.New("peer_task_event_status_invalid")
+	}
+	record, err := s.TaskEvent(ctx, event)
+	if err != nil || record.Direction != "out" {
+		return errors.New("peer_task_event_outbox_missing")
+	}
+	if status == "delivered" || record.RelayDelivered != "delivered" {
+		record.RelayDelivered = status
+	}
+	return s.replace(ctx, "peer_task_events", taskEventKey(event), record)
 }
 
 func (s *Store) insert(ctx context.Context, table string, limit int, id, pairID string, value any) error {
@@ -582,7 +957,7 @@ func (s *Store) insert(ctx context.Context, table string, limit int, id, pairID 
 	var count int
 	countQuery := "SELECT COUNT(*) FROM " + table
 	if table == "peer_outbox" {
-		countQuery = "SELECT (SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts)"
+		countQuery = "SELECT (SELECT COUNT(*) FROM peer_outbox) + (SELECT COUNT(*) FROM peer_task_starts) + (SELECT COUNT(*) FROM peer_task_events WHERE direction='out')"
 	}
 	if err := tx.QueryRowContext(ctx, countQuery).Scan(&count); err != nil {
 		return err

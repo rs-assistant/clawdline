@@ -31,6 +31,11 @@ one target Session. A repeat with identical bytes returns the same task and
 target Session; a repeat with changed bytes is refused. If a claim was made but
 the effect cannot be proved, the outcome is unknown and is not run again.
 
+The task ID is a lowercase UUID. The encrypted body is a closed JSON object
+with `assistant`, `title`, and `instructions`; it cannot supply a target path.
+The target writes a private brief under its own state directory, resolves the
+Project locally, and records the target execution before accepting a finish.
+
 The target records its terminal ID, conversation ID and execution generation.
 Every subsequent message names the task ID and both current executions. A
 replaced source or target execution refuses an old request. Machine pairing
@@ -49,8 +54,10 @@ has a separate admission path and receipt scope. `task.message` and
 `task.finish` use the exact Sessions and generations created by the start.
 
 The source CLI exposes `clawdline remote machines`, `clawdline remote dispatch
---machine <id> --project <id> --title <title> --instructions-file <file>`,
-`clawdline remote show <task-id>`, and `clawdline remote send <task-id>`.
+--pair <id> --machine <id> --project <id> --assistant <name> --title <title>
+--instructions-file <file>`, `clawdline remote show <task-id>`,
+`clawdline remote send <task-id>`, and `clawdline remote ack <task-id>`.
+The target CLI uses `clawdline remote finish <task-id>` to publish one result.
 The CLI reads local credentials, pair and execution identities; it does not
 ask the Agent to compose wire headers or use a browser. The target Agent gets
 a task briefing with its scope, stop condition and reporting command. Its

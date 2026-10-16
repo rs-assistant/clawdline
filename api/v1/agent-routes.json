@@ -428,6 +428,21 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/remote/machines",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/remote/tasks",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/remote/tasks/",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/screens",
       "guide": "connect"
     },

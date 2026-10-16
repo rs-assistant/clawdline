@@ -72,7 +72,8 @@ func TestOnlyNoServerIsAnEmptyListing(t *testing.T) {
 }
 
 // A listing that fails for any reason but "no server" is incomplete, and says
-// why. Runs tmux against a socket directory it refuses.
+// why. An inaccessible parent gives a permission error on both tmux 3.4 and
+// 3.6a; an existing directory passed as -S says "no server" on tmux 3.4.
 func TestAFailedListingIsIncomplete(t *testing.T) {
 	bin, err := exec.LookPath("tmux")
 	if err != nil {
@@ -83,11 +84,14 @@ func TestAFailedListingIsIncomplete(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
+	if err := os.Chmod(dir, 0); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chmod(dir, 0700)
 	t.Setenv("TMUX", "")
 	t.Setenv("TMUX_PANE", "")
-	// -S names an existing directory, which tmux cannot use as a socket.
-	// This provokes an error without consulting the default server.
-	sock := dir
+	// -S names a socket below a directory this process cannot traverse.
+	sock := filepath.Join(dir, "socket")
 	inv, err := (&Tmux{Binary: bin, Socket: sock}).Inventory(context.Background())
 	if err != nil {
 		t.Fatal(err)

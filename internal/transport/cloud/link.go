@@ -191,10 +191,13 @@ type LinkOptions struct {
 	PeerReceipts    peerapp.Receipts
 	PeerAdmitTarget func(context.Context, string, string, string) error
 	PeerExecute     func(context.Context, peercontract.Request, []byte) error
-	// PeerTaskStartFacts and PeerTaskStartOpen are target-owned seams. Without
-	// both, machine-targeted starts remain closed even if the relay delivers one.
+	// PeerTaskStartOpen is the target-owned effect. Facts can be injected for
+	// isolated tests; the built-in facts fail closed until a source execution
+	// challenge can be verified.
 	PeerTaskStartFacts func(context.Context, peercontract.TaskStart, peercontract.Principal) (peercontract.TaskStartFacts, error)
 	PeerTaskStartOpen  func(context.Context, peercontract.TaskStart, []byte) (string, string, error)
+	PeerTaskProject    func(context.Context, string) (string, bool)
+	PeerTaskNotice     func(context.Context, peercontract.TaskStart) error
 	// Authorize stamps the credential the gate judges an in-process request by.
 	Authorize func(*http.Request)
 	// Version is this build, for the machine registration record.
@@ -307,6 +310,9 @@ type Link struct {
 	terminalRequests   chan Inbound
 	peerRequests       chan []byte
 	peerAcks           chan []byte
+	peerTaskStarts     chan []byte
+	peerTaskProbes     chan []byte
+	peerTaskPending    map[string]pendingTaskProof
 	terminalLists      chan Inbound
 	terminalRefusals   chan Inbound
 }
@@ -713,6 +719,10 @@ func (l *Link) wire() error {
 		PeerAck:              l.enqueuePeerAck,
 		PeerTaskStartInbound: l.enqueuePeer,
 		PeerTaskStartAck:     l.enqueuePeerAck,
+		PeerTaskProbeInbound: l.enqueuePeer,
+		PeerTaskProbeAck:     l.enqueuePeerAck,
+		PeerTaskEventInbound: l.enqueuePeer,
+		PeerTaskEventAck:     l.enqueuePeerAck,
 		OnDisconnect:         l.closeAllTerminalConnections,
 		OnSettled:            l.terminalReceiptSettled,
 		PublicKeyFor:         l.publicKeyFor,
@@ -890,11 +900,22 @@ func (l *Link) runOnce(ctx context.Context) error {
 	l.mu.Lock()
 	l.peerRequests = make(chan []byte, PeerIngressLimit)
 	l.peerAcks = make(chan []byte, PeerAckIngressLimit)
+	l.peerTaskStarts = make(chan []byte, PeerTaskStartIngressLimit)
+	l.peerTaskProbes = make(chan []byte, PeerProbeIngressLimit)
+	l.peerTaskPending = make(map[string]pendingTaskProof)
 	l.mu.Unlock()
 	peerCtx, stopPeer := context.WithCancel(ctx)
 	peerDone := make(chan struct{})
 	go func() { defer close(peerDone); l.runPeer(peerCtx) }()
 	defer func() { stopPeer(); <-peerDone }()
+	taskDone := make(chan struct{})
+	probeDone := make(chan struct{})
+	go func() { defer close(taskDone); l.runTaskStarts(peerCtx) }()
+	go func() { defer close(probeDone); l.runTaskProbes(peerCtx) }()
+	defer func() { stopPeer(); <-taskDone; <-probeDone }()
+	noticeDone := make(chan struct{})
+	go func() { defer close(noticeDone); l.runTaskNotices(peerCtx) }()
+	defer func() { stopPeer(); <-noticeDone }()
 	l.terminalRequests = make(chan Inbound, CloudTerminalIngressLimit)
 	l.terminalLists = make(chan Inbound, CloudTerminalListIngressLimit)
 	l.terminalRefusals = make(chan Inbound, CloudTerminalRefusalsLimit)

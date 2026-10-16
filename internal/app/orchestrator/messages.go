@@ -89,6 +89,16 @@ type Relayed struct {
 // message and before typing it types it after the restart, once, and a daemon
 // that dies mid-typing says "unknown" rather than typing it again.
 func (b *Broker) Relay(ctx context.Context, m Message, key string) (Relayed, error) {
+	return b.relay(ctx, m, key, false)
+}
+
+// RemoteTaskNotice uses the same durable relay receipt for a machine-owned
+// completion wake. Only this internal caller may address its own Session.
+func (b *Broker) RemoteTaskNotice(ctx context.Context, sessionID, text, key string) (Relayed, error) {
+	return b.relay(ctx, Message{From: sessionID, To: sessionID, Text: text}, key, true)
+}
+
+func (b *Broker) relay(ctx context.Context, m Message, key string, allowSelf bool) (Relayed, error) {
 	if m.From == "" || m.To == "" {
 		return Relayed{}, refuse(http.StatusBadRequest, "bad_request",
 			"The closed body needs only from_session, to_session, 0…100000 characters of text and optional images.")
@@ -101,7 +111,7 @@ func (b *Broker) Relay(ctx context.Context, m Message, key string) (Relayed, err
 		return Relayed{}, refuse(http.StatusBadRequest, "bad_request",
 			"The closed body needs only from_session, to_session, 0…100000 characters of text and optional images.")
 	}
-	if m.From == m.To {
+	if m.From == m.To && !allowSelf {
 		return Relayed{}, refuse(http.StatusConflict, "same_session",
 			"A session message must go to a different session.")
 	}

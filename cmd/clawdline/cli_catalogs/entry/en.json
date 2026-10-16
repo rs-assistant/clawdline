@@ -5,6 +5,7 @@
   "main_clawdline_no_backend_for": "clawdline: no backend for",
   "main_clawdline_type_needs_text": "clawdline type needs text",
   "main_cloud_status_on_off_login_connect": "  cloud <status|on|off|login|connect>   the line to app.clawdline.com; off by default",
+  "main_remote_agent_tasks": "  remote <machines|dispatch|show|send|finish|ack|retry>   work with a paired Agent on another machine",
   "main_coordinator_bind_conversation_id_register_this": "  coordinator bind [--conversation id]   register this machine-workspace Session, or rebind an offline role",
   "main_coordination_resources": "  coordination <status|pause|observed|safe|wake|resumed|retry|run>   coordinate Session resources and safe pauses",
   "main_devices_revoke_id_the_browsers_and": "  devices [revoke <id>]     the browsers and devices signed in to this machine directly; revoke one",

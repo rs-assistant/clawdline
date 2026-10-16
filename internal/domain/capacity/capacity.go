@@ -824,15 +824,20 @@ func Register() []Entry {
 			Sources:   []string{"internal/adapters/peerstore.OutboxLimit"},
 		},
 		{
-			// Peer frames wait off the socket reader for fresh authorization.
+			// Peer frames, starts and source probes wait off the socket reader
+			// for fresh authorization on their separate bounded workers.
 			Name: CloudPeerIngress, Class: Buffer, Unit: Rows,
 			Limit: 16, AtLimit: Refuse,
 			Told:      []Channel{Diagnostics, Log, Sender},
 			EvictedBy: Daemon,
 			Sources: []string{"internal/transport/cloud.PeerIngressLimit",
 				"internal/transport/cloud.PeerAckIngressLimit",
+				"internal/transport/cloud.PeerTaskStartIngressLimit",
+				"internal/transport/cloud.PeerProbeIngressLimit",
 				"internal/transport/cloud.(*Link).runOnce:chan(PeerIngressLimit)",
-				"internal/transport/cloud.(*Link).runOnce:chan(PeerAckIngressLimit)"},
+				"internal/transport/cloud.(*Link).runOnce:chan(PeerAckIngressLimit)",
+				"internal/transport/cloud.(*Link).runOnce:chan(PeerTaskStartIngressLimit)",
+				"internal/transport/cloud.(*Link).runOnce:chan(PeerProbeIngressLimit)"},
 		},
 		{
 			// Decrypted Cloud requests waiting for the bridge (limits N20).

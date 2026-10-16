@@ -124,12 +124,13 @@ func TestTaskStartOutboxKeepsRelayEvidenceSeparateFromTargetExecution(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	start := agenthandoff.TaskStart{TaskID: "task-1", RequestID: "request-1",
+	start := agenthandoff.TaskStart{TaskID: "11111111-1111-4111-8111-111111111111", RequestID: "request-1",
 		Source: agenthandoff.Endpoint{MachineID: "machine-a", SessionID: "session-a",
 			ExecutionGeneration: "11111111111111111111111111111111"},
 		TargetMachineID: "machine-b", TargetProjectID: "project-b", PairID: "pair-1",
 		BodyDigest: "a" + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
-	item := TaskStartOutboxItem{Start: start, RelayAccepted: "unknown", RelayDelivered: "unknown", At: time.Now()}
+	item := TaskStartOutboxItem{Start: start, Frame: []byte(`{"sealed":"first"}`),
+		RelayAccepted: "unknown", RelayDelivered: "unknown", At: time.Now()}
 	if err := st.SaveTaskStartOutbox(ctx, item); err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +143,12 @@ func TestTaskStartOutboxKeepsRelayEvidenceSeparateFromTargetExecution(t *testing
 		t.Fatal("same task ID changed its Project")
 	}
 	changed = item
-	changed.Start.TaskID = "task-2"
+	changed.Frame = []byte(`{"sealed":"different"}`)
+	if err := st.SaveTaskStartOutbox(ctx, changed); err == nil {
+		t.Fatal("same task ID changed its signed frame")
+	}
+	changed = item
+	changed.Start.TaskID = "22222222-2222-4222-8222-222222222222"
 	if err := st.SaveTaskStartOutbox(ctx, changed); err == nil {
 		t.Fatal("request ID was reused for another task")
 	}
@@ -161,11 +167,140 @@ func TestTaskStartOutboxKeepsRelayEvidenceSeparateFromTargetExecution(t *testing
 	}
 	defer st.Close()
 	saved, err := st.TaskStartOutboxByRequest(ctx, start.RequestID)
-	if err != nil || saved.Start != start || saved.RelayDelivered != "unknown" || !saved.RelayConflict {
+	if err != nil || saved.Start != start || string(saved.Frame) != string(item.Frame) ||
+		saved.RelayDelivered != "delivered" || saved.RelayConflict {
 		t.Fatalf("outbox after restart: %+v, %v", saved, err)
 	}
 	if usage, err := ReadUsage(ctx, dir); err != nil || usage.Outbox != 1 {
 		t.Fatalf("task start outbox usage: %+v, %v", usage, err)
+	}
+}
+
+func TestTaskEventsSurviveRestartAndCannotSwitchTheTargetExecution(t *testing.T) {
+	ctx := context.Background()
+	dir := filepath.Join(t.TempDir(), "private-peers")
+	st, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := agenthandoff.TaskStart{TaskID: "11111111-1111-4111-8111-111111111111", RequestID: "request-1",
+		Source: agenthandoff.Endpoint{MachineID: "source", SessionID: "source-session",
+			ExecutionGeneration: "11111111111111111111111111111111"},
+		TargetMachineID: "target", TargetProjectID: "project", PairID: "pair",
+		BodyDigest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	item := TaskStartOutboxItem{Start: start, Frame: []byte(`{"sealed":"start"}`),
+		RelayAccepted: "unknown", RelayDelivered: "unknown", At: time.Now()}
+	if err := st.SaveTaskStartOutbox(ctx, item); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MarkTaskStartOpened(ctx, start.TaskID, "target-session", "22222222222222222222222222222222"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MarkTaskStartOpened(ctx, start.TaskID, "target-session", "33333333333333333333333333333333"); err == nil {
+		t.Fatal("a second target execution replaced the first")
+	}
+	body := "Inventory complete."
+	sum := sha256.Sum256([]byte(body))
+	event := agenthandoff.TaskEvent{Start: start, RequestID: "finish-1", Kind: agenthandoff.TaskEventFinish,
+		Sender: agenthandoff.Endpoint{MachineID: "target", SessionID: "target-session",
+			ExecutionGeneration: "22222222222222222222222222222222"},
+		Recipient: start.Source, BodyDigest: hex.EncodeToString(sum[:])}
+	record := TaskEventRecord{Event: event, Direction: "in", Body: body, At: time.Now()}
+	if err := st.SaveTaskEvent(ctx, record); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveTaskEvent(ctx, record); err != nil {
+		t.Fatalf("identical retry: %v", err)
+	}
+	changed := record
+	changed.Body = "different result"
+	if err := st.SaveTaskEvent(ctx, changed); err == nil {
+		t.Fatal("one request ID changed its result")
+	}
+	second := record
+	second.Event.RequestID = "finish-2"
+	if err := st.SaveTaskEvent(ctx, second); err == nil {
+		t.Fatal("a second finish request created another completion")
+	}
+	if err := st.MarkTaskFinishAcknowledged(ctx, event); err == nil {
+		t.Fatal("an unread result was acknowledged")
+	}
+	if err := st.MarkTaskFinishNotified(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MarkTaskFinishObserved(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MarkTaskFinishAcknowledged(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	st, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	rows, err := st.TaskEvents(ctx, start.TaskID)
+	if err != nil || len(rows) != 1 || rows[0].Body != body || !rows[0].NoticeDelivered ||
+		rows[0].ObservedAt.IsZero() || rows[0].AcknowledgedAt.IsZero() {
+		t.Fatalf("task result after restart: %+v, %v", rows, err)
+	}
+	if usage, err := ReadUsage(ctx, dir); err != nil || usage.Inbox != 1 || usage.Outbox != 1 {
+		t.Fatalf("event capacity usage: %+v, %v", usage, err)
+	}
+}
+
+func TestRemoteTaskClaimSurvivesRestartAndCannotSwitchExecution(t *testing.T) {
+	ctx := context.Background()
+	dir := filepath.Join(t.TempDir(), "private-peers")
+	st, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	instructions := `{"assistant":"claude","title":"Disk inventory","instructions":"Inspect disk usage without deleting files."}`
+	digest := sha256.Sum256([]byte(instructions))
+	start := agenthandoff.TaskStart{TaskID: "11111111-1111-4111-8111-111111111111", RequestID: "request-1",
+		Source: agenthandoff.Endpoint{MachineID: "machine-a", SessionID: "session-a",
+			ExecutionGeneration: "11111111111111111111111111111111"},
+		TargetMachineID: "machine-b", TargetProjectID: "project-b", PairID: "pair-1",
+		BodyDigest: hex.EncodeToString(digest[:])}
+	task := RemoteTask{Start: start, Body: instructions, State: "accepted", At: time.Now()}
+	if err := st.SaveRemoteTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SaveRemoteTask(ctx, task); err != nil {
+		t.Fatalf("identical replay: %v", err)
+	}
+	changed := task
+	changed.Start.TaskID = "22222222-2222-4222-8222-222222222222"
+	if err := st.SaveRemoteTask(ctx, changed); err == nil {
+		t.Fatal("same request ID started another task")
+	}
+	if err := st.MarkRemoteTaskOpened(ctx, start.TaskID, "target-session", "22222222222222222222222222222222"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	st, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if err := st.MarkRemoteTaskOpened(ctx, start.TaskID, "target-session", "22222222222222222222222222222222"); err != nil {
+		t.Fatalf("same opening replay: %v", err)
+	}
+	if err := st.MarkRemoteTaskOpened(ctx, start.TaskID, "other-session", "33333333333333333333333333333333"); err == nil {
+		t.Fatal("replay switched the opened Session")
+	}
+	saved, err := st.RemoteTask(ctx, start.TaskID)
+	if err != nil || saved.TargetSessionID != "target-session" || saved.TargetGeneration != "22222222222222222222222222222222" {
+		t.Fatalf("target execution after restart: %+v, %v", saved, err)
+	}
+	if usage, err := ReadUsage(ctx, dir); err != nil || usage.Inbox != 1 {
+		t.Fatalf("target task usage: %+v, %v", usage, err)
 	}
 }
 

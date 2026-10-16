@@ -1,0 +1,16 @@
+{
+  "usage.machines": "用法：clawdline remote machines",
+  "usage.dispatch": "       clawdline remote dispatch --machine ID --pair ID --project ID --assistant NAME --title TITLE --instructions-file PATH [--task-id UUID --request-id UUID]",
+  "usage.show": "       clawdline remote show TASK-ID",
+  "usage.send": "       clawdline remote send TASK-ID TEXT [--request-id UUID]",
+  "usage.finish": "       clawdline remote finish TASK-ID TEXT [--request-id UUID]",
+  "usage.retry": "       clawdline remote retry TASK-ID",
+  "usage.ack": "       clawdline remote ack TASK-ID",
+  "error.session": "需要目前執行中的助理 Session",
+  "error.dispatch_fields": "必須指定機器、配對、Project、助理、標題及指示檔案",
+  "error.retry_ids": "任務 ID 與請求 ID 必須一起提供",
+  "error.instructions_size": "指示內容必須介於 1 到 524288 位元組",
+  "error.effect_fields": "必須提供任務 ID 與文字內容",
+  "dispatch_ids": "任務 %s，請求 %s；若回應不確定，請重用這兩個 ID\n",
+  "event_id": "請求 %s；若回應不確定，請重用此 ID\n"
+}
