@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5304,
+  "englishContentKeys": 5305,
   "riskKeys": 2337,
-  "nonRiskCount": 2967,
+  "nonRiskCount": 2968,
   "groups": [
     {
       "name": "bar / other",
@@ -1891,7 +1891,7 @@
     },
     {
       "name": "next / end",
-      "count": 10,
+      "count": 11,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1899,6 +1899,7 @@
         "next.endNamedTitle",
         "next.endProcessRecoveryGo",
         "next.endWorkBoardLabel",
+        "next.endWorkChangedConfirm",
         "next.endWorkChecking",
         "next.endWorkClose",
         "next.endWorkConfirmClose",

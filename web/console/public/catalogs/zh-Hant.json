@@ -3591,6 +3591,7 @@
   "next.endProcessRecoveryGo": "結束助理行程",
   "next.endProcessRecoveryWarning": "目前只能確認助理行程還在；Clawdline 無法讀取終端，也無法檢查未儲存的工作。結束行程可能會遺失尚未記錄的內容。",
   "next.endWorkBoardLabel": "看板",
+  "next.endWorkChangedConfirm": "這個 Session 在上次確認後已有變動。請查看目前的工作，再決定是否強制關閉。",
   "next.endWorkChecking": "正在確認這個 Session 尚未完成的看板項目…",
   "next.endWorkClose": "關閉 Session",
   "next.endWorkCloseUnknown": "Clawdline 還不能確認這個 Session 是否適合關閉。",
