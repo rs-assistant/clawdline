@@ -252,7 +252,7 @@ export function statusSource(current: () => StatusClient | null,
               (client.now?.() ?? Date.now()) - started, failures + 1)
             return null
           })
-        cached = { client, until: now + STATUS_MARKER_RETRY_MS, value: null,
+        cached = { client, until: now + STATUS_GAP_RETRY_MS, value: null,
           failures, promise }
         directLists.set(machineID, cached)
         void promise.then((value) => { if (directLists.get(machineID) === cached) {

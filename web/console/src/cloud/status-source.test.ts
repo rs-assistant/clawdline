@@ -336,10 +336,13 @@ test("a direct fallback refreshes its presentation after the short gap window", 
           work_provenance: "broker", persona: "" } }] }
   }
   const source = statusSource(() => client as never)
+  const first = await source.readMachine(machineID, new AbortController().signal)
   assert.equal((await source.readMachinePresentations?.(machineID, new AbortController().signal))?.[0]?.status?.work_note,
     workNote)
   workNote = "Queued heavy command finished"
   now += STATUS_GAP_RETRY_MS
+  const refreshed = await source.readMachine(machineID, new AbortController().signal)
+  assert.notEqual(refreshed.snapshotGeneration, first.snapshotGeneration)
   assert.equal((await source.readMachinePresentations?.(machineID, new AbortController().signal))?.[0]?.status?.work_note,
     workNote)
   assert.deepEqual(calls, ["sessions.list:" + machineID, "sessions.list:" + machineID])
