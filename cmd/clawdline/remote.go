@@ -44,6 +44,16 @@ func remoteCommand(args []string) {
 		}
 	case "send", "finish":
 		err = remoteEffect(args[0], args[1:])
+	case "ack":
+		if len(args) != 2 {
+			remoteUsage()
+			os.Exit(2)
+		}
+		var session string
+		session, err = remoteSession()
+		if err == nil {
+			err = remoteRequest(http.MethodPost, "/v1/remote/tasks/"+url.PathEscape(args[1])+"/ack", map[string]any{"session_id": session})
+		}
 	case "retry":
 		if len(args) != 2 {
 			remoteUsage()
@@ -66,6 +76,7 @@ func remoteUsage() {
 	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.send", "       clawdline remote send TASK-ID TEXT [--request-id UUID]"))
 	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.finish", "       clawdline remote finish TASK-ID TEXT [--request-id UUID]"))
 	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.retry", "       clawdline remote retry TASK-ID"))
+	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.ack", "       clawdline remote ack TASK-ID"))
 }
 
 func remoteSession() (string, error) {

@@ -117,6 +117,8 @@ type TaskEventRecord struct {
 	Frame           []byte                 `json:"frame,omitempty"`
 	RelayDelivered  string                 `json:"relay_delivered,omitempty"`
 	NoticeDelivered bool                   `json:"notice_delivered,omitempty"`
+	ObservedAt      time.Time              `json:"observed_at,omitempty"`
+	AcknowledgedAt  time.Time              `json:"acknowledged_at,omitempty"`
 	At              time.Time              `json:"at"`
 }
 
@@ -160,8 +162,9 @@ func Open(dir string) (*Store, error) {
 		"CREATE TABLE IF NOT EXISTS peer_outbox (id TEXT PRIMARY KEY, body BLOB NOT NULL)",
 		"CREATE TABLE IF NOT EXISTS peer_task_starts (id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, body BLOB NOT NULL)",
 		"CREATE TABLE IF NOT EXISTS peer_remote_tasks (id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, body BLOB NOT NULL)",
-		"CREATE TABLE IF NOT EXISTS peer_task_events (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, request_id TEXT NOT NULL UNIQUE, direction TEXT NOT NULL, body BLOB NOT NULL)",
+		"CREATE TABLE IF NOT EXISTS peer_task_events (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, request_id TEXT NOT NULL UNIQUE, direction TEXT NOT NULL, kind TEXT NOT NULL, body BLOB NOT NULL)",
 		"CREATE INDEX IF NOT EXISTS peer_task_events_task ON peer_task_events(task_id)",
+		"CREATE UNIQUE INDEX IF NOT EXISTS peer_task_finish_once ON peer_task_events(task_id,direction,kind) WHERE kind='finish'",
 	} {
 		if _, err := db.Exec(statement); err != nil {
 			db.Close()
@@ -801,8 +804,8 @@ func (s *Store) SaveTaskEvent(ctx context.Context, record TaskEventRecord) error
 		return ErrFull
 	}
 	if _, err := tx.ExecContext(ctx,
-		"INSERT INTO peer_task_events(id,task_id,request_id,direction,body) VALUES(?,?,?,?,?)",
-		key, record.Event.Start.TaskID, record.Event.RequestID, record.Direction, encoded); err != nil {
+		"INSERT INTO peer_task_events(id,task_id,request_id,direction,kind,body) VALUES(?,?,?,?,?,?)",
+		key, record.Event.Start.TaskID, record.Event.RequestID, record.Direction, record.Event.Kind, encoded); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -857,7 +860,8 @@ func (s *Store) PendingTaskFinishes(ctx context.Context) ([]TaskEventRecord, err
 		if err := rows.Scan(&pairBody{into: &record}); err != nil {
 			return nil, err
 		}
-		if record.Event.Kind == agenthandoff.TaskEventFinish && !record.NoticeDelivered {
+		if record.Event.Kind == agenthandoff.TaskEventFinish && !record.NoticeDelivered &&
+			record.ObservedAt.IsZero() {
 			records = append(records, record)
 		}
 	}
@@ -865,12 +869,64 @@ func (s *Store) PendingTaskFinishes(ctx context.Context) ([]TaskEventRecord, err
 }
 
 func (s *Store) MarkTaskFinishNotified(ctx context.Context, event agenthandoff.TaskEvent) error {
-	record, err := s.TaskEvent(ctx, event)
-	if err != nil || record.Direction != "in" || record.Event.Kind != agenthandoff.TaskEventFinish {
-		return errors.New("peer_task_finish_missing")
+	return s.updateTaskFinish(ctx, event, func(record *TaskEventRecord) error {
+		record.NoticeDelivered = true
+		return nil
+	})
+}
+
+func (s *Store) MarkTaskFinishObserved(ctx context.Context, event agenthandoff.TaskEvent) error {
+	return s.updateTaskFinish(ctx, event, func(record *TaskEventRecord) error {
+		if record.ObservedAt.IsZero() {
+			record.ObservedAt = time.Now().UTC()
+		}
+		return nil
+	})
+}
+
+func (s *Store) MarkTaskFinishAcknowledged(ctx context.Context, event agenthandoff.TaskEvent) error {
+	return s.updateTaskFinish(ctx, event, func(record *TaskEventRecord) error {
+		if record.ObservedAt.IsZero() {
+			return errors.New("peer_task_finish_unobserved")
+		}
+		if record.AcknowledgedAt.IsZero() {
+			record.AcknowledgedAt = time.Now().UTC()
+		}
+		return nil
+	})
+}
+
+// Compare the original blob when advancing independent notice and Agent-read
+// rungs, so concurrent updates cannot silently erase each other.
+func (s *Store) updateTaskFinish(ctx context.Context, event agenthandoff.TaskEvent,
+	change func(*TaskEventRecord) error) error {
+	key := taskEventKey(event)
+	for attempt := 0; attempt < 8; attempt++ {
+		var original []byte
+		if err := s.db.QueryRowContext(ctx, "SELECT body FROM peer_task_events WHERE id=?", key).Scan(&original); err != nil {
+			return errors.New("peer_task_finish_missing")
+		}
+		var record TaskEventRecord
+		if json.Unmarshal(original, &record) != nil || record.Direction != "in" ||
+			record.Event != event || record.Event.Kind != agenthandoff.TaskEventFinish {
+			return errors.New("peer_task_finish_missing")
+		}
+		if err := change(&record); err != nil {
+			return err
+		}
+		updated, err := json.Marshal(record)
+		if err != nil {
+			return err
+		}
+		result, err := s.db.ExecContext(ctx, "UPDATE peer_task_events SET body=? WHERE id=? AND body=?", updated, key, original)
+		if err != nil {
+			return err
+		}
+		if n, err := result.RowsAffected(); err == nil && n == 1 {
+			return nil
+		}
 	}
-	record.NoticeDelivered = true
-	return s.replace(ctx, "peer_task_events", taskEventKey(event), record)
+	return errors.New("peer_task_finish_update_conflict")
 }
 
 func (s *Store) MarkTaskEventDelivered(ctx context.Context, event agenthandoff.TaskEvent,

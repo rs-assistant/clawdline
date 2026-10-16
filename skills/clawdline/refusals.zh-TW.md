@@ -175,9 +175,12 @@
 | `receipt_unavailable` | `internal/transport/http/secret_handoff.go` |
 | `receipt_update_failed` | `internal/transport/http/work_v2_agent.go` |
 | `receipts_full` | `internal/transport/http/receipts.go`, `internal/transport/http/work.go` |
+| `remote_ack_refused` | `internal/transport/http/cloud_remote_routes.go` |
 | `remote_dispatch_refused` | `internal/transport/http/cloud_remote_routes.go` |
 | `remote_event_refused` | `internal/transport/http/cloud_remote_routes.go` |
+| `remote_finish_missing` | `internal/transport/http/cloud_remote_routes.go` |
 | `remote_finish_refused` | `internal/transport/http/cloud_remote_routes.go` |
+| `remote_observation_unavailable` | `internal/transport/http/cloud_remote_routes.go` |
 | `remote_source_unverified` | `internal/transport/http/cloud_remote_routes.go` |
 | `remote_store_unavailable` | `internal/transport/http/cloud_remote_routes.go` |
 | `remote_task_missing` | `internal/transport/http/cloud_remote_routes.go` |

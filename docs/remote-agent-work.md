@@ -54,8 +54,10 @@ has a separate admission path and receipt scope. `task.message` and
 `task.finish` use the exact Sessions and generations created by the start.
 
 The source CLI exposes `clawdline remote machines`, `clawdline remote dispatch
---machine <id> --project <id> --title <title> --instructions-file <file>`,
-`clawdline remote show <task-id>`, and `clawdline remote send <task-id>`.
+--pair <id> --machine <id> --project <id> --assistant <name> --title <title>
+--instructions-file <file>`, `clawdline remote show <task-id>`,
+`clawdline remote send <task-id>`, and `clawdline remote ack <task-id>`.
+The target CLI uses `clawdline remote finish <task-id>` to publish one result.
 The CLI reads local credentials, pair and execution identities; it does not
 ask the Agent to compose wire headers or use a browser. The target Agent gets
 a task briefing with its scope, stop condition and reporting command. Its

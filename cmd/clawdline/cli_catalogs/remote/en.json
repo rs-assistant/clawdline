@@ -5,6 +5,7 @@
   "usage.send": "       clawdline remote send TASK-ID TEXT [--request-id UUID]",
   "usage.finish": "       clawdline remote finish TASK-ID TEXT [--request-id UUID]",
   "usage.retry": "       clawdline remote retry TASK-ID",
+  "usage.ack": "       clawdline remote ack TASK-ID",
   "error.session": "a current assistant Session is required",
   "error.dispatch_fields": "machine, pair, project, assistant, title and instructions file are required",
   "error.retry_ids": "task ID and request ID must be supplied together",

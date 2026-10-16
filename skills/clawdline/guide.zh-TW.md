@@ -210,6 +210,18 @@ roster 與本機信任狀態；配對後要唯讀複查，也用這條。
 `clawdline cloud peer revoke-pair` 先在本機拒絕，再要求 Cloud 撤銷。舊的 Session 授權
 仍可供既有請求使用。同帳號與 viewer key 都不能取代機器簽章或目前的執行世代。
 
+**不用瀏覽器就能把新 Agent 任務交給已配對機器。** 來源 Agent 在目前的 Session 執行
+`clawdline remote machines`，可列出本機固定的單向配對；此清單不證明目標在線，目標離線時
+會在派工時由 Relay 回報。選定目標機器已登錄的 Project ID，執行
+`clawdline remote dispatch --machine <id> --pair <id> --project <id> --assistant claude|codex --title <title> --instructions-file <path>`。
+保留印出的任務 ID 與請求 ID。若回應不確定，重用這兩個 ID，或執行
+`clawdline remote retry <task-id>`；不要另建任務 ID。目標 Agent 讀取自己的私有任務說明，
+可以用 `clawdline remote send <task-id> <text>` 回覆，完成時用
+`clawdline remote finish <task-id> <result>`。來源 Agent 收到只含任務 ID 的喚醒訊息後，
+用 `clawdline remote show <task-id>` 讀取已驗證的結果，向使用者報告，再用
+`clawdline remote ack <task-id>` 記錄已確認。`show` 記錄已讀；`ack` 必須在已讀之後。
+Relay 的交付狀態只證明 socket 傳送，不代表目標 Agent 已執行。
+
 本機路由為 `POST /v1/cloud/peer/control`（`action`、配對或授權 ID、核對過的指紋、指定
 Session ID 與世代、範圍）、`POST /v1/cloud/peer/send`（`request` 內含兩端機器／Session／
 世代、類型、以配對 ID 填入 wire `grant_id` 欄位、內容摘要，另附 `body`）、`GET /v1/cloud/peer/outbox/<request-id>`

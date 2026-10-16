@@ -217,6 +217,23 @@ func TestTaskEventsSurviveRestartAndCannotSwitchTheTargetExecution(t *testing.T)
 	if err := st.SaveTaskEvent(ctx, changed); err == nil {
 		t.Fatal("one request ID changed its result")
 	}
+	second := record
+	second.Event.RequestID = "finish-2"
+	if err := st.SaveTaskEvent(ctx, second); err == nil {
+		t.Fatal("a second finish request created another completion")
+	}
+	if err := st.MarkTaskFinishAcknowledged(ctx, event); err == nil {
+		t.Fatal("an unread result was acknowledged")
+	}
+	if err := st.MarkTaskFinishNotified(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MarkTaskFinishObserved(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.MarkTaskFinishAcknowledged(ctx, event); err != nil {
+		t.Fatal(err)
+	}
 	if err := st.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +243,8 @@ func TestTaskEventsSurviveRestartAndCannotSwitchTheTargetExecution(t *testing.T)
 	}
 	defer st.Close()
 	rows, err := st.TaskEvents(ctx, start.TaskID)
-	if err != nil || len(rows) != 1 || rows[0].Body != body {
+	if err != nil || len(rows) != 1 || rows[0].Body != body || !rows[0].NoticeDelivered ||
+		rows[0].ObservedAt.IsZero() || rows[0].AcknowledgedAt.IsZero() {
 		t.Fatalf("task result after restart: %+v, %v", rows, err)
 	}
 	if usage, err := ReadUsage(ctx, dir); err != nil || usage.Inbox != 1 || usage.Outbox != 1 {

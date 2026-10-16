@@ -185,6 +185,9 @@ func (s *Server) remoteTaskRoute(w http.ResponseWriter, r *http.Request) {
 		case "finish", "messages":
 			s.remoteTaskEffect(w, r, st, id, parts[1])
 			return
+		case "ack":
+			s.remoteTaskAck(w, r, st, id)
+			return
 		case "retry":
 			if line := s.remoteLine(); line != nil {
 				if _, err := line.RetryTaskStart(r.Context(), id); err == nil {
@@ -209,7 +212,36 @@ func (s *Server) remoteTaskShow(w http.ResponseWriter, r *http.Request, st *peer
 			writeRefusal(w, http.StatusServiceUnavailable, "remote_store_unavailable", "The task events are unavailable.")
 			return
 		}
-		writeJSON(w, map[string]any{"role": "source", "task": start, "events": events})
+		state := "submitted"
+		if start.RelayDelivered == "delivered" {
+			state = "relay_delivered"
+		}
+		if start.TargetSessionID != "" {
+			state = "session_opened"
+		}
+		for i := range events {
+			if events[i].Direction == "in" && events[i].Event.Kind == agenthandoff.TaskEventFinish {
+				if err := st.MarkTaskFinishObserved(r.Context(), events[i].Event); err != nil {
+					writeRefusal(w, http.StatusServiceUnavailable, "remote_observation_unavailable", err.Error())
+					return
+				}
+				updated, err := st.TaskEvent(r.Context(), events[i].Event)
+				if err != nil {
+					writeRefusal(w, http.StatusServiceUnavailable, "remote_store_unavailable", err.Error())
+					return
+				}
+				events[i] = updated
+				state = "source_observed"
+				if !updated.AcknowledgedAt.IsZero() {
+					state = "source_acknowledged"
+				}
+			}
+		}
+		start.Frame = nil
+		for i := range events {
+			events[i].Frame = nil
+		}
+		writeJSON(w, map[string]any{"role": "source", "state": state, "task": start, "events": events})
 		return
 	}
 	if task, err := st.RemoteTask(r.Context(), id); err == nil &&
@@ -220,10 +252,49 @@ func (s *Server) remoteTaskShow(w http.ResponseWriter, r *http.Request, st *peer
 			writeRefusal(w, http.StatusServiceUnavailable, "remote_store_unavailable", "The task events are unavailable.")
 			return
 		}
-		writeJSON(w, map[string]any{"role": "target", "task": task, "events": events})
+		for i := range events {
+			events[i].Frame = nil
+		}
+		writeJSON(w, map[string]any{"role": "target", "state": task.State, "task": task, "events": events})
 		return
 	}
 	writeRefusal(w, http.StatusNotFound, "remote_task_missing", "No remote task belongs to this Session.")
+}
+
+func (s *Server) remoteTaskAck(w http.ResponseWriter, r *http.Request, st *peerstore.Store, id string) {
+	var input struct {
+		SessionID string `json:"session_id"`
+	}
+	if json.NewDecoder(io.LimitReader(r.Body, 1024)).Decode(&input) != nil {
+		writeRefusal(w, http.StatusBadRequest, "bad_request", "The acknowledgement is invalid.")
+		return
+	}
+	current, err := s.currentRemoteSession(r.Context(), input.SessionID)
+	if err != nil {
+		writeRefusal(w, http.StatusConflict, "remote_source_unverified", err.Error())
+		return
+	}
+	start, err := st.TaskStartOutbox(r.Context(), id)
+	if err != nil || start.Start.Source != current {
+		writeRefusal(w, http.StatusNotFound, "remote_task_missing", "No remote task belongs to this Session.")
+		return
+	}
+	events, err := st.TaskEvents(r.Context(), id)
+	if err != nil {
+		writeRefusal(w, http.StatusServiceUnavailable, "remote_store_unavailable", err.Error())
+		return
+	}
+	for _, event := range events {
+		if event.Direction == "in" && event.Event.Kind == agenthandoff.TaskEventFinish {
+			if err := st.MarkTaskFinishAcknowledged(r.Context(), event.Event); err != nil {
+				writeRefusal(w, http.StatusConflict, "remote_ack_refused", err.Error())
+				return
+			}
+			writeJSON(w, map[string]any{"task_id": id, "state": "source_acknowledged"})
+			return
+		}
+	}
+	writeRefusal(w, http.StatusConflict, "remote_finish_missing", "The target has not finished this task.")
 }
 
 func (s *Server) remoteTaskEffect(w http.ResponseWriter, r *http.Request, st *peerstore.Store,

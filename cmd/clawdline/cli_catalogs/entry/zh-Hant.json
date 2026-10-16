@@ -5,7 +5,7 @@
   "main_clawdline_no_backend_for": "clawdline: 沒有可用的後端：",
   "main_clawdline_type_needs_text": "clawdline type 需要文字",
   "main_cloud_status_on_off_login_connect": "  cloud <status|on|off|login|connect>   連接 app.clawdline.com 的通道；預設關閉",
-  "main_remote_agent_tasks": "  remote <machines|dispatch|show|send|finish|retry>   與另一台已配對機器的 Agent 協作",
+  "main_remote_agent_tasks": "  remote <machines|dispatch|show|send|finish|ack|retry>   與另一台已配對機器的 Agent 協作",
   "main_coordinator_bind_conversation_id_register_this": "  coordinator bind [--conversation id]   註冊此機器工作區的 Session，或重新綁定離線角色",
   "main_coordination_resources": "  coordination <status|pause|observed|safe|wake|resumed|retry|run>   協調 Session 資源與安全停點暫停",
   "main_devices_revoke_id_the_browsers_and": "  devices [revoke <id>]     直接登入此機器的瀏覽器及裝置；可撤銷其中一個",

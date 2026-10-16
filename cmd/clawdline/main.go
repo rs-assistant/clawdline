@@ -562,7 +562,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_devices_revoke_id_the_browsers_and", "  devices [revoke <id>]     the browsers and devices signed in to this machine directly; revoke one"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_tunnel_json_what_the_cloudflared_tunnel", "  tunnel [--json]           what the cloudflared tunnel is doing; remote_tunnel in the settings turns it on"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_cloud_status_on_off_login_connect", "  cloud <status|on|off|login|connect>   the line to app.clawdline.com; off by default"))
-	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_remote_agent_tasks", "  remote <machines|dispatch|show|send|finish|retry>   work with a paired Agent on another machine"))
+	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_remote_agent_tasks", "  remote <machines|dispatch|show|send|finish|ack|retry>   work with a paired Agent on another machine"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_board_tracks_rows_json_the_old", "  board tracks [--rows] [--json]   the old cards on the three tracks, read-only"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_project_add_remove_list_explicitly_keep", "  project <add|remove|list>    explicitly keep directories in the session-start list"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_project_unify_apply_check_dir_one", "  project unify [--apply|--check] [dir]   one rules file and one skills directory for Claude and Codex; --check exits 0 unified, 1 drifting, 3 unknown"))

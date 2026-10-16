@@ -5,6 +5,7 @@
   "usage.send": "       clawdline remote send TASK-ID TEXT [--request-id UUID]",
   "usage.finish": "       clawdline remote finish TASK-ID TEXT [--request-id UUID]",
   "usage.retry": "       clawdline remote retry TASK-ID",
+  "usage.ack": "       clawdline remote ack TASK-ID",
   "error.session": "需要目前執行中的助理 Session",
   "error.dispatch_fields": "必須指定機器、配對、Project、助理、標題及指示檔案",
   "error.retry_ids": "任務 ID 與請求 ID 必須一起提供",
