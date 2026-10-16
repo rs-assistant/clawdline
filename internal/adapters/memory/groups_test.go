@@ -146,9 +146,7 @@ func TestResidentEntriesPastTheBoundAreCutAndGroupsKept(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		e := invented(fmt.Sprintf("resident-%03d", i), TypeFeedback)
 		e.Description = strings.Repeat("d", 80)
-		if _, err := s.Add(testKey, e); err != nil {
-			t.Fatal(err)
-		}
+		seed(t, s, e)
 	}
 	text, _, cut, err := s.Index(testKey)
 	if err != nil || !cut {

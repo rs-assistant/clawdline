@@ -20,6 +20,30 @@ func invented(name string, t Type) Entry {
 
 const testKey = "scratch-project-0123abcd"
 
+// seed lands entries as the files Add would write, without Add's synced
+// write and index rewrite per entry: a test of a bound needs hundreds of
+// entries on disk, and filling them one Add at a time spent two fsyncs and a
+// read of the whole directory on each (123 s for one test on 2026-10-16).
+// What the test then asks of Add, Update or Index still goes through them.
+func seed(t *testing.T, s *Store, entries ...Entry) {
+	t.Helper()
+	dir, err := s.Dir(testKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if err := Validate(e); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, e.Name+".md"), []byte(Format(e)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestAnEntryRoundTripsThroughItsFile(t *testing.T) {
 	s := New(t.TempDir())
 	e := Entry{Name: "quote-in-description", Description: `says "hi": twice`, Type: TypeReference,
@@ -110,11 +134,11 @@ func TestWritesAreIdempotentAndRefusalsAreTyped(t *testing.T) {
 
 func TestAFullProjectRefusesOneMore(t *testing.T) {
 	s := New(t.TempDir())
+	full := make([]Entry, 0, EntryCountLimit)
 	for i := 0; i < EntryCountLimit; i++ {
-		if _, err := s.Add(testKey, invented(fmt.Sprintf("lesson-%03d", i), TypeProject)); err != nil {
-			t.Fatal(err)
-		}
+		full = append(full, invented(fmt.Sprintf("lesson-%03d", i), TypeProject))
 	}
+	seed(t, s, full...)
 	if _, err := s.Add(testKey, invented("one-too-many", TypeProject)); !errors.Is(err, ErrFull) {
 		t.Fatalf("one past the limit: %v", err)
 	}
@@ -164,9 +188,7 @@ func TestAnIndexPastItsBoundIsCutAtALineAndSaysSo(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		e := invented(fmt.Sprintf("lesson-%03d", i), TypeFeedback)
 		e.Description = strings.Repeat("d", 80)
-		if _, err := s.Add(testKey, e); err != nil {
-			t.Fatal(err)
-		}
+		seed(t, s, e)
 	}
 	text, n, cut, err := s.Index(testKey)
 	if err != nil || n != 200 || !cut {
