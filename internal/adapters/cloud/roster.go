@@ -49,6 +49,10 @@ import (
 // clock is the only refresh and it is the shorter one.
 const RosterRefresh = 60 * time.Second
 
+// RosterShortReadAttemptsLimit bounds a deadline-bound authority read. The
+// second attempt uses a fresh transport and shares the original deadline.
+const RosterShortReadAttemptsLimit = 2
+
 // RosterDevice is one enrolled viewer as the control plane describes it.
 type RosterDevice struct {
 	ID          string   `json:"id"`
@@ -170,29 +174,58 @@ func (r *Roster) fetch(ctx context.Context) ([]RosterDevice, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
+	// Content and terminal authority have a two-second deadline. A broken
+	// pooled connection can consume that entire window even while the account
+	// API is healthy. Reserve half of a short window for one fresh connection.
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining > 0 && remaining <= 2*time.Second {
+			first, stop := context.WithTimeout(ctx, remaining/time.Duration(RosterShortReadAttemptsLimit))
+			devices, retry, err := r.fetchOnce(first, r.client)
+			stop()
+			if err == nil || !retry || ctx.Err() != nil {
+				return devices, err
+			}
+			transport := http.DefaultTransport.(*http.Transport).Clone()
+			transport.DisableKeepAlives = true
+			defer transport.CloseIdleConnections()
+			return r.fetchOnceResult(ctx, &http.Client{Transport: transport})
+		}
+	}
+	return r.fetchOnceResult(ctx, r.client)
+}
+
+func (r *Roster) fetchOnceResult(ctx context.Context, client *http.Client) ([]RosterDevice, error) {
+	devices, _, err := r.fetchOnce(ctx, client)
+	return devices, err
+}
+
+// retry is true only for a transport failure or an interrupted response body.
+// An HTTP refusal or malformed roster is never retried.
+func (r *Roster) fetchOnce(ctx context.Context, client *http.Client) ([]RosterDevice, bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.apiBase+"/v1/devices", nil)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	req.Header.Set("Authorization", "Bearer "+r.credential)
 	req.Header.Set("Accept", "application/json")
-	res, err := r.client.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, true, err
 	}
 	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, false, fmt.Errorf("%w: the control plane answered %d", ErrRosterUnreadable, res.StatusCode)
+	}
 	body, err := io.ReadAll(io.LimitReader(res.Body, maxResponseBytes))
 	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%w: the control plane answered %d", ErrRosterUnreadable, res.StatusCode)
+		return nil, true, err
 	}
 	var answer struct {
 		Devices []RosterDevice `json:"devices"`
 	}
 	if err := json.Unmarshal(body, &answer); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrRosterUnreadable, err)
+		return nil, false, fmt.Errorf("%w: %v", ErrRosterUnreadable, err)
 	}
-	return answer.Devices, nil
+	return answer.Devices, false, nil
 }
