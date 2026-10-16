@@ -10,6 +10,7 @@ import { ReceiptGate, sourceLabel, visiblePersonas, type SquadDraft, type SquadP
 import { ACTIVE_SKILL_BYTES, activeSkillBytes, makeSkill, sameSkill, skillInputError, type SkillTransaction } from "./squad/skill-create.js"
 import { PersonaCreator } from "./squad/PersonaCreator.js"
 import { forgetPersonas } from "../personas.js"
+import "../page-skeleton.css"
 import "./squad/squad.css"
 import "../page-bar.css"
 import { arriveAtDetail, detailInHash, enterDetail, leaveDetail } from "../page-detail.js"
@@ -714,7 +715,7 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
           <option value="">{catalogWord("inline", "6a1c5fd6909b")}</option>{data?.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
         </select></label></header>
       {notice && <p className="squad-notice" role="status" aria-live="polite" data-error={notice.error || undefined}>{notice.text}</p>}
-      {reading.kind === "loading" && (data ? <p className="squad-notice" role="status">{catalogWord("inline", "78427b9ef6b7")}</p> : <div className="squad-loading" role="status" aria-live="polite"><div className="squad-loading-rail" /><div className="squad-loading-roster" /><div className="squad-loading-detail" /><span>{catalogWord("inline", "d30b77c6b717")}</span></div>)}
+      {reading.kind === "loading" && (data ? <p className="squad-notice" role="status">{catalogWord("inline", "78427b9ef6b7")}</p> : <SquadSkeleton label={catalogWord("inline", "d30b77c6b717")} />)}
       {reading.kind === "error" && <div className="squad-error" role="alert"><h2>{readErrorTitle(reading.code)}</h2><p>{reading.detail}</p><button type="button" onClick={() => void load(scope)}>{catalogWord("inline", "07244b042280")}</button></div>}
       {data?.partial && <div className="squad-notice" role="status">{catalogWord("inline", "08228e7394ef")}<button type="button" onClick={() => void load(scope)}>{catalogWord("inline", "07244b042280")}</button></div>}
       {data && !data.canWrite && <p className="squad-notice" role="status">{catalogWord("inline", "7bdb8640f903")}</p>}
@@ -851,6 +852,24 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
       </dialog>
     </div>
   </section>
+}
+
+/** The first read: groups, role cards and one profile, in the three panels' own geometry. */
+function SquadSkeleton({ label }: { label: string }) {
+  return <div className="page-skeleton squad-layout squad-skeleton" data-mobile-view="roster" role="status" aria-label={label}>
+    <div className="squad-rail" aria-hidden="true"><span className="page-skeleton-line squad-skeleton-heading" />
+      <div className="squad-teams">{[0, 1, 2, 3, 4].map((team) => <span className="squad-skeleton-team" key={team}><span className="page-skeleton-line" /></span>)}</div></div>
+    <div className="squad-roster" aria-hidden="true"><span className="page-skeleton-line squad-skeleton-heading" /><span className="page-skeleton-line squad-skeleton-sub" />
+      <div className="squad-cards">{[0, 1, 2, 3].map((card) => <div className="squad-persona-card squad-skeleton-card" key={card}>
+        <div className="squad-card-head"><span className="page-skeleton-line squad-skeleton-mark" /><span className="squad-skeleton-names"><span className="page-skeleton-line squad-skeleton-name" /><span className="page-skeleton-line squad-skeleton-sub" /></span></div>
+        <span className="squad-skeleton-summary"><span className="page-skeleton-line" /><span className="page-skeleton-line" /><span className="page-skeleton-line squad-skeleton-sub" /></span>
+        <span className="page-skeleton-line squad-skeleton-foot" />
+      </div>)}</div></div>
+    <div className="squad-detail" aria-hidden="true">
+      <div className="squad-profile"><span className="page-skeleton-line squad-skeleton-portrait" /><span className="squad-skeleton-names"><span className="page-skeleton-line squad-skeleton-sub" /><span className="page-skeleton-line squad-skeleton-title" /></span></div>
+      {[0, 1].map((block) => <div className="squad-detail-block squad-skeleton-summary" key={block}><span className="page-skeleton-line squad-skeleton-name" /><span className="page-skeleton-line" /><span className="page-skeleton-line squad-skeleton-sub" /></div>)}
+    </div>
+  </div>
 }
 
 export const page: PageModule = { id: "squad", Component: SquadPageView }
