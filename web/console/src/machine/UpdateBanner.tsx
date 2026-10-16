@@ -37,6 +37,9 @@ export function UpdateBanner({ embedded = false }: { embedded?: boolean } = {}) 
   const [releaseSaid, setReleaseSaid] = useState("")
   const last = useRef<UpdateStatus | null>(null)
   if (read?.kind === "status") last.current = read.status
+  // A fresh check — after a machine switch, or the page waking — answers for the
+  // machine now read; what was kept from before is not shown meanwhile.
+  else if (read?.kind === "checking") last.current = null
 
   const version = updateBannerVersion(read?.kind === "status" ? read.status : null, dismissed)
   const view = updatePanel({
