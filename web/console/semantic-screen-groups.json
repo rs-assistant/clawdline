@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5351,
-  "riskKeys": 2356,
-  "nonRiskCount": 2995,
+  "englishContentKeys": 5353,
+  "riskKeys": 2357,
+  "nonRiskCount": 2996,
   "groups": [
     {
       "name": "bar / other",
@@ -1966,7 +1966,7 @@
     },
     {
       "name": "next / other",
-      "count": 182,
+      "count": 183,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2152,7 +2152,8 @@
         "next.updateStripTagNew",
         "next.updateTitle",
         "next.updateToVersion",
-        "next.updateVerifying"
+        "next.updateVerifying",
+        "next.worktreeRemoveClose"
       ]
     },
     {

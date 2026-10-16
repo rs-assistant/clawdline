@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5351,
+  "englishKeys": 5353,
   "counts": {
-    "negation": 1523,
+    "negation": 1524,
     "state": 741,
     "permission": 339,
-    "deletion": 114,
+    "deletion": 115,
     "uncertainty": 155
   },
-  "unionCount": 2356,
+  "unionCount": 2357,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1370,6 +1370,7 @@
       "next.updateStagedApp",
       "next.worktreeRemoveFailed",
       "next.worktreeRemoveRisk",
+      "next.worktreeRemoveWaiting",
       "plan.fine",
       "projects.activityNone",
       "projects.emptyAdd",
@@ -2717,6 +2718,7 @@
       "next.worktreeRemoveDescription",
       "next.worktreeRemoveFailed",
       "next.worktreeRemoveTitle",
+      "next.worktreeRemoveWaiting",
       "settings.settingsHooksLegacy",
       "settings.settingsHooksRemove",
       "settings.settingsScopeHint",
@@ -4942,6 +4944,7 @@
     "next.worktreeRemoveFailed",
     "next.worktreeRemoveRisk",
     "next.worktreeRemoveTitle",
+    "next.worktreeRemoveWaiting",
     "plan.fine",
     "plan.machinesMany",
     "plan.machinesOne",
