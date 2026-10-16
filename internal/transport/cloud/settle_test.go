@@ -2,6 +2,8 @@ package cloud
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -84,6 +86,21 @@ func TestOneSessionRowIsStatedNowEvenUnchanged(t *testing.T) {
 	if strings.Join(stated.IDs, ",") != "%19" {
 		t.Fatalf("answered %+v", stated)
 	}
+	// The answer carries the row it put on s/, byte for byte, so a page that
+	// was not subscribed to that channel at the moment still has it.
+	var carried struct {
+		Session struct {
+			ID string `json:"id"`
+		} `json:"session"`
+	}
+	if err := json.Unmarshal(stated.Row, &carried); err != nil || carried.Session.ID != "%19" {
+		t.Fatalf("the answer carried %s (%v)", stated.Row, err)
+	}
+	var answered map[string]any
+	_ = json.Unmarshal(stated.Row, &answered)
+	if sent := out.payload(t, "s/mac-01/%2519"); !reflect.DeepEqual(sent, answered) {
+		t.Fatalf("the answer carried %v; s/ was given %v", answered, sent)
+	}
 	channels := strings.Join(out.channels(), " ")
 	if !strings.Contains(channels, "s/mac-01/%2519") || strings.Contains(channels, "s/mac-01/%2520") {
 		t.Fatalf("published %v; want the one row asked for", channels)
@@ -91,7 +108,7 @@ func TestOneSessionRowIsStatedNowEvenUnchanged(t *testing.T) {
 	if _, refusal := publisher.StateRow(ctx, "viewer-01", "%19"); refusal == nil || refusal.Code != "cloud_read_busy" {
 		t.Fatalf("the same viewer asking again at once was answered %+v", refusal)
 	}
-	if stated, refusal := publisher.StateRow(ctx, "viewer-01", "%99"); refusal != nil || len(stated.IDs) != 0 {
+	if stated, refusal := publisher.StateRow(ctx, "viewer-01", "%99"); refusal != nil || len(stated.IDs) != 0 || stated.Row != nil {
 		t.Fatalf("a row the machine does not have was answered %+v %+v", stated, refusal)
 	}
 	cancel()

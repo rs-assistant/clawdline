@@ -182,6 +182,14 @@ export interface CloudReadClient {
    * waiting question's options (`withOpenedMenu`).
    */
   readonly detailSnapshots?: ReadonlyMap<string, unknown>
+  /**
+   * The row a `sessions.row` answer carried, taken as its s/ envelope would
+   * be (`_applyAnsweredSessionRow`, legacy/js/net/cloud-client.js), unless an
+   * envelope for that row arrived after `_sessionRowMark` was read. Optional:
+   * a copied client older than the method waits for the s/ row as before.
+   */
+  _sessionRowMark?(machine: string, session: string): number
+  _applyAnsweredSessionRow?(machine: string, session: string, payload: unknown, mark: number): boolean
   events(listener: (event: CloudEvent) => void): () => void
   /** The current account rows, used here only to answer health for the chosen machine. */
   machines?(): Promise<{
@@ -1026,9 +1034,7 @@ export class RelayReader {
             const look = this.only(url, path, "look").look ?? ""
             if (!look) return this.refuse(method, path, 400, "invalid_session", "No Session was named to read again.")
             this.questionAsked = null
-            return await this.machineRead(init?.signal, method, path,
-              this.machineImplements("sessions.row") ? "sessions.row" : "sessions.snapshot",
-              this.machineImplements("sessions.row") ? { row: look } : {})
+            return await this.askRow(init?.signal, method, path, look)
           }
           this.note(method, path, "local")
           return json(200, await this.initialSnapshot(init?.signal,
@@ -2540,11 +2546,43 @@ export class RelayReader {
     // `sessions.row` states just this row, now (publish.go StateRow); the
     // whole restatement is for a machine from before that word.
     const ask = implements_("sessions.row")
-      ? this.machineRead(null, "GET", "/v1/sessions", "sessions.row", { row: target.sessionID })
+      ? this.askRow(null, "GET", "/v1/sessions", target.sessionID)
       : this.machineRead(null, "GET", "/v1/sessions",
         implements_("sessions.snapshot.initial") ? "sessions.snapshot.initial" : "sessions.snapshot", {})
     void ask.catch(() => undefined)
     return true
+  }
+
+  /**
+   * `sessions.row` for one Session, whose answer carries the row the machine
+   * just put on s/ (publish.go `stateRow`), and the row taken from it.
+   *
+   * The s/ envelope reaches this page only while it holds that channel. On
+   * 2026-10-16 the machine's log showed the opened waiting Session's row going
+   * out with `fanout=0` and `fanout=1` by turns, and the card kept saying its
+   * choices were on their way after "read again" — the machine had read them,
+   * and the answer that did reach the page said only that it had. A machine
+   * older than the carried row, or a client without the method, leaves the row
+   * to its channel as before.
+   */
+  private async askRow(signal: AbortSignal | null | undefined, method: string, path: string,
+    session: string): Promise<Response> {
+    if (!this.machineImplements("sessions.row")) {
+      return await this.machineRead(signal, method, path, "sessions.snapshot", {})
+    }
+    const client = this.client
+    const mark = client?._sessionRowMark?.(this.machine, session) ?? 0
+    const res = await this.machineRead(signal, method, path, "sessions.row", { row: session })
+    // The mark belongs to the client it was read from; a page that connected
+    // or reconnected while the ask was out leaves the row to its channel.
+    if (!res.ok || !client || this.client !== client || typeof client._applyAnsweredSessionRow !== "function") return res
+    try {
+      const answer = await res.clone().json() as { row?: unknown } | null
+      if (answer && typeof answer === "object" && answer.row !== undefined) {
+        client._applyAnsweredSessionRow(this.machine, session, answer.row, mark)
+      }
+    } catch { /* an answer without a readable row leaves the row to its channel */ }
+    return res
   }
 
   /**

@@ -889,3 +889,91 @@ test("a schedules read does not stand in for the machine's own descriptor", asyn
   client.orchestratorReceived.add("linux-b")
   assert.equal(client._holdsOrchestrator("linux-b"), true)
 })
+
+// 2026-10-16: the machine's log showed an opened waiting Session's s/ row going
+// out with `fanout=0` and `fanout=1` by turns. The list's row recovery asked for
+// the same channel as the opened detail and let go of it when the row came, or
+// when it gave up waiting, though the opened detail still held it.
+test("the list's row recovery does not let go of the channel an opened detail holds", () => {
+  for (const ending of ["row", "timeout"]) {
+    const client = Object.create(StatusCloudClient.prototype)
+    client.statusSnapshots = new Map([
+      [JSON.stringify(["m", "__clawdline_inventory_v1__"]), { payload: {
+        complete: true, snapshot_generation: genA, inventory: { version: 1, sessions: ["s"] } } }],
+      [JSON.stringify(["m", "s"]), { payload: { snapshot_generation: genA, execution_generation: genA } }],
+    ])
+    client.sessionSnapshots = new Map()
+    client.classicSessionMachine = null
+    client.classicSessionReads = new Map()
+    client.classicSessionAttempted = new Map()
+    client.pendingSubscriptions = new Set()
+    client.socketSubscriptions = new Map()
+    client.subscriptionHolds = new Map()
+    client.resubscribes = new Map()
+    client.openedDetails = new Set()
+    client.detailSnapshots = new Map()
+    client.listeners = new Set()
+    client.subscriptionLimit = 8
+    client.ready = true
+    client.now = () => 100
+    let fire = null
+    client.setTimeout = (fn) => { fire = fn; return 1 }
+    client.clearTimeout = () => {}
+    const frames = []
+    client._sendSubscriptionFrame = (type, channels) => frames.push({ type, channels })
+    client.openDetail({ machineID: "m", sessionID: "s", executionGeneration: genA })
+    client.enableClassicSessionView("m", "s")
+    assert.deepEqual(frames, [{ type: "subscribe", channels: ["s/m/s"] }])
+    if (ending === "row") {
+      client.sessionSnapshots.set("m\u0000s", { execution_generation: genA })
+      client._emit({ type: "sessions", identity: { machine: "m", session: "s" } })
+    } else fire()
+    assert.ok(client.socketSubscriptions.has("s/m/s"), `the opened detail's channel was let go on ${ending}`)
+    assert.ok(!frames.some((f) => f.type === "unsubscribe"), ending)
+    assert.equal(client.classicSessionReads.size, 0, "the recovery's own read is still finished")
+  }
+})
+
+// The row a `sessions.row` answer carries is taken as its s/ envelope would
+// be, and copied to the opened detail — unless an envelope moved the row while
+// the ask was out, it names another Session, or the machine's marker no
+// longer lists it.
+test("an answered Session row is taken only when nothing newer came", () => {
+  const make = () => {
+    const client = Object.create(StatusCloudClient.prototype)
+    client.sessionSnapshots = new Map()
+    client.sessionSequenceByKey = new Map()
+    client.sessionInventoryByMachine = new Map([["m", { sequence: 5, ids: new Set(["m\u0000s"]) }]])
+    client.sessionKeysHeard = new Set()
+    client.sessionRecovery = new Map()
+    client.orchestratorSnapshots = new Map()
+    client.machineDescriptors = new Map()
+    client.openedDetails = new Set(["s/m/s"])
+    client.detailSnapshots = new Map()
+    client.listeners = new Set()
+    client.events = []
+    client.listeners.add((event) => client.events.push(event))
+    return client
+  }
+  const payload = { session: { id: "s", state: "waiting", menu: { options: [{ n: 1, label: "Yes" }] } }, at: 1, scan: {} }
+  const client = make()
+  const mark = client._sessionRowMark("m", "s")
+  assert.equal(client._applyAnsweredSessionRow("m", "s", payload, mark), true)
+  assert.deepEqual(client.detailSnapshots.get("m\u0000s")?.menu, payload.session.menu)
+  assert.equal(client.events.at(-1)?.type, "sessions")
+  assert.deepEqual(client.events.at(-1)?.identity, { machine: "m", session: "s" })
+
+  const newer = make()
+  const before = newer._sessionRowMark("m", "s")
+  newer.sessionSequenceByKey.set("m\u0000s", 9)
+  newer.sessionSnapshots.set("m\u0000s", { id: "s", state: "working" })
+  assert.equal(newer._applyAnsweredSessionRow("m", "s", payload, before), false)
+  assert.equal(newer.sessionSnapshots.get("m\u0000s").state, "working", "an envelope delivered meanwhile wins")
+
+  const other = make()
+  assert.equal(other._applyAnsweredSessionRow("m", "s", { session: { id: "t" } }, 0), false)
+  const gone = make()
+  gone.sessionInventoryByMachine.set("m", { sequence: 6, ids: new Set() })
+  assert.equal(gone._applyAnsweredSessionRow("m", "s", payload, 0), false)
+  assert.equal(gone.sessionSnapshots.size, 0)
+})

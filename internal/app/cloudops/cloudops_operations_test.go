@@ -1150,6 +1150,39 @@ func TestBoardItemsRoutesTheWholeQuery(t *testing.T) {
 	}
 }
 
+// "Read again" answers with the row it stated, so a page that held no
+// subscription to that s/ channel at the moment still draws the question
+// (2026-10-16). The snapshot words carry no row.
+func TestSessionsRowAnswerCarriesTheRow(t *testing.T) {
+	row := json.RawMessage(`{"session":{"id":"%19","state":"waiting","menu":{"options":[{"n":1,"label":"Yes"}]}},"at":1,"scan":{}}`)
+	bridge := Bridge{MachineID: "mac-01",
+		SessionsFor: func(context.Context, string, bool) (SessionsStated, *Refusal) {
+			return SessionsStated{IDs: []string{"%19"}, Complete: true, Row: row}, nil
+		},
+		SessionRow: func(_ context.Context, _, session string) (SessionsStated, *Refusal) {
+			if session != "%19" {
+				return SessionsStated{IDs: []string{}, Complete: true}, nil
+			}
+			return SessionsStated{IDs: []string{"%19"}, Complete: true, Row: row}, nil
+		}}
+	answer := bridge.Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "sessions.row", "session": MachineReplySession, "request": "req-1", "row": "%19"}))
+	if !answer.OK() {
+		t.Fatalf("answered %+v", answer)
+	}
+	got, _ := json.Marshal(answerOf(t, answer)["body"])
+	want := `{"complete":true,"row":{"at":1,"scan":{},"session":{"id":"%19","menu":{"options":[{"label":"Yes","n":1}]},"state":"waiting"}},"sessions":["%19"]}`
+	if string(got) != want {
+		t.Fatalf("the answer said %s\nwant %s", got, want)
+	}
+	answer = bridge.Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "sessions.row", "session": MachineReplySession, "request": "req-2", "row": "%99"}))
+	got, _ = json.Marshal(answerOf(t, answer)["body"])
+	if string(got) != `{"complete":true,"sessions":[]}` {
+		t.Fatalf("a row the machine does not have was answered %s", got)
+	}
+}
+
 // TestSessionsSnapshotAnswersTheIdsThePublisherStated. The page reads
 // `{"sessions":[ids],"complete":bool}` under `read:<request>` on the machine's
 // reply channel (`_askSessionSnapshot` in net/cloud-client.js), and accepts

@@ -1848,6 +1848,36 @@ test("read again asks the machine for just that row", async () => {
   assert.equal(client.reads.at(-1)?.word, "sessions.snapshot", "an older machine is asked to restate everything")
 })
 
+// 2026-10-16: the machine read the menu whole after "read again" and put it on
+// an s/ channel this page did not hold at that moment (`fanout=0`). The answer
+// carries the row, and the page takes it — unless an s/ envelope for the row
+// arrived while the ask was out, which is newer than the answer's copy.
+test("read again takes the row its answer carries", async () => {
+  const client = new FakeClient()
+  ;(client as unknown as { _machineImplements(machine: string, word: string): string })._machineImplements =
+    (_machine, word) => word === "sessions.row" ? "yes" : "unknown"
+  const row = { session: { id: "%19", state: "waiting", menu: { options: [{ n: 1, label: "Yes" }] } }, at: 1, scan: {} }
+  client.readAnswer = async () => ({ sessions: ["%19"], complete: true, row })
+  const applied: { machine: string; session: string; payload: unknown; mark: number }[] = []
+  let mark = 7
+  const c = client as unknown as {
+    _sessionRowMark(machine: string, session: string): number
+    _applyAnsweredSessionRow(machine: string, session: string, payload: unknown, mark: number): boolean
+  }
+  c._sessionRowMark = () => mark
+  c._applyAnsweredSessionRow = (machine, session, payload, at) => { applied.push({ machine, session, payload, mark: at }); return true }
+  const r = reader(client, { t: 10_000 })
+  const res = await r.fetch("/v1/sessions?look=%2519")
+  assert.equal(res.status, 200)
+  assert.deepEqual(applied, [{ machine: "mac-a", session: "%19", payload: row, mark: 7 }],
+    "the mark is read before the ask, so a row delivered meanwhile wins")
+  // An older machine's answer names the row and carries none: nothing to take.
+  client.readAnswer = async () => ({ sessions: ["%19"], complete: true })
+  mark = 8
+  await r.fetch("/v1/sessions?look=%2519")
+  assert.equal(applied.length, 1)
+})
+
 /**
  * The single-machine page after a Session ended on the machine: the fleet's
  * held pass, taken before, still lists it; the retained ss/ marker, taken

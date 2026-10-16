@@ -1471,6 +1471,46 @@ export class CloudClient {
         } catch (e) { /* observing a failure must never become a second one */ }
     }
 
+    /**
+     * Where one Session's row stands before a `sessions.row` ask: the sequence of the last s/
+     * envelope this page took for it, or 0. `_applyAnsweredSessionRow` takes the answer's row only
+     * if no envelope moved that since, so an answer can never put back a row older than one the
+     * channel delivered while the ask was out.
+     */
+    _sessionRowMark(machine, session) {
+        try {
+            return this.sessionSequenceByKey.get(sessionIdentityKey({ machine: machine, session: session })) || 0;
+        } catch (e) { return 0; }
+    }
+
+    /**
+     * The row a `sessions.row` answer carried (the machine's `stateRow`), taken as if its s/
+     * envelope had arrived. On 2026-10-16 a phone pressed "read again" on a waiting Session, the
+     * machine read the menu whole and published it on s/ with `fanout=0`: this page held no
+     * subscription to that channel at that moment, and the answer that did reach it said only that
+     * the row had been asked for. The card said the choices were on their way until a later ask
+     * happened to land while the channel was held. The answer is sealed by the machine like any
+     * read; it carries the same payload s/ was given. Answers whether the row was taken.
+     */
+    _applyAnsweredSessionRow(machine, session, payload, mark) {
+        var row = payload && typeof payload === "object" && !Array.isArray(payload) ? payload.session : null;
+        if (!row || typeof row !== "object" || Array.isArray(row) || row.id !== session) return false;
+        var identity;
+        try { identity = sessionIdentity({ machine: machine, session: session }); } catch (e) { return false; }
+        var key = sessionIdentityKey(identity);
+        if ((this.sessionSequenceByKey.get(key) || 0) !== (mark || 0)) return false;
+        var knownInventory = this.sessionInventoryByMachine.get(identity.machine);
+        if (knownInventory && !knownInventory.ids.has(key)) return false;
+        this.sessionSnapshots.set(key, Object.assign({}, row, {
+            id: row.id, machine: identity.machine, session: identity.session, identity: identity
+        }));
+        this.sessionKeysHeard.add(key);
+        var sessions = this._sessionResponse(this.sessionsAtMs);
+        if (this.handlers && this.handlers.sessions) this.handlers.sessions(sessions.sessions, sessions.at, sessions.scan);
+        this._emit({ type: "sessions", data: sessions, identity: identity, answered: true });
+        return true;
+    }
+
     _applySnapshot(channel, payload, envelope, realign) {
         this.envelopeOpened = true;
         if (channel.kind === "session") {
