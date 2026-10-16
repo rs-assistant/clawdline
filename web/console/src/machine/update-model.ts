@@ -229,6 +229,15 @@ export function classifyUpdateRead(answer: Answer): UpdateRead {
   return { kind: "refused" }
 }
 
+/** Keep cached running/apply facts after a failed fresh request, without presenting
+ * an old release as available when it may have been withdrawn. */
+export function cachedUpdateAfterFreshFailure(read: UpdateRead): UpdateRead {
+  if (read.kind !== "status") return read
+  return { kind: "status", status: {
+    ...read.status, state: "unknown", latest: { stamp: "" },
+  } }
+}
+
 /** How a press of 「立即更新」 came back. */
 export type ApplyAnswer =
   | { kind: "started"; status: UpdateStatus | null }
