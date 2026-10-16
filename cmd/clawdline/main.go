@@ -353,6 +353,8 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		PeerReceipts:      srv.PeerReceipts(),
 		PeerAdmitTarget:   srv.AdmitExecutionTarget,
 		PeerExecute:       srv.PeerExecute,
+		PeerTaskStartOpen: srv.PeerTaskStartOpen,
+		PeerTaskProject:   srv.CloudTerminalProject,
 		Authorize: func(r *http.Request) {
 			local, machine, err := srv.CloudCredentials()
 			if err != nil {

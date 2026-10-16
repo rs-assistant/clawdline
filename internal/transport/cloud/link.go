@@ -191,10 +191,12 @@ type LinkOptions struct {
 	PeerReceipts    peerapp.Receipts
 	PeerAdmitTarget func(context.Context, string, string, string) error
 	PeerExecute     func(context.Context, peercontract.Request, []byte) error
-	// PeerTaskStartFacts and PeerTaskStartOpen are target-owned seams. Without
-	// both, machine-targeted starts remain closed even if the relay delivers one.
+	// PeerTaskStartOpen is the target-owned effect. Facts can be injected for
+	// isolated tests; the built-in facts fail closed until a source execution
+	// challenge can be verified.
 	PeerTaskStartFacts func(context.Context, peercontract.TaskStart, peercontract.Principal) (peercontract.TaskStartFacts, error)
 	PeerTaskStartOpen  func(context.Context, peercontract.TaskStart, []byte) (string, string, error)
+	PeerTaskProject    func(context.Context, string) (string, bool)
 	// Authorize stamps the credential the gate judges an in-process request by.
 	Authorize func(*http.Request)
 	// Version is this build, for the machine registration record.

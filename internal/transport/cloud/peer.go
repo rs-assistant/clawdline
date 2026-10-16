@@ -254,7 +254,7 @@ func (l *Link) RetryTaskStart(ctx context.Context, taskID string) (TaskStartSubm
 }
 
 func (l *Link) receivePeerTaskStart(ctx context.Context, raw []byte) {
-	if l.opts.PeerReceipts == nil || l.opts.PeerTaskStartFacts == nil || l.opts.PeerTaskStartOpen == nil {
+	if l.keys == nil || l.opts.PeerReceipts == nil || l.opts.PeerTaskStartOpen == nil {
 		return
 	}
 	var frame peerTaskStartFrame
@@ -287,11 +287,56 @@ func (l *Link) receivePeerTaskStart(ctx context.Context, raw []byte) {
 	}
 	principal := peercontract.Principal{MachineID: pair.SourceMachineID,
 		KeyFingerprint: pair.SourceFingerprint, PairID: pair.ID, MachinePeer: true}
-	starter := peerapp.TaskStarter{Receipts: l.opts.PeerReceipts, Facts: l.opts.PeerTaskStartFacts,
+	facts := l.taskStartFacts
+	if l.opts.PeerTaskStartFacts != nil {
+		facts = l.opts.PeerTaskStartFacts
+	}
+	starter := peerapp.TaskStarter{Receipts: l.opts.PeerReceipts, Facts: facts,
 		Open: l.opts.PeerTaskStartOpen, Now: l.opts.Now}
 	result := starter.Start(ctx, frame.Start, body, principal)
 	l.logf("cloud peer task start: task %s machine execution %s code %s",
 		result.TaskID, result.MachineExecution, result.Code)
+}
+
+// taskStartFacts never substitutes a signed source request for a fresh source
+// execution proof. Until the source challenge rail is available, admission
+// fails at SourceCurrent even when the pair and Project are valid.
+func (l *Link) taskStartFacts(ctx context.Context, start peercontract.TaskStart,
+	principal peercontract.Principal) (peercontract.TaskStartFacts, error) {
+	facts := peercontract.TaskStartFacts{LocalMachineID: l.identity.MachineID,
+		Principal: principal, MachineWritesAllowed: l.allowCommands(), Now: l.opts.Now()}
+	if l.keys == nil {
+		return facts, errors.New("peer_task_start_unavailable")
+	}
+	st, err := peerstore.Open(l.keys.Dir())
+	if err != nil {
+		return facts, err
+	}
+	defer st.Close()
+	pair, err := st.Pair(ctx, start.PairID)
+	if err != nil {
+		if errors.Is(err, peerstore.ErrNotFound) {
+			return facts, nil
+		}
+		return facts, err
+	}
+	if pair.SourceMachineID != principal.MachineID ||
+		pair.SourceFingerprint != principal.KeyFingerprint || pair.TargetMachineID != l.identity.MachineID ||
+		pair.TargetSignature == "" || !pair.RevokedAt.IsZero() || !facts.Now.Before(pair.ExpiresAt) {
+		return facts, nil
+	}
+	auth, err := adaptercloud.NewAccountClient(l.settings.APIBase).AuthorizePeerTaskStart(ctx,
+		l.identity.MachineCredential, start, pair.SourcePublicKey)
+	if err != nil || !auth.Authorized || auth.SourcePublicKey != pair.SourcePublicKey ||
+		auth.SourceKeyFingerprint != pair.SourceFingerprint ||
+		auth.TargetMachineID != l.identity.MachineID || auth.PairID != pair.ID {
+		return facts, errors.New("peer_authority_unavailable")
+	}
+	facts.PairActive = true
+	if l.opts.PeerTaskProject != nil {
+		_, facts.ProjectAvailable = l.opts.PeerTaskProject(ctx, start.TargetProjectID)
+	}
+	return facts, nil
 }
 
 func (l *Link) receivePeer(ctx context.Context, raw []byte) {
