@@ -17,6 +17,11 @@
 export interface MachineVersion {
   version?: string
   apiLevel?: number
+  /**
+   * The version is not known yet, as opposed to not given: a Cloud console has
+   * not received the machine's descriptor (Health `version_pending`).
+   */
+  pending?: boolean
 }
 
 /** The part of a `MachineNeedsUpdate` (core/src/refusal.ts) these words read. */
@@ -42,16 +47,18 @@ export const SETTINGS_UPDATE_HREF = "#page=settings&focus=update"
  */
 export function machineVersionFromHealth(health: unknown): MachineVersion {
   if (typeof health !== "object" || health === null) return {}
-  const { version, api_level } = health as { version?: unknown; api_level?: unknown }
+  const { version, api_level, version_pending } = health as { version?: unknown; api_level?: unknown; version_pending?: unknown }
+  const known = typeof version === "string" && version.trim()
   return {
-    ...(typeof version === "string" && version.trim() ? { version: version.trim() } : {}),
+    ...(known ? { version: version.trim() } : {}),
     ...(typeof api_level === "number" && Number.isInteger(api_level) && api_level >= 0 ? { apiLevel: api_level } : {}),
+    ...(!known && version_pending === true ? { pending: true } : {}),
   }
 }
 
 /** Two readings are the same when both fields are; lets a store skip a no-op publish. */
 export function sameMachineVersion(a: MachineVersion, b: MachineVersion): boolean {
-  return a.version === b.version && a.apiLevel === b.apiLevel
+  return a.version === b.version && a.apiLevel === b.apiLevel && !a.pending === !b.pending
 }
 
 export interface NeedsUpdateWords {

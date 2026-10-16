@@ -140,7 +140,8 @@
         "password": { "description": "Whether a password has been set, so a page offers the password door only when there is one behind it. The Swift app's health says the same.", "type": "boolean" },
         "reason": { "description": "Why `ok` is false, when it is. Absent when ok. The name only: what is behind it is in Diagnostics.", "$ref": "#/$defs/HealthReason" },
         "served_by": { "description": "Which implementation answered. This is how a reader tells the Go daemon from the Swift app on the same port.", "type": "string" },
-        "version": { "description": "The daemon's own version, as `clawdline version` prints it: a release tag, or `devel+<revision>` for a build from a checkout. What a person is told when a feature needs a newer one. Absent when the reading could not learn it.", "type": "string" }
+        "version": { "description": "The daemon's own version, as `clawdline version` prints it: a release tag, or `devel+<revision>` for a build from a checkout. What a person is told when a feature needs a newer one. Absent when the reading could not learn it.", "type": "string" },
+        "version_pending": { "description": "Set only by a Cloud console's relay reader, which answers this route itself: true while the chosen machine's own descriptor (`orch/`), which carries its version, has not arrived yet. `version` is then not known yet, not missing; a page says it is still reading.", "type": "boolean" }
       }
     },
     "Diagnostics": {

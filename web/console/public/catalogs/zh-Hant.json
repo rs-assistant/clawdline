@@ -4416,6 +4416,7 @@
   "next.updateStripTagNew": "新版",
   "next.updateStripOpen": "前往",
   "next.updateStripRelease": "Release",
+  "next.sidebarVersionReading": "正在讀取機器版本……",
   "projects.activityInProgress": "{n} 項進行中",
   "projects.activityLastKnown": "上次紀錄：{n}",
   "projects.activityNone": "目前無進行中項目",

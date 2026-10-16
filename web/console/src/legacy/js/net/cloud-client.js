@@ -368,6 +368,15 @@ function socketURL(input) {
  * shut and Close dead until the page was reloaded. `Tests/web-start-sheet-failures.mjs` finds
  * these methods by enumeration and calls each one with inputs that fail.
  */
+/**
+ * The machines whose `orch/` envelope a client opened; a client built before
+ * that set existed has only its snapshot map, every entry of which was one.
+ */
+function receivedOrchestrators(client) {
+    if (client.orchestratorReceived instanceof Set) return Array.from(client.orchestratorReceived);
+    return Array.from(client.orchestratorSnapshots ? client.orchestratorSnapshots.keys() : []);
+}
+
 export class CloudClient {
     constructor(options) {
         options = options || {};
@@ -477,10 +486,17 @@ export class CloudClient {
         }, this);
         this.transcriptSnapshots = new Map();
         this.orchestratorSnapshots = new Map();
+        // Machines whose `orch/` envelope this client has opened. orchestratorSnapshots is not that
+        // list: a schedules or snippets read keeps its rows in the same map, before any `orch/`
+        // envelope has come, and a page that read schedules first took the entry for the snapshot
+        // and never asked for it — so it had no `app`, and a Linux machine on v1.0.9 read as
+        // "version not provided" until another machine was chosen and this one chosen again
+        // (2026-10-16).
+        this.orchestratorReceived = new Set();
         // Machines whose `orch/` snapshot this page holds, whichever client of the same viewer heard
         // it: what `sessions.snapshot` needs to know before it adds `orchestrator` (`_holdsOrchestrator`).
         this.orchestratorHeld = new Set(sameViewer ? prior.orchestratorHeld : []);
-        if (sameViewer) prior.orchestratorSnapshots.forEach(function (_, machine) { this.orchestratorHeld.add(machine); }, this);
+        if (sameViewer) receivedOrchestrators(prior).forEach(function (machine) { this.orchestratorHeld.add(machine); }, this);
         // This is evidence of the last authenticated envelope seen from a machine, not a
         // presence lease.  Carry it across a viewer-token renewal just like the retained
         // Session rows: it decides whether the picker may take the one-machine fast path, while
@@ -853,7 +869,7 @@ export class CloudClient {
         if (this.resumedFrom) {
             var prior = this.resumedFrom;
             this.resumedFrom = null;
-            prior.orchestratorSnapshots.forEach(function (_, machine) { this.orchestratorHeld.add(machine); }, this);
+            receivedOrchestrators(prior).forEach(function (machine) { this.orchestratorHeld.add(machine); }, this);
             // A renewal: the socket this one replaces is still up — it heard a frame after the ping
             // sent when this client began connecting — so nothing published since then was lost; it
             // went to that socket. Take what it heard meanwhile. A socket left half-open by a network
@@ -1607,6 +1623,7 @@ export class CloudClient {
             var previousSnapshot = this.orchestratorSnapshots.get(machine);
             var commandsBefore = descriptorCommandsKey(this._descriptorFor(machine));
             this.orchestratorSnapshots.set(machine, payload || {});
+            (this.orchestratorReceived || (this.orchestratorReceived = new Set())).add(machine);
             this._rememberDescriptor(machine, payload);
             // A new build may know a word the old one refused, so what it refused is asked again.
             // So may a machine whose descriptor has just arrived, or now advertises a different
@@ -1756,7 +1773,9 @@ export class CloudClient {
 
     /** Whether this page holds `machine`'s `orch/` snapshot, from this client or one it resumed from. */
     _holdsOrchestrator(machine) {
-        return this.orchestratorSnapshots.has(machine) || this.orchestratorHeld.has(machine);
+        var received = this.orchestratorReceived instanceof Set ? this.orchestratorReceived.has(machine)
+            : this.orchestratorSnapshots.has(machine); // a client made without the constructor
+        return received || this.orchestratorHeld.has(machine);
     }
 
     /** This socket was sent the machine's inventory and a row or tombstone for every id in it. */

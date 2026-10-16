@@ -147,6 +147,10 @@ test("over Cloud, health carries the descriptor's version and level only when th
 test("health's version and level are read only when present; absent is unknown, not zero", () => {
   assert.deepEqual(machineVersionFromHealth({ ok: true, version: "1.2.3", api_level: 1 }), { version: "1.2.3", apiLevel: 1 })
   assert.deepEqual(machineVersionFromHealth({ ok: true }), {})
+  assert.deepEqual(machineVersionFromHealth({ ok: true, version_pending: true }), { pending: true })
+  assert.deepEqual(machineVersionFromHealth({ ok: true, version: "v1.0.9", version_pending: true }), { version: "v1.0.9" },
+    "a version that is known is not pending")
+  assert.equal(sameMachineVersion({ pending: true }, {}), false, "pending and unknown are different readings")
   assert.deepEqual(machineVersionFromHealth({ version: " ", api_level: "1" }), {})
   assert.deepEqual(machineVersionFromHealth(null), {})
   assert.equal(sameMachineVersion({ version: "1" }, { version: "1" }), true)

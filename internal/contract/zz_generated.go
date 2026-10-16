@@ -2911,6 +2911,12 @@ type Health struct {
 	// `devel+<revision>` for a build from a checkout. What a person is told when a
 	// feature needs a newer one. Absent when the reading could not learn it.
 	Version string `json:"version,omitempty"`
+
+	// Set only by a Cloud console's relay reader, which answers this route itself:
+	// true while the chosen machine's own descriptor (`orch/`), which carries its
+	// version, has not arrived yet. `version` is then not known yet, not missing; a
+	// page says it is still reading.
+	VersionPending bool `json:"version_pending,omitempty"`
 }
 
 // Why /v1/health says ok:false. `broker_beat_stalled`: the broker's loop has

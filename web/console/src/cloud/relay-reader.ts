@@ -155,6 +155,8 @@ export interface CloudReadClient {
    * says nothing, never zero.
    */
   readonly orchestratorSnapshots?: Map<string, unknown>
+  /** The machines whose own `orch/` envelope this client has opened (`cloud-client.js`). */
+  readonly orchestratorReceived?: ReadonlySet<string>
   /**
    * machine → the descriptor this browser remembered from an earlier
    * connection, as `{ machine: { …, commands } }`
@@ -329,6 +331,16 @@ export function machineApp(client: CloudReadClient, machine: string): { version?
     ...(typeof version === "string" && version ? { version: version.slice(0, 64) } : {}),
     ...(typeof api_level === "number" && Number.isInteger(api_level) && api_level >= 0 ? { api_level } : {}),
   }
+}
+
+/**
+ * Whether this page has opened `machine`'s own `orch/` envelope. A copied
+ * client that does not say is taken to have: it never claims a version is
+ * still coming.
+ */
+export function machineDescribed(client: CloudReadClient, machine: string): boolean {
+  const received = client.orchestratorReceived
+  return !(received instanceof Set) || received.has(machine)
 }
 
 /**
@@ -1210,13 +1222,18 @@ export class RelayReader {
             return this.refuse(method, path, 503, code,
               "The chosen machine is not currently reporting through Clawdline Cloud.")
           }
+          const app = machineApp(client, this.machine)
           const health: Health = {
             at: Math.floor(this.now() / 1000),
             authed: true,
             ok: true,
             password: false,
             served_by: "cloud-machine-via-relay",
-            ...machineApp(client, this.machine),
+            ...app,
+            // The version rides on the machine's own orch/ descriptor. Until
+            // that has arrived the version is not known yet, which is not the
+            // same as a machine that publishes none.
+            ...(app.version === undefined && !machineDescribed(client, this.machine) ? { version_pending: true } : {}),
           }
           this.note(method, path, "local")
           return json(200, health)
