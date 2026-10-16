@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react"
 import { RefusalError } from "@clawdline/core"
 import * as L from "../../legacy/bridge.js"
 import { nextWord } from "../../next-strings.js"
+import { ChoiceMenu } from "../../ui-language/ChoiceMenu.js"
 import {
   defaultModelOptions,
   readDefaultModels,
@@ -76,18 +77,10 @@ export function DefaultModelsBlock({ shown }: { shown: boolean }) {
     const value = modelOf(snapshot, key)
     return (
       <div className="settings-model-field">
-        <label htmlFor={`settings-${assistant}-default-model`}>{label}</label>
-        <select
-          className="find settings-model-select"
-          id={`settings-${assistant}-default-model`}
-          value={value}
-          disabled={disabled}
-          onChange={(event) => commit(key, event.currentTarget.value)}
-        >
-          {defaultModelOptions(snapshot, assistant, value, nextWord("defaultModelPlaceholder")).map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
+        <div className="settings-model-label">{label}</div>
+        <ChoiceMenu id={`settings-${assistant}-default-model`} label={label} value={value} disabled={disabled}
+          options={defaultModelOptions(snapshot, assistant, value, nextWord("defaultModelPlaceholder"))}
+          onPick={(selected) => commit(key, selected)} />
       </div>
     )
   }
@@ -97,13 +90,11 @@ export function DefaultModelsBlock({ shown }: { shown: boolean }) {
       <p className="say">{nextWord("defaultModelsHint")}</p>
       {picker("codex", "codex_default_model", nextWord("defaultCodexModel"))}
       <div className="settings-model-field">
-        <label htmlFor="settings-codex-default-effort">{nextWord("defaultCodexEffort")}</label>
-        <select className="find settings-model-select" id="settings-codex-default-effort"
+        <div className="settings-model-label">{nextWord("defaultCodexEffort")}</div>
+        <ChoiceMenu id="settings-codex-default-effort" label={nextWord("defaultCodexEffort")}
           value={modelOf(snapshot, "codex_default_effort")} disabled={disabled}
-          onChange={(event) => commit("codex_default_effort", event.currentTarget.value)}>
-          <option value="">{nextWord("defaultModelPlaceholder")}</option>
-          <option value="high">{catalogWord("inline", "6ef7c9b15ecd")}</option><option value="xhigh">{catalogWord("inline", "b5255978be8e")}</option>
-        </select>
+          options={[{ value: "", label: nextWord("defaultModelPlaceholder") }, { value: "high", label: catalogWord("inline", "6ef7c9b15ecd") }, { value: "xhigh", label: catalogWord("inline", "b5255978be8e") }]}
+          onPick={(selected) => commit("codex_default_effort", selected)} />
       </div>
       {picker("claude", "claude_default_model", nextWord("defaultClaudeModel"))}
       {snapshot ? null : (

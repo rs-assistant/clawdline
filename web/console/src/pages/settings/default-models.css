@@ -2,19 +2,19 @@
   margin-top: 10px;
 }
 
-.page-settings .settings-model-field label {
+.page-settings .settings-model-label {
   display: block;
   margin-bottom: 5px;
   color: var(--soft);
   font-size: 12px;
 }
 
-.page-settings .settings-model-select {
+.page-settings .settings-model-field .choice-menu {
   width: 100%;
 }
 
 @media (max-width: 899px) {
-  .page-settings .settings-model-field select {
+  .page-settings .settings-model-field .choice-menu {
     font-size: 16px;
   }
 }

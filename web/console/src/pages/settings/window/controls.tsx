@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { ChoiceMenu } from "../../../ui-language/ChoiceMenu.js"
 import "./switch.css"
 
 /**
@@ -143,26 +144,8 @@ export function PopUp({
   // A hand-edited value the list does not hold still has to be shown, or the
   // popup would silently read as the first option and a pick would write it.
   const known = options.some((o) => o.value === value)
-  return (
-    <span className="sw-popup">
-      <select
-        aria-label={label}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onPick(e.currentTarget.value)}
-      >
-        {!known && value ? <option value={value}>{value}</option> : null}
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-      <svg className="sw-popup-mark" viewBox="0 0 8 10" aria-hidden="true" focusable="false">
-        <path d="M1 4 4 1l3 3M1 6l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.2" />
-      </svg>
-    </span>
-  )
+  return <ChoiceMenu label={label} value={value} options={!known && value ? [{ value, label: value }, ...options] : options}
+    disabled={disabled} onPick={onPick} compact />
 }
 
 /**
