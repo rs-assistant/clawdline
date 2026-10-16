@@ -220,6 +220,11 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 			// without them here the list never learned to read its title
 			// again and kept drawing "Claude Session" with no icon.
 			"label": row["label"], "cwd": row["cwd"], "icon": row["icon"],
+			// What a waiting card draws. Its line names the question, the
+			// rows and the caret but not a multi-select's ticks, so a box
+			// ticked from the phone never woke the list and the card kept
+			// it empty. Hashed into the id here, never sent on ss/.
+			"menu": row["menu"],
 		}
 		displays = append(displays, display)
 		steadyDisplays = append(steadyDisplays, volatileFree(display))
