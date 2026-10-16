@@ -54,9 +54,6 @@ import {
  *   block and not the original's: the register's rows and the dead letters from
  *   `/v1/capacity`. Every capacity push names it, so it reads through Clawdline
  *   Cloud as well.
- * - **Project Timeline**: this settings page has no project context to read,
- *   so its permanently disabled toggle says that the setting belongs to each
- *   project instead of presenting an unfinished read.
  * - **Version**: the Mac's version from `/v1/health`, which this daemon's does
  *   not carry, so the line is empty and hidden by `.foot span:empty`.
  *
@@ -87,11 +84,6 @@ function notifySay(T: Record<string, string>, state: string): string {
     default:
       return ""
   }
-}
-
-/** `words(en, zh)` (`view/timeline.js`): the page's language decides. */
-function timelineWords(en: string, zh: string): string {
-  return /^zh(?:-|$)/i.test(String(document.documentElement.lang || "")) ? zh : en
 }
 
 function SettingsPage({ shown }: { shown: boolean }) {
@@ -449,24 +441,6 @@ function SettingsPage({ shown }: { shown: boolean }) {
             </div>
             <div className="settings-column">
         <GateSettingsBlock shown={shown && tab === 1} />
-        <div className="block" id="settings-timeline">
-          <b id="settings-timeline-title">{timelineWords("Enable Project Timeline", catalogWord("literal", "b593e064f518"))}</b>
-          <p className="say" id="settings-timeline-say">
-            {timelineWords("Keep a traceable history of deliveries and availability.", catalogWord("literal", "acc0b43a1d07"))}
-          </p>
-          <button className="chip" id="settings-timeline-toggle" type="button" aria-pressed="false" disabled>
-            {nextWord("timelineSetPerProject")}
-          </button>{" "}
-          <button
-            className="chip"
-            id="settings-timeline-history"
-            type="button"
-            onClick={() => goToPage("projects")}
-          >
-            {timelineWords("Open timeline", catalogWord("literal", "6f1c2c5c46b4"))}
-          </button>
-          <p className="say" id="settings-timeline-status" role="status"></p>
-        </div>
             </div>
           </div>
         </div>

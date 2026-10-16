@@ -288,7 +288,6 @@
 | `terminal.paste_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `terminal.streams` | 16 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `terminal.viewers` | 8 | `rows` | `refuse` | `diagnostics, sender` | — |
-| `timeline.entries` | 500 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `update.apply_body_bytes` | 4096 | `bytes` | `refuse` | `diagnostics` | — |
 | `update.build_body_bytes` | 4096 | `bytes` | `refuse` | `diagnostics` | — |
 | `update.fetch_timeout_seconds` | 10 | `seconds` | `evict_oldest` | `diagnostics` | — |

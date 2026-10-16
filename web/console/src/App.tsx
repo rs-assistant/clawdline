@@ -65,7 +65,7 @@ import {
  * stylesheet is that app's. The drawer is `input/sidebar.js` and the page
  * switch is `core/pages.js`, rule for rule.
  */
-type Page = "sessions" | "devices" | "projects" | "workflow" | "timeline" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
+type Page = "sessions" | "devices" | "projects" | "workflow" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
 
 /** What became of a session the address asked for: see `openAsked`. */
 type Asked = "none" | "waiting" | "opened" | "gone"
@@ -75,8 +75,6 @@ type Asked = "none" | "waiting" | "opened" | "gone"
 // whose backend this daemon does not own stay on screen and
 // disabled rather than missing, so what is not here can be seen.
 //
-// The Timeline is in neither drawer: it is one work item's Project history,
-// reached from that item on the work page.
 const PAGES: { id: Page; nav: string; icon: SidebarIconName; key?: string; text?: string; ready: boolean }[] = [
   { id: "sessions", nav: "nav-sessions", icon: "sessions", key: "webSessions", ready: true },
   { id: "projects", nav: "nav-projects", icon: "projects", key: "webProjects", ready: false },

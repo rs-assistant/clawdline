@@ -111,7 +111,6 @@ const words = {
     reasonDoneElsewhere: "Done, delivered off this item",
     rankNone: "Unranked",
     rank: "Rank {n}",
-    timeline: "Timeline",
 
     opStart: "Start",
     opSchedule: "Schedule",
@@ -325,7 +324,6 @@ const words = {
     reasonDoneElsewhere: "做完了，交付沒綁上這一項",
     rankNone: "未排序",
     rank: "第 {n} 順位",
-    timeline: "時間軸",
 
     opStart: "開始做",
     opSchedule: "排入",

@@ -162,13 +162,6 @@ const RULES: Rule[] = [
     probes: [{ file: "web/console/src/pages/projects/section.html", all: [">Projects</h1>", "Directories an assistant has actually been run in", "Repository lifecycle", "Refresh observation"] }],
   },
   {
-    id: "E07",
-    family: E,
-    title: "A permanently disabled settings control says Loading",
-    cause: "raw_ui_english",
-    probes: [{ file: "web/console/src/pages/settings.tsx", all: ["id=\"settings-timeline-toggle\"", "Loading…"] }],
-  },
-  {
     id: "E08",
     family: E,
     title: "Board settings fall back to English before the answer arrives",
@@ -253,7 +246,7 @@ const RULES: Rule[] = [
   },
 ]
 
-const EXPECTED_RULES = 27
+const EXPECTED_RULES = 26
 const EXPECTED_OPEN = 0
 const EXPECTED_LOCKED = 0
 

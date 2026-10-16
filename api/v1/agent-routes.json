@@ -528,11 +528,6 @@
     },
     {
       "method": "*",
-      "pattern": "/v1/timeline",
-      "guide": "board"
-    },
-    {
-      "method": "*",
       "pattern": "/v1/transcript",
       "guide": "connect"
     },

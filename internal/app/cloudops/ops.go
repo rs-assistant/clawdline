@@ -294,7 +294,7 @@ type op struct {
 //
 // It is not tidiness. The routes under `/v1/work/` refuse a query field that
 // is present and empty by name (`workQuery`, "Unknown or repeated query field
-// project."), and `/v1/timeline` reads an absent `environment` as production
+// project.")
 // and an empty one as a bad one. So "the viewer did not say" has to reach
 // these routes as silence, which is what a browser on this machine's own
 // network already sends (`URLSearchParams` is only given what was chosen).

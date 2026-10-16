@@ -11,8 +11,6 @@
 | `artifact_expired` | `internal/transport/http/images.go` |
 | `artifact_not_found` | `internal/transport/http/images.go` |
 | `artifact_storage_failed` | `internal/transport/http/images.go` |
-| `bad_category` | `internal/transport/http/timeline.go` |
-| `bad_environment` | `internal/transport/http/timeline.go` |
 | `bad_machine` | `internal/transport/http/cloud_agent.go` |
 | `bad_offer` | `internal/transport/http/cloud_agent.go` |
 | `bad_path` | `internal/transport/http/page.go` |
@@ -120,7 +118,7 @@
 | `memory_full` | `internal/transport/http/project_memory.go` |
 | `memory_group_not_found` | `internal/transport/http/project_memory.go` |
 | `memory_unreadable` | `internal/transport/http/project_memory.go` |
-| `method_not_allowed` | `internal/transport/http/actions.go`, `internal/transport/http/agents.go`, `internal/transport/http/callbacks.go`, `internal/transport/http/devstacks.go`, `internal/transport/http/handoffs.go`, `internal/transport/http/images.go`, `internal/transport/http/intent.go`, `internal/transport/http/notification_rules.go`, `internal/transport/http/orchestrator.go`, `internal/transport/http/personas.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_folders.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/project_tree.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/projects.go`, `internal/transport/http/proposals.go`, `internal/transport/http/reports.go`, `internal/transport/http/runs.go`, `internal/transport/http/screen.go`, `internal/transport/http/session_archive.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/settings.go`, `internal/transport/http/shells.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_events.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_role_draft.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/terminals.go`, `internal/transport/http/timeline.go`, `internal/transport/http/tracks.go`, `internal/transport/http/update.go`, `internal/transport/http/update_dev_release.go`, `internal/transport/http/usage.go`, `internal/transport/http/verify.go`, `internal/transport/http/voice.go`, `internal/transport/http/waits.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_persona_suggestion.go`, `internal/transport/http/work_v2_reference_images.go`, `internal/transport/http/work_v2_session_todos.go`, `internal/transport/http/workflow.go` |
+| `method_not_allowed` | `internal/transport/http/actions.go`, `internal/transport/http/agents.go`, `internal/transport/http/callbacks.go`, `internal/transport/http/devstacks.go`, `internal/transport/http/handoffs.go`, `internal/transport/http/images.go`, `internal/transport/http/intent.go`, `internal/transport/http/notification_rules.go`, `internal/transport/http/orchestrator.go`, `internal/transport/http/personas.go`, `internal/transport/http/project_files.go`, `internal/transport/http/project_folders.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/project_tree.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/projects.go`, `internal/transport/http/proposals.go`, `internal/transport/http/reports.go`, `internal/transport/http/runs.go`, `internal/transport/http/screen.go`, `internal/transport/http/session_archive.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/settings.go`, `internal/transport/http/shells.go`, `internal/transport/http/squad.go`, `internal/transport/http/squad_events.go`, `internal/transport/http/squad_packages.go`, `internal/transport/http/squad_role_draft.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/terminals.go`, `internal/transport/http/tracks.go`, `internal/transport/http/update.go`, `internal/transport/http/update_dev_release.go`, `internal/transport/http/usage.go`, `internal/transport/http/verify.go`, `internal/transport/http/voice.go`, `internal/transport/http/waits.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_persona_suggestion.go`, `internal/transport/http/work_v2_reference_images.go`, `internal/transport/http/work_v2_session_todos.go`, `internal/transport/http/workflow.go` |
 | `mirror_capacity` | `internal/transport/http/project_sync.go` |
 | `mirror_source_mismatch` | `internal/transport/http/project_sync.go` |
 | `mirror_store_unavailable` | `internal/transport/http/project_sync.go` |
@@ -164,7 +162,7 @@
 | `project_not_found` | `internal/transport/http/project_files.go`, `internal/transport/http/project_memory.go`, `internal/transport/http/project_tree.go`, `internal/transport/http/project_unify.go`, `internal/transport/http/tracks.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_agent.go` |
 | `project_not_offered` | `internal/transport/http/project_sync.go` |
 | `project_registry_failed` | `internal/transport/http/projects.go` |
-| `project_required` | `internal/domain/work/v2.go`, `internal/transport/http/squad_skill_sources.go`, `internal/transport/http/timeline.go` |
+| `project_required` | `internal/domain/work/v2.go`, `internal/transport/http/squad_skill_sources.go` |
 | `project_sync_unavailable` | `internal/transport/http/project_sync.go` |
 | `project_unreadable` | `internal/transport/http/project_sync.go` |
 | `proposal_is_for_sessions` | `internal/transport/http/proposals.go` |
@@ -214,7 +212,6 @@
 | `subscriptions_full` | `internal/transport/http/push.go` |
 | `target_session_ambiguous` | `internal/transport/http/human_interventions.go` |
 | `target_session_unavailable` | `internal/transport/http/human_interventions.go` |
-| `timeline_unreadable` | `internal/transport/http/timeline.go` |
 | `title_not_saved` | `internal/transport/http/actions.go`, `internal/transport/http/session_smart_title.go` |
 | `title_required` | `internal/domain/work/v2.go` |
 | `too_large` | `internal/transport/http/actions.go`, `internal/transport/http/voice.go` |

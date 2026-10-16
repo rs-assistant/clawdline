@@ -12,7 +12,6 @@ export interface LegacyCorrection {
     | "session-state-unrecognized"
     | "device-session-count-unknown"
     | "session-activity-not-drawn"
-    | "timeline-board-pills-unmapped"
   sources: readonly {
     file: string
     line: number
@@ -67,19 +66,5 @@ export const LEGACY_CORRECTIONS: readonly LegacyCorrection[] = [
     copiedBehaviour: "Leaves the session row's last activity out of the metadata line.",
     whyWrong: "The daemon supplies that timestamp and the list already orders by it, so hiding it leaves the visible order unexplained.",
     consoleBehaviour: "Shows a known activity timestamp as relative time and draws nothing when the timestamp is absent or unknown.",
-  },
-  {
-    id: "timeline-board-pills-unmapped",
-    sources: [
-      {
-        file: "web/console/src/legacy/js/view/timeline.js",
-        line: 152,
-        contains: "function boardPills(parent, entry)",
-      },
-    ],
-    copiedBehaviour: "Draws a clickable pill for each of an entry's boardItemIds and opens the old Project Board on it.",
-    whyWrong:
-      "The old Board was removed as a frozen store nobody writes, and a boardItemId has no proved mapping to a work id. A pill that opens nothing, or that guesses which work item it meant, would draw an unknown relation as a certainty.",
-    consoleBehaviour: "Removes the pills as they are drawn, so an entry shows only what it can stand behind.",
   },
 ] as const
