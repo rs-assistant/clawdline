@@ -630,13 +630,14 @@ func TrimSilence(samples []byte, rate int, overRoom float64) []byte {
 	if first < 0 {
 		return nil
 	}
-	// A breath of room either side, so words are not clipped at their edges.
-	// 300ms rather than 150: a consonant that starts a word is quieter than
-	// the vowel behind it, and the padding is what stops the threshold from
-	// shaving it off.
-	const pad = 6
-	from := max(0, first-pad) * window
-	to := min(count, (last+1+pad)*window)
+	// A breath of room before speech protects quiet initial consonants.
+	// A soft ending can remain below the room threshold for an entire word or
+	// phrase. Keep two seconds after the last loud window so Whisper can hear
+	// that ending, while still removing a long trailing silence.
+	const leadingPad = 6
+	const trailingPad = 40
+	from := max(0, first-leadingPad) * window
+	to := min(count, (last+1+trailingPad)*window)
 	if to <= from {
 		return nil
 	}

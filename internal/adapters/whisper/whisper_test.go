@@ -230,6 +230,18 @@ func TestTrimSilenceKeepsTheQuietEndOfASentence(t *testing.T) {
 	}
 }
 
+func TestTrimSilenceKeepsSoftFinalWordsBelowTheRoomThreshold(t *testing.T) {
+	clip := append([]byte{}, tone(time.Second, 40)...)
+	clip = append(clip, tone(time.Second, 9000)...)
+	clip = append(clip, tone(time.Second, 80)...) // soft final words, below 2.5x room
+	clip = append(clip, tone(3*time.Second, 40)...)
+	cut := TrimSilence(clip, Rate, 2.5)
+	// The final words occupy the third second. The trailing room must still be cut.
+	if got := float64(len(cut)) / float64(Rate*2); got < 3 || got >= 5 {
+		t.Fatalf("soft ending lost or trailing room kept: %.2fs", got)
+	}
+}
+
 func TestLooksLikeLoopKnowsAGrooveFromASentence(t *testing.T) {
 	grooves := []string{"和音，和音，和音，和音，", "好,好,好。", "謝謝大家謝謝大家謝謝大家謝謝大家"}
 	for _, said := range grooves {
