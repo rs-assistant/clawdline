@@ -19,20 +19,27 @@ import (
 )
 
 const (
-	PeerIngressLimit    = 16
-	PeerAckIngressLimit = 16
+	PeerIngressLimit          = 16
+	PeerAckIngressLimit       = 16
+	PeerTaskStartIngressLimit = 16
+	PeerProbeIngressLimit     = 16
 )
 
 // PeerIngressUsage measures the fuller of the work and relay-ack queues.
 // Each has the same registered capacity and both refuse new frames when full.
 func (l *Link) PeerIngressUsage() (int, bool) {
 	l.mu.Lock()
-	requests, acks := l.peerRequests, l.peerAcks
+	requests, acks, starts, probes := l.peerRequests, l.peerAcks, l.peerTaskStarts, l.peerTaskProbes
 	l.mu.Unlock()
-	if requests == nil || acks == nil {
+	if requests == nil || acks == nil || starts == nil || probes == nil {
 		return 0, false
 	}
-	return max(len(requests), len(acks)), true
+	return max(len(requests), len(acks), len(starts), len(probes)), true
+}
+
+type pendingTaskProof struct {
+	challenge peercontract.TaskProbe
+	reply     chan peercontract.TaskProbe
 }
 
 type peerFrame struct {
@@ -47,6 +54,13 @@ type peerTaskStartFrame struct {
 	peercontract.TaskStartEnvelope
 }
 
+type peerTaskProbeFrame struct {
+	Type            string                 `json:"type"`
+	Probe           peercontract.TaskProbe `json:"probe"`
+	SignerPublicKey string                 `json:"signer_public_key,omitempty"`
+	SourcePublicKey string                 `json:"source_public_key"`
+}
+
 type peerAck struct {
 	Type      string `json:"type"`
 	RequestID string `json:"request_id"`
@@ -54,12 +68,30 @@ type peerAck struct {
 }
 
 func (l *Link) enqueuePeer(frame []byte) {
-	if len(frame) > adaptercloud.PeerFrameBytesLimit || l.peerRequests == nil {
+	if len(frame) > adaptercloud.PeerFrameBytesLimit {
+		return
+	}
+	var header struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(frame, &header) != nil {
+		return
+	}
+	l.mu.Lock()
+	queue := l.peerRequests
+	switch header.Type {
+	case "peer_task_start_envelope":
+		queue = l.peerTaskStarts
+	case "peer_task_probe_envelope":
+		queue = l.peerTaskProbes
+	}
+	l.mu.Unlock()
+	if queue == nil {
 		return
 	}
 	copyFrame := append([]byte(nil), frame...)
 	select {
-	case l.peerRequests <- copyFrame:
+	case queue <- copyFrame:
 	default:
 		l.logf("cloud peer: inbound queue full; frame outcome unknown")
 	}
@@ -83,17 +115,36 @@ func (l *Link) runPeer(ctx context.Context) {
 			return
 		case frame := <-l.peerRequests:
 			requestCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-			var header struct {
-				Type string `json:"type"`
-			}
-			if json.Unmarshal(frame, &header) == nil && header.Type == "peer_task_start_envelope" {
-				l.receivePeerTaskStart(requestCtx, frame)
-			} else {
-				l.receivePeer(requestCtx, frame)
-			}
+			l.receivePeer(requestCtx, frame)
 			cancel()
 		case frame := <-l.peerAcks:
 			l.recordPeerAck(ctx, frame)
+		}
+	}
+}
+
+func (l *Link) runTaskStarts(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case frame := <-l.peerTaskStarts:
+			requestCtx, cancel := context.WithTimeout(ctx, 180*time.Second)
+			l.receivePeerTaskStart(requestCtx, frame)
+			cancel()
+		}
+	}
+}
+
+func (l *Link) runTaskProbes(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case frame := <-l.peerTaskProbes:
+			requestCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+			l.receivePeerTaskProbe(requestCtx, frame)
+			cancel()
 		}
 	}
 }
@@ -285,9 +336,56 @@ func (l *Link) receivePeerTaskStart(ctx context.Context, raw []byte) {
 	if err != nil {
 		return
 	}
+	key, found, err := l.keys.DeviceKey()
+	if err != nil || !found || !key.Valid() || key.Fingerprint() != pair.TargetFingerprint {
+		return
+	}
+	challenge, err := peercontract.NewTaskChallenge(frame.Start, ed25519.NewKeyFromSeed(key.Seed()))
+	if err != nil {
+		return
+	}
+	reply := make(chan peercontract.TaskProbe, 1)
+	l.mu.Lock()
+	if len(l.peerTaskPending) >= PeerTaskStartIngressLimit {
+		l.mu.Unlock()
+		l.logf("cloud peer task start: source proof capacity reached")
+		return
+	}
+	if _, exists := l.peerTaskPending[frame.Start.TaskID]; exists {
+		l.mu.Unlock()
+		return
+	}
+	l.peerTaskPending[frame.Start.TaskID] = pendingTaskProof{challenge: challenge, reply: reply}
+	l.mu.Unlock()
+	defer func() {
+		l.mu.Lock()
+		delete(l.peerTaskPending, frame.Start.TaskID)
+		l.mu.Unlock()
+	}()
+	probeFrame, err := json.Marshal(struct {
+		Type            string                 `json:"type"`
+		Probe           peercontract.TaskProbe `json:"probe"`
+		SourcePublicKey string                 `json:"source_public_key"`
+	}{Type: "peer_task_probe_publish", Probe: challenge, SourcePublicKey: pair.SourcePublicKey})
+	if err != nil || l.transport.PublishPeerTaskProbe(probeFrame) != nil {
+		return
+	}
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(8 * time.Second):
+		l.logf("cloud peer task start: source execution proof unavailable for task %s", frame.Start.TaskID)
+		return
+	case <-reply:
+	}
 	principal := peercontract.Principal{MachineID: pair.SourceMachineID,
 		KeyFingerprint: pair.SourceFingerprint, PairID: pair.ID, MachinePeer: true}
-	facts := l.taskStartFacts
+	facts := func(ctx context.Context, start peercontract.TaskStart,
+		principal peercontract.Principal) (peercontract.TaskStartFacts, error) {
+		answer, err := l.taskStartFacts(ctx, start, principal)
+		answer.SourceCurrent = err == nil
+		return answer, err
+	}
 	if l.opts.PeerTaskStartFacts != nil {
 		facts = l.opts.PeerTaskStartFacts
 	}
@@ -337,6 +435,91 @@ func (l *Link) taskStartFacts(ctx context.Context, start peercontract.TaskStart,
 		_, facts.ProjectAvailable = l.opts.PeerTaskProject(ctx, start.TargetProjectID)
 	}
 	return facts, nil
+}
+
+func (l *Link) receivePeerTaskProbe(ctx context.Context, raw []byte) {
+	if l.keys == nil || l.opts.PeerAdmitTarget == nil || l.transport == nil {
+		return
+	}
+	var frame peerTaskProbeFrame
+	if json.Unmarshal(raw, &frame) != nil || frame.Type != "peer_task_probe_envelope" ||
+		peercontract.ValidateTaskStartHeader(frame.Probe.Start) != nil {
+		return
+	}
+	start := frame.Probe.Start
+	st, err := peerstore.Open(l.keys.Dir())
+	if err != nil {
+		return
+	}
+	defer st.Close()
+	pair, err := st.Pair(ctx, start.PairID)
+	if err != nil || pair.SourceMachineID != start.Source.MachineID ||
+		pair.TargetMachineID != start.TargetMachineID || pair.TargetSignature == "" ||
+		!pair.RevokedAt.IsZero() || !l.opts.Now().Before(pair.ExpiresAt) ||
+		frame.SourcePublicKey != pair.SourcePublicKey {
+		return
+	}
+	sourceSigner, err := base64.StdEncoding.Strict().DecodeString(pair.SourcePublicKey)
+	if err != nil || len(sourceSigner) != ed25519.PublicKeySize {
+		return
+	}
+	switch frame.Probe.Kind {
+	case peercontract.TaskProbeChallenge:
+		if l.identity.MachineID != pair.SourceMachineID {
+			return
+		}
+		targetSigner, err := base64.StdEncoding.Strict().DecodeString(pair.TargetPublicKey)
+		if err != nil || len(targetSigner) != ed25519.PublicKeySize ||
+			peercontract.VerifyTaskProbe(frame.Probe, targetSigner) != nil {
+			return
+		}
+		item, err := st.TaskStartOutbox(ctx, start.TaskID)
+		if err != nil || item.Start != start {
+			return
+		}
+		if l.opts.PeerAdmitTarget(ctx, start.Source.MachineID,
+			start.Source.SessionID, start.Source.ExecutionGeneration) != nil {
+			return
+		}
+		auth, err := adaptercloud.NewAccountClient(l.settings.APIBase).AuthorizePeerTaskStart(ctx,
+			l.identity.MachineCredential, start, pair.SourcePublicKey)
+		if err != nil || !auth.Authorized || auth.PairID != pair.ID ||
+			auth.SourcePublicKey != pair.SourcePublicKey || auth.TargetMachineID != pair.TargetMachineID {
+			return
+		}
+		key, found, err := l.keys.DeviceKey()
+		if err != nil || !found || !key.Valid() || key.Fingerprint() != pair.SourceFingerprint {
+			return
+		}
+		proof, err := peercontract.AnswerTaskChallenge(frame.Probe, targetSigner,
+			ed25519.NewKeyFromSeed(key.Seed()))
+		if err != nil {
+			return
+		}
+		encoded, err := json.Marshal(struct {
+			Type            string                 `json:"type"`
+			Probe           peercontract.TaskProbe `json:"probe"`
+			SourcePublicKey string                 `json:"source_public_key"`
+		}{Type: "peer_task_probe_publish", Probe: proof, SourcePublicKey: pair.SourcePublicKey})
+		if err == nil {
+			_ = l.transport.PublishPeerTaskProbe(encoded)
+		}
+	case peercontract.TaskProbeProof:
+		if l.identity.MachineID != pair.TargetMachineID ||
+			peercontract.VerifyTaskProbe(frame.Probe, sourceSigner) != nil {
+			return
+		}
+		l.mu.Lock()
+		pending, exists := l.peerTaskPending[start.TaskID]
+		l.mu.Unlock()
+		if !exists || peercontract.MatchTaskProof(pending.challenge, frame.Probe, sourceSigner) != nil {
+			return
+		}
+		select {
+		case pending.reply <- frame.Probe:
+		default:
+		}
+	}
 }
 
 func (l *Link) receivePeer(ctx context.Context, raw []byte) {

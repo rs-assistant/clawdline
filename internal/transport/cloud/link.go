@@ -309,6 +309,9 @@ type Link struct {
 	terminalRequests   chan Inbound
 	peerRequests       chan []byte
 	peerAcks           chan []byte
+	peerTaskStarts     chan []byte
+	peerTaskProbes     chan []byte
+	peerTaskPending    map[string]pendingTaskProof
 	terminalLists      chan Inbound
 	terminalRefusals   chan Inbound
 }
@@ -715,6 +718,8 @@ func (l *Link) wire() error {
 		PeerAck:              l.enqueuePeerAck,
 		PeerTaskStartInbound: l.enqueuePeer,
 		PeerTaskStartAck:     l.enqueuePeerAck,
+		PeerTaskProbeInbound: l.enqueuePeer,
+		PeerTaskProbeAck:     l.enqueuePeerAck,
 		OnDisconnect:         l.closeAllTerminalConnections,
 		OnSettled:            l.terminalReceiptSettled,
 		PublicKeyFor:         l.publicKeyFor,
@@ -892,11 +897,19 @@ func (l *Link) runOnce(ctx context.Context) error {
 	l.mu.Lock()
 	l.peerRequests = make(chan []byte, PeerIngressLimit)
 	l.peerAcks = make(chan []byte, PeerAckIngressLimit)
+	l.peerTaskStarts = make(chan []byte, PeerTaskStartIngressLimit)
+	l.peerTaskProbes = make(chan []byte, PeerProbeIngressLimit)
+	l.peerTaskPending = make(map[string]pendingTaskProof)
 	l.mu.Unlock()
 	peerCtx, stopPeer := context.WithCancel(ctx)
 	peerDone := make(chan struct{})
 	go func() { defer close(peerDone); l.runPeer(peerCtx) }()
 	defer func() { stopPeer(); <-peerDone }()
+	taskDone := make(chan struct{})
+	probeDone := make(chan struct{})
+	go func() { defer close(taskDone); l.runTaskStarts(peerCtx) }()
+	go func() { defer close(probeDone); l.runTaskProbes(peerCtx) }()
+	defer func() { stopPeer(); <-taskDone; <-probeDone }()
 	l.terminalRequests = make(chan Inbound, CloudTerminalIngressLimit)
 	l.terminalLists = make(chan Inbound, CloudTerminalListIngressLimit)
 	l.terminalRefusals = make(chan Inbound, CloudTerminalRefusalsLimit)
