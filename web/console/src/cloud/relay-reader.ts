@@ -2498,13 +2498,14 @@ export class RelayReader {
     const rich = ((opened ? client.detailSnapshots?.get(key) : undefined) ??
       (client as { sessionSnapshots?: ReadonlyMap<string, unknown> }).sessionSnapshots?.get(key)) as
       | { machine?: unknown; session?: unknown; execution_generation?: unknown; state?: unknown;
-        menu?: { options?: unknown }; screen_reading?: unknown;
+        menu?: { options?: unknown }; screen_reading?: unknown; activity?: { at?: unknown };
         source?: { freshness?: unknown; observed_at?: unknown } } | undefined
     const observedAt = Number(rich?.source?.observed_at) * 1000
     if (!rich || rich.machine !== this.machine || rich.session !== id ||
       rich.execution_generation !== row.execution_generation || rich.state !== "waiting" ||
       rich.source?.freshness !== "current" || !Number.isFinite(observedAt) ||
       Math.abs(this.now() - observedAt) > RICH_MENU_FRESH_MS ||
+      this.movedSince(client, id, row.execution_generation, rich.activity?.at) ||
       !Array.isArray(rich.menu?.options) || !rich.menu.options.length) {
       if (!opened) return row
       if (this.askForOpenedQuestion(opened)) this.reportMissingQuestion(client, opened, rich, observedAt)
@@ -2513,6 +2514,27 @@ export class RelayReader {
       return { ...row, menu_arriving: true }
     }
     return { ...row, menu: rich.menu, ...(typeof rich.screen_reading === "string" ? { screen_reading: rich.screen_reading } : {}) }
+  }
+
+  /**
+   * Whether this Session's status row says its conversation moved after the
+   * rich row held for it was read (`last_movement_at` against the rich row's
+   * own `activity.at`, both the machine's transcript clock, in seconds).
+   *
+   * A rich row stays "current" for `RICH_MENU_FRESH_MS`. On 2026-10-16 a
+   * Session answered one question and stopped on the next while the page
+   * missed the s/ row that carried it: the ss/ row said waiting again, and
+   * the card drew the previous question's four options under it until "read
+   * again" brought the new one. A moved Session's held question is not its
+   * question; the card asks for the row instead (`askForOpenedQuestion`).
+   */
+  private movedSince(client: CloudReadClient, id: string, execution: unknown, richAt: unknown): boolean {
+    const status = client.statusSnapshots?.get(JSON.stringify([this.machine, id])) as
+      | { payload?: { execution_generation?: unknown; last_movement_at?: unknown } } | undefined
+    const moved = Number(status?.payload?.last_movement_at)
+    const read = Number(richAt)
+    return status?.payload?.execution_generation === execution &&
+      Number.isFinite(moved) && Number.isFinite(read) && moved > read
   }
 
   /**
