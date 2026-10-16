@@ -243,6 +243,7 @@ const words = {
     scheduleInvalidStatus: "Invalid",
     scheduleTriggerOnly: "No time — runs only by webhook or by hand",
     scheduleTriggerOnlyNext: "Runs only by webhook or by hand",
+    scheduleOnceOn: "Once, on {date}",
     scheduleForceRunConfirmation:
       "“{title}” already has work running. Start another run anyway? Both tasks will keep running. If they would write to the same place, or session capacity is full, the new run will still be refused.",
     fontScaleTitle: "Text size",
@@ -1023,6 +1024,8 @@ const words = {
     worktreeRemoveDescription: "Delete the checkout at {path}? Its branch and commits will remain.",
     worktreeRemoveConfirm: "Delete worktree",
     worktreeRemoveBusy: "Deleting…",
+    worktreeRemoveWaiting: "The machine is deleting this worktree. Closing this does not stop it; the list updates when it finishes.",
+    worktreeRemoveClose: "Close",
     worktreeRemoveFailed: "Could not delete the worktree.",
     worktreeRemoveRisk: "This worktree is not confirmed landed and clean. Files that were never committed, and anything a Session is doing there, will be lost.",
     projectsRefreshObservation: "Refresh observation",
@@ -1637,6 +1640,7 @@ const words = {
     scheduleInvalidStatus: "無效",
     scheduleTriggerOnly: "不設時間——只由 webhook 或手動執行",
     scheduleTriggerOnlyNext: "只由 webhook 或手動執行",
+    scheduleOnceOn: "只在 {date} 執行一次",
     scheduleForceRunConfirmation:
       "「{title}」已有一個執行中的工作。仍要強制再執行一次嗎？兩個工作都會繼續執行；如果它們會寫到同一個地方，或 Session 容量已滿，新工作仍會被擋下。",
     fontScaleTitle: "文字大小",
@@ -2325,6 +2329,8 @@ const words = {
     worktreeRemoveDescription: "刪除 {path} 的工作樹？分支與提交仍會保留。",
     worktreeRemoveConfirm: "刪除工作樹",
     worktreeRemoveBusy: "刪除中…",
+    worktreeRemoveWaiting: "機器正在刪除這棵工作樹。關閉這個視窗不會中止刪除，完成後列表會自動更新。",
+    worktreeRemoveClose: "關閉",
     worktreeRemoveFailed: "無法刪除工作樹。",
     worktreeRemoveRisk: "這棵工作樹還沒確認已併入主線且乾淨。從未提交的檔案，以及 Session 正在這裡做的事，刪除後都會消失。",
     projectsRefreshObservation: "重新觀測",

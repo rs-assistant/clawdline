@@ -217,10 +217,16 @@ key 的拼法、值的範圍都跟舊 app 的 `Config` 一樣，所以一行從�
 
 - **輸入條那一頁的每一列**（位置、寬度、不透明度、閱讀面板）——clawdline-go 還沒有輸入條。
   值寫得進檔案，之後輸入條做好就會讀到。
-- **語音輸入的兩個秒數與引擎**——同上，還沒有聽寫。
+- **Voice engine and timing values** — `/v1/voice` uses this machine's Whisper installation.
+  `voice_engine`, `voice_settle_seconds`, and `voice_stop_seconds` do not affect transcription,
+  so the Voice tab omits those controls. It offers the effective `voice_language`, the resolved
+  recognition language, and the shell's Whisper status.
 - **遠端那一頁的開關與通道**——`remote`、`remote_write`、四個推播開關、`remote_tunnel`、
   `remote_hostname` 都寫得進檔案；tunnel 本身、已配對裝置清單、Cloud 登入卡片沒有後端，所以沒有畫。
-- **派工那一頁的「派工的規矩」卡片與「排程」清單**——需要 policy 檔與排程後端，沒有畫。
+- **Dispatch rules** have their own tab. The shipped base is read-only and the person's local
+  additions are editable. `/v1/settings/dispatch-policy` requires this machine's identity and
+  a read version before saving, so a stale page cannot overwrite an external edit. Schedules
+  remain on their dedicated page.
 - **Claude Code Hook 的安裝鍵是關著的**（`hooks.supported` 為 `false`）。
   讀的那半是真的：它會去 `~/.claude/settings.json` 找命令列裡含 `clawdline-next/hook.sh` 的項目，
   也就是**這個 app 自己的**項目。舊 app 找的是 `clawdline/hook.sh`，兩個字串互不包含，

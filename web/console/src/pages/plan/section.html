@@ -2,33 +2,61 @@
     <div class="plan-shell">
         <div class="plan-heading">
             <div>
-                <h1 id="plan-title" tabindex="-1">Plan</h1>
-                <p class="plan-lede" id="plan-lede">What this Cloud account is entitled to, and how to change it.</p>
+                <h1 id="plan-title" tabindex="-1">Plans and pricing</h1>
+                <p class="plan-lede" id="plan-lede">Local work is always free. A plan only covers Cloud.</p>
             </div>
             <button class="plan-close" id="plan-close" type="button" data-page-to="sessions">Sessions</button>
         </div>
 
-        <div class="plan-card">
+        <!-- The copied module still writes the tier, its note, the limits table and
+             the provisional line. The two cards below say all of that, so these stay
+             in the document for the module and out of sight. -->
+        <div class="plan-legacy" hidden>
             <strong class="plan-tier" id="plan-tier">Free</strong>
             <p class="plan-tier-note" id="plan-tier-note"></p>
-            <p class="plan-say" id="plan-say" role="status" aria-live="polite" hidden></p>
-            <p class="plan-alert" id="plan-alert" role="alert" hidden></p>
-            <div class="plan-actions">
-                <button class="plan-go" id="plan-upgrade" type="button" hidden>Upgrade to Pro</button>
-                <button class="plan-alt" id="plan-portal" type="button" hidden>Manage subscription</button>
-                <button class="plan-go" id="plan-signin" type="button" hidden>Continue with GitHub</button>
-                <button class="plan-alt" id="plan-retry" type="button" hidden>Try again</button>
-                <button class="plan-alt" id="plan-recheck" type="button" hidden>Check again</button>
-            </div>
-            <!-- Only on the copy of this page the Mac itself serves, where there is no Cloud
-                 account to charge and saying so is the honest answer rather than a broken one. -->
-            <p class="plan-elsewhere" id="plan-elsewhere" hidden></p>
-            <p class="plan-elsewhere-link"><a id="plan-console" href="https://app.clawdline.com/#page=plan">app.clawdline.com</a></p>
+            <h2 class="plan-includes" id="plan-includes">What this plan includes</h2>
+            <dl class="plan-limits" id="plan-limits" hidden></dl>
+            <p class="plan-fine" id="plan-fine" hidden></p>
         </div>
 
-        <h2 class="plan-includes" id="plan-includes">What this plan includes</h2>
-        <dl class="plan-limits" id="plan-limits" hidden></dl>
-        <p class="plan-fine" id="plan-fine" hidden></p>
+        <div class="plan-offers">
+            <article class="plan-offer plan-offer-pro" id="plan-offer-pro" data-current="false">
+                <span class="plan-offer-tag" id="plan-offer-pro-tag">Recommended</span>
+                <div class="plan-offer-top">
+                    <h2 class="plan-offer-name">Pro</h2>
+                    <span class="plan-offer-active" id="plan-offer-pro-active" hidden>Active</span>
+                </div>
+                <p class="plan-offer-price"><span class="plan-offer-amount">$10</span><span class="plan-offer-per" id="plan-offer-pro-per">/ month</span></p>
+                <p class="plan-offer-pitch" id="plan-offer-pro-pitch"></p>
+                <ul class="plan-offer-features" id="plan-offer-pro-features"></ul>
+                <p class="plan-say" id="plan-say" role="status" aria-live="polite" hidden></p>
+                <p class="plan-alert" id="plan-alert" role="alert" hidden></p>
+                <div class="plan-actions">
+                    <button class="plan-go" id="plan-upgrade" type="button" hidden>Upgrade to Pro</button>
+                    <button class="plan-alt" id="plan-portal" type="button" hidden>Manage subscription</button>
+                    <button class="plan-go" id="plan-signin" type="button" hidden>Continue with GitHub</button>
+                    <button class="plan-alt" id="plan-retry" type="button" hidden>Try again</button>
+                    <button class="plan-alt" id="plan-recheck" type="button" hidden>Check again</button>
+                </div>
+                <!-- Only on the copy of this page a machine serves, where there is no Cloud
+                     account to charge and saying so is the honest answer rather than a broken one. -->
+                <p class="plan-elsewhere" id="plan-elsewhere" hidden></p>
+                <p class="plan-elsewhere-link"><a id="plan-console" href="https://app.clawdline.com/#page=plan">app.clawdline.com</a></p>
+            </article>
+
+            <article class="plan-offer plan-offer-free" id="plan-offer-free" data-current="false">
+                <div class="plan-offer-top">
+                    <h2 class="plan-offer-name">Free</h2>
+                    <span class="plan-offer-current" id="plan-offer-free-current" hidden>Current plan</span>
+                </div>
+                <p class="plan-offer-price"><span class="plan-offer-amount">$0</span></p>
+                <p class="plan-offer-pitch" id="plan-offer-free-pitch"></p>
+                <ul class="plan-offer-features" id="plan-offer-free-features"></ul>
+            </article>
+        </div>
+
+        <p class="plan-offer-fine" id="plan-offer-fine"></p>
+
         <section class="plan-simulation" id="plan-simulation" hidden>
             <h2 id="plan-simulation-title">SuperUser plan simulation</h2>
             <dl class="plan-limits" id="plan-simulation-values"></dl>

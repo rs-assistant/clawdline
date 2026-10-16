@@ -2073,6 +2073,26 @@ func (t *WorkV2Tx) DirectTodo(id string) (work.DirectTodoV2, error) {
     FROM session_direct_todos WHERE id=?`, id))
 }
 
+// OpenDirectTodoTexts is the text of every to-do this Session has not
+// completed, read inside the transaction that is about to add or reopen one.
+func (t *WorkV2Tx) OpenDirectTodoTexts(session string) ([]string, error) {
+	rows, err := t.tx.QueryContext(t.ctx, `SELECT text FROM session_direct_todos
+    WHERE session_id=? AND completed_at IS NULL`, session)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var text string
+		if err := rows.Scan(&text); err != nil {
+			return nil, err
+		}
+		out = append(out, text)
+	}
+	return out, rows.Err()
+}
+
 func (t *WorkV2Tx) PutDirectTodo(prev, next work.DirectTodoV2) error {
 	res, err := t.tx.ExecContext(t.ctx, `UPDATE session_direct_todos SET text=?,created_by=?,sent_at=?,read_at=?,completed_at=?,
     completed_by=?,version=version+1 WHERE id=? AND version=?`, next.Text, next.CreatedBy,

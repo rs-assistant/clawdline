@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5312,
-  "riskKeys": 2342,
-  "nonRiskCount": 2970,
+  "englishContentKeys": 5353,
+  "riskKeys": 2357,
+  "nonRiskCount": 2996,
   "groups": [
     {
       "name": "bar / other",
@@ -26,6 +26,38 @@
         "bar.placeholder",
         "bar.scanning",
         "bar.sessionAgents"
+      ]
+    },
+    {
+      "name": "capacityHelp / other",
+      "count": 8,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "capacityHelp.action_disconnect",
+        "capacityHelp.action_evict_oldest",
+        "capacityHelp.action_expire",
+        "capacityHelp.action_rotate",
+        "capacityHelp.action_summarize",
+        "capacityHelp.limit",
+        "capacityHelp.log",
+        "capacityHelp.open"
+      ]
+    },
+    {
+      "name": "clawdfatherMenu / other",
+      "count": 6,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "clawdfatherMenu.edit",
+        "clawdfatherMenu.editing",
+        "clawdfatherMenu.message",
+        "clawdfatherMenu.mine",
+        "clawdfatherMenu.name",
+        "clawdfatherMenu.new"
       ]
     },
     {
@@ -1934,7 +1966,7 @@
     },
     {
       "name": "next / other",
-      "count": 182,
+      "count": 183,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2120,7 +2152,8 @@
         "next.updateStripTagNew",
         "next.updateTitle",
         "next.updateToVersion",
-        "next.updateVerifying"
+        "next.updateVerifying",
+        "next.worktreeRemoveClose"
       ]
     },
     {
@@ -2195,7 +2228,7 @@
     },
     {
       "name": "next / schedule",
-      "count": 24,
+      "count": 25,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2211,6 +2244,7 @@
         "next.scheduleMoveWebhookMoved",
         "next.scheduleMoved",
         "next.scheduleMoving",
+        "next.scheduleOnceOn",
         "next.schedulePermissionAsk",
         "next.schedulePermissionDefault",
         "next.schedulePermissionEdits",
@@ -2369,6 +2403,25 @@
         "next.terminalTerminateSucceeded",
         "next.terminalUnavailableOld",
         "next.terminalViewOnly"
+      ]
+    },
+    {
+      "name": "plan / other",
+      "count": 10,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "plan.active",
+        "plan.control",
+        "plan.current",
+        "plan.freePitch",
+        "plan.heading",
+        "plan.lede",
+        "plan.perMonth",
+        "plan.proBilling",
+        "plan.push",
+        "plan.recommended"
       ]
     },
     {

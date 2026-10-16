@@ -47,6 +47,8 @@ import { COMPACT_MAX, COMPACT_MIN, compactWindowText, compactWindowValue } from 
 import { gateModeOptions, gateModeText } from "./gate-mode.js"
 import { BrowserLanguageControl } from "../../../ui-language/BrowserLanguageControl.js"
 import { CATALOG_TAGS, catalogWord } from "../../../catalog.js"
+import { askShell } from "../shell.js"
+import { DispatchPolicyPane } from "./DispatchPolicyPane.js"
 
 /**
  * The native "Clawdline 設定" window, as a web page.
@@ -75,12 +77,11 @@ import { CATALOG_TAGS, catalogWord } from "../../../catalog.js"
  *
  * ## What is not here
  *
- * The tabs the original fills from state this daemon does not keep: paired
- * devices and the Cloud account, the tunnel's own reading, the schedule list,
- * the dispatch policy card, the smart-notification health card. Those are
- * features rather than settings, and inventing a card that reports nothing
- * would be worse than the honest gap. Their switches — the ones that are a
- * value in the file — are all here. See docs/shell-bridge.md.
+ * The input bar and hook tabs remain paused. The voice tab shows only the
+ * setting the current Whisper route reads; the old engine and timing values
+ * are retained in config for compatibility, without controls that imply they
+ * affect a recording. The dispatch rules tab edits only the local additions.
+ * See docs/shell-bridge.md.
  */
 
 /** The value being written, over what the file last said, so a slider moves while it saves. */
@@ -88,7 +89,7 @@ type Draft = Partial<Record<SettingKey, string | number | boolean>>
 
 // The native input bar is paused; keep its controls for when it returns.
 const INPUT_BAR_ENABLED = false
-const VOICE_ENABLED = false
+const VOICE_ENABLED = true
 const HOOKS_ENABLED = false
 
 export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}) {
@@ -140,7 +141,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
 
   const has = inShell()
   const voiceTab = INPUT_BAR_ENABLED ? 2 : 1
-  const remoteTab = (INPUT_BAR_ENABLED ? 2 : 1) + (VOICE_ENABLED && !embedded ? 1 : 0)
+  const remoteTab = (INPUT_BAR_ENABLED ? 2 : 1) + (VOICE_ENABLED ? 1 : 0)
 
   const snapshotRef = useRef(snapshot)
   snapshotRef.current = snapshot
@@ -163,7 +164,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   }, [read])
 
   useEffect(() => {
-    if (!VOICE_ENABLED || embedded || tab !== voiceTab) return
+    if (!VOICE_ENABLED || tab !== voiceTab) return
     let live = true
     void readVoiceLanguage().then((answer) => {
       if (live) setVoiceLanguage(answer)
@@ -171,7 +172,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     return () => {
       live = false
     }
-  }, [tab, snapshot, embedded, voiceTab])
+  }, [tab, snapshot, voiceTab])
 
   // The Cloud line, while the Remote ("遠端") tab is open. A line that is
   // reconnecting changes on its own, so this card is the one thing in this
@@ -254,6 +255,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
         return next
       })
       ask({ kind: "changed" })
+      if (embedded && ("notch" in keys || "mascot" in keys)) askShell("changed")
       // A Remote-tab switch moves the tunnel at once (the daemon applies it
       // on the write); the card asks again rather than waiting its turn.
       if (!embedded && ("remote" in keys || "remote_tunnel" in keys || "remote_hostname" in keys)) {
@@ -362,13 +364,14 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
 
   // MARK: the tabs
 
-  const panes = [generalPane, ...(INPUT_BAR_ENABLED ? [barPane] : []), ...(VOICE_ENABLED && !embedded ? [voicePane] : []), remotePane, orchestratorPane, ...(HOOKS_ENABLED ? [hooksPane] : [])]
+  const panes = [generalPane, ...(INPUT_BAR_ENABLED ? [barPane] : []), ...(VOICE_ENABLED ? [voicePane] : []), remotePane, orchestratorPane, () => <DispatchPolicyPane />, ...(HOOKS_ENABLED ? [hooksPane] : [])]
   const titles = [
     W.settingsGeneral,
     ...(INPUT_BAR_ENABLED ? [W.settingsBar] : []),
-    ...(VOICE_ENABLED && !embedded ? [W.settingsVoice] : []),
+    ...(VOICE_ENABLED ? [W.settingsVoice] : []),
     W.settingsRemote,
     W.settingsOrchestrator,
+    /^zh(?:-|$)/i.test(document.documentElement.lang) ? "派工規則" : "Dispatch rules",
     ...(HOOKS_ENABLED ? [W.settingsHooks] : []),
   ]
 
@@ -426,17 +429,17 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
           {String(now("language")) !== "auto" && !CATALOG_TAGS.includes(String(now("language")) as (typeof CATALOG_TAGS)[number]) ? (
             <p className="sw-said" role="status">{catalogWord("ui", "unsupportedAgentHint")}</p>
           ) : null}
-          {!embedded && <Row label={W.menuMascot}>
+          <Row label={W.menuMascot}>
             <PopUp
               label={W.menuMascot}
               value={String(now("mascot"))}
-              options={(shell?.mascots?.length ? shell.mascots : [String(now("mascot"))]).map((name) => ({
+              options={(shell?.mascots?.length ? shell.mascots : window.__clawdlineShell?.settings?.mascots?.length ? window.__clawdlineShell.settings.mascots : [String(now("mascot"))]).map((name) => ({
                 label: name,
                 value: name,
               }))}
               onPick={pick("mascot")}
             />
-          </Row>}
+          </Row>
           <Row label={W.settingsSessionTerminal} hint={W.settingsSessionTerminalHint}>
             <PopUp
               label={W.settingsSessionTerminal}
@@ -575,9 +578,9 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
               }}
             />
           </Row>
-          {!embedded && <Row label={W.settingsNotch} hint={W.settingsNotchHint}>
+          <Row label={W.settingsNotch} hint={W.settingsNotchHint}>
             <Switch label={W.settingsNotch} on={!!now("notch")} onChange={flip("notch")} />
-          </Row>}
+          </Row>
         </div>
       </>
     )
@@ -687,21 +690,11 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   }
 
   function voicePane() {
+    const dictation = shell?.dictation ?? window.__clawdlineShell?.settings?.dictation
     return (
       <>
         <div className="sw-column">
-          <Row label={W.settingsEngine} first>
-            <PopUp
-              label={W.settingsEngine}
-              value={String(now("voice_engine"))}
-              options={[
-                { label: W.settingsAuto, value: "auto" },
-                { label: "Apple", value: "apple" },
-                { label: "Whisper", value: "whisper" },
-              ]}
-              onPick={pick("voice_engine")}
-            />
-          </Row>
+          <Row label={W.settingsEngine} first>Whisper</Row>
           <Row label={W.settingsVoiceLanguage} hint={W.settingsVoiceLanguageHint}>
             <PopUp
               label={W.settingsVoiceLanguage}
@@ -711,32 +704,12 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
             />
           </Row>
           {voiceLanguage ? <p className="sw-said">{voiceLanguageSaid(voiceLanguage)}</p> : null}
-          <Row label={W.settingsSettle}>
-            <Slider
-              label={W.settingsSettle}
-              min={0}
-              max={8}
-              step={0.1}
-              format={(v) => (v === 0 ? W.settingsOff : seconds(v))}
-              {...slide("voice_settle_seconds")}
-            />
-          </Row>
-          <Row label={W.settingsStop}>
-            <Slider
-              label={W.settingsStop}
-              min={0}
-              max={30}
-              step={0.1}
-              format={(v) => (v === 0 ? W.settingsOff : seconds(v))}
-              {...slide("voice_stop_seconds")}
-            />
-          </Row>
         </div>
         <div className="sw-column">
-          {shell?.dictation ? (
+          {dictation ? (
             <Block>
-              <Note dot={shell.dictation.kind === "ready" ? "live" : "warn"}>
-                {dictationStatus(shell.dictation)}
+              <Note dot={dictation.kind === "ready" ? "live" : "warn"}>
+                {dictationStatus(dictation)}
               </Note>
             </Block>
           ) : null}

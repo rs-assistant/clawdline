@@ -148,7 +148,7 @@ declare global {
   interface Window {
     __clawdlineShell?: {
       /** The console settings page's shell-only block, set before its first script runs. */
-      settings?: { words?: Record<string, string> }
+      settings?: { words?: Record<string, string>; mascots?: string[]; dictation?: ShellDictation }
       /** A shell that is not macOS puts its transport here. */
       post?: Post
       /** Set by a shell that opened the settings window. */

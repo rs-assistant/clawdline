@@ -35,7 +35,7 @@ export interface Snippet {
   id: string
   title: string
   body: string
-  scope: "global" | "project" | "workflow"
+  scope: "global" | "project" | "workflow" | "clawdfather"
   /** Absent on a global snippet — never null; see `snippetCreateBody`. */
   project?: string
   /** Origin of an imported Workflow. The launch message remains independent. */

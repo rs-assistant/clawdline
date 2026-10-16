@@ -306,6 +306,12 @@ func (g *gate) wrap(next http.Handler) http.Handler {
 			writeAuthRefusal(w, http.StatusUnauthorized, "unauthorized", unauthorizedMessage)
 			return
 		}
+		// Dispatch rules may include a person's private instructions. A paired
+		// device's read token must not see them through a GET.
+		if p == "/v1/settings/dispatch-policy" && !(verdict.Allowed && verdict.Local) {
+			writeAuthRefusal(w, http.StatusForbidden, "forbidden", "Only this machine may read its dispatch policy.")
+			return
+		}
 		// Reads are exempt from what follows: they are already gated by the
 		// token, and a page elsewhere cannot read the answer.
 		if isChange(r.Method) {
@@ -493,6 +499,10 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 		// machine's own token changes them.
 		if !(v.Allowed && v.Local) {
 			return http.StatusForbidden, "forbidden", "Only this machine's own token may change its settings."
+		}
+	case p == "/v1/settings/dispatch-policy":
+		if !(v.Allowed && v.Local) {
+			return http.StatusForbidden, "forbidden", "Only this machine may read or change its dispatch policy."
 		}
 	case p == "/v1/settings/browser":
 		// The handler limits this route to controls shown by the local browser.

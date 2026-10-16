@@ -39,6 +39,7 @@ import "./legacy/snippets.css"
 import "./side-border-overrides.css"
 
 import "./shell.css"
+import "./sidebar-scroll.css"
 import "./font-scale.css"
 
 import { restoreFontScale } from "./font-scale.js"

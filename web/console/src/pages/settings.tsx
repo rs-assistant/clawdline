@@ -25,6 +25,7 @@ import { DefaultModelsBlock } from "./settings/DefaultModelsBlock.js"
 import { GateSettingsBlock } from "./settings/GateSettingsBlock.js"
 import { nextWord } from "../next-strings.js"
 import { BrowserLanguageControl } from "../ui-language/BrowserLanguageControl.js"
+import { Switch } from "./settings/Switch.js"
 import {
   DEFAULT_FONT_SCALE,
   FONT_SCALE_STEPS,
@@ -285,22 +286,15 @@ function SettingsPage({ shown }: { shown: boolean }) {
             {notifySay(T, push.state)}
           </p>
           <div className="row">
-            <button
-              className={push.state === "on" ? "chip on" : "chip"}
+            {(push.state === "off" || push.state === "on") && <Switch
               id="settings-notify-go"
-              type="button"
-              hidden={!(push.state === "off" || push.state === "on")}
+              labelledBy="settings-notify-title"
+              describedBy="settings-notify-say"
+              on={push.state === "on"}
+              stateText={push.state === "on" ? catalogWord("literal", "09b410f51b19") : catalogWord("literal", "862364ba6811")}
               disabled={push.busy}
-              onClick={togglePush}
-            >
-              {push.state === "on"
-                ? push.busy
-                  ? T.webNotifyStopping
-                  : T.webNotifyStop
-                : push.busy
-                  ? T.webNotifyAsking
-                  : T.webNotifyGo}
-            </button>
+              onToggle={togglePush}
+            />}
             {/* Only offered where there is something subscribed for it to reach. */}
             <button
               className="chip"

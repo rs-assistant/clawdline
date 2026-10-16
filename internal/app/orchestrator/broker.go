@@ -221,6 +221,11 @@ type Broker struct {
 	removeTaskScratch func(root, path, name string) error
 	// Clock is injectable so a test does not wait out a real deadline.
 	Clock func() time.Time
+	// ScreenReadEvery is the pause between two readings of a tab's screen
+	// while a briefing or a handoff waits for its prompt. Zero is
+	// DefaultScreenReadEvery; a test that steps Clock past the deadline sets
+	// it short, since the pause is real time and Clock is not.
+	ScreenReadEvery time.Duration
 	// NewID makes a task id when a caller does not.
 	NewID func() string
 
@@ -363,6 +368,16 @@ func (b *Broker) now() time.Time {
 		return b.Clock()
 	}
 	return time.Now()
+}
+
+// DefaultScreenReadEvery is how often a waiting briefing reads the tab again.
+const DefaultScreenReadEvery = 2 * time.Second
+
+func (b *Broker) screenReadEvery() time.Duration {
+	if b.ScreenReadEvery > 0 {
+		return b.ScreenReadEvery
+	}
+	return DefaultScreenReadEvery
 }
 
 func (b *Broker) maxChildren() int {
