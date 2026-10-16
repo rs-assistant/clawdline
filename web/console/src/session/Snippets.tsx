@@ -39,6 +39,7 @@ import {
   readWorkflowProject,
   updateSnippet,
 } from "./snippets-api.js"
+import { RefusalError } from "@clawdline/core"
 import { createDirectTodoV2, directTodoActionV2 } from "../pages/work/api.js"
 import { workflowTodoText } from "./workflow-run.js"
 import { workflowWord as W } from "../workflow-words.js"
@@ -180,6 +181,8 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   // One write at a time: a second ↑ before the first has landed would send an
   // order built from rows the machine has already moved.
   const busy = useRef(false)
+  // The same for Start: a second tap can land before the disabled button is drawn.
+  const launching = useRef(false)
   // Which control the keyboard should be standing on after the next redraw.
   const pendingFocus = useRef<{ attribute: string; id: string; at: number } | null>(null)
   // Only the newest read may paint, the same rule the transcript reads under.
@@ -222,27 +225,28 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   }, [currentWorkflow])
 
   const startWorkflow = async () => {
-    if (error || !currentWorkflow || (projectUnresolved && (!!currentWorkflow.project || currentWorkflow.builtin === "zero_review")) || startingWorkflow) return
+    if (error || !currentWorkflow || (projectUnresolved && (!!currentWorkflow.project || currentWorkflow.builtin === "zero_review")) || launching.current) return
+    launching.current = true
     setStartingWorkflow(true); setWorkflowError("")
     let launchBody = currentWorkflow.body
     if (currentWorkflow.source) {
       if (!currentWorkflow.project && currentWorkflow.source.scope === "project") {
-        setWorkflowError(W("sourceScopeConflict")); setStartingWorkflow(false); return
+        setWorkflowError(W("sourceScopeConflict")); launching.current = false; setStartingWorkflow(false); return
       }
       try {
         const source = currentWorkflow.source
         const answer = await readProjectFile(source.place_id, source.file_id)
         if (!workflowSourceMatches({ source }, answer.file)) {
-          setWorkflowError(W("sourceStartUnavailable")); setStartingWorkflow(false); return
+          setWorkflowError(W("sourceStartUnavailable")); launching.current = false; setStartingWorkflow(false); return
         }
         launchBody = workflowSourceText(answer.file,
           document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en").body
         if (!workflowPreview || workflowPreview.id !== currentWorkflow.id || workflowPreview.body !== launchBody ||
             workflowPreview.name !== workflowSourceTitle(answer.file) || workflowPreview.version !== answer.version) {
           setWorkflowPreview({ id: currentWorkflow.id, name: workflowSourceTitle(answer.file), version: answer.version, body: launchBody })
-          setWorkflowError(W("sourceChangedReview")); setStartingWorkflow(false); return
+          setWorkflowError(W("sourceChangedReview")); launching.current = false; setStartingWorkflow(false); return
         }
-      } catch { setWorkflowError(W("sourceStartUnavailable")); setStartingWorkflow(false); return }
+      } catch { setWorkflowError(W("sourceStartUnavailable")); launching.current = false; setStartingWorkflow(false); return }
     }
     try {
       const text = workflowTodoText(currentWorkflow.id, currentWorkflow.title, launchBody)
@@ -250,12 +254,14 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
       await directTodoActionV2(row.id, created.todo.id, "send")
       document.dispatchEvent(new CustomEvent("clawdline:workflow-started"))
       onClose()
-    } catch {
+    } catch (e) {
+      // The machine keeps one Workflow running per Session; nothing was written.
+      if (e instanceof RefusalError && e.code === "workflow_running") { setWorkflowError(W("alreadyRunning")); return }
       // A created row is durable even when the send was refused or its answer
       // was lost. The to-do fold shows it and offers Send without recreating it.
       document.dispatchEvent(new CustomEvent("clawdline:workflow-started"))
       setWorkflowError(W("startUnknown"))
-    } finally { setStartingWorkflow(false) }
+    } finally { launching.current = false; setStartingWorkflow(false) }
   }
   const editorOpen = !!draft
 
