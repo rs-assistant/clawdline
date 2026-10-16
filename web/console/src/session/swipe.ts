@@ -60,6 +60,21 @@ export function archivable(conversation: string | null | undefined): boolean {
   return typeof conversation === "string" && conversation.trim() !== ""
 }
 
+/** A retained Session is display history, not a target for a destructive press. */
+export function sessionSwipeActions(freshness: "current" | "stale" | "unknown",
+  conversation: string | null | undefined): { close: boolean; archive: boolean } {
+  const close = freshness === "current"
+  return { close, archive: close && archivable(conversation) }
+}
+
+/** Rich local/selected-machine rows use the same action rule as fleet rows. */
+export function richSessionSwipeActions(row: { source?: { freshness?: string }; sessionId?: string } | null):
+  { close: boolean; archive: boolean } {
+  const freshness = row?.source?.freshness
+  return sessionSwipeActions(freshness === "unverified" || freshness === "missing" ? "stale" : "current",
+    row?.sessionId)
+}
+
 /** How much a row uncovers: both buttons, or the close alone. */
 export function actionWidth(conversation: string | null | undefined): number {
   return archivable(conversation) ? BOTH_WIDTH : ACTION_WIDTH
