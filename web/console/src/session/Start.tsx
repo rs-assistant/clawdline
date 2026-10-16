@@ -474,7 +474,11 @@ function draw(): void {
   const agentHelp = el("start-agent-help")
   const retry = el<HTMLButtonElement>("start-retry-places")
   const setup = el<HTMLAnchorElement>("start-agent-setup")
-  const needsAgent = !!places?.length && assistants.length === 0 || agentSignInRequired
+  // Said as soon as the places are read, projects or not: a new machine with
+  // neither used to show only "no projects", and the missing AI tool — the
+  // thing that actually blocks a first Session — appeared only after a folder
+  // had been added.
+  const needsAgent = !!places && assistants.length === 0 || agentSignInRequired
   const localMac = !hostedConsole() && ((startOS === "darwin" && startArch === "arm64") || !!(window as Window & {
     webkit?: { messageHandlers?: { shellAgentSetup?: unknown } }
   }).webkit?.messageHandlers?.shellAgentSetup)
@@ -555,8 +559,11 @@ function draw(): void {
         : placesUnread
           ? nextWord("firstSessionPlacesUnread")
           : places && !places.length
-          ? catalogWord("projects", "emptyAdd")
-          : places?.length && assistants.length === 0
+          ? mode !== "terminal" && assistants.length === 0
+            ? `${nextWord("firstSessionAgentMissing")} ${catalogWord("projects", "emptyAdd")}`
+            : catalogWord("projects", "emptyAdd")
+          // A terminal is a shell: it needs a folder, not an AI tool.
+          : places?.length && assistants.length === 0 && mode !== "terminal"
             ? nextWord("firstSessionAgentMissing")
           : "",
   )
@@ -574,7 +581,7 @@ function draw(): void {
     row.type = "button"
     row.className = "place"
     row.dataset.id = p.id
-    row.disabled = !!pressing || !!wait || editingProjects || !with_
+    row.disabled = !!pressing || !!wait || editingProjects || (mode !== "terminal" && !with_)
     if (pressing === p.id) row.dataset.busy = "1"
     row.innerHTML = '<canvas></canvas><span class="name"></span><span class="where"></span>'
 

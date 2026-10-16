@@ -119,9 +119,11 @@ func (p *Places) List(live []string, limit int) []Place {
 	// leave out the ones under ~/Library (library.go).
 	all := p.recorded(60, 240)
 	all = append(all, p.codexRecorded(60, 40)...)
+	registered := map[string]bool{}
 	if p.Registered != nil {
 		if rows, err := p.Registered(); err == nil {
 			for _, row := range rows {
+				registered[comparablePath(row.Path)] = true
 				all = append(all, Place{ID: PlaceID(row.Path), Path: row.Path,
 					Label: p.label(row.Path), At: time.Unix(row.AddedAt, 0)})
 			}
@@ -145,8 +147,17 @@ func (p *Places) List(live []string, limit int) []Place {
 		}
 	}
 	durable := durableJudge(p.Managed)
+	// The home directory is left out when it is only where a session happened
+	// to start, but one the person added on purpose is theirs: a fresh Linux
+	// machine has nothing under ~, the folder picker offers ~ itself, and the
+	// add used to succeed and then vanish from every list.
+	homeDir := resolvedPath(home())
+	chosenHome := func(path string) bool {
+		return registered[comparablePath(path)] && resolvedPath(path) == homeDir
+	}
 	return tidy(all, limit, isDirectory, func(path string) bool {
-		return !hidden[comparablePath(path)] && !IsMachineWorkspace(p.MachineStateDir, path) && durable(path)
+		return !hidden[comparablePath(path)] && !IsMachineWorkspace(p.MachineStateDir, path) &&
+			(durable(path) || chosenHome(path))
 	})
 }
 

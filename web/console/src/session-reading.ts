@@ -136,7 +136,11 @@ export function sessionCountState(reading: {
   loaded: boolean
   error: string | null
 }): ReadState<SessionRow[]> {
-  const rows = reading.snapshot?.sessions
+  // A snapshot whose list is missing or null is a list with nothing in it, not
+  // a list still loading: older daemons sent `"sessions": null` for an empty
+  // machine, and the header then said it was loading for as long as it stayed
+  // empty.
+  const rows = reading.snapshot ? reading.snapshot.sessions ?? [] : undefined
   if (rows && rows.length > 0) return { phase: "ready", value: rows }
   if (reading.error) return { phase: "unanswered", error: reading.error }
   if (rows && reading.snapshot?.scan.emptyAuthoritative) return { phase: "empty_authoritative", value: rows }

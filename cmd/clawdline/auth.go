@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/devices"
+	"github.com/sainteye/clawdline/internal/adapters/install"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/contract"
 )
@@ -30,10 +31,16 @@ import (
 // Both talk to the running daemon with this machine's own token, read from
 // this app's directory and never from the Swift app's.
 
-// daemonPort is the port the daemon listens on: CLAWDLINE_NEXT_PORT, else 7727.
+// daemonPort is the port the daemon listens on: CLAWDLINE_NEXT_PORT, else the
+// port `clawdline setup --port` recorded in this state directory's
+// service.json, else 7727. Without the middle step every command after a
+// `--port` install knocked on 7727 and was refused by whatever answered there.
 func daemonPort() (int, error) {
 	v := os.Getenv("CLAWDLINE_NEXT_PORT")
 	if v == "" {
+		if sf, err := install.ReadServiceFile(config.Load().Dir); err == nil && sf.Port > 0 && sf.Port <= 65535 {
+			return sf.Port, nil
+		}
 		return config.DefaultPort, nil
 	}
 	port, err := strconv.Atoi(v)

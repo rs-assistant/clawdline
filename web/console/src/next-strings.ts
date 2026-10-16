@@ -388,7 +388,7 @@ const words = {
     cloudPairLinkGo: "Pair with it",
     cloudPairLinkWaiting: "Answered. Waiting for the machine to hand over its key…",
     cloudPairLinkExpired:
-      "That link has run out: a machine's link lasts about three minutes. Pair from the machine list instead, whose code lasts longer and says until when.",
+      "That link has run out: a machine's link lasts about ten minutes. Pair from the machine list instead, whose code lasts longer and says until when.",
     cloudPairLinkBad: "That is not a pairing link this page can read ({code}).",
     cloudMachineSessionsUnread: "its sessions cannot be read here",
     cloudMachineSessionsUnknown: "sessions not known yet",
@@ -1759,7 +1759,7 @@ const words = {
     cloudPairLinkFine: "配對會把那台機器的金鑰交給這個瀏覽器。只回應你剛剛從自己機器上拿到的連結。",
     cloudPairLinkGo: "和它配對",
     cloudPairLinkWaiting: "已經回應，正在等那台機器交出金鑰…",
-    cloudPairLinkExpired: "這個連結已經過期了：機器印出的連結只有大約三分鐘。改從機器清單配對，那裡的代碼有效得比較久，也會寫出到幾點。",
+    cloudPairLinkExpired: "這個連結已經過期了：機器印出的連結只有大約十分鐘。改從機器清單配對，那裡的代碼有效得比較久，也會寫出到幾點。",
     cloudPairLinkBad: "這不是這一頁讀得懂的配對連結（{code}）。",
     cloudMachineSessionsUnread: "這裡讀不到它的 session",
     cloudMachineSessionsUnknown: "還不知道有幾個 session",

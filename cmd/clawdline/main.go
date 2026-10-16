@@ -435,7 +435,13 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 func doctor() {
 	cfg := config.Load()
 	fmt.Printf(cliCopy("entry", "main_version_s", "version   %s\n"), version)
-	fmt.Printf(cliCopy("entry", "main_port_d", "port      %d\n"), cfg.Port)
+	// The port the CLI talks to, which is the one setup installed the service
+	// on, not the compiled-in default.
+	port := cfg.Port
+	if p, err := daemonPort(); err == nil {
+		port = p
+	}
+	fmt.Printf(cliCopy("entry", "main_port_d", "port      %d\n"), port)
 	// "0" would read like a port. Nobody behind this daemon is the ordinary
 	// answer and it is said in words (config.NoUpstream).
 	if port, ok := cfg.Upstream(); ok {

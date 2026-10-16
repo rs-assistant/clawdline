@@ -93,4 +93,7 @@ test("the header tells first load, authoritative empty, and no answer apart", ()
   assert.equal(sessionCountState({
     snapshot: { sessions: [{ id: "one" }], scan: { emptyAuthoritative: false } }, loaded: true, error: null,
   } as never).phase, "ready")
+  assert.equal(sessionCountState({
+    snapshot: { sessions: null, scan: { emptyAuthoritative: true } }, loaded: true, error: null,
+  } as never).phase, "empty_authoritative", "a null list from an older daemon is an empty list, not a load")
 })

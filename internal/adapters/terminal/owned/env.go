@@ -227,6 +227,12 @@ func (m Machine) shell(ctx context.Context, fromEnv, name string) string {
 	return m.fallbackShell()
 }
 
+// AccountShell is the login shell the user database names for the account
+// called name, or "" when it names none. Setup uses it when it is run without
+// SHELL (a script, cron, `docker exec`), so the service it writes carries the
+// person's shell instead of /bin/sh, which every terminal would then run.
+func AccountShell(ctx context.Context, name string) string { return userShell(ctx, name) }
+
 // interactive is whether a shell can hold a terminal: an absolute path this
 // account can run, not nologin or false, and listed in /etc/shells where
 // there is one.
