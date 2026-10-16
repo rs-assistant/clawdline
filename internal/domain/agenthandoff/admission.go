@@ -116,17 +116,18 @@ type Refusal string
 func (r Refusal) Error() string { return string(r) }
 
 const (
-	InvalidRequest        Refusal = "handoff_invalid_request"
-	SourceUnverified      Refusal = "handoff_source_unverified"
-	WrongMachine          Refusal = "handoff_wrong_machine"
-	GrantUnavailable      Refusal = "handoff_grant_unavailable"
-	PairInactive          Refusal = "handoff_pair_inactive"
-	GrantDenied           Refusal = "handoff_grant_denied"
-	GrantRevoked          Refusal = "handoff_grant_revoked"
-	GrantExpired          Refusal = "handoff_grant_expired"
-	CapabilityUnavailable Refusal = "handoff_capability_unavailable"
-	MachineWritesDisabled Refusal = "handoff_machine_writes_disabled"
-	ExecutionUnverified   Refusal = "handoff_execution_unverified"
+	InvalidRequest         Refusal = "handoff_invalid_request"
+	SourceUnverified       Refusal = "handoff_source_unverified"
+	WrongMachine           Refusal = "handoff_wrong_machine"
+	GrantUnavailable       Refusal = "handoff_grant_unavailable"
+	PairInactive           Refusal = "handoff_pair_inactive"
+	GrantDenied            Refusal = "handoff_grant_denied"
+	GrantRevoked           Refusal = "handoff_grant_revoked"
+	GrantExpired           Refusal = "handoff_grant_expired"
+	CapabilityUnavailable  Refusal = "handoff_capability_unavailable"
+	MachineWritesDisabled  Refusal = "handoff_machine_writes_disabled"
+	ExecutionUnverified    Refusal = "handoff_execution_unverified"
+	TaskProjectUnavailable Refusal = "handoff_target_project_unavailable"
 )
 
 var generation = regexp.MustCompile(`^[0-9a-f]{32}$`)
