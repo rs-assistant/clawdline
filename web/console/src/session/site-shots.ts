@@ -75,7 +75,7 @@ export type Callout = { sel: string; n: number; label: string; pad?: number }
 
 /**
  * A page expression that marks the real elements' boxes on the live page: a
- * hairline outline with a small number at its corner, and a light shade over
+ * 1px outline at 70% opacity with a small number at its corner, and a light shade over
  * the rest. The picture carries no legend; the website's caption and lightbox
  * name each number, in the words of `SITE_CALLOUTS`.
  */
@@ -105,7 +105,7 @@ export function calloutScript(marks: Callout[]): string {
       for (const [k, v] of Object.entries({ x: l, y: t, width: r - l, height: b - t, rx: 10, fill: "black" })) hole.setAttribute(k, v)
       mask.appendChild(hole)
       const box = document.createElementNS(NS, "rect")
-      for (const [k, v] of Object.entries({ x: l + .75, y: t + .75, width: r - l - 1.5, height: b - t - 1.5, rx: 10, fill: "none", stroke: accent, "stroke-width": 1.5 })) box.setAttribute(k, v)
+      for (const [k, v] of Object.entries({ x: l + .5, y: t + .5, width: r - l - 1, height: b - t - 1, rx: 10, fill: "none", stroke: accent, "stroke-opacity": .7, "stroke-width": 1 })) box.setAttribute(k, v)
       svg.appendChild(box)
       const tag = document.createElement("span"); tag.className = "site-callout"; tag.textContent = String(m.n)
       Object.assign(tag.style, { position: "fixed", left: Math.max(2, l - 9) + "px", top: Math.max(2, t - 9) + "px", width: "18px", height: "18px",
