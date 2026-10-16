@@ -1,7 +1,8 @@
 #!/bin/bash
-# Recapture the website's three feature pictures from the console's own e2e
-# fixtures, in English and Taiwan Traditional Chinese, with their numbered
-# callouts drawn in. docs/site-shots.md is the whole of it.
+# Recapture the website's three feature pictures from the built console and the
+# story in web/console/src/session/site-shots.ts, in English and Taiwan
+# Traditional Chinese, with their numbered callouts drawn in. docs/site-shots.md
+# is the whole of it.
 #
 #   tools/site-shots.sh <directory>
 #
@@ -24,8 +25,7 @@ scenes=(attention-note session-todo board-item)
 for lang in en zh-Hant; do
   for scene in ${scenes[@]+"${scenes[@]}"}; do rm -f "$out/$scene-$lang.png"; done
   ( cd "$root/web/console" && SITE_SHOTS="$out" SITE_SHOTS_LANG="$lang" \
-      node --test --experimental-strip-types --test-name-pattern='^site shot' \
-      src/session/human-interventions.e2e.ts src/session/list-gestures.e2e.ts )
+      node --test --experimental-strip-types src/session/site-shots.e2e.ts )
 done
 
 missing=0

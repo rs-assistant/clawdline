@@ -45,6 +45,7 @@ import { PersonaBot, usePersonas } from "./PersonaBot.js"
 import "./work-tree.css"
 import "./git-status.css"
 import "./empty-detail.css"
+import "./detail-head.css"
 
 /**
  * Whether this transport can read a project's snippets — `snippetControls(api).read`
