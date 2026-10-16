@@ -264,8 +264,7 @@ test("one word, one list, and every route names a word the table carries", () =>
   assert.ok("coordination.waits" in CARRIED)
   assert.ok("coordination.pauses" in CARRIED)
   assert.ok("snippets" in CARRIED)
-  assert.ok("timeline" in CARRIED)
-  // 104, counted on this tree — including the spoken-intent planner, Work v2 list/detail/search reads and person actions,
+  // Including the spoken-intent planner, Work v2 list/detail/search reads and person actions,
   // the single-schedule read, the versioned webhook-binding write, Git's per-file diff, icon copying and the
   // copied client's reconnect ask for every Session row, the token bill's three usage reads, the menu's stop and the
   // compaction comparison, the seven verification words, the Settings page's capacity read, two default-model words and two work-gate words, the three words that
@@ -319,7 +318,7 @@ test("one word, one list, and every route names a word the table carries", () =>
   // An opened waiting Session's one row, asked when its question has not come.
   assert.ok("sessions.row" in CARRIED)
   assert.ok("session-snippets" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 162)
+  assert.equal(Object.keys(CARRIED).length, 161)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {
@@ -386,7 +385,6 @@ test("a route this console does not carry is refused by the word it stands for",
   // Retired v1 board reads have no Cloud word; current reads still do.
   assert.equal(uncarriedWordOf("GET", "/v1/work/board"), "")
   assert.match(notCarriedDetail("GET", "/v1/work/board"), /is not carried over Clawdline Cloud/)
-  assert.equal(uncarriedWordOf("GET", "/v1/timeline?project=p"), "", "a Project's timeline is carried")
   // Both a schedule in full and the schedule list are carried. The detail
   // sheet therefore reaches the selected machine instead of manufacturing a
   // Cloud refusal before it can show webhook state.

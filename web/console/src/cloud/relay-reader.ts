@@ -1363,18 +1363,6 @@ export class RelayReader {
         case "/v1/project-sync/mirror":
           this.only(url, path)
           return await this.machineRead(init?.signal, method, path, "project-mirror", {})
-        case "/v1/timeline": {
-          // `upcoming` is a filter with two meanings and the page sends it
-          // every time; the rest are left as the page left them, because this
-          // route reads an absent `environment` as production and an empty one
-          // as a refusal (`internal/transport/http/timeline.go`).
-          const q = this.only(url, path, "project", "entry", "cursor", "environment", "category", "upcoming")
-          return await this.machineRead(init?.signal, method, path, "timeline", {
-            project: q.project ?? "", entry: q.entry ?? "", cursor: q.cursor ?? "",
-            environment: q.environment ?? "", category: q.category ?? "",
-            upcoming: q.upcoming !== "false",
-          })
-        }
         case "/v1/strings": {
           // The words are the bundle's own file, not the machine's (`cloud/strings.ts`):
           // they belong to the screen and the screen is here. An empty answer

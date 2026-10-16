@@ -11,11 +11,6 @@ import { documentIdentityForSession } from "../legacy/js/net/document-links.js"
 import { arrangeSessions } from "../session/order.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { RelayReader, headerReadDiagnostics, ROW_RESTATE_MS, TRANSCRIPT_LINE_REREAD_MS, TRANSCRIPT_MAX_REUSE_MS, type CloudEvent, type CloudIdentity, type CloudReadClient, type CloudRow, type CloudSchedules, type CloudSnippets } from "./relay-reader.ts"
-import { failureFromMac } from "../legacy/js/net/cloud-failure.js"
-import { CatalogCloudClient } from "./refusal-client.js"
-import japanese from "../../public/catalogs/ja.json" with { type: "json" }
-// @ts-expect-error -- Node runs the source test with type stripping.
-import { activateCatalog, catalogRefusalDetail, resetCatalogForTest } from "../catalog.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { acceptSnapshot } from "../../../core/src/fleet-accept.ts"
 
@@ -1215,39 +1210,6 @@ test("the machine's refusal stays typed; a timeout is nobody answering", async (
   await assert.rejects(r.fetch("/v1/transcript?session=slow"), /cloud_read_timeout/)
 })
 
-test("a signed Cloud read keeps its explicit detail key without trusting raw lookalikes", async () => {
-  const message = "A timeline is one Project's; name it with ?project=."
-  const key = "http.e5a8008cc3310596"
-  const verified = new CatalogCloudClient({ relayURL: "wss://relay.example.test/v1/connect", deviceToken: "fixture" })
-  let signed: Error | null = null
-  verified.events((event: { type?: string; error?: Error }) => { if (event.type === "read") signed = event.error ?? null })
-  verified._applySnapshot({ kind: "transcript", machine: "mac-a", session: "s1" }, {
-    read: "read:timeline", status: 400,
-    error: { code: "project_required", layer: "mac_route", message, detail_key: key },
-  }, { seq: 5, ts: "2026-10-07T00:00:00Z" }, false)
-  assert.ok(signed, "the copied CloudClient emitted its parsed refusal")
-  const client = new FakeClient()
-  client.readAnswer = async () => { throw signed }
-  const r = reader(client, { t: 1000 })
-  const keyed = await body<{ error: string; detail: string; detail_key?: string }>(await r.fetch("/v1/timeline?upcoming=true"))
-  assert.deepEqual([keyed.error, keyed.detail, keyed.detail_key], ["project_required", message, key])
-  const oldDocument = globalThis.document
-  Object.defineProperty(globalThis, "document", { configurable: true, value: { documentElement: { lang: "en", dir: "ltr", setAttribute() {} } } })
-  try {
-    assert.equal(activateCatalog(japanese, "ja"), "ja")
-    assert.deepEqual(catalogRefusalDetail(keyed), { text: japanese[key], lang: "ja" })
-  } finally {
-    resetCatalogForTest()
-    Object.defineProperty(globalThis, "document", { configurable: true, value: oldDocument })
-  }
-
-  const raw = failureFromMac({ code: "project_required", layer: "mac_route", message }, 400, null)
-  ;(raw as Error & { detailKey?: string }).detailKey = key
-  client.readAnswer = async () => { throw raw }
-  const untrusted = await body<{ detail_key?: string }>(await r.fetch("/v1/timeline?upcoming=true"))
-  assert.equal(untrusted.detail_key, undefined)
-})
-
 // The Mac's channel filled and the answer could not leave. What the page gets
 // back is that sentence, at once, with the bound it met — not sixty seconds of
 // "loading" and then `cloud_read_timeout`, which was the whole of it before:
@@ -1677,19 +1639,9 @@ const CARRIED_READS: [string, string, Record<string, unknown>][] = [
     "board.items",
     { project: "p1", audience: "agent", cursor: 60, limit: 90 },
   ],
-  [
-    "/v1/timeline?project=clawdline-go&upcoming=false",
-    "timeline",
-    { project: "clawdline-go", entry: "", cursor: "", environment: "", category: "", upcoming: false },
-  ],
-  [
-    "/v1/timeline?project=clawdline-go&environment=staging&category=feature&upcoming=true",
-    "timeline",
-    { project: "clawdline-go", entry: "", cursor: "", environment: "staging", category: "feature", upcoming: true },
-  ],
 ]
 
-test("the work system, the projects and the timeline reach the machine as their own words", async () => {
+test("the work system and projects reach the machine as their own words", async () => {
   for (const [path, word, sent] of CARRIED_READS) {
     const client = new FakeClient()
     const r = reader(client, { t: 1000 })
@@ -1790,21 +1742,6 @@ test("a client with no generic read refuses each word by name rather than throwi
     assert.equal(refusal.error, "cloud_not_carried", path)
     assert.match(refusal.detail, new RegExp(word.replace(".", "\\.")), path + " did not name the word")
   }
-})
-
-test("a refusal from the machine's own route stays that route's refusal", async () => {
-  const client = new FakeClient()
-  client.readAnswer = async () => {
-    throw Object.assign(new Error("A timeline is one Project's; name it with ?project=."), {
-      code: "project_required",
-      status: 400,
-    })
-  }
-  const r = reader(client, { t: 1000 })
-  const res = await r.fetch("/v1/timeline?upcoming=true")
-  assert.equal(res.status, 400, "the machine's own status is what the page sees")
-  const refusal = await body<{ error: string }>(res)
-  assert.equal(refusal.error, "project_required", "a route's refusal is not turned into a seam refusal")
 })
 
 test("squad reads carry exact scope, binding and cursor fields to the chosen machine", async () => {

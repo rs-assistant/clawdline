@@ -629,49 +629,6 @@ func init() {
 				return LocalRequest{Method: "DELETE", Path: "/v1/projects/" + segment(p.project) + "/worktrees/" + segment(p.id)}
 			}},
 
-		op{name: "timeline", read: true,
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "project", "entry", "cursor",
-					"environment", "category", "upcoming") {
-					return plan{}, false
-				}
-				p, ok := machinePlan(b)
-				if !ok {
-					return plan{}, false
-				}
-				project, projectOK := b.str("project")
-				entry, entryOK := b.str("entry")
-				cursor, cursorOK := b.str("cursor")
-				environment, environmentOK := b.str("environment")
-				category, categoryOK := b.str("category")
-				upcoming, upcomingOK := b.boolean("upcoming")
-				if !projectOK || !entryOK || !cursorOK || !environmentOK || !categoryOK || !upcomingOK ||
-					len(project) > 200 || len(entry) > 200 || len(cursor) > 20 ||
-					len(environment) > 32 || len(category) > 32 {
-					return plan{}, false
-				}
-				p.project, p.entry, p.cursor = project, entry, cursor
-				p.environment, p.category, p.upcoming = environment, category, upcoming
-				return p, true
-			},
-			// `upcoming` is sent every time and both values mean something —
-			// the route's default is on and the page's filter turns it off —
-			// so it is not in `someOf`. The rest are left out when empty,
-			// because this route reads an absent parameter and an empty one
-			// differently (`environment` defaults to production; an empty one
-			// would be refused `bad_environment`).
-			route: func(p plan) LocalRequest {
-				query := someOf(map[string]string{
-					"project": p.project, "entry": p.entry, "cursor": p.cursor,
-					"environment": p.environment, "category": p.category,
-				})
-				query["upcoming"] = "false"
-				if p.upcoming {
-					query["upcoming"] = "true"
-				}
-				return LocalRequest{Method: "GET", Path: "/v1/timeline", Query: query}
-			}},
-
 		// The capacity block on the Settings page (docs/limits.md §4.5 "the
 		// screen"): every row of the register and the dead letters. A capacity
 		// push names that block, and the person reads it on the phone that got
