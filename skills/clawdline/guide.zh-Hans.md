@@ -12,6 +12,8 @@
 在本指南中，**步骤**是工作项目检查清单中的一条，任务的 **writes** 是它可以修改的路径，
 **assignment** 表示工作项目的负责人，**部分**是本指南中具名的一段内容。
 
+**私有 tmux 实验：**每条命令（包括 `kill-server`）都使用 `env -u TMUX tmux -S <私有绝对 socket 路径> ...`，并在删除 socket 目录前关闭该 server。在 pane 中，`TMUX_TMPDIR` 不会覆盖 `$TMUX`。2026-10-16 曾因清理命令漏掉 `-S`，误杀主 server，使 15 个 Session 中断。`clawdline tmux` 会拒绝没有明确私有 `-S` socket 的大范围删除命令。
+
 ## 0. 如果你从 Swift 应用程序认识 Clawdline，请先阅读这里
 
 Swift 应用程序已于 2026-09-19 退役：它已停止运作，不再于登录时启动，端口 7717 也不再有回应。

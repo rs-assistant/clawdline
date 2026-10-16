@@ -15,6 +15,8 @@
 這份指南裡，項目清單的一列叫 **step**，task 可以改的路徑叫它的 **writes**，項目歸誰負責叫
 **指派**，這份指南可單獨印出的一段叫 **part**。
 
+**私有 tmux 實驗：**每個命令（包括 `kill-server`）都用 `env -u TMUX tmux -S <私有絕對 socket 路徑> ...`，並在移除 socket 目錄前關閉該 server。在 pane 內，`TMUX_TMPDIR` 不會覆蓋 `$TMUX`。2026-10-16 曾因清理命令漏了 `-S`，誤殺主 server，使 15 個 Session 中斷。`clawdline tmux` 會拒絕沒有明確私有 `-S` socket 的大範圍刪除命令。
+
 ## 0. 如果你是從 Swift app 學會 Clawdline 的，先讀這段
 
 Swift app 已於 2026-09-19 退役：它被停掉、取消了登入時啟動，port 7717 沒有人在聽。它的目錄

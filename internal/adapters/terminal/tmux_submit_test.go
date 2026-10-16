@@ -129,7 +129,7 @@ func composerStub(logPath, mode string) {
 
 // privateTmux starts a tmux server nobody else uses, with one pane running
 // the composer stub, and answers the pane and the stub's log.
-func privateTmux(t *testing.T, mode string) (session.Session, string) {
+func privateTmux(t *testing.T, mode string) (session.Session, string, *Tmux) {
 	t.Helper()
 	bin, err := exec.LookPath("tmux")
 	if err != nil {
@@ -143,7 +143,7 @@ func privateTmux(t *testing.T, mode string) (session.Session, string) {
 	t.Setenv("TMUX", "")
 	os.Unsetenv("TMUX")
 	os.Unsetenv("TMUX_PANE")
-	t.Setenv("TMUX_TMPDIR", dir)
+	sock := filepath.Join(dir, "private.sock")
 	// tmux runs the pane's command through $SHELL. A service account's is
 	// /usr/sbin/nologin, which refuses it, and the stub never ran: measured on
 	// the Linux host's release build, where this test was red on every commit.
@@ -155,24 +155,24 @@ func privateTmux(t *testing.T, mode string) (session.Session, string) {
 	}
 	command := fmt.Sprintf("stty raw -echo; exec env %s=%s %s=%s %s -test.run '^TestComposerStubProgram$'",
 		stubLogEnv, logPath, stubModeEnv, mode, self)
-	out, err := exec.Command(bin, "-f", "/dev/null", "new-session", "-d", "-x", "160", "-y", "40",
+	out, err := exec.Command(bin, "-S", sock, "-f", "/dev/null", "new-session", "-d", "-x", "160", "-y", "40",
 		"-P", "-F", "#{pane_id}", command).Output()
 	if err != nil {
 		t.Skipf("could not start a private tmux server: %v", err)
 	}
-	t.Cleanup(func() { exec.Command(bin, "kill-server").Run() })
+	t.Cleanup(func() { exec.Command(bin, "-S", sock, "kill-server").Run() })
 	pane := session.Session{ID: strings.TrimSpace(string(out)), Backend: session.BackendTmux}
 	// Wait for the stub to draw its composer, which is also the moment it
 	// has asked for bracketed paste.
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		if screen, ok := NewTmux().Capture(context.Background(), pane); ok && strings.Contains(screen, "❯") {
-			return pane, logPath
+		if screen, ok := (&Tmux{Binary: bin, Socket: sock}).Capture(context.Background(), pane); ok && strings.Contains(screen, "❯") {
+			return pane, logPath, &Tmux{Binary: bin, Socket: sock}
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
 	t.Fatal("the stub never drew its composer")
-	return pane, logPath
+	return pane, logPath, &Tmux{Binary: bin, Socket: sock}
 }
 
 func stubEvents(t *testing.T, logPath string) []stubEvent {
@@ -211,12 +211,12 @@ func noticeSizedLine() string {
 // framed composer whose screen has not caught up with the first Enter; after
 // the stub has submitted the line, those bounded follow-up Enters are empty.
 func TestTmuxSendSubmitsANoticeSizedLineWhole(t *testing.T) {
-	pane, logPath := privateTmux(t, "")
+	pane, logPath, client := privateTmux(t, "")
 	text := noticeSizedLine()
 	if len(text) != 1045 {
 		t.Fatalf("the line is %d bytes, want 1045", len(text))
 	}
-	if err := NewTmux().Send(context.Background(), pane, text); err != nil {
+	if err := client.Send(context.Background(), pane, text); err != nil {
 		t.Fatalf("send: %v", err)
 	}
 	var submitted []string
@@ -259,11 +259,11 @@ func TestTmuxSendSubmitsANoticeSizedLineWhole(t *testing.T) {
 // A program that reads the paste and never shows it is never sent an Enter:
 // Send answers Unsubmitted, and no Return byte reaches the program at all.
 func TestTmuxSendPressesNoEnterUntilThePaneShowsTheText(t *testing.T) {
-	pane, logPath := privateTmux(t, "blind")
+	pane, logPath, client := privateTmux(t, "blind")
 	defer func(was time.Duration) { sendConfirm = was }(sendConfirm)
 	sendConfirm = 800 * time.Millisecond
 	text := "please read the briefing 0123456789abcdef0123456789abcdef"
-	err := NewTmux().Send(context.Background(), pane, text)
+	err := client.Send(context.Background(), pane, text)
 	var unsubmitted Unsubmitted
 	if !errors.As(err, &unsubmitted) {
 		t.Fatalf("send to a program that never showed the text answered %T %v, want Unsubmitted", err, err)
