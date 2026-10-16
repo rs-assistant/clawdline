@@ -27,6 +27,13 @@ test("a trigger-only body sends trigger_only and none of at, days and on", () =>
   assert.deepEqual(scheduleWhenFields(false, "09:00", "daily"), { at: "09:00", days: "daily" })
 })
 
+test("a one-shot save sends its date and no days, so it stays a one-shot", () => {
+  const fields = scheduleWhenFields(false, "09:00", "daily", "2026-10-17")
+  assert.deepEqual(fields, { at: "09:00", on: "2026-10-17" })
+  assert.equal("days" in fields, false)
+  assert.deepEqual(scheduleWhenFields(true, "09:00", "daily", "2026-10-17"), { trigger_only: true })
+})
+
 test("a schedule keeps its named zone and a legacy one takes the browser zone", () => {
   assert.equal(scheduleTimeZone("Asia/Taipei", "America/New_York"), "Asia/Taipei")
   assert.equal(scheduleTimeZone(undefined, "Asia/Taipei"), "Asia/Taipei")
