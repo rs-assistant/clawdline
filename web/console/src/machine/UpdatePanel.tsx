@@ -97,6 +97,9 @@ export function UpdatePanel({ shown }: { shown: boolean }) {
   const read = useSyncExternalStore(subscribeUpdate, currentUpdateRead, currentUpdateRead)
   const last = useRef<UpdateStatus | null>(null)
   if (read?.kind === "status") last.current = read.status
+  // A fresh check — after a machine switch, or the page waking — answers for the
+  // machine now read; what was kept from before is not shown meanwhile.
+  else if (read?.kind === "checking") last.current = null
   const [following, setFollowing] = useState(false)
   const [sending, setSending] = useState(false)
   const [pressRefused, setPressRefused] = useState<{ code: string; detail: string } | null>(null)

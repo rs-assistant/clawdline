@@ -1,4 +1,5 @@
 import { followFleetFrom, followFleetWriteAccess } from "../client.js"
+import { readingThrough } from "./machine-switch.js"
 import { carryPictures } from "../legacy/images-bridge.js"
 import type { StreamHandle, StreamHandlers, StreamTransport } from "@clawdline/core"
 import type { RelayReader } from "./relay-reader.js"
@@ -45,6 +46,7 @@ const changingFleet: StreamTransport = {
 
 export function readThroughRelay(reader: RelayReader): void {
   activeReader = reader
+  readingThrough(reader)
   if (networkFetch) {
     for (const slot of fleetListeners) {
       slot.handle.close()

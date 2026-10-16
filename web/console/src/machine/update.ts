@@ -1,4 +1,5 @@
 import { client } from "../client.js"
+import { onMachineChanged } from "../cloud/machine-switch.js"
 import { isDifferentBuild } from "../build-freshness.js"
 import { classifyApplyAnswer, classifyDevReleaseAnswer, classifyUpdateRead, createUpdateReadStore, type Answer, type ApplyAnswer, type DevReleaseAnswer, type UpdateRead } from "./update-model.js"
 
@@ -104,6 +105,10 @@ const store = createUpdateReadStore(readUpdate, {
   setInterval: (listener, ms) => setInterval(listener, ms),
   clearInterval: (timer) => clearInterval(timer),
 })
+
+// Another machine's status is not this one's: a switch asks the new machine
+// at once, and an answer the old one sends late is dropped (recheck).
+onMachineChanged(() => { void store.recheck() })
 
 /** Read now while visible; a read already on the wire is shared rather than doubled. */
 export function refreshUpdate(): Promise<UpdateRead | null> {
