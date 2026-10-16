@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5305,
-  "riskKeys": 2340,
-  "nonRiskCount": 2965,
+  "englishContentKeys": 5322,
+  "riskKeys": 2347,
+  "nonRiskCount": 2975,
   "groups": [
     {
       "name": "bar / other",
@@ -2364,6 +2364,25 @@
         "next.terminalTerminateSucceeded",
         "next.terminalUnavailableOld",
         "next.terminalViewOnly"
+      ]
+    },
+    {
+      "name": "plan / other",
+      "count": 10,
+      "sources": [
+        null
+      ],
+      "keys": [
+        "plan.active",
+        "plan.control",
+        "plan.current",
+        "plan.freePitch",
+        "plan.heading",
+        "plan.lede",
+        "plan.perMonth",
+        "plan.proBilling",
+        "plan.push",
+        "plan.recommended"
       ]
     },
     {

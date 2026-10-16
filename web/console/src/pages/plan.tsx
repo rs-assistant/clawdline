@@ -3,6 +3,7 @@ import type { PageModule } from "./types.js"
 import { bindPlan, type PlanPage } from "../legacy/plan-bridge.js"
 import { useCloudAccount } from "../cloud/account-context.js"
 import sectionMarkup from "./plan/section.html?raw"
+import "./plan/offers.css"
 
 /**
  * The Plan page: `section#plan` in the Swift app's `index.html`, drawn by its
