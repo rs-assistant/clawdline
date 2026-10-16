@@ -8,11 +8,21 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see `order.test.ts`.
-import { ACTION_WIDTH, actionWidth, archivable, BOTH_WIDTH, BUTTON_WIDTH, offsetFor, revealFor, settleOpen, Swipes, type RevealWords } from "./swipe.ts"
+import { ACTION_WIDTH, actionWidth, archivable, BOTH_WIDTH, BUTTON_WIDTH, offsetFor, revealFor, richSessionSwipeActions, sessionSwipeActions, settleOpen, Swipes, type RevealWords } from "./swipe.ts"
 
 const WORDS: RevealWords = {
   end: "關閉 Session",
 }
+
+test("single-machine and fleet actions use the same current-row rule", () => {
+  assert.deepEqual(richSessionSwipeActions({ source: { freshness: "current" }, sessionId: "conversation" }),
+    sessionSwipeActions("current", "conversation"))
+  assert.deepEqual(richSessionSwipeActions({ source: { freshness: "unverified" }, sessionId: "conversation" }),
+    sessionSwipeActions("stale", "conversation"))
+  assert.deepEqual(richSessionSwipeActions({ source: { freshness: "missing" }, sessionId: "conversation" }),
+    sessionSwipeActions("unknown", "conversation"))
+  assert.deepEqual(sessionSwipeActions("current", ""), { close: true, archive: false })
+})
 
 test("a row only moves the way there is something to uncover", () => {
   assert.equal(offsetFor(0, 0), 0)
