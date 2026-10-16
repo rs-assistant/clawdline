@@ -33,18 +33,18 @@ func TestNewTmuxPaneDoesNotInheritAssistantIdentityFromServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	t.Setenv("TMUX_TMPDIR", dir)
+	sock := filepath.Join(dir, "private.sock")
 	t.Setenv("TMUX", "")
 	t.Setenv("TMUX_PANE", "")
 	for _, key := range []string{"CLAUDE_CODE_SESSION_ID", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_THREAD_ID", "CODEX_SESSION_ID", "CLAWDLINE_SQUAD_CAPABILITY_FILE"} {
 		t.Setenv(key, "leaked")
 	}
-	defer exec.Command(bin, "kill-server").Run()
+	defer exec.Command(bin, "-S", sock, "kill-server").Run()
 	ctx := context.Background()
-	if _, err := runTmux(ctx, TmuxChoice{Path: bin}, "new-session", "-d", "-s", "seed", "sleep 60"); err != nil {
+	if _, err := runTmux(ctx, TmuxChoice{Path: bin, Socket: sock}, "new-session", "-d", "-s", "seed", "sleep 60"); err != nil {
 		t.Skipf("could not start private tmux: %v", err)
 	}
-	initial, err := runTmux(ctx, TmuxChoice{Path: bin}, "show-environment", "-g")
+	initial, err := runTmux(ctx, TmuxChoice{Path: bin, Socket: sock}, "show-environment", "-g")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,15 +56,15 @@ func TestNewTmuxPaneDoesNotInheritAssistantIdentityFromServer(t *testing.T) {
 	}
 	// A server may have been started by an older daemon or an assistant.
 	for _, key := range []string{"CLAUDE_CODE_SESSION_ID", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_THREAD_ID", "CODEX_SESSION_ID", "CLAWDLINE_SQUAD_CAPABILITY_FILE"} {
-		if out, err := exec.Command(bin, "set-environment", "-g", key, "leaked").CombinedOutput(); err != nil {
+		if out, err := exec.Command(bin, "-S", sock, "set-environment", "-g", key, "leaked").CombinedOutput(); err != nil {
 			t.Fatalf("seed %s: %v: %s", key, err, out)
 		}
 	}
-	if err := clearTmuxAssistantIdentity(ctx, TmuxChoice{Path: bin}); err != nil {
+	if err := clearTmuxAssistantIdentity(ctx, TmuxChoice{Path: bin, Socket: sock}); err != nil {
 		t.Fatal(err)
 	}
 	output := filepath.Join(dir, "pane-env")
-	if _, err := runTmux(ctx, TmuxChoice{Path: bin}, "new-window", "-d", "-t", "seed:", "env > "+output); err != nil {
+	if _, err := runTmux(ctx, TmuxChoice{Path: bin, Socket: sock}, "new-window", "-d", "-t", "seed:", "env > "+output); err != nil {
 		t.Fatal(err)
 	}
 	var data []byte
@@ -84,14 +84,14 @@ func TestNewTmuxPaneDoesNotInheritAssistantIdentityFromServer(t *testing.T) {
 			t.Errorf("pane inherited %s", key)
 		}
 	}
-	if out, err := exec.Command(bin, "set-environment", "-t", "seed", "CLAUDE_CODE_SESSION_ID", "stale-session").CombinedOutput(); err != nil {
+	if out, err := exec.Command(bin, "-S", sock, "set-environment", "-t", "seed", "CLAUDE_CODE_SESSION_ID", "stale-session").CombinedOutput(); err != nil {
 		t.Fatalf("seed session identity: %v: %s", err, out)
 	}
-	if out, err := exec.Command(bin, "set-environment", "-t", "seed", "CLAWDLINE_SQUAD_CAPABILITY_FILE", "/stale").CombinedOutput(); err != nil {
+	if out, err := exec.Command(bin, "-S", sock, "set-environment", "-t", "seed", "CLAWDLINE_SQUAD_CAPABILITY_FILE", "/stale").CombinedOutput(); err != nil {
 		t.Fatalf("seed session capability: %v: %s", err, out)
 	}
 	windowOutput := filepath.Join(dir, "window-env")
-	launcher := Launcher{Tmux: &Tmux{Binary: bin}}
+	launcher := Launcher{Tmux: &Tmux{Binary: bin, Socket: sock}}
 	if _, err := launcher.NewTmuxWindow(ctx, dir, "env > "+windowOutput); err != nil {
 		t.Fatal(err)
 	}
@@ -130,15 +130,15 @@ func TestANewPaneShowsALaunchLineThatIsNotASCII(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	t.Setenv("TMUX_TMPDIR", dir)
+	sock := filepath.Join(dir, "private.sock")
 	t.Setenv("TMUX", "")
 	t.Setenv("TMUX_PANE", "")
 	t.Setenv("SHELL", "/bin/sh")
 	for _, key := range []string{"LANG", "LC_ALL", "LC_CTYPE"} {
 		t.Setenv(key, "")
 	}
-	defer exec.Command(bin, "kill-server").Run()
-	launcher := Launcher{Tmux: &Tmux{Binary: bin}}
+	defer exec.Command(bin, "-S", sock, "kill-server").Run()
+	launcher := Launcher{Tmux: &Tmux{Binary: bin, Socket: sock}}
 	if _, err := launcher.NewTmuxSession(context.Background(), dir, "cl-utf8", `: '{"language":"繁體中文"}'`); err != nil {
 		t.Fatalf("a launch line that is not ASCII did not start: %v", err)
 	}

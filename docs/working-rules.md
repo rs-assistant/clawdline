@@ -198,10 +198,13 @@ of it.
   seven and a half hours. The console is back when `GET /` answers 200, or when the line under
   `listening` in `logs/daemon.log` says `console: served from …`.
 - **Kills its own tmux server before removing the directory it lives in.** A drill that gives
-  tmux a private `TMUX_TMPDIR` (or `-S` socket) owns that server; deleting the directory removes
+  tmux a private `-S` socket owns that server; deleting the directory removes
   the socket and leaves the server and every assistant inside it running, unreachable. On
   2026-10-07 an install drill removed its scratch home this way and left two real `claude`
   processes running for two days; the person's fleet list showed them as dashed rows reading
   "terminal unreachable" until they were closed by hand. In the drill's exit trap, run
-  `tmux -S <its socket> kill-server` (or `TMUX_TMPDIR=<dir> tmux kill-server`) first, then
-  remove the directory.
+  `env -u TMUX tmux -S <its socket> kill-server` first, then remove the directory.
+  Every command in the drill must name the same absolute socket with `-S`. Inside a tmux
+  pane, `$TMUX` overrides `TMUX_TMPDIR`: on 2026-10-16, a cleanup command that set only
+  `TMUX_TMPDIR` killed the main server and disconnected 15 Sessions. `clawdline tmux`
+  now refuses server-wide deletion unless the caller names a private absolute socket.

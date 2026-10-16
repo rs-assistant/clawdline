@@ -16,6 +16,8 @@ En esta guía, un **paso** (step) es una entrada de la lista de verificación de
 **escrituras** (writes) de una tarea son las rutas que puede cambiar, la **asignación**
 (assignment) es quién es dueño de un ítem, y una **parte** es un fragmento con nombre de esta guía.
 
+**Experimentos privados con tmux:** usa `env -u TMUX tmux -S <ruta absoluta del socket privado> ...` en cada comando, incluido `kill-server`, y detén ese servidor antes de borrar su directorio. Dentro de un pane, `TMUX_TMPDIR` no prevalece sobre `$TMUX`. El 2026-10-16, un comando sin `-S` detuvo el servidor principal y desconectó 15 Sessions. `clawdline tmux` rechaza borrados globales sin un socket privado `-S` explícito.
+
 ## 0. Si aprendiste Clawdline con la app Swift, lee esto primero
 
 La app Swift se retiró el 2026-09-19: está detenida, ya no arranca al iniciar sesión y nada

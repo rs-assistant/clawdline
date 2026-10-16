@@ -34,7 +34,6 @@ func realTermFixture(t *testing.T) *termFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("TMUX_TMPDIR", dir)
 	host, err := owned.New(dir)
 	if err != nil {
 		t.Fatal(err)

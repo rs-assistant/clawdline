@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -29,14 +28,14 @@ func TestInventoryListsPanesUnderTheCLocale(t *testing.T) {
 	t.Setenv("TMUX_PANE", "")
 	os.Unsetenv("TMUX")
 	os.Unsetenv("TMUX_PANE")
-	t.Setenv("TMUX_TMPDIR", dir)
-	start := exec.Command(bin, "new-session", "-d", "-s", "t", "-c", dir, "sleep", "30")
+	sock := filepath.Join(dir, "private.sock")
+	start := exec.Command(bin, "-S", sock, "new-session", "-d", "-s", "t", "-c", dir, "sleep", "30")
 	if out, err := start.CombinedOutput(); err != nil {
 		t.Skipf("could not start a private tmux server: %v %s", err, out)
 	}
-	defer exec.Command(bin, "kill-server").Run()
+	defer exec.Command(bin, "-S", sock, "kill-server").Run()
 
-	inv, err := NewTmux().Inventory(context.Background())
+	inv, err := (&Tmux{Binary: bin, Socket: sock}).Inventory(context.Background())
 	if err != nil || !inv.Complete {
 		t.Fatalf("err=%v inv=%+v", err, inv)
 	}
@@ -75,7 +74,8 @@ func TestOnlyNoServerIsAnEmptyListing(t *testing.T) {
 // A listing that fails for any reason but "no server" is incomplete, and says
 // why. Runs tmux against a socket directory it refuses.
 func TestAFailedListingIsIncomplete(t *testing.T) {
-	if _, err := exec.LookPath("tmux"); err != nil {
+	bin, err := exec.LookPath("tmux")
+	if err != nil {
 		t.Skip("no tmux")
 	}
 	dir, err := os.MkdirTemp("/tmp", "clawdline-tmux-bad-")
@@ -83,18 +83,12 @@ func TestAFailedListingIsIncomplete(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	sock := filepath.Join(dir, "tmux-"+strconv.Itoa(os.Getuid()))
-	if err := os.MkdirAll(sock, 0o777); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(sock, 0o777); err != nil {
-		t.Fatal(err)
-	}
 	t.Setenv("TMUX", "")
-	os.Unsetenv("TMUX")
-	os.Unsetenv("TMUX_PANE")
-	t.Setenv("TMUX_TMPDIR", dir)
-	inv, err := NewTmux().Inventory(context.Background())
+	t.Setenv("TMUX_PANE", "")
+	// -S names an existing directory, which tmux cannot use as a socket.
+	// This provokes an error without consulting the default server.
+	sock := dir
+	inv, err := (&Tmux{Binary: bin, Socket: sock}).Inventory(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,23 +112,23 @@ func TestCloseTmuxSessionClosesOnlyWhatItsPaneProves(t *testing.T) {
 	t.Setenv("TMUX", "")
 	os.Unsetenv("TMUX")
 	os.Unsetenv("TMUX_PANE")
-	t.Setenv("TMUX_TMPDIR", dir)
+	sock := filepath.Join(dir, "private.sock")
 	open := func(name string) string {
-		out, err := exec.Command(bin, "new-session", "-d", "-s", name, "-P", "-F", "#{pane_id}", "sleep", "60").Output()
+		out, err := exec.Command(bin, "-S", sock, "new-session", "-d", "-s", name, "-P", "-F", "#{pane_id}", "sleep", "60").Output()
 		if err != nil {
 			t.Skipf("could not start a private tmux server: %v", err)
 		}
 		return strings.TrimSpace(string(out))
 	}
-	defer exec.Command(bin, "kill-server").Run()
+	defer exec.Command(bin, "-S", sock, "kill-server").Run()
 	ours := open("clawdline-task-aaaaaaaa")
 	// Another session whose name starts with ours: a close by name would
 	// reach it by prefix; the close by id cannot.
 	other := open("clawdline-task-aaaaaaaa-other")
 	alive := func(name string) bool {
-		return exec.Command(bin, "has-session", "-t", "="+name).Run() == nil
+		return exec.Command(bin, "-S", sock, "has-session", "-t", "="+name).Run() == nil
 	}
-	l := NewLauncher()
+	l := Launcher{Tmux: &Tmux{Binary: bin, Socket: sock}}
 	ctx := context.Background()
 
 	if closed, err := l.CloseTmuxSession(ctx, other, "clawdline-task-aaaaaaaa"); closed || err != nil {
@@ -174,22 +168,22 @@ func TestCloseTmuxSessionLeavesAWindowThatIsNotTheTasks(t *testing.T) {
 	t.Setenv("TMUX", "")
 	os.Unsetenv("TMUX")
 	os.Unsetenv("TMUX_PANE")
-	t.Setenv("TMUX_TMPDIR", dir)
+	sock := filepath.Join(dir, "private.sock")
 	const name = "clawdline-task-bbbbbbbb"
-	out, err := exec.Command(bin, "new-session", "-d", "-s", name, "-P", "-F", "#{pane_id}", "sleep", "60").Output()
+	out, err := exec.Command(bin, "-S", sock, "new-session", "-d", "-s", name, "-P", "-F", "#{pane_id}", "sleep", "60").Output()
 	if err != nil {
 		t.Skipf("could not start a private tmux server: %v", err)
 	}
-	defer exec.Command(bin, "kill-server").Run()
+	defer exec.Command(bin, "-S", sock, "kill-server").Run()
 	ours := strings.TrimSpace(string(out))
-	theirs, err := exec.Command(bin, "new-window", "-d", "-t", "="+name+":", "-P", "-F", "#{pane_id}", "sleep", "60").Output()
+	theirs, err := exec.Command(bin, "-S", sock, "new-window", "-d", "-t", "="+name+":", "-P", "-F", "#{pane_id}", "sleep", "60").Output()
 	if err != nil {
 		t.Fatalf("could not add a window: %v", err)
 	}
-	if closed, err := NewLauncher().CloseTmuxSession(context.Background(), ours, name); !closed || err != nil {
+	if closed, err := (Launcher{Tmux: &Tmux{Binary: bin, Socket: sock}}).CloseTmuxSession(context.Background(), ours, name); !closed || err != nil {
 		t.Fatalf("the proven pane closed=%v err=%v", closed, err)
 	}
-	panes, err := exec.Command(bin, "list-panes", "-a", "-F", "#{pane_id}").Output()
+	panes, err := exec.Command(bin, "-S", sock, "list-panes", "-a", "-F", "#{pane_id}").Output()
 	if err != nil {
 		t.Fatalf("the window that was not the task's went with it: %v", err)
 	}

@@ -104,14 +104,14 @@ func TestRevealWillNotSayYesWhenNobodyIsAttached(t *testing.T) {
 	t.Setenv("TMUX_PANE", "")
 	os.Unsetenv("TMUX")
 	os.Unsetenv("TMUX_PANE")
-	t.Setenv("TMUX_TMPDIR", dir)
-	start := exec.Command(bin, "new-session", "-d", "-s", "unwatched", "-c", dir, "sleep", "30")
+	sock := filepath.Join(dir, "private.sock")
+	start := exec.Command(bin, "-S", sock, "new-session", "-d", "-s", "unwatched", "-c", dir, "sleep", "30")
 	if out, err := start.CombinedOutput(); err != nil {
 		t.Skipf("could not start a private tmux server: %v %s", err, out)
 	}
-	defer exec.Command(bin, "kill-server").Run()
+	defer exec.Command(bin, "-S", sock, "kill-server").Run()
 
-	tmux := NewTmux()
+	tmux := (&Tmux{Binary: bin, Socket: sock})
 	inv, err := tmux.Inventory(context.Background())
 	if err != nil || len(inv.Sessions) != 1 {
 		t.Fatalf("err=%v sessions=%+v", err, inv.Sessions)
@@ -129,7 +129,7 @@ func TestRevealWillNotSayYesWhenNobodyIsAttached(t *testing.T) {
 	}
 	// The selection still happened: it is the answer that was wrong, not the
 	// act. The next client to attach arrives on that pane.
-	out, err := exec.Command(bin, "display-message", "-p", "#{pane_id}").Output()
+	out, err := exec.Command(bin, "-S", sock, "display-message", "-p", "#{pane_id}").Output()
 	if err != nil || strings.TrimSpace(string(out)) != inv.Sessions[0].ID {
 		t.Errorf("active pane %q (%v), want %q", strings.TrimSpace(string(out)), err, inv.Sessions[0].ID)
 	}

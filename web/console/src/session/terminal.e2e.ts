@@ -6,7 +6,7 @@
 //
 // Terminals are the daemon's own tmux server, so there is no stand-in here.
 // Start a throwaway daemon first — an empty CLAWDLINE_NEXT_DIR, a port other
-// than the one in use, a private TMUX_TMPDIR, one project — then:
+// than the one in use, a private terminal socket under that state directory, one project — then:
 //
 //   (cd web && npm run build)
 //   CLAWDLINE_TERMINAL_ORIGIN=http://127.0.0.1:<port> \

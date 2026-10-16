@@ -190,7 +190,7 @@ including `Fixed but not yet released (awaiting review)`, also goes before the f
   `CLAWDLINE_NEXT_DIR` of its own, never a copy of `~/.config/clawdline-next`.
 - Read `~/.config/clawdline` except where the code already does, or write it.
 - Stop a daemon by pattern: stop your own **by the PID** your `serve` printed.
-- Remove a private `TMUX_TMPDIR` or socket directory while its tmux server still runs: kill that
+- Remove a private tmux socket directory while its tmux server still runs: kill that
   server first, or its assistants keep running where nothing can reach them.
 - Confirm a restart with `/v1/health` alone: the console is back when `GET /` answers 200.
 

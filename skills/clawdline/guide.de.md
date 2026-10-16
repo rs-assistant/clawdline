@@ -18,6 +18,8 @@ In diesem Leitfaden ist ein **Schritt** ein Checklisteneintrag an einem Item, di
 Aufgabe sind die Pfade, die sie ändern darf, die **Zuweisung** sagt, wem ein Item gehört, und ein
 **Abschnitt** ist ein benanntes Stück dieses Leitfadens.
 
+**Private tmux-Experimente:** Verwende `env -u TMUX tmux -S <absoluter privater Socket-Pfad> ...` für jeden Befehl, auch `kill-server`, und beende den Server vor dem Löschen des Socket-Verzeichnisses. In einem Pane hat `$TMUX` Vorrang vor `TMUX_TMPDIR`. Am 2026-10-16 beendete ein Aufräumbefehl ohne `-S` den Hauptserver und trennte 15 Sessions. `clawdline tmux` verweigert serverweite Löschungen ohne expliziten privaten `-S`-Socket.
+
 ## 0. Wenn du Clawdline aus der Swift-App kennst, lies zuerst dies
 
 Die Swift-App wurde am 2026-09-19 außer Dienst gestellt: Sie ist gestoppt, startet nicht mehr bei der
