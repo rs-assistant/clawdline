@@ -2,7 +2,7 @@ import type { UpdateApplyState, UpdateState } from "@clawdline/contract"
 import type { CloudMachine } from "./copied.js"
 import type { CloudReadClient } from "./relay-reader.js"
 // @ts-expect-error -- Node runs source tests with type stripping.
-import { buildName, classifyUpdateRead, type UpdateRead } from "../machine/update-model.ts"
+import { buildName, cachedUpdateAfterFreshFailure, classifyUpdateRead, type UpdateRead } from "../machine/update-model.ts"
 
 /**
  * The fleet picker reads each paired, online machine by its own encrypted
@@ -10,17 +10,23 @@ import { buildName, classifyUpdateRead, type UpdateRead } from "../machine/updat
  * A refused or unanswered read stays distinct from an older daemon.
  */
 export async function readFleetUpdate(client: CloudReadClient, machine: string, signal?: AbortSignal, fresh = false): Promise<UpdateRead> {
-  if (typeof client._machineRequest !== "function") return { kind: "refused" }
-  try {
-    const parsed = await client._machineRequest(machine, fresh ? "update-fresh" : "update", {}, "read", undefined, signal ? { signal } : undefined)
-    return classifyUpdateRead({ transport: "answered", status: 200, parsed })
-  } catch (error) {
-    const failure = error as { code?: unknown; status?: unknown }
-    const code = typeof failure?.code === "string" ? failure.code : ""
-    const status = typeof failure?.status === "number" && failure.status >= 400 && failure.status < 600
-      ? failure.status : 502
-    return classifyUpdateRead({ transport: "answered", status, parsed: { error: { code } } })
+  const request = client._machineRequest
+  if (typeof request !== "function") return { kind: "refused" }
+  const read = async (word: "update" | "update-fresh"): Promise<UpdateRead> => {
+    try {
+      const parsed = await request.call(client, machine, word, {}, "read", undefined, signal ? { signal } : undefined)
+      return classifyUpdateRead({ transport: "answered", status: 200, parsed })
+    } catch (error) {
+      const failure = error as { code?: unknown; status?: unknown }
+      const code = typeof failure?.code === "string" ? failure.code : ""
+      const status = typeof failure?.status === "number" && failure.status >= 400 && failure.status < 600
+        ? failure.status : 502
+      return classifyUpdateRead({ transport: "answered", status, parsed: { error: { code } } })
+    }
   }
+  const answer = await read(fresh ? "update-fresh" : "update")
+  return fresh && (answer.kind === "unreachable" || answer.kind === "refused")
+    ? cachedUpdateAfterFreshFailure(await read("update")) : answer
 }
 
 export interface FleetUpdateFacts {

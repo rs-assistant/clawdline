@@ -29,6 +29,10 @@ final class StagedAppWatcher {
     var inUse: () -> Bool = { true }
     /// Whether the console window is on screen.
     var consoleOnScreen: () -> Bool = { false }
+    /// The request seam lets the shell test launch and foreground behavior.
+    var load: (URLRequest, @escaping (Data?, URLResponse?, Error?) -> Void) -> Void = { request, done in
+        URLSession.shared.dataTask(with: request, completionHandler: done).resume()
+    }
 
     private let home: URL
     private let launchedAt = Date()
@@ -38,26 +42,29 @@ final class StagedAppWatcher {
     init(home: URL) { self.home = home }
 
     func start() {
-        guard serviceMode != nil else {
-            shellLog("update: not a service install; a staged app is left to the update banner")
-            return
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.firstLookSeconds) { [weak self] in self?.look() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.firstLookSeconds) { [weak self] in self?.look(fresh: true) }
+        guard serviceMode != nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: Self.pollSeconds, repeats: true) { [weak self] _ in
-            self?.look()
+            self?.look(fresh: false)
         }
     }
 
-    private func look() {
+    func becameActive() { look(fresh: true) }
+
+    private func look(fresh: Bool) {
         guard !restarting, let token = LocalToken.read() else { return }
-        var request = URLRequest(url: home.appendingPathComponent("v1/update"))
+        var request = URLRequest(url: home.appendingPathComponent(fresh ? "v1/update/fresh" : "v1/update"))
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 10
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
-            guard (response as? HTTPURLResponse)?.statusCode == 200, let data,
-                  let version = StagedApp.version(in: data) else { return }
-            DispatchQueue.main.async { self?.consider(version) }
-        }.resume()
+        request.timeoutInterval = fresh ? 12 : 10
+        load(request) { [weak self] data, response, _ in
+            if (response as? HTTPURLResponse)?.statusCode == 200, let data {
+                if let version = StagedApp.version(in: data) {
+                    DispatchQueue.main.async { self?.consider(version) }
+                }
+            } else if fresh {
+                self?.look(fresh: false)
+            }
+        }
     }
 
     private func consider(_ version: String) {

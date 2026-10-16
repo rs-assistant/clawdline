@@ -1,7 +1,7 @@
 import { client } from "../client.js"
 import { onMachineChanged } from "../cloud/machine-switch.js"
 import { isDifferentBuild } from "../build-freshness.js"
-import { classifyApplyAnswer, classifyDevReleaseAnswer, classifyUpdateRead, createUpdateReadStore, type Answer, type ApplyAnswer, type DevReleaseAnswer, type UpdateRead } from "./update-model.js"
+import { cachedUpdateAfterFreshFailure, classifyApplyAnswer, classifyDevReleaseAnswer, classifyUpdateRead, createUpdateReadStore, type Answer, type ApplyAnswer, type DevReleaseAnswer, type UpdateRead } from "./update-model.js"
 
 /**
  * `/v1/update` and `/v1/update/apply`, asked the way `read.ts` asks
@@ -14,8 +14,12 @@ import { classifyApplyAnswer, classifyDevReleaseAnswer, classifyUpdateRead, crea
  * answer comes back sorted (`update-model.ts`), and the panel says what that
  * means rather than 「讀取失敗」.
  */
-export function readUpdate(fresh = false): Promise<UpdateRead> {
-  return call("GET", fresh ? "/v1/update/fresh" : "/v1/update").then(classifyUpdateRead)
+export async function readUpdate(fresh = false): Promise<UpdateRead> {
+  const answer = classifyUpdateRead(await call("GET", fresh ? "/v1/update/fresh" : "/v1/update"))
+  if (fresh && (answer.kind === "unreachable" || answer.kind === "refused")) {
+    return cachedUpdateAfterFreshFailure(classifyUpdateRead(await call("GET", "/v1/update")))
+  }
+  return answer
 }
 
 /**
