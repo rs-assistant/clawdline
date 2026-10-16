@@ -6,12 +6,16 @@ Scope: the shipped Go daemon and React console at `070c9a0fc`, inspected by trac
 
 The Timeline page had no caller of `openTimeline`. The v1 Board link had been retired, and Settings sent its "Open timeline" button to Projects while its toggle stayed disabled. Its read projected broker task and Git landing records; no deployment producer could establish availability. The removal covers the React page and copied renderer, settings block, HTTP route, Cloud read word and relay mapping, JSON schema and generated contracts, capacity row, translations, and feature tests. The route removal raises the daemon API level from 10 to 11. Broker task records and landing evidence remain where their active consumers read them. The terminal receipt timeline and schedule webhook delivery timeline are separate active features.
 
-## Additional candidates
+## Follow-up cleanup: unused legacy copies
+
+The Project Board renderer and the Start and Schedule input copies were removed in the follow-up cleanup. The unused `input/schedule-history.js` copy was removed with them because it imported both deleted input modules; leaving it would preserve broken imports. The legacy-copy manifest and current source comments were updated. The live Board compatibility API and styles, React Start and Schedules pages, and their active bridges remain.
+
+## Additional candidates reviewed
 
 | Candidate | Evidence | Disposition |
 | --- | --- | --- |
-| Copied Project Board page renderer, `web/console/src/legacy/js/view/board.js` | It exports `bindBoardPage`; no runtime file imports or calls it. `web/console/src/legacy/board-bridge.ts` says the page is gone and serves Settings plus a Projects fallback. | Remove the renderer in a separate change after updating the legacy-copy manifest and checks. Keep `board-bridge.ts`, `GET/POST /v1/board`, and `legacy/board.css`: Settings and current pages still consume them. |
-| Copied Start and Schedule input modules, `web/console/src/legacy/js/input/start.js` and `input/schedule.js` | No runtime imports of these modules. `web/console/src/legacy/schedules-bridge.ts` explicitly describes the Schedule copy as a text reference for the React implementation; `session/Start.tsx` similarly references the Start copy. | These are dormant reference copies, not active flows. Decide whether the byte-locked legacy reference corpus remains a repository policy before deleting them; their React replacements are active. |
+| Copied Project Board page renderer, `web/console/src/legacy/js/view/board.js` | It exported `bindBoardPage`; no runtime file imported or called it. `web/console/src/legacy/board-bridge.ts` serves Settings plus a Projects fallback. | Removed. Kept `board-bridge.ts`, `GET/POST /v1/board`, and `legacy/board.css`: Settings and current pages still consume them. |
+| Copied Start and Schedule input modules, `web/console/src/legacy/js/input/start.js` and `input/schedule.js` | No runtime imports of these modules. `input/schedule-history.js` imported both but itself had no runtime entry. | Removed all three copies and their manifest pins. Their React replacements remain active. |
 | Project Timeline's historical docs and old inventories | `docs/timeline-design.md`, `docs/design-decisions.md`, and `docs/cutover.md` record the retired implementation and earlier decisions. Inventory snapshots still name old strings. | Keep historical records; update current status statements and regenerate inventories through their own tools. Do not present old design plans as current features. |
 
 ## Checked and retained
