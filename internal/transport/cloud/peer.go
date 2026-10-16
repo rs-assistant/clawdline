@@ -41,6 +41,12 @@ type peerFrame struct {
 	peercontract.Envelope
 }
 
+type peerTaskStartFrame struct {
+	Type            string `json:"type"`
+	SourcePublicKey string `json:"source_public_key,omitempty"`
+	peercontract.TaskStartEnvelope
+}
+
 type peerAck struct {
 	Type      string `json:"type"`
 	RequestID string `json:"request_id"`
@@ -77,7 +83,14 @@ func (l *Link) runPeer(ctx context.Context) {
 			return
 		case frame := <-l.peerRequests:
 			requestCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-			l.receivePeer(requestCtx, frame)
+			var header struct {
+				Type string `json:"type"`
+			}
+			if json.Unmarshal(frame, &header) == nil && header.Type == "peer_task_start_envelope" {
+				l.receivePeerTaskStart(requestCtx, frame)
+			} else {
+				l.receivePeer(requestCtx, frame)
+			}
 			cancel()
 		case frame := <-l.peerAcks:
 			l.recordPeerAck(ctx, frame)
@@ -99,6 +112,47 @@ func (l *Link) recordPeerAck(ctx context.Context, raw []byte) {
 	if err := st.MarkOutbox(ctx, ack.RequestID, "accepted", ack.Status); err != nil {
 		l.logf("cloud peer: could not record ack for %s: %v", ack.RequestID, err)
 	}
+}
+
+func (l *Link) receivePeerTaskStart(ctx context.Context, raw []byte) {
+	if l.opts.PeerReceipts == nil || l.opts.PeerTaskStartFacts == nil || l.opts.PeerTaskStartOpen == nil {
+		return
+	}
+	var frame peerTaskStartFrame
+	if json.Unmarshal(raw, &frame) != nil || frame.Type != "peer_task_start_envelope" ||
+		frame.Start.TargetMachineID != l.identity.MachineID {
+		return
+	}
+	st, err := peerstore.Open(l.keys.Dir())
+	if err != nil {
+		return
+	}
+	defer st.Close()
+	pair, err := st.Pair(ctx, frame.Start.PairID)
+	if err != nil || pair.TargetMachineID != l.identity.MachineID ||
+		pair.SourceMachineID != frame.Start.Source.MachineID || pair.TargetSignature == "" ||
+		!pair.RevokedAt.IsZero() || !l.opts.Now().Before(pair.ExpiresAt) {
+		return
+	}
+	signer, err := base64.StdEncoding.Strict().DecodeString(pair.SourcePublicKey)
+	if err != nil || len(signer) != ed25519.PublicKeySize {
+		return
+	}
+	private, err := ecdh.X25519().NewPrivateKey(pair.LocalPrivateKey)
+	if err != nil {
+		return
+	}
+	body, err := peercontract.OpenTaskStart(frame.TaskStartEnvelope, pairKeys(pair), private, signer)
+	if err != nil {
+		return
+	}
+	principal := peercontract.Principal{MachineID: pair.SourceMachineID,
+		KeyFingerprint: pair.SourceFingerprint, PairID: pair.ID, MachinePeer: true}
+	starter := peerapp.TaskStarter{Receipts: l.opts.PeerReceipts, Facts: l.opts.PeerTaskStartFacts,
+		Open: l.opts.PeerTaskStartOpen, Now: l.opts.Now}
+	result := starter.Start(ctx, frame.Start, body, principal)
+	l.logf("cloud peer task start: task %s machine execution %s code %s",
+		result.TaskID, result.MachineExecution, result.Code)
 }
 
 func (l *Link) receivePeer(ctx context.Context, raw []byte) {

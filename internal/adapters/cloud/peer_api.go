@@ -76,6 +76,15 @@ type PeerAuthorization struct {
 	ExpiresAt            string `json:"expires_at"`
 }
 
+type PeerTaskStartAuthorization struct {
+	Authorized           bool   `json:"authorized"`
+	SourcePublicKey      string `json:"source_public_key"`
+	SourceKeyFingerprint string `json:"source_key_fingerprint"`
+	TargetMachineID      string `json:"target_machine_id"`
+	PairID               string `json:"pair_id"`
+	ExpiresAt            string `json:"expires_at"`
+}
+
 func (c *AccountClient) StartPeerPair(ctx context.Context, credential string, input PeerPairStart) (PeerPair, error) {
 	var out PeerPair
 	err := c.post(ctx, "/v1/peer/pairs", credential, input, &out)
@@ -118,6 +127,15 @@ func (c *AccountClient) AuthorizePeer(ctx context.Context, credential string, re
 	var out PeerAuthorization
 	err := c.post(ctx, "/v1/peer/authorize", credential, map[string]any{
 		"request": request, "source_public_key": sourcePublicKey,
+	}, &out)
+	return out, err
+}
+
+func (c *AccountClient) AuthorizePeerTaskStart(ctx context.Context, credential string,
+	start agenthandoff.TaskStart, sourcePublicKey string) (PeerTaskStartAuthorization, error) {
+	var out PeerTaskStartAuthorization
+	err := c.post(ctx, "/v1/peer/task-start/authorize", credential, map[string]any{
+		"start": start, "source_public_key": sourcePublicKey,
 	}, &out)
 	return out, err
 }
