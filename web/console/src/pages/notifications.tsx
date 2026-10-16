@@ -5,6 +5,7 @@ import { settingsFailureSentence } from "./settings/window/failure.js"
 import { pushShape, sendPushTest, startPush, subscribePush, togglePush } from "../push/push.js"
 import { legacyState } from "../legacy/overlay-bridge.js"
 import type { PageModule } from "./types.js"
+import { Switch } from "./settings/Switch.js"
 import "./notifications/notifications.css"
 
 type Preference = keyof Pick<SettingsRequest,
@@ -79,9 +80,9 @@ function NotificationsPage({ shown }: { shown: boolean }) {
       <h1>{word("Notifications", "通知")}</h1>
       <p>{word("Choose which events may notify your subscribed devices. These settings apply to this machine; browser permission is set separately on each device.", "逐項選擇哪些事件可以推播到已訂閱的裝置。這些設定套用到這台機器；每台裝置的瀏覽器權限需分別開啟。")}</p>
       <div className="notification-device">
-        <h2>{word("This device", "這台裝置")}</h2>
-        <p>{push.state === "on" ? word("Notifications are on.", "通知已開啟。") : push.state === "blocked" ? word("The browser blocks notifications for this site.", "瀏覽器已封鎖這個網站的通知。") : push.state === "homescreen" ? word("On iPhone or iPad, add this site to the Home Screen first.", "在 iPhone 或 iPad 上，請先將網站加入主畫面。") : push.state === "unsupported" ? word("This browser or address cannot receive notifications.", "這個瀏覽器或網址無法接收通知。") : word("Notifications are off on this device.", "這台裝置的通知尚未開啟。")}</p>
-        {(push.state === "on" || push.state === "off") && <button type="button" disabled={push.busy} onClick={togglePush}>{push.state === "on" ? word("Turn off on this device", "關閉這台裝置的通知") : word("Turn on on this device", "開啟這台裝置的通知")}</button>}
+        <h2 id="notification-device-title">{word("This device", "這台裝置")}</h2>
+        <p id="notification-device-state">{push.state === "on" ? word("Notifications are on.", "通知已開啟。") : push.state === "blocked" ? word("The browser blocks notifications for this site.", "瀏覽器已封鎖這個網站的通知。") : push.state === "homescreen" ? word("On iPhone or iPad, add this site to the Home Screen first.", "在 iPhone 或 iPad 上，請先將網站加入主畫面。") : push.state === "unsupported" ? word("This browser or address cannot receive notifications.", "這個瀏覽器或網址無法接收通知。") : word("Notifications are off on this device.", "這台裝置的通知尚未開啟。")}</p>
+        {(push.state === "on" || push.state === "off") && <Switch labelledBy="notification-device-title" describedBy="notification-device-state" on={push.state === "on"} stateText={push.state === "on" ? word("On", "開") : word("Off", "關")} disabled={push.busy} onToggle={togglePush} />}
         {push.state === "on" && <button type="button" disabled={push.testing} onClick={() => sendPushTest(legacyState.openId || legacyState.selectedId || null)}>{word("Send a test", "送一則測試")}</button>}
         <p role="status">{push.said}</p>
       </div>
