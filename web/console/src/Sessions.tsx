@@ -333,7 +333,7 @@ export function SessionsPage({
               ) : said.current ? (
                 <>
                   <b>{said.current[0]}</b>
-                  {said.current[1]}
+                  <span className="empty-hint">{said.current[1]}</span>
                   {homeEmpty && emptyAuthoritative && live && (
                     <button className="chip" type="button" onClick={() => Start.open()}>
                       {nextWord("firstSessionStart")}
