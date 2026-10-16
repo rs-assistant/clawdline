@@ -8,8 +8,6 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync 
 import { tmpdir } from "node:os"
 import { dirname, extname, join, normalize, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-// @ts-expect-error -- Node's strip-types test runner needs the source extension.
-import { SITE_CALLOUTS, SITE_LANG, SITE_SHOTS, calloutScript, siteSuffix, siteText } from "./site-shots.ts"
 
 const dist = resolve(dirname(fileURLToPath(import.meta.url)), "../../dist")
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -283,7 +281,7 @@ const snapshot = () => ({ at: Date.now(), scan: { complete: true, completed: { c
   sessions: [{ ...row, ...(listAttentionCount < 0 ? {} : { attention_count: listAttentionCount }),
     state: listWaiting ? "waiting" : "idle", work_state: listWaiting ? "waiting_you" : "ready" }] })
 const TYPES: Record<string, string> = { ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".json": "application/json", ".webp": "image/webp" }
-function json(res: ServerResponse, status: number, value: unknown) { res.writeHead(status, { "content-type": "application/json" }); res.end(siteText(JSON.stringify(value))) }
+function json(res: ServerResponse, status: number, value: unknown) { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(value)) }
 function document(ui = "zh-Hant"): string {
   const html = readFileSync(join(dist, "index.html"), "utf8")
   const words = JSON.parse(readFileSync(join(dist, "strings", "zh-Hant.json"), "utf8"))
@@ -296,7 +294,7 @@ function fixture(): Server {
   let resolvedAt: number | null = null
   let version = 1
   const eventClients = new Set<ServerResponse>()
-  const publish = () => { for (const client of eventClients) client.write("event: sessions\ndata: " + siteText(JSON.stringify(snapshot())) + "\n\n") }
+  const publish = () => { for (const client of eventClients) client.write("event: sessions\ndata: " + JSON.stringify(snapshot()) + "\n\n") }
   return createServer((req, res) => {
     const path = new URL(req.url ?? "/", "http://fixture").pathname
     if (path === "/__fixture/reset") { readAt = null; resolvedAt = null; version = 1; failReads = false; failActions = false; readDelay = 0; noteReads = 0; todoReads = 0; noteCount = 1; showOptions = true; singleOption = false; secretMode = false; handoffValues = []; handoffDelay = 0; failHandoff = false; listWaiting = false; listAttentionCount = 1; documentMode = "ready"; documentListMode = "ready"; documentReadDelay = 0; sendRequests = 0; sentTexts = []; sentBeforeResolve = []; failSends = false; sendDelay = 0; return json(res, 200, { ok: true }) }
@@ -939,9 +937,7 @@ test("Secret Handoff pastes one-line and multi-line values without sending them 
   }
 })
 
-// ---- the website's picture (tools/site-shots.sh; skipped unless SITE_SHOTS is set)
-
-test("site shot: an attention Note with suggested replies", { skip: !SITE_SHOTS }, async () => {
+test("an English phone header keeps the Session's name and names its machine button", async () => {
   const { targetId } = await browser.send("Target.createTarget", { url: "about:blank" })
   const { sessionId: id } = await browser.send("Target.attachToTarget", { targetId, flatten: true })
   const run = async (expression: string) => {
@@ -949,28 +945,21 @@ test("site shot: an attention Note with suggested replies", { skip: !SITE_SHOTS 
     if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text)
     return result.value
   }
-  const until = async (expression: string) => {
-    const deadline = Date.now() + 8000
-    while (!(await run(expression))) { if (Date.now() > deadline) assert.fail("UI did not reach " + expression); await new Promise((r) => setTimeout(r, 50)) }
-  }
   try {
     await fetch(origin + "/__fixture/reset")
     await browser.send("Page.enable", {}, id); await browser.send("Runtime.enable", {}, id)
     await browser.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }, id)
-    const mark = browser.loadCount; await browser.send("Page.navigate", { url: origin + "/?ui=" + SITE_LANG + "#session=" + SESSION }, id); await browser.loaded(id, mark)
-    await until(`!!document.querySelector(".human-interventions-head")`)
-    await run(`document.querySelector(".human-interventions-head").click()`)
-    await until(`!!document.querySelector(".human-intervention-option")`)
-    await new Promise((r) => setTimeout(r, 500))
-    await run(`document.querySelector(".human-intervention-drafts").scrollIntoView({ block: "end" })`)
-    await new Promise((r) => setTimeout(r, 300))
-    const [question, replies] = SITE_CALLOUTS["attention-note"]
-    await run(calloutScript([
-      { sel: ".human-intervention-title, .human-intervention-reason", n: 1, label: question },
-      { sel: ".human-intervention-option", n: 2, label: replies },
-    ]))
-    await new Promise((r) => setTimeout(r, 300))
-    const { data } = await browser.send("Page.captureScreenshot", { format: "png" }, id)
-    writeFileSync(join(SITE_SHOTS, `attention-note-${siteSuffix}.png`), Buffer.from(data, "base64"))
+    const mark = browser.loadCount; await browser.send("Page.navigate", { url: origin + "/?ui=en#session=" + SESSION }, id); await browser.loaded(id, mark)
+    const deadline = Date.now() + 8000
+    while (!(await run(`document.querySelector(".detail-head .name")?.textContent === "Delivery Session" && !!document.querySelector("#tx-focus:not([hidden])")`))) {
+      if (Date.now() > deadline) assert.fail("the Session header never showed")
+      await new Promise((r) => setTimeout(r, 50))
+    }
+    // "Show on this machine" took 157 of 390 pixels and drew every name as "D…".
+    const name = await run(`(() => { const n = document.querySelector(".detail-head .name"); return { shown: n.clientWidth, needs: n.scrollWidth } })()`)
+    assert.ok(name.needs <= name.shown, `the Session's name needs ${name.needs}px and was given ${name.shown}px`)
+    const { nodes } = await browser.send("Accessibility.getFullAXTree", {}, id)
+    assert.ok(nodes.some((node: any) => node.role?.value === "button" && node.name?.value === "Show on this machine"), "the icon-only button keeps its name")
+    assert.equal(await run(`document.documentElement.scrollWidth <= 390`), true)
   } finally { await browser.send("Target.closeTarget", { targetId }) }
 })

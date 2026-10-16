@@ -1,0 +1,11 @@
+/* On a phone the header is one line, and the Session's name is the part of it worth keeping.
+   In English "Show on this machine" took 157 of 390 pixels and left the name 24, so every
+   Session read as "C…". Below 520px the button keeps its icon and its tooltip; the words stay
+   for a screen reader, so the button is still named. */
+@media (max-width: 520px) {
+  .detail-head #tx-focus { padding-left: 9px; padding-right: 9px; }
+  .detail-head #tx-focus-label {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
+}
