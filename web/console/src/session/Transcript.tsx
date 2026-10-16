@@ -8,6 +8,7 @@ import {
   useState,
   useSyncExternalStore,
   type MouseEvent,
+  type ClipboardEvent,
   type ReactElement,
 } from "react"
 import type {
@@ -1371,6 +1372,7 @@ function entryHTML(v: View, e: Entry, at: number): ReactElement {
         className="body"
         key={role === "assistant" ? artifactsKey(e.artifacts) : undefined}
         onClick={copyFrom}
+        onCopy={copyWithListNumbers}
         dangerouslySetInnerHTML={{ __html: body }}
       />
     </div>
@@ -1780,6 +1782,37 @@ function patchHTML(v: View, e: Entry, at: number) {
 function copyFrom(ev: MouseEvent<HTMLElement>) {
   const copy = (ev.target as Element).closest?.("button.codecopy")
   if (copy) L.copyCode(copy.getAttribute("data-code-copy") ?? "")
+}
+
+/** Browser list markers are painted outside the selected text. Put them in plain-text copies. */
+function copyWithListNumbers(ev: ClipboardEvent<HTMLElement>) {
+  const selection = window.getSelection()
+  if (!selection || selection.isCollapsed || !ev.clipboardData || !selection.rangeCount) return
+  const range = selection.getRangeAt(0)
+  const body = ev.currentTarget
+  if (!body.contains(range.commonAncestorContainer)) return
+  const items = Array.from(body.querySelectorAll("ol > li, ul > li")).filter((item) => range.intersectsNode(item))
+  if (!items.length) return
+
+  const fragment = range.cloneContents()
+  const copiedItems = Array.from(fragment.querySelectorAll("li"))
+  if (copiedItems.length !== items.length) return
+  copiedItems.forEach((copy, index) => {
+    const item = items[index]
+    const list = item.parentElement
+    if (!list) return
+    const siblings = Array.from(list.children).filter((child) => child.tagName === "LI")
+    const number = (list instanceof HTMLOListElement ? list.start + siblings.indexOf(item) : 0)
+    copy.insertBefore(document.createTextNode(number ? `${number}. ` : "• "), copy.firstChild)
+  })
+  const holder = document.createElement("div")
+  holder.style.cssText = "position:fixed;left:-100000px;top:0;white-space:normal"
+  holder.append(fragment)
+  document.body.append(holder)
+  const plain = holder.innerText
+  holder.remove()
+  ev.clipboardData.setData("text/plain", plain)
+  ev.preventDefault()
 }
 
 /**
