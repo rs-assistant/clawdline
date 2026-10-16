@@ -28,10 +28,16 @@ const (
 	Global   Scope = "global"
 	Project  Scope = "project"
 	Workflow Scope = "workflow"
+	// Clawdfather is an action the person added to Clawdfather's own menu,
+	// beside the ones the console ships. Clawdfather stands in no project, so
+	// it is machine-wide and refuses a project path the way Global does.
+	Clawdfather Scope = "clawdfather"
 )
 
 // KnownScope reports whether s is a reusable text scope.
-func KnownScope(s Scope) bool { return s == Global || s == Project || s == Workflow }
+func KnownScope(s Scope) bool {
+	return s == Global || s == Project || s == Workflow || s == Clawdfather
+}
 
 // The bounds, **counted in UTF-8 bytes**.
 //
@@ -311,7 +317,7 @@ func build(id string, f Fields, position, createdAt, updatedAt int64) (Record, *
 	}
 	if !KnownScope(f.Scope) {
 		return Record{}, refuse(400, CodeMalformed,
-			"A reusable text's scope is `global`, `project`, or `workflow`.", nil)
+			"A reusable text's scope is `global`, `project`, `workflow`, or `clawdfather`.", nil)
 	}
 	if f.Source != nil && f.Scope != Workflow {
 		return Record{}, refuse(400, CodeMalformed, "Only a Workflow can link to a source.", nil)
@@ -391,6 +397,9 @@ func Sort(records []Record) {
 
 // InScope is the snippets one session sees, in the order the sheet draws them:
 // the open project's own first, then the ones that belong to every project.
+// Clawdfather's actions ride in the machine-wide group for every session, as
+// they do over Cloud, where the list is the whole machine's; the sheet draws
+// them only on Clawdfather's own tab.
 //
 // A project key that is empty is a session whose project could not be
 // resolved, which sees the global group and nothing else — a smaller answer,
@@ -406,7 +415,7 @@ func InScope(records []Record, projectKey string) []Record {
 			mine = append(mine, r)
 		case r.Scope == Workflow && r.Project == "":
 			global = append(global, r)
-		case r.Scope == Global:
+		case r.Scope == Global, r.Scope == Clawdfather:
 			global = append(global, r)
 		}
 	}

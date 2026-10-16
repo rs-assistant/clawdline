@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5306,
+  "englishKeys": 5313,
   "counts": {
     "negation": 1517,
     "state": 734,
     "permission": 336,
-    "deletion": 110,
+    "deletion": 111,
     "uncertainty": 155
   },
-  "unionCount": 2341,
+  "unionCount": 2342,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -2604,6 +2604,7 @@
       "worktree.refreshed"
     ],
     "deletion": [
+      "clawdfatherMenu.limitReached",
       "http.26d554c47eb3ebc1",
       "http.419cca48c2e35b93",
       "http.688ad40f43c980ea",
@@ -2881,6 +2882,7 @@
     "bar.sessionShellOne",
     "bar.sessionWaiting",
     "bar.stackTip",
+    "clawdfatherMenu.limitReached",
     "count.pendingInterventions",
     "count.skillFoldersSkipped",
     "count.unsyncedProjects",
