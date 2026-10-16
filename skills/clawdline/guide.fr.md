@@ -14,6 +14,8 @@ code de refus et se termine avec le code 1 sans rien afficher sur la sortie stan
 Dans ce guide, une **étape** correspond à une entrée de la liste de contrôle d'un élément, les **écritures** d'une tâche correspondent aux chemins qu'elle
 peut modifier, l'**affectation** indique le propriétaire d'un élément et une **partie** correspond à une partie nommée de ce guide.
 
+**Expériences tmux privées :** utilisez `env -u TMUX tmux -S <chemin absolu du socket privé> ...` pour chaque commande, y compris `kill-server`, puis arrêtez ce serveur avant de supprimer son répertoire. Dans un pane, `TMUX_TMPDIR` ne remplace pas `$TMUX`. Le 2026-10-16, une commande sans `-S` a arrêté le serveur principal et déconnecté 15 Sessions. `clawdline tmux` refuse les suppressions globales sans socket privé `-S` explicite.
+
 ## 0. Si vous avez appris Clawdline grâce à l'application Swift, lisez ceci en premier.
 
 L'application Swift a été mise hors service le 19/09/2026 : elle est arrêtée, ne se lance plus à l'ouverture de session et rien ne répond sur le port 7717. Son répertoire, `~/.config/clawdline`, est toujours présent sur le disque et est toujours accessible en lecture seule, pour un historique que ce démon n'a jamais conservé. Ce démon n'est pas une copie de cette application, et voici cinq différences qui peuvent poser problème :

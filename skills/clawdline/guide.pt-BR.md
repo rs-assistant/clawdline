@@ -4,6 +4,8 @@ Para uma sessão de assistente — Claude Code ou Codex — em uma máquina onde
 
 Neste guia, uma **etapa** é uma entrada da lista de verificação em um item, as **gravações** de uma tarefa são os caminhos que ela pode alterar, a **atribuição** é quem possui um item e uma **parte** é uma parte nomeada deste guia.
 
+**Experimentos privados com tmux:** use `env -u TMUX tmux -S <caminho absoluto do socket privado> ...` em todos os comandos, inclusive `kill-server`, e encerre o servidor antes de remover o diretório do socket. Dentro de um pane, `TMUX_TMPDIR` não prevalece sobre `$TMUX`. Em 2026-10-16, um comando sem `-S` encerrou o servidor principal e desconectou 15 Sessions. `clawdline tmux` recusa exclusões amplas sem um socket privado `-S` explícito.
+
 ## 0. Se você aprendeu Clawdline com o aplicativo Swift, leia isto primeiro
 
 O aplicativo Swift foi descontinuado em 19/09/2026: ele foi interrompido, não inicia mais no login e nada responde à porta 7717. Seu diretório, `~/.config/clawdline`, ainda está no disco e ainda é lido - apenas lido - para o histórico que este daemon nunca manteve. Este daemon não é uma cópia desse aplicativo, e cinco diferenças costumam causar erros:

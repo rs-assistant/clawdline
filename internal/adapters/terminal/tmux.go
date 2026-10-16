@@ -51,6 +51,8 @@ type Tmux struct {
 	// that executable instead: it is run as it is, on the default server, and
 	// nothing else is looked for.
 	Binary string
+	// Socket pins test and explicit clients to one server, independent of TMUX.
+	Socket string
 	// fallbacks is nil in production, where tmuxFallbacks is used. Tests set
 	// an explicit list so the Finder-style PATH case does not depend on what
 	// package manager is installed on the machine running them.
@@ -67,14 +69,22 @@ func (t *Tmux) choice(ctx context.Context) TmuxChoice {
 	}
 	if filepath.IsAbs(t.Binary) {
 		if executableFile(t.Binary) {
-			return TmuxChoice{Path: t.Binary}
+			return TmuxChoice{Path: t.Binary, Socket: t.Socket}
 		}
 		return TmuxChoice{}
 	}
 	if (t.Binary == "" || t.Binary == "tmux") && t.fallbacks == nil {
-		return defaultResolver.resolve(ctx)
+		choice := defaultResolver.resolve(ctx)
+		if t.Socket != "" {
+			choice.Socket = t.Socket
+		}
+		return choice
 	}
-	return (&tmuxResolver{name: t.Binary, fallbacks: t.fallbacks}).resolve(ctx)
+	choice := (&tmuxResolver{name: t.Binary, fallbacks: t.fallbacks}).resolve(ctx)
+	if t.Socket != "" {
+		choice.Socket = t.Socket
+	}
+	return choice
 }
 
 // command is one tmux invocation on the chosen server, under LC_ALL=C; nil

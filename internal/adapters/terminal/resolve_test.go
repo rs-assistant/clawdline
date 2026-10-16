@@ -206,8 +206,7 @@ func TestTheCarriedTmuxRunsOnItsOwnServer(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	// The default server, were anything to reach it, is a private one too.
-	t.Setenv("TMUX_TMPDIR", dir)
+	// The carried server must not create a second socket in this fixture.
 	t.Setenv("TMUX", "")
 	t.Setenv("PATH", t.TempDir())
 	t.Setenv(BundledTmuxEnv, real)
@@ -235,8 +234,8 @@ func TestTheCarriedTmuxRunsOnItsOwnServer(t *testing.T) {
 	if !strings.Contains(screen, "carried-ok") {
 		t.Fatalf("the pane was not read: %q", screen)
 	}
-	if out, err := exec.Command(real, "ls").CombinedOutput(); err == nil {
-		t.Fatalf("the default server was started: %s", out)
+	if out, err := exec.Command(real, "-S", filepath.Join(dir, "unexpected.sock"), "ls").CombinedOutput(); err == nil {
+		t.Fatalf("an unexpected private server was started: %s", out)
 	}
 }
 
@@ -339,7 +338,6 @@ func TestTheCarriedServerIsAskedForItsSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
-	t.Setenv("TMUX_TMPDIR", dir)
 	t.Setenv("TMUX", "")
 	sock := filepath.Join(dir, SessionsSocketName)
 	t.Cleanup(func() { _ = exec.Command(real, "-S", sock, "kill-server").Run() })

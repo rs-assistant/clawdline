@@ -15,6 +15,8 @@ refusal code, and exits 1 with nothing on stdout when no part names it.
 In this guide, a **step** is one checklist entry on an item, a task's **writes** are the paths it
 may change, **assignment** is who owns an item, and a **part** is one named piece of this guide.
 
+**Private tmux experiments:** Always use `env -u TMUX tmux -S <private absolute socket> ...` for every command, including `kill-server`, and kill that server before removing its socket directory. `TMUX_TMPDIR` does not override `$TMUX` inside a pane. On 2026-10-16, a cleanup command without `-S` killed the main server and disconnected 15 Sessions. `clawdline tmux` refuses server-wide deletion without an explicit private `-S` socket.
+
 ## 0. If you learned Clawdline from the Swift app, read this first
 
 The Swift app was retired on 2026-09-19: it is stopped, it no longer starts at login, and nothing
