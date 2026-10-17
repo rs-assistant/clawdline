@@ -63,8 +63,9 @@ func pushBeat(t *testing.T, s *Server, readings map[string]capacity.Reading, lim
 		}
 	}
 	broker := &orchestrator.Broker{Store: s.store, Push: p.push}
-	b := &capacityBeat{resolved: resolved, tracker: capacity.NewTracker(), measure: measures,
-		record: s.store.Append, since: time.Now(), started: time.Now(), tick: time.Minute,
+	b := &capacityBeat{resolved: resolved, tracker: capacity.NewTracker(),
+		measure: func() map[string]func() capacity.Reading { return measures },
+		record:  s.store.Append, since: time.Now(), started: time.Now(), tick: time.Minute,
 		intent: s.store.RecordIntent, run: broker.RunEffects, loc: time.UTC}
 	if seed {
 		b.latest = func(ctx context.Context) ([]store.Effect, error) {
