@@ -138,24 +138,6 @@ func (s *Server) cloudViewerRoute(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 	path := r.URL.Path
-	if path == "/v1/cloud/viewer/status" {
-		if r.Method != http.MethodGet {
-			writeAuthRefusal(w, http.StatusMethodNotAllowed, "bad_request", "bad_request")
-			return
-		}
-		settings, keys, err := s.viewerSettings()
-		if err != nil {
-			writeViewerError(w, err)
-			return
-		}
-		identity, found, err := adaptercloud.NewViewerIdentityStore(keys.Dir()).Load()
-		if err != nil {
-			writeViewerError(w, err)
-			return
-		}
-		writeJSON(w, map[string]any{"enabled": settings.Enabled, "authorized": found && identity.APIBase == settings.APIBase})
-		return
-	}
 	if path == "/v1/cloud/viewer/actions" && r.Method != http.MethodPost ||
 		path != "/v1/cloud/viewer/actions" && r.Method != http.MethodGet {
 		writeAuthRefusal(w, http.StatusMethodNotAllowed, "bad_request", "bad_request")
@@ -182,8 +164,6 @@ func (s *Server) cloudViewerRoute(w http.ResponseWriter, r *http.Request) {
 				return client.ReadTranscriptPage(ctx, viewerDestination(r), before)
 			}
 			return client.ReadDetail(ctx, viewerDestination(r))
-		case "/v1/cloud/viewer/skills":
-			return client.ReadSkills(ctx, viewerDestination(r))
 		case "/v1/cloud/viewer/actions":
 			var input adaptercloud.ViewerMutation
 			r.Body = http.MaxBytesReader(w, r.Body, sendBodyLimit)

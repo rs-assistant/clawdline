@@ -478,11 +478,9 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/remote/inbox/"}, s.remoteInboxRoute},
 		{Route{"*", "/v1/remote/tasks"}, s.remoteTasksRoute},
 		{Route{"*", "/v1/remote/tasks/"}, s.remoteTaskRoute},
-		{Route{"*", "/v1/cloud/viewer/status"}, s.cloudViewerRoute},
 		{Route{"*", "/v1/cloud/viewer/machines"}, s.cloudViewerRoute},
 		{Route{"*", "/v1/cloud/viewer/sessions"}, s.cloudViewerRoute},
 		{Route{"*", "/v1/cloud/viewer/detail"}, s.cloudViewerRoute},
-		{Route{"*", "/v1/cloud/viewer/skills"}, s.cloudViewerRoute},
 		{Route{"*", "/v1/cloud/viewer/actions"}, s.cloudViewerRoute},
 		{Route{"*", "/v1/cloud/viewer/receipts"}, s.cloudViewerRoute},
 		{Route{"*", "/v1/cloud/login"}, s.cloudLoginRoute},
@@ -582,7 +580,6 @@ func (s *Server) routeTable() []route {
 			s.sessionAction(w, r)
 		}},
 		// What this feature has done to the machine, published (screen.go).
-		{Route{"*", "/v1/screens"}, s.screensRoute},
 		{Route{"*", "/v1/terminals"}, s.terminalsRoute},
 		{Route{"*", "/v1/terminals/"}, s.terminalRoute},
 		{Route{"*", "/v1/events"}, s.events},
@@ -632,7 +629,6 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/orchestrator/whoami"}, s.brokerWhoAmI},
 		// What a run was: the message a person sent a session, which a relay of
 		// their words names (runs.go).
-		{Route{"*", "/v1/orchestrator/runs/"}, s.runRoute},
 		// The address book a wait, a relay or a handoff names sessions from, and
 		// under a session: its delivery receipt, its to-dos and the retired
 		// workflow route (workflow.go).
@@ -644,7 +640,6 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/orchestrator/assistants"}, s.brokerAssistants},
 		{Route{"*", "/v1/orchestrator/landings"}, s.brokerLandings},
 		{Route{"*", "/v1/orchestrator/notify"}, s.brokerMachineNotify},
-		{Route{"*", "/v1/orchestrator/durable-reports/promotions"}, s.brokerDurableReportPromotion},
 		// The coordination plane (W5): the machine role, file waits, leases (the
 		// compile slot and landing), the completion ledger's manual path, and
 		// detached automation (coordinator.go, waits.go).

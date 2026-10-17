@@ -34,8 +34,8 @@ Swift app 已於 2026-09-19 退役：它被停掉、取消了登入時啟動，p
 4. **換了一扇門。** Port 7727（或 `CLAWDLINE_NEXT_PORT`），狀態放在 `~/.config/clawdline-next`
    （或 `CLAWDLINE_NEXT_DIR`）。絕對不要讀 `~/.config/clawdline`：那裡的 token 不是這個 daemon 的，
    會被 `401 unauthorized` 拒絕。
-5. **Swift app 有、這個 daemon 沒有的東西：** durable report 升級（回
-   `501 durable_report_promotion_unsupported`）、coordinator succession（回
+5. **Swift app 有、這個 daemon 沒有的東西：** durable report 升級（沒有這條路由：回
+   `501 not_implemented`）、coordinator succession（回
    `501 succession_unavailable`），以及 brief 欄位 `serialize`、
    `attach_session`（兩個都會被點名拒絕，code 是 `bad_task`）。`reasoning_effort` 有支援：
    `high` 或 `xhigh`，而且只在 `codex` 的 task 上。

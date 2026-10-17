@@ -101,23 +101,12 @@ func TestTheRetiredWorkflowStepIsAnsweredAndRecordsNothing(t *testing.T) {
 	}
 }
 
-// The address book is the orchestrator token's; the durable-report promotion
-// this daemon does not keep is refused by name, not by the fallback.
-func TestTheAddressBookAndThePromotionAreRefusedByName(t *testing.T) {
+// The address book is the orchestrator token's.
+func TestTheAddressBookIsRefusedByName(t *testing.T) {
 	s := w8Server(t)
 	rec := httptest.NewRecorder()
 	s.brokerAddressBook(rec, w8Request(http.MethodGet, "/v1/orchestrator/sessions", "", false, nil))
 	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "a wait can name") {
 		t.Fatalf("address book without the token: %d %s", rec.Code, rec.Body)
-	}
-	rec = httptest.NewRecorder()
-	s.brokerDurableReportPromotion(rec, w8Request(http.MethodPost, "/v1/orchestrator/durable-reports/promotions", `{}`, true, nil))
-	if rec.Code != http.StatusNotImplemented || !strings.Contains(rec.Body.String(), `"durable_report_promotion_unsupported"`) {
-		t.Fatalf("promotion: %d %s", rec.Code, rec.Body)
-	}
-	rec = httptest.NewRecorder()
-	s.brokerDurableReportPromotion(rec, w8Request(http.MethodPost, "/v1/orchestrator/durable-reports/promotions", `{}`, false, nil))
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("promotion without the token: %d %s", rec.Code, rec.Body)
 	}
 }

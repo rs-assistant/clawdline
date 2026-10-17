@@ -5260,37 +5260,6 @@ type ScreenEvent struct {
 	Revision string `json:"revision"`
 }
 
-// The machine state this feature creates, published so that somebody can see
-// it. `tmux list-panes -a -F '#{pane_id} #{pane_pipe}'` answers the same
-// question in one command; this answers it and says which of those pipes this
-// daemon can account for, which tmux cannot, because `#{pane_pipe}` is a
-// boolean with no owner in it. A pane that is piped and not on this daemon's
-// list is therefore `unattributed` rather than a leak, and nothing here takes
-// somebody else's pipe off.
-type ScreenInventory struct {
-	Attached     []string      `json:"attached"`
-	LeaseSeconds int64         `json:"leaseSeconds"`
-	Piped        []string      `json:"piped"`
-	Screens      []ScreenWatch `json:"screens"`
-	Unattributed []string      `json:"unattributed"`
-	WindowMs     int64         `json:"windowMs"`
-}
-
-// One row of what this daemon is watching.
-type ScreenWatch struct {
-	Backend   Backend       `json:"backend"`
-	Captures  int64         `json:"captures"`
-	Channel   ScreenChannel `json:"channel"`
-	ExpiresIn int64         `json:"expiresIn"`
-	ID        string        `json:"id"`
-	Readable  bool          `json:"readable"`
-
-	// Whether this daemon has a pipe on that pane right now.
-	Signalled bool  `json:"signalled"`
-	Signals   int64 `json:"signals"`
-	Watching  bool  `json:"watching"`
-}
-
 // Text, pictures, or both; a send that is neither is refused. Each picture is a
 // base64 `data:` URL, at most six, inside the 20 MB body limit. Pictures that
 // cannot be decoded are left out, and a send none of whose pictures can be is

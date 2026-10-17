@@ -37,8 +37,8 @@ differences are where people fall:
 4. **A different door.** Port 7727 (or `CLAWDLINE_NEXT_PORT`), state in `~/.config/clawdline-next`
    (or `CLAWDLINE_NEXT_DIR`). Never read `~/.config/clawdline`: its token is not this daemon's and
    is refused with `401 unauthorized`.
-5. **Things the Swift app had and this daemon does not:** durable-report promotion (answers
-   `501 durable_report_promotion_unsupported`), coordinator succession (answers
+5. **Things the Swift app had and this daemon does not:** durable-report promotion (no route:
+   answers `501 not_implemented`), coordinator succession (answers
    `501 succession_unavailable`), and the brief fields `serialize`
    and `attach_session` (each refused by name as `bad_task`). `reasoning_effort` is supported:
    `high` or `xhigh`, on a `codex` task only.
