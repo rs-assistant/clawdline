@@ -219,3 +219,75 @@ waiting:
 		}
 	}
 }
+
+// countingTerminalHost draws a new revision whenever the test says so and
+// counts how often the screen is read.
+type countingTerminalHost struct {
+	idleTerminalHost
+	revision atomic.Int32
+	reads    atomic.Int32
+	wake     chan struct{}
+}
+
+func (h *countingTerminalHost) Frame(context.Context, terminal.ID) (terminal.Frame, error) {
+	h.reads.Add(1)
+	rev := h.revision.Load()
+	return terminal.Frame{Rev: string(rune('a' + rev)), At: time.Now(), Cols: 80, Rows: 24}, nil
+}
+
+func (h *countingTerminalHost) Changed(context.Context, terminal.ID) (<-chan struct{}, func(), error) {
+	return h.wake, func() {}, nil
+}
+
+// A Cloud viewer of a terminal whose adapter signals drawing gets every
+// change from the signal, and a still screen is not read every pollEvery
+// for the sake of the frame heartbeat.
+func TestCloudViewerFollowsTheChangeSignalWithoutSampling(t *testing.T) {
+	host := &countingTerminalHost{wake: make(chan struct{}, 1)}
+	svc := New(host, func(Principal) error { return nil })
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	watch, err := svc.Watch(ctx, Principal{Device: "viewer", Cloud: true}, terminal.NewID(), "tab")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer watch.Stop()
+	frames := make(chan string, 16)
+	done := make(chan error, 1)
+	go func() {
+		done <- watch.RunWithFrameHeartbeat(ctx, 3*time.Second, func(e Event) error {
+			if e.Kind == EventFrame {
+				frames <- e.Frame.Rev
+			}
+			return nil
+		})
+	}()
+	receive := func(want string) {
+		t.Helper()
+		select {
+		case rev := <-frames:
+			if rev != want {
+				t.Fatalf("frame %q, want %q", rev, want)
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("frame %q missing", want)
+		}
+	}
+	receive("a")
+	const changes = 5
+	for i := 1; i <= changes; i++ {
+		host.revision.Store(int32(i))
+		host.wake <- struct{}{}
+		receive(string(rune('a' + i)))
+	}
+	before := host.reads.Load()
+	time.Sleep(4 * pollEvery)
+	if idle := host.reads.Load() - before; idle != 0 {
+		t.Fatalf("a still screen was read %d times in %s", idle, 4*pollEvery)
+	}
+	if reads := host.reads.Load(); reads != 1+changes {
+		t.Fatalf("read the screen %d times for %d changes", reads, changes)
+	}
+	cancel()
+	<-done
+}

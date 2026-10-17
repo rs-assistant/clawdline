@@ -203,11 +203,28 @@ func (w *Watch) run(ctx context.Context, heartbeat time.Duration, send func(Even
 	} else if err != nil {
 		return err
 	}
+	// Only a platform that cannot signal a change samples the screen every
+	// pollEvery. Where the adapter signals drawing, the screen is read on the
+	// signal, and a frame heartbeat reads it again once it has been still for
+	// heartbeat: next is armed after every frame sent, and armed short after a
+	// deferred one so the consumer is offered it again soon.
 	var poll <-chan time.Time
-	if w.wake == nil || heartbeat > 0 {
+	if w.wake == nil {
 		t := time.NewTicker(pollEvery)
 		defer t.Stop()
 		poll = t.C
+	}
+	var next <-chan time.Time
+	var nextTimer *time.Timer
+	arm := func(d time.Duration) {}
+	if w.wake != nil && heartbeat > 0 {
+		nextTimer = time.NewTimer(heartbeat)
+		defer nextTimer.Stop()
+		next = nextTimer.C
+		arm = func(d time.Duration) { nextTimer.Reset(d) }
+		if owed {
+			arm(pollEvery)
+		}
 	}
 	beat := time.NewTicker(BeatEvery)
 	defer beat.Stop()
@@ -257,6 +274,7 @@ func (w *Watch) run(ctx context.Context, heartbeat time.Duration, send func(Even
 				return false, nil
 			}
 			if err := send(Event{Kind: EventFrame, Frame: frame}); errors.Is(err, ErrFrameDeferred) {
+				arm(pollEvery)
 				return false, nil
 			} else if err != nil {
 				return true, err
@@ -264,6 +282,7 @@ func (w *Watch) run(ctx context.Context, heartbeat time.Duration, send func(Even
 			owed = false
 			last = frame
 			lastSentAt = frame.At
+			arm(heartbeat)
 		} else {
 			last.At = frame.At
 		}
@@ -291,6 +310,11 @@ func (w *Watch) run(ctx context.Context, heartbeat time.Duration, send func(Even
 				return err
 			}
 		case <-poll:
+			if done, err := look(); done || err != nil {
+				return err
+			}
+		case <-next:
+			arm(heartbeat)
 			if done, err := look(); done || err != nil {
 				return err
 			}
