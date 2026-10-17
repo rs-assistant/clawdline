@@ -734,6 +734,7 @@ func (l *Link) wire() error {
 		PeerTaskEventAck:     l.enqueuePeerAck,
 		OnDisconnect:         l.closeAllTerminalConnections,
 		OnSettled:            l.terminalReceiptSettled,
+		OnAck:                l.publicationAcked,
 		PublicKeyFor:         l.publicKeyFor,
 		ContentKey:           secret,
 		Log:                  func(line string) { l.logf("%s", line) },
@@ -805,6 +806,16 @@ func (l *Link) wire() error {
 	// A press from a page is shown landing at the next look, not the next pass.
 	l.service.Acted = l.publisher.Settle
 	return nil
+}
+
+// publicationAcked hands the relay's fan-out count for each publication to
+// the publisher, which stops building Session rows while they reach nobody
+// (`Publisher.Acked`). The publisher is built after the transport and before
+// the line starts, so every receipt finds it.
+func (l *Link) publicationAcked(frame adaptercloud.AckFrame) {
+	if l.publisher != nil {
+		l.publisher.Acked(frame.Ch, frame.Fanout)
+	}
 }
 
 // machineName is the name this machine publishes to the account's machine

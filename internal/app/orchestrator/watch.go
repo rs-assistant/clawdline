@@ -135,8 +135,13 @@ func (b *Broker) pass(ctx context.Context, number int64) Pulse {
 	// Answered receipts past their window become tombstones (D03), once every
 	// sixty passes: a late resend is told "expired" either way, and this only
 	// lets go of the answer it no longer owes anybody.
+	// On the same clock, done effects and random-key tombstones a week old
+	// are let go in bounded batches (store/retention.go); the two kinds read
+	// by subject keep their newest row.
 	if number%60 == 1 {
 		_, _ = b.Store.ExpireReceipts(ctx, "", store.ReceiptPolicy{}, b.now())
+		_, _ = b.Store.PruneDoneEffects(ctx, b.now(), []string{EffectCapacityPush, EffectPauseDelivery})
+		_, _ = b.Store.PruneReceiptTombstones(ctx, b.now())
 	}
 	// Effects a broker that has since died left unfinished are settled first
 	// (effects.go): a message it recorded and never typed is typed now, once.

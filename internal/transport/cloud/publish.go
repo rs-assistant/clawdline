@@ -222,6 +222,24 @@ type Publisher struct {
 	// restate is set when a device that is not in the audience has been heard
 	// from, and cleared by the pass that re-states everything for it.
 	restate bool
+	// viewerAt is the newest evidence that a viewer is connected: a viewer
+	// heard from (Seen) or a status publication the relay fanned out to at
+	// least one socket (Acked). emptyAt is the newest status publication the
+	// relay fanned out to nobody. A pass made while emptyAt is the newer of
+	// the two builds no Session list and sends no row (Watched); both are
+	// zero on a new socket, which counts as watched until the first pass's
+	// receipts say otherwise.
+	viewerAt, emptyAt time.Time
+	// unwatched is what the last pass decided, so the log says it once per
+	// change rather than every pass. The publisher goroutine's.
+	unwatched bool
+	// probedAt is the last full pass made while unwatched. A fan-out of zero
+	// can be the relay's mistake — it answers zero while its revocation
+	// authority is not durable, with a phone still connected — so an
+	// unwatched machine still makes a full pass every UnwatchedProbe: a
+	// connected viewer's rows are then at most that stale, not a heartbeat's,
+	// and its delivered acks reopen the gate. The publisher goroutine's.
+	probedAt time.Time
 
 	// inventoried is the last inventory this publisher stated, by id, with
 	// enough of each row to decide later which source would have seen it
@@ -304,6 +322,10 @@ type inventoriedRow struct {
 // viewer's staleness threshold is 300.
 const Heartbeat = 240 * time.Second
 
+// UnwatchedProbe is how often a machine that believes nobody watches still
+// makes a full pass (Publisher.probedAt).
+const UnwatchedProbe = 30 * time.Second
+
 // freshnessOnlySessionRowFields are the row paths that move with every reading
 // of this machine whether or not the row's content moved
 // (`CloudAppBridge.swift:1418-1422`). They are removed before a row is
@@ -362,6 +384,7 @@ func (p *Publisher) Run(ctx context.Context) error {
 	// everything anyway, and the audience starts empty rather than carrying a
 	// belief about who holds what across a line that went down.
 	p.forgetAudience()
+	p.unwatched = false
 	ticker := time.NewTicker(every)
 	defer ticker.Stop()
 	// The first pass states everything anyway, so it answers anybody who
@@ -380,7 +403,7 @@ func (p *Publisher) Run(ctx context.Context) error {
 				p.restatePass(ctx)
 				continue
 			}
-			p.pass(ctx)
+			p.tick(ctx)
 		case <-settle:
 			p.pressedAt = p.now()
 			stopSettling()
@@ -723,8 +746,67 @@ func (p *Publisher) windowLeft() time.Duration {
 	return every - p.now().Sub(stated)
 }
 
-// Pass publishes one round, for a caller that drives the clock itself.
-func (p *Publisher) Pass(ctx context.Context) { _, _, _ = p.pass(ctx) }
+// Pass publishes one round, for a caller that drives the clock itself. It is
+// the round Run's ticker makes.
+func (p *Publisher) Pass(ctx context.Context) { p.tick(ctx) }
+
+// tick is one round of Run's clock. While nobody watches (Watched) it states
+// only the descriptor: its heartbeat is what a viewer arriving later needs
+// first, and the rows that viewer needs come from the `sessions.snapshot`
+// it asks on connecting (`relay-reader.ts`), which restatePass answers with
+// a list built then. Measured on 2026-10-17: 409 publications
+// in ten minutes, every one fanned out to nobody, and with no local console
+// open each pass built the whole list (about 90 ms of CPU) to send them.
+func (p *Publisher) tick(ctx context.Context) {
+	if p.Watched() {
+		if p.unwatched {
+			p.unwatched = false
+			p.logf("cloud: a viewer is connected; Session rows are published again")
+		}
+		_, _, _ = p.pass(ctx)
+		return
+	}
+	if !p.unwatched {
+		p.unwatched = true
+		p.probedAt = p.now()
+		p.logf("cloud: no viewer is connected; Session rows wait until one is, and the descriptor keeps its heartbeat")
+	}
+	if p.now().Sub(p.probedAt) >= UnwatchedProbe {
+		p.probedAt = p.now()
+		_, _, _ = p.pass(ctx)
+		return
+	}
+	p.unsent = 0
+	p.refreshTasks(ctx)
+	p.publishDescriptor(ctx)
+}
+
+// Watched answers whether a viewer may be connected: nothing since this
+// socket came up says otherwise, or the newest evidence of a viewer is no
+// older than the newest status publication that reached nobody.
+func (p *Publisher) Watched() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.restate || p.emptyAt.IsZero() || !p.emptyAt.After(p.viewerAt)
+}
+
+// Acked is the relay's receipt for one publication on ch, with how many
+// sockets it was fanned out to. Only the status channels count: ss/ and
+// orch/ reach every viewer socket that reads Sessions without a
+// subscription, so a fan-out of zero there is nobody connected, where on s/
+// it is only nobody subscribed. Called on the transport's read loop.
+func (p *Publisher) Acked(ch string, fanout int) {
+	if !strings.HasPrefix(ch, "ss/") && !strings.HasPrefix(ch, "orch/") {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if fanout > 0 {
+		p.viewerAt = p.now()
+	} else {
+		p.emptyAt = p.now()
+	}
+}
 
 // The sessions are read before the descriptor goes out and published after it:
 // which finished tasks the descriptor's task list carries depends on which
@@ -1353,6 +1435,7 @@ func (p *Publisher) Seen(device string) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.viewerAt = p.now()
 	if p.audience[device] {
 		return
 	}
@@ -1380,6 +1463,7 @@ func (p *Publisher) forgetAudience() {
 	defer p.mu.Unlock()
 	p.audience = map[string]bool{}
 	p.restate = false
+	p.viewerAt, p.emptyAt = time.Time{}, time.Time{}
 }
 
 func (p *Publisher) now() time.Time {

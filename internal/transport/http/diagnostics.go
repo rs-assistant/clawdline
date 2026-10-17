@@ -1038,7 +1038,19 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		capacity.ReleaseLockStaleSeconds: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "a timing ceiling of the release updater; no retained buffer"}
 		},
+		capacity.StoreDoneEffectRetention: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "an age the store prunes by on its maintenance pass; no retained buffer"}
+		},
+		capacity.StoreReceiptTombstoneRetention: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "an age the store prunes by on its maintenance pass; no retained buffer"}
+		},
+		capacity.StoreRetentionPruneBatch: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "a per-pass ceiling of the store's maintenance prune; no retained buffer"}
+		},
 		capacity.ReleaseAppSwapPollSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "a timing ceiling of the release updater; no retained buffer"}
+		},
+		capacity.ReleaseAppRelistSeconds: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "a timing ceiling of the release updater; no retained buffer"}
 		},
 		capacity.ReleaseAutoApplyRetrySeconds: func() capacity.Reading {

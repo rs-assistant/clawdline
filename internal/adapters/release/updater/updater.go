@@ -95,6 +95,13 @@ const (
 	// missed every reopen for four releases in a row. A look without a
 	// staged bundle reads one small file; with one, it also lists processes.
 	AppSwapPollSecondsLimit = 2
+	// AppRelistSecondsLimit is the longest a daemon watching a running app
+	// trusts the pids it last listed: between listings a poll asks the
+	// kernel whether those pids are alive instead of running `ps` (38 ms of
+	// CPU each, 30 a minute measured on 2026-10-17). Every pid gone, or this
+	// age reached, lists the processes again, so a pid reused by another
+	// process delays the swap by at most this long.
+	AppRelistSecondsLimit = 60
 	// AutoApplyRetrySecondsLimit is how often an auto-apply held back by a
 	// busy session looks again whether the sessions are idle, between
 	// release checks.
