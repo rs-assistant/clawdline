@@ -759,24 +759,11 @@ func (r *InventoryReading) retainLocked(raw session.Inventory) session.Inventory
 	return display
 }
 
-// processSource is the process table's name in a reading's Sources. A row no
-// terminal backend owns was listed by it, under its tty.
-const processSource = "ps"
+// processSource is the process table's name in a reading's Sources.
+const processSource = session.ProcessSource
 
-// rowSource is the source that answers for one row: its terminal backend's,
-// or the process table's for a row only the process table saw.
-func rowSource(row session.Session) string {
-	if session.SourceForID(row.ID) == processSource {
-		return processSource
-	}
-	if source := session.SourceFor(row.Backend); source != "" {
-		return source
-	}
-	if row.Backend == "" {
-		return processSource
-	}
-	return ""
-}
+// rowSource is the source that answers for one row (session.OwningSource).
+func rowSource(row session.Session) string { return session.OwningSource(row) }
 
 // rowAnswered is whether the source that owns row answered completely in raw.
 //

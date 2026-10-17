@@ -34,6 +34,7 @@ import { setAccountMachines, setAccountRosterStatus, setMachineForgetting, setMa
 import { machinePaired } from "./pairing-completion.js"
 import { setProjectSyncSeam, syncSeamFor, type SyncClient } from "./project-sync.js"
 import { machinePresentation } from "../legacy/js/session/selection.js"
+import { SESSION_INVENTORY_ID } from "../legacy/js/net/client.js"
 import { forgetPersonas } from "../personas.js"
 import { accountMachineForConfirmation, accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, withAccountRegistrations, type AccountName } from "./unpaired-rows.js"
 import { machineSeenWord } from "./machine-seen.js"
@@ -1049,7 +1050,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               event.type === "orchestrator" || event.type === "session_status")) listMachines()
             else if (!reader.current && (event.type === "orchestrator" || event.type === "session_status")) listMachines()
             else if (fleetScopeRef.current && (event.type === "orchestrator" ||
-              event.type === "session_status" && event.identity?.session === "__clawdline_inventory_v1__")) listMachines()
+              event.type === "session_status" && event.identity?.session === SESSION_INVENTORY_ID)) listMachines()
             // A decryptable inventory clears only the problem attributed to
             // that machine. One machine answering is not evidence that a
             // different machine's key problem went away.

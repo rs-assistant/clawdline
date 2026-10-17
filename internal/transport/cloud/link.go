@@ -494,6 +494,29 @@ func (l *Link) rosterFresh() bool { return l.rosterRead() == nil }
 // it; the ordinary Cloud command path keeps its own roster policy (the 60 s
 // adaptercloud.RosterRefresh and the background ticker) and never waits for
 // this one.
+//
+// Why there are two refresh paths and not one (checked 2026-10-17). Both
+// end in roster.Refresh, so the fetch itself is one copy; what differs is
+// the policy around it, and each policy is load-bearing:
+//
+//   - Folding the ticker into this read (a 60 s caller of rosterRead) puts
+//     the command path's sender keys and roster_unreadable answer behind a
+//     CloudTerminalRosterDeadlineLimit (2 s) deadline instead of the fetch's
+//     own 10 s one, so a control plane answering in 3 s would turn every
+//     Cloud command into command_roster_unreadable where it is answered today.
+//   - Running the ticker at this read's 2 s freshness instead keeps
+//     revocation latency but costs one GET /v1/devices every 2 s on every
+//     idle connected machine, thirty times today's traffic, for answers
+//     nobody asked for.
+//   - Dropping the ticker and leaving only this lazy read lengthens nothing
+//     for terminals but makes the first command after a quiet minute wait on
+//     a roster fetch inside PublicKeyFor, and leaves the status route's
+//     Readable() as old as the last terminal frame.
+//
+// So the ticker keeps sender keys warm for commands and this read proves the
+// 2 s freshness terminal and Session-content authority need; neither can
+// stand in for the other without changing revocation latency, timeouts or
+// traffic.
 func (l *Link) rosterRead() error {
 	now := l.opts.Now()
 	l.rosterReadMu.Lock()
@@ -993,7 +1016,9 @@ func (l *Link) runOnce(ctx context.Context) error {
 	return err
 }
 
-// refreshRoster re-reads the account's viewer devices until ctx is done.
+// refreshRoster re-reads the account's viewer devices until ctx is done. It is
+// the command path's refresh; rosterRead says why it is not merged with the
+// terminal path's.
 func (l *Link) refreshRoster(ctx context.Context) {
 	ticker := time.NewTicker(adaptercloud.RosterRefresh)
 	defer ticker.Stop()

@@ -8,6 +8,12 @@
 
 export const LOCAL_MACHINE = "this-mac";
 
+/** The Cloud inventory marker's session id, and how many ids it may name.
+ *  Every console file reads these two here; the daemon's copy is
+ *  internal/domain/cloud InventorySessionID and InventoryLimit. */
+export const SESSION_INVENTORY_ID = "__clawdline_inventory_v1__";
+export const SESSION_INVENTORY_LIMIT = 512;
+
 /** Carry one lazy report selector through both the direct and current closed Cloud Board read. */
 export function boardReportSelection(item, report) {
     if (typeof item !== "string" || !item || typeof report !== "string" || !report)

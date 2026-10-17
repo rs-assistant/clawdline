@@ -30,14 +30,13 @@ func cloudViewerPairCommand(args []string) {
 	if err != nil {
 		fail(err)
 	}
-	identity, found, err := cloud.NewViewerIdentityStore(parts.keys.Dir()).Load()
-	if err != nil || !found || identity.APIBase != parts.settings.APIBase {
+	identity, key, err := cloud.LoadViewerAuthorization(parts.keys, parts.settings.APIBase)
+	if errors.Is(err, cloud.ErrViewerKeyMissing) || errors.Is(err, cloud.ErrViewerKeyUnreadable) {
+		fail(errors.New("viewer_key_missing"))
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, cliCopy("viewer", "login_required", "viewer_login_required: authorize this local viewer first"))
 		os.Exit(1)
-	}
-	key, found, err := parts.keys.ViewerKey()
-	if err != nil || !found {
-		fail(errors.New("viewer_key_missing"))
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), *wait+time.Minute)
 	defer cancel()
@@ -56,8 +55,8 @@ func cloudViewerMachinesCommand(args []string) {
 	if err != nil {
 		fail(err)
 	}
-	identity, found, err := cloud.NewViewerIdentityStore(parts.keys.Dir()).Load()
-	if err != nil || !found || identity.APIBase != parts.settings.APIBase {
+	identity, err := cloud.LoadViewerIdentity(parts.keys.Dir(), parts.settings.APIBase)
+	if err != nil {
 		fmt.Fprintln(os.Stderr, cliCopy("viewer", "login_required", "viewer_login_required: authorize this local viewer first"))
 		os.Exit(1)
 	}

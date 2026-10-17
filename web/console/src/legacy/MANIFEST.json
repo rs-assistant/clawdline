@@ -66,7 +66,7 @@
     "js/net/cloud-crypto.js": "1ed51a5f2634e23b",
     "js/net/document-links.js": "434ad37d1c146669",
     "js/view/documents.js": "130ecb29731148d3",
-    "js/net/client.js": "6f70ec765b174a9e",
+    "js/net/client.js": "d177344da1b14aa8",
     "js/net/session-links.js": "c2d622b5198add08",
     "js/view/schedules.js": "11e99a41970bb344",
     "js/net/schedules.js": "c0993a27eaf78c58",
@@ -74,7 +74,7 @@
     "js/input/schedule-run.js": "4a7213cac6954c85",
     "js/door/door.js": "712ba04a6d7323fd",
     "js/net/cloud-viewer-events.js": "bdedb8d818f0000a",
-    "js/net/cloud-client.js": "5e6af218fc1d4a52",
+    "js/net/cloud-client.js": "437076722ccbb424",
     "js/net/cloud-pairing.js": "9a93a640b43c0cb0",
     "js/net/cloud-onboarding.js": "ef4044a53fb313f6",
     "js/net/cloud-boot.js": "d3104910f1280046"

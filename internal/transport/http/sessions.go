@@ -570,13 +570,8 @@ func sourceComplete(inv session.Inventory, backend session.Backend) bool {
 
 // A tty-named assistant came only from ps, even if its provisional backend
 // is iTerm2. Its evidence must follow ps; an unrelated Apple Event failure
-// cannot make the process reading stale.
-func rowSource(item session.Session) string {
-	if session.SourceForID(item.ID) == "ps" {
-		return "ps"
-	}
-	return session.SourceFor(item.Backend)
-}
+// cannot make the process reading stale (session.OwningSource).
+func rowSource(item session.Session) string { return session.OwningSource(item) }
 
 func sourceCompleteRow(inv session.Inventory, item session.Session) bool {
 	proves, _ := inv.ProvesAbsence(rowSource(item))

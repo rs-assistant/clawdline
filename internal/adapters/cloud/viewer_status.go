@@ -11,7 +11,6 @@ import (
 	domain "github.com/sainteye/clawdline/internal/domain/cloud"
 )
 
-const viewerInventorySession = "__clawdline_inventory_v1__"
 const viewerStatusFreshness = 5 * time.Minute
 
 var viewerGeneration = regexp.MustCompile(`^[0-9a-f]{32}$`)
@@ -98,7 +97,7 @@ func (s *ViewerStatusStore) GapTarget(machineID string) (sessionID, snapshot str
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	stored := s.rows[machineID]
-	markerRow, exists := stored[viewerInventorySession]
+	markerRow, exists := stored[domain.InventorySessionID]
 	if !exists {
 		return "", "", false
 	}
@@ -114,7 +113,7 @@ func (s *ViewerStatusStore) GapTarget(machineID string) (sessionID, snapshot str
 		return "", "", false
 	}
 	for _, id := range marker.Inventory.Sessions {
-		if id == "" || id == viewerInventorySession {
+		if id == "" || id == domain.InventorySessionID {
 			return "", "", false
 		}
 		row, found := stored[id]
@@ -135,7 +134,7 @@ func (s *ViewerStatusStore) Project(machineID string, now time.Time) ViewerProje
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	stored := s.rows[machineID]
-	markerRow, ok := stored[viewerInventorySession]
+	markerRow, ok := stored[domain.InventorySessionID]
 	if !ok {
 		return ViewerProjection{Kind: "unavailable", Reason: "unknown"}
 	}
@@ -154,7 +153,7 @@ func (s *ViewerStatusStore) Project(machineID string, now time.Time) ViewerProje
 	}
 	seen := make(map[string]bool, len(marker.Inventory.Sessions))
 	for _, id := range marker.Inventory.Sessions {
-		if id == "" || id == viewerInventorySession || seen[id] {
+		if id == "" || id == domain.InventorySessionID || seen[id] {
 			return ViewerProjection{Kind: "unavailable", Reason: "bad_projection"}
 		}
 		seen[id] = true

@@ -93,7 +93,38 @@ func SourceForID(id string) string {
 		return "iterm"
 	case strings.HasPrefix(id, "tty") || strings.HasPrefix(id, "pts/"):
 		// A row only the process table saw is listed under its tty.
-		return "ps"
+		return ProcessSource
+	}
+	return ""
+}
+
+// ProcessSource is the process table's name in a reading's Sources.
+const ProcessSource = "ps"
+
+// OwningSource is the one source that answers for a row: the only source whose
+// silence about it means anything.
+//
+// A row only the process table saw is the process table's, whatever backend it
+// was provisionally given: the process scan files every terminal it finds
+// under iTerm2 and lists it by its tty, so an id shaped like a tty, or an id
+// that is the row's own tty, is that degraded row and not an iTerm2 one. Any
+// other row is its terminal backend's. A row with no backend at all is the
+// source's that issues an id of its shape, and otherwise the process table's,
+// which is the only scanner that lists a terminal it cannot name. A backend no
+// source here speaks for (a pty this daemon opened) answers empty, and a
+// caller then falls back to the whole reading.
+func OwningSource(row Session) string {
+	if SourceForID(row.ID) == ProcessSource || (row.TTY != "" && row.ID == row.TTY) {
+		return ProcessSource
+	}
+	if source := SourceFor(row.Backend); source != "" {
+		return source
+	}
+	if row.Backend == "" {
+		if source := SourceForID(row.ID); source != "" {
+			return source
+		}
+		return ProcessSource
 	}
 	return ""
 }

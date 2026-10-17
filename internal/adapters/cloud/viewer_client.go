@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -279,7 +278,7 @@ func (c *ViewerClient) ReadMachine(ctx context.Context, machineID string) (Viewe
 		}
 		if projection.Reason == "event_gap" {
 			if sessionID, _, ok := c.status.GapTarget(machineID); ok {
-				next := "ss/" + viewerChannelSegment(machineID) + "/" + viewerChannelSegment(sessionID)
+				next := "ss/" + domain.ChannelSegment(machineID) + "/" + domain.ChannelSegment(sessionID)
 				if next != recovering {
 					if recovering != "" {
 						_ = c.transport.Unsubscribe(recovering)
@@ -300,21 +299,4 @@ func (c *ViewerClient) ReadMachine(ctx context.Context, machineID string) (Viewe
 		case <-c.update:
 		}
 	}
-}
-
-func viewerChannelSegment(value string) string {
-	const safe = "-_.!~*'()"
-	const hex = "0123456789ABCDEF"
-	var out strings.Builder
-	for i := 0; i < len(value); i++ {
-		c := value[i]
-		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.IndexByte(safe, c) >= 0 {
-			out.WriteByte(c)
-		} else {
-			out.WriteByte('%')
-			out.WriteByte(hex[c>>4])
-			out.WriteByte(hex[c&0x0f])
-		}
-	}
-	return out.String()
 }
