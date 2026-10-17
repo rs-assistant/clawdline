@@ -4,14 +4,12 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/documents"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/contract"
 )
 

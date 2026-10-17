@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	_ "embed"
-	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 )

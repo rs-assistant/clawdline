@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/sainteye/clawdline/internal/adapters/logs"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	httptransport "github.com/sainteye/clawdline/internal/transport/http"
@@ -23,7 +22,7 @@ import (
 // opened keeps logging to stderr, and the register's row says the log is not
 // being measured.
 func daemonLog(cfg config.Config) {
-	w, err := logs.Open(cfg.Dir, append(foreignDirs(), swiftstore.Dir())...)
+	w, err := logs.Open(cfg.Dir, foreignDirs()...)
 	if err != nil {
 		log.Printf("log: staying on stderr, because the log directory could not be opened: %v", err)
 		return

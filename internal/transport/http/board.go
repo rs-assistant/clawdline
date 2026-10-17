@@ -13,7 +13,6 @@ import (
 
 	boardstore "github.com/sainteye/clawdline/internal/adapters/board"
 	"github.com/sainteye/clawdline/internal/domain/auth"
-	domainboard "github.com/sainteye/clawdline/internal/domain/board"
 )
 
 // The retired board's compatibility resource: `GET /v1/board` in the Swift
@@ -25,12 +24,12 @@ import (
 // What is and is not here follows docs/board-design.md: the wire, the card
 // allow-list and the progress rules are carried over; item writes are refused
 // by name, because where an item is stored is a decision the design document
-// leaves open. Cards from the Swift app are read, never written (plan.md §4).
+// leaves open. The cards were the retired Swift app's, and its board is no
+// longer read (docs/cutover.md §7): every catalog this route answers is empty.
 
 // boardDeps is per server, and lives here rather than on the Server struct so
 // that the board's wiring is one file.
 type boardDeps struct {
-	legacy   *boardstore.Legacy
 	settings *boardstore.Settings
 }
 
@@ -42,7 +41,6 @@ func (s *Server) board() *boardDeps {
 	}
 	// settings is the old document, read once to carry it over (D37).
 	d, _ := boardByServer.LoadOrStore(s, &boardDeps{
-		legacy:   boardstore.OpenLegacy(boardstore.LegacyPath()),
 		settings: boardstore.OpenSettings(s.cfg.Dir),
 	})
 	return d.(*boardDeps)
@@ -105,51 +103,26 @@ func (s *Server) boardRead(w http.ResponseWriter, r *http.Request) {
 		q.Limit = clampInt(values.Get("limit"), boardstore.DefaultPageLimit, 1, boardstore.MaximumPageLimit)
 	}
 
-	d := s.board()
 	settings, err := s.boardSettings(r.Context())
 	if err != nil {
 		writeBoardRefusal(w, err, false)
 		return
 	}
-	legacy, legacyAt, legacyErr := d.legacy.Read()
-
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	presence, paths := s.boardPresence(ctx)
+	presence := s.boardPresence(ctx)
 
 	env, status := boardstore.Build(boardstore.Inputs{
-		Legacy: legacy, LegacyAt: legacyAt, LegacyErr: legacyErr,
 		Settings: settings, Viewer: boardViewer(r), Presence: presence,
-		ProjectPath: func(id string) string { return paths[id] },
-		ProjectIcon: func(path string) any { return wireIcon(s.icons.For(path)) },
 	}, q)
 	writeBoardEnvelope(w, env, status, false)
 }
 
-// boardPresence is the live inventory, keyed on the conversation id the board
-// joins on, and the paths the running sessions name, keyed on project id.
-func (s *Server) boardPresence(ctx context.Context) (boardstore.Presence, map[string]string) {
+// boardPresence is the live inventory the envelope's responsibilitySource
+// describes.
+func (s *Server) boardPresence(ctx context.Context) boardstore.Presence {
 	inv := s.reading(ctx)
-	presence := boardstore.Presence{Complete: inv.Complete, Fresh: true,
-		ObservedAt: inv.ObservedAt, ByConversation: map[string][]boardstore.PresenceRow{}}
-	paths := map[string]string{}
-	for _, item := range inv.Sessions {
-		if !item.IsAssistant() {
-			continue
-		}
-		if item.CWD != "" {
-			paths[domainboard.ID("project", item.CWD)] = item.CWD
-		}
-		if item.ConversationID == "" {
-			continue
-		}
-		id := strings.ToLower(item.ConversationID)
-		presence.ByConversation[id] = append(presence.ByConversation[id], boardstore.PresenceRow{
-			TerminalID: item.ID, Title: item.Label, Provider: string(item.Assistant),
-			State: string(item.State),
-		})
-	}
-	return presence, paths
+	return boardstore.Presence{Complete: inv.Complete, Fresh: true, ObservedAt: inv.ObservedAt}
 }
 
 // boardWrite applies one command.
@@ -176,7 +149,6 @@ func (s *Server) boardWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d := s.board()
 	outcome, answered := s.boardApply(w, r, viewer.ID, c, raw)
 	if answered {
 		return
@@ -189,11 +161,7 @@ func (s *Server) boardWrite(w http.ResponseWriter, r *http.Request) {
 		writeBoardRefusal(w, err, true)
 		return
 	}
-	legacy, legacyAt, legacyErr := d.legacy.Read()
-	env, _ := boardstore.Build(boardstore.Inputs{
-		Legacy: legacy, LegacyAt: legacyAt, LegacyErr: legacyErr,
-		Settings: settings, Viewer: viewer,
-	}, boardstore.Query{})
+	env, _ := boardstore.Build(boardstore.Inputs{Settings: settings, Viewer: viewer}, boardstore.Query{})
 	env.Projects = []boardstore.ProjectRow{}
 	body := map[string]any{
 		"board": env, "ok": true,

@@ -9,7 +9,6 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/projectlinks"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 )
