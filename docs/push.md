@@ -201,8 +201,8 @@ console 原本寫了 `viewport-fit=cover`，而它抄來的那份 stylesheet 在
 | 點開 | 那個 session | `terminal` 帶在推播上；tag 是 `waiting-<terminal>`，同一個 session 的新一則蓋掉舊的。 |
 
 **只有讀數能結束一次停頓。** `unknown` 不是「沒在等」；讀數看不到那個終端機（例如 iTerm2 沒回應）
-時，列表上少了那一列也不是它不在了。沒有人看到結束的停頓（daemon 當時沒在跑）就當作已經推過：
-推兩次比讓他在列表上看到更糟（DG-7）。
+時，列表上少了那一列也不是它不在了。沒有人看到結束的停頓（daemon 當時沒在跑）就當作已經推過，期限是 events 保留這一列的 30 天（`store.EventKeptAgeLimit`）：
+推兩次比讓他在列表上看到更糟（DG-7）。超過 30 天後重啟，仍在等的 Session 會再推一次。
 
 ### 不推的，以及為什麼
 

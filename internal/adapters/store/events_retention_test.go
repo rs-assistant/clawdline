@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -398,5 +399,53 @@ func TestTheKeepSetOnAFourMonthFixture(t *testing.T) {
 	}
 	if want := 30 * 18; bounded != want {
 		t.Fatalf("kept with the limit: %d, want the last thirty days' subjects, %d", bounded, want)
+	}
+}
+
+// A kept row superseded while a long pass is walking is deleted by the next
+// pass. The pass takes the top of its window before it walks, so a row
+// appended meanwhile is after that mark and the next pass reads it; a mark
+// taken after the walk would skip it, and the old row would be kept for good.
+func TestARowSupersededDuringAPassGoesOnTheNext(t *testing.T) {
+	if testing.Short() {
+		t.Skip("writes sixty thousand rows")
+	}
+	st := openEventStore(t)
+	now := time.Now()
+	old := now.Add(-EventAgeLimit - time.Hour).Unix()
+	rows := [][3]any{{old, "run.latest", "superseded"}}
+	for i := range 60_000 {
+		rows = append(rows, [3]any{old, "lease.granted", fmt.Sprint("s", i%400)})
+	}
+	seedEvents(t, st, rows)
+	ctx := context.Background()
+
+	done := make(chan error, 1)
+	var finished atomic.Bool
+	go func() {
+		_, err := st.PruneEvents(ctx, now)
+		finished.Store(true)
+		done <- err
+	}()
+	time.Sleep(5 * time.Millisecond)
+	if err := st.Append(ctx, Event{Kind: "run.latest", Subject: "superseded"}); err != nil {
+		t.Fatal(err)
+	}
+	appendedDuring := !finished.Load()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if !appendedDuring {
+		t.Skip("the pass ended before the append; this machine is too fast for the fixture")
+	}
+	if _, err := st.PruneEvents(ctx, now); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := st.db.QueryRow(`SELECT COUNT(*) FROM events WHERE kind = 'run.latest' AND subject = 'superseded'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("%d run.latest rows for the subject after two passes, want only the one that superseded the old", n)
 	}
 }
