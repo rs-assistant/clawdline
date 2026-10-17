@@ -102,14 +102,24 @@ export class StatusCloudClient extends CatalogCloudClient {
 
   /** Dictates on this Session's machine unless a person selected another host. */
   async voiceFor(machine, audio, rate) {
-    const host = this._sessionVoiceHost(machine)
-    if (!host.machine) throw host.error
-    try {
-      return await this._machineRequest(host.machine, "voice",
-        { audio, rate }, "action", VOICE_TIMEOUT_MS)
-    } catch (error) {
-      this._recordMissingWhisper(error, host)
-      throw error
+    let missing = null
+    for (;;) {
+      const host = this._sessionVoiceHost(machine)
+      if (!host.machine) throw missing || host.error
+      try {
+        return await this._machineRequest(host.machine, "voice",
+          { audio, rate }, "action", VOICE_TIMEOUT_MS)
+      } catch (error) {
+        this._recordMissingWhisper(error, host)
+        if (error?.code !== "no_whisper") throw error
+        // A command in the descriptor says that the daemon understands the
+        // route, not that whisper-cli and its model are installed. Remember
+        // this machine's authoritative refusal for this page and retry the
+        // same recording on the next eligible host.
+        if (!(this.voiceUnavailable instanceof Set)) this.voiceUnavailable = new Set()
+        this.voiceUnavailable.add(host.machine)
+        missing = error
+      }
     }
   }
 
@@ -162,6 +172,8 @@ export class StatusCloudClient extends CatalogCloudClient {
     this.classicSessionReads = new Map()
     this.classicSessionAttempted = new Map()
     this.classicSessionPass = null
+    const priorUnavailable = options?.resumeFrom?.voiceUnavailable
+    this.voiceUnavailable = priorUnavailable instanceof Set ? new Set(priorUnavailable) : new Set()
   }
 
   // The archived client keeps only the first 64 advertised command words in
@@ -433,16 +445,21 @@ export class StatusCloudClient extends CatalogCloudClient {
   }
 
   _machinesFor(type) {
-    const found = super._machinesFor(type)
-    if (type !== "voice" || found.capable.length || !found.evidentMac) return found
-    // The archived picker drops every unknown route as soon as it sees a Mac.
-    // Its 64-word descriptor cache makes voice unknown on that very Mac while
-    // its live descriptor is between snapshots. Keep only paired, evident Macs
-    // as candidates; a named request gets the machine's authoritative answer.
-    const possible = found.unconfirmed.filter((row) => this._evidentMac(row.id))
-    if (!possible.length) return found
-    return { ...found, capable: possible,
-      unconfirmed: found.unconfirmed.filter((row) => !possible.includes(row)) }
+    let found = super._machinesFor(type)
+    if (type !== "voice") return found
+    if (!found.capable.length && found.evidentMac) {
+      // The archived picker drops every unknown route as soon as it sees a Mac.
+      // Its 64-word descriptor cache makes voice unknown on that very Mac while
+      // its live descriptor is between snapshots. Keep only paired, evident Macs
+      // as candidates; a named request gets the machine's authoritative answer.
+      const possible = found.unconfirmed.filter((row) => this._evidentMac(row.id))
+      if (possible.length) found = { ...found, capable: possible,
+        unconfirmed: found.unconfirmed.filter((row) => !possible.includes(row)) }
+    }
+    if (this.voiceUnavailable instanceof Set && this.voiceUnavailable.size) {
+      found = { ...found, capable: found.capable.filter((row) => !this.voiceUnavailable.has(row.id)) }
+    }
+    return found
   }
 
   /** A saved choice wins; otherwise one current Mac is the fleet fallback. */
