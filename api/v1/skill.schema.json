@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skill.schema.json",
+  "title": "Whether this machine's assistants have the clawdline skill",
+  "description": "GET /v1/skill reads, and POST /v1/skill/install installs, the stub `clawdline skill install` writes: one per assistant, under ~/.claude/skills and ~/.agents/skills. Both are this machine's own token only (403 `forbidden` otherwise), because the files are the person's own assistant configuration (design-guidelines DG-10): the console offers the install, and only a press makes it. The install writes only a target whose state is `missing` or `stale`; a `changed` or `other` file is somebody's, and is left for `clawdline skill install` to refuse or record by hand.",
+  "$defs": {
+    "SkillReply": {
+      "description": "Every target, Claude Code's first. After an install, `state` is read again, so it says what is there now.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["targets"],
+      "properties": {
+        "targets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SkillTarget" }
+        }
+      }
+    },
+    "SkillTarget": {
+      "description": "One assistant's skill file.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assistant", "path", "state"],
+      "properties": {
+        "assistant": {
+          "description": "Which assistant reads this file: Claude Code reads ~/.claude/skills, Codex reads ~/.agents/skills.",
+          "type": "string",
+          "enum": ["claude", "codex"]
+        },
+        "path": {
+          "description": "The SKILL.md path on this machine.",
+          "type": "string"
+        },
+        "state": {
+          "description": "`current` is this build's stub; `missing` is nothing there; `stale` is an earlier stub of ours; `changed` is our install edited since; `other` is a file or link that was never ours; `unreadable` is a state that could not be read, which never authorises a write.",
+          "type": "string",
+          "enum": ["current", "missing", "stale", "changed", "other", "unreadable"]
+        },
+        "outcome": {
+          "description": "POST only: what the install did here. `skipped` is a target that was current, or not ours to replace; `failed` is a write that did not complete.",
+          "type": "string",
+          "enum": ["installed", "updated", "already_current", "skipped", "failed"]
+        }
+      }
+    }
+  }
+}

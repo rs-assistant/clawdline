@@ -465,6 +465,7 @@ const (
 	ConsoleRelayTranscriptExpectReask = "console.relay_transcript_expect_reask_seconds"
 	ConsoleRelayFeatureWait           = "console.relay_feature_wait_seconds"
 	ConsoleStatusGapRetry             = "console.status_gap_retry_seconds"
+	ConsolePersonaRetry               = "console.persona_retry_seconds"
 	ConsoleStatusMarkerRetry          = "console.status_marker_retry_seconds"
 	ConsolePinnedListReadTimeout      = "console.pinned_list_read_timeout_seconds"
 	ConsoleStatusMarkerRecoveryWait   = "console.status_marker_recovery_wait_seconds"
@@ -2774,6 +2775,15 @@ func Register() []Entry {
 			// web/console/src/cloud/status-source.ts). A failed attempt must
 			// not pin the list in event_gap for the rest of the status pass.
 			Name: ConsoleStatusGapRetry, Class: Cache, Unit: Seconds,
+			Limit: 5, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// A transient failure reading one machine's role catalog gets one
+			// retry per machine (RETRY_MS, web/console/src/personas.ts). A
+			// phone returning from a Cloud connection gap must not keep an
+			// empty catalog, and therefore hide Session roles, indefinitely.
+			Name: ConsolePersonaRetry, Class: Cache, Unit: Seconds,
 			Limit: 5, AtLimit: Expire,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},

@@ -1261,6 +1261,9 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		capacity.ConsoleStatusGapRetry: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console retry of a missing Cloud status row; daemon cannot measure another device's reads"}
 		},
+		capacity.ConsolePersonaRetry: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Console retry of a transient role catalog failure; daemon cannot measure another device's reads"}
+		},
 		capacity.ConsoleStatusMarkerRetry: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console retry of a missing Cloud status inventory; daemon cannot measure another device's reads"}
 		},

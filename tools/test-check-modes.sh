@@ -15,7 +15,7 @@ done
 cat > "$scratch/bin/go" <<'MOCK'
 #!/bin/bash
 printf 'go %s\n' "$*" >> "$CALLS"
-if [ "$1" = list ]; then printf '{"Dir":"%s/internal/example","ImportPath":"fixture/example"}\n{"Dir":"%s/internal/caller","ImportPath":"fixture/caller","Imports":["fixture/example"]}\n' "$PWD" "$PWD"; exit 0; fi
+if [ "$1" = list ]; then root=$(pwd -P); printf '{"Dir":"%s/internal/example","ImportPath":"fixture/example"}\n{"Dir":"%s/internal/caller","ImportPath":"fixture/caller","Imports":["fixture/example"]}\n' "$root" "$root"; exit 0; fi
 if [ "${FAIL_TESTS:-0}" = 1 ] && [ "$1" = test ]; then exit 7; fi
 if [ "$1 $2" = 'test -json' ]; then
   printf '%s\n' '{"Action":"pass","Package":"fixture","Elapsed":1}'
