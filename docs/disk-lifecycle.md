@@ -102,12 +102,23 @@ reclaimed by this mechanism. The register operation is intentionally internal
 to the gate dispatch; an arbitrary path, including a shared GOPATH or
 GOCACHE, is not admitted as gate scratch.
 
-On Linux, `tools/heavy.sh` runs its command and then clears Go's build, module,
-test, and fuzz caches before releasing the compile slot. It also clears after
-a failed command and preserves that command's failure. The Linux user-service
-deploy runs its release build through this wrapper. This deliberately trades
-repeat downloads and cold compilations for bounded cache lifetime. Commands
-that bypass `tools/heavy.sh` are outside this cleanup path.
+On Linux, `tools/heavy.sh` uses a persistent wrapper-owned Go cache across
+worktrees instead of clearing all Go caches after every command. The root
+has a private ownership marker and lock; symlinked or unmarked roots are
+refused. Explicit `GOCACHE`/`GOMODCACHE` values stay with their owner, including
+broker gate caches. The user's default shared caches are never reclaimed by
+this wrapper. Its cache is not a Session-owned disposable directory.
+
+The registered managed-cache budget is 4 GiB, with a 2 GiB filesystem reserve.
+Before and after the command, the wrapper measures disk and cache usage. Only
+budget or disk pressure triggers reclamation, compiled entries first and
+modules only if needed. A still-low preflight refuses the build. Command
+failure survives cleanup failure; unreadable ownership or measurements never
+authorize deletion. This is a between-command budget, not an in-flight quota.
+The implementation, tests and diagnostics are described in [checks](checks.md).
+The Linux user-service deploy uses the same wrapper. The previous policy
+(2026-10-14) purged build, module, test and fuzz caches after every command;
+it avoided indefinite growth but forced each next check to start cold.
 
 Before an operator manually clears the shared cache, read `go env GOCACHE`,
 the active compile lease and queue, and whether other Go commands are using

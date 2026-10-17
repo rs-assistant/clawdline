@@ -1,0 +1,103 @@
+# Check scope and timing
+
+The development target is ten seconds; the ordinary local commit target is one
+minute. These are workflow goals, not timeouts that kill an unfinished test or
+turn missing coverage into success. Measure elapsed work separately from waiting
+for the compile slot. A large changed package or a conservative fallback can
+exceed the target and must remain visible.
+
+## Development
+
+```sh
+tools/check.sh --quick ./internal/config --run=TestRetiredClaimScanPreservesLineNumbersAndSentenceRules
+tools/check.sh --quick ./internal/adapters/store
+```
+
+Run the smallest relevant package/test while editing. `--run=` accepts Go's test
+name expression. Quick mode is explicitly a development check, not a commit or
+integration receipt. A package with slow tests may need a narrower expression to
+meet ten seconds. Use `tools/heavy.sh` for other ad hoc test commands too.
+
+## Ordinary local commits
+
+```sh
+tools/check.sh --plan       # Explain changed paths, direct tests and callers.
+tools/check.sh              # Run the local change gate.
+tools/check.sh --callers    # Also compile transitive callers' tests without running them.
+```
+
+The plan includes committed changes since the merge base with `main`, staged
+changes (even when the working file was reverted), unstaged, deleted, renamed
+and untracked files. A known empty change set is different from unreadable Git
+state. Unknown/tooling/policy inputs and unreliable discovery fall back to full
+verification, with a reason. Platform-constrained inputs are named in the plan; foreign-platform validation
+remains an explicit integration/CI requirement.
+
+Go package metadata identifies the changed packages and the transitive callers,
+including test imports. The local gate runs the changed packages' tests. Caller
+compilation can be requested with `--callers`; caller runtime suites wait for
+integration and CI. A deleted or unowned package cannot silently disappear.
+Selection is by path and tests execute the working tree; partial-hunk commits
+need exact-commit CI evidence before landing. Repository-copy and
+capacity-registration guards still run, uncached, even for
+documentation edits. Generated contracts and the existing source guards remain.
+
+For the console, TypeScript checks the entire project incrementally. Its build
+information stays in the ignored `web/.clawdline-check.tsbuildinfo` of this
+worktree and is removed with the checkout. The TypeScript resolver traces import,
+export and literal dynamic-import dependencies to affected tests. Filesystem
+readers and computed loaders remain conservative readers of changed inputs.
+Configuration/unknown fixture changes run the broader web test set. Catalogs
+retain their complete localization validators. The bundle build waits for
+integration/CI. A test selection is not a claim that unselected tests ran.
+
+Privacy checks on ordinary commits read the changed files through literal Git
+pathspecs, including untracked files. They still require the private-word list;
+undetermined is not a pass. Whole-tree checks and the existing incoming-commit
+history guard remain mandatory before publication. A local delta check does not
+certify old commits or an unchanged tree against a changed private-word list.
+
+## Integration, CI, dev and releases
+
+```sh
+tools/check.sh --full
+tools/check.sh --full --profile
+```
+
+Run the full gate once on the final integrated tree before landing a batch on
+`main`, publishing or installing dev/release artifacts. Full CI evidence for the
+same tree can satisfy the integration requirement. Do not repeat the full gate
+after every intermediate local commit; repeat it when code, failures or missing
+coverage require it. CI's full platform matrix, complete Go and console suites,
+cross-builds, whole-tree privacy and release acceptance remain authoritative.
+`--web` explicitly requests the complete web gate locally.
+
+Profile mode forces uncached Go tests with JSON events and retains logs and
+`go-profile.json`. Package times overlap; subtests overlap parents. Neither sum
+is wall time. Event time excludes work before the first event. Compare ordinary
+warm runs separately because `-count=1` intentionally bypasses test-result reuse.
+
+## Linux cache ownership and disk pressure
+
+Linux heavy commands share a persistent tool-owned cache under
+`$XDG_CACHE_HOME/clawdline/heavy-go-v1` (default `$HOME/.cache`). A private owner
+marker and user ownership are required. Unmarked or symlinked caches are refused;
+a file lock serializes use without a daemon too. Nested wrappers reuse the lock.
+
+The managed-cache budget is 4 GiB, with a 2 GiB free-space reserve. Decimal KiB
+constants in `internal/domain/capacity/heavy_cache.go` are read by the wrapper
+and recorded in `capacity.ToolRegister`. Both capacity guards validate daemon
+and tool bounds. Tool measurements are emitted by the wrapper, not invented as
+zero daemon usage or added to the daemon's capacity UI.
+
+Before and after each command, the wrapper measures its owned cache and disk.
+Only budget or disk pressure triggers reclamation: compiled entries first,
+modules only if needed. A still-low preflight refuses the build. Original command
+failure survives cleanup failure. Unknown ownership or measurement never
+permits deletion. This is a between-command budget, not an in-flight quota.
+
+Explicit `GOCACHE` and `GOMODCACHE` values stay with their owners, including gate
+scratch. The default shared Go caches are not cleared or migrated. The old shared
+cache needs the owner/idle-process review in `docs/disk-lifecycle.md`. Persistent
+wrapper caches and the per-worktree TypeScript build information follow their
+stated lifecycle instead of per-command Session cleanup.

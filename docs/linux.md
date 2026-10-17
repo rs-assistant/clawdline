@@ -71,9 +71,11 @@ checkout's HEAD ([updates.md](updates.md)).
 The deploy builds from a disposable checkout, leaves the running version alone when a check fails,
 atomically switches `~/.local/share/clawdline-next/current`, restarts only the daemon, checks both
 `GET /` and the authenticated `BUILD.json`, and restores the previous release if either check fails.
-Its build holds the compile slot and clears Go's caches when the build finishes,
-including when a check fails. Other Linux builds should use `tools/heavy.sh`
-for the same cleanup. The small Go command that reads the registered deployment
+Its build holds the compile slot and reuses the wrapper-owned Go cache. The
+registered cache budget and free-space reserve trigger cleanup only under
+pressure; explicit user and broker caches remain with their owners. Other
+Linux builds should use `tools/heavy.sh` for the same ownership and budget
+checks; see [checks](checks.md). The small Go command that reads the registered deployment
 health deadline also runs through that wrapper before the service is switched.
 The user unit uses `KillMode=process`, so restarting the daemon does not kill the tmux server or the
 assistants it opened. `loginctl enable-linger` keeps the user manager alive without an interactive

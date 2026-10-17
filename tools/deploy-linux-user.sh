@@ -65,7 +65,7 @@ export XDG_RUNTIME_DIR=$runtime
 export DBUS_SESSION_BUS_ADDRESS=unix:path=$runtime/bus
 
 # Reading the registered health deadline compiles a small Go program. Finish
-# that compilation and clear its caches before switching the running release.
+# that compilation under the managed cache policy before switching the running release.
 deploy_health_seconds=$(HEAVY_HANDOFF=0 tools/heavy.sh go run ./tools/deploy-limit)
 
 current=$data_root/current
