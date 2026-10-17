@@ -465,8 +465,6 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
         if let web = Bundle.main.resourceURL?.appendingPathComponent("web"),
            FileManager.default.fileExists(atPath: web.path) {
             env["CLAWDLINE_NEXT_WEB"] = web.path
-            env["CLAWDLINE_NEXT_STANDALONE"] = "1"
-            env["CLAWDLINE_NEXT_OWN_SESSIONS"] = "1"
         } else {
             // tools/package-macos.sh removes the bundle before it copies the
             // console in, so a launch in that window finds no console. The

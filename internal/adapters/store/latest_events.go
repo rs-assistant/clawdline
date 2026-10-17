@@ -13,8 +13,8 @@ import (
 //
 // The index is what keeps it one seek per subject. The list is built every
 // time a page asks; without the index each build would scan every event the
-// table holds. The newest row per subject of each kind read here is never
-// pruned (events_retention.go).
+// table holds. The newest row per subject of each kind read here is kept until
+// its subject has been silent for EventKeptAgeLimit (events_retention.go).
 const latestEventsSchema = `
 CREATE INDEX IF NOT EXISTS events_kind_subject ON events(kind, subject, seq);
 `

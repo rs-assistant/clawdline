@@ -64,7 +64,6 @@ tar -xzf /var/tmp/payload.tgz -C /opt/clawdline-next
 systemd-run --unit=clawdline-next --uid=<service user> --gid=<service user> \
   --setenv=HOME=<service home> \
   --setenv=CLAWDLINE_NEXT_WEB=/opt/clawdline-next/dist \
-  --setenv=CLAWDLINE_NEXT_STANDALONE=1 --setenv=CLAWDLINE_NEXT_OWN_SESSIONS=1 \
   /opt/clawdline-next/clawdline serve
 ```
 

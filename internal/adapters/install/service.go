@@ -80,8 +80,6 @@ func (s ServiceSpec) env() [][2]string {
 		{"PATH", s.Path},
 		{"SHELL", s.Shell},
 		{"CLAWDLINE_NEXT_PORT", strconv.Itoa(s.Port)},
-		{"CLAWDLINE_NEXT_STANDALONE", "1"},
-		{"CLAWDLINE_NEXT_OWN_SESSIONS", "1"},
 	}
 	if s.StateDir != "" {
 		out = append(out, [2]string{"CLAWDLINE_NEXT_DIR", s.StateDir})
