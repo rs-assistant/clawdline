@@ -82,10 +82,12 @@ func (s *Server) ownOverlayOf(ctx context.Context, lives []swiftstore.Live, reco
 	} else {
 		own.Tasks = ownTasks(records, byTerminal)
 	}
-	if waits, err := s.broker.Waits(ctx); err != nil {
-		failed = true
-	} else {
-		own.Waits = ownWaits(waits, terminalOf)
+	if s.broker != nil {
+		if waits, err := s.broker.Waits(ctx); err != nil {
+			failed = true
+		} else {
+			own.Waits = ownWaits(waits, terminalOf)
+		}
 	}
 	if deliveries, err := s.ownDeliveries(ctx, lives); err != nil {
 		failed = true
@@ -146,6 +148,11 @@ func conversationTerminals(lives []swiftstore.Live) map[string]string {
 // own obligation list already carries it (D01), and a second copy here would
 // count it twice. A finished task's result is its record's; one that ended
 // without a result ended by the broker's verdict, which is its answer.
+//
+// No CompletionDelivery is carried either, and Broker.SessionTasks relies on
+// it: a finished task told only by its root is not read for the list. Carry
+// the notice here and SessionTasks must read such tasks too
+// (TestTheSessionListIsTheOneTheWholeHistoryGave fails until it does).
 func ownTasks(records []orchestrator.Record, byTerminal map[string]swiftstore.Live) []swiftstore.Task {
 	out := make([]swiftstore.Task, 0, len(records))
 	for _, r := range records {

@@ -113,6 +113,16 @@ func sessionHistory(tb testing.TB, raws ...string) (*Server, session.Inventory) 
 		ChildConversationID: historyChild, Root: &orchestrator.RootRef{SessionID: historyRoot, Assistant: "claude"},
 		Landing: &orchestrator.Landing{State: orchestrator.LandingLanded, Target: "main", Commit: commit,
 			TargetCommit: target, At: time.Now()}}, nil, nil)
+	// A finished task told only by its root, its completion notice not yet
+	// acknowledged. No Session row reads a notice today (ownTasks carries no
+	// CompletionDelivery), so the narrow read leaves it out and the page is
+	// the same. Were a row ever to read it, the whole read would carry this
+	// task and the narrow one would not, and this comparison would fail.
+	put(orchestrator.Record{Protocol: orchestrator.Protocol, ID: "e3333333-3333-4333-8333-000000000000",
+		Assistant: "claude", Title: "finished, notice pending", State: orchestrator.StateSuccess,
+		CreatedAt: procStart.Add(-2 * time.Minute), FinishedAt: time.Now(), Claims: []string{},
+		ProjectDir: "/repo", Repository: "/repo", Root: &orchestrator.RootRef{SessionID: historyRoot, Assistant: "claude"}},
+		&store.BrokerNotice{ID: "n-pending", TaskID: "e3333333-3333-4333-8333-000000000000", State: "pending", CreatedAt: time.Now()}, nil)
 	// Three live: a child in pane-live, a callback the root waits on, and a
 	// task of a root not on screen.
 	put(orchestrator.Record{Protocol: orchestrator.Protocol, ID: "e1111111-1111-4111-8111-000000000000",
@@ -252,7 +262,7 @@ func TestSessionTasksLeavesTheRestOfTheHistoryUnread(t *testing.T) {
 	if err != nil || len(bad) != 0 {
 		t.Fatalf("read: %v, %d unreadable", err, len(bad))
 	}
-	if len(whole) != 3004 || len(narrow) == 0 || len(narrow) > len(whole)/2 {
+	if len(whole) != 3005 || len(narrow) == 0 || len(narrow) > len(whole)/2 {
 		t.Fatalf("whole %d, narrow %d", len(whole), len(narrow))
 	}
 	t.Logf("whole %d, narrow %d", len(whole), len(narrow))
