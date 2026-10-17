@@ -41,7 +41,7 @@ class FakeClient implements CloudWriteClient {
   ready = true
   allowWrites = true
   macCapabilities = new Set<string>()
-  descriptors = new Map<string, { machine: { commands?: string[] } }>([["mac-a", GO_DAEMON]])
+  descriptors = new Map<string, { machine: { commands?: string[]; name?: string; platform?: string } }>([["mac-a", GO_DAEMON]])
   machineDescriptors = new Map<string, unknown>()
   orchestratorSnapshots = new Map<string, unknown>()
   sessionInventoryByMachine = new Map<string, unknown>()
@@ -231,6 +231,7 @@ test("each console route is the Cloud word the machine lists, and nothing else",
     ["POST", "/v1/places/p1/resume/abc", "resume"],
     ["POST", "/v1/places/p1/resume/claude/abc", "resume"],
     ["POST", "/v1/voice", "voice"],
+    ["GET", "/v1/voice/source", "voice"],
     ["GET", "/v1/places", "places"],
     ["GET", "/v1/settings/default-models", "default-models"],
     ["POST", "/v1/settings/default-models", "default-models-update"],
@@ -840,6 +841,16 @@ test("dictation picks the machine this page reads when the voice machine is ambi
   assert.deepEqual(await json(res), { text: "hello there", ms: 900 })
   assert.deepEqual(client.calls.map((c) => c[0]), ["voice", "setVoiceHost", "voice"])
   assert.equal(client.calls[1][1], "mac-a")
+})
+
+test("the voice source names the actual selected Whisper machine without sending audio", async () => {
+  const client = new FakeClient()
+  client.descriptors.set("mac-a", { machine: { commands: ["voice"], name: "Build host", platform: "linux" } })
+  const { reader } = seam(client)
+  const res = await reader.fetch("/v1/voice/source")
+  assert.equal(res.status, 200)
+  assert.deepEqual(await json(res), { machine: "mac-a", name: "Build host", platform: "linux" })
+  assert.deepEqual(client.calls, [["voiceHost"]])
 })
 
 test("a spoken intent follows dictation to the chosen voice machine", async () => {
@@ -2391,6 +2402,7 @@ test("a persisted complete command list admits close before the next descriptor"
 
 test("every read the writer carries is one it waits for", () => {
   const reads: [string, string][] = [
+    ["/v1/voice/source", "voice-source"],
     ["/v1/work/v2/images/a1", "work-v2-image"],
     ["/v1/usage/compare-compaction", "usage-compare"],
     ["/v1/usage/compare-handoff", "usage-compare"],

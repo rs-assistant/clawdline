@@ -10609,6 +10609,29 @@ export interface VoiceSetup {
 }
 
 /**
+ * GET /v1/voice/source: the machine whose Whisper will read the next recording. The
+ * composer uses this only as a quiet source label; a failure to read it never
+ * prevents dictation.
+ */
+export interface VoiceSource {
+  /**
+   * The authenticated Cloud machine id, or empty on a page served directly by this
+   * machine.
+   */
+  machine: string
+
+  /**
+   * The machine's display name, bounded by the UI before it is shown.
+   */
+  name: string
+
+  /**
+   * darwin, linux or windows.
+   */
+  platform: string
+}
+
+/**
  * One file wait, in the Swift app's camelCase. `ownerSessionId` and each waiter's
  * `sessionId` are conversation ids.
  */

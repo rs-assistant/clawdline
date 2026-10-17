@@ -39,6 +39,17 @@
         "script_tag": { "description": "The tag that decided `script`.", "type": "string" }
       }
     },
+    "VoiceSource": {
+      "description": "GET /v1/voice/source: the machine whose Whisper will read the next recording. The composer uses this only as a quiet source label; a failure to read it never prevents dictation.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["machine", "name", "platform"],
+      "properties": {
+        "machine": { "description": "The authenticated Cloud machine id, or empty on a page served directly by this machine.", "type": "string" },
+        "name": { "description": "The machine's display name, bounded by the UI before it is shown.", "type": "string" },
+        "platform": { "description": "darwin, linux or windows.", "type": "string" }
+      }
+    },
     "VoiceSetup": {
       "description": "GET /v1/voice/setup: what this machine has for local dictation, where it looked, and the exact supported way to add the missing pieces. Paths under the current home directory are written with ~ so this response carries no account path.",
       "type": "object",

@@ -633,6 +633,11 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/voice/source",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/work/",
       "guide": "board"
     },
