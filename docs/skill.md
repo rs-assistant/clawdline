@@ -80,7 +80,10 @@ be a different build from the daemon that will answer:
 ## Installing the stub is the person's decision
 
 The stub lives in the person's own assistant configuration, so **nothing installs it by itself**
-(DG-10): a person runs `clawdline skill install` on the cutover day. Two skills with one name cannot
+(DG-10): a person runs `clawdline skill install`, or presses **Install** on the console's skill
+strip. The strip reads `GET /v1/skill` with this machine's own token and is never drawn through
+Cloud; its press (`POST /v1/skill/install`) writes only a target that is missing or an older stub
+of ours, and leaves an edited or foreign file for the command to refuse or record. Two skills with one name cannot
 coexist — Claude Code tells skills apart by their directory — so before that day the new stub is only
 tried inside this repository.
 

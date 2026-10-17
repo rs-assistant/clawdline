@@ -568,6 +568,16 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/skill",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/skill/install",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/update/dev-release",
       "guide": "connect"
     },

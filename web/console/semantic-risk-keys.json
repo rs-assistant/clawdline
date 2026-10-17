@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5353,
+  "englishKeys": 5361,
   "counts": {
-    "negation": 1524,
+    "negation": 1526,
     "state": 741,
     "permission": 339,
     "deletion": 115,
     "uncertainty": 155
   },
-  "unionCount": 2357,
+  "unionCount": 2359,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1277,6 +1277,8 @@
       "next.signedInRevokeFailed",
       "next.signedInSignOutFailed",
       "next.signedInThisWindow",
+      "next.skillBannerMissing",
+      "next.skillInstallFailed",
       "next.smartTitleConfirmSay",
       "next.smartTitleConfirmSayAuto",
       "next.smartTitleFailed",
@@ -4800,6 +4802,8 @@
     "next.signedInSignOutAsk",
     "next.signedInSignOutFailed",
     "next.signedInThisWindow",
+    "next.skillBannerMissing",
+    "next.skillInstallFailed",
     "next.smartTitleConfirmSay",
     "next.smartTitleConfirmSayAuto",
     "next.smartTitleFailed",

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5353,
-  "riskKeys": 2357,
-  "nonRiskCount": 2996,
+  "englishContentKeys": 5361,
+  "riskKeys": 2359,
+  "nonRiskCount": 3002,
   "groups": [
     {
       "name": "bar / other",
@@ -1966,7 +1966,7 @@
     },
     {
       "name": "next / other",
-      "count": 183,
+      "count": 189,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2081,6 +2081,12 @@
         "next.sidebarServiceVersion",
         "next.sidebarVersionReading",
         "next.sidebarWork",
+        "next.skillBannerStale",
+        "next.skillInstall",
+        "next.skillInstallPartial",
+        "next.skillInstalled",
+        "next.skillInstalling",
+        "next.skillUpdate",
         "next.smartTitleAction",
         "next.smartTitleButton",
         "next.smartTitleConfirmTitle",

@@ -14,6 +14,7 @@ import { Command, CommandSheet } from "./session/Command.js"
 import { Starting } from "./session/Starting.js"
 import { StartProgressDialog } from "./session/StartProgress.js"
 import { UpdateBanner } from "./machine/UpdateBanner.js"
+import { SkillBanner } from "./machine/SkillBanner.js"
 import { RestoreCard, RestoreHero, RestoreSheet, useRestoreOffer } from "./session/Restore.js"
 import { offerShape } from "./session/restore-offer.js"
 import "./session/empty-list.css"
@@ -297,6 +298,7 @@ export function SessionsPage({
               installs it, or the dev build running here and the ways on from
               it (machine/UpdateBanner.tsx). */}
           {fleetList ?? <><UpdateBanner />
+          <SkillBanner />
           <SessionToolbar onFilter={onFilter} terminalMode={terminalMode}
             onSessions={() => chooseTerminalMode(false)} onTerminals={() => chooseTerminalMode(true)}
             onVoice={() => Command.openAndListen()} onWork={() => openNewWorkItem()}

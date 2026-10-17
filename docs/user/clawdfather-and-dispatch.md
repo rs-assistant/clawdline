@@ -12,7 +12,8 @@ Free and local, on macOS and Linux. Dispatch needs a terminal Clawdline can open
 
 ## 1. Teach your sessions: install the skill
 
-Sessions learn Clawdline from a skill. Nothing installs it for you:
+Sessions learn Clawdline from a skill. Nothing installs it without you: the console offers it in a
+strip above the session list on this machine, or you can run
 
 ```sh
 ./bin/clawdline skill install
