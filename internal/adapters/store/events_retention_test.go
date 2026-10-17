@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -142,7 +143,7 @@ func TestThePruneHoldsTheTableUnderItsRowLimit(t *testing.T) {
 		rows = append(rows, [3]any{now.Unix() - 40 + int64(i), "lease.granted", fmt.Sprint("r", i)})
 	}
 	seedEvents(t, st, rows)
-	got, err := st.pruneEvents(context.Background(), now, EventAgeLimit, 10, 7)
+	got, err := st.pruneEvents(context.Background(), now, EventAgeLimit, EventKeptAgeLimit, 10, 7)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -234,5 +235,168 @@ func TestAHundredThousandRowPruneIsBatched(t *testing.T) {
 		got.Removed, got.Batches, got.Took, appends, slowest)
 	if slowest > 2*time.Second {
 		t.Fatalf("an append waited %s behind the prune", slowest)
+	}
+}
+
+// The newest row about a subject is kept only while its subject is younger
+// than EventKeptAgeLimit; past it the Session or run is gone and so is the row.
+func TestAKeptRowGoesOnceItsSubjectIsSilentTooLong(t *testing.T) {
+	st := openEventStore(t)
+	now := time.Unix(2_000_000_000, 0)
+	expired := now.Add(-EventKeptAgeLimit - time.Hour).Unix()
+	kept := now.Add(-EventKeptAgeLimit + time.Hour).Unix()
+	seedEvents(t, st, [][3]any{
+		{expired, "session.delivered", "gone"},
+		{expired, "run.latest", "gone"},
+		{expired, "session.waiting", "gone|c"},
+		{kept, "session.delivered", "still"},
+		{kept, "run.latest", "still"},
+		{kept, "session.waiting", "still|c"},
+	})
+	ctx := context.Background()
+	got, err := st.PruneEvents(ctx, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Removed != 3 {
+		t.Fatalf("removed %d, want the three silent subjects", got.Removed)
+	}
+	for key := range eventRows(t, st) {
+		if strings.Contains(key, "gone") {
+			t.Fatalf("an expired kept row survived: %v", eventRows(t, st))
+		}
+	}
+	// The rows the walk kept are behind its cursor now; a later prune, once
+	// they too are silent past the limit, lets them go without walking again.
+	later := now.Add(2 * time.Hour)
+	got, err = st.PruneEvents(ctx, later)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Removed != 3 || len(eventRows(t, st)) != 0 {
+		t.Fatalf("a later prune removed %d, left %v", got.Removed, eventRows(t, st))
+	}
+}
+
+// A prune starts where the last one stopped: the rows it already kept are not
+// walked again, and a kept row behind it that a newer row has superseded since
+// still goes.
+func TestThePruneResumesWhereTheLastOneStopped(t *testing.T) {
+	st := openEventStore(t)
+	now := time.Unix(2_000_000_000, 0)
+	old := now.Add(-EventAgeLimit - time.Hour).Unix()
+	var rows [][3]any
+	for i := range 50 {
+		rows = append(rows, [3]any{old, "run.latest", fmt.Sprint("c", i)})
+	}
+	rows = append(rows, [3]any{old, "lease.granted", "x"}, [3]any{now.Unix(), "lease.granted", "y"})
+	seedEvents(t, st, rows)
+	var lastOld int64
+	if err := st.db.QueryRow(`SELECT MAX(seq) FROM events WHERE at = ?`, old).Scan(&lastOld); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if _, err := st.PruneEvents(ctx, now); err != nil {
+		t.Fatal(err)
+	}
+	if st.prunes.cursor != lastOld {
+		t.Fatalf("the prune stopped at %d, want after the last old row %d", st.prunes.cursor, lastOld)
+	}
+
+	// c7 is written again. Its old row is behind the cursor; it goes, and no
+	// other kept row is touched.
+	if err := st.Append(ctx, Event{Kind: "run.latest", Subject: "c7"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := st.PruneEvents(ctx, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Removed != 1 {
+		t.Fatalf("removed %d, want c7's superseded row", got.Removed)
+	}
+	// It read y and c7's new row, not the kept rows again.
+	if got.Walked != 2 {
+		t.Fatalf("the resumed prune walked %d rows, want the 2 after where the last one stopped", got.Walked)
+	}
+	latest, err := st.LatestEvents(ctx, "run.latest", []string{"c7", "c8"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest["c7"].Seq <= lastOld || latest["c8"].Seq == 0 || latest["c8"].Seq > lastOld {
+		t.Fatalf("after the resumed prune: %+v", latest)
+	}
+	if n := len(eventRows(t, st)); n != 49+1+1 {
+		t.Fatalf("%d rows left, want the 49 other kept rows, c7's new row and y", n)
+	}
+}
+
+// A prune that fails part way does not move its cursor past rows it did not
+// delete: the next one still finds them.
+func TestAFailedPruneLeavesItsCursorBehind(t *testing.T) {
+	st := openEventStore(t)
+	now := time.Unix(2_000_000_000, 0)
+	old := now.Add(-EventAgeLimit - time.Hour).Unix()
+	seedEvents(t, st, [][3]any{{old, "lease.granted", "x"}, {old, "lease.granted", "y"}})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := st.PruneEvents(ctx, now); !errors.Is(err, context.Canceled) {
+		t.Fatalf("an ended prune: %v", err)
+	}
+	if st.prunes.cursor != 0 {
+		t.Fatalf("the cursor moved to %d without a deletion", st.prunes.cursor)
+	}
+	got, err := st.PruneEvents(context.Background(), now)
+	if err != nil || got.Removed != 2 {
+		t.Fatalf("the next prune: %+v %v", got, err)
+	}
+}
+
+// The keep-set on a fixture shaped like this machine's ledger: four months of
+// sessions, each day a few terminals and conversations, each with its runs,
+// deliveries and waiting stops. Kept forever, every subject ever seen stays;
+// with EventKeptAgeLimit only the last thirty days' do.
+func TestTheKeepSetOnAFourMonthFixture(t *testing.T) {
+	now := time.Unix(2_000_000_000, 0)
+	var rows [][3]any
+	for day := 120; day > 0; day-- {
+		at := now.Add(-time.Duration(day) * 24 * time.Hour).Unix()
+		for c := range 6 {
+			terminal := fmt.Sprintf("t%d-%d", day, c%3)
+			conversation := fmt.Sprintf("c%d-%d", day, c)
+			for range 3 {
+				rows = append(rows, [3]any{at, "run.issued", fmt.Sprintf("r%d-%d", day, len(rows))},
+					[3]any{at, "run.latest", conversation}, [3]any{at, "run.latest", terminal},
+					[3]any{at, "session.typed", terminal})
+			}
+			rows = append(rows, [3]any{at, "session.delivered", terminal},
+				[3]any{at, "session.waiting", terminal + "|" + conversation},
+				[3]any{at, "session.waiting", terminal + "|" + conversation})
+		}
+	}
+	kept := func(keptAge time.Duration) int {
+		st := openEventStore(t)
+		seedEvents(t, st, rows)
+		if _, err := st.pruneEvents(context.Background(), now, EventAgeLimit, keptAge, EventKeepLimit, EventPruneBatchLimit); err != nil {
+			t.Fatal(err)
+		}
+		// The keep-set: the subjects of the kept kinds that still have a row.
+		var n int
+		if err := st.db.QueryRow(`SELECT COUNT(*) FROM (SELECT DISTINCT kind, subject FROM events
+			WHERE kind IN ('run.latest', 'session.delivered', 'session.waiting'))`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	forever, bounded := kept(100*365*24*time.Hour), kept(EventKeptAgeLimit)
+	t.Logf("%d rows over 120 days; the keep-set is %d subjects kept forever, %d with EventKeptAgeLimit",
+		len(rows), forever, bounded)
+	// Each day has 18 subjects: run.latest for six conversations and three
+	// terminals, three terminals' deliveries, six waiting stops.
+	if want := 120 * 18; forever != want {
+		t.Fatalf("kept forever: %d, want every subject, %d", forever, want)
+	}
+	if want := 30 * 18; bounded != want {
+		t.Fatalf("kept with the limit: %d, want the last thirty days' subjects, %d", bounded, want)
 	}
 }

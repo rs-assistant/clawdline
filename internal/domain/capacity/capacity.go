@@ -645,15 +645,16 @@ func Register() []Entry {
 		{
 			// The store's events table, the operational journal. Rows past
 			// EventAgeLimit are deleted except the newest per subject of each
-			// kind a program reads back; past this many rows the oldest of the
-			// rest go first, whatever their age. Pruned in batches on the
-			// reference-image sweep's clock (store.MaintainEvery).
+			// kind a program reads back, and that newest row goes too once its
+			// subject has been silent for EventKeptAgeLimit; past this many rows
+			// the oldest of the rest go first, whatever their age. Pruned in
+			// batches on the reference-image sweep's clock (store.MaintainEvery).
 			Name: StoreEvents, Class: Journal, Unit: Rows,
 			Limit: 150_000, AtLimit: EvictOldest,
 			Told:      []Channel{Diagnostics},
 			EvictedBy: Daemon,
 			Sources: []string{"internal/adapters/store.EventAgeLimit", "internal/adapters/store.EventKeepLimit",
-				"internal/adapters/store.EventPruneBatchLimit"},
+				"internal/adapters/store.EventPruneBatchLimit", "internal/adapters/store.EventKeptAgeLimit"},
 		},
 		{
 			// One durable identity per terminal id on this machine. Full
