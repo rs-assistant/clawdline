@@ -5795,6 +5795,8 @@
   "capacityRow.console.relay_feature_wait_seconds.full": "等完之後照樣把讀取送給機器，由機器自己的回答決定；最多就是頁面第一次讀取慢幾秒。你不用做任何事。",
   "capacityRow.console.status_gap_retry_seconds.what": "透過 Cloud 使用時，清單少了某個對話、補抓又被拒絕或逾時，頁面要等多久再試一次。這樣一次失敗不會讓清單整輪都卡在「不完整」。",
   "capacityRow.console.status_gap_retry_seconds.full": "頁面會自己再試，缺的對話通常下一次就會補上。如果一直沒出現，檢查那台機器的連線。",
+  "capacityRow.console.persona_retry_seconds.what": "機器連線或伺服器暫時無法提供角色目錄時，頁面隔多久再讀一次。這段期間，Session 清單可能暫時看不到角色。",
+  "capacityRow.console.persona_retry_seconds.full": "頁面會自動重試，機器回應後就補回角色名稱。如果機器仍離線，連線恢復後角色會重新出現。",
   "capacityRow.console.status_marker_retry_seconds.what": "透過 Cloud 使用時，剛打開的頁面缺了機器「目前有哪些對話」的總表，要等多久才再問一次；問失敗時會從較短的間隔開始，慢慢拉長到這麼久。等待期間一般的更新常常就會補上，不必一直經過 Cloud 重問。",
   "capacityRow.console.status_marker_retry_seconds.full": "在那之前清單可能少幾個對話，等更新送到或下一次詢問時就會補齊。你不用做任何事。",
   "capacityRow.console.pinned_list_read_timeout_seconds.what": "透過 Cloud 使用時，頁面向機器要對話清單，最多等多久沒回應就放棄這一次。沒有這個時限，連線卡住時清單會一直等下去。",
