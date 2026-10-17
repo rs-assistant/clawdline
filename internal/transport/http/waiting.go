@@ -88,6 +88,23 @@ func waitingAfter() time.Duration {
 	return 0
 }
 
+// waitingTick is how often the watcher reads the session list: the 15 seconds
+// it kept while it ran beside the retired v1 board sweep. A variable so a
+// test can watch it take more than one reading.
+var waitingTick = 15 * time.Second
+
+// StartWaiting runs the watcher of sessions standing on a question, which
+// pushes "a session is waiting for you" (docs/push.md "有人在等你回答"). It
+// needs the broker: its push is one of the broker's outbox effects. Started by
+// the daemon; until 2026-10-17 it was started from inside the v1 board sweep,
+// and retiring that sweep stopped this push with it.
+func (s *Server) StartWaiting(ctx context.Context) {
+	if s.broker == nil {
+		return
+	}
+	go s.watchWaiting(ctx, waitingTick)
+}
+
 // watchWaiting reads the session list on the board's clock and hands it to
 // the watcher. It takes whatever reading is held while that is younger than
 // its own tick — the broker's beat takes one every five seconds — so on a
