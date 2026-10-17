@@ -4442,7 +4442,7 @@
   "next.voiceInstallPromptTitle": "Set up Whisper on this machine?",
   "next.voiceInstallPromptNoBinary": "None of the available machines has a working Whisper command. Would you like to open the setup instructions?",
   "next.voiceInstallPromptNoModel": "None of the available machines has a Whisper model. Would you like to download and set it up?",
-  "next.voiceInstallPromptRemoteHelp": "Open Clawdline on the machine where you want dictation, then go to Settings > Machine > Voice input. System tools must be installed from that machine.",
+  "next.voiceInstallPromptRemoteHelp": "Open Clawdline on the machine where you want dictation, then go to Settings → Machine → Voice input. System tools must be installed from that machine.",
   "next.voiceInstallPromptLater": "Not now",
   "next.voiceInstallPromptSetUp": "Set up Whisper",
   "next.voiceInstallPromptDone": "Done",

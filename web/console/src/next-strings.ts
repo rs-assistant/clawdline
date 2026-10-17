@@ -30,7 +30,7 @@ const words = {
     voiceInstallPromptNoModel:
       "None of the available machines has a Whisper model. Would you like to download and set it up?",
     voiceInstallPromptRemoteHelp:
-      "Open Clawdline on the machine where you want dictation, then go to Settings > Machine > Voice input. System tools must be installed from that machine.",
+      "Open Clawdline on the machine where you want dictation, then go to Settings → Machine → Voice input. System tools must be installed from that machine.",
     voiceInstallPromptLater: "Not now",
     voiceInstallPromptSetUp: "Set up Whisper",
     voiceInstallPromptDone: "Done",
@@ -1514,7 +1514,7 @@ const words = {
     voiceInstallPromptNoBinary: "目前可用的機器都沒有可執行的 Whisper。要查看安裝方式嗎？",
     voiceInstallPromptNoModel: "目前可用的機器都沒有 Whisper 模型。要現在下載並設定嗎？",
     voiceInstallPromptRemoteHelp:
-      "請在要使用語音的機器上開啟 Clawdline，前往「設定 > 機器 > 語音輸入」。系統工具必須從那台機器安裝。",
+      "請在要使用語音的機器上開啟 Clawdline，前往「設定 → 機器 → 語音輸入」。系統工具必須從那台機器安裝。",
     voiceInstallPromptLater: "稍後再說",
     voiceInstallPromptSetUp: "設定 Whisper",
     voiceInstallPromptDone: "完成",

@@ -4442,7 +4442,7 @@
   "next.voiceInstallPromptTitle": "要在這台機器設定 Whisper 嗎？",
   "next.voiceInstallPromptNoBinary": "目前可用的機器都沒有可執行的 Whisper。要查看安裝方式嗎？",
   "next.voiceInstallPromptNoModel": "目前可用的機器都沒有 Whisper 模型。要現在下載並設定嗎？",
-  "next.voiceInstallPromptRemoteHelp": "請在要使用語音的機器上開啟 Clawdline，前往「設定 > 機器 > 語音輸入」。系統工具必須從那台機器安裝。",
+  "next.voiceInstallPromptRemoteHelp": "請在要使用語音的機器上開啟 Clawdline，前往「設定 → 機器 → 語音輸入」。系統工具必須從那台機器安裝。",
   "next.voiceInstallPromptLater": "稍後再說",
   "next.voiceInstallPromptSetUp": "設定 Whisper",
   "next.voiceInstallPromptDone": "完成",
