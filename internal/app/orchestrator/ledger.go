@@ -21,7 +21,9 @@ import (
 // Bringing it up to date costs the tally, then the heads written since the
 // last one it saw, then the records whose version moved (G33). A tally that
 // still disagrees after that — a writer whose clock was behind, a migration
-// that moved a version and not updated_at — falls back to every head.
+// that moved a version and not updated_at — falls back to every head. One
+// whose clock was ahead does not: the heads are read from when the last
+// tally was asked for, if that is earlier than the newest updated_at.
 type ledgerSnapshot struct {
 	mu     sync.Mutex
 	synced bool
@@ -30,6 +32,14 @@ type ledgerSnapshot struct {
 	// order is every id in rows, as BrokerTaskHeads orders them: newest
 	// created first, then descending id.
 	order []string
+	// fullScans is how many times sync read every head, the first time
+	// included; a test holds the cost of a fallback with it.
+	fullScans int
+	// at is this machine's clock when the tally the snapshot holds was asked
+	// for. A write stamped by an honest clock after it is stamped at or after
+	// it, so sync looks from here when the newest updated_at is later —
+	// which only a writer whose clock ran ahead can make it.
+	at time.Time
 }
 
 type decodedRecord struct {
@@ -43,15 +53,20 @@ type decodedRecord struct {
 
 // sync brings the snapshot up to the table. The caller holds l.mu.
 func (l *ledgerSnapshot) sync(ctx context.Context, st *store.Store) error {
+	now := time.Now()
 	tally, err := st.BrokerTaskTally(ctx)
 	if err != nil {
 		return err
 	}
 	if l.synced && tally == l.tally {
+		l.at = now
 		return nil
 	}
 	if l.synced {
-		heads, err := st.BrokerTaskHeadsSince(ctx, time.Unix(l.tally.Through, 0))
+		// The earlier of the two, so a future updated_at costs re-reading
+		// its own row, not every head until the clock reaches it.
+		since := min(l.tally.Through, l.at.Unix())
+		heads, err := st.BrokerTaskHeadsSince(ctx, time.Unix(since, 0))
 		if err != nil {
 			return err
 		}
@@ -59,7 +74,7 @@ func (l *ledgerSnapshot) sync(ctx context.Context, st *store.Store) error {
 			return err
 		}
 		if l.tallied() == tally {
-			l.tally = tally
+			l.tally, l.at = tally, now
 			return nil
 		}
 	}
@@ -67,12 +82,13 @@ func (l *ledgerSnapshot) sync(ctx context.Context, st *store.Store) error {
 	if err != nil {
 		return err
 	}
+	l.fullScans++
 	if err := l.merge(ctx, st, heads, true); err != nil {
 		return err
 	}
 	// The tally of what was read, not of what was asked about first: a write
 	// between the two is then a disagreement the next sync settles.
-	l.tally, l.synced = l.tallied(), true
+	l.tally, l.synced, l.at = l.tallied(), true, now
 	return nil
 }
 

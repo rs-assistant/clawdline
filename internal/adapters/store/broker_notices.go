@@ -358,7 +358,7 @@ func migrateBrokerNotices(db *sql.DB) error {
 				return err
 			}
 		}
-		if _, err := tx.Exec(`UPDATE broker_tasks SET record = ? WHERE id = ?`, string(stripped), p.id); err != nil {
+		if _, err := tx.Exec(`UPDATE broker_tasks SET record = ?, version = version + 1 WHERE id = ?`, string(stripped), p.id); err != nil {
 			_ = tx.Rollback()
 			return err
 		}
