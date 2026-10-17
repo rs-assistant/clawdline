@@ -183,8 +183,11 @@ records before broadening any rule.
 On 2026-10-17, before fixed-port support, an Ubuntu EC2 host used OS-selected UDP ports. Its
 ephemeral range was `32768 60999`, so the temporary ingress rule covered that range. Before the
 rule change, both daemon-side STUN requests timed out; afterward, both returned valid responses.
-A paired phone's Terminal `input` and `resize` receipts then had `outcome=ok_direct`. That measured
-result is the baseline for verifying the smaller rule, not evidence that the smaller rule works.
+A paired phone's Terminal `input` and `resize` receipts then had `outcome=ok_direct`. After the
+fixed-port deployment, the daemon owned UDP 3479 on its private interface, and a security-group
+readback showed only UDP 3479 open for inbound direct traffic; the temporary ephemeral-range
+ingress rule was removed. A new direct Session-read channel opened after that change. A fresh
+Terminal `input` receipt after the smaller rule is still required to accept the whole Terminal path.
 
 Security group rules and the Internet Gateway have no separate hourly charge. An existing public
 IPv4 address and Internet-bound data transfer follow [AWS VPC pricing](https://aws.amazon.com/vpc/pricing/)
