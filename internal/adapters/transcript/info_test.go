@@ -12,6 +12,19 @@ import (
 // `Transcript.title(ofTranscript:)`, `SessionInfo.recordFacts`,
 // `Orchestrator.cost(of:)` and `Shells`.
 
+func TestCodexEffortComesFromNewestTurnContext(t *testing.T) {
+	older := `{"type":"turn_context","payload":{"model":"gpt-6-sol","effort":"high"}}` + "\n"
+	newer := `{"type":"turn_context","payload":{"model":"gpt-6.1-sol","effort":"low"}}`
+	facts := codexFacts([]byte(older + newer))
+	if facts.Model != "gpt-6.1-sol" || facts.Effort != "low" || facts.Usage != nil {
+		t.Fatalf("turn settings = %+v", facts)
+	}
+	facts = codexFacts([]byte(older + `{"type":"turn_context","payload":{"model":"gpt-6.1-sol"}}`))
+	if facts.Effort != "" {
+		t.Fatalf("older effort leaked into newest turn: %+v", facts)
+	}
+}
+
 func TestProjectSlugDashesEveryUTF16UnitThatIsNotAlphanumeric(t *testing.T) {
 	cases := map[string]string{
 		"/Users/a/code/clawdline-go": "-Users-a-code-clawdline-go",

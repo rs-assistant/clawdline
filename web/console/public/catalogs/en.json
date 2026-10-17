@@ -4428,6 +4428,7 @@
   "next.scheduleOnceOn": "Once, on {date}",
   "next.worktreeRemoveWaiting": "The machine is deleting this worktree. Closing this does not stop it; the list updates when it finishes.",
   "next.worktreeRemoveClose": "Close",
+  "next.infoReasoningEffort": "Reasoning effort",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

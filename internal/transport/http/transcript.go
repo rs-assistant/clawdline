@@ -477,8 +477,16 @@ func (s *Server) sessionInfoRoute(w http.ResponseWriter, r *http.Request, id str
 	if path := recordPath(item); path != "" {
 		if facts, err := s.facts.Read(path, string(item.Assistant)); err == nil {
 			info.Session.Model = facts.Model
+			info.Session.Effort = facts.Effort
 			info.Usage = wireSessionUsage(facts.Usage, item, status)
 			info.Context = wireSessionContext(facts, item.Assistant, status)
+		}
+	}
+	// Before the first turn Codex may have no record naming its model yet.
+	// Its startup card is direct evidence; machine defaults are not.
+	if info.Session.Model == "" && item.Assistant == session.AssistantCodex && s.inventory.Screen != nil {
+		if screen, ok := s.inventory.Screen.Capture(ctx, item); ok {
+			info.Session.Model, info.Session.Effort = session.ReadStartupSettings(screen, item.Assistant)
 		}
 	}
 	info.Limits = s.sessionLimits(item.Assistant, time.Now())
