@@ -77,7 +77,6 @@ func (s *Server) tasksList(w http.ResponseWriter, r *http.Request) {
 // tasksPayload builds the task list the route and the stream's `orchestrator`
 // frame both publish.
 func (s *Server) tasksPayload(ctx context.Context, cursor, limit int) (contract.TaskList, error) {
-	own := []contract.TaskRow{}
 	// The broker's own tasks, which live in this daemon's store rather than in
 	// the Swift app's. Without this the console would show a child this daemon
 	// dispatched only while the Swift app also happened to know about it, which
@@ -88,55 +87,25 @@ func (s *Server) tasksPayload(ctx context.Context, cursor, limit int) (contract.
 	// "your children are gone". And a row it could not decode is listed as
 	// `unreadable` — unfinished, so it rides on every page — never skipped
 	// (D05 ②).
-	records, unreadable, err := s.broker.Records(ctx)
+	//
+	// The page is cut from a window, not from the whole history: every task
+	// not finished, every unreadable row, and the newest finished tasks up to
+	// the end of this page. Thousands of tasks that finished before them are
+	// counted, not built into rows that the page would only throw away.
+	start := max(cursor, 0)
+	window, err := s.broker.TaskWindow(ctx, start+pageWindow(limit))
 	if err != nil {
 		return contract.TaskList{}, err
 	}
-	screen := s.screen(ctx)
-	{
-		for _, u := range unreadable {
-			created := u.CreatedAt.Unix()
-			own = append(own, contract.TaskRow{
-				ID:         u.ID,
-				TaskID:     u.ID,
-				Assistant:  contract.Assistant(u.Assistant),
-				ProjectDir: u.Project,
-				Claims:     []string{},
-				State:      contract.TaskState(orchestrator.StateUnreadable),
-				Created:    created,
-				CreatedAt:  created,
-				Dir:        s.broker.Tasks.Path(u.ID),
-			})
-		}
-		for _, t := range records {
-			claims := t.Lease()
-			created := t.CreatedAt.Unix()
-			row := contract.TaskRow{
-				ID:             t.ID,
-				TaskID:         t.ID,
-				Assistant:      contract.Assistant(t.Assistant),
-				ProjectDir:     t.ProjectDir,
-				Claims:         claims,
-				ClaimsDeclared: t.Claims != nil,
-				State:          contract.TaskState(t.State),
-				Created:        created,
-				CreatedAt:      created,
-				Dir:            t.Dir,
-				Title:          t.Title,
-				Kind:           t.Kind,
-				CallbackIntent: callbackIntentOf(t),
-				ScheduleID:     t.ScheduleID,
-				Persona:        t.Persona,
-			}
-			if !t.FinishedAt.IsZero() {
-				row.FinishedAt = t.FinishedAt.Unix()
-			}
-			ownTaskLinks(&row, t, screen)
-			own = append(own, row)
-		}
-	}
-
+	own := s.ownTaskRows(window.Unreadable, append(window.Live, window.Finished...), s.screen(ctx))
 	rows, page := swiftstore.TaskPage(own, cursor, limit)
+	// TaskPage counted only the finished rows it was given; the page is of
+	// all of them.
+	end := int(page.Cursor) + len(rows) - int(page.Unfinished)
+	page.Finished, page.NextCursor = int64(window.FinishedTotal), 0
+	if end < window.FinishedTotal {
+		page.NextCursor = int64(end)
+	}
 	now := time.Now()
 	return contract.TaskList{
 		At:    now.Unix(),
@@ -149,6 +118,62 @@ func (s *Server) tasksPayload(ctx context.Context, cursor, limit int) (contract.
 		Store:  contract.StoreReadingDisabled,
 		Source: contract.BearingsSource{ObservedAt: now.Unix(), Provenance: "broker", Freshness: contract.SourceFreshnessCurrent},
 	}, nil
+}
+
+// ownTaskRows is the broker's tasks as the list's rows: every unreadable row,
+// then the records, in the order given.
+func (s *Server) ownTaskRows(unreadable []orchestrator.Unreadable, records []orchestrator.Record, screen []swiftstore.OnScreen) []contract.TaskRow {
+	own := []contract.TaskRow{}
+	for _, u := range unreadable {
+		created := u.CreatedAt.Unix()
+		own = append(own, contract.TaskRow{
+			ID:         u.ID,
+			TaskID:     u.ID,
+			Assistant:  contract.Assistant(u.Assistant),
+			ProjectDir: u.Project,
+			Claims:     []string{},
+			State:      contract.TaskState(orchestrator.StateUnreadable),
+			Created:    created,
+			CreatedAt:  created,
+			Dir:        s.broker.Tasks.Path(u.ID),
+		})
+	}
+	for _, t := range records {
+		claims := t.Lease()
+		created := t.CreatedAt.Unix()
+		row := contract.TaskRow{
+			ID:             t.ID,
+			TaskID:         t.ID,
+			Assistant:      contract.Assistant(t.Assistant),
+			ProjectDir:     t.ProjectDir,
+			Claims:         claims,
+			ClaimsDeclared: t.Claims != nil,
+			State:          contract.TaskState(t.State),
+			Created:        created,
+			CreatedAt:      created,
+			Dir:            t.Dir,
+			Title:          t.Title,
+			Kind:           t.Kind,
+			CallbackIntent: callbackIntentOf(t),
+			ScheduleID:     t.ScheduleID,
+			Persona:        t.Persona,
+		}
+		if !t.FinishedAt.IsZero() {
+			row.FinishedAt = t.FinishedAt.Unix()
+		}
+		ownTaskLinks(&row, t, screen)
+		own = append(own, row)
+	}
+	return own
+}
+
+// pageWindow is at least as many finished rows as TaskPage puts on one page
+// of limit: it gives 50 for a limit it does not take, and never more than 500.
+func pageWindow(limit int) int {
+	if limit <= 0 || limit > 500 {
+		return 500
+	}
+	return limit
 }
 
 func callbackIntentOf(t orchestrator.Record) string {

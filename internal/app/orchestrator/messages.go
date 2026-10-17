@@ -357,7 +357,8 @@ func (b *Broker) LiveRootSession(ctx context.Context, conversationID string) (se
 		}
 		return session.Session{}, err
 	}
-	records, err := b.records(ctx)
+	// Only a task still running can make this terminal a child's.
+	records, err := b.liveTasks(ctx)
 	if err != nil {
 		return session.Session{}, err
 	}
@@ -412,7 +413,7 @@ func (b *Broker) ReportSessionDelivery(ctx context.Context, terminalID, summary 
 			"The current assistant process and conversation could not be bound.")
 	}
 	// A terminal that is a live Clawdline child reports through its result.
-	records, err := b.records(ctx)
+	records, err := b.liveTasks(ctx)
 	if err != nil {
 		return SessionDelivery{}, err
 	}
