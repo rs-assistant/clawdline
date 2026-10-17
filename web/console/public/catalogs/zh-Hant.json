@@ -4024,6 +4024,7 @@
   "next.terminalDiagnosticsCopy": "複製診斷",
   "next.terminalDiagnosticsCopyFailed": "無法複製；請直接選取文字。",
   "next.terminalDiagnosticsNote": "只有階段代碼，不含畫面、按鍵、金鑰，也沒有實際的裝置、連線或請求識別。",
+  "next.terminalDismissMenu": "收起選單",
   "next.terminalDropped": "有 {bytes} 還沒打出去的輸入已丟棄。",
   "next.terminalEntry": "終端",
   "next.terminalEntryFor": "{project} 的終端",
