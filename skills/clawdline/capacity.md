@@ -282,7 +282,6 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `store.receipts` | 4096 | `rows` | `refuse` | `diagnostics, notice` | — |
 | `terminal.body_bytes` | 6295552 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `terminal.count` | 8 | `rows` | `refuse` | `diagnostics, sender` | — |
-| `terminal.grants_bytes` | 262144 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `terminal.history_lines` | 2000 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `terminal.input_bytes` | 4096 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `terminal.lane` | 16 | `rows` | `refuse` | `diagnostics, sender` | — |

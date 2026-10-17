@@ -351,7 +351,6 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		Handler:               srv.Handler(),
 		TerminalService:       srv.CloudTerminalService,
 		TerminalProject:       srv.CloudTerminalProject,
-		DropTerminalGrant:     srv.CloudDropTerminalGrant,
 		PeerReceipts:          srv.PeerReceipts(),
 		PeerAdmitTarget:       srv.AdmitExecutionTarget,
 		PeerExecute:           srv.PeerExecute,

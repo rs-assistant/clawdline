@@ -4172,12 +4172,6 @@ export interface PairedDevice {
    */
   last_seen?: number
   name: string
-
-  /**
-   * Legacy terminal grant record for older clients. Access now follows pairing;
-   * this field does not grant or revoke terminal access.
-   */
-  terminal?: boolean
 }
 
 /**
@@ -8620,17 +8614,6 @@ export const TerminalCursorShapeValues: readonly TerminalCursorShape[] = ["defau
  */
 export interface TerminalDiagnostics {
   /**
-   * Why the grants file could not be read.
-   */
-  grants_error?: string
-
-  /**
-   * The legacy terminal grants file could be read. It no longer controls terminal
-   * access.
-   */
-  grants_ok: boolean
-
-  /**
    * Control leases held now.
    */
   leases: number
@@ -8677,26 +8660,6 @@ export interface TerminalFrame {
    * The screen's height. The text is `lines`.
    */
   rows: number
-}
-
-export interface TerminalGrant {
-  device_id: string
-  granted: boolean
-
-  /**
-   * Unix seconds. Absent when not granted.
-   */
-  granted_at?: number
-}
-
-/**
- * Legacy POST /v1/auth/devices/{id}/terminal. This machine's own token only, and
- * never through Clawdline Cloud. The record remains readable for older clients, but
- * terminal access now follows pairing and send permission; this grant does not
- * change access.
- */
-export interface TerminalGrantRequest {
-  grant: boolean
 }
 
 /**

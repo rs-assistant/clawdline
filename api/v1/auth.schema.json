@@ -100,8 +100,7 @@
         "created": { "description": "Unix seconds.", "type": "integer" },
         "id": { "type": "string" },
         "last_seen": { "description": "Unix seconds of the last request it made since the daemon started or last saved; absent when never.", "type": "integer" },
-        "name": { "type": "string" },
-        "terminal": { "description": "Legacy terminal grant record for older clients. Access now follows pairing; this field does not grant or revoke terminal access.", "type": "boolean" }
+        "name": { "type": "string" }
       }
     },
     "DeviceList": {

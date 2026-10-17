@@ -187,9 +187,8 @@ type LinkOptions struct {
 	SessionLook func(id string)
 	// TerminalService is the only ingress to the local terminal service from
 	// signed Cloud envelopes. The regular Router remains forbidden.
-	TerminalService   func() (*terminals.Service, error)
-	TerminalProject   func(context.Context, string) (string, bool)
-	DropTerminalGrant func(string) error
+	TerminalService func() (*terminals.Service, error)
+	TerminalProject func(context.Context, string) (string, bool)
 	// PeerReceipts and PeerExecute are the daemon's durable peer inbox seam.
 	// Without all three hooks, peer ingress is refused.
 	PeerReceipts    peerapp.Receipts

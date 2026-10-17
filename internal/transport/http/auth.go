@@ -14,7 +14,6 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/devices"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/auth"
-	"github.com/sainteye/clawdline/internal/transport/cloud"
 )
 
 // The /v1/auth/ routes. The gate lets every one of them through without a
@@ -219,7 +218,6 @@ func (g *gate) logout(w http.ResponseWriter, r *http.Request) {
 			writeStoreFailure(w, err)
 			return
 		}
-		g.dropTerminalGrants()
 	}
 	w.Header().Set("Set-Cookie", sessionCookie+"=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict")
 	writeAuthJSON(w, contract.AuthOK{OK: true})
@@ -315,7 +313,7 @@ func (g *gate) pairings(w http.ResponseWriter, r *http.Request) {
 }
 
 // devicesRoute is the device list and what can be done to it, for this
-// machine's own token only. A paired device cannot list, revoke or grant.
+// machine's own token only. A paired device cannot list or revoke.
 func (g *gate) devicesRoute(w http.ResponseWriter, r *http.Request, rest string) {
 	// Split first, then decode each segment: the id of a device is a name, and
 	// a name is one segment (routePath, gate.go).
@@ -324,20 +322,11 @@ func (g *gate) devicesRoute(w http.ResponseWriter, r *http.Request, rest string)
 		parts[i] = decodeSegment(part)
 	}
 	rest = strings.Join(parts, "/")
-	grant := len(parts) == 2 && parts[0] != "" && parts[1] == "terminal"
-	// A terminal grant is refused through Clawdline Cloud before anything
-	// else is asked, so the answer names the reason and not the token.
-	if grant && cloud.ViaCloud(r.Context()) {
-		g.terminalGrantRoute(w, r, parts[0])
-		return
-	}
 	if !requireLocal(w, r) {
 		return
 	}
 	get, post := r.Method == http.MethodGet, r.Method == http.MethodPost
 	switch {
-	case grant:
-		g.terminalGrantRoute(w, r, parts[0])
 	case get && rest == "":
 		g.listDevices(w)
 	case post && rest == "revoke-all":
@@ -346,7 +335,6 @@ func (g *gate) devicesRoute(w http.ResponseWriter, r *http.Request, rest string)
 			writeStoreFailure(w, err)
 			return
 		}
-		g.dropTerminalGrants()
 		writeAuthJSON(w, contract.RevokedAll{OK: true, Count: int64(count)})
 	case post && rest == "browser":
 		g.browserDevice(w, r)
@@ -362,11 +350,7 @@ func (g *gate) devicesRoute(w http.ResponseWriter, r *http.Request, rest string)
 		}
 		writeAuthJSON(w, contract.AuthOK{OK: true})
 	case post && len(parts) == 2 && parts[0] != "" && parts[1] == "revoke":
-		err := g.auth.Revoke(parts[0])
-		if err == nil {
-			g.dropTerminalGrants()
-		}
-		writeDeviceChange(w, err)
+		writeDeviceChange(w, g.auth.Revoke(parts[0]))
 	default:
 		writeNoSuchRoute(w, r)
 	}
@@ -378,12 +362,6 @@ func (g *gate) listDevices(w http.ResponseWriter) {
 		Password:   g.auth.HasPassword(),
 		Devices:    []contract.PairedDevice{},
 	}
-	// A grants file that cannot be read shows nobody as granted, which is what
-	// the terminal routes answer too; diagnostics says why.
-	var grants map[string]devices.Grant
-	if g.grants != nil {
-		grants, _ = g.grants.All()
-	}
 	for _, d := range g.auth.Devices() {
 		caps := make([]string, 0, len(d.Caps))
 		for _, c := range d.Caps {
@@ -392,9 +370,6 @@ func (g *gate) listDevices(w http.ResponseWriter) {
 		row := contract.PairedDevice{ID: d.ID, Name: d.Name, Caps: caps, Created: d.Created.Unix()}
 		if !d.LastSeen.IsZero() {
 			row.LastSeen = d.LastSeen.Unix()
-		}
-		if _, ok := grants[d.ID]; ok && !d.Local {
-			row.Terminal = true
 		}
 		out.Devices = append(out.Devices, row)
 	}

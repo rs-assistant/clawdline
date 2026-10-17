@@ -3565,10 +3565,6 @@ type PairedDevice struct {
 	// absent when never.
 	LastSeen int64  `json:"last_seen,omitempty"`
 	Name     string `json:"name"`
-
-	// Legacy terminal grant record for older clients. Access now follows pairing; this
-	// field does not grant or revoke terminal access.
-	Terminal bool `json:"terminal,omitempty"`
 }
 
 // One `pairing` event on GET /v1/auth/pairings, the server-sent stream only
@@ -7134,13 +7130,6 @@ var TerminalCursorShapeValues = []TerminalCursorShape{TerminalCursorShapeDefault
 
 // What /v1/diagnostics says about terminals.
 type TerminalDiagnostics struct {
-	// Why the grants file could not be read.
-	GrantsError string `json:"grants_error,omitempty"`
-
-	// The legacy terminal grants file could be read. It no longer controls terminal
-	// access.
-	GrantsOK bool `json:"grants_ok"`
-
 	// Control leases held now.
 	Leases    int64                 `json:"leases"`
 	Osascript *OsascriptDiagnostics `json:"osascript,omitempty"`
@@ -7172,22 +7161,6 @@ type TerminalFrame struct {
 
 	// The screen's height. The text is `lines`.
 	Rows int64 `json:"rows"`
-}
-
-type TerminalGrant struct {
-	DeviceID string `json:"device_id"`
-	Granted  bool   `json:"granted"`
-
-	// Unix seconds. Absent when not granted.
-	GrantedAt int64 `json:"granted_at,omitempty"`
-}
-
-// Legacy POST /v1/auth/devices/{id}/terminal. This machine's own token only,
-// and never through Clawdline Cloud. The record remains readable for older
-// clients, but terminal access now follows pairing and send permission; this
-// grant does not change access.
-type TerminalGrantRequest struct {
-	Grant bool `json:"grant"`
 }
 
 // GET /v1/terminals/{id}/history?lines=N: up to N lines that scrolled off the

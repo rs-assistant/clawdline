@@ -409,8 +409,7 @@ test("terminal HTTP routes remain local while hosted terminals use separate encr
     assert.equal(uncarriedWordOf("GET", path), "", path + " stands for no Cloud word")
   }
   assert.equal(notCarriedDetail("POST", "/v1/terminals/trm_x/input"), MACHINE_ONLY[0].sentence)
-  assert.equal(notCarriedDetail("POST", "/v1/auth/devices/dev-1/terminal"), MACHINE_ONLY[1].sentence)
-  assert.equal(machineOnly("/v1/auth/devices/dev-1/revoke"), "", "only the grant route is a terminal route")
+  assert.equal(machineOnly("/v1/auth/devices/dev-1/revoke"), "", "a device route is not a terminal route")
   assert.equal(machineOnly("/v1/terminalsx"), "", "a prefix is a whole segment")
   for (const word of words()) assert.ok(!/terminal/.test(word), word + ": the generic Router has no terminal word")
   assert.equal(mac.asked.length, 0, "nothing was asked of the machine")
