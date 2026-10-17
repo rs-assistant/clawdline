@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5993,
+  "englishKeys": 5996,
   "counts": {
-    "negation": 1907,
-    "state": 1066,
+    "negation": 1909,
+    "state": 1067,
     "permission": 373,
     "deletion": 156,
     "uncertainty": 174
   },
-  "unionCount": 2863,
+  "unionCount": 2865,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1426,6 +1426,8 @@
       "next.cloudAllUnresponsive",
       "next.cloudBlocked",
       "next.cloudCarrierDirect",
+      "next.cloudCarrierNoReport",
+      "next.cloudCarrierOffline",
       "next.cloudCarrierRelayMachineOff",
       "next.cloudCarrierRelayNotOpen",
       "next.cloudCarrierUnknown",
@@ -2670,6 +2672,7 @@
       "next.cloudAllOpenCurrent",
       "next.cloudAllStateWaiting",
       "next.cloudAllWaitingForReply",
+      "next.cloudCarrierOffline",
       "next.cloudCarrierRelayMachineOff",
       "next.cloudDeviceRemoveAsk",
       "next.cloudDeviceTicketExpired",
@@ -5686,6 +5689,8 @@
     "next.cloudAllWaitingForReply",
     "next.cloudBlocked",
     "next.cloudCarrierDirect",
+    "next.cloudCarrierNoReport",
+    "next.cloudCarrierOffline",
     "next.cloudCarrierRelayMachineOff",
     "next.cloudCarrierRelayNotOpen",
     "next.cloudCarrierUnknown",

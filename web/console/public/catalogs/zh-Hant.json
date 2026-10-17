@@ -5993,5 +5993,8 @@
   "plan.control": "用手機查看、控制 Session",
   "plan.push": "瀏覽器推播通知",
   "plan.webhooks": "用 Webhook 啟動已儲存的排程",
-  "plan.fine": "本機的 Session、看板與內建角色不需要帳號，永遠免費。兩種方案都能配對 5 個手機或瀏覽器，已配對的裝置即使離線也占一個名額。Cloud 提供連線，不提供運算：機器離線時，兩種方案都無法執行工作。Lemon Squeezy 是正式賣方，可隨時在帳務入口取消訂閱。"
+  "plan.fine": "本機的 Session、看板與內建角色不需要帳號，永遠免費。兩種方案都能配對 5 個手機或瀏覽器，已配對的裝置即使離線也占一個名額。Cloud 提供連線，不提供運算：機器離線時，兩種方案都無法執行工作。Lemon Squeezy 是正式賣方，可隨時在帳務入口取消訂閱。",
+  "next.cloudCarrierOffline": "{machine} 已離線：最近沒有收到它的回報，無法讀取或傳送。",
+  "next.cloudCarrierNoReport": "這個瀏覽器還沒看過 {machine} 回報。",
+  "next.cloudAllMachineOffline": "離線 · {seen}。下方 Session 是它最後一次回報的內容。"
 }
