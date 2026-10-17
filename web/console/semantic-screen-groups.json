@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6017,
-  "riskKeys": 2872,
-  "nonRiskCount": 3145,
+  "englishContentKeys": 6025,
+  "riskKeys": 2878,
+  "nonRiskCount": 3147,
   "groups": [
     {
       "name": "bar / other",
@@ -1800,7 +1800,7 @@
     },
     {
       "name": "next / bg",
-      "count": 8,
+      "count": 10,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1810,8 +1810,10 @@
         "next.bgAgentUnknown",
         "next.bgClose",
         "next.bgOpen",
+        "next.bgQueued",
         "next.bgShellMany",
         "next.bgShellOne",
+        "next.bgTimeout",
         "next.bgTitle"
       ]
     },

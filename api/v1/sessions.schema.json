@@ -141,7 +141,9 @@
         },
         "screen_reading": { "$ref": "#/$defs/SessionScreenReading" },
         "sessionId": { "description": "The assistant's own conversation id, when one was recovered from its command line.", "type": "string" },
-        "shells": { "description": "The commands this session left running in the background, newest first, at most six. Absent rather than empty when there are none, as the Swift app sends it; always absent for Codex, which keeps no record of them.", "type": "array", "items": { "$ref": "#/$defs/SessionShell" } },
+        "shells": {"description": "Active provider shells followed by daemon-owned callbacks. Provider shells retain their existing display bound; callbacks use MaxCallbacksPerRoot and are available for every assistant.", "type": "array", "items": {"$ref": "#/$defs/SessionShell"}},
+        "background_reading": {"type": "string", "enum": ["complete", "unavailable"], "description": "Whether daemon-owned callback rows could be read."},
+        "background_omitted": {"type": "integer", "description": "Additional callbacks beyond the registered per-root display bound."},
         "state": { "$ref": "common.schema.json#/$defs/SessionState" },
         "tty": { "type": "string" },
         "working_since": { "description": "When the turn a working session's `line` reports began, in unix seconds: when the line was read, less the assistant's own clock in it. Present only beside a `line` that carries that clock. A page that has it draws the clock itself from this instant, so `line` is republished only when something other than the clock moved; a page without it draws `line` as sent.", "type": "integer" },
@@ -286,16 +288,53 @@
       }
     },
     "SessionShell": {
-      "description": "One background command a session started and has not finished: its output file has no ending written under it, and the session's transcript announced its id as a background command. `at` is when it last printed something.",
+      "description": "One provider background shell or daemon-owned callback. Callback ids start with callback-. Callback rows remain readable after completion while their output is retained.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["at", "id"],
+      "required": [
+        "at",
+        "id"
+      ],
       "properties": {
-        "at": { "description": "Unix seconds.", "type": "integer" },
-        "command": { "description": "The command line that started it, on one line. Absent when the two transcript records it is joined from straddled a read.", "type": "string" },
-        "doing": { "description": "The last line it printed, clipped to 160 characters.", "type": "string" },
-        "id": { "description": "Claude Code's own id for it.", "type": "string" },
-        "what": { "description": "The description written beside the command, when there was one.", "type": "string" }
+        "at": {
+          "description": "Unix seconds.",
+          "type": "integer"
+        },
+        "command": {
+          "description": "The command line that started it, on one line. Absent when the two transcript records it is joined from straddled a read.",
+          "type": "string"
+        },
+        "doing": {
+          "description": "The last line it printed, clipped to 160 characters.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Claude Code's own id for it.",
+          "type": "string"
+        },
+        "what": {
+          "description": "The description written beside the command, when there was one.",
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "callback"
+          ],
+          "description": "Daemon-owned background work, read through the same Shell panel."
+        },
+        "state": {
+          "type": "string",
+          "description": "Callback phase: queued, running, success, failure, timeout or cancelled."
+        },
+        "started_at": {
+          "type": "integer",
+          "description": "Unix seconds when command execution started; absent while queued."
+        },
+        "directory": {
+          "type": "string",
+          "description": "The callback working directory."
+        }
       }
     },
     "SessionModel": {

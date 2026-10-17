@@ -5,6 +5,7 @@ import { nextWord } from "../next-strings.js"
 import { backgroundCounts, backgroundLine, backgroundLive, showsBackground, type BackgroundWords } from "./background.js"
 import { WorkTree } from "./WorkTree.js"
 import "./background.css"
+import { callbackWord } from "./callback-copy.js"
 
 /**
  * The one line above the composer that says a session has work going on in
@@ -25,7 +26,7 @@ export function BackgroundStrip({ row, selected, onAgent, onShell }: {
   const [open, setOpen] = useState(false)
   useEffect(() => setOpen(false), [row.id])
   const counts = backgroundCounts(row)
-  const shows = showsBackground(counts)
+  const shows = showsBackground(counts) || row.background_reading === "unavailable" || !!row.background_omitted
   useEffect(() => {
     if (!shows) setOpen(false)
   }, [shows])
@@ -53,7 +54,7 @@ export function BackgroundStrip({ row, selected, onAgent, onShell }: {
         onClick={() => setOpen((was) => !was)}
       >
         <span className="dot" data-live={backgroundLive(counts) ? "on" : "off"} />
-        <span className="said">{backgroundLine(counts, stripWords())}</span>
+        <span className="said">{[backgroundLine(counts, stripWords()), row.background_reading === "unavailable" ? nextWord("bgUnavailable") : ""].filter(Boolean).join(" · ")}</span>
         <span className="chev" aria-hidden="true">›</span>
       </button>
       {open ? (
@@ -79,6 +80,8 @@ export function BackgroundStrip({ row, selected, onAgent, onShell }: {
               </button>
             </div>
             <div className="bg-sheet-body">
+ {row.background_reading === "unavailable" && <p role="status">{nextWord("bgUnavailable")}</p>}
+ {!!row.background_omitted && <p role="status">{nextWord("bgMore")}</p>}
               {shells.length ? (
                 <section className="agents bg-shells" aria-label={T.webShells}>
                   <div className="head"><span>{T.webShells}</span><span className="n">{shells.length}</span></div>
@@ -95,7 +98,7 @@ export function BackgroundStrip({ row, selected, onAgent, onShell }: {
                       <span className="cmd">{shell.command || shell.id}</span>
                       <span className="at">{L.clock(shell.at)}</span>
                       <span className="sub">
-                        {[shell.what, shell.doing].filter(Boolean).join(" · ") || T.webShellRunning}
+                        {[shell.what, shell.kind === "callback" ? callbackWord(shell.state) : shell.doing].filter(Boolean).join(" · ") || T.webShellRunning}
                       </span>
                     </button>
                   ))}

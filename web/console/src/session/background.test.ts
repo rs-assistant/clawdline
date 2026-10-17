@@ -107,3 +107,16 @@ test("the reader stays at the bottom unless they scrolled up", () => {
   assert.equal(sticksToBottom(false, 3590, 400, 4000), true, "within a line of the end is at the end")
   assert.equal(sticksToBottom(false, 1200, 400, 4000), false)
 })
+
+test("daemon callbacks open in the same strip and retain terminal state on the final read", () => {
+  const callback: SessionShell = { id: "callback-task", at: 100, kind: "callback", state: "queued", command: "go test ./...", what: "Verify dev" }
+  const counts = backgroundCounts(row({ shells: [callback], agents_reading: { state: "complete" } } as Partial<SessionRow>))
+  assert.equal(showsBackground(counts), true)
+  assert.equal(backgroundLive(counts), true)
+  const running = stepShell(openShell(callback), { kind: "answer", reply: { shell: { ...callback, state: "running", started_at: 102 }, text: "building\n", signature: "running", ended: false } })
+  assert.equal(running.view.meta.state, "running")
+  const done = stepShell(running.view, { kind: "answer", reply: { shell: { ...callback, state: "failure" }, text: "failed\n", signature: "failure", ended: true } })
+  assert.equal(done.poll, false)
+  assert.equal(done.view.meta.state, "failure")
+  assert.equal(done.view.text, "failed\n")
+})

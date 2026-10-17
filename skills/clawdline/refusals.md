@@ -138,7 +138,7 @@ Generated from typed refusal calls in the current Go source. It lists directly d
 | `not_a_repo` | `internal/transport/http/git.go` |
 | `not_an_agent_session` | `internal/transport/http/agent_session_only.go` |
 | `not_epic_owner` | `internal/domain/work/v2.go` |
-| `not_found` | `internal/transport/http/agents.go`, `internal/transport/http/auth.go`, `internal/transport/http/cloud_agent.go`, `internal/transport/http/git.go`, `internal/transport/http/links.go`, `internal/transport/http/page.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/proposals.go`, `internal/transport/http/pwa.go`, `internal/transport/http/runs.go`, `internal/transport/http/schedules.go`, `internal/transport/http/shells.go`, `internal/transport/http/skills.go`, `internal/transport/http/snippets.go`, `internal/transport/http/terminals.go`, `internal/transport/http/verify.go` |
+| `not_found` | `internal/transport/http/agents.go`, `internal/transport/http/auth.go`, `internal/transport/http/cloud_agent.go`, `internal/transport/http/git.go`, `internal/transport/http/links.go`, `internal/transport/http/page.go`, `internal/transport/http/project_sync.go`, `internal/transport/http/proposals.go`, `internal/transport/http/pwa.go`, `internal/transport/http/runs.go`, `internal/transport/http/schedules.go`, `internal/transport/http/session_callbacks.go`, `internal/transport/http/shells.go`, `internal/transport/http/skills.go`, `internal/transport/http/snippets.go`, `internal/transport/http/terminals.go`, `internal/transport/http/verify.go` |
 | `not_subscribed` | `internal/transport/http/push.go` |
 | `notification_rule_conflict` | `internal/transport/http/notification_rules.go` |
 | `notification_rules_invalid` | `internal/transport/http/notification_rules.go` |

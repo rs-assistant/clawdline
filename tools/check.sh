@@ -92,11 +92,11 @@ if [ "$web" = auto ]; then
 fi
 echo "check plan: $(node tools/check-scope.mjs --field "$logs/scope.json" reason)"
 go_tests=() go_compile=() private_paths=() web_tests=()
-node tools/check-scope.mjs --field "$logs/scope.json" go.tests --nul > "$logs/go-tests.list" || exit 2
+node tools/check-scope.mjs --field "$logs/scope.json" go.runs --nul > "$logs/go-tests.list" || exit 2
 node tools/check-scope.mjs --field "$logs/scope.json" go.compile --nul > "$logs/go-compile.list" || exit 2
 node tools/check-scope.mjs --field "$logs/scope.json" paths --nul > "$logs/paths.list" || exit 2
 node tools/check-scope.mjs --field "$logs/scope.json" webTests --nul > "$logs/web-tests.list" || exit 2
-while IFS= read -r -d '' path; do go_tests+=("$path"); done < "$logs/go-tests.list"
+
 while IFS= read -r -d '' path; do go_compile+=("$path"); done < "$logs/go-compile.list"
 while IFS= read -r -d '' path; do private_paths+=("$path"); done < "$logs/paths.list"
 while IFS= read -r -d '' path; do web_tests+=("$PWD/$path"); done < "$logs/web-tests.list"
@@ -124,7 +124,19 @@ check() {
 gofmt_silent() { local out; out=$(gofmt -l internal cmd) || return $?; [ -z "$out" ] || { echo "$out"; return 1; }; }
 
 run_web_tests() { (cd web/console && node --experimental-strip-types --test ${web_tests[@]+"${web_tests[@]}"}); }
-check "gofmt -l internal cmd" gofmt_silent
+selected() {
+  local value
+  value=$(node tools/check-scope.mjs --field "$logs/scope.json" "guards.$1") || exit 2
+  case "$value" in true) return 0 ;; false) return 1 ;; *) echo "invalid guard selection" >&2; exit 2 ;; esac
+}
+run_go_module() {
+  local package=$1 pattern=$2 code
+  go test -json "-run=$pattern" "$package" > "$logs/module-events.jsonl" 2>&1
+  code=$?
+  if [ "$code" -ne 0 ]; then cat "$logs/module-events.jsonl"; return "$code"; fi
+  node tools/check-profile.mjs "$logs/module-events.jsonl" "$logs/module-summary.json" --require-tests || { cat "$logs/module-events.jsonl"; return 2; }
+}
+if selected format; then check "gofmt -l internal cmd" gofmt_silent; fi
 if [ "$go_checks" = yes ]; then
   check "go vet ./..." go vet ./...
   check "go build ./..." go build ./...
@@ -144,19 +156,21 @@ elif [ "$scope_full" = true ]; then
   check "go test ./..." go test ./...
   check "repository copy guards (uncached)" go test -count=1 ./internal/config
 else
-  if [ "${#go_tests[@]}" -gt 0 ]; then check "changed Go packages" go test ${go_tests[@]+"${go_tests[@]}"}; fi
+  while IFS= read -r -d '' package && IFS= read -r -d '' pattern; do
+    if [ -n "$pattern" ]; then check "Go module: $package (paired tests)" run_go_module "$package" "$pattern"; else check "Go package: $package" go test "$package"; fi
+  done < "$logs/go-tests.list"
   if [ "${#go_compile[@]}" -gt 0 ]; then
     if [ "$callers" = yes ]; then check "caller compilation (runtime tests in integration/CI)" go test '-run=^$' ${go_compile[@]+"${go_compile[@]}"}; else summary+=("SKIP  caller compilation and runtime tests  (${#go_compile[@]} packages listed by --plan; integration/CI or --callers)"); fi
   fi
   check "repository copy guards (uncached)" go test -count=1 ./internal/config
-  check "capacity registration and copy guards" go test -count=1 ./internal/domain/capacity '-run=^(TestEveryBoundIsRegistered|TestRegisterRowsAnswerTheFourQuestions|TestEveryRowExplainsItselfToAPerson)$'
+  if selected capacity; then check "capacity registration and copy guards" go test -count=1 ./internal/domain/capacity '-run=^(TestEveryBoundIsRegistered|TestRegisterRowsAnswerTheFourQuestions|TestEveryRowExplainsItselfToAPerson)$'; fi
 fi
-check "contract-gen -check" go run ./tools/contract-gen -check
-check "check-legacy-css.sh" tools/check-legacy-css.sh
+if selected contract; then check "contract-gen -check" go run ./tools/contract-gen -check; else summary+=("SKIP  contract-gen -check  (inputs unchanged; full CI retains coverage)"); fi
+if selected legacy; then check "check-legacy-css.sh" tools/check-legacy-css.sh; else summary+=("SKIP  check-legacy-css.sh  (inputs unchanged; full CI retains coverage)"); fi
 check "web dependencies" node tools/ensure-web-deps.mjs
-check "check-rounded-side-borders.mjs" node web/console/tools/check-rounded-side-borders.mjs
+if selected borders; then check "check-rounded-side-borders.mjs" node web/console/tools/check-rounded-side-borders.mjs; else summary+=("SKIP  check-rounded-side-borders.mjs  (inputs unchanged; full CI retains coverage)"); fi
 check "check-machine-words.sh" tools/check-machine-words.sh
-check "check-shell-expansions.sh" tools/check-shell-expansions.sh
+if selected shell; then check "check-shell-expansions.sh" tools/check-shell-expansions.sh; else summary+=("SKIP  check-shell-expansions.sh  (inputs unchanged; full CI retains coverage)"); fi
 if [ "$scope_full" = true ]; then
   check "check-private.sh (whole tree)" tools/check-private.sh
 elif [ "${#private_paths[@]}" -gt 0 ]; then
@@ -164,6 +178,7 @@ elif [ "${#private_paths[@]}" -gt 0 ]; then
 fi
 check "check-console-tests.mjs" node tools/check-console-tests.mjs
 check "check-mirror-tests.mjs" node tools/check-mirror-tests.mjs
+if selected tooling; then
 check "test-notify-release-success.sh" sh tools/test-notify-release-success.sh
 if [ "$(uname -s)" = Linux ]; then
   check "test-heavy-linux-cache.sh" bash tools/test-heavy-linux-cache.sh
@@ -173,6 +188,7 @@ check "check planning and profiling tests" node --test tools/check-plan.test.mjs
 check "check modes integration" bash tools/test-check-modes.sh
 if [ "$(uname -s)" = Darwin ]; then
   check "Swift staged app watcher" sh tools/test-staged-app-watcher.sh
+fi
 fi
 if [ "$web" = yes ]; then
   check "web: npm run check" sh -c 'cd web && npm run deps && npm run check'

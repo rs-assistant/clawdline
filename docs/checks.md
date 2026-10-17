@@ -34,13 +34,21 @@ verification, with a reason. Platform-constrained inputs are named in the plan; 
 remains an explicit integration/CI requirement.
 
 Go package metadata identifies the changed packages and the transitive callers,
-including test imports. The local gate runs the changed packages' tests. Caller
+including test imports. API schema and route inputs under `api/v1/` select
+contract-package tests and contract generation checks alongside changed packages;
+they do not force the full platform suite. The local gate selects tests in files paired with changed Go source files,
+or directly edited test files. Ambiguous/shared inputs retain the entire package.
+The JSON test report must show actual test results; an empty selector is refused.
+This local module selection does not claim cross-file runtime coverage. Caller
 compilation can be requested with `--callers`; caller runtime suites wait for
 integration and CI. A deleted or unowned package cannot silently disappear.
 Selection is by path and tests execute the working tree; partial-hunk commits
 need exact-commit CI evidence; pending CI does not block dev installation. Repository-copy and
 capacity-registration guards still run, uncached, even for
-documentation edits. Generated contracts and the existing source guards remain.
+documentation edits. Contract generation runs when schema/generated-contract inputs change.
+Capacity guards run for Go or capacity-copy inputs; CSS and shell guards follow
+their inputs. Tool self-tests run for tooling/full checks. Repository-copy,
+privacy and source guards remain; full CI retains complete validation.
 
 For the console, TypeScript checks the entire project incrementally. Its build
 information stays in the ignored `web/.clawdline-check.tsbuildinfo` of this
@@ -105,3 +113,14 @@ scratch. The default shared Go caches are not cleared or migrated. The old share
 cache needs the owner/idle-process review in `docs/disk-lifecycle.md`. Persistent
 wrapper caches and the per-worktree TypeScript build information follow their
 stated lifecycle instead of per-command Session cleanup.
+
+## Seeing a background check
+
+Daemon callbacks appear in their owning Session's existing background-work strip,
+including Codex callbacks whose assistant has returned to idle. Open a command
+like a provider shell to read its command, working directory, phase and recent
+output. Queue placement is distinct from execution. Reads use the existing
+Session-shell route and Cloud capability with the current Session identity; they
+do not acknowledge completion. Logs use the registered callback tail bound and
+remain outside repository source. Closing the panel stops reads. An expired or
+unreadable log is reported instead of being treated as successful completion.

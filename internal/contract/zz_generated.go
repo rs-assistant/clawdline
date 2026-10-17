@@ -5758,15 +5758,21 @@ type SessionRow struct {
 	// Unresolved attention notes for this conversation. Zero is a successful empty
 	// reading; absent means the count or current unique session identity could not be
 	// established.
-	AttentionCount int64                `json:"attention_count,omitempty"`
-	Backend        Backend              `json:"backend"`
-	Closeability   Closeability         `json:"closeability"`
-	Coordination   *SessionCoordination `json:"coordination,omitempty"`
-	Coordinator    *SessionCoordinator  `json:"coordinator,omitempty"`
-	CWD            string               `json:"cwd,omitempty"`
-	Disposition    *WorkDisposition     `json:"disposition,omitempty"`
-	EpicParent     *EpicSessionParent   `json:"epic_parent,omitempty"`
-	Evidence       Evidence             `json:"evidence"`
+	AttentionCount int64   `json:"attention_count,omitempty"`
+	Backend        Backend `json:"backend"`
+
+	// Additional callbacks beyond the registered per-root display bound.
+	BackgroundOmitted int64 `json:"background_omitted,omitempty"`
+
+	// Whether daemon-owned callback rows could be read.
+	BackgroundReading string               `json:"background_reading,omitempty"`
+	Closeability      Closeability         `json:"closeability"`
+	Coordination      *SessionCoordination `json:"coordination,omitempty"`
+	Coordinator       *SessionCoordinator  `json:"coordinator,omitempty"`
+	CWD               string               `json:"cwd,omitempty"`
+	Disposition       *WorkDisposition     `json:"disposition,omitempty"`
+	EpicParent        *EpicSessionParent   `json:"epic_parent,omitempty"`
+	Evidence          Evidence             `json:"evidence"`
 
 	// Machine-issued durable identity of this terminal execution. Absent when the
 	// source or process start cannot be verified, the machine has no Cloud identity,
@@ -5819,9 +5825,9 @@ type SessionRow struct {
 	// line.
 	SessionID string `json:"sessionId,omitempty"`
 
-	// The commands this session left running in the background, newest first, at most
-	// six. Absent rather than empty when there are none, as the Swift app sends it;
-	// always absent for Codex, which keeps no record of them.
+	// Active provider shells followed by daemon-owned callbacks. Provider shells
+	// retain their existing display bound; callbacks use MaxCallbacksPerRoot and are
+	// available for every assistant.
 	Shells []SessionShell `json:"shells,omitempty"`
 
 	// When and how this row's terminal state was read. `current` was read this pass;
@@ -5882,9 +5888,9 @@ const (
 // SessionScreenReadingValues is every value the contract allows, in contract order.
 var SessionScreenReadingValues = []SessionScreenReading{SessionScreenReadingRead, SessionScreenReadingUnavailable}
 
-// One background command a session started and has not finished: its output
-// file has no ending written under it, and the session's transcript announced
-// its id as a background command. `at` is when it last printed something.
+// One provider background shell or daemon-owned callback. Callback ids start
+// with callback-. Callback rows remain readable after completion while their
+// output is retained.
 type SessionShell struct {
 	// Unix seconds.
 	At int64 `json:"at"`
@@ -5893,11 +5899,23 @@ type SessionShell struct {
 	// records it is joined from straddled a read.
 	Command string `json:"command,omitempty"`
 
+	// The callback working directory.
+	Directory string `json:"directory,omitempty"`
+
 	// The last line it printed, clipped to 160 characters.
 	Doing string `json:"doing,omitempty"`
 
 	// Claude Code's own id for it.
 	ID string `json:"id"`
+
+	// Daemon-owned background work, read through the same Shell panel.
+	Kind string `json:"kind,omitempty"`
+
+	// Unix seconds when command execution started; absent while queued.
+	StartedAt int64 `json:"started_at,omitempty"`
+
+	// Callback phase: queued, running, success, failure, timeout or cancelled.
+	State string `json:"state,omitempty"`
 
 	// The description written beside the command, when there was one.
 	What string `json:"what,omitempty"`

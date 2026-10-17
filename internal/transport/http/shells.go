@@ -40,6 +40,10 @@ func (s *Server) sessionShellRoute(w http.ResponseWriter, r *http.Request, sessi
 		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "a shell's output is a GET")
 		return
 	}
+	if strings.HasPrefix(shellID, callbackShellPrefix) {
+		s.sessionCallbackOutput(w, r, sessionID, shellID)
+		return
+	}
 	window := int64(transcript.ShellOutputDefault)
 	if n, err := strconv.ParseInt(r.URL.Query().Get("bytes"), 10, 64); err == nil {
 		window = n

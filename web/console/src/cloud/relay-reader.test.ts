@@ -990,6 +990,14 @@ test("an agent transcript is a session read of the chosen machine, never the gen
   assert.equal(r.log.at(-1)?.word, "agent")
 })
 
+test("a callback output uses the pinned shell read on the selected machine", async () => {
+  const client=new FakeClient(), r=reader(client,{t:1000})
+  const answer=await r.fetch("/v1/sessions/root%20pane/shells/callback-c5100000-0000-4000-8000-000000000001?bytes=65536")
+  assert.equal(answer.status,200)
+  assert.deepEqual(client.sessionReads,[{word:"shell",identity:{machine:"mac-a",session:"root pane"},id:"callback-c5100000-0000-4000-8000-000000000001"}])
+  assert.deepEqual(client.reads,[])
+})
+
 test("a shell's output is a session read of the chosen machine, never the generic machine request", async () => {
   const client = new FakeClient()
   const r = reader(client, { t: 1000 })

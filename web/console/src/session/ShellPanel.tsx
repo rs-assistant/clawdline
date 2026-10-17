@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { SessionRow, SessionShell, ShellOutputReply } from "@clawdline/contract"
+import { nextWord } from "../next-strings.js"
+import { callbackWord } from "./callback-copy.js"
+import { elapsedWords } from "./working-clock.js"
 import { catalogRefusalDetail } from "../catalog.js"
 import * as L from "../legacy/bridge.js"
 import { openShell, SHELL_BEAT_MS, SHELL_WINDOW_BYTES, stepShell, sticksToBottom, type ShellRead, type ShellView } from "./background.js"
@@ -27,6 +30,7 @@ export function ShellPanel({ row, shell, onClose }: {
   shell: SessionShell | null
   onClose: (restore: boolean) => void
 }) {
+  const [now, setNow] = useState(() => Date.now() / 1000)
   const T = L.strings
   const open = !!row && !!shell
   const [view, setView] = useState<ShellView | null>(null)
@@ -105,6 +109,12 @@ export function ShellPanel({ row, shell, onClose }: {
     if (!view.loading) first.current = false
   }, [view])
 
+  useEffect(() => {
+    if (!open) return
+    const timer = window.setInterval(() => setNow(Date.now() / 1000), SHELL_BEAT_MS)
+    return () => window.clearInterval(timer)
+  }, [open])
+
   useLayoutEffect(() => {
     if (!open) return
     document.getElementById("shell-close")?.focus({ preventScroll: true })
@@ -127,7 +137,7 @@ export function ShellPanel({ row, shell, onClose }: {
       }}
     >
       <div className="panel-view-head">
-        <h2 id="shell-title">{T.webShellTitle}</h2>
+        <h2 id="shell-title">{shell?.kind === "callback" ? nextWord("bgTitle") : T.webShellTitle}</h2>
         <button className="chip" id="shell-close" type="button" onClick={() => onClose(true)}>
           {T.webShellClose}
         </button>
@@ -140,8 +150,10 @@ export function ShellPanel({ row, shell, onClose }: {
               <span className="dot" />
               {meta.what ? <span>{meta.what}</span> : null}
               <span className="id">{meta.id}</span>
-              <span>{ended ? T.webShellEnded : T.webShellRunning}</span>
+              <span>{meta.kind === "callback" ? callbackWord(meta.state) : ended ? T.webShellEnded : T.webShellRunning}</span>
             </p>
+            {meta.kind === "callback" && !ended && <p>{elapsedWords(now - (meta.started_at || meta.at))}</p>}
+            {meta.directory && <p className="shell-cmd">{meta.directory}</p>}
             {view?.error ? <div className="git-note err" role="alert">{view.error}</div> : null}
             {text.trim()
               ? <pre className="shell-out">{text}</pre>

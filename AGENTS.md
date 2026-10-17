@@ -40,9 +40,9 @@ The workflow targets **ten seconds during development and one minute for an ordi
 commit**. Run the smallest relevant package/test while editing with
 `tools/check.sh --quick ./package --run=TestName`. This is never an integration receipt.
 
-**`tools/check.sh` is the local commit gate.** It runs changed Go packages, affected console tests,
+**`tools/check.sh` is the local commit gate.** It runs directly edited or paired Go test modules (whole-package fallback), affected console tests,
 incremental whole-project type checking, changed-file privacy and repository guards. `--plan`
-explains the direct scope and transitive callers; `--callers` also compiles those callers' tests.
+explains the direct scope, module selectors, guard triggers and transitive callers; `--callers` also compiles those callers' tests.
 Caller runtime suites, cross-platform builds/vet, complete suites and bundles run in background
 CI after integration. They do not block a local commit, landing on main or a dev installation.
 A public Release requires complete verification of its exact tree and release acceptance.
