@@ -34,7 +34,9 @@ verification, with a reason. Platform-constrained inputs are named in the plan; 
 remains an explicit integration/CI requirement.
 
 Go package metadata identifies the changed packages and the transitive callers,
-including test imports. The local gate runs the changed packages' tests. Caller
+including test imports. API schema and route inputs under `api/v1/` select
+contract-package tests and contract generation checks alongside changed packages;
+they do not force the full platform suite. The local gate runs the changed packages' tests. Caller
 compilation can be requested with `--callers`; caller runtime suites wait for
 integration and CI. A deleted or unowned package cannot silently disappear.
 Selection is by path and tests execute the working tree; partial-hunk commits

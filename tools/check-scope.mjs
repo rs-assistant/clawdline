@@ -24,7 +24,9 @@ export function selectGo(paths, packages, root) {
   if (packages.some(p => p.Error || p.Incomplete || !p.Dir || !p.ImportPath)) throw new Error('unreadable Go package inventory');
   const byName = new Map(packages.map(p => [p.ImportPath, p]));
   const changed = new Set(), production = new Set();
-  for (const path of paths.filter(p => /^(internal|cmd|skills)\//.test(p))) {
+  const inputs = [...paths];
+  if (paths.some(p => p.startsWith('api/v1/'))) inputs.push('internal/contract/zz_generated.go');
+  for (const path of inputs.filter(p => /^(internal|cmd|skills)\//.test(p))) {
     const absolute = resolve(root, path);
     const owners = packages.filter(p => absolute.startsWith(resolve(p.Dir) + '/')).sort((a,b) => b.Dir.length-a.Dir.length);
     if (!owners.length) throw new Error(`no package owns ${path}`);
@@ -110,7 +112,7 @@ async function plan(full) {
   const root = process.cwd();
   const { paths, known } = changedPaths();
   const base = known && !paths.length && !full ? { go: false, web: false } : classify(paths, full, known);
-  const broad = full || !known || paths.some(p => !/^(web\/|docs\/|README(?:\.[\w-]+)?\.md$|CHANGELOG\.md$|internal\/|cmd\/|skills\/)/.test(p));
+  const broad = full || !known || paths.some(p => !/^(web\/|docs\/|README(?:\.[\w-]+)?\.md$|CHANGELOG\.md$|internal\/|cmd\/|skills\/|api\/v1\/)/.test(p));
   const result = { paths, full: broad, reason: broad ? 'full integration or unclassified infrastructure inputs' : 'changed-package tests; caller and full runtime coverage stay in integration/CI', go: { tests: [], compile: [] }, web: base.web, webTests: [], webBroad: false };
   if (broad) { result.web = true; return result; }
   try {

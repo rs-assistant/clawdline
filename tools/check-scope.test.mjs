@@ -19,6 +19,16 @@ test('Go changes run their own tests and compile transitive callers including te
   assert.throws(() => selectGo([], [{ Error: {} }], '/repo'), /unreadable/);
 });
 
+test('API schema and route changes select contracts and changed packages without full runtime suites', () => {
+  const packages = [
+    { Dir: '/repo/internal/contract', ImportPath: 'm/contract' },
+    { Dir: '/repo/internal/http', ImportPath: 'm/http', Imports: ['m/contract'] },
+    { Dir: '/repo/internal/unrelated', ImportPath: 'm/unrelated' },
+  ];
+  assert.deepEqual(selectGo(['api/v1/routes.json'], packages, '/repo'), { tests: ['m/contract'], compile: ['m/http'] });
+  assert.deepEqual(selectGo(['api/v1/sessions.schema.json', 'internal/http/routes.go'], packages, '/repo'), { tests: ['m/contract', 'm/http'], compile: [] });
+});
+
 test('Go JSON inventory decoding handles quotes and concatenated records, rejecting truncation', () => {
   const data = [{ Dir: '/repo/a{b}', ImportPath: 'm/a', Doc: 'quote " }' }, { Dir: '/repo/b', ImportPath: 'm/b' }];
   assert.deepEqual(decodePackages(data.map(v => JSON.stringify(v)).join('\n')), data);

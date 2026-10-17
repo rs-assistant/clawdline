@@ -15,7 +15,7 @@ export function classify(paths, full = false, known = true) {
     else { go = true; if (path.startsWith('docs/')) web = true; }
     // Generator, tooling, policy and unknown paths can affect both products.
     if (!path.startsWith('web/') && !path.startsWith('docs/') &&
-        !/^(internal\/|cmd\/|skills\/|go\.(mod|sum)$|README(?:\.[\w-]+)?\.md$|CHANGELOG\.md$)/.test(path)) web = true;
+        !/^(internal\/|cmd\/|skills\/|api\/v1\/|go\.(mod|sum)$|README(?:\.[\w-]+)?\.md$|CHANGELOG\.md$)/.test(path)) web = true;
   }
   return { go, web, reason: go ? 'Go, tooling, policy or unclassified inputs changed' : 'only console/documentation inputs changed' };
 }
