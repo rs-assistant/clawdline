@@ -823,6 +823,13 @@ func Register() []Entry {
 			EvictedBy: Person,
 			Sources:   []string{"internal/adapters/peerstore.OutboxLimit"},
 		},
+
+		{
+			Name: "cloud.peer_discovery_reply", Class: Buffer, Unit: Rows,
+			Limit: 1, AtLimit: Refuse, Told: []Channel{Sender, Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.DiscoveryReplyLimit",
+				"internal/transport/cloud.(*Link).InspectPeer:chan(DiscoveryReplyLimit)"},
+		},
 		{
 			// Peer frames, starts and source probes wait off the socket reader
 			// for fresh authorization on their separate bounded workers.

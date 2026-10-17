@@ -1253,6 +1253,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     [machineList, names, registered, forgotten],
   )
   const quickMachines = shown.phase === "ready" ? shown.machines.filter((machine) => machine.selectable) : []
+  // The roster's word for the one machine a single-machine page reads, so that
+  // page says "offline" where its own line to the relay would say "connected".
+  const readingRow = shown.phase === "ready" ? shown.machines.find((machine) => machine.id === reading) : undefined
+  const readingOffline = readingRow?.freshness === "stale" ? { seenAt: machineIdentityFacts(readingRow).seenAt } : null
   // The names the detail's own sentences use, read when one is written rather
   // than captured when the effect below was last built.
   const machineNames = useRef(new Map<string, string>())
@@ -1740,6 +1744,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               refreshFleetPresentation((revision) => revision + 1)
             }}
             cloudStartedRow={!fleetScope && confirmedStart?.machineID === reading ? confirmedStart.row : null}
+            cloudMachineOffline={fleetScope ? null : readingOffline}
             onCloudStartedObserved={startedObserved}
             cloudPeerAccess={(active) => <PeerAccessPage active={active}
               machines={(shown.phase === "ready" ? shown.machines : []).map((machine) => ({

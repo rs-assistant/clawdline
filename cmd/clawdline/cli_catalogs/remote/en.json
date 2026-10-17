@@ -1,16 +1,18 @@
 {
   "usage.machines": "usage: clawdline remote machines",
-  "usage.dispatch": "       clawdline remote dispatch --machine ID --pair ID --project ID --assistant NAME --title TITLE --instructions-file PATH [--task-id UUID --request-id UUID]",
+  "usage.dispatch": "       clawdline remote dispatch --machine ID [--pair ID] --project ID --assistant NAME --title TITLE --instructions-file PATH [--task-id UUID --request-id UUID]",
   "usage.show": "       clawdline remote show TASK-ID",
   "usage.send": "       clawdline remote send TASK-ID TEXT [--request-id UUID]",
   "usage.finish": "       clawdline remote finish TASK-ID TEXT [--request-id UUID]",
   "usage.retry": "       clawdline remote retry TASK-ID",
   "usage.ack": "       clawdline remote ack TASK-ID",
   "error.session": "a current assistant Session is required",
-  "error.dispatch_fields": "machine, pair, project, assistant, title and instructions file are required",
+  "error.dispatch_fields": "machine, project, assistant, title and instructions file are required",
   "error.retry_ids": "task ID and request ID must be supplied together",
   "error.instructions_size": "instructions must be between 1 and 524288 bytes",
   "error.effect_fields": "task ID and text are required",
   "dispatch_ids": "task %s request %s; reuse both IDs if the reply is uncertain\n",
-  "event_id": "request %s; reuse this ID if the reply is uncertain\n"
+  "event_id": "request %s; reuse this ID if the reply is uncertain\n",
+  "usage.inspect": "       clawdline remote inspect --machine ID [--pair ID] (Projects, Sessions and assistants)",
+  "error.machine": "a target machine is required"
 }

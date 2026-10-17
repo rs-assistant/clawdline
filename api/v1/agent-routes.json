@@ -428,6 +428,16 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/remote/inbox/",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/remote/inspect",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/remote/machines",
       "guide": "cloud"
     },
@@ -468,12 +478,12 @@
     },
     {
       "method": "*",
-      "pattern": "/v1/settings/dispatch-policy",
+      "pattern": "/v1/settings/default-models",
       "guide": "connect"
     },
     {
       "method": "*",
-      "pattern": "/v1/settings/default-models",
+      "pattern": "/v1/settings/dispatch-policy",
       "guide": "connect"
     },
     {

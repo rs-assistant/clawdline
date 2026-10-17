@@ -17,7 +17,8 @@ import (
 // somebody else — the controls, each of which a looser rule would pass.
 func TestAnOwnTaskIsTiedOnlyToItsOwnProcess(t *testing.T) {
 	r := orchestrator.Record{ID: "t1", Assistant: "claude", State: orchestrator.StateSuccess, ChildTerminalID: "%3",
-		CreatedAt: time.Unix(990, 0), SpawnedAt: time.Unix(1000, 0), FinishedAt: time.Unix(2000, 0),
+		ChildConversationID: "c",
+		CreatedAt:           time.Unix(990, 0), SpawnedAt: time.Unix(1000, 0), FinishedAt: time.Unix(2000, 0),
 		Landing: &orchestrator.Landing{State: orchestrator.LandingPending}}
 	live := swiftstore.Live{TerminalID: "%3", TTY: "ttys003", Assistant: "claude", PID: 9,
 		ProcessStart: time.Unix(1001, 0), ConversationID: "c"}
@@ -48,13 +49,35 @@ func TestAnOwnTaskIsTiedOnlyToItsOwnProcess(t *testing.T) {
 	}
 }
 
+func TestAFinishedTaskNeedsItsRecordedConversationToNameAChild(t *testing.T) {
+	r := orchestrator.Record{ID: "t1", Assistant: "codex", State: orchestrator.StateSuccess,
+		ChildTerminalID: "%1", CreatedAt: time.Unix(990, 0), FinishedAt: time.Unix(2000, 0)}
+	live := swiftstore.Live{TerminalID: "%1", Assistant: "codex", PID: 9,
+		ProcessStart: time.Unix(1000, 0), ConversationID: "new-conversation"}
+	read := func() swiftstore.Task {
+		return ownTasks([]orchestrator.Record{r}, map[string]swiftstore.Live{"%1": live})[0]
+	}
+	if got := read(); got.ChildSession != nil || got.TranscriptProven {
+		t.Fatalf("finished task without a recorded conversation borrowed the current one: %+v", got)
+	}
+	r.ChildConversationID = "old-conversation"
+	if got := read(); got.ChildSession == nil || *got.ChildSession != "old-conversation" || got.TranscriptProven {
+		t.Fatalf("finished task borrowed a different conversation: %+v", got)
+	}
+	r.ChildConversationID = live.ConversationID
+	if got := read(); got.ChildSession == nil || *got.ChildSession != live.ConversationID || !got.TranscriptProven {
+		t.Fatalf("finished task lost its recorded conversation: %+v", got)
+	}
+}
+
 // The assistant in a child's tmux session starts as soon as the session
 // exists, and SpawnedAt is stamped only after the tab that shows it has
 // opened. A child whose process predates SpawnedAt by more than the tolerance
 // is still that task's child as long as it started after the task was created.
 func TestAChildStartedBeforeItsTabFinishedOpeningIsStillTheTasksChild(t *testing.T) {
 	r := orchestrator.Record{ID: "t2", Assistant: "codex", State: orchestrator.StateSuccess, ChildTerminalID: "%42",
-		CreatedAt: time.Unix(1000, 0), SpawnedAt: time.Unix(1021, 0), FinishedAt: time.Unix(1055, 0),
+		ChildConversationID: "c2",
+		CreatedAt:           time.Unix(1000, 0), SpawnedAt: time.Unix(1021, 0), FinishedAt: time.Unix(1055, 0),
 		Landing: &orchestrator.Landing{State: orchestrator.LandingPending}}
 	live := swiftstore.Live{TerminalID: "%42", TTY: "ttys009", Assistant: "codex", PID: 4242,
 		ProcessStart: time.Unix(1002, 0), ConversationID: "c2"}

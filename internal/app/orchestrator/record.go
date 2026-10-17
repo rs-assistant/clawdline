@@ -454,8 +454,9 @@ type Record struct {
 	// ChildConversationID is the assistant's own id for the conversation
 	// the child's tab held, as the beat first read it from that tab while the
 	// task was running. A scheduled run is resumed by it after its tab has
-	// gone (docs/schedules.md "Runs are conversations too"). Empty until a
-	// reading bound one, and on every record from before it existed.
+	// gone (docs/schedules.md "Runs are conversations too"); finished task
+	// titles also require it. Empty until a reading bound one, and on every
+	// record from before it existed.
 	ChildConversationID string    `json:"child_conversation_id,omitempty"`
 	RootTerminalID      string    `json:"root_terminal_id,omitempty"`
 	SpawnedAt           time.Time `json:"spawned_at,omitempty"`

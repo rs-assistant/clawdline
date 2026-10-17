@@ -133,6 +133,14 @@ func (s *Server) remoteTasksRoute(w http.ResponseWriter, r *http.Request) {
 		writeRefusal(w, http.StatusBadRequest, "bad_request", "The remote task request is invalid.")
 		return
 	}
+	if input.PairID == "" {
+		pairID, pairErr := s.remotePair(r.Context(), input.MachineID, "")
+		if pairErr != nil {
+			writeRefusal(w, http.StatusConflict, pairErr.Error(), "No unique active outgoing pair covers this machine.")
+			return
+		}
+		input.PairID = pairID
+	}
 	source, err := s.currentRemoteSession(r.Context(), input.SourceSession)
 	if err != nil {
 		writeRefusal(w, http.StatusConflict, "remote_source_unverified", "The source Session is not current.")

@@ -34,6 +34,7 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `cloud.header_read_diagnostic_rows` | 24 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cloud.header_read_diagnostic_seconds` | 3600 | `seconds` | `expire` | `diagnostics` | — |
 | `cloud.peer_body_bytes` | 524288 | `bytes` | `refuse` | `diagnostics, notice, sender` | — |
+| `cloud.peer_discovery_reply` | 1 | `rows` | `refuse` | `sender, diagnostics` | — |
 | `cloud.peer_frame_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics, log, sender` | — |
 | `cloud.peer_grants` | 512 | `rows` | `refuse` | `diagnostics, notice, health` | — |
 | `cloud.peer_inbox` | 512 | `rows` | `refuse` | `diagnostics, notice, health` | — |

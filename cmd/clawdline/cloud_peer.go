@@ -167,14 +167,25 @@ func peerUsage() {
 }
 
 func (p *peerCLI) send(ctx context.Context, args []string) error {
-	grant, err := p.store.Grant(ctx, args[0])
-	if err != nil {
+
+	source := contract.Endpoint{MachineID: p.identity.MachineID, SessionID: args[1], ExecutionGeneration: args[2]}
+	target := contract.Endpoint{MachineID: args[3], SessionID: args[4], ExecutionGeneration: args[5]}
+	pair, err := p.store.Pair(ctx, args[0])
+	if err == nil {
+		if pair.SourceMachineID != source.MachineID || pair.TargetMachineID != target.MachineID ||
+			pair.TargetSignature == "" || !pair.RevokedAt.IsZero() || !time.Now().Before(pair.ExpiresAt) {
+			return errors.New("peer_pair_inactive")
+		}
+	} else if errors.Is(err, peerstore.ErrNotFound) {
+		grant, err := p.store.Grant(ctx, args[0])
+		if err != nil {
+			return err
+		}
+		if grant.Source != source || grant.Target != target {
+			return errors.New("the explicit source and destination do not match the pinned grant")
+		}
+	} else {
 		return err
-	}
-	if grant.Source.MachineID != p.identity.MachineID || grant.Source.SessionID != args[1] ||
-		grant.Source.ExecutionGeneration != args[2] || grant.Target.MachineID != args[3] ||
-		grant.Target.SessionID != args[4] || grant.Target.ExecutionGeneration != args[5] {
-		return errors.New("the explicit source and destination do not match the pinned grant")
 	}
 	kind := contract.Kind(args[6])
 	if kind != contract.Message && kind != contract.Handoff {
@@ -186,7 +197,7 @@ func (p *peerCLI) send(ctx context.Context, args []string) error {
 	}
 	digest := sha256.Sum256([]byte(args[7]))
 	request := contract.Request{RequestID: hex.EncodeToString(requestID), Kind: kind,
-		Source: grant.Source, Target: grant.Target, GrantID: grant.ID,
+		Source: source, Target: target, GrantID: args[0],
 		BodyDigest: hex.EncodeToString(digest[:])}
 	req, err := daemonRequest(http.MethodPost, "/v1/cloud/peer/send",
 		map[string]any{"request": request, "body": args[7]})

@@ -69,6 +69,8 @@ type Options struct {
 	PeerTaskProbeInbound func([]byte)
 	PeerTaskProbeAck     func([]byte)
 	PeerTaskEventInbound func([]byte)
+	PeerDiscoveryInbound func([]byte)
+	PeerDiscoveryStatus  func([]byte)
 	PeerTaskEventAck     func([]byte)
 	// OnDisconnect invalidates terminal connection registrations tied to this socket.
 	OnDisconnect func()
@@ -507,6 +509,14 @@ func (t *Transport) handle(conn *Conn, data []byte) error {
 			t.opts.PeerInbound(data)
 		}
 		return nil
+	case "peer_discovery_ack", "peer_discovery_error":
+		if t.opts.PeerDiscoveryStatus != nil {
+			t.opts.PeerDiscoveryStatus(data)
+		}
+	case "peer_discovery_envelope":
+		if t.opts.PeerDiscoveryInbound != nil {
+			t.opts.PeerDiscoveryInbound(data)
+		}
 	case "peer_task_start_envelope":
 		if t.opts.PeerTaskStartInbound != nil {
 			t.opts.PeerTaskStartInbound(data)
@@ -967,4 +977,8 @@ func trimSlash(s string) string {
 		s = s[:len(s)-1]
 	}
 	return s
+}
+
+func (t *Transport) PublishPeerDiscovery(frame []byte) error {
+	return t.publishPeerFrame(frame, "peer_discovery_publish")
 }

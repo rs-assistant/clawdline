@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5997,
-  "riskKeys": 2865,
-  "nonRiskCount": 3132,
+  "englishContentKeys": 6002,
+  "riskKeys": 2868,
+  "nonRiskCount": 3134,
   "groups": [
     {
       "name": "bar / other",
@@ -43,7 +43,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 138,
+      "count": 140,
       "sources": [
         null
       ],
@@ -52,6 +52,8 @@
         "capacityRow.cache.session_skills.what",
         "capacityRow.callback.per_machine.what",
         "capacityRow.cloud.header_read_diagnostic_seconds.what",
+        "capacityRow.cloud.peer_discovery_reply.full",
+        "capacityRow.cloud.peer_discovery_reply.what",
         "capacityRow.cloud.peer_frame_bytes.what",
         "capacityRow.cloud.peer_inbox.what",
         "capacityRow.cloud.peer_inbox_page.what",
@@ -1814,7 +1816,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 217,
+      "count": 216,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1969,7 +1971,6 @@
         "next.cloudPeerAccessIntro",
         "next.cloudPeerAccessLoading",
         "next.cloudPeerAccessPairs",
-        "next.cloudPeerAccessPurpose",
         "next.cloudPeerAccessReadFrom",
         "next.cloudPeerAccessRefresh",
         "next.cloudPeerAccessScopesWhat",
@@ -2110,7 +2111,7 @@
     },
     {
       "name": "next / other",
-      "count": 184,
+      "count": 185,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2218,6 +2219,7 @@
         "next.sessionWaitHeavyQueued",
         "next.sessionWriteDisabled",
         "next.sessionsListWaitTitle",
+        "next.sessionsMachineOfflineTitle",
         "next.sidebarAppStaged",
         "next.sidebarChooseMachineVersion",
         "next.sidebarMain",

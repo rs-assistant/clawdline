@@ -1036,3 +1036,51 @@ func (p *pairBody) Scan(src any) error {
 	}
 	return nil
 }
+
+// PendingTaskMessages is the durable wake outbox for received task messages.
+func (s *Store) PendingTaskMessages(ctx context.Context) ([]TaskEventRecord, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT body FROM peer_task_events WHERE direction='in' AND kind='message' ORDER BY rowid")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var records []TaskEventRecord
+	for rows.Next() {
+		var record TaskEventRecord
+		if err := rows.Scan(&pairBody{into: &record}); err != nil {
+			return nil, err
+		}
+		if !record.NoticeDelivered {
+			records = append(records, record)
+		}
+	}
+	return records, rows.Err()
+}
+func (s *Store) MarkTaskMessageNotified(ctx context.Context, event agenthandoff.TaskEvent) error {
+	var original []byte
+	key := taskEventKey(event)
+	if err := s.db.QueryRowContext(ctx, "SELECT body FROM peer_task_events WHERE id=?", key).Scan(&original); err != nil {
+		return err
+	}
+	var record TaskEventRecord
+	if json.Unmarshal(original, &record) != nil || record.Direction != "in" || record.Event != event || event.Kind != agenthandoff.TaskEventMessage {
+		return errors.New("peer_task_message_missing")
+	}
+	record.NoticeDelivered = true
+	updated, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	result, err := s.db.ExecContext(ctx, "UPDATE peer_task_events SET body=? WHERE id=? AND body=?", updated, key, original)
+	if err != nil {
+		return err
+	}
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return errors.New("peer_task_message_changed")
+	}
+	return nil
+}
