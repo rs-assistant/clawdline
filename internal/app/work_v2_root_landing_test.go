@@ -91,10 +91,16 @@ func TestARootLandingRecordedTwiceIsOneRecord(t *testing.T) {
 	}
 }
 
-// An event an older daemon wrote, with its landing copy, still reads: the
-// item shows the event as it was and lists the copy as a landing.
-func TestALegacyLandingCopyStillReads(t *testing.T) {
+// An event an older daemon wrote, with its landing copy, reads as it was, and
+// once the store has been opened again its copy is a root landing row.
+func TestALegacyLandingCopyReadsAsARootLandingAfterReopening(t *testing.T) {
+	dir := t.TempDir()
+	st, err := store.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	w := newWorkV2Test(t)
+	w.Store = st
 	v := mergingWorkV2Test(t, w, implementingWorkV2Test(t, w))
 	legacy := `{"from":"merging","to":"deploying","verification":"","landing":{"commit":"c0ffee","target":"main",` +
 		`"target_commit":"c0ffee","remote":"origin","remote_commit":"c0ffee"},"deployment":"","no_deployment_reason":""}`
@@ -105,6 +111,13 @@ func TestALegacyLandingCopyStillReads(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if w.Store, err = store.Open(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = w.Store.Close() })
 	read, err := w.Item(context.Background(), v.Item.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -113,8 +126,9 @@ func TestALegacyLandingCopyStillReads(t *testing.T) {
 	if last.Payload != legacy {
 		t.Fatalf("legacy event reads as %s", last.Payload)
 	}
-	if len(read.Landings) != 1 || read.Landings[0].Source != LandingSourcePhaseEvent || read.Landings[0].Commit != "c0ffee" ||
-		read.Landings[0].Repository != "/p" || read.Landings[0].Remote != "origin" {
+	if len(read.Landings) != 1 || read.Landings[0].Source != LandingSourceRoot ||
+		read.Landings[0].ID != store.RootLandingID(v.Item.ID, "/p", "c0ffee", "main") ||
+		read.Landings[0].Commit != "c0ffee" || read.Landings[0].Repository != "/p" || read.Landings[0].Remote != "origin" {
 		t.Fatalf("legacy landing = %+v", read.Landings)
 	}
 }

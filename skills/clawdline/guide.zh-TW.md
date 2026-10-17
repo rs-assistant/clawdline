@@ -814,8 +814,8 @@ POST /v1/orchestrator/tasks/<id>/landing
 
 `clawdline landings --work-id <item id>`（`GET /v1/orchestrator/landings?work_id=<item id>`）則是一個
 看板項目所有**已記錄**的 landing：`{"work_id", "landings": [...], "at"}`，每一列帶 `id` 和 `source`——
-`task`（綁定 child 的 landed 或 incorporated 記錄，id 就是 task id）、`root`（`item phase deploying
---commit` 寫下的記錄）或 `phase_event`（舊版 daemon 留在項目歷史裡的副本）。讀不到記錄的綁定 task 會是一列
+`task`（綁定 child 的 landed 或 incorporated 記錄，id 就是 task id）或 `root`（`item phase deploying
+--commit` 寫下的記錄，或舊版 daemon 留在項目歷史裡、已由 store 補成一列的副本）。讀不到記錄的綁定 task 會是一列
 `state: "unknown"`，不會被省略。項目讀取帶的 `landings` 就是同樣這些列。項目不存在時回
 `404 work_not_found`。
 

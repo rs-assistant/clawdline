@@ -721,8 +721,8 @@ avec un `ownership.status`. `unknown` ne signifie pas « personne » : cela s
 `clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) correspond à
 chaque intégration **enregistré** pour un élément Board : `{"work_id", "landings": [...], "at"}`, chaque
 ligne avec ses `id` et `source` — `task` (enregistrement d'intégration ou d'incorporation d'un enfant lié ; l'identifiant est
-l'identifiant de la tâche), `root` (l'enregistrement écrit par `item phase deploying --commit`) ou `phase_event` (une copie conservée par
-un ancien démon dans l'historique de l'élément). Une tâche liée dont l'enregistrement est illisible est une ligne avec
+l'identifiant de la tâche) ou `root` (l'enregistrement écrit par `item phase deploying --commit`, ou une copie conservée par
+un ancien démon dans l'historique de l'élément, à laquelle le store a donné sa propre ligne). Une tâche liée dont l'enregistrement est illisible est une ligne avec
 `state: "unknown"`, jamais omise. L'élément lu contient les mêmes lignes que `landings`. Un élément qui
 n'existe pas est `404 work_not_found`.
 

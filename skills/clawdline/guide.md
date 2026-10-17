@@ -929,8 +929,8 @@ their place.
 `clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) is
 every landing **recorded** for one Board item instead: `{"work_id", "landings": [...], "at"}`, each
 row with its `id` and `source` — `task` (a bound child's landed or incorporated record; the id is
-the task id), `root` (the record `item phase deploying --commit` wrote) or `phase_event` (a copy an
-older daemon kept in the item's history). A bound task whose record cannot be read is a row with
+the task id) or `root` (the record `item phase deploying --commit` wrote, or a copy an older daemon
+kept in the item's history, which the store gave a row of its own). A bound task whose record cannot be read is a row with
 `state: "unknown"`, never left out. The item read carries the same rows as `landings`. An item that
 does not exist is `404 work_not_found`.
 

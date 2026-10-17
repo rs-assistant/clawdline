@@ -2,8 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
@@ -22,17 +20,15 @@ const (
 	// LandingSourceTask is a bound broker task's landed or incorporated record.
 	LandingSourceTask = "task"
 	// LandingSourceRoot is a broker_root_landings row: a landing the owning
-	// Session proved with no child task.
+	// Session proved with no child task, or a copy an older daemon wrote into
+	// the item's phase event, which the store gave a row when it opened.
 	LandingSourceRoot = "root"
-	// LandingSourcePhaseEvent is a landing copy an older daemon wrote into the
-	// item's phase event before root landings had rows. Read, never rewritten.
-	LandingSourcePhaseEvent = "phase_event"
 )
 
 // ItemLandingV2 is one recorded landing of an item.
 type ItemLandingV2 struct {
 	// ID is the record's own id: the task id for a task landing, the row id
-	// for a root landing, `event-<seq>` for a legacy copy.
+	// for a root landing.
 	ID           string
 	Source       string
 	Task         string
@@ -51,9 +47,8 @@ type ItemLandingV2 struct {
 // of its own rather than reading shorter.
 const LandingStateUnknown = "unknown"
 
-// itemLandings composes the three sources.
-func itemLandings(item work.ItemV2, rows []store.BrokerRow, roots []store.RootLanding,
-	legacy []store.LegacyLanding) []ItemLandingV2 {
+// itemLandings composes the two sources.
+func itemLandings(item work.ItemV2, rows []store.BrokerRow, roots []store.RootLanding) []ItemLandingV2 {
 	out := []ItemLandingV2{}
 	for _, row := range rows {
 		r, err := orchestrator.Decode(row.Record)
@@ -80,24 +75,6 @@ func itemLandings(item work.ItemV2, rows []store.BrokerRow, roots []store.RootLa
 			Repository: l.Repository, Target: l.Target, Commit: l.Commit, TargetCommit: l.TargetCommit,
 			Remote: l.Remote, RemoteCommit: l.RemoteCommit, RecordedAt: l.RecordedAt})
 	}
-	for _, e := range legacy {
-		var change struct {
-			Landing *VerifiedLandingV2 `json:"landing"`
-		}
-		if err := json.Unmarshal([]byte(e.Payload), &change); err != nil || !change.Landing.complete() {
-			// The store selected only payloads whose landing is an object; one
-			// that does not decode into a whole proof is not a landing.
-			continue
-		}
-		repo := change.Landing.Repository
-		if repo == "" {
-			repo = item.ProjectPath
-		}
-		out = append(out, ItemLandingV2{ID: fmt.Sprintf("event-%d", e.Seq), Source: LandingSourcePhaseEvent,
-			State: string(orchestrator.LandingLanded), Repository: repo, Target: change.Landing.Target,
-			Commit: change.Landing.Commit, TargetCommit: change.Landing.TargetCommit, Remote: change.Landing.Remote,
-			RemoteCommit: change.Landing.RemoteCommit, RecordedAt: e.At})
-	}
 	return out
 }
 
@@ -111,11 +88,7 @@ func (w *WorkSystemV2) readItemLandings(ctx context.Context, item work.ItemV2) (
 	if err != nil {
 		return nil, err
 	}
-	legacy, err := w.Store.LegacyLandings(ctx, item.ID)
-	if err != nil {
-		return nil, err
-	}
-	return itemLandings(item, rows, roots, legacy), nil
+	return itemLandings(item, rows, roots), nil
 }
 
 // ItemLandings is every landing recorded for one item: what

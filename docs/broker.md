@@ -113,9 +113,9 @@ what is recorded, and a refusal for want of a landing ends with what the look fo
 to live only as a copy inside the item's `item.phase_changed` payload — 233 of 238 entries into deploying, as the Board
 review (R3) counted them — a second truth beside the broker's records (D01). It is now one broker row, written in the same SQLite
 transaction as the phase change, keyed by item, repository, commit and target (the same four are the same row), and the
-event carries only its `landing_id`. Older events keep their `landing` copy and are read as `phase_event` rows; nothing
-is rewritten. `GET /v1/orchestrator/landings?work_id=<item>` and the item read list the same rows — bound tasks'
-`landed`/`incorporated` records, root rows and legacy copies — from one function (`internal/app/work_v2_landings.go`).
+event carries only its `landing_id`. Older events keep their `landing` copy; when the store opens, each copy is given the
+root row it would have been (same four keys, same id; `migrateLegacyLandings`), and no event is rewritten. `GET /v1/orchestrator/landings?work_id=<item>` and the item read list the same rows — bound tasks'
+`landed`/`incorporated` records and root rows — from one function (`internal/app/work_v2_landings.go`).
 One item keeps 64 root rows (`work.root_landings_per_item`); the next is refused `landings_full`.
 
 The target is the record's (D19). A pending landing opens without one, and the broker does **not** fill it with `HEAD`.

@@ -815,8 +815,8 @@ an ihrer Stelle wird keine kürzere Liste angeboten.
 `clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) ist stattdessen
 jedes für ein Board-Item **aufgezeichnete** Landing: `{"work_id", "landings": [...], "at"}`, jede Zeile mit
 ihrer `id` und ihrer `source` – `task` (der landed- oder incorporated-Datensatz eines gebundenen Childs; die
-ID ist die Aufgaben-ID), `root` (der Datensatz, den `item phase deploying --commit` geschrieben hat) oder
-`phase_event` (eine Kopie, die ein älterer Daemon im Verlauf des Items aufbewahrt hat). Eine gebundene
+ID ist die Aufgaben-ID) oder `root` (der Datensatz, den `item phase deploying --commit` geschrieben hat, oder
+eine Kopie, die ein älterer Daemon im Verlauf des Items aufbewahrt hat und der der Store eine eigene Zeile gab). Eine gebundene
 Aufgabe, deren Datensatz sich nicht lesen lässt, ist eine Zeile mit `state: "unknown"` und wird nie
 weggelassen. Das Lesen des Items trägt dieselben Zeilen als `landings`. Ein Item, das nicht existiert, ist
 `404 work_not_found`.

@@ -5350,16 +5350,15 @@ export interface RecordedLanding {
  * Where a recorded landing of a Board item comes from. `task`: a bound broker
  * task's landed or incorporated record; its id is the task id. `root`: a broker
  * root landing row, written when the owning Session proved a commit with `item
- * phase deploying --commit --target --remote` and no child task carried it.
- * `phase_event`: a landing copy an older daemon wrote into the item's phase event
- * before root landings had rows of their own; read, never rewritten.
+ * phase deploying --commit --target --remote` and no child task carried it. A
+ * landing copy an older daemon wrote into the item's phase event is given a root
+ * row when the store opens.
  */
 export type RecordedLandingSource =
     "task"
   | "root"
-  | "phase_event"
 
-export const RecordedLandingSourceValues: readonly RecordedLandingSource[] = ["task", "root", "phase_event"] as const
+export const RecordedLandingSourceValues: readonly RecordedLandingSource[] = ["task", "root"] as const
 
 /**
  * Every refusal on this daemon has this shape. A caller reads `error` as the code

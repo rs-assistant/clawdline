@@ -4565,19 +4565,18 @@ type RecordedLanding struct {
 // Where a recorded landing of a Board item comes from. `task`: a bound broker
 // task's landed or incorporated record; its id is the task id. `root`: a broker
 // root landing row, written when the owning Session proved a commit with `item
-// phase deploying --commit --target --remote` and no child task carried it.
-// `phase_event`: a landing copy an older daemon wrote into the item's phase
-// event before root landings had rows of their own; read, never rewritten.
+// phase deploying --commit --target --remote` and no child task carried it. A
+// landing copy an older daemon wrote into the item's phase event is given a
+// root row when the store opens.
 type RecordedLandingSource string
 
 const (
-	RecordedLandingSourceTask       RecordedLandingSource = "task"
-	RecordedLandingSourceRoot       RecordedLandingSource = "root"
-	RecordedLandingSourcePhaseEvent RecordedLandingSource = "phase_event"
+	RecordedLandingSourceTask RecordedLandingSource = "task"
+	RecordedLandingSourceRoot RecordedLandingSource = "root"
 )
 
 // RecordedLandingSourceValues is every value the contract allows, in contract order.
-var RecordedLandingSourceValues = []RecordedLandingSource{RecordedLandingSourceTask, RecordedLandingSourceRoot, RecordedLandingSourcePhaseEvent}
+var RecordedLandingSourceValues = []RecordedLandingSource{RecordedLandingSourceTask, RecordedLandingSourceRoot}
 
 // Every refusal on this daemon has this shape. A caller reads `error` as the
 // code and never parses `detail`.

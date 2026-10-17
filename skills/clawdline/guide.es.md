@@ -838,9 +838,9 @@ más corta en su lugar.
 `clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) es, en
 cambio, cada landing **registrado** para un ítem del Board: `{"work_id", "landings": [...], "at"}`,
 cada fila con su `id` y su `source`: `task` (el registro landed o incorporated de un child
-vinculado; el id es el id de la tarea), `root` (el registro que escribió
-`item phase deploying --commit`) o `phase_event` (una copia que un daemon más antiguo guardó en el
-historial del ítem). Una tarea vinculada cuyo registro no se puede leer es una fila con
+vinculado; el id es el id de la tarea) o `root` (el registro que escribió
+`item phase deploying --commit`, o una copia que un daemon más antiguo guardó en el historial del
+ítem y a la que el store dio una fila propia). Una tarea vinculada cuyo registro no se puede leer es una fila con
 `state: "unknown"`, nunca se omite. La lectura del ítem trae las mismas filas como `landings`. Un
 ítem que no existe es `404 work_not_found`.
 

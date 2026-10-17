@@ -722,9 +722,9 @@ POST /v1/orchestrator/tasks/<id>/landing
 
 `clawdline landings --work-id <item id>`（`GET /v1/orchestrator/landings?work_id=<item id>`）
 则列出某看板项目**已记录**的所有落地：`{"work_id", "landings": [...], "at"}`。
-每列含 `id` 和 `source`：`task`（已绑定 child 的 landed 或 incorporated 记录，ID 即任务 ID）、
-`root`（`item phase deploying --commit` 写入的记录），或 `phase_event`
-（旧版守护进程保存在项目历史中的副本）。
+每列含 `id` 和 `source`：`task`（已绑定 child 的 landed 或 incorporated 记录，ID 即任务 ID），或
+`root`（`item phase deploying --commit` 写入的记录，或旧版守护进程保存在项目历史中、
+已由 store 补成一列的副本）。
 若已绑定任务的记录无法读取，仍会保留一列 `state: "unknown"`，绝不省略。
 项目读取结果也包含与 `landings` 相同的列。不存在的项目会收到 `404 work_not_found`。
 

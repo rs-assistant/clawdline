@@ -426,7 +426,7 @@ POST /v1/orchestrator/tasks/<id>/landing
 
 `clawdline landings` (`GET /v1/orchestrator/landings`) はマシン上で保留中のすべてのランディングであり、それぞれに `ownership.status` が付いています。 `unknown` は「誰でもない」ではありません。証拠を読み取ることができなかったことを意味します。 `503 landings_incomplete` は、一部の行を読み取ることができず、代わりに短いリストが提供されないことを意味します。
 
-`clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) は、代わりに 1 つのボード アイテムのすべてのランディング **記録**です: `{"work_id", "landings": [...], "at"}`、各行の `id` および `source` — `task` (バインドされた子のランディングまたは組み込まれたレコード。ID はタスク ID)、`root` (レコード) `item phase deploying --commit` が書き込みました) または `phase_event` (アイテムの履歴に保存されている古いデーモンのコピー)。レコードを読み取ることができないバインドされたタスクは、`state: "unknown"` の行であり、取り残されることはありません。読み取られた項目には、`landings` と同じ行が含まれます。存在しない商品は`404 work_not_found`です。
+`clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) は、代わりに 1 つのボード アイテムのすべてのランディング **記録**です: `{"work_id", "landings": [...], "at"}`、各行の `id` および `source` — `task` (バインドされた子のランディングまたは組み込まれたレコード。ID はタスク ID)、または `root` (`item phase deploying --commit` が書き込んだレコード、または古いデーモンがアイテムの履歴に残し、ストアが独自の行にしたコピー)。レコードを読み取ることができないバインドされたタスクは、`state: "unknown"` の行であり、取り残されることはありません。読み取られた項目には、`landings` と同じ行が含まれます。存在しない商品は`404 work_not_found`です。
 
 **1 つのチェックアウトにランディングする 2 つのルート**は、最初にランディングリースを取得します (§11)。
 
