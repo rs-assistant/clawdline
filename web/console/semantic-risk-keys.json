@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6006,
+  "englishKeys": 6008,
   "counts": {
     "negation": 1911,
-    "state": 1069,
+    "state": 1070,
     "permission": 374,
     "deletion": 156,
-    "uncertainty": 174
+    "uncertainty": 175
   },
-  "unionCount": 2869,
+  "unionCount": 2870,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -2022,6 +2022,7 @@
       "capacityRow.cloud.viewer_events_seen_batches.full",
       "capacityRow.console.health_live_seconds.what",
       "capacityRow.console.opened_row_quiet_seconds.full",
+      "capacityRow.console.persona_retry_seconds.what",
       "capacityRow.console.pinned_list_read_timeout_seconds.full",
       "capacityRow.console.pinned_list_read_timeout_seconds.what",
       "capacityRow.console.relay_feature_wait_seconds.full",
@@ -3535,6 +3536,7 @@
       "capacityRow.cloud.terminal_roster_deadline_seconds.full",
       "capacityRow.console.opened_row_restate_seconds.full",
       "capacityRow.console.opened_row_restate_seconds.what",
+      "capacityRow.console.persona_retry_seconds.what",
       "capacityRow.console.status_gap_retry_seconds.full",
       "capacityRow.console.status_gap_retry_seconds.what",
       "capacityRow.console.status_marker_retry_seconds.full",
@@ -3868,6 +3870,7 @@
     "capacityRow.console.opened_row_quiet_seconds.full",
     "capacityRow.console.opened_row_restate_seconds.full",
     "capacityRow.console.opened_row_restate_seconds.what",
+    "capacityRow.console.persona_retry_seconds.what",
     "capacityRow.console.pinned_list_read_timeout_seconds.full",
     "capacityRow.console.pinned_list_read_timeout_seconds.what",
     "capacityRow.console.relay_feature_wait_seconds.full",

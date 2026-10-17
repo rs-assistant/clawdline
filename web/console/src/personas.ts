@@ -23,7 +23,13 @@ const HERE = ""
 
 const catalogs = new Map<string, Persona[]>()
 const readings = new Map<string, Promise<Persona[]>>()
+const retries = new Map<string, ReturnType<typeof setTimeout>>()
 const listeners = new Set<() => void>()
+let generation = 0
+
+// A failed Cloud read may be a momentary loss of the machine connection. Keep
+// one retry per machine so a list of Sessions cannot multiply the requests.
+const RETRY_MS = 5_000
 
 function wellFormed(p: unknown): p is Persona {
   const q = p as Persona | null
@@ -42,22 +48,38 @@ export function loadPersonas(read: typeof fetch = (...args) => fetch(...args),
   const key = machine || HERE
   const held = readings.get(key)
   if (held) return held
+  const started = generation
   const reading = (async () => {
+    let retry = false
+    let list: Persona[] = []
     try {
       const res = await read("/v1/personas" + (machine ? "?machine=" + encodeURIComponent(machine) : ""),
         { credentials: "same-origin" })
-      if (!res.ok) return []
-      const body = (await res.json()) as PersonaCatalog | null
-      return Array.isArray(body?.personas) ? body.personas.filter(wellFormed).map(withTeams) : []
+      if (res.ok) {
+        const body = (await res.json()) as PersonaCatalog | null
+        list = Array.isArray(body?.personas) ? body.personas.filter(wellFormed).map(withTeams) : []
+      } else {
+        retry = res.status === 408 || res.status === 429 || (res.status >= 500 && res.status !== 501)
+      }
     } catch {
-      // refusal-ok: a missing catalog is shown as no roles to pick, not as a failure.
-      return []
+      retry = true
     }
-  })().then((list) => {
+    if (started !== generation) return catalogs.get(key) ?? []
     catalogs.set(key, list)
     listeners.forEach((fn) => fn())
+    if (retry) {
+      readings.delete(key)
+      if (!retries.has(key)) retries.set(key, setTimeout(() => {
+        retries.delete(key)
+        void loadPersonas(read, machine)
+      }, RETRY_MS))
+    } else {
+      const timer = retries.get(key)
+      if (timer) clearTimeout(timer)
+      retries.delete(key)
+    }
     return list
-  })
+  })()
   readings.set(key, reading)
   return reading
 }
@@ -76,6 +98,9 @@ export function personasNow(machine: string | null = null): Persona[] | null {
  * asks for it.
  */
 export function forgetPersonas(): void {
+  generation++
+  for (const timer of retries.values()) clearTimeout(timer)
+  retries.clear()
   catalogs.clear()
   readings.clear()
   listeners.forEach((fn) => fn())

@@ -11,7 +11,7 @@ export function usePersonas(machine: string | null = null): Persona[] {
     let active = true
     setList(personasNow(machine) ?? [])
     const off = onPersonas(() => { if (active) setList(personasNow(machine) ?? []) })
-    void loadPersonas(undefined, machine).then((l) => { if (active) setList(l) })
+    void loadPersonas(undefined, machine).then(() => { if (active) setList(personasNow(machine) ?? []) })
     return () => { active = false; off() }
   }, [machine])
   return list

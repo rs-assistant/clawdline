@@ -331,10 +331,11 @@ merge keeps it whichever side it arrived on (`richer`). `SessionRow.persona` rep
 ## Console and Cloud
 
 The console calls a persona a "Role" (角色). It reads `GET /v1/personas` once per machine
-(`web/console/src/personas.ts`), including machines shown in the Cloud fleet. A read that fails
-for any reason is an empty catalog, and an empty catalog draws no
-chips and no bots: an older daemon, or a machine on Cloud that cannot answer, shows the console it
-showed before this feature, never a sheet that breaks after a press.
+(`web/console/src/personas.ts`), including machines shown in the Cloud fleet. A failed read
+temporarily draws no chips or bots. A transient transport, timeout, rate-limit or server failure
+is retried once per machine after five seconds; a successful catalog, including an empty one, is
+held. A machine that permanently refuses the route still shows the console it showed before this
+feature without a broken sheet.
 
 - **The team switcher.** The start sheet, its resume step and the Board's new-Session assignment
   draw one role row (`session/RoleRow.tsx`). When the catalog has personas in more than one team,

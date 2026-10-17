@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6006,
-  "riskKeys": 2869,
-  "nonRiskCount": 3137,
+  "englishContentKeys": 6008,
+  "riskKeys": 2870,
+  "nonRiskCount": 3138,
   "groups": [
     {
       "name": "bar / other",
@@ -43,7 +43,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 140,
+      "count": 141,
       "sources": [
         null
       ],
@@ -79,6 +79,7 @@
         "capacityRow.cloud.terminal_viewer_connections.what",
         "capacityRow.cloud.viewer_events_batch_bytes.what",
         "capacityRow.console.opened_row_quiet_seconds.what",
+        "capacityRow.console.persona_retry_seconds.full",
         "capacityRow.console.relay_transcript_expect_reask_seconds.what",
         "capacityRow.console.status_marker_recovery_wait_seconds.what",
         "capacityRow.console.transcript_backoff_seconds.full",
