@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -115,7 +116,7 @@ func (s *Server) watchWaiting(ctx context.Context, tick time.Duration) {
 	defer t.Stop()
 	said := ""
 	for {
-		if _, err := s.waiting().Observe(ctx, s.readingWithin(ctx, tick)); err != nil {
+		if err := s.observeWaiting(ctx, tick); err != nil {
 			// Said once until it changes: the sweep runs every few seconds,
 			// and the same line every few seconds buries the ones that matter.
 			if err.Error() != said {
@@ -131,6 +132,19 @@ func (s *Server) watchWaiting(ctx context.Context, tick time.Duration) {
 		case <-t.C:
 		}
 	}
+}
+
+// observeWaiting is one reading of the watcher. A panic in it is logged and
+// the next tick tries again, as the broker and capacity beats do: this push is
+// not worth the daemon.
+func (s *Server) observeWaiting(ctx context.Context, tick time.Duration) (err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			err = fmt.Errorf("a reading panicked: %v", v)
+		}
+	}()
+	_, err = s.waiting().Observe(ctx, s.readingWithin(ctx, tick))
+	return err
 }
 
 // readingWithin is Server.reading for a reader on a slower clock

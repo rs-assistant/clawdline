@@ -184,7 +184,7 @@ console 原本寫了 `viewport-fit=cover`，而它抄來的那份 stylesheet 在
 
 **機器怎麼知道它在等。** 讀數本來就知道：Claude 自己的狀態檔寫 `waiting`，或畫面上畫著選單
 （`AskUserQuestion`、權限詢問）。列表上畫成 🙋、`work_state: waiting_you` 的就是它。
-`internal/app/waiting.go` 每 15 秒看一次（daemon 的 `serve` 呼叫 `Server.StartWaiting`，有 broker 才啟動），
+`internal/app/waiting.go` 決定要不要推；時鐘在 `internal/transport/http/waiting.go`，每 15 秒看一次（daemon 的 `serve` 呼叫 `Server.StartWaiting`，有 broker 才啟動；單次讀取 panic 只記一行，下一次照跑），
 取的是手上最近一次、15 秒內的讀數（`InventoryReading.Within`）——broker 的 beat 每 5 秒本來就會讀一次，
 所以它不自己另外掃。2026-09-22 退休 v1 board sweep 時，啟動這個 watcher 的那一行跟著 sweep 一起被刪，
 從那天到 2026-10-17 這則推播一則都沒送；現在由 `TestServeStartsTheWaitingWatcher` 與

@@ -87,5 +87,17 @@ func TestStartWaitingPushesAStandingQuestionOnce(t *testing.T) {
 		if n := pushes(s, asking); n != 0 {
 			t.Fatalf("with push_on_waiting off, %d pushes were recorded; want 0", n)
 		}
+		// Zero alone would also be the answer of a watcher that never ran:
+		// turned back on while the question still stands, it pushes once.
+		if _, err := nextconfig.Open(s.cfg.Dir).Set(map[string]any{"push_on_waiting": true}); err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.Now().Add(3 * time.Second)
+		for pushes(s, asking) == 0 && time.Now().Before(deadline) {
+			time.Sleep(5 * time.Millisecond)
+		}
+		if n := pushes(s, asking); n != 1 {
+			t.Fatalf("turned back on, a question still standing recorded %d pushes; want 1", n)
+		}
 	})
 }
