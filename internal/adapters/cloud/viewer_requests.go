@@ -193,7 +193,7 @@ func (c *ViewerClient) request(ctx context.Context, destination ViewerDestinatio
 		return nil, err
 	}
 	key := viewerReplyKey(destination.MachineID, destination.SessionID, readName)
-	fullChannel := channel + "/" + viewerChannelSegment(destination.MachineID)
+	fullChannel := channel + "/" + domain.ChannelSegment(destination.MachineID)
 	p := &viewerPending{key: key, channel: fullChannel, seq: seq, action: action,
 		pinnedRead: channel == "r", destination: destination, answer: make(chan viewerReply, 1)}
 	c.pendingMu.Lock()
@@ -366,7 +366,7 @@ func (c *ViewerClient) Mutate(ctx context.Context, input ViewerMutation) (Viewer
 			return ViewerMutationResult{}, ViewerRefusal{Code: "menu_unverified"}
 		}
 	}
-	path := "t/" + viewerChannelSegment(input.Destination.MachineID) + "/" + viewerChannelSegment(input.Destination.SessionID)
+	path := "t/" + domain.ChannelSegment(input.Destination.MachineID) + "/" + domain.ChannelSegment(input.Destination.SessionID)
 	if err := c.transport.Subscribe(path); err != nil {
 		return ViewerMutationResult{}, err
 	}
@@ -408,7 +408,7 @@ func (c *ViewerClient) ReadReceipt(ctx context.Context, destination ViewerDestin
 	if err := c.WaitReady(ctx); err != nil {
 		return ViewerReceipt{}, err
 	}
-	path := "t/" + viewerChannelSegment(destination.MachineID) + "/" + viewerChannelSegment(destination.SessionID)
+	path := "t/" + domain.ChannelSegment(destination.MachineID) + "/" + domain.ChannelSegment(destination.SessionID)
 	if err := c.transport.Subscribe(path); err != nil {
 		return ViewerReceipt{}, err
 	}
@@ -440,7 +440,7 @@ func (c *ViewerClient) ReadDetail(ctx context.Context, destination ViewerDestina
 	if err := c.requireCurrentDestination(ctx, destination); err != nil {
 		return ViewerDetail{}, err
 	}
-	suffix := viewerChannelSegment(destination.MachineID) + "/" + viewerChannelSegment(destination.SessionID)
+	suffix := domain.ChannelSegment(destination.MachineID) + "/" + domain.ChannelSegment(destination.SessionID)
 	c.openRich(destination)
 	defer c.closeRich(destination)
 	if err := c.transport.Subscribe("s/"+suffix, "t/"+suffix); err != nil {
@@ -491,7 +491,7 @@ func (c *ViewerClient) ReadTranscriptPage(ctx context.Context, destination Viewe
 	if err := c.requireCurrentDestination(ctx, destination); err != nil {
 		return ViewerTranscriptPage{}, err
 	}
-	path := "t/" + viewerChannelSegment(destination.MachineID) + "/" + viewerChannelSegment(destination.SessionID)
+	path := "t/" + domain.ChannelSegment(destination.MachineID) + "/" + domain.ChannelSegment(destination.SessionID)
 	if err := c.transport.Subscribe(path); err != nil {
 		return ViewerTranscriptPage{}, err
 	}
@@ -513,7 +513,7 @@ func (c *ViewerClient) ReadSkills(ctx context.Context, destination ViewerDestina
 	if err := c.requireCurrentDestination(ctx, destination); err != nil {
 		return nil, err
 	}
-	path := "t/" + viewerChannelSegment(destination.MachineID) + "/" + viewerChannelSegment(destination.SessionID)
+	path := "t/" + domain.ChannelSegment(destination.MachineID) + "/" + domain.ChannelSegment(destination.SessionID)
 	if err := c.transport.Subscribe(path); err != nil {
 		return nil, err
 	}
