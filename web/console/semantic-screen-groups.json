@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5993,
-  "riskKeys": 2863,
-  "nonRiskCount": 3130,
+  "englishContentKeys": 5999,
+  "riskKeys": 2867,
+  "nonRiskCount": 3132,
   "groups": [
     {
       "name": "bar / other",
@@ -1814,7 +1814,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 216,
+      "count": 217,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1872,6 +1872,7 @@
         "next.cloudAllLoadingOlder",
         "next.cloudAllMachine",
         "next.cloudAllMachineID",
+        "next.cloudAllMachineOffline",
         "next.cloudAllMachines",
         "next.cloudAllNameUnread",
         "next.cloudAllPlatform",
@@ -2109,7 +2110,7 @@
     },
     {
       "name": "next / other",
-      "count": 183,
+      "count": 184,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2216,6 +2217,7 @@
         "next.sessionWaitHeavyQueued",
         "next.sessionWriteDisabled",
         "next.sessionsListWaitTitle",
+        "next.sessionsMachineOfflineTitle",
         "next.sidebarAppStaged",
         "next.sidebarChooseMachineVersion",
         "next.sidebarMain",
