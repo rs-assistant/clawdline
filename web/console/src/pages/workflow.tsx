@@ -4,6 +4,7 @@ import { readProjectPlaces, type ProjectPlace } from "./work/api.js"
 import { listProjectFiles, readProjectFile, type ProjectFile } from "./projects/project-files-api.js"
 import { createWorkflow, deleteWorkflow, readReusableTextForMachine, SnippetFailure, updateWorkflow } from "../session/snippets-api.js"
 import type { PageModule } from "./types.js"
+import "../page-skeleton.css"
 import "./workflow/workflow.css"
 import { workflowWord as W } from "../workflow-words.js"
 import { workflowSourceMatches, workflowSourceText, workflowSourceTitle } from "../workflow-source.js"
@@ -286,7 +287,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
         <button className="workflow-page-reload" type="button" onClick={() => void refresh(place)} disabled={(!place && !globalView) || loading || busy}>{W("reload")}</button>
       </div>
     </header>
-    {loading && <p role="status">{W("loading")}</p>}
+    {loading && <WorkflowSkeleton label={W("loading")} />}
     {error && !draft && <p role="alert" className="workflow-error">{error}</p>}
     {(place || globalView) && <>
       {!loading && rows.length > 0 && <div className="workflow-toolbar"><h2>{W("workflowCount")} <span>{rows.length}</span></h2>
@@ -363,6 +364,16 @@ function WorkflowPage({ shown }: { shown: boolean }) {
       </div>
     </div>}
   </section>
+}
+
+/** The first read: the count and three workflow cards, in the list's own geometry. */
+function WorkflowSkeleton({ label }: { label: string }) {
+  return <div className="page-skeleton" role="status" aria-label={label}>
+    <div className="workflow-toolbar" aria-hidden="true"><span className="page-skeleton-line workflow-skeleton-count" /></div>
+    <div className="workflow-list" aria-hidden="true">{[0, 1, 2].map((card) => <div className="workflow-list-card workflow-skeleton-card" key={card}>
+      <span className="page-skeleton-line workflow-skeleton-title" /><span className="page-skeleton-line" /><span className="page-skeleton-line workflow-skeleton-short" />
+    </div>)}</div>
+  </div>
 }
 
 export const page: PageModule = { id: "workflow", requiresApiLevel: 1, Component: WorkflowPage }

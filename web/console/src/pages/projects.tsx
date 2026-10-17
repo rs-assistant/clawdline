@@ -15,9 +15,11 @@ import { nextWord, type NextWord } from "../next-strings.js"
 import { workPageHash } from "../page-route.js"
 import { showProjectRefusalDetail } from "./projects/refusal-detail.js"
 import { removeProjectPlace } from "./work/api.js"
-import { failureSentence } from "../legacy/bridge.js"
+import { failureSentence, strings } from "../legacy/bridge.js"
 import { arriveAtDetail, detailInHash, enterDetail, leaveDetail } from "../page-detail.js"
 import "../page-bar.css"
+import "../page-skeleton.css"
+import "./projects/project-skeleton.css"
 
 /** An opened Project is `#page=projects&id=<place id>` (page-detail.ts). */
 const PROJECTS_ADDRESS = {
@@ -61,6 +63,23 @@ type BoundProjects = ProjectsPage & {
 function ProjectsPageView({ shown }: { shown: boolean }) {
   const [toolsHost, setToolsHost] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => { setToolsHost(document.getElementById("project-tools-host")) }, [])
+  // The copied renderer says it is reading in a status line; the rows it is
+  // about to draw are shown in its place, beside its list, without touching it.
+  const [skeletonHost, setSkeletonHost] = useState<HTMLElement | null>(null)
+  const [listReading, setListReading] = useState(false)
+  useLayoutEffect(() => {
+    const rows = document.getElementById("projects-rows")
+    if (!rows) return
+    const host = document.createElement("div")
+    rows.after(host)
+    setSkeletonHost(host)
+    return () => { host.remove(); setSkeletonHost(null) }
+  }, [])
+  useLayoutEffect(() => {
+    const view = document.getElementById("projects-list-view")
+    if (listReading) view?.setAttribute("data-reading", "")
+    else view?.removeAttribute("data-reading")
+  }, [listReading])
   const page = useRef<BoundProjects | null>(null)
   const setup = useRef<ProjectSetupHandle>(null)
   const was = useRef(false)
@@ -295,6 +314,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       }
       const localizedStatus = localizePinnedProjectStatus(status.textContent ?? "")
       if (localizedStatus !== status.textContent) status.textContent = localizedStatus
+      setListReading(!rows.childElementCount && status.textContent === strings.webProjectsLoading)
       showProjectRefusalDetail(status, latestProjectReadRefusal())
     }
     const onSettings = (ev: Event) => {
@@ -404,6 +424,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
       hidden={!shown}
       dangerouslySetInnerHTML={{ __html: sectionMarkup }}
     />
+    {skeletonHost && listReading && createPortal(<ProjectsSkeleton label={strings.webProjectsLoading} />, skeletonHost)}
     {toolsHost && createPortal(<>
       <ProjectTools shown={shown} changed={() => { void page.current?.enter() }} setupRef={setup} />
     </>, toolsHost)}
@@ -436,6 +457,16 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
     </dialog>
     </>
   )
+}
+
+/** The first read: Project rows in the list's own geometry. */
+function ProjectsSkeleton({ label }: { label: string }) {
+  return <div className="page-skeleton" role="status" aria-label={label}>
+    <ol className="projects-rows" aria-hidden="true">{[0, 1, 2, 3, 4].map((row) => <li className="project-row-wrap" key={row}>
+      <div className="project-row project-skeleton-row"><span className="page-skeleton-line project-skeleton-mark" />
+        <span className="project-row-text"><span className="page-skeleton-line project-skeleton-name" /><span className="page-skeleton-line project-skeleton-path" /></span></div>
+    </li>)}</ol>
+  </div>
 }
 
 /** The page router, as the drawer moves: its row for that page, clicked. */

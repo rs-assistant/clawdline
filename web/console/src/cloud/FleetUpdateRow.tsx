@@ -3,7 +3,7 @@ import type { CloudMachine } from "./copied.js"
 import type { CloudReadClient } from "./relay-reader.js"
 import { nextWord } from "../next-strings.js"
 import { fleetUpdateFacts, readFleetUpdate } from "./fleet-update.js"
-import { applyMoving, UPDATE_FOLLOW_EVERY_MS, UPDATE_READ_EVERY_MS, type UpdateRead } from "../machine/update-model.js"
+import { applyMoving, createUpdateReadStore, UPDATE_FOLLOW_EVERY_MS, type UpdateRead } from "../machine/update-model.js"
 import "./fleet-update.css"
 
 /** Version, update availability, compatibility and last result for one machine. */
@@ -16,19 +16,28 @@ export function FleetUpdateRow({ client, machine, appVersion }: {
   useEffect(() => {
     setRead(null)
     if (!client || machine.pairing !== "paired" || machine.freshness !== "current") return
-    const controller = new AbortController()
-    let next: ReturnType<typeof setTimeout> | undefined
-    async function refresh() {
-      const answer = await readFleetUpdate(client!, machine.id, controller.signal)
-      if (controller.signal.aborted) return
-      setRead(answer)
-      const moving = answer.kind === "status" && applyMoving(answer.status)
-      next = setTimeout(() => void refresh(), moving ? UPDATE_FOLLOW_EVERY_MS : UPDATE_READ_EVERY_MS)
-    }
-    void refresh()
+    let active = true
+    const store = createUpdateReadStore(
+      (fresh) => readFleetUpdate(client, machine.id, undefined, fresh),
+      {
+        now: () => Date.now(), visible: () => document.visibilityState !== "hidden",
+        onVisibilityChange: (fn) => { document.addEventListener("visibilitychange", fn); return () => document.removeEventListener("visibilitychange", fn) },
+        onFocus: (fn) => { window.addEventListener("focus", fn); return () => window.removeEventListener("focus", fn) },
+        onPageShow: (fn) => { const restored = (event: PageTransitionEvent) => { if (event.persisted) fn() }; window.addEventListener("pageshow", restored); return () => window.removeEventListener("pageshow", restored) },
+        onBlur: (fn) => { window.addEventListener("blur", fn); return () => window.removeEventListener("blur", fn) },
+        onOnline: (fn) => { window.addEventListener("online", fn); return () => window.removeEventListener("online", fn) },
+        setInterval: (fn, ms) => setInterval(fn, ms), clearInterval: (timer) => clearInterval(timer),
+      },
+    )
+    const stop = store.subscribe(() => { if (active) setRead(store.current()) })
+    const follow = setInterval(() => {
+      const current = store.current()
+      if (current?.kind === "status" && applyMoving(current.status)) void store.refresh()
+    }, UPDATE_FOLLOW_EVERY_MS)
     return () => {
-      controller.abort()
-      if (next) clearTimeout(next)
+      active = false
+      stop()
+      clearInterval(follow)
     }
   }, [client, machine.id, machine.pairing, machine.freshness])
 

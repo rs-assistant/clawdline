@@ -30,6 +30,8 @@ import { sessionsPageHash, sessionsTerminalMode, sessionsTerminalRoute, type Ter
 import { TerminalList } from "./session/TerminalList.js"
 import { TerminalPane } from "./pages/terminal/TerminalPane.js"
 import { TERMINAL_ROUTE, forgetNewTerminal, newTerminalProject } from "./pages/terminal/navigate.js"
+import { offlinePlacement, type MachineOffline } from "./session/machine-offline.js"
+import { machineSeenWord } from "./cloud/machine-seen.js"
 
 /**
  * The session list page: the list, and the conversation beside it.
@@ -43,6 +45,7 @@ export function SessionsPage({
   loaded,
   arrived,
   live,
+  machineOffline,
   emptyAuthoritative,
   readingSource,
   scanNotes,
@@ -72,6 +75,8 @@ export function SessionsPage({
   arrived: boolean
   /** The stream is up: the original's `S.conn === "live"`. */
   live: boolean
+  /** The machine underneath has stopped reporting; `live` above is only this browser's line. */
+  machineOffline?: MachineOffline | null
   emptyAuthoritative: boolean
   /** The whole batch's freshness; rows carry the source they came from. */
   readingSource?: BearingsSource
@@ -160,7 +165,6 @@ export function SessionsPage({
   const sourceFailure = scanFailureWords(scanNotes, scanSources)
   const briefRefresh = inventoryRefreshInProgress(scanNotes) &&
     readingSource?.freshness === "unverified" && Date.now() / 1000 - readingSource.observed_at < 30
-  const readingSaid = sourceFailure ?? (briefRefresh ? null : batchReadingWords(readingSource))
 
   // `thawOrder` redraws the list through the session UI seam once the order it
   // held is let go, and this page is that list.
@@ -205,6 +209,10 @@ export function SessionsPage({
   const skeleton = wait === "shown"
   const listUnknown = !arrived && wait !== "over"
   const drawn = skeleton ? [] : shown
+  const offlineAt = offlinePlacement(machineOffline ?? null, drawn.length)
+  const offlineSeen = machineOffline ? machineSeenWord(machineOffline.seenAt) : ""
+  const readingSaid = offlineAt === "line" ? nextWord("sessionsMachineOfflineLine", { seen: offlineSeen })
+    : sourceFailure ?? (briefRefresh ? null : batchReadingWords(readingSource))
   const depths = visualDepths(drawn, tasks ?? [], L.taskShaping)
   const branches = visualBranches(drawn, depths)
 
@@ -234,10 +242,14 @@ export function SessionsPage({
   // The original's fifth, a browser that was refused, has no counterpart on
   // this daemon. What the element holds is only rewritten when it is shown, as
   // there, so a skeleton that has been taken down is still inside it, hidden.
-  const empty = !skeleton && drawn.length === 0 && !arriving && !listUnknown
+  // An offline machine's empty page is the offline sentence even while the list
+  // would otherwise still be "arriving": nothing is on its way from a machine that is off.
+  const empty = offlineAt === "empty" || (!skeleton && drawn.length === 0 && !arriving && !listUnknown)
   const homeEmpty = empty && rows.length === 0 && !filter
   const said = useRef<"skel" | [string, string] | null>(null)
-  if (skeleton) said.current = "skel"
+  if (offlineAt === "empty") said.current = [nextWord("sessionsMachineOfflineTitle"),
+    nextWord("sessionsMachineOfflineHint", { seen: offlineSeen })]
+  else if (skeleton) said.current = "skel"
   else if (empty) {
     said.current = rows.length
       ? [L.fillString(T.webEmptyFilterTitle, { q: filter }), T.webEmptyFilterHint]
@@ -249,7 +261,7 @@ export function SessionsPage({
             ? [nextWord("sessionsListIncompleteTitle"), sourceFailure]
             : [nextWord("sessionsListWaitTitle"), nextWord("sessionsListWaitHint")]
   }
-  const emptyClass = skeleton ? "skel" : "empty" + (homeEmpty ? " home-hero-list" : "")
+  const emptyClass = skeleton && offlineAt !== "empty" ? "skel" : "empty" + (homeEmpty ? " home-hero-list" : "")
 
   // The sessions a reboot took away (docs/session-restore.md). Offered in the
   // home hero's place when the list is empty, and as a card above the rows
@@ -335,7 +347,7 @@ export function SessionsPage({
               ) : said.current ? (
                 <>
                   <b>{said.current[0]}</b>
-                  {said.current[1]}
+                  <span className="empty-hint">{said.current[1]}</span>
                   {homeEmpty && emptyAuthoritative && live && (
                     <button className="chip" type="button" onClick={() => Start.open()}>
                       {nextWord("firstSessionStart")}

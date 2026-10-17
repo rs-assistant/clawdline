@@ -44,8 +44,10 @@ deploying the hosted console does not require quitting the local app or restarti
    investigate before trying again.
 4. On macOS, a healthy daemon update can leave the app bundle staged while the app remains open.
    `apply.staged_app` records that state. The app puts the staged bundle in place by itself
-   (`shell/darwin/StagedAppWatcher.swift`): it reads `GET /v1/update` 3 s after launching and every
-   30 s after, and when a bundle is staged for a version other than its own it restarts into it —
+   (`shell/darwin/StagedAppWatcher.swift`): it reads `GET /v1/update/fresh` 3 s after launching
+   and whenever the app returns to the foreground. Its 30 s staged-bundle poll reads cached
+   `GET /v1/update`. If a fresh request fails, it reads the cached staged-bundle state. When a
+   bundle is staged for a version other than its own it restarts into it —
    at once within a minute of launching, otherwise only while it is not in front and its input bar
    is closed. A restart the person did not ask for reopens behind other apps (`open -g`), and a
    window that was on screen comes back. One version is tried at most once every 30 minutes, so a
@@ -295,7 +297,10 @@ cannot be installed from an old banner. Dismissing the banner is remembered per 
 browser. Settings retains the full version check, release notes, and update controls.
 
 The Cloud console's **All machines** Session list also checks each paired online machine for a
-fresh signed release. It names the machine and available version in a banner, including when this
+fresh signed release when the row opens or the page returns from hidden, blur, or the back-forward
+cache. Its ten-minute checks are fresh; progress polling reads cached status. If a fresh client
+request fails, cached running and apply facts remain visible but latest becomes unknown, so an
+old cached release is never offered. It names the machine and available version in a banner, including when this
 page is shown inside the Mac app's Cloud tab. Its button switches to that machine's console, where
 the person can choose **立即更新**; the banner itself never starts an update. An offline, unpaired,
 unanswered, or rolled-back machine cannot produce this prompt. The local Mac app and its Cloud tab
@@ -304,7 +309,9 @@ remain open while the release is prepared and while the prompt is shown.
 On a release install, the fresh route rereads the signed manifest. A 404 clears a withdrawn release;
 an unreachable or invalid source produces `unknown` instead of showing a cached version as
 available. Concurrent background and foreground checks are serialized, so an older result cannot
-overwrite the new one. Over Cloud this route uses the distinct `update-fresh` word; a daemon
+overwrite the new one. Overlapping checks share one source read; sequential foreground returns
+still check again. A failed console client request falls back to cached running and apply details,
+while treating latest as unknown. Over Cloud this route uses the distinct `update-fresh` word; a daemon
 predating that word refuses it and the console suppresses the prompt. The request depends on the
 release host answering; an unreachable host cannot establish whether a release was withdrawn.
 The remaining cross-platform acceptance evidence is tracked in

@@ -10,6 +10,7 @@ import {
   devStrip,
   INSTALL_COMMAND,
   classifyUpdateRead,
+  cachedUpdateAfterFreshFailure,
   settleUpdateRead,
   shortStamp,
   shouldLookForNewConsole,
@@ -61,6 +62,18 @@ test("a refused or failed read is silent, a daemon predating the route above all
   const read = settleUpdateRead(true, status("update_available"))
   assert.equal(read?.state, "update_available")
   assert.ok(updateNotice(read, nextWord))
+})
+
+test("failed fresh reads retain cached running and apply facts without offering a stale release", () => {
+  const cached = release("update_available", { state: "healthy", to: "v0.11.0" })
+  const fallback = cachedUpdateAfterFreshFailure({ kind: "status", status: cached })
+  assert.equal(fallback.kind, "status")
+  if (fallback.kind !== "status") return
+  assert.equal(fallback.status.running.version, "v0.10.0")
+  assert.equal(fallback.status.apply?.state, "healthy")
+  assert.equal(fallback.status.state, "unknown")
+  assert.equal(fallback.status.latest.version, undefined)
+  assert.equal(updateBannerVersion(fallback.status, null), null)
 })
 
 test("the notice reads no more often than every ten minutes, and prints eight characters", () => {

@@ -1,0 +1,9 @@
+/* The Projects list's first read (projects.tsx). The copied renderer's status
+   line gives way to rows shaped like `.project-row`, which the real rows replace. */
+#projects-list-view[data-reading] #projects-status { display: none; }
+.project-skeleton-row { pointer-events: none; }
+.project-skeleton-mark { flex: none; width: 32px; height: 16px; border-radius: 4px; }
+.project-skeleton-name { width: 38%; height: 14px; }
+.project-skeleton-path { width: 62%; height: 10px; }
+.project-row-wrap:nth-child(even) .project-skeleton-name { width: 28%; }
+.project-row-wrap:nth-child(3n) .project-skeleton-path { width: 48%; }

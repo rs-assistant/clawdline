@@ -397,6 +397,7 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
                 return
             }
         }
+        stagedApp.becameActive()
         DispatchQueue.main.async { [weak self] in
             guard let self, NSApp.isActive, !NSApp.isHidden else { return }
             guard !self.somethingOnScreen else { return }

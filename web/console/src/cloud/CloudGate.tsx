@@ -64,7 +64,7 @@ import { RelayReader, machineApp, presentsEvery } from "./relay-reader.js"
 import { OPENED_ROW_QUIET_MS, openedRowShow } from "./opened-row.js"
 import { FleetSessionList, type MachineToolbarAction } from "./FleetSessionList.js"
 import { CarrierDot } from "./CarrierDot.js"
-import { carrierReading, type CarrierReading } from "./carrier-state.js"
+import { carrierReading, machineLight, type CarrierReading } from "./carrier-state.js"
 import { CloudSessionSheets, type PendingMachineAction } from "./CloudSessionSheets.js"
 import { PeerAccessPage } from "./PeerAccessPage.js"
 import { destinationAvailable, destinationFragment, destinationFromFragment, destinationKey,
@@ -208,6 +208,13 @@ function pendingMachineTool(): PendingMachineAction | null {
       Number.isFinite(value.at) && Math.abs(Date.now() - value.at) <= 30_000 ? value : null
   } catch { return null }
 }
+
+/**
+ * How often the machine list is worked out again while some machine on it is
+ * current, so one that goes quiet turns offline within this of the roster's
+ * own five-minute window (`cloud-client.js` `MACHINE_INVENTORY_FRESH_MS`).
+ */
+const MACHINE_PRESENCE_RECHECK_MS = 30_000
 
 /** The screens on which this browser is signed in with a device key, so a pairing can start. */
 const SIGNED_IN = new Set<Screen["at"]>(["machines", "console", "pairing"])
@@ -415,6 +422,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const [pairState, setPairState] = useState<PairState>({ phase: "idle" })
   const [names, setNames] = useState<ReadonlyMap<string, AccountName>>(new Map())
   const [registered, setRegistered] = useState<ReadonlyMap<string, AccountName>>(new Map())
+  // Whether the account's roster has been asked for and not yet answered. The
+  // tab does not open a machine meanwhile: the relay can still list one the
+  // account revoked (`opening.ts`).
+  const [rosterPending, setRosterPending] = useState(transport.kind === "cloud")
   const [connectionVersion, setConnectionVersion] = useState(0)
   const pairingStore = useMemo(() => browserPendingPairings(), [])
 
@@ -425,6 +436,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     setAccountRosterStatus("loading")
     void accountMachineRoster(apiOrigin).then((roster) => {
       if (request !== rosterRequest.current) return
+      setRosterPending(false)
       if (!roster) {
         namesRef.current = new Map()
         registeredRef.current = new Map()
@@ -549,6 +561,17 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       },
     )
   }, [])
+
+  // A machine leaves "current" by staying quiet, which is no event, so the list
+  // was worked out again only when another machine spoke, and a page whose other
+  // machines were quiet too went on showing a closed laptop as there. This is
+  // arithmetic on what the page already decrypted; it sends nothing.
+  const anyCurrent = machineList.phase === "ready" && machineList.machines.some((machine) => machine.freshness === "current")
+  useEffect(() => {
+    if (!anyCurrent) return
+    const timer = setInterval(listMachines, MACHINE_PRESENCE_RECHECK_MS)
+    return () => clearInterval(timer)
+  }, [anyCurrent, listMachines])
 
   const retryMachineList = useCallback(() => {
     setMachineList({ phase: "loading" })
@@ -1153,11 +1176,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         : document ? { machine: document } : null,
       everyMachineAddressed: location.hash === "#all-machines",
       remembered: remembered(),
+      forgotten,
+      rosterPending,
     })
     if (opening.at !== "console") return
     setFleetScope(opening.fleet)
     choose(machines.find((machine) => machine.id === opening.machine)!, opening.remember)
-  }, [screen, managingMachines, machines, who, choose, remembered])
+  }, [screen, managingMachines, machines, who, choose, remembered, forgotten, rosterPending])
 
   /**
    * Leave the machine this tab chose and start again at the list. This drops
@@ -1228,6 +1253,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     [machineList, names, registered, forgotten],
   )
   const quickMachines = shown.phase === "ready" ? shown.machines.filter((machine) => machine.selectable) : []
+  // The roster's word for the one machine a single-machine page reads, so that
+  // page says "offline" where its own line to the relay would say "connected".
+  const readingRow = shown.phase === "ready" ? shown.machines.find((machine) => machine.id === reading) : undefined
+  const readingOffline = readingRow?.freshness === "stale" ? { seenAt: machineIdentityFacts(readingRow).seenAt } : null
   // The names the detail's own sentences use, read when one is written rather
   // than captured when the effect below was last built.
   const machineNames = useRef(new Map<string, string>())
@@ -1529,7 +1558,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             {quickMachines.map((machine) => {
               const current = !fleetScope && machine.id === reading
               const identity = machineIdentityFacts(machine)
-              const carrier = carrierOf(machine.id)
+              const carrier = machineLight(machine.freshness, carrierOf(machine.id))
               return (
                 <button
                   type="button"
@@ -1715,6 +1744,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               refreshFleetPresentation((revision) => revision + 1)
             }}
             cloudStartedRow={!fleetScope && confirmedStart?.machineID === reading ? confirmedStart.row : null}
+            cloudMachineOffline={fleetScope ? null : readingOffline}
             onCloudStartedObserved={startedObserved}
             cloudPeerAccess={(active) => <PeerAccessPage active={active}
               machines={(shown.phase === "ready" ? shown.machines : []).map((machine) => ({
@@ -1750,6 +1780,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             machines={quickMachines.map((machine) => ({
               id: machine.id, name: machine.name || machine.label || machine.id,
               platform: platformWord(machineIdentityFacts(machine).platform), freshness: machine.freshness,
+              seenAt: machineIdentityFacts(machine).seenAt,
             }))}
             source={liveSessionSource}
             titleRevision={titleRevision}

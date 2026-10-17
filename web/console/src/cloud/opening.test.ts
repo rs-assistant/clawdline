@@ -83,3 +83,23 @@ test("a machine opened on its own is the one to come back to", () => {
   // A document address is one machine's page, and coming back to it is right.
   assert.equal(remembers(openingFor({ machines: two, addressed: { machine: "linux" } })), true)
 })
+
+test("a machine the account revoked is not opened, however the tab came to name it", () => {
+  // The relay keeps a revoked machine's last snapshots, so it still reads as
+  // selectable; the header then named a machine the picker below it left out.
+  const withRevoked = [{ id: "revoked", selectable: true }, ...two]
+  assert.deepEqual(openingFor({ machines: withRevoked, forgotten: ["revoked"] }),
+    { at: "console", machine: "mac", fleet: true, remember: false })
+  assert.deepEqual(openingFor({ machines: withRevoked, forgotten: ["revoked"], remembered: "revoked" }),
+    { at: "console", machine: "mac", fleet: true, remember: false })
+  assert.deepEqual(openingFor({ machines: withRevoked, forgotten: ["revoked"], addressed: { machine: "revoked", inFleet: true } }),
+    { at: "list" })
+  assert.deepEqual(openingFor({ machines: [{ id: "revoked", selectable: true }, ...one], forgotten: ["revoked"] }),
+    { at: "list" })
+})
+
+test("nothing opens until the account has said which machines it revoked", () => {
+  assert.deepEqual(openingFor({ machines: two, rosterPending: true, remembered: "linux" }), { at: "list" })
+  assert.deepEqual(openingFor({ machines: two, rosterPending: false, remembered: "linux" }),
+    { at: "console", machine: "linux", fleet: false, remember: true })
+})

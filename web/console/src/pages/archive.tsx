@@ -11,6 +11,7 @@ import { sessionFragment } from "../session/address.js"
 import { assistantName } from "../session/restore-offer.js"
 import { archivedName, archivedWhen, entryLine, withoutRestored, type Outcome } from "./archive/model.js"
 import type { PageModule } from "./types.js"
+import "../page-skeleton.css"
 import "./archive/archive.css"
 
 /**
@@ -196,7 +197,7 @@ function ArchivePageView({ shown }: { shown: boolean }) {
           list.failure ? (
             <p className="archive-failure" role="status">{list.failure}</p>
           ) : (
-            <p className="archive-empty" role="status">{nextWord("archiveLoading")}</p>
+            <ArchiveSkeleton label={nextWord("archiveLoading")} />
           )
         ) : list.sessions.length === 0 ? (
           <p className="archive-empty">{nextWord("archiveEmpty")}</p>
@@ -266,6 +267,17 @@ function ArchivePageView({ shown }: { shown: boolean }) {
       </div>
     </section>
   )
+}
+
+/** The first read: archived Sessions in the entries' own geometry. */
+function ArchiveSkeleton({ label }: { label: string }) {
+  return <div className="page-skeleton" role="status" aria-label={label}>
+    <ul className="archive-list" aria-hidden="true">{[0, 1, 2, 3].map((entry) => <li className="archive-entry archive-skeleton-entry" key={entry}>
+      <span className="page-skeleton-line archive-skeleton-mark" />
+      <span className="archive-copy"><span className="page-skeleton-line archive-skeleton-title" /><span className="page-skeleton-line archive-skeleton-where" /><span className="page-skeleton-line archive-skeleton-when" /></span>
+      <span className="archive-actions"><span className="page-skeleton-line archive-skeleton-button" /><span className="page-skeleton-line archive-skeleton-button" /></span>
+    </li>)}</ul>
+  </div>
 }
 
 // `requiresApiLevel: 1` is the first route level a daemon reports

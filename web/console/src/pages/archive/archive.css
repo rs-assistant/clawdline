@@ -35,6 +35,13 @@
 .archive-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .archive-forget-go { color: var(--bad); }
 
+.archive-skeleton-entry .archive-copy { gap: 9px; padding: 3px 0; }
+.archive-skeleton-mark { width: 28px; height: 16px; margin-top: 3px; border-radius: 3px; }
+.archive-skeleton-title { width: 46%; height: 15px; }
+.archive-skeleton-where { width: 68%; height: 10px; }
+.archive-skeleton-when { width: 28%; height: 10px; }
+.archive-skeleton-button { width: 84px; height: 40px; border-radius: 10px; }
+
 .archive-empty { margin: 16px 0 0; color: var(--faint); font-size: 13px; line-height: 1.6; }
 .archive-failure { margin: 16px 0 0; color: var(--bad); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 
@@ -51,4 +58,5 @@
     .archive-page { padding-inline: 16px; }
     .archive-entry { grid-template-columns: auto minmax(0, 1fr); padding: 14px; }
     .archive-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; margin-top: 6px; }
+    .archive-skeleton-button { width: 100%; }
 }

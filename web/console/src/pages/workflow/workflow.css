@@ -37,6 +37,10 @@
 .workflow-list-card { border: 1px solid var(--line); border-radius: .6rem; background: var(--card); overflow: hidden; }
 .workflow-page .workflow-list-main { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem; text-align: left; padding: 1.15rem 1.3rem; border: 0; border-radius: 0; }
 .workflow-page .workflow-list-source { min-height: 0; margin: 0 1.3rem .8rem; padding: .35rem .65rem; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); background: color-mix(in srgb, var(--accent) 12%, var(--card)); color: var(--accent); font-size: .82rem; font-weight: 650; text-align: left; }
+.workflow-skeleton-count { width: 8.5rem; height: 1.1rem; }
+.workflow-skeleton-card { display: grid; gap: .6rem; padding: 1.25rem 1.3rem; }
+.workflow-skeleton-title { width: 36%; height: 1rem; margin-bottom: .15rem; }
+.workflow-skeleton-short { width: 62%; }
 .workflow-list-copy { display: grid; gap: .45rem; min-width: 0; }
 .workflow-list-copy strong { font-size: 1.06rem; }
 .workflow-list-copy small { display: inline-block; margin-left: .45rem; padding: .15rem .45rem; border-radius: .35rem; color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); font-size: .72rem; font-weight: 600; vertical-align: middle; }

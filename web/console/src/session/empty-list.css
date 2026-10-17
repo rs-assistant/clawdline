@@ -15,3 +15,6 @@
         background: none;
     }
 }
+
+.pane-list .empty .empty-hint { display: block; }
+.pane-list .empty .empty-hint + .chip { margin-top: 16px; }

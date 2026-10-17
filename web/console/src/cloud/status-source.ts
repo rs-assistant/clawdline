@@ -236,6 +236,14 @@ export function statusSource(current: () => StatusClient | null,
         : { kind: "unavailable", reason: "unknown", observedAt: expired.observedAt }
     }
     let projection = statusProjection(client, machineID)
+    // A machine the roster has stopped hearing from is stale before it is
+    // anything else. The recoveries below ask that machine to restate what it
+    // published, which a closed laptop never does, so a gap on it stayed
+    // "reading this machine again" for as long as it was off.
+    const roster = await client.machines().catch(() => null)
+    if (signal.aborted) return projection
+    if (roster?.machines.find((entry) => entry.id === machineID)?.freshness === "stale")
+      return retainedStatus(projection, "stale")
     // The roster can arrive before orch/ advertises the reader. One bounded
     // authenticated attempt is safe: an older machine refuses sessions.list,
     // while waiting for the descriptor can hold a cold browser for a minute.
