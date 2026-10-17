@@ -734,8 +734,9 @@ func (s *Server) relaySession(ctx context.Context, runID, sessionID, noRun, noth
 // nothing is written. Nothing is typed into the terminal: the Session asked.
 func (s *Server) agentClaimItem(w http.ResponseWriter, r *http.Request, id string) {
 	var body struct {
-		ExpectedVersion int64  `json:"expected_version"`
-		SessionID       string `json:"session_id"`
+		ExpectedVersion int64     `json:"expected_version"`
+		Kind            work.Kind `json:"kind"`
+		SessionID       string    `json:"session_id"`
 		Via             struct {
 			Run string `json:"run"`
 		} `json:"via"`
@@ -770,7 +771,8 @@ func (s *Server) agentClaimItem(w http.ResponseWriter, r *http.Request, id strin
 	itemOf := s.workV2ItemProjector(r.Context())
 	var answer []byte
 	_, err = s.workV2().ClaimFromSession(r.Context(), id, app.ClaimWorkV2{Run: *run, ExpectedVersion: app.AgentExpectedVersion(body.ExpectedVersion),
-		SessionID: sess.ConversationID, TerminalID: sess.ID, Assistant: string(sess.Assistant)},
+		ConvertKind: body.Kind,
+		SessionID:   sess.ConversationID, TerminalID: sess.ID, Assistant: string(sess.Assistant)},
 		func(v app.WorkV2View) (store.ReceiptKey, store.ReceiptAnswer, bool) {
 			answer = workV2Answer(itemOf(v))
 			return k, store.ReceiptAnswer{Status: http.StatusOK, Body: answer}, true

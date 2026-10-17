@@ -576,7 +576,7 @@ coordination to the new owner, whose `session_id` then passes the check.
 | Assign/reassign/unassign/delete (cancel) | yes | assign/reassign only, by an Epic's owner, of that Epic's open children (§6.5) | no | no |
 | Complete by hand (to `done` without evidence) | yes | no | no | no |
 | Reopen terminal work | yes | own just-completed `done` only, never a person's completion | no | no |
-| Change Project/kind/deployment policy | yes | no | no | no |
+| Change Project/kind/deployment policy | yes | may convert an unassigned Plan to an executable kind while claiming it on the person's message (§7.2) | no | no |
 | Edit title/description | yes | yes | no | no |
 | Edit acceptance Markdown | yes before merging | may fill empty criteria once while assigned or implementing; an Epic owner may revise a child's criteria through a reasoned escalation decision | no | no |
 | Decide a verification escalation | yes when routed to the person | designated live parent Epic owner through the Agent route only | no | no |
@@ -594,7 +594,9 @@ Person-only writes are served through device-authenticated routes requiring the 
 They are not accepted merely because a request carries the orchestrator credential. Agent writes
 use the orchestrator surface and expose only the Agent operations in the table.
 
-A person may correct Project or kind only before the first successful assignment. Thereafter those
+A person may correct Project or kind only before the first successful assignment. A Session may
+choose an unassigned Plan's executable kind as part of its first claim, when the person's message
+asks it to take that Plan. Thereafter those
 identity fields are immutable; changing direction means cancelling this item and deliberately
 creating another. Deployment policy remains person-editable on a nonterminal item.
 
@@ -696,18 +698,26 @@ Clawdline, to take a specific item. The person's own assign route stays the pers
 
 ```
 POST /v1/work/v2/agent/items/<id>/claim     (machine auth, Idempotency-Key required)
-{"expected_version": N, "session_id": "<conversation id>", "via": {"run": "<run id>"}}
+{"expected_version": N, "session_id": "<conversation id>", "via": {"run": "<run id>"},
+ "kind"?: "feature" | "issue" | "epic" | "refactor"}
 ```
 
 There is no field naming a Session or terminal: the item goes to the Session the run was said to,
 and only to it. The run and Session are checked exactly as §7.1 checks them (`run_unknown`,
 `run_expired`, `run_other_session`, `session_not_found`, `child_session`), then the item: it exists
 (`work_not_found`), is in the Project the Session works in (`project_mismatch`, the person's
-`existing_session` check), is not a planning kind, a Plan (`planning_not_assignable`) or finished
+`existing_session` check), is not a Plan without an executable `kind` (`planning_not_assignable`
+or `conversion_kind_not_executable`) or finished
 (`item_terminal`), has not changed (`version_conflict`), and has no Session and none being opened
 for it (`item_assigned` — a person may move an item between Sessions, a Session may only take one
 nobody holds). One run backs at most five claims, active or released (`run_claims_exhausted`,
 capacity row `run.claimed_items`, mirroring `run.created_items`). Every refusal writes nothing.
+
+For an unassigned top-level Plan in `created`, the Session chooses the executable kind from the
+Plan's work and supplies it as `kind` (`clawdline item claim --kind refactor <id>`, for example).
+The same transaction records `item.converted` followed by `item.assigned`; any failed claim rolls
+back both writes. Supplying `kind` for another item or an already assigned Plan is refused. A Plan
+claim without `kind` is refused, so the Session must make the classification explicitly.
 
 Underneath it is the person's `existing_session` Assign — one transaction writing the active
 assignment, the owner, `assigned`, the description-seeded steps and the `item.assigned` event — with
