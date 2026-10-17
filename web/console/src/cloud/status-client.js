@@ -27,6 +27,8 @@ const CARRIER_TIMEOUT_MS = 15_000
 const PINNED_LIST_READ_TIMEOUT_MS = 10_000
 /** A retained marker normally replays at once; silence must not block the direct-list fallback. */
 const STATUS_MARKER_RECOVERY_TIMEOUT_MS = 5_000
+/** Whisper may load a model before it can answer the first recording. */
+const VOICE_TIMEOUT_MS = 6 * 60 * 1000
 
 function refused(code, message) {
   return Object.assign(new Error(message), { code })
@@ -93,21 +95,37 @@ export class StatusCloudClient extends CatalogCloudClient {
     try {
       return await super.voice(audio, rate)
     } catch (error) {
-      if (error?.code === "no_whisper" && host.machine) {
-        try {
-          const reason = error.detail?.reason || error.reason || null
-          this.viewerEvents.record("cloud.voice.whisper_missing", {
-            target_machine: host.machine,
-            chosen: host.chosen,
-            candidates: host.candidates,
-            reason,
-            web_build: this.webBuild || null,
-          }, ["cloud.voice.whisper_missing", host.machine, reason].join("|"))
-          this._scheduleViewerEvents()
-        } catch { /* diagnostics cannot change the voice result */ }
-      }
+      this._recordMissingWhisper(error, host)
       throw error
     }
+  }
+
+  /** Dictates on this Session's machine unless a person selected another host. */
+  async voiceFor(machine, audio, rate) {
+    const host = this._sessionVoiceHost(machine)
+    if (!host.machine) throw host.error
+    try {
+      return await this._machineRequest(host.machine, "voice",
+        { audio, rate }, "action", VOICE_TIMEOUT_MS)
+    } catch (error) {
+      this._recordMissingWhisper(error, host)
+      throw error
+    }
+  }
+
+  _recordMissingWhisper(error, host) {
+    if (error?.code !== "no_whisper" || !host.machine) return
+    try {
+      const reason = error.detail?.reason || error.reason || null
+      this.viewerEvents.record("cloud.voice.whisper_missing", {
+        target_machine: host.machine,
+        chosen: host.chosen,
+        candidates: host.candidates,
+        reason,
+        web_build: this.webBuild || null,
+      }, ["cloud.voice.whisper_missing", host.machine, reason].join("|"))
+      this._scheduleViewerEvents()
+    } catch { /* diagnostics cannot change the voice result */ }
   }
 
   constructor(options) {
@@ -425,6 +443,45 @@ export class StatusCloudClient extends CatalogCloudClient {
     if (!possible.length) return found
     return { ...found, capable: possible,
       unconfirmed: found.unconfirmed.filter((row) => !possible.includes(row)) }
+  }
+
+  /** A saved choice wins; otherwise one current Mac is the fleet fallback. */
+  _voiceHost() {
+    const choice = this._voiceHostChoice()
+    if (choice) return super._voiceHost()
+    const found = this._machinesFor("voice")
+    const macs = found.capable.filter((row) => row.freshness === "current" &&
+      ["darwin", "macos"].includes(String(this.machineDescriptor(row.id)?.machine?.platform || "").toLowerCase()))
+    if (macs.length === 1) {
+      return { machine: macs[0].id, chosen: false,
+        candidates: Object.freeze(found.capable.map((row) => row.id)), error: null }
+    }
+    return super._voiceHost()
+  }
+
+  /**
+   * The Session owner is the automatic first choice. It is never persisted:
+   * moving to another Session must move dictation with it. If that machine is
+   * stale or cannot transcribe, the ordinary macOS-first fleet fallback applies.
+   */
+  _sessionVoiceHost(machine) {
+    if (this._voiceHostChoice()) return this._voiceHost()
+    const found = this._machinesFor("voice")
+    const current = found.capable.find((row) => row.id === machine && row.freshness === "current")
+    if (current) {
+      return { machine: current.id, chosen: false,
+        candidates: Object.freeze(found.capable.map((row) => row.id)), error: null }
+    }
+    return this._voiceHost()
+  }
+
+  voiceHostFor(machine) {
+    try {
+      const host = this._sessionVoiceHost(machine)
+      if (!host.machine) throw host.error
+      return Promise.resolve({ machine: host.machine, chosen: host.chosen,
+        candidates: host.candidates })
+    } catch (error) { return Promise.reject(error) }
   }
 
   /**
