@@ -218,3 +218,32 @@ test("a named machine is read and held on its own, and a changed console drops b
   await fresh.loadPersonas(answered)
   assert.equal(asked.length, 3)
 })
+
+test("a mounted fleet role rereads its catalog after switching the Cloud reader", async () => {
+  // @ts-expect-error -- a `.ts` path is required by Node's native type stripping.
+  const fresh = (await import("./personas.ts?watch-after-switch")) as typeof import("./personas.js")
+  const asked: string[] = []
+  const shown: string[][] = []
+  const read = (async (url: string) => {
+    asked.push(url)
+    return new Response(JSON.stringify({ personas: [catalog[0]] }), { status: 200 })
+  }) as unknown as typeof fetch
+  const off = fresh.watchPersonas("mac-a", (list) => shown.push(list.map((p) => p.id)), read)
+  await fresh.loadPersonas(read, "mac-a")
+  assert.deepEqual(shown.at(-1), ["architect"])
+  fresh.forgetPersonas()
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("the mounted row did not reread its catalog")), 1_000)
+    const offReady = fresh.onPersonas(() => {
+      if (asked.length !== 2 || shown.at(-1)?.[0] !== "architect") return
+      clearTimeout(timeout)
+      offReady()
+      resolve()
+    })
+  })
+  assert.deepEqual(asked, ["/v1/personas?machine=mac-a", "/v1/personas?machine=mac-a"])
+  assert.deepEqual(shown.at(-1), ["architect"])
+  off()
+  fresh.forgetPersonas()
+  assert.equal(asked.length, 2, "an unmounted row makes no more reads")
+})

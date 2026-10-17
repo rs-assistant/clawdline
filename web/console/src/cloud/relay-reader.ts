@@ -2139,6 +2139,15 @@ export class RelayReader {
       mark("ask_started")
       const answer = await abandonable(asked, signal, word)
       mark("answer_observed")
+      if (word === "personas") {
+        try {
+          const log = (client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>): unknown } }).viewerEvents
+          const personas = (answer as { personas?: unknown } | null)?.personas
+          log?.record?.("cloud.personas.read", { machine,
+            count: Array.isArray(personas) ? personas.length : null,
+            ms: Math.max(0, Math.round(this.now() - started)) })
+        } catch { /* diagnostics cannot fail the catalog read */ }
+      }
       this.note(method, path, "relay", undefined, { word })
       return json(200, answer)
     } catch (error) {
@@ -2743,7 +2752,7 @@ export class RelayReader {
    * relay's own layer is `relay_refused`, and a machine's is `answered`. A read
    * the page itself stopped waiting for is not a failure and is not recorded.
    */
-  private reportReadFailure(read: { word: string; session: string | null }, started: number, error: unknown, answer: Response | null): void {
+  private reportReadFailure(read: { word: string; session: string | null; machine?: string }, started: number, error: unknown, answer: Response | null): void {
     try {
       const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } } | null)?.viewerEvents
       if (typeof log?.record !== "function") return
@@ -2773,7 +2782,7 @@ export class RelayReader {
         connection: !client ? "none" : client.ready === false ? "not_ready" : "ready",
         marker_age_s: age(marker?.payload?.at), row_age_s: age(row?.payload?.projected_at),
         offline_hold_ms: offline && typeof offline.until === "number" ? Math.max(0, Math.round(offline.until - this.now())) : null,
-        machine: this.machine, session: read.session,
+        machine: read.machine ?? this.machine, session: read.session,
       }
       log.record("cloud.read.failed", data, ["cloud.read.failed", read.word, stage, code].join("|"))
     } catch {
@@ -2885,7 +2894,7 @@ function sessionAgent(path: string): { session: string; agent: string } | null {
  * The Session reads a failure of which is reported to the machine
  * (`reportReadFailure`), by the route the page asked for, or null.
  */
-function readFailureWord(input: RequestInfo | URL, init?: RequestInit): { word: string; session: string | null } | null {
+function readFailureWord(input: RequestInfo | URL, init?: RequestInit): { word: string; session: string | null; machine?: string } | null {
   try {
     const method = (init?.method ?? (typeof input === "object" && "method" in input ? input.method : "GET")).toUpperCase()
     if (method !== "GET") return null
@@ -2896,6 +2905,8 @@ function readFailureWord(input: RequestInfo | URL, init?: RequestInit): { word: 
       return { word: url.searchParams.has("before") ? "transcript_page" : "transcript", session: url.searchParams.get("session") }
     }
     if (path === "/v1/sessions") return { word: "session_list", session: null }
+    if (path === "/v1/personas") return { word: "personas", session: null,
+      machine: url.searchParams.get("machine") || undefined }
     const todos = workV2SessionTodosTerminal(path)
     if (todos) return { word: "session_todos", session: todos }
     const info = /^\/v1\/sessions\/([^/]+)\/info$/u.exec(path)
