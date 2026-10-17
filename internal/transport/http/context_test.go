@@ -3,11 +3,43 @@ package http
 import (
 	"encoding/json"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
+
+func TestNewCodexInfoShowsModelWithoutTranscript(t *testing.T) {
+	screen, err := os.ReadFile("../../domain/session/testdata/menu-codex-composer.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := &pane{s: session.Session{ID: "%19", Backend: session.BackendTmux,
+		Assistant: session.AssistantCodex, State: session.StateIdle}, screen: string(screen)}
+	s := paneServer(t, p)
+	for _, parts := range []string{"summary", "all"} {
+		req := httptest.NewRequest("GET", "/v1/sessions/%2519/info?parts="+parts, nil)
+		rec := httptest.NewRecorder()
+		s.sessionInfoRoute(rec, req, "%19")
+		var reply struct {
+			Info struct {
+				Session struct {
+					Model  string `json:"model"`
+					Effort string `json:"effort"`
+				} `json:"session"`
+				Usage   any `json:"usage"`
+				Context any `json:"context"`
+			} `json:"info"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &reply); err != nil {
+			t.Fatal(err)
+		}
+		if rec.Code != 200 || reply.Info.Session.Model != "gpt-5.6-sol" || reply.Info.Session.Effort != "high" || reply.Info.Usage != nil || reply.Info.Context != nil {
+			t.Fatalf("new session info: %d %s", rec.Code, rec.Body.String())
+		}
+	}
+}
 
 func TestListInfoReturnsOnlyTheSessionDisplayIdentity(t *testing.T) {
 	p := &pane{s: session.Session{ID: "%19", Backend: session.BackendTmux,

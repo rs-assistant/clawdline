@@ -4428,6 +4428,7 @@
   "next.scheduleOnceOn": "只在 {date} 執行一次",
   "next.worktreeRemoveWaiting": "機器正在刪除這棵工作樹。關閉這個視窗不會中止刪除，完成後列表會自動更新。",
   "next.worktreeRemoveClose": "關閉",
+  "next.infoReasoningEffort": "推理強度",
   "projects.activityInProgress": "{n} 項進行中",
   "projects.activityLastKnown": "上次紀錄：{n}",
   "projects.activityNone": "目前無進行中項目",

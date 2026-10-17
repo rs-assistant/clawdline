@@ -6533,13 +6533,18 @@ export interface SessionInfoReply {
 export interface SessionInfoSession {
   assistant?: Assistant
   cwd?: string
+
+  /**
+   * The reasoning effort explicitly named by the newest Codex turn context, or its
+   * startup card before a turn context names it. Absent when unknown.
+   */
+  effort?: string
   icon?: Icon
   id: string
 
   /**
-   * The model the session is on, as its record last named it: the newest assistant
-   * turn's model, or a `/model` switch made after it. Absent when the record says
-   * nothing.
+   * The model explicitly named by the session record, or by Codex's startup card
+   * before a record names it. Absent without evidence.
    */
   model?: string
 

@@ -242,6 +242,7 @@ function hero(s: Facts["session"], u: Facts["usage"]): string {
   const title = s.title || model || T.webInfoUnknown
   const modelMeta = s.title && model ? '<span class="dot">·</span><span class="model-name">' + esc(model) + "</span>" : ""
   const meta: string[] = []
+  if (s.effort) meta.push('<span>' + esc(nextWord("infoReasoningEffort")) + ': ' + esc(s.effort) + '</span>')
   if (s.cwd) meta.push('<span title="' + esc(T.webInfoDirectory) + '">' + esc(L.path(s.cwd)) + "</span>")
   if (s.sessionId) {
     meta.push(
