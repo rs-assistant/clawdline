@@ -26,7 +26,7 @@ export function BackgroundStrip({ row, selected, onAgent, onShell }: {
   const [open, setOpen] = useState(false)
   useEffect(() => setOpen(false), [row.id])
   const counts = backgroundCounts(row)
-  const shows = showsBackground(counts) || row.background_reading === "unavailable" || !!row.background_omitted
+  const shows = showsBackground(counts) || !!row.background_omitted
   useEffect(() => {
     if (!shows) setOpen(false)
   }, [shows])
