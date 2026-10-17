@@ -114,6 +114,21 @@ export function onPersonas(fn: () => void): () => void {
   }
 }
 
+/** Keep a mounted view reading its machine after a Cloud reader switch clears the catalogs. */
+export function watchPersonas(machine: string | null, show: (list: Persona[]) => void,
+  read: typeof fetch = (...args) => fetch(...args)): () => void {
+  let active = true
+  const update = () => {
+    if (!active) return
+    const current = personasNow(machine)
+    show(current ?? [])
+    if (current === null) void loadPersonas(read, machine)
+  }
+  const off = onPersonas(update)
+  update()
+  return () => { active = false; off() }
+}
+
 /** The persona a session row or an assignment names, when the catalog has it. */
 export function personaById(list: readonly Persona[] | null, id: string | null | undefined): Persona | null {
   if (!id || !list) return null

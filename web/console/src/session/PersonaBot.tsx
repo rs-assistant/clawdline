@@ -1,19 +1,13 @@
 import { useEffect, useRef, useState } from "react"
 import type { Persona } from "@clawdline/contract"
 import * as L from "../legacy/bridge.js"
-import { loadPersonas, onPersonas, personaById, personaName, personaTitle, personasNow } from "../personas.js"
+import { personaById, personaName, personaTitle, personasNow, watchPersonas } from "../personas.js"
 import "./persona.css"
 
 /** The catalog, re-rendering once it arrives; empty until then and when it cannot be read. */
 export function usePersonas(machine: string | null = null): Persona[] {
   const [list, setList] = useState<Persona[]>(() => personasNow(machine) ?? [])
-  useEffect(() => {
-    let active = true
-    setList(personasNow(machine) ?? [])
-    const off = onPersonas(() => { if (active) setList(personasNow(machine) ?? []) })
-    void loadPersonas(undefined, machine).then(() => { if (active) setList(personasNow(machine) ?? []) })
-    return () => { active = false; off() }
-  }, [machine])
+  useEffect(() => watchPersonas(machine, setList), [machine])
   return list
 }
 
