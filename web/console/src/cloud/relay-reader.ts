@@ -1263,26 +1263,9 @@ export class RelayReader {
           return json(200, key)
         }
         case "/v1/board": {
-          // One path, two words, told apart exactly as the page tells them
-          // apart: a read that names an audience is the paged card list and
-          // everything else is the envelope (`legacy/board-bridge.ts`).
-          const q = this.only(url, path, "project", "item", "audience", "cursor", "limit")
-          if (q.audience === undefined) {
-            return await this.machineRead(init?.signal, method, path, "board", {
-              project: q.project ?? "", item: q.item ?? "",
-            })
-          }
-          return await this.machineRead(init?.signal, method, path, "board.items", {
-            project: q.project ?? "", audience: q.audience,
-            // Absent is not zero and not the maximum: this route reads a
-            // missing `cursor` as 0 and a missing `limit` as its own default
-            // (`clampInt`, internal/transport/http/board.go), and the page
-            // leaves both off for the first page of a Project it has just
-            // opened. The word carries two integers and no absence, so the
-            // route's own numbers are what is sent — anything else would page
-            // a phone differently from the browser on the machine.
-            cursor: whole(q.cursor, 0),
-            limit: whole(q.limit, BOARD_PAGE_DEFAULT),
+          const q = this.only(url, path, "project", "item")
+          return await this.machineRead(init?.signal, method, path, "board", {
+            project: q.project ?? "", item: q.item ?? "",
           })
         }
         case "/v1/work/proposals": {
@@ -2846,21 +2829,6 @@ class NotConnected extends Error {
   constructor() {
     super("the relay connection is not up")
   }
-}
-
-/**
- * The page size `/v1/board` uses when a read names no `limit`
- * (`boardstore.DefaultPageLimit`, internal/adapters/board/board.go). It is
- * here because the Cloud word carries two integers and no absence, so the
- * seam has to say what the route would have said. The two are checked against
- * each other by `TestTheBoardsCloudPageSizeIsTheRoutesOwn`.
- */
-const BOARD_PAGE_DEFAULT = 30
-
-/** A whole number from a query field, or `fallback` when it names none. */
-function whole(value: string | undefined, fallback: number): number {
-  const n = Number(value)
-  return value !== undefined && Number.isSafeInteger(n) && n >= 0 ? n : fallback
 }
 
 /** The two ids in `/v1/sessions/{session}/shells/{shell}`, decoded after splitting. */

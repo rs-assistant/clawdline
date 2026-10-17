@@ -40,8 +40,6 @@
   "main_tunnel_json_what_the_cloudflared_tunnel": "  tunnel [--json]           cloudflared 터널 상태. 설정의 remote_tunnel로 활성화",
   "main_type_session_id_text_type_straight": "  type <session-id> <text>      터미널에 직접 입력하며 아무것도 기록하지 않음(백엔드 테스트용)",
   "main_update_json_apply_force_whether_this": "  update [--json] [--apply [--force]]   이 머신의 빌드가 클라우드의 최신 빌드보다 뒤처졌는지 확인. 종료 코드: 0 최신, 10 뒤처짐, 3 확인 불가",
-  "main_upstream_d": "업스트림  %d\n",
-  "main_upstream_none_an_unowned_route_answers": "업스트림  없음 (소유되지 않은 경로는 501 not_implemented 응답을 반환하며 %s에서는 경로를 요청함)\n",
   "main_usage_clawdline_lang_tag_command_arguments": "사용법: clawdline --lang <tag> <command> [arguments]",
   "main_usage_clawdline_s_session_id_text": "사용법: clawdline %s <session-id> [text]\n",
   "main_usage_clawdline_serve_doctor_guide_skill": "사용법: clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|tunnel|cloud|board|project|task|webhook|update|version>",

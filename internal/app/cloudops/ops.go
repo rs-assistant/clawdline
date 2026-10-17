@@ -225,10 +225,10 @@ type plan struct {
 	persona string
 	// typed is the end of the words an `enter` submits, and namesTyped whether
 	// the body named them at all: a send of pictures alone names "".
-	typed                          string
-	namesTyped                     bool
-	project, item, audience, entry string
-	status, query                  string
+	typed                string
+	namesTyped           bool
+	project, item, entry string
+	status, query        string
 	// until is the work samples' end, a Unix time; query holds their since.
 	until                         string
 	environment, category, cursor string

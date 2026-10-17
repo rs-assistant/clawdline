@@ -50,8 +50,6 @@
   "main_type_session_id_text_type_straight": "  type <session-id> <text>      直接在終端機輸入，不留下紀錄（供測試後端使用）",
   "main_update_json_apply_force_whether_this": "  update [--json] [--apply [--force]]   查看此機器是否落後於雲端最新版本；結束碼：0 已是最新、10 落後、3 未知",
   "main_update_release_help": "  update [--apply [--version vX.Y.Z] [--force]] [--json] [--port n]   檢查或安裝發行版；結束狀態 0 為最新、10 為有新版、3 為不明",
-  "main_upstream_d": "上游      %d\n",
-  "main_upstream_none_an_unowned_route_answers": "上游      無（無擁有者的路由回應 501 not_implemented；%s 會要求一個上游）\n",
   "main_usage_clawdline_lang_tag_command_arguments": "用法：clawdline --lang <tag> <command> [arguments]",
   "main_usage_clawdline_s_session_id_text": "用法：clawdline %s <session-id> [text]\n",
   "main_usage_clawdline_serve_doctor_guide_skill": "用法：clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|tunnel|cloud|board|project|task|webhook|update|version>",

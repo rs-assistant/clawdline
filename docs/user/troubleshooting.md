@@ -31,7 +31,6 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:7727/     # 200 means 
 | The daemon exits with status 3 | Another process holds the port | `logs/daemon.log` names it: pid, command, since when, and whether it is a Clawdline daemon. Stop that process by its pid, or start this one with another `CLAWDLINE_NEXT_PORT` |
 | `the daemon did not answer` from the command line | Nothing is listening on that port, or the command line and the daemon use different ports | Start `serve`, or set the same `CLAWDLINE_NEXT_PORT` for both |
 | `501 not_implemented` on a `/v1/` route, or **需要更新** (*needs update*) beside a console feature | This machine's daemon is older than the console and does not have that route; the body names it | Update the machine ([updates.md](../updates.md)); the console's **前往設定更新** (*go to Settings to update*) link goes there |
-| `502 upstream_unreachable` | `CLAWDLINE_NEXT_UPSTREAM_PORT` is set and nothing listens there | Unset it |
 
 ## Installing and updating
 

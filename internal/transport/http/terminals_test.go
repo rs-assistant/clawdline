@@ -4,14 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/sainteye/clawdline/internal/adapters/devices"
 	"github.com/sainteye/clawdline/internal/app/cloudops"
 	"github.com/sainteye/clawdline/internal/app/terminals"
 	"github.com/sainteye/clawdline/internal/contract"
@@ -50,12 +47,6 @@ func TestCloudPinAndSendPermissionNeedNoLocalGrant(t *testing.T) {
 	}
 	if err := svc.Allow(p); err != nil {
 		t.Fatalf("pinned sender without a separate grant: %v", err)
-	}
-	router := cloud.Router{Handler: f.h, Authorize: cloud.LocalAuthorizer(f.local, f.machine)}
-	if got, err := router.Do(context.Background(), cloudops.LocalRequest{Method: http.MethodPost,
-		Path: "/v1/auth/devices/cloud-viewer/terminal", Body: []byte(`{"grant":false}`)}); err != nil ||
-		got.Status != http.StatusForbidden || !strings.Contains(string(got.Body), "terminal_cloud_not_supported") {
-		t.Fatalf("Cloud grant route: %+v, %v", got, err)
 	}
 	stub.allowed = false
 	if err := svc.Allow(p); err == nil {
@@ -175,8 +166,8 @@ func TestRevocationDuringInitialCaptureNeverSendsFrame(t *testing.T) {
 	}
 }
 
-// Every paired device inherits send permission; terminal grants remain separate.
-func TestEveryPairedDeviceMayUseTerminalsButCannotGrantItself(t *testing.T) {
+// Every paired device may look at terminals; typing still takes the lease.
+func TestEveryPairedDeviceMayUseTerminals(t *testing.T) {
 	f := newTermFixture(t, newFakeTerms())
 	term := f.open(f.local)
 	_, reader := f.device("phone", false)
@@ -190,29 +181,13 @@ func TestEveryPairedDeviceMayUseTerminalsButCannotGrantItself(t *testing.T) {
 	if _, rec := f.control(term.ID, reader, "c1", "acquire"); rec.Code != http.StatusOK {
 		t.Fatalf("acquire: %d %s", rec.Code, rec.Body)
 	}
-	// A device may not give itself a grant: the grant route takes this
-	// machine's own token.
-	if rec := f.do(http.MethodPost, "/v1/auth/devices/x/terminal", reader, `{"grant":true}`); rec.Code != http.StatusForbidden {
-		t.Fatalf("a device granting: %d %s", rec.Code, rec.Body)
+	// A sender may look, and is still read-only until it holds the lease.
+	_, sender := f.device("tablet", true)
+	if rec := f.do(http.MethodGet, "/v1/terminals", sender, ""); rec.Code != http.StatusOK {
+		t.Fatalf("a sender's list: %d %s", rec.Code, rec.Body)
 	}
-
-	// With the grant it may look, and is still read-only until it holds the
-	// lease.
-	_, granted := f.device("tablet", true)
-	if rec := f.do(http.MethodGet, "/v1/terminals", granted, ""); rec.Code != http.StatusOK {
-		t.Fatalf("a granted list: %d %s", rec.Code, rec.Body)
-	}
-	if rec := f.input(term.ID, granted, "c2", 1, 1, "ls\r"); termCode(rec) != "not_controller" {
-		t.Fatalf("a granted input without the lease: %d %s", rec.Code, rec.Body)
-	}
-	var list contract.DeviceList
-	_ = json.Unmarshal(f.do(http.MethodGet, "/v1/auth/devices", f.local, "").Body.Bytes(), &list)
-	flags := map[string]bool{}
-	for _, d := range list.Devices {
-		flags[d.Name] = d.Terminal
-	}
-	if flags["phone"] || !flags["tablet"] {
-		t.Fatalf("the device list's terminal flags: %v", flags)
+	if rec := f.input(term.ID, sender, "c2", 1, 1, "ls\r"); termCode(rec) != "not_controller" {
+		t.Fatalf("a sender's input without the lease: %d %s", rec.Code, rec.Body)
 	}
 }
 
@@ -375,12 +350,11 @@ func TestRevokingEndsTheStreamWithinASecond(t *testing.T) {
 }
 
 // Acceptance 6: through Clawdline Cloud, with no app origin at all, every
-// terminal route and the grant route are refused by name.
+// terminal route is refused by name.
 func TestCloudNeverReachesATerminal(t *testing.T) {
 	host := newFakeTerms()
 	f := newTermFixture(t, host)
 	term := f.open(f.local)
-	id, _ := f.device("phone", false)
 	router := cloud.Router{Handler: f.h, Authorize: cloud.LocalAuthorizer(f.local, f.machine)}
 	asks := []cloudops.LocalRequest{
 		{Method: http.MethodGet, Path: "/v1/terminals"},
@@ -393,7 +367,6 @@ func TestCloudNeverReachesATerminal(t *testing.T) {
 		{Method: http.MethodPost, Path: "/v1/terminals/" + term.ID + "/paste", Body: []byte(`{"epoch":1,"client":"c","seq":1,"text":"ls"}`)},
 		{Method: http.MethodPost, Path: "/v1/terminals/" + term.ID + "/resize", Body: []byte(`{"epoch":1,"client":"c","cols":9,"rows":9}`)},
 		{Method: http.MethodDelete, Path: "/v1/terminals/" + term.ID, Body: []byte(`{"epoch":1,"client":"c"}`)},
-		{Method: http.MethodPost, Path: "/v1/auth/devices/" + id + "/terminal", Body: []byte(`{"grant":true}`)},
 	}
 	for _, ask := range asks {
 		got, err := router.Do(context.Background(), ask)
@@ -406,41 +379,6 @@ func TestCloudNeverReachesATerminal(t *testing.T) {
 	}
 	if typed := host.typedNow(); len(typed) != 0 {
 		t.Fatalf("typed through Cloud: %q", typed)
-	}
-	if ok, _ := f.s.gate().grants.Granted(id); ok {
-		t.Fatal("a grant was given through Cloud")
-	}
-}
-
-// Legacy grant corruption is reported but cannot remove a sender's access.
-func TestACorruptGrantsFileDoesNotChangeSendAuthority(t *testing.T) {
-	f := newTermFixture(t, newFakeTerms())
-	_, token := f.device("phone", true)
-	if rec := f.do(http.MethodGet, "/v1/terminals", token, ""); rec.Code != http.StatusOK {
-		t.Fatalf("before: %d %s", rec.Code, rec.Body)
-	}
-	path := filepath.Join(f.s.gate().files.Dir(), devices.GrantsFile)
-	if err := os.WriteFile(path, []byte(`{"not":"a grant"`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if rec := f.do(http.MethodGet, "/v1/terminals", token, ""); rec.Code != http.StatusOK {
-		t.Fatalf("a paired sender with the old file broken: %d %s", rec.Code, rec.Body)
-	}
-	if rec := f.do(http.MethodGet, "/v1/terminals", f.local, ""); rec.Code != http.StatusOK {
-		t.Fatalf("this machine's own token with the file broken: %d %s", rec.Code, rec.Body)
-	}
-	if rec := f.do(http.MethodGet, "/v1/sessions", token, ""); rec.Code != http.StatusOK {
-		t.Fatalf("/v1/sessions with the file broken: %d %s", rec.Code, rec.Body)
-	}
-	var diag contract.Diagnostics
-	_ = json.Unmarshal(f.do(http.MethodGet, "/v1/diagnostics", f.local, "").Body.Bytes(), &diag)
-	if diag.Terminals == nil || diag.Terminals.GrantsOK || !strings.Contains(diag.Terminals.GrantsError, devices.GrantsFile) {
-		t.Fatalf("diagnostics: %+v", diag.Terminals)
-	}
-	t.Logf("diagnostics says: %s", diag.Terminals.GrantsError)
-	// And a grant is not written over what could not be read.
-	if rec := f.do(http.MethodPost, "/v1/auth/devices/x/terminal", f.local, `{"grant":true}`); rec.Code == http.StatusOK {
-		t.Fatalf("a grant over a broken file: %d %s", rec.Code, rec.Body)
 	}
 }
 

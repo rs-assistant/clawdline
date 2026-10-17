@@ -1,10 +1,6 @@
 // Package http is an inbound adapter: it decodes requests, authenticates them
 // and calls application commands. It owns no domain state, and nothing in
 // internal/domain may import it.
-//
-// While the rewrite is in progress this adapter also proxies every route it has
-// not taken over to the Swift app. That is scaffolding, not shipped behaviour:
-// P4 removes it.
 package http
 
 import (
@@ -15,8 +11,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -71,7 +65,6 @@ type Server struct {
 	// version is this build as `clawdline version` prints it, for /v1/health
 	// (SetVersion). Empty leaves `version` out of the answer.
 	version        string
-	proxy          *httputil.ReverseProxy
 	inventory      app.Inventory
 	store          *store.Store
 	secretHandoffs *app.SecretHandoffs
@@ -221,26 +214,6 @@ type Server struct {
 const servedBy = "clawdline-go"
 
 func New(cfg config.Config) (*Server, error) {
-	// No upstream is the ordinary case, and then there is no proxy at all:
-	// nothing can accidentally forward to a port nobody is listening on.
-	var proxy *httputil.ReverseProxy
-	if port, ok := cfg.Upstream(); ok {
-		upstream, err := url.Parse(fmt.Sprintf("http://127.0.0.1:%d", port))
-		if err != nil {
-			return nil, err
-		}
-		proxy = httputil.NewSingleHostReverseProxy(upstream)
-		// Server-sent events must reach the client as they arrive. Without this
-		// the transport buffers and the console's stream looks dead.
-		proxy.FlushInterval = -1
-		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-			// A refusal has to name which hop failed. "The upstream is not
-			// running" and "this daemon is broken" are different problems for
-			// the reader.
-			writeRawRefusalAbout(w, http.StatusBadGateway, "upstream_unreachable", err.Error(),
-				contract.Refusal{Upstream: upstream.String()})
-		}
-	}
 	// A store that cannot be opened is a refusal at startup, not a daemon that
 	// runs without durability and discovers it later.
 	st, err := store.Open(cfg.Dir)
@@ -264,7 +237,6 @@ func New(cfg config.Config) (*Server, error) {
 		store:          st,
 		secretHandoffs: app.NewSecretHandoffs(),
 		cfg:            cfg,
-		proxy:          proxy,
 		terminals:      terminal.Hosts(),
 		facts:          transcript.NewRecordFacts(),
 		icons:          icons,
@@ -415,26 +387,19 @@ func (s *Server) Handler() http.Handler {
 	for _, rt := range s.routeTable() {
 		mux.HandleFunc(rt.Pattern, rt.handle)
 	}
-	// By default this daemon refuses what it has not implemented instead of
-	// borrowing it. Proxying is a scaffold, and a scaffold that never says what
-	// it is holding up cannot be removed on purpose — so it is asked for by
-	// name (config.UpstreamPortEnv) and is off otherwise.
-	if !s.proxying() {
-		if root := WebRoot(); root != "" {
-			mux.Handle("/app/", newPage(root))
-			// The home-screen shell in front of the console (pwa.go): the
-			// launch images are drawn, and everything else there is a file in
-			// the bundle that `page` already serves.
-			mux.Handle("/", s.withPWA(&fallback{page: newPage(root), miss: s.notImplemented}))
-			return wrap()
-		}
-		// No web root is not a route this daemon has yet to write: `/` is its
-		// own, and it was not told where the files are. The page says that by
-		// name (no_web_root); an unowned /v1 route still says not_implemented.
-		mux.Handle("/", &fallback{page: newPage(""), miss: s.notImplemented})
+	// A route this daemon does not own answers by name (notImplemented).
+	if root := WebRoot(); root != "" {
+		mux.Handle("/app/", newPage(root))
+		// The home-screen shell in front of the console (pwa.go): the
+		// launch images are drawn, and everything else there is a file in
+		// the bundle that `page` already serves.
+		mux.Handle("/", s.withPWA(&fallback{page: newPage(root), miss: s.notImplemented}))
 		return wrap()
 	}
-	mux.Handle("/", s.proxy)
+	// No web root is not a route this daemon has yet to write: `/` is its
+	// own, and it was not told where the files are. The page says that by
+	// name (no_web_root); an unowned /v1 route still says not_implemented.
+	mux.Handle("/", &fallback{page: newPage(""), miss: s.notImplemented})
 	return wrap()
 }
 
@@ -612,7 +577,6 @@ func (s *Server) routeTable() []route {
 		// command's local half; and moving schedules in and out (schedules.go).
 		{Route{"*", "/v1/orchestrator/schedules/"}, s.scheduleRoute},
 		{Route{"*", "/v1/orchestrator/schedule-webhooks/bind"}, s.scheduleWebhookBindRoute},
-		{Route{"*", "/v1/orchestrator/schedule-imports"}, s.scheduleImportRoute},
 		{Route{"*", "/v1/orchestrator/schedule-exports"}, s.scheduleExportRoute},
 		// The text somebody wrote once and presses instead of typing it again
 		// (snippets.go). This daemon's own store, never the Swift app's directory.
@@ -774,7 +738,6 @@ func (s *Server) diagnostics(w http.ResponseWriter, r *http.Request) {
 		Terminals: s.terminalDiagnostics(),
 		ServedBy:  servedBy,
 		Port:      int64(s.cfg.Port),
-		Upstream:  int64(s.cfg.UpstreamPort),
 		Usage:     s.usageDiagnostics(),
 		Dir:       s.cfg.Dir,
 		At:        time.Now().Unix(),
@@ -856,42 +819,6 @@ func (f *fallback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.page.ServeHTTP(w, r)
 }
 
-// standaloneForced is CLAWDLINE_NEXT_STANDALONE=1, which says "never forward"
-// whatever else is configured.
-//
-// It was the way to opt out while 7717 — the port the Swift app held until
-// 2026-09-19 — was the default destination. Forwarding is now opt-in, so on an
-// ordinary machine this changes nothing and setting it is harmless; it is still
-// read so that a script or a bundle written before that flip keeps meaning what
-// it meant.
-func standaloneForced() bool { return os.Getenv("CLAWDLINE_NEXT_STANDALONE") == "1" }
-
-// proxying reports whether there is another daemon behind this one to forward
-// an unowned route to. False is the ordinary answer: an unowned route then
-// names itself rather than borrowing an answer.
-func (s *Server) proxying() bool {
-	if s.proxy == nil {
-		return false
-	}
-	if _, ok := s.cfg.Upstream(); !ok {
-		return false
-	}
-	return !standaloneForced()
-}
-
-// forwardUpstream hands one request to the daemon behind this one.
-//
-// Every route that used to reach for `s.proxy` directly comes through here, so
-// that "there is nobody behind me" is one answer written once, by name, instead
-// of a nil dereference or a 502 pointing at a port nobody holds.
-func (s *Server) forwardUpstream(w http.ResponseWriter, r *http.Request) {
-	if !s.proxying() {
-		s.notImplemented(w, r)
-		return
-	}
-	s.proxy.ServeHTTP(w, r)
-}
-
 // notImplemented answers a route this daemon does not own yet, by name.
 //
 // The list of these is exactly what P4 costs, and it is measured rather than
@@ -920,16 +847,11 @@ func (s *Server) Serve(ln net.Listener) error {
 		// wrong: this daemon is reachable from outside this machine.
 		log.Printf("WARNING: binding to %s, which is not loopback", s.cfg.Host)
 	}
-	if port, ok := s.cfg.Upstream(); ok && !standaloneForced() {
-		log.Printf("clawdline-go listening on http://%s (forwarding unowned routes to :%d, asked for with %s)",
-			addr, port, config.UpstreamPortEnv)
-	} else {
-		log.Printf("clawdline-go listening on http://%s (nothing behind it: an unowned route answers 501 not_implemented and names itself)", addr)
-		// Directly under `listening`, because that is the line somebody reads
-		// after a restart, and whether this address shows a page is the thing
-		// they restarted it for. A forwarding daemon's `/` is the upstream's.
-		log.Print(consoleLogLine(consoleReading(WebRoot())))
-	}
+	log.Printf("clawdline-go listening on http://%s (an unowned route answers 501 not_implemented and names itself)", addr)
+	// Directly under `listening`, because that is the line somebody reads
+	// after a restart, and whether this address shows a page is the thing
+	// they restarted it for.
+	log.Print(consoleLogLine(consoleReading(WebRoot())))
 	srv := &http.Server{
 		Handler:           s.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,

@@ -318,11 +318,6 @@
     },
     {
       "method": "*",
-      "pattern": "/v1/orchestrator/schedule-imports",
-      "guide": "schedule"
-    },
-    {
-      "method": "*",
       "pattern": "/v1/orchestrator/schedule-webhooks/bind",
       "guide": "schedule"
     },

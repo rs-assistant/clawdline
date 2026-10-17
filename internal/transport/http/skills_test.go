@@ -20,7 +20,6 @@ import (
 // working directory, Codex's from its own rollout, and a session this daemon
 // cannot place is refused rather than answered with an empty menu.
 func TestTheSlashMenuIsReadPerSession(t *testing.T) {
-	t.Setenv("CLAWDLINE_NEXT_OWN_SESSIONS", "1")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	work := t.TempDir()

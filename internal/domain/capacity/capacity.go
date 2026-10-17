@@ -489,7 +489,6 @@ const (
 	TerminalViewers      = "terminal.viewers"
 	TerminalStreams      = "terminal.streams"
 	TerminalLeaseSeconds = "terminal.lease_seconds"
-	TerminalGrantsBytes  = "terminal.grants_bytes"
 	// Every API call this daemon answers, counted by route shape and caller
 	// (`/v1/diagnostics.routes`).
 	DiagnosticsRouteStatKeys          = "diagnostics.route_stat_keys"
@@ -3386,14 +3385,6 @@ func Register() []Entry {
 			Limit: 2, AtLimit: Expire,
 			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/transport/cloud.CloudTerminalReceiptBusyRetrySecondsLimit"},
-		},
-		{
-			// The terminal grants file. A larger one is not read, and then
-			// grants nobody; a write that would make it larger is refused.
-			Name: TerminalGrantsBytes, Class: Buffer, Unit: Bytes,
-			Limit: 256 << 10, AtLimit: Refuse,
-			Told: []Channel{Diagnostics, Sender}, EvictedBy: Person,
-			Sources: []string{"internal/adapters/devices.MaxGrantsBytes"},
 		},
 		{
 			// One terminal request's body: a 1 MiB paste JSON-escaped, and

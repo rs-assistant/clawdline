@@ -40,8 +40,6 @@
   "main_tunnel_json_what_the_cloudflared_tunnel": "  tunnel [--json]           o estado do túnel cloudflared; remote_tunnel nas configurações o ativa",
   "main_type_session_id_text_type_straight": "  type <session-id> <text>      digita diretamente em um terminal, sem registrar nada (para testar um backend)",
   "main_update_json_apply_force_whether_this": "  update [--json] [--apply [--force]]   verifica se esta máquina está atrás da versão mais recente na nuvem; retorno 0 atual, 10 atrasada, 3 desconhecido",
-  "main_upstream_d": "upstream  %d\n",
-  "main_upstream_none_an_unowned_route_answers": "upstream  nenhum (uma rota sem responsável responde 501 not_implemented; %s solicita uma)\n",
   "main_usage_clawdline_lang_tag_command_arguments": "uso: clawdline --lang <tag> <command> [arguments]",
   "main_usage_clawdline_s_session_id_text": "uso: clawdline %s <session-id> [text]\n",
   "main_usage_clawdline_serve_doctor_guide_skill": "uso: clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|tunnel|cloud|board|project|task|webhook|update|version>",

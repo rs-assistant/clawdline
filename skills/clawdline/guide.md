@@ -335,11 +335,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":"<code>","detail":"…"}` — route misses, wrong methods and some reads.
 
 A route this daemon does not own is refused as `501 not_implemented`, and the refusal names the
-route. That is the answer on any ordinary machine. It is only forwarded when somebody deliberately
-put another daemon behind this one with `CLAWDLINE_NEXT_UPSTREAM_PORT`, and then a `502
-upstream_unreachable` names the address that did not answer. Neither is an answer from this
-daemon. Before 2026-09-19 the forwarding was on by default and went to the Swift app on 7717, so a
-note written then will say an unowned route reaches that app; it does not.
+route. Nothing is forwarded to another daemon.
 
 ### Set up a Project's Clawdline display
 
@@ -933,8 +929,8 @@ their place.
 `clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) is
 every landing **recorded** for one Board item instead: `{"work_id", "landings": [...], "at"}`, each
 row with its `id` and `source` — `task` (a bound child's landed or incorporated record; the id is
-the task id), `root` (the record `item phase deploying --commit` wrote) or `phase_event` (a copy an
-older daemon kept in the item's history). A bound task whose record cannot be read is a row with
+the task id) or `root` (the record `item phase deploying --commit` wrote, or a copy an older daemon
+kept in the item's history, which the store gave a row of its own). A bound task whose record cannot be read is a row with
 `state: "unknown"`, never left out. The item read carries the same rows as `landings`. An item that
 does not exist is `404 work_not_found`.
 

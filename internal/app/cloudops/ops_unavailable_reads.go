@@ -78,41 +78,6 @@ func init() {
 				return machinePlan(b)
 			}},
 
-		op{name: "board.items", read: true,
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "project", "audience", "cursor", "limit") {
-					return plan{}, false
-				}
-				p, ok := machinePlan(b)
-				if !ok {
-					return plan{}, false
-				}
-				project, projectOK := b.nonEmpty("project")
-				audience, audienceOK := b.str("audience")
-				cursor, cursorOK := b.integer("cursor")
-				limit, limitOK := b.integer("limit")
-				if !projectOK || len(project) > 200 || !audienceOK || !cursorOK || !limitOK ||
-					cursor < 0 || cursor > 100_000 || limit < 1 || limit > 200 {
-					return plan{}, false
-				}
-				switch audience {
-				case "human", "agent", "archive", "all":
-				default:
-					return plan{}, false
-				}
-				p.project, p.audience = project, audience
-				p.offset, p.limit = cursor, limit
-				return p, true
-			},
-			// The Swift app sends all four, always (`CloudLocalRoute.swift:123-128`):
-			// board and board.items share one path and differ only by query shape.
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "GET", Path: "/v1/board", Query: map[string]string{
-					"project": p.project, "audience": p.audience,
-					"cursor": strconv.FormatInt(p.offset, 10), "limit": strconv.FormatInt(p.limit, 10),
-				}}
-			}},
-
 		// The token bill (docs/token-ledger.md, "What a person and a session
 		// see"): one conversation, one child task, one Board item. Each is the
 		// local route's own question with its id in the path, so each takes

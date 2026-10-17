@@ -51,10 +51,6 @@ func gitDiffPath(r *http.Request) (string, bool) {
 // go through `/send` with the confirmation sheet in front of them, exactly as
 // they do in the app being replicated.
 func (s *Server) sessionGitRoute(w http.ResponseWriter, r *http.Request, id string) {
-	if !s.ownsSessions() {
-		s.forwardUpstream(w, r)
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	item, err := s.actions().FindForRead(ctx, id)
@@ -86,10 +82,6 @@ func (s *Server) sessionGitRoute(w http.ResponseWriter, r *http.Request, id stri
 // lets a paired device inspect a change without turning the
 // route into a general file reader.
 func (s *Server) sessionGitDiffRoute(w http.ResponseWriter, r *http.Request, id string) {
-	if !s.ownsSessions() {
-		s.forwardUpstream(w, r)
-		return
-	}
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		writeRefusal(w, http.StatusBadRequest, "bad_request", "A Git diff needs a changed path")

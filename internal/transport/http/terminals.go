@@ -102,24 +102,11 @@ func (s *Server) terminalStats() (leases, streams int) {
 	return 0, 0
 }
 
-// terminalDiagnostics keeps the legacy grants-file reading for older clients.
-// Its status no longer determines whether a paired sender may use terminals.
+// terminalDiagnostics is what /v1/diagnostics says about terminals.
 func (s *Server) terminalDiagnostics() *contract.TerminalDiagnostics {
 	leases, streams := s.terminalStats()
-	out := &contract.TerminalDiagnostics{GrantsOK: true, Leases: int64(leases), Streams: int64(streams),
+	return &contract.TerminalDiagnostics{Leases: int64(leases), Streams: int64(streams),
 		Osascript: osascriptDiagnostics()}
-	g := s.gate()
-	switch {
-	case g.grants == nil:
-		out.GrantsOK = false
-		out.GrantsError = "the device store could not be opened"
-	default:
-		if err := g.grants.Err(); err != nil {
-			out.GrantsOK = false
-			out.GrantsError = err.Error()
-		}
-	}
-	return out
 }
 
 // terminalAccess is whether p may still see and operate terminals. It is asked
@@ -164,17 +151,6 @@ func (s *Server) CloudTerminalService() (*terminals.Service, error) {
 // ingress has authorized the viewer. It uses the local project catalog.
 func (s *Server) CloudTerminalProject(ctx context.Context, id string) (string, bool) {
 	return s.terminalProjectDir(ctx, id)
-}
-
-// CloudDropTerminalGrant clears a legacy record after a pin revoke. The pin
-// itself is the authority, so an unreadable legacy file cannot block revoke.
-func (s *Server) CloudDropTerminalGrant(device string) error {
-	g := s.gate()
-	if g.grants == nil {
-		return nil
-	}
-	_, _ = g.grants.Set(device, false, time.Now())
-	return nil
 }
 
 // terminalPrincipal is who is asking, or the refusal already written.
@@ -616,84 +592,4 @@ func writeTerminalRefusal(w http.ResponseWriter, err error, viewer *terminalView
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(out)
-}
-
-// terminalGrantRoute preserves the old local-only record for older clients.
-// This record no longer grants shell access; pairing and send permission do.
-func (g *gate) terminalGrantRoute(w http.ResponseWriter, r *http.Request, device string) {
-	if cloud.ViaCloud(r.Context()) {
-		writeTerminalRefusal(w, terminal.Refuse(terminal.CodeCloudNotSupported,
-			"terminal grants are given on this machine, never through Clawdline Cloud"), nil)
-		return
-	}
-	if r.Method != http.MethodPost {
-		writeAuthRefusal(w, http.StatusMethodNotAllowed, "bad_request", "A grant is changed with POST.")
-		return
-	}
-	var req contract.TerminalGrantRequest
-	body := readBody(r)
-	grant, ok := body["grant"].(bool)
-	if !ok || len(body) != 1 {
-		writeAuthRefusal(w, http.StatusBadRequest, "bad_request", "That needs grant: true or false, and nothing else.")
-		return
-	}
-	req.Grant = grant
-	d, held := g.auth.Holds(device)
-	if !held {
-		if line := cloudTerminalLine(g.dir); line != nil {
-			if name, pinned := line.PinnedTerminalViewer(device); pinned {
-				d.Name, d.ID, held = name, device, true
-			}
-		}
-	}
-	if !held {
-		writeAuthRefusal(w, http.StatusNotFound, "not_found", "No paired device has that id.")
-		return
-	}
-	if d.Local {
-		writeAuthRefusal(w, http.StatusForbidden, "forbidden", "This machine's own token uses terminals without a grant.")
-		return
-	}
-	if g.grants == nil {
-		writeAuthRefusal(w, http.StatusServiceUnavailable, "store_unavailable", "The terminal grants could not be opened.")
-		return
-	}
-	row, err := g.grants.Set(device, req.Grant, time.Now())
-	if err != nil {
-		log.Printf("auth: a terminal grant was not changed: %v", err)
-		writeAuthRefusal(w, http.StatusServiceUnavailable, "store_unavailable",
-			"The terminal grants could not be written; nothing was changed.")
-		return
-	}
-	event := "device.terminal_revoke"
-	if req.Grant {
-		event = "device.terminal_grant"
-	}
-	g.files.Audit(event, map[string]string{"device": d.Name, "id": d.ID})
-	out := contract.TerminalGrant{DeviceID: device, Granted: req.Grant}
-	if req.Grant {
-		out.GrantedAt = row.GrantedAt.Unix()
-	}
-	writeAuthJSON(w, out)
-}
-
-// dropTerminalGrants takes the grants of every device that is gone away with
-// it: a device revoked, signed out, or all of them at once. A failure is
-// logged and not the revocation's: the grant alone never lets anybody in,
-// because every question asks that the device is still paired as well.
-func (g *gate) dropTerminalGrants() {
-	if g.grants == nil || g.auth == nil {
-		return
-	}
-	if err := g.grants.Keep(func(device string) bool {
-		_, ok := g.auth.Holds(device)
-		if !ok {
-			if line := cloudTerminalLine(g.dir); line != nil {
-				_, ok = line.PinnedTerminalViewer(device)
-			}
-		}
-		return ok
-	}); err != nil {
-		log.Printf("auth: the grants of a revoked device could not be removed: %v", err)
-	}
 }

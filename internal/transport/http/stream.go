@@ -12,10 +12,6 @@ import (
 )
 
 // streamTick is how often this daemon looks at the machine for the stream.
-//
-// It is a decision this daemon now has to make for itself. While the stream was
-// spliced from the Swift app, upstream decided when a session update was due
-// and only the content changed; without it, the rhythm is ours.
 func streamTick() time.Duration {
 	if v := os.Getenv("CLAWDLINE_NEXT_STREAM"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil && d >= 250*time.Millisecond {
@@ -32,13 +28,7 @@ func streamTick() time.Duration {
 // comment costs two bytes and removes that ambiguity.
 const heartbeat = 15 * time.Second
 
-// ownEvents publishes this daemon's own stream, with no upstream behind it.
-//
-// This is what `standalone` was always claiming and could not do: until now
-// /v1/events consumed the Swift app's stream unconditionally, so the clock, the
-// authentication and the `orchestrator` payload were all upstream's. A console
-// pointed at this daemon was reading the other app's heartbeat and reporting it
-// as this one's.
+// ownEvents publishes this daemon's own stream.
 //
 // The `orchestrator` frame is this daemon's task list, which reads the Swift
 // app's store (read-only) and adds its own tasks; see tasksPayload.

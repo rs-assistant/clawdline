@@ -23,7 +23,7 @@ import (
 // files were. It now says that, by name; a /v1 route nobody has written still
 // says not_implemented.
 func TestADaemonWithNoWebRootSaysSoAtItsFrontDoor(t *testing.T) {
-	h, token := upstreamFixture(t, config.Load())
+	h, token := daemonFixture(t, config.Load())
 
 	for _, path := range []string{"/", "/index.html", "/app/js/main.js"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
@@ -65,7 +65,7 @@ func TestADaemonWithNoWebRootSaysSoAtItsFrontDoor(t *testing.T) {
 // contract (ConsoleDiagnostics): a missing local page stops nothing a paired
 // phone uses. This pins that the choice was made, not forgotten.
 func TestHealthStaysAboutTheDaemonWhenThereIsNoConsole(t *testing.T) {
-	h, _ := upstreamFixture(t, config.Load())
+	h, _ := daemonFixture(t, config.Load())
 	req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
 	req.Host = "127.0.0.1:7757"
 	rec := httptest.NewRecorder()
@@ -102,7 +102,6 @@ func TestTheConsoleIsReadAsServedNoneOrBroken(t *testing.T) {
 // after a restart, and nothing in between may push it out of sight.
 func TestTheConsoleLineIsTheLineAfterListening(t *testing.T) {
 	t.Setenv("CLAWDLINE_NEXT_WEB", "")
-	t.Setenv(config.UpstreamPortEnv, "")
 	cfg := config.Load()
 	cfg.Dir = filepath.Join(t.TempDir(), "next")
 	cfg.Port = 0

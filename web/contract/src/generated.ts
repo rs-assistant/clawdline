@@ -3069,7 +3069,6 @@ export interface Diagnostics {
   scheduler: SchedulerPulse
   served_by: string
   terminals?: TerminalDiagnostics
-  upstream: number
   usage?: UsageDiagnostics
 }
 
@@ -4173,12 +4172,6 @@ export interface PairedDevice {
    */
   last_seen?: number
   name: string
-
-  /**
-   * Legacy terminal grant record for older clients. Access now follows pairing;
-   * this field does not grant or revoke terminal access.
-   */
-  terminal?: boolean
 }
 
 /**
@@ -5357,16 +5350,15 @@ export interface RecordedLanding {
  * Where a recorded landing of a Board item comes from. `task`: a bound broker
  * task's landed or incorporated record; its id is the task id. `root`: a broker
  * root landing row, written when the owning Session proved a commit with `item
- * phase deploying --commit --target --remote` and no child task carried it.
- * `phase_event`: a landing copy an older daemon wrote into the item's phase event
- * before root landings had rows of their own; read, never rewritten.
+ * phase deploying --commit --target --remote` and no child task carried it. A
+ * landing copy an older daemon wrote into the item's phase event is given a root
+ * row when the store opens.
  */
 export type RecordedLandingSource =
     "task"
   | "root"
-  | "phase_event"
 
-export const RecordedLandingSourceValues: readonly RecordedLandingSource[] = ["task", "root", "phase_event"] as const
+export const RecordedLandingSourceValues: readonly RecordedLandingSource[] = ["task", "root"] as const
 
 /**
  * Every refusal on this daemon has this shape. A caller reads `error` as the code
@@ -5382,7 +5374,6 @@ export interface Refusal {
   detail_key?: string
   error: string
   route?: string
-  upstream?: string
 }
 
 /**
@@ -8622,17 +8613,6 @@ export const TerminalCursorShapeValues: readonly TerminalCursorShape[] = ["defau
  */
 export interface TerminalDiagnostics {
   /**
-   * Why the grants file could not be read.
-   */
-  grants_error?: string
-
-  /**
-   * The legacy terminal grants file could be read. It no longer controls terminal
-   * access.
-   */
-  grants_ok: boolean
-
-  /**
    * Control leases held now.
    */
   leases: number
@@ -8679,26 +8659,6 @@ export interface TerminalFrame {
    * The screen's height. The text is `lines`.
    */
   rows: number
-}
-
-export interface TerminalGrant {
-  device_id: string
-  granted: boolean
-
-  /**
-   * Unix seconds. Absent when not granted.
-   */
-  granted_at?: number
-}
-
-/**
- * Legacy POST /v1/auth/devices/{id}/terminal. This machine's own token only, and
- * never through Clawdline Cloud. The record remains readable for older clients, but
- * terminal access now follows pairing and send permission; this grant does not
- * change access.
- */
-export interface TerminalGrantRequest {
-  grant: boolean
 }
 
 /**

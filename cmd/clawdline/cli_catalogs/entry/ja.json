@@ -40,8 +40,6 @@
   "main_tunnel_json_what_the_cloudflared_tunnel": "  tunnel [--json]           cloudflared トンネルの状態。設定の remote_tunnel で有効化",
   "main_type_session_id_text_type_straight": "  type <session-id> <text>      記録せずに端末へ直接入力（バックエンドのテスト用）",
   "main_update_json_apply_force_whether_this": "  update [--json] [--apply [--force]]   このマシンがクラウドの最新ビルドより遅れているか確認。終了コード: 0 最新、10 遅延、3 不明",
-  "main_upstream_d": "上流      %d\n",
-  "main_upstream_none_an_unowned_route_answers": "上流      なし（所有者のないルートは 501 not_implemented を返し、%s は上流を要求します）\n",
   "main_usage_clawdline_lang_tag_command_arguments": "使い方: clawdline --lang <tag> <command> [arguments]",
   "main_usage_clawdline_s_session_id_text": "使い方: clawdline %s <session-id> [text]\n",
   "main_usage_clawdline_serve_doctor_guide_skill": "使い方: clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|tunnel|cloud|board|project|task|webhook|update|version>",

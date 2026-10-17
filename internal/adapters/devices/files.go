@@ -630,11 +630,10 @@ func usableMachineToken(path string, data []byte) (string, error) {
 var (
 	securityPrefixes = []string{"pair.", "device.", "password.", "push.", "capacity."}
 	securityEvents   = map[string]bool{
-		"orchestrator.schedule.created":  true,
-		"orchestrator.schedule.updated":  true,
-		"orchestrator.schedule.deleted":  true,
-		"orchestrator.schedule.imported": true,
-		"schedule_webhook.bind":          true,
+		"orchestrator.schedule.created": true,
+		"orchestrator.schedule.updated": true,
+		"orchestrator.schedule.deleted": true,
+		"schedule_webhook.bind":         true,
 	}
 	journalEvents = map[string]bool{
 		"orchestrator.schedule.run":               true,

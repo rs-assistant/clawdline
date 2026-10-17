@@ -543,14 +543,7 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 			_, streams := s.terminalStats()
 			return capacity.Reading{Known: true, Used: int64(streams)}
 		},
-		capacity.TerminalLeaseSeconds: func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-lease clock"} },
-		capacity.TerminalGrantsBytes: func() capacity.Reading {
-			g := s.gate()
-			if g.grants == nil {
-				return capacity.Unmeasured("the device store could not be opened")
-			}
-			return g.grants.Reading()
-		},
+		capacity.TerminalLeaseSeconds:    func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-lease clock"} },
 		capacity.TerminalBodyBytes:       func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-request guard"} },
 		capacity.TerminalLaunchLineBytes: func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-launch guard"} },
 		capacity.DispatchAlsoWorkIDs:     func() capacity.Reading { return capacity.Reading{Known: true, Note: "per-dispatch guard"} },

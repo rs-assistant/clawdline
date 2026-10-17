@@ -31,10 +31,6 @@ func skillsPath(r *http.Request) (string, bool) {
 // because one key for both would hand a Codex session Claude's skills, a wrong
 // answer served quickly.
 func (s *Server) sessionSkillsRoute(w http.ResponseWriter, r *http.Request, id string) {
-	if !s.ownsSessions() {
-		s.forwardUpstream(w, r)
-		return
-	}
 	if !s.admitPinnedTarget(w, r, id) {
 		return
 	}

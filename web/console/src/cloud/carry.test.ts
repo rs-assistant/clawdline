@@ -318,7 +318,7 @@ test("one word, one list, and every route names a word the table carries", () =>
   // An opened waiting Session's one row, asked when its question has not come.
   assert.ok("sessions.row" in CARRIED)
   assert.ok("session-snippets" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 161)
+  assert.equal(Object.keys(CARRIED).length, 160)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {
@@ -409,8 +409,7 @@ test("terminal HTTP routes remain local while hosted terminals use separate encr
     assert.equal(uncarriedWordOf("GET", path), "", path + " stands for no Cloud word")
   }
   assert.equal(notCarriedDetail("POST", "/v1/terminals/trm_x/input"), MACHINE_ONLY[0].sentence)
-  assert.equal(notCarriedDetail("POST", "/v1/auth/devices/dev-1/terminal"), MACHINE_ONLY[1].sentence)
-  assert.equal(machineOnly("/v1/auth/devices/dev-1/revoke"), "", "only the grant route is a terminal route")
+  assert.equal(machineOnly("/v1/auth/devices/dev-1/revoke"), "", "a device route is not a terminal route")
   assert.equal(machineOnly("/v1/terminalsx"), "", "a prefix is a whole segment")
   for (const word of words()) assert.ok(!/terminal/.test(word), word + ": the generic Router has no terminal word")
   assert.equal(mac.asked.length, 0, "nothing was asked of the machine")

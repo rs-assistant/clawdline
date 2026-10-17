@@ -37,8 +37,6 @@ const (
 	commandBodyLimit = 2 << 20
 	// authBodyLimit is the Swift app's reading of an auth or push body.
 	authBodyLimit = 64 << 10
-	// scheduleImportBodyLimit is a batch of schedule files moved in at once.
-	scheduleImportBodyLimit = 4 << 20
 	// terminalBodyLimit is one terminal request: the largest is a 1 MiB
 	// paste, which JSON writes in up to six bytes a byte (`\u0001`), plus
 	// room for the request's other fields (`terminal.body_bytes`).
@@ -48,12 +46,11 @@ const (
 // bodyLimits are the routes whose bound is not commandBodyLimit, by the
 // pattern they are registered under.
 var bodyLimits = map[string]int64{
-	"/v1/auth/":                         authBodyLimit,
-	"/v1/push/":                         authBodyLimit,
-	"/v1/sessions/":                     sendBodyLimit,
-	"/v1/voice":                         voiceBodyLimit,
-	"/v1/terminals/":                    terminalBodyLimit,
-	"/v1/orchestrator/schedule-imports": scheduleImportBodyLimit,
+	"/v1/auth/":      authBodyLimit,
+	"/v1/push/":      authBodyLimit,
+	"/v1/sessions/":  sendBodyLimit,
+	"/v1/voice":      voiceBodyLimit,
+	"/v1/terminals/": terminalBodyLimit,
 	// One project's settings with contents (project_sync.go).
 	"/v1/project-sync/": projectsync.MaxEntryBytes,
 }

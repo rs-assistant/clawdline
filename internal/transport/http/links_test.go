@@ -22,7 +22,6 @@ import (
 // — "we do not know where this session is" and "this project has no addresses"
 // are the two sentences this route must never merge.
 func TestTheLinksSheetIsReadPerSession(t *testing.T) {
-	t.Setenv("CLAWDLINE_NEXT_OWN_SESSIONS", "1")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	status := filepath.Join(home, ".claude", "statusline-cache")

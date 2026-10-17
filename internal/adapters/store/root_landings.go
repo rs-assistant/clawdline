@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -23,8 +25,10 @@ import (
 // Idempotency-Key after a version reread, or Finish after `item phase` — is the
 // same row, and the first proof stands.
 //
-// Expand only: an older daemon never reads this table, and the events it
-// wrote before it keep their `landing` copy, which the item read still shows.
+// The events an older daemon wrote keep their `landing` copy, and
+// migrateLegacyLandings gives each copy its row. An older binary opening the
+// same file reads both, so after a rollback a legacy landing is listed twice;
+// only the listing is affected.
 const rootLandingSchema = `
 CREATE TABLE IF NOT EXISTS broker_root_landings (
   id            TEXT    PRIMARY KEY,
@@ -42,8 +46,7 @@ CREATE TABLE IF NOT EXISTS broker_root_landings (
 CREATE INDEX IF NOT EXISTS broker_root_landings_work ON broker_root_landings(work_id, recorded_at, id);
 `
 
-// WorkV2RootLandingLimit is how many root landings one item keeps, and how
-// many legacy landing copies its read returns. An item re-enters deploying
+// WorkV2RootLandingLimit is how many root landings one item keeps. An item re-enters deploying
 // once a cycle, so this is many reopenings; at the limit a new landing is
 // refused and nothing is evicted.
 const WorkV2RootLandingLimit = 64
@@ -156,43 +159,106 @@ func (t *WorkV2Tx) RootLandings(workID string) ([]RootLanding, error) {
 	return queryRootLandings(t.ctx, t.tx, workID)
 }
 
-// LegacyLanding is a landing copy an `item.phase_changed` event carried
-// before root landings were rows of their own. It is read, never rewritten.
-type LegacyLanding struct {
-	Seq     int64
-	At      time.Time
-	Payload string
-}
-
-func queryLegacyLandings(ctx context.Context, q querier, workID string) ([]LegacyLanding, error) {
-	rows, err := q.QueryContext(ctx, `SELECT seq, at, payload FROM work_v2_events
-	  WHERE work_id = ? AND kind = 'item.phase_changed' AND json_valid(payload)
-	    AND json_type(payload, '$.landing') = 'object' AND json_type(payload, '$.landing_id') IS NULL
-	  ORDER BY seq LIMIT ?`, workID, WorkV2RootLandingLimit)
+// migrateLegacyLandings gives every landing copy an older daemon wrote into an
+// `item.phase_changed` payload — before root landings were rows of their own —
+// the broker_root_landings row it would have been: the same item, repository,
+// commit and target, so the same id RecordRootLanding derives. The events
+// themselves are history and are not rewritten.
+//
+// It runs at every open and is idempotent: a copy whose four keys already
+// name a row is not selected, so a second open inserts nothing, and a copy
+// recorded both ways keeps the row that was there first. A copy that is not a
+// whole proof was never shown as a landing and is not made one. An item
+// already at WorkV2RootLandingLimit keeps what it has; the copies left over
+// are counted in the log line, not evicted for.
+func migrateLegacyLandings(db *sql.DB) error {
+	tx, err := db.Begin()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer rows.Close()
-	out := []LegacyLanding{}
+	defer func() { _ = tx.Rollback() }()
+	rows, err := tx.Query(`SELECT e.work_id, e.actor, e.at,
+	    COALESCE(NULLIF(json_extract(e.payload, '$.landing.repository'), ''), i.project_path),
+	    json_extract(e.payload, '$.landing.target'), json_extract(e.payload, '$.landing.commit'),
+	    json_extract(e.payload, '$.landing.target_commit'), json_extract(e.payload, '$.landing.remote'),
+	    json_extract(e.payload, '$.landing.remote_commit')
+	  FROM work_v2_events e JOIN work_v2_items i ON i.id = e.work_id
+	  WHERE e.kind = 'item.phase_changed' AND json_valid(e.payload)
+	    AND json_type(e.payload, '$.landing') = 'object' AND json_type(e.payload, '$.landing_id') IS NULL
+	    AND (json_type(e.payload, '$.landing.repository') IS NULL OR json_type(e.payload, '$.landing.repository') IN ('text', 'null'))
+	    AND json_type(e.payload, '$.landing.commit') = 'text' AND json_extract(e.payload, '$.landing.commit') != ''
+	    AND json_type(e.payload, '$.landing.target') = 'text' AND json_extract(e.payload, '$.landing.target') != ''
+	    AND json_type(e.payload, '$.landing.target_commit') = 'text' AND json_extract(e.payload, '$.landing.target_commit') != ''
+	    AND json_type(e.payload, '$.landing.remote') = 'text' AND json_extract(e.payload, '$.landing.remote') != ''
+	    AND json_type(e.payload, '$.landing.remote_commit') = 'text' AND json_extract(e.payload, '$.landing.remote_commit') != ''
+	    AND NOT EXISTS (SELECT 1 FROM broker_root_landings r WHERE r.work_id = e.work_id
+	      AND r.repository = COALESCE(NULLIF(json_extract(e.payload, '$.landing.repository'), ''), i.project_path)
+	      AND r.commit_sha = json_extract(e.payload, '$.landing.commit')
+	      AND r.target = json_extract(e.payload, '$.landing.target'))
+	  ORDER BY e.seq`)
+	if err != nil {
+		return fmt.Errorf("legacy landings: %w", err)
+	}
+	var copies []RootLanding
 	for rows.Next() {
-		var l LegacyLanding
+		var l RootLanding
 		var at int64
-		if err := rows.Scan(&l.Seq, &at, &l.Payload); err != nil {
-			return nil, err
+		if err := rows.Scan(&l.WorkID, &l.SessionID, &at, &l.Repository, &l.Target, &l.Commit,
+			&l.TargetCommit, &l.Remote, &l.RemoteCommit); err != nil {
+			rows.Close()
+			return fmt.Errorf("legacy landings: %w", err)
 		}
-		l.At = time.Unix(at, 0)
-		out = append(out, l)
+		l.RecordedAt = time.Unix(at, 0)
+		copies = append(copies, l)
 	}
-	return out, rows.Err()
-}
-
-// LegacyLandings is every landing copy an older daemon wrote into the item's
-// phase events, oldest first.
-func (s *Store) LegacyLandings(ctx context.Context, workID string) ([]LegacyLanding, error) {
-	if err := reading(); err != nil {
-		return nil, err
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("legacy landings: %w", err)
 	}
-	return queryLegacyLandings(ctx, s.rd, workID)
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("legacy landings: %w", err)
+	}
+	if len(copies) == 0 {
+		return nil
+	}
+	held := map[string]int{}
+	moved, full := 0, 0
+	for _, l := range copies {
+		l.ID = RootLandingID(l.WorkID, l.Repository, l.Commit, l.Target)
+		n, ok := held[l.WorkID]
+		if !ok {
+			if err := tx.QueryRow(`SELECT COUNT(*) FROM broker_root_landings WHERE work_id = ?`, l.WorkID).Scan(&n); err != nil {
+				return fmt.Errorf("legacy landings: %w", err)
+			}
+		}
+		if n >= WorkV2RootLandingLimit {
+			held[l.WorkID] = n
+			full++
+			continue
+		}
+		// OR IGNORE: two copies of one landing in one item's history are one row.
+		res, err := tx.Exec(`INSERT OR IGNORE INTO broker_root_landings
+		  (id, work_id, session_id, repository, target, commit_sha, target_commit, remote, remote_commit, recorded_at)
+		  VALUES (?,?,?,?,?,?,?,?,?,?)`, l.ID, l.WorkID, l.SessionID, l.Repository, l.Target, l.Commit,
+			l.TargetCommit, l.Remote, l.RemoteCommit, l.RecordedAt.Unix())
+		if err != nil {
+			return fmt.Errorf("legacy landings: %w", err)
+		}
+		if added, _ := res.RowsAffected(); added > 0 {
+			n++
+			moved++
+		}
+		held[l.WorkID] = n
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("legacy landings: %w", err)
+	}
+	// Every open rescans; only an open that moved something says so, so an
+	// item already full does not repeat its line at every start.
+	if moved > 0 {
+		log.Printf("store: %d legacy landing copies became root landings; %d left out because their item already holds %d",
+			moved, full, WorkV2RootLandingLimit)
+	}
+	return nil
 }
 
 // WorkV2Tasks is WorkV2Tx.Tasks outside a write: the broker tasks bound to

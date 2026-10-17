@@ -78,7 +78,6 @@ export const CARRIED = {
   // The Settings page's 「立即更新」 (`machine/UpdatePanel.tsx`): install the
   // newest release of the machine's channel, a machine command with no body.
   "update-apply": "POST /v1/update/apply",
-  "board.items": "GET /v1/board?project=&audience=&cursor=&limit=",
   end: "POST /v1/sessions/{id}/close",
   focus: "POST /v1/sessions/{id}/focus",
   git: "GET /v1/sessions/{id}/git",
@@ -361,7 +360,7 @@ export const ANSWERED_HERE: readonly string[] = [
 /**
  * HTTP routes this machine answers only to itself and paired devices. The
  * hosted terminal uses its separate encrypted channels, not this generic
- * Cloud Router; terminal grant writes also remain local to the machine.
+ * Cloud Router.
  *
  * **Why a fourth list and not one of the three.** Those three are the
  * machine's Cloud vocabulary, held to `Implemented()` and `Vocabulary()` by the
@@ -378,10 +377,6 @@ export const MACHINE_ONLY: readonly { readonly route: RegExp; readonly sentence:
   {
     route: /^\/v1\/terminals(\/|$)/,
     sentence: "Terminal HTTP routes are local to this machine or a paired device. Hosted terminals use separate encrypted Cloud channels.",
-  },
-  {
-    route: /^\/v1\/auth\/devices\/[^/]+\/terminal$/,
-    sentence: "Terminal grants are changed on this machine. Hosted terminals use those grants but cannot change them.",
   },
 ]
 
@@ -435,7 +430,7 @@ export function uncarriedWordOf(method: string, path: string): string {
     return ""
   }
   const [head, a, b] = segments
-  // `/v1/snippets*`, `board`, `board-command`, `board.items` were all here until
+  // `/v1/snippets*`, `board` and `board-command` were all here until
   // this console began asking for them. What is carried is parsed once — by
   // the reader's own case and by `writeRoute` — and a second spelling of it
   // here would be a second thing to keep right. The Settings page's POST to

@@ -1,7 +1,6 @@
 package http
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"net/http/httptest"
@@ -103,19 +102,5 @@ func TestAProgressNoteIsSentOncePerConnection(t *testing.T) {
 	}
 	if len(seqs) != 3 || seqs[0] != 1 || seqs[1] != 3 || seqs[2] != 2 {
 		t.Fatalf("sent notes %v, want [1 3 2]", seqs)
-	}
-}
-
-// Two task lists that differ only in when they were built are the same frame.
-func TestOrchestratorIdentityIgnoresTheClock(t *testing.T) {
-	a := contract.TaskList{At: 1, Tasks: []contract.TaskRow{{ID: "x", State: "briefed"}}}
-	b := a
-	b.At = 2
-	if !bytes.Equal(orchestratorIdentity(a), orchestratorIdentity(b)) {
-		t.Fatal("a list that moved only its clock has a new identity")
-	}
-	c := contract.TaskList{At: 1, Tasks: []contract.TaskRow{{ID: "x", State: "success"}}}
-	if bytes.Equal(orchestratorIdentity(a), orchestratorIdentity(c)) {
-		t.Fatal("a state change kept the old identity")
 	}
 }

@@ -712,9 +712,6 @@ func (l *Link) revokeTerminalViewer(viewer string) error {
 	for _, c := range denied {
 		l.revokeRegisteredTerminal(context.Background(), c)
 	}
-	if l.opts.DropTerminalGrant != nil {
-		return l.opts.DropTerminalGrant(viewer)
-	}
 	return nil
 }
 

@@ -351,7 +351,6 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		Handler:               srv.Handler(),
 		TerminalService:       srv.CloudTerminalService,
 		TerminalProject:       srv.CloudTerminalProject,
-		DropTerminalGrant:     srv.CloudDropTerminalGrant,
 		PeerReceipts:          srv.PeerReceipts(),
 		PeerAdmitTarget:       srv.AdmitExecutionTarget,
 		PeerExecute:           srv.PeerExecute,
@@ -449,14 +448,6 @@ func doctor() {
 		port = p
 	}
 	fmt.Printf(cliCopy("entry", "main_port_d", "port      %d\n"), port)
-	// "0" would read like a port. Nobody behind this daemon is the ordinary
-	// answer and it is said in words (config.NoUpstream).
-	if port, ok := cfg.Upstream(); ok {
-		fmt.Printf(cliCopy("entry", "main_upstream_d", "upstream  %d\n"), port)
-	} else {
-		fmt.Printf(cliCopy("entry", "main_upstream_none_an_unowned_route_answers", "upstream  none (an unowned route answers 501 not_implemented; %s asks for one)\n"),
-			config.UpstreamPortEnv)
-	}
 	fmt.Printf(cliCopy("entry", "main_dir_s", "dir       %s\n"), cfg.Dir)
 
 	st, err := store.Open(cfg.Dir)

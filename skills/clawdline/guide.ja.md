@@ -141,7 +141,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":{"code":"…","message":"…","request_id":"…", …extras}}` — ゲートとブローカー。 `retry_after` などの追加機能は `error` 内に収まります。
 - `{"error":"<code>","detail":"…"}` — 存在しないルート、間違ったメソッド、および一部の読み取り。
 
-このデーモンが所有していないルートは `501 not_implemented` として拒否され、拒否によりルートに名前が付けられます。それが普通のマシンの答えです。これは、誰かが意図的に `CLAWDLINE_NEXT_UPSTREAM_PORT` を使用してこのデーモンの背後に別のデーモンを配置し、応答しなかったアドレスに `502 upstream_unreachable` を指定した場合にのみ転送されます。どちらもこのデーモンからの応答ではありません。 2026 年 9 月 19 日より前は、転送がデフォルトでオンになっていて、7717 の Swift アプリに送信されていたため、その時に書かれたメモには、所有されていないルートがそのアプリに到達すると記載されます。そうではありません。
+このデーモンが所有していないルートは `501 not_implemented` として拒否され、拒否にはそのルート名が含まれます。別のデーモンへ転送されることはありません。
 
 ### プロジェクトの Clawdline 表示を設定する
 
@@ -426,7 +426,7 @@ POST /v1/orchestrator/tasks/<id>/landing
 
 `clawdline landings` (`GET /v1/orchestrator/landings`) はマシン上で保留中のすべてのランディングであり、それぞれに `ownership.status` が付いています。 `unknown` は「誰でもない」ではありません。証拠を読み取ることができなかったことを意味します。 `503 landings_incomplete` は、一部の行を読み取ることができず、代わりに短いリストが提供されないことを意味します。
 
-`clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) は、代わりに 1 つのボード アイテムのすべてのランディング **記録**です: `{"work_id", "landings": [...], "at"}`、各行の `id` および `source` — `task` (バインドされた子のランディングまたは組み込まれたレコード。ID はタスク ID)、`root` (レコード) `item phase deploying --commit` が書き込みました) または `phase_event` (アイテムの履歴に保存されている古いデーモンのコピー)。レコードを読み取ることができないバインドされたタスクは、`state: "unknown"` の行であり、取り残されることはありません。読み取られた項目には、`landings` と同じ行が含まれます。存在しない商品は`404 work_not_found`です。
+`clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) は、代わりに 1 つのボード アイテムのすべてのランディング **記録**です: `{"work_id", "landings": [...], "at"}`、各行の `id` および `source` — `task` (バインドされた子のランディングまたは組み込まれたレコード。ID はタスク ID)、または `root` (`item phase deploying --commit` が書き込んだレコード、または古いデーモンがアイテムの履歴に残し、ストアが独自の行にしたコピー)。レコードを読み取ることができないバインドされたタスクは、`state: "unknown"` の行であり、取り残されることはありません。読み取られた項目には、`landings` と同じ行が含まれます。存在しない商品は`404 work_not_found`です。
 
 **1 つのチェックアウトにランディングする 2 つのルート**は、最初にランディングリースを取得します (§11)。
 

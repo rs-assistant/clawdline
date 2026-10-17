@@ -305,11 +305,8 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
   `retry_after` 這類額外欄位放在 `error` 裡面。
 - `{"error":"<code>","detail":"…"}`——找不到路由、HTTP method 錯誤，以及部分讀取用這種。
 
-不歸這個 daemon 管的路由會回 `501 not_implemented`，而且拒絕訊息會說出那條路由的名字——
-一般機器上就是這個答案。只有在有人刻意用 `CLAWDLINE_NEXT_UPSTREAM_PORT` 在它後面擺了另一個
-daemon 時才會轉送出去，轉不到則回 `502 upstream_unreachable`，並說出打不通的位址。兩種都不是
-這個 daemon 給的答案。2026-09-19 之前轉送是預設開著、且指向 7717 的 Swift app，所以當時寫的筆記
-會說沒接管的路由會跑到那個 app——現在不會。
+不歸這個 daemon 管的路由會回 `501 not_implemented`，而且拒絕訊息會說出那條路由的名字；
+不會轉送給其他 daemon。
 
 ### 設定 Project 在 Clawdline 裡的顯示
 
@@ -817,8 +814,8 @@ POST /v1/orchestrator/tasks/<id>/landing
 
 `clawdline landings --work-id <item id>`（`GET /v1/orchestrator/landings?work_id=<item id>`）則是一個
 看板項目所有**已記錄**的 landing：`{"work_id", "landings": [...], "at"}`，每一列帶 `id` 和 `source`——
-`task`（綁定 child 的 landed 或 incorporated 記錄，id 就是 task id）、`root`（`item phase deploying
---commit` 寫下的記錄）或 `phase_event`（舊版 daemon 留在項目歷史裡的副本）。讀不到記錄的綁定 task 會是一列
+`task`（綁定 child 的 landed 或 incorporated 記錄，id 就是 task id）或 `root`（`item phase deploying
+--commit` 寫下的記錄，或舊版 daemon 留在項目歷史裡、已由 store 補成一列的副本）。讀不到記錄的綁定 task 會是一列
 `state: "unknown"`，不會被省略。項目讀取帶的 `landings` 就是同樣這些列。項目不存在時回
 `404 work_not_found`。
 

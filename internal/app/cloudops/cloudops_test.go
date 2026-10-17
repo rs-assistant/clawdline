@@ -403,16 +403,6 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		method: "POST", path: "/v1/board",
 		body2: `{"enabled":true,"expectedRevision":4,"operation":"set_ai_consent","policy":"board-reading-v1","provider":"codex","requestId":"req-board-write"}`,
 	}, {
-		// The same path as board; the query shape is the whole difference, and
-		// the Swift app sends all four parameters every time.
-		word: "board.items",
-		body: map[string]any{"type": "board.items", "session": machine, "request": "req-items",
-			"project": "clawdline-go", "audience": "human", "cursor": 0, "limit": 50},
-		session: machine, name: "read:req-items",
-		method: "GET", path: "/v1/board",
-		query: map[string]string{"project": "clawdline-go", "audience": "human",
-			"cursor": "0", "limit": "50"},
-	}, {
 		// Participation reads remain carried after the v1 work page retires.
 		word: "work.proposals",
 		body: map[string]any{"type": "work.proposals", "session": machine,

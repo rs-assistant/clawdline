@@ -91,11 +91,10 @@ login; that is why the bootstrap needs root exactly once.
 Linux.** They are not any more, and the same change is why: until 2026-09-19 the daemon forwarded
 every route it had not taken over to port 7717, where the Swift app answered on macOS and nothing
 answered anywhere else, so `GET /v1/sessions` came back `502 upstream_unreachable` on a machine
-where the session list is the product. Forwarding is now off unless
-`CLAWDLINE_NEXT_UPSTREAM_PORT` asks for it, so a stock Linux build refuses unimplemented routes by
-name and answers `/v1/sessions` itself with no variables at all.
-`CLAWDLINE_NEXT_STANDALONE=1` and `CLAWDLINE_NEXT_OWN_SESSIONS=1` are still read and still mean
-what they meant, so the command line above keeps working with them in — they just change nothing.
+where the session list is the product. That forwarding has since been removed, so a stock Linux
+build refuses unimplemented routes by name and answers `/v1/sessions` itself with no variables at
+all. `CLAWDLINE_NEXT_STANDALONE=1` and `CLAWDLINE_NEXT_OWN_SESSIONS=1` are no longer read; the
+command line above keeps working with them in — they just change nothing.
 
 State goes to `$XDG_CONFIG_HOME/clawdline-next`, else `~/.config/clawdline-next` — verified for
 both. The directory is created `0700` and `local-token`, `orchestrator-token` and the SQLite file

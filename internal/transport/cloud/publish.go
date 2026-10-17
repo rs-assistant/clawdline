@@ -64,13 +64,13 @@ const SnapshotInterval = 5 * time.Second
 // FeatureWords is `CloudAppBridge.swift:1436`'s `cloudFeatures`: the words a
 // newer machine answers that an older one does not. A page sends such a word only
 // to a machine that listed it.
-var FeatureWords = []string{"sessions.snapshot", "sessions.snapshot.initial", "sessions.row", "board.items"}
+var FeatureWords = []string{"sessions.snapshot", "sessions.snapshot.initial", "sessions.row"}
 
 // Features is the subset of those this daemon can actually answer.
 //
 // It is **computed, not copied**, which is what keeps it true as the catalog
-// moves: `sessions.snapshot` is answered by this publisher (Snapshot) and
-// `board.items` is routed, so today this list is both. Advertising a word this daemon
+// moves: `sessions.snapshot` is answered by this publisher (Snapshot), so
+// today this list is all of them. Advertising a word this daemon
 // refuses would buy a refusal per tap rather than a feature — and worse than a
 // refusal, because a page that has been told a machine implements a word and
 // is then refused records it as a fault rather than as an absence.
