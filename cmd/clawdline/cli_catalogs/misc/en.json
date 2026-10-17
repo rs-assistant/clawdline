@@ -255,6 +255,7 @@
   "coordination.waiting": "Waiting for %s, position %d.\n",
   "coordination.timed_out": "The lease wait ended before a grant; the command did not run.",
   "coordination.release_failed": "The lease release could not be confirmed; inspect the holder before another exclusive operation.",
+  "coordination.lease_lost": "The exclusive lease lapsed while the command was running; inspect the holder before another exclusive operation.",
   "tmux.passed": "  (%s)\n",
   "tmux.private_socket_required": "%s requires -S <private absolute socket>; TMUX_TMPDIR does not override $TMUX",
   "tmux.daemon_socket_refused": "%s targets the daemon's tmux server; use -S <private socket>",

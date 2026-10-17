@@ -975,29 +975,6 @@ func (s *Server) brokerMachineNotify(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, contract.BrokerNotifyResult{OK: true, Sent: int64(out.Sent), Failed: int64(out.Failed)})
 }
 
-// brokerDurableReportPromotion is POST /v1/orchestrator/durable-reports/promotions,
-// which this daemon does not keep. The Swift app's promotion copies a task
-// report into an immutable store that the documents route and the Cloud
-// document link then serve; half of that — keeping the bytes without the read
-// path behind the link it returns — would hand out a link that opens nothing.
-// So it is refused by name, with what to do instead, rather than answered by
-// the fallback's generic "not implemented".
-func (s *Server) brokerDurableReportPromotion(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "a promotion is sent with POST")
-		return
-	}
-	if !machineAuthed(r) {
-		writeAuthRefusal(w, http.StatusForbidden, "forbidden",
-			"Promoting a durable report needs the orchestrator token.")
-		return
-	}
-	writeAuthRefusal(w, http.StatusNotImplemented, "durable_report_promotion_unsupported",
-		"This Clawdline does not keep durable reports, so nothing was promoted. Cite the task's own "+
-			"artifact instead, and copy anything that must outlive the task directory into the "+
-			"repository's docs/ first.")
-}
-
 // writeBrokerError sends a typed refusal in the Swift app's envelope, with the
 // extras merged inside `error` where the Swift app puts them.
 func writeBrokerError(w http.ResponseWriter, err error) {

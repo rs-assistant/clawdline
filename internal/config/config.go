@@ -29,10 +29,6 @@ const (
 	// route answered `502 upstream_unreachable` instead of saying its own
 	// name. Forwarding is now something an operator asks for out loud.
 	NoUpstream = 0
-	// RetiredUpstreamPort is that port, kept as a name rather than as a
-	// default so the number in the logs and in docs/cutover.md still has
-	// something to point at. Nothing in this daemon reaches for it.
-	RetiredUpstreamPort = 7717
 	// UpstreamPortEnv names the port to forward unowned routes to. Unset, or
 	// not a port, means NoUpstream. It exists for the one case that is left:
 	// running this daemon in front of another that does answer.

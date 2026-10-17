@@ -138,16 +138,6 @@
     },
     {
       "method": "*",
-      "pattern": "/v1/cloud/viewer/skills",
-      "guide": "cloud"
-    },
-    {
-      "method": "*",
-      "pattern": "/v1/cloud/viewer/status",
-      "guide": "cloud"
-    },
-    {
-      "method": "*",
       "pattern": "/v1/devstacks",
       "guide": "project"
     },
@@ -238,11 +228,6 @@
     },
     {
       "method": "*",
-      "pattern": "/v1/orchestrator/durable-reports/promotions",
-      "guide": "report"
-    },
-    {
-      "method": "*",
       "pattern": "/v1/orchestrator/graphs",
       "guide": "coordination"
     },
@@ -325,11 +310,6 @@
       "method": "*",
       "pattern": "/v1/orchestrator/root-assignments/",
       "guide": "landing"
-    },
-    {
-      "method": "*",
-      "pattern": "/v1/orchestrator/runs/",
-      "guide": "running"
     },
     {
       "method": "*",
@@ -455,11 +435,6 @@
       "method": "*",
       "pattern": "/v1/remote/tasks/",
       "guide": "cloud"
-    },
-    {
-      "method": "*",
-      "pattern": "/v1/screens",
-      "guide": "connect"
     },
     {
       "method": "*",

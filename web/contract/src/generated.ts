@@ -6207,43 +6207,6 @@ export interface ScreenEvent {
 }
 
 /**
- * The machine state this feature creates, published so that somebody can see it.
- * `tmux list-panes -a -F '#{pane_id} #{pane_pipe}'` answers the same question in
- * one command; this answers it and says which of those pipes this daemon can
- * account for, which tmux cannot, because `#{pane_pipe}` is a boolean with no owner
- * in it. A pane that is piped and not on this daemon's list is therefore
- * `unattributed` rather than a leak, and nothing here takes somebody else's pipe
- * off.
- */
-export interface ScreenInventory {
-  attached: string[]
-  leaseSeconds: number
-  piped: string[]
-  screens: ScreenWatch[]
-  unattributed: string[]
-  windowMs: number
-}
-
-/**
- * One row of what this daemon is watching.
- */
-export interface ScreenWatch {
-  backend: Backend
-  captures: number
-  channel: ScreenChannel
-  expiresIn: number
-  id: string
-  readable: boolean
-
-  /**
-   * Whether this daemon has a pipe on that pane right now.
-   */
-  signalled: boolean
-  signals: number
-  watching: boolean
-}
-
-/**
  * Text, pictures, or both; a send that is neither is refused. Each picture is a
  * base64 `data:` URL, at most six, inside the 20 MB body limit. Pictures that
  * cannot be decoded are left out, and a send none of whose pictures can be is

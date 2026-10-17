@@ -17,7 +17,6 @@ import (
 //
 //	POST /v1/sessions/{id}/send                      a person's message; issues its run
 //	GET  /v1/orchestrator/sessions/{session}/run     the run of the newest message a person sent that session
-//	GET  /v1/orchestrator/runs/{run}                 what a run was: which session, when, sent by whom
 //
 // A run is issued by the send route alone — the one route a person's device,
 // and never the orchestrator credential, may type into a session with
@@ -121,34 +120,6 @@ func (s *Server) sessionRun(w http.ResponseWriter, r *http.Request, id string) {
 		writeRefusal(w, http.StatusNotFound, "no_run",
 			"Nobody has sent this session a message through Clawdline, so it has no run to relay a person's words under. "+
 				"A person typing straight into the terminal is not a run; ask them to answer in Clawdline.")
-	default:
-		writeJSON(w, runOneWire{OK: true, Run: runOf(run)})
-	}
-}
-
-// runRoute is GET /v1/orchestrator/runs/{run}: what a run was. A person
-// reads it too, to see whose words a relayed move rests on.
-func (s *Server) runRoute(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "A run is read with GET.")
-		return
-	}
-	if !machineAuthed(r) && !accessOf(r).verdict.Allowed {
-		writeAuthRefusal(w, http.StatusForbidden, "forbidden", "This needs the orchestrator token or a paired device.")
-		return
-	}
-	id := strings.TrimPrefix(routePath(r), "/v1/orchestrator/runs/")
-	if !work.RunShaped(id) || s.store == nil {
-		writeRefusal(w, http.StatusNotFound, "run_unknown", "No run has that id.")
-		return
-	}
-	run, ok, err := s.runs().Find(r.Context(), id)
-	switch {
-	case err != nil:
-		w.Header().Set("Retry-After", "1")
-		writeRefusal(w, http.StatusServiceUnavailable, "store_unavailable", "The runs could not be read.")
-	case !ok:
-		writeRefusal(w, http.StatusNotFound, "run_unknown", "No run has that id.")
 	default:
 		writeJSON(w, runOneWire{OK: true, Run: runOf(run)})
 	}

@@ -166,8 +166,9 @@ func fakeBeat(t *testing.T, s *Server, rows map[string]capacity.Reading, limits 
 		resolved = append(resolved, capacity.Resolved{Entry: e, Limit: limit, Overridden: limit != e.Limit})
 		measures[e.Name] = func() capacity.Reading { return r }
 	}
-	b := &capacityBeat{resolved: resolved, tracker: capacity.NewTracker(), measure: measures,
-		record: s.store.Append, since: time.Now(), started: time.Now(), tick: time.Minute}
+	b := &capacityBeat{resolved: resolved, tracker: capacity.NewTracker(),
+		measure: func() map[string]func() capacity.Reading { return measures },
+		record:  s.store.Append, since: time.Now(), started: time.Now(), tick: time.Minute}
 	capacityByServer.Store(s, b)
 	t.Cleanup(func() { capacityByServer.Delete(s) })
 	b.pass(context.Background())

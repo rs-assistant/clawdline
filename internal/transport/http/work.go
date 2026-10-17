@@ -13,7 +13,6 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/app"
-	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	"github.com/sainteye/clawdline/internal/domain/work"
 )
@@ -45,18 +44,6 @@ func (s *Server) work() *app.WorkBoard {
 	w.Also = s.participationSweep
 	got, _ := workByServer.LoadOrStore(s, w)
 	return got.(*app.WorkBoard)
-}
-
-// StartWork remains as the daemon wiring boundary. Work-system v2 is advanced
-// explicitly by its owning Agent and by broker evidence at that command; the
-// retired v1 sweep must not manufacture digests or proposals after cutover.
-func (s *Server) StartWork(ctx context.Context) {
-	_ = ctx
-}
-
-// V2 has no background sweep whose pulse can stall.
-func (s *Server) workHealth(h *contract.Health) {
-	_ = h
 }
 
 // ——— Wire ———

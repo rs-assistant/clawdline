@@ -10,11 +10,13 @@ import (
 	"github.com/sainteye/clawdline/internal/domain/work"
 )
 
+// The floor was 118 until 2026-10-17, when the 13 strings of the removed
+// `board tracks --store` replay mode were deleted with nothing reading them.
 func TestWorkflowCatalogHasNineCompleteLanguages(t *testing.T) {
 	for _, language := range []string{"en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"} {
 		translated, total := cliCatalogCoverage("workflow", language)
-		if total < 118 || translated != total {
-			t.Errorf("workflow catalog %s = %d/%d, initial baseline is 118", language, translated, total)
+		if total < 105 || translated != total {
+			t.Errorf("workflow catalog %s = %d/%d, baseline is 105", language, translated, total)
 		}
 	}
 }

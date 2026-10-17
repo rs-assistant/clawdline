@@ -30,7 +30,7 @@ func workV2StepsInstruction(id string) string {
 }
 
 // workV2EpicInstruction is the procedure an Epic's owner follows before it
-// may enter implementing (work.EpicPlanGate): an Epic is large, so its plan is
+// may enter implementing (work.PlanningGate): an Epic is large, so its plan is
 // written onto the item and a child reviews it before code is written. The
 // daemon refuses `phase implementing` until both are recorded.
 func workV2EpicInstruction(id string) string {

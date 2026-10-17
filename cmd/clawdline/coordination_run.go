@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
@@ -54,6 +52,8 @@ type coordinationRunOptions struct {
 	maxWait                    time.Duration
 	handoff                    bool
 	port                       int
+	// renew is the lease renewal interval; zero is 20 seconds.
+	renew time.Duration
 }
 
 func runCoordinatedOperation(stdout, stderr io.Writer, b *broker, opts coordinationRunOptions, argv []string,
@@ -115,32 +115,24 @@ func runCoordinatedOperation(stdout, stderr io.Writer, b *broker, opts coordinat
 	}
 	// The wrapper remains alive throughout the command. If the daemon restarts,
 	// its persisted lease and this exact process prove ownership until release.
-	ctx, cancel := context.WithCancel(context.Background())
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		ticker := time.NewTicker(20 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				owner.Phase = "running"
-				_, _ = b.request(http.MethodPost, "/v1/orchestrator/leases/renew", nil, owner, "")
-			}
-		}
-	}()
+	// A lease the daemon says is lost is said, as heavy says it; the command
+	// already started and is not stopped halfway.
+	running := owner
+	running.Phase = "running"
+	renew := opts.renew
+	if renew <= 0 {
+		renew = 20 * time.Second
+	}
+	stop := renewLease(b, renew, running, func() {
+		fmt.Fprintln(stderr, cliCopy("misc", "coordination.lease_lost", "The exclusive lease lapsed while the command was running; inspect the holder before another exclusive operation."))
+	})
 	childEnv := []string(nil)
 	if opts.resource == "daemon_restart" {
 		// Heavy compile cannot be granted while this wrapper holds the restart lease.
 		childEnv = []string{"CLAWDLINE_DAEMON_RESTART_HELD=1"}
 	}
 	code, runErr := run(argv, childEnv)
-	cancel()
-	wg.Wait()
-	owner.Phase = ""
+	stop()
 	if a, err := b.request(http.MethodPost, "/v1/orchestrator/leases/release", nil, owner, ""); err != nil || !a.ok() {
 		fmt.Fprintln(stderr, cliCopy("misc", "coordination.release_failed", "The lease release could not be confirmed; inspect the holder before another exclusive operation."))
 	}

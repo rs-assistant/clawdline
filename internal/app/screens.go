@@ -146,29 +146,6 @@ type ScreenReading struct {
 // Pending is "nothing has been captured for this session yet".
 func (r ScreenReading) Pending() bool { return r.Text == nil && !r.Readable && r.At.IsZero() }
 
-// ScreenWatchRow is one row of what this daemon is watching, for /v1/screens.
-type ScreenWatchRow struct {
-	ID        string
-	Backend   session.Backend
-	Channel   ScreenChannel
-	Watching  bool
-	ExpiresIn int
-	Signalled bool
-	Captures  int
-	Signals   int
-	Readable  bool
-}
-
-// ScreenInventoryReading is the whole of what this feature has done to the
-// machine, including the panes the backend says are piped that this daemon
-// cannot account for.
-type ScreenInventoryReading struct {
-	Screens      []ScreenWatchRow
-	Attached     []string
-	Piped        []string
-	Unattributed []string
-}
-
 // screenCoalescer is the window, as arithmetic rather than as a timer.
 //
 // Separated from everything that owns a clock so the thing deciding how often
@@ -550,74 +527,6 @@ func (s *Screens) Sweep(now time.Time) {
 			s.signal.Detach(id)
 		}
 	}
-}
-
-// Inventory is what this daemon has attached, what the backend says about it,
-// and the difference between the two.
-//
-// **`#{pane_pipe}` is a boolean, so tmux cannot say whose pipe it is.** A pane
-// that is piped and not on this daemon's list is therefore `unattributed`
-// rather than a leak — it may be somebody's own `pipe-pane`, and this daemon
-// does not take other people's pipes off.
-func (s *Screens) Inventory(ctx context.Context) ScreenInventoryReading {
-	now := time.Now()
-	s.mu.Lock()
-	ids := make([]string, 0, len(s.watches))
-	for id := range s.watches {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	out := ScreenInventoryReading{Screens: make([]ScreenWatchRow, 0, len(ids))}
-	ours := map[string]bool{}
-	for _, id := range ids {
-		watch := s.watches[id]
-		attached := s.signal != nil && s.signal.IsAttached(id)
-		if attached {
-			ours[id] = true
-		}
-		expires := int(watch.until.Sub(now).Round(time.Second) / time.Second)
-		if expires < 0 {
-			expires = 0
-		}
-		out.Screens = append(out.Screens, ScreenWatchRow{
-			ID:        id,
-			Backend:   watch.session.Backend,
-			Channel:   s.Channel(watch.session.Backend),
-			Watching:  watch.until.After(now),
-			ExpiresIn: expires,
-			Signalled: attached,
-			Captures:  watch.captures,
-			Signals:   watch.signals,
-			Readable:  watch.readable,
-		})
-	}
-	s.mu.Unlock()
-
-	out.Attached = make([]string, 0, len(ours))
-	for id := range ours {
-		out.Attached = append(out.Attached, id)
-	}
-	sort.Strings(out.Attached)
-	out.Piped = []string{}
-	out.Unattributed = []string{}
-	for _, h := range s.hosts {
-		pipes, ok := h.(ports.PipeHost)
-		if !ok {
-			continue
-		}
-		for pane, piped := range pipes.PipedPanes(ctx) {
-			if !piped {
-				continue
-			}
-			out.Piped = append(out.Piped, pane)
-			if !ours[pane] {
-				out.Unattributed = append(out.Unattributed, pane)
-			}
-		}
-	}
-	sort.Strings(out.Piped)
-	sort.Strings(out.Unattributed)
-	return out
 }
 
 // Reclaim takes back the panes piped by a previous run of this daemon.

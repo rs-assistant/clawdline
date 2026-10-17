@@ -120,9 +120,11 @@ type capacityBeat struct {
 	resolved []capacity.Resolved
 	problems []string
 	tracker  *capacity.Tracker
-	measure  map[string]func() capacity.Reading
-	record   func(context.Context, store.Event) error
-	since    time.Time
+	// measure builds one pass's readers, so a reading several rows share is
+	// taken once per pass and never carried into the next.
+	measure func() map[string]func() capacity.Reading
+	record  func(context.Context, store.Event) error
+	since   time.Time
 
 	// intent records a notice's event with the push it owes, in one
 	// transaction; run sends pushes so recorded; latest reads the last push
@@ -172,7 +174,7 @@ func (s *Server) capacity() *capacityBeat {
 		resolved: resolved,
 		problems: problems,
 		tracker:  capacity.NewTracker(),
-		measure:  s.capacityMeasures(),
+		measure:  s.capacityMeasures,
 		record:   s.store.Append,
 		since:    time.Now(),
 		poke:     make(chan struct{}, 1),
@@ -209,8 +211,13 @@ var daemonLogs sync.Map // dir -> *logs.Writer
 func SetDaemonLog(dir string, w *logs.Writer) { daemonLogs.Store(dir, w) }
 
 // capacityMeasures is one measurement per registered row, each the adapter's
-// own and each cheap: a stat, a length, a count kept in memory.
+// own and each cheap: a stat, a length, a count kept in memory. A pass builds
+// them anew, so a reading shared by several rows is taken once per pass.
 func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
+	// The three squad rows are one query's three counts.
+	squadUsage := sync.OnceValues(func() (store.SquadCounts, error) {
+		return s.store.SquadUsage(context.Background())
+	})
 	return map[string]func() capacity.Reading{
 		capacity.SecretHandoffBytes: func() capacity.Reading {
 			if s.secretHandoffs == nil {
@@ -274,21 +281,21 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-turn Board role-classification input; released with the turn"}
 		},
 		capacity.SquadEntities: func() capacity.Reading {
-			counts, err := s.store.SquadUsage(context.Background())
+			counts, err := squadUsage()
 			if err != nil {
 				return capacity.Unmeasured(err.Error())
 			}
 			return capacity.Reading{Known: true, Used: counts.Entities}
 		},
 		capacity.SquadSettingsRows: func() capacity.Reading {
-			counts, err := s.store.SquadUsage(context.Background())
+			counts, err := squadUsage()
 			if err != nil {
 				return capacity.Unmeasured(err.Error())
 			}
 			return capacity.Reading{Known: true, Used: counts.Settings}
 		},
 		capacity.SquadReceipts: func() capacity.Reading {
-			counts, err := s.store.SquadUsage(context.Background())
+			counts, err := squadUsage()
 			if err != nil {
 				return capacity.Unmeasured(err.Error())
 			}
@@ -1566,8 +1573,9 @@ func (b *capacityBeat) pass(ctx context.Context) {
 	rows := make([]capacity.Status, len(b.resolved))
 	var events []capacity.Event
 	var notices []owedNotice
+	measures := b.measure()
 	for i, res := range b.resolved {
-		measure := b.measure[res.Entry.Name]
+		measure := measures[res.Entry.Name]
 		r := capacity.Unmeasured("nothing measures this row")
 		if measure != nil {
 			r = measure()
