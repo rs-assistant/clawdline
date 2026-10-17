@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"io"
 	"log"
 	"net/http"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/bootid"
 	"github.com/sainteye/clawdline/internal/adapters/store"
+	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"

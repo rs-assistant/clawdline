@@ -495,8 +495,7 @@ func (s Snapshot) TitleOf(l Live, customTitle string, live []Live) Titles {
 			}
 		}
 	}
-	// Over whatever records there are: the Swift store's when it was read,
-	// and this daemon's own laid over them (own.go) either way. The terminal
+	// Over this daemon's own records, laid in by With (own.go). The terminal
 	// rule stays strict; a conversation the Board opened, and that now runs
 	// in a tab nobody recorded, is found by the conversation behind it.
 	out.Orchestrator = s.orchestratorTitle(l.TerminalID, live)
@@ -871,11 +870,10 @@ func sameMover(a, b contract.CloseMover) bool { return a == b }
 
 // Closeability is Orchestrator.sessionCloseability → projectCloseability.
 //
-// A store that could not be read at all is one more evidence reason, so the
-// answer is `unknown` with whatever else is known listed under it — never a
-// short list that reads as complete. A store that is absent, or switched off,
-// is not unread: it is known to hold nothing, and this daemon's own records
-// laid over it (own.go) are the whole list.
+// The records are this daemon's own (own.go), and they are the whole list:
+// the retired Swift app's store is no longer read (docs/cutover.md §7). A
+// caller whose own records could not be read says so in Extra, so the answer
+// is `unknown` rather than a short list that reads as complete.
 func (s Snapshot) Closeability(in CloseInput) contract.Closeability {
 	l := in.Live
 	evidence := []contract.CloseReason{}

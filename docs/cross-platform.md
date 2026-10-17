@@ -169,7 +169,7 @@ The "Today" column is clawdline-go on macOS (master `d40545e`).
 | Six-digit pairing | Printed by the CLI | ✅ | ✅ | ✅ | Platforms without a shell use the CLI anyway (`remote.md` §5 says so) | — |
 | tunnel | cloudflared, brought by the user | ❌ not done | ✅ official binaries exist | ✅ official binaries exist | — | M |
 | Cloud bridge | PROTOCOL.md | ❌ not done | ✅ pure network | ✅ pure network | — | L |
-| Reading the old Swift app's store | `~/.config/clawdline` | ✅ `swiftstore/` | Empty by nature (that machine has no old app) | Empty by nature | The crown and the delivery check are simply absent | — |
+| Reading the old Swift app's store | `~/.config/clawdline` | ➖ no longer read (2026-10-17, `docs/cutover.md` §3) | Not read | Not read | The crown, task chips and delivery checks come from this daemon's own records on every platform | — |
 | Reading transcripts / plan quotas | `~/.claude`, `~/.codex` | ✅ | ✅ same paths | ✅ `%USERPROFILE%` | — | — |
 | Schedules | Pure Go | ✅ | ✅ | ✅ | — | — |
 
@@ -829,7 +829,12 @@ already comes close). Go's `os` adds `\\?\` to absolute paths automatically, but
 
 `implemented`
 
-`internal/adapters/swiftstore` reads the old app's `~/.config/clawdline`, read-only (who Clawdfather is, the task list,
+**As of 2026-10-17 the daemon no longer reads the old app's state at all** (`docs/cutover.md` §3): what
+`internal/adapters/swiftstore` keeps is the projection rules, which run over this daemon's own records on every
+platform, `ProcessStart`, and the read-only cache of the old app's session images. The rest of this section is the
+record of how it read before then.
+
+`internal/adapters/swiftstore` read the old app's `~/.config/clawdline`, read-only (who Clawdfather is, the task list,
 delivery records, session titles and images). **On Linux and Windows the old app does not exist, so this whole area
 is empty by nature**, and the code already handles that correctly:
 

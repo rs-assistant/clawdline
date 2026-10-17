@@ -104,8 +104,8 @@ claims `internal/app/orchestrator`、`internal/adapters/store`、`taskdir`、`su
 
 | 檔案／目錄 | 大小 | 今天誰寫 | 新版今天怎麼用 | 退役後誰寫 | 遷移方式 |
 |---|---|---|---|---|---|
-| `~/.config/clawdline/orchestrator.json` | 6.4 MB | 舊 app | **唯讀**（`swiftstore`，依 mtime 快取；讀不到＝「未知」不是「空」） | 新 daemon 的 `clawdline.sqlite3` 事件流 | **不要轉檔**。把它當成凍結的歷史：新 daemon 從空的 store 開始，舊檔留著給 `swiftstore` 讀舊 task 的標題與交付紀錄，直到畫面不再需要 |
-| `coordinator.json` | 3.8 KB | 舊 app | 唯讀（皇冠） | 新 daemon 的 `coordinator` 表 | 重新註冊一次即可，不轉檔 |
+| `~/.config/clawdline/orchestrator.json` | 6.4 MB | 舊 app | **不再讀**（2026-10-17 起；之前是 `swiftstore` 唯讀） | 新 daemon 的 `clawdline.sqlite3` 事件流 | **不要轉檔**。把它當成凍結的歷史：新 daemon 從空的 store 開始，舊檔留著給 `swiftstore` 讀舊 task 的標題與交付紀錄，直到畫面不再需要 |
+| `coordinator.json` | 3.8 KB | 舊 app | 不再讀（2026-10-17 起；之前唯讀，給皇冠） | 新 daemon 的 `coordinator` 表 | 重新註冊一次即可，不轉檔 |
 | `landing-queue.json` | 70 KB | 舊 app | 未讀 | 新 daemon | 250 個 repo 的 landing path 是有用的歷史；建議匯入成 read-only 參考，不要當權威 |
 | `owned-storage.jsonl` | 228 KB | 舊 app | 未讀 | 新 daemon | 同上 |
 | `project-board.json` | 4.1 MB | 舊 app | 未讀 | 新 daemon | **776 張卡、34 個專案、2,618 筆收據、revision 6343**。新版的 `/v1/board` 是另一種東西（見 §6） |
@@ -113,7 +113,7 @@ claims `internal/app/orchestrator`、`internal/adapters/store`、`taskdir`、`su
 | `project-timeline.json` | 2.4 MB | 舊 app | 未讀 | 新 daemon | 時間軸整個沒有移植 |
 | `schedules/*.json` | 6 檔 | 舊 app | 只讀 `schedule_id` 與 `title`（給用量頁） | 新 daemon | **要人工搬**：5 個啟用中的營運排程 |
 | `snippets/*.json` | 5 檔 | 舊 app | 未讀 | 新 daemon | 小、可手動重建 |
-| `usage.sqlite3` | 6.4 MB＋3 MB WAL | 舊 app | **唯讀副本**（複製主檔與 `-wal` 到自己的 `$TMPDIR`，最多每 5 秒一次） | 新 daemon 要有自己的帳本 | 舊檔＝歷史；退役後新 daemon 若沒有自己的帳本，用量頁會退回 transcript 計算（已實作） |
+| `usage.sqlite3` | 6.4 MB＋3 MB WAL | 舊 app | 不再讀（讀取器已在 `0957d7448` 刪除；之前是唯讀副本） | 新 daemon 要有自己的帳本 | 舊檔＝歷史；退役後新 daemon 若沒有自己的帳本，用量頁會退回 transcript 計算（已實作） |
 | `~/Library/Caches/com.tsunamiworks.clawdline/session-images/` | 86 項 | 舊 app | 唯讀（對話裡的 `<clawdline-image id>` 標記沒有第二份來源） | 新 daemon（自己的 `CLAWDLINE_NEXT_DIR/session-images`，已實作，先查自己再問舊的） | 舊圖留著，否則舊對話裡的圖變成一行文字 |
 | `durable-reports/` | 44 KB | 舊 app | 未讀 | 新 daemon | 升級過的報告，量少 |
 | `~/Library/Application Support/Clawdline/worktrees/` | **434 MB**（6 repo） | 舊 app（`ProjectWorktreeLifecycle`） | 未管理 | 新 daemon | **退役前要決定誰清**。今天沒人清＝硬碟慢慢長大 |
@@ -131,6 +131,18 @@ Feature Root、coordinator 表，以及自己從 transcript 算的用量），�
 一個都不開，回應裡以 `disabled` 具名（task 列表 `store`、用量 `source.legacyLedger`、`/v1/board/tracks` 的
 `sources.board/history.status`）。舊檔不存在時是 `absent`（已知沒有），不再是「未知」。
 **不歸這個開關管**的只有 B3 的舊圖片快取（`session-images`、`drops`）與語音模型——那是歷史資產，不是狀態。
+
+**2026-10-17：整條舊讀取拿掉了。** daemon 不再讀舊 app 的任何狀態：`swiftstore` 的 Store／Snapshot 讀檔
+（`orchestrator.json`、`coordinator.json`、`config.json` 的 session 標題與配額設定）、家規 local 檔的退路、
+`internal/adapters/board` 的舊看板與卡片紀錄、`internal/adapters/projects` 的 Board catalog 都刪了，
+`CLAWDLINE_NEXT_LEGACY_STORE` 與 `CLAWDLINE_SWIFT_DIR` 也不再有作用。回應的形狀不變，答的就是以前開關
+`off` 時的答案：task 列表 `store: disabled`、`/v1/board/tracks` 的 `sources.board/history.status: disabled`、
+`/v1/board` 與 `/v1/projects` 的 catalog 是空的。`swiftstore` 套件留下來的是投影規則（`project.go`，現在只讀
+這個 daemon 自己的紀錄，經 `Snapshot.With`）、`ProcessStart`，與 B3 的舊圖片讀取。
+**一處刻意不照 `off`**：Projects 頁的 worktree 生命週期。`off` 時 task 紀錄永遠不算權威，所有 worktree 都不能
+清；現在以自己的紀錄為權威——舊 app 的 worktree 在這裡沒有紀錄，生命週期把它的擁有者判成 unknown
+（`managed_path_without_task_record`），unknown 一律不准刪，所以它們仍然不會被清掉。
+`~/.config/clawdline` 底下的資料本身沒有動；拒絕寫進去的防護（gate、設定、log、技能安裝、Cloud viewer）照留。
 
 ---
 
@@ -329,7 +341,7 @@ Feature Root、coordinator 表，以及自己從 transcript 算的用量），�
 
 ### B. 資料
 
-- [ ] **B1 新 daemon 不再需要讀 `~/.config/clawdline`。**
+- [x] **B1 新 daemon 不再需要讀 `~/.config/clawdline`。**（2026-10-17：讀取整條刪掉，見 §3 末段。）
       驗：把 `CLAWDLINE_SWIFT_DIR` 指到一個空目錄跑一次，畫面上皇冠、task chip、
       協調等待、交付勾、標題**仍然正確**（來源換成自己的 store）。**這是退役的硬門檻。**
       **驗法補一條（B1 實作）**：改用 `CLAWDLINE_NEXT_LEGACY_STORE=off` 啟動（它連

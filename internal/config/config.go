@@ -83,7 +83,7 @@ func (c Config) Upstream() (int, bool) {
 
 // upstreamPort reads UpstreamPortEnv. A value that is not a port is said once
 // in the log and leaves the default standing, because a misspelt port must not
-// look like one that worked — the same rule the legacy-store switch follows.
+// look like one that worked.
 func upstreamPort() int {
 	v := strings.TrimSpace(os.Getenv(UpstreamPortEnv))
 	if v == "" {

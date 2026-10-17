@@ -27,7 +27,6 @@ func TestTunnelFollowsTheDevices(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the fake cloudflared is a shell script")
 	}
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "swift"))
 	dir := filepath.Join(t.TempDir(), "next")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)

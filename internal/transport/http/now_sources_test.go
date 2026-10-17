@@ -7,13 +7,12 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/auth"
+	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
 // Three readings, each saying what it is worth (work-system-review §5.2, W4).
@@ -29,82 +28,27 @@ import (
 // Each test here has the control that makes it red (DG-8): the neighbouring
 // case that must keep the ordinary word.
 
-// A task list carries the word for what it is worth, and it is not the same
-// word as the store reading beside it.
-func TestTheTaskListSaysWhatItIsWorth(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0)
-	cases := []struct {
-		name string
-		snap swiftstore.Snapshot
-		want contract.SourceFreshness
-	}{
-		{
-			// Read, and short: the other store answered nothing, so this list
-			// is this daemon's own tasks and is short by however many that
-			// store held. Short is not empty and not wrong.
-			name: "the other store could not be read",
-			snap: swiftstore.Snapshot{Known: false},
-			want: contract.SourceFreshnessStale,
-		},
-		{
-			// Every row is here and an earlier reading is what they came
-			// from. This is the case the word was added for.
-			name: "an earlier reading was carried",
-			snap: swiftstore.Snapshot{Known: true, Stale: true},
-			want: contract.SourceFreshnessUnverified,
-		},
-		{
-			name: "read in full, now",
-			snap: swiftstore.Snapshot{Known: true},
-			want: contract.SourceFreshnessCurrent,
-		},
-		{
-			// The control: absent is a known quantity. A machine with no
-			// Swift store is not a machine whose list is short — there is
-			// nothing there to be short of — and calling it `stale` would
-			// put a warning on every list on every such machine forever.
-			name: "there is no such store on this machine",
-			snap: swiftstore.Snapshot{Known: true, Source: swiftstore.SourceAbsent},
-			want: contract.SourceFreshnessCurrent,
-		},
-		{
-			name: "this daemon was told not to read it",
-			snap: swiftstore.Snapshot{Known: true, Source: swiftstore.SourceDisabled},
-			want: contract.SourceFreshnessCurrent,
-		},
+// A task list says the retired Swift app's store was not read, and that its
+// own list is whole: `disabled` beside `current`. The retired store is no
+// longer read at all (docs/cutover.md §7), so neither word may depend on
+// what is under ~/.config/clawdline. `missing` is the deliberate absence: this
+// route refuses rather than answering with an empty list.
+func TestTheTaskListNamesTheRetiredStoreDisabledAndItsOwnListCurrent(t *testing.T) {
+	p := &pane{s: session.Session{ID: "pane-1", Backend: session.BackendTmux, Assistant: session.AssistantClaude,
+		State: session.StateIdle}}
+	s := paneServer(t, p)
+	list, err := s.tasksPayload(context.Background(), 0, 50)
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, c := range cases {
-		got := taskListSource(now, c.snap)
-		if got.Freshness != c.want {
-			t.Errorf("%s: freshness %q, want %q", c.name, got.Freshness, c.want)
-		}
-		if got.ObservedAt != now.Unix() {
-			t.Errorf("%s: a reading with no time on it cannot be aged", c.name)
-		}
-		if got.Provenance == "" {
-			t.Errorf("%s: a source that will not name itself cannot be chased", c.name)
-		}
+	if list.Store != contract.StoreReadingDisabled {
+		t.Errorf("store %q, want disabled", list.Store)
 	}
-}
-
-// Every one of the four words the contract allows is a word this daemon can
-// actually produce for a task list — or is deliberately not one.
-//
-// `missing` is the deliberate absence: this route refuses rather than
-// answering with an empty list, so a reader who has a list in their hands
-// knows the list was read. A word that no producer can reach and no comment
-// explains is how a vocabulary rots.
-func TestTheTaskListNeverClaimsItsOwnSourceIsMissing(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0)
-	for _, snap := range []swiftstore.Snapshot{
-		{Known: false},
-		{Known: true, Stale: true},
-		{Known: true},
-		{Known: true, Source: swiftstore.SourceAbsent},
-	} {
-		if taskListSource(now, snap).Freshness == contract.SourceFreshnessMissing {
-			t.Fatalf("a list that was answered called its own source missing: %+v", snap)
-		}
+	if list.Source.Freshness != contract.SourceFreshnessCurrent {
+		t.Errorf("freshness %q, want current", list.Source.Freshness)
+	}
+	if list.Source.ObservedAt != list.At || list.Source.Provenance != "broker" {
+		t.Errorf("source %+v does not name itself at the list's time %d", list.Source, list.At)
 	}
 }
 

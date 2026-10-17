@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/icon"
@@ -28,7 +27,6 @@ func archivePane(conversation string) *pane {
 func archiveServer(t *testing.T, p *pane) *Server {
 	t.Helper()
 	s := paneServer(t, p)
-	s.swift = swiftstore.Open(t.TempDir())
 	s.icons = &icon.Registry{}
 	s.archive = &app.SessionArchive{Store: s.store, Title: s.sessionDisplayLabel}
 	return s

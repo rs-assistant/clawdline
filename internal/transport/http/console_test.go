@@ -101,7 +101,6 @@ func TestTheConsoleIsReadAsServedNoneOrBroken(t *testing.T) {
 // The line is under `listening`, because that line is the one somebody reads
 // after a restart, and nothing in between may push it out of sight.
 func TestTheConsoleLineIsTheLineAfterListening(t *testing.T) {
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "swift"))
 	t.Setenv("CLAWDLINE_NEXT_WEB", "")
 	t.Setenv(config.UpstreamPortEnv, "")
 	cfg := config.Load()

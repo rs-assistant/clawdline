@@ -22,7 +22,6 @@ import (
 // its own, and this machine's token as the daemon wrote it.
 func realDoor(t *testing.T) localDoor {
 	t.Helper()
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "swift"))
 	dir := filepath.Join(t.TempDir(), "next")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)

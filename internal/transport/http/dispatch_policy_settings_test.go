@@ -13,7 +13,6 @@ import (
 )
 
 func TestDispatchPolicySettingsKeepsBaseAndRejectsStaleSave(t *testing.T) {
-	t.Setenv("CLAWDLINE_NEXT_LEGACY_STORE", "off")
 	dir := t.TempDir()
 	s := &Server{cfg: config.Config{Dir: dir}}
 	call := func(method, body string) *httptest.ResponseRecorder {

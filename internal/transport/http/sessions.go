@@ -257,8 +257,7 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 	swift := swiftstore.Snapshot{}
 	// And of this daemon's own machine role (W5): when it holds one, the
 	// crown is drawn from it and from nothing else — one role, one source.
-	// An unreadable role draws no crown of its own and falls back to the
-	// Swift store's, as before this daemon had a role at all.
+	// An unreadable role draws no crown.
 	role, roleStatus, _ := s.store.Coordinator(records)
 	ownRole := roleStatus == store.CoordinatorReady
 
@@ -1173,7 +1172,7 @@ func wireMover(m task.Mover) contract.Mover {
 	return contract.Mover{Kind: contract.MoverKind(m.Kind), ID: m.ID}
 }
 
-// workState is this daemon's own projection, used only when the Swift store
+// workState is this daemon's own projection, used only when its own records
 // cannot be read: it gathers this session's axes and hands them to the
 // projection.
 func workState(item session.Session, owed []task.Obligation, owedErr error) task.WorkState {
