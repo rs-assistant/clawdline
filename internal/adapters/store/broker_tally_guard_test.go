@@ -27,9 +27,7 @@ import (
 // brokerTallyExceptions are the writes that do not move version, each by
 // where it is (file and function) and why the snapshot cannot be holding the
 // row it changes. An entry that no longer matches a statement fails too.
-var brokerTallyExceptions = map[string]string{
-	"broker_notices.go migrateBrokerNotices": "runs inside Open, before the handle exists, so no snapshot has been taken of the record it strips",
-}
+var brokerTallyExceptions = map[string]string{}
 
 var (
 	brokerSQLDelete   = regexp.MustCompile(`(?i)\bdelete\s+from\s+broker_tasks\b`)
