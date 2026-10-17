@@ -577,7 +577,6 @@ func (s *Server) routeTable() []route {
 		// command's local half; and moving schedules in and out (schedules.go).
 		{Route{"*", "/v1/orchestrator/schedules/"}, s.scheduleRoute},
 		{Route{"*", "/v1/orchestrator/schedule-webhooks/bind"}, s.scheduleWebhookBindRoute},
-		{Route{"*", "/v1/orchestrator/schedule-imports"}, s.scheduleImportRoute},
 		{Route{"*", "/v1/orchestrator/schedule-exports"}, s.scheduleExportRoute},
 		// The text somebody wrote once and presses instead of typing it again
 		// (snippets.go). This daemon's own store, never the Swift app's directory.

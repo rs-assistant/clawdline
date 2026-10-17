@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6043,
+  "englishContentKeys": 6041,
   "riskKeys": 2883,
-  "nonRiskCount": 3160,
+  "nonRiskCount": 3158,
   "groups": [
     {
       "name": "bar / other",
@@ -535,7 +535,7 @@
     },
     {
       "name": "http / other",
-      "count": 559,
+      "count": 557,
       "sources": [
         "internal/productcopy/http_refusals/en.json"
       ],
@@ -662,7 +662,6 @@
         "http.3961012d50a7b99a",
         "http.3964afdd0090e0f9",
         "http.3a1aabc94ef49a31",
-        "http.3ad9765394f45b04",
         "http.3b8d6a4bd6b67f02",
         "http.3badee63308501de",
         "http.3bf8bab61ef819c6",
@@ -1042,7 +1041,6 @@
         "http.e7b9cd712fcbe216",
         "http.e7cc3de806dff535",
         "http.e8080e81621aff22",
-        "http.e8f4dd21d7f1814b",
         "http.e9e8f95e4f0ae25d",
         "http.ea57099cc7130d36",
         "http.ea72c00b8b63958c",

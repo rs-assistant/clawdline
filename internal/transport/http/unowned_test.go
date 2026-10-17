@@ -105,3 +105,31 @@ func TestSessionsAreAnsweredByThisDaemon(t *testing.T) {
 		t.Errorf("/v1/sessions answered without a session list: %s", rec.Body)
 	}
 }
+
+// The schedule import route was removed with the Swift app it moved files
+// from; asking for it is an unowned route, not a refused import.
+func TestTheScheduleImportRouteIsGone(t *testing.T) {
+	withoutInheritedNextEnv(t)
+	t.Setenv("CLAWDLINE_NEXT_WEB", "")
+	cfg := config.Load()
+	cfg.Dir, cfg.Port = filepath.Join(t.TempDir(), "next"), 7757
+	s, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = s.store.Close() })
+	machine, err := s.gate().files.MachineToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/v1/orchestrator/schedule-imports",
+		strings.NewReader(`{"files":{"x.json":"{}"}}`))
+	req.Host = "127.0.0.1:7757"
+	req.Header.Set("X-Clawdline-Orchestrator", machine)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotImplemented || !strings.Contains(rec.Body.String(), "not_implemented") {
+		t.Fatalf("the import route answered %d %s", rec.Code, rec.Body)
+	}
+}
