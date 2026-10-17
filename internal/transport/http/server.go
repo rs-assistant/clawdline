@@ -174,8 +174,6 @@ type Server struct {
 	reclaimSummaryMu sync.Mutex
 	reclaimSummaryAt time.Time
 	reclaimSummary   contract.MachineReclaimSummary
-	// beat is the broker's account of its last pass, read by /v1/diagnostics.
-	beat atomic.Pointer[orchestrator.Pulse]
 	// pulse is the scheduler's own account of its last pass, read by
 	// /v1/diagnostics.
 	pulse atomic.Pointer[app.Pulse]

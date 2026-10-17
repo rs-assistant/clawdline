@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -104,5 +105,49 @@ func TestCoordinatedRestartNeverRunsAfterQueueDeadline(t *testing.T) {
 		func([]string, []string) (int, error) { t.Fatal("ran without a grant"); return 0, nil })
 	if code != heavyExitTimedOut || len(moves) != 3 || moves[2] != "/v1/orchestrator/leases/cancel" {
 		t.Fatalf("code %d, moves %v, stderr %q", code, moves, stderr.String())
+	}
+}
+
+// A lease the daemon says is lost while the command runs is said, the way
+// heavy says it, instead of being renewed into silence.
+func TestCoordinatedRunSaysALostLease(t *testing.T) {
+	renewed := make(chan struct{}, 8)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/orchestrator/leases":
+			fmt.Fprint(w, `{"state":"granted"}`)
+		case "/v1/orchestrator/leases/renew":
+			w.WriteHeader(http.StatusConflict)
+			fmt.Fprint(w, `{"ok":false,"error":{"code":"lease_lost","message":"the lease is no longer held"}}`)
+			renewed <- struct{}{}
+		default:
+			fmt.Fprint(w, `{"state":"released"}`)
+		}
+	}))
+	defer server.Close()
+	b := &broker{base: server.URL, token: "test", client: server.Client()}
+	var stdout, stderr bytes.Buffer
+	code := runCoordinatedOperation(&stdout, &stderr, b,
+		coordinationRunOptions{resource: "landing", checkout: t.TempDir(), maxWait: time.Minute, renew: 5 * time.Millisecond},
+		[]string{"git", "merge"}, time.Now, time.Sleep,
+		func(key string) string {
+			if key == "CODEX_THREAD_ID" {
+				return "379d0000-0000-4000-8000-000000000002"
+			}
+			return ""
+		},
+		func(argv, env []string) (int, error) {
+			<-renewed
+			time.Sleep(20 * time.Millisecond)
+			return 0, nil
+		})
+	if code != 0 {
+		t.Fatalf("code %d, stderr %q", code, stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "lease lapsed") {
+		t.Fatalf("a lost lease went unsaid: %q", stderr.String())
+	}
+	if n := len(renewed); n != 0 {
+		t.Fatalf("renewed %d more times after the lease was lost", n)
 	}
 }

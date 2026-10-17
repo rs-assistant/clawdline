@@ -400,9 +400,7 @@ func (s *Server) StartBroker(ctx context.Context) {
 	}
 	// A Board assignment whose Root was settled while no daemon listened.
 	go s.settleAwaitedAssignments(ctx)
-	go s.broker.Run(ctx, tick, func(p orchestrator.Pulse) {
-		s.beat.Store(&p)
-	})
+	go s.broker.Run(ctx, tick, nil)
 	// A Session's own close waiting for its turn to end, on the same beat;
 	// a pass with nothing waiting reads nothing.
 	go s.runScheduledCloses(ctx, tick)
