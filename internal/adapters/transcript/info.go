@@ -36,6 +36,8 @@ type Summary struct {
 
 // Facts is what an info read learns from the record itself.
 type Facts struct {
+	// Effort is the reasoning effort explicitly named by the newest turn context.
+	Effort string
 	// Usage is absent when there is no honest total: a Claude transcript
 	// larger than the read limit, or a record with no counted turn at all.
 	Usage *Summary
@@ -396,10 +398,12 @@ func codexFacts(data []byte) Facts {
 	var usage *Summary
 	var fill *Context
 	model, fallback := "", ""
+	effort, sawTurn := "", false
 	reversedLines(data, func(line []byte) bool {
 		wantsTokens := (usage == nil || fill == nil) && bytes.Contains(line, []byte("token_count"))
 		wantsModel := model == "" && bytes.Contains(line, []byte(`"model"`))
-		if !wantsTokens && !wantsModel {
+		wantsTurn := !sawTurn && bytes.Contains(line, []byte(`"turn_context"`))
+		if !wantsTokens && !wantsModel && !wantsTurn {
 			return false
 		}
 		rec, ok := decodeObject(line)
@@ -411,6 +415,11 @@ func codexFacts(data []byte) Facts {
 			payload = rec
 		}
 		kind, _ := payload.str("type")
+		outer, _ := rec.str("type")
+		if !sawTurn && (kind == "turn_context" || outer == "turn_context") {
+			sawTurn = true
+			effort, _ = payload.str("effort")
+		}
 		if wantsTokens && kind == "token_count" {
 			if outer, _ := rec.str("type"); outer == "event_msg" {
 				if info, ok := payload.object("info"); ok {
@@ -443,14 +452,14 @@ func codexFacts(data []byte) Facts {
 		}
 		if wantsModel {
 			if named, ok := payload.str("model"); ok && named != "" {
-				if kind == "turn_context" {
+				if kind == "turn_context" || outer == "turn_context" {
 					model = named
 				} else if fallback == "" {
 					fallback = named
 				}
 			}
 		}
-		return usage != nil && fill != nil && model != ""
+		return usage != nil && fill != nil && model != "" && sawTurn
 	})
 	if model == "" {
 		model = fallback
@@ -459,7 +468,7 @@ func codexFacts(data []byte) Facts {
 		usage.Model = model
 		usage.Cost, usage.HasCost = Cost(*usage)
 	}
-	return Facts{Usage: usage, Model: model, Context: fill}
+	return Facts{Usage: usage, Model: model, Context: fill, Effort: effort}
 }
 
 // looseInt is a number the way `SessionInfo.int` reads one: an integer, a

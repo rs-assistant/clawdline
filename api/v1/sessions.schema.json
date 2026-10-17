@@ -318,7 +318,8 @@
         "cwd": { "type": "string" },
         "icon": { "$ref": "common.schema.json#/$defs/Icon" },
         "id": { "type": "string" },
-        "model": { "description": "The model the session is on, as its record last named it: the newest assistant turn's model, or a `/model` switch made after it. Absent when the record says nothing.", "type": "string" },
+        "model": { "description": "The model explicitly named by the session record, or by Codex's startup card before a record names it. Absent without evidence.", "type": "string" },
+        "effort": { "description": "The reasoning effort explicitly named by the newest Codex turn context, or its startup card before a turn context names it. Absent when unknown.", "type": "string" },
         "namingAssistant": { "description": "The assistant selected in Settings for one-turn session naming. The confirmation shows it before spending that assistant's quota. `auto` asks Claude Code first and Codex only when Claude Code has no usage left or is not installed.", "type": "string", "enum": ["claude", "codex", "auto"] },
         "sessionId": { "type": "string" },
         "title": { "description": "The same label the session list shows.", "type": "string" }

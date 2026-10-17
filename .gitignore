@@ -22,3 +22,6 @@
 node_modules
 web/*/dist/
 .serena/
+
+# Per-worktree incremental type-check output, reclaimed with the checkout.
+web/.clawdline-check.tsbuildinfo

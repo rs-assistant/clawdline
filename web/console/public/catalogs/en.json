@@ -4437,6 +4437,7 @@
   "next.skillInstalled": "Installed. Assistant sessions started from now on know Clawdline.",
   "next.skillInstallPartial": "Some skill files belong to someone else, so they were left unchanged. Run clawdline skill install in a terminal to see why.",
   "next.skillInstallFailed": "The skill was not installed. Run clawdline skill install in a terminal to see why.",
+  "next.infoReasoningEffort": "Reasoning effort",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

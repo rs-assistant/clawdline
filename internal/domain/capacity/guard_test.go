@@ -15,6 +15,9 @@ import (
 	"testing"
 )
 
+// Daemon and repository-tool entries share both guards. Tool-owned readings
+// are emitted by the wrapper; they are not invented as zero daemon usage.
+//
 // The register's two guards (docs/limits.md §4.1).
 //
 // The first walks the register: every row answers the four questions, its
@@ -223,7 +226,7 @@ func readBaseline(t *testing.T, path string) map[string]string {
 func TestRegisterRowsAnswerTheFourQuestions(t *testing.T) {
 	names := map[string]bool{}
 	deviating := []string{}
-	for _, e := range Register() {
+	for _, e := range append(Register(), ToolRegister()...) {
 		if (!namePattern.MatchString(e.Name) && !gateNamePattern.MatchString(e.Name)) || names[e.Name] {
 			t.Errorf("%q: a row needs a unique area.thing name", e.Name)
 		}
@@ -303,7 +306,7 @@ func TestEveryBoundIsRegistered(t *testing.T) {
 		t.Fatalf("the scan found %d bounded declarations; it is not reading the tree", len(found))
 	}
 	registered := map[string]string{}
-	for _, e := range Register() {
+	for _, e := range append(Register(), ToolRegister()...) {
 		for _, s := range e.Sources {
 			registered[s] = e.Name
 		}

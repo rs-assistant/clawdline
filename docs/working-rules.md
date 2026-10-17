@@ -109,7 +109,10 @@ When a build or check uses a private cache created by this Session (for example 
 processes exit. Check the resolved path and ownership first; if either is uncertain, keep it for
 owner review. The normal Go build cache is shared by all Sessions, and broker-managed gate caches
 follow their task's registered cleanup decision. Neither is a Session's disposable build output.
-The shared-cache emergency procedure is in `docs/disk-lifecycle.md`.
+The shared-cache emergency procedure is in `docs/disk-lifecycle.md`. Linux's
+persistent wrapper-owned cache has its own registered pressure budget and is
+not a Root Session's disposable output. Development package checks, the
+changed-package local gate, integration timing, full checks and profiling are in [checks](checks.md).
 
 ## A push is not a background chore to run beside a build
 

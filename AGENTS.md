@@ -36,10 +36,26 @@ git worktree add -f <scratch>/<name> HEAD
 
 ## Before anything is committed
 
-Every one of these, and every one green. **`tools/check.sh` runs them all**, once inside
-`tools/heavy.sh`, the web checks only when `web/` changed since `main` (or with `--web`), and ends
-with one `PASS`/`FAIL` line per check and exit 0 only when every one passed. Run it rather than a
-loop of your own; when you add a check here, add it there too.
+The workflow targets **ten seconds during development and one minute for an ordinary local
+commit**. Run the smallest relevant package/test while editing with
+`tools/check.sh --quick ./package --run=TestName`. This is never an integration receipt.
+
+**`tools/check.sh` is the local commit gate.** It runs changed Go packages, affected console tests,
+incremental whole-project type checking, changed-file privacy and repository guards. `--plan`
+explains the direct scope and transitive callers; `--callers` also compiles those callers' tests.
+Caller runtime suites, cross-platform builds/vet, complete suites and bundles run in background
+CI after integration. They do not block a local commit, landing on main or a dev installation.
+A public Release requires complete verification of its exact tree and release acceptance.
+Dev installation builds the selected commit, then checks the running version, console and existing
+Sessions; a failed startup rolls back. Report pending or failed CI explicitly and fix failures.
+Unknown/tooling/policy inputs and unreliable scope discovery conservatively select full checks
+when requesting a local check, but are not a dev-install prerequisite. Platform inputs remain
+named in the plan; foreign-platform validation belongs to CI and the Release gate.
+
+Every selected check must be green; unknown is not a pass. **`tools/check.sh --full` runs every
+check below**, once inside `tools/heavy.sh`, and prints individual outcomes and elapsed times.
+`--full --profile` retains uncached Go timing evidence. Keep new checks in that script too.
+See [docs/checks.md](docs/checks.md) for coverage, timing, fallback and cache ownership semantics.
 
 ```sh
 gofmt -l internal cmd          # silent
@@ -49,6 +65,7 @@ GOOS=linux GOARCH=amd64 CGO_ENABLED=0 tools/heavy.sh go build -o /dev/null ./cmd
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 tools/heavy.sh go build -o /dev/null ./cmd/clawdline
 GOOS=windows tools/heavy.sh go vet ./...      # the Windows-only files, and every test, as Windows compiles them
 tools/heavy.sh go test ./...
+tools/heavy.sh go test -count=1 ./internal/config # uncached repository copy guards
 go run ./tools/contract-gen -check      # Go and TypeScript are generated together
 tools/check-legacy-css.sh               # the byte-for-byte copies still match
 node web/console/tools/check-rounded-side-borders.mjs # no rounded surfaces with accent side borders
@@ -57,6 +74,10 @@ tools/check-shell-expansions.sh         # no $name runs into a non-ASCII charact
 tools/check-private.sh                  # nothing of the person's is in a public repo
 node tools/check-console-tests.mjs      # every console test file is run by npm test or npm run check
 node tools/check-mirror-tests.mjs       # no console test asserts on the shape of the code
+tools/heavy.sh node --test tools/check-plan.test.mjs tools/check-profile.test.mjs tools/check-scope.test.mjs
+tools/heavy.sh bash tools/test-check-modes.sh # entrypoint scope, fallback and failure propagation
+tools/heavy.sh bash tools/test-linux-dev-build.sh # Linux only: dev skips full checks; ordinary builds preserve failures
+tools/heavy.sh bash tools/test-heavy-linux-cache.sh # Linux only: cache ownership, retention and pressure cleanup
 ( cd web && npm run check && ../tools/heavy.sh npm run build && ../tools/heavy.sh npm test )   # when anything under web/ changed
 ```
 
@@ -67,6 +88,8 @@ node tools/check-mirror-tests.mjs       # no console test asserts on the shape o
   the incident and procedure.
 - **After compilation, remove the cache you created for that build** once its commands have exited
   and no other process uses it. Confirm the exact path belongs to this task before removing it.
+  The persistent Linux heavy-wrapper cache follows its registered budget; per-worktree TypeScript
+  build information is reclaimed with the checkout. Neither follows per-command Session cleanup.
   Do not clear the default shared Go cache, another Session's cache, or a broker-managed gate cache
   as routine post-build cleanup. See `docs/disk-lifecycle.md` for ownership and shared-cache rules.
 

@@ -4437,6 +4437,7 @@
   "next.skillInstalled": "已安裝。之後開啟的助手 Session 都會認識 Clawdline。",
   "next.skillInstallPartial": "有些 skill 檔案不是 Clawdline 的，所以沒有改動。可以在終端機執行 clawdline skill install 查看原因。",
   "next.skillInstallFailed": "skill 沒有安裝成功。可以在終端機執行 clawdline skill install 查看原因。",
+  "next.infoReasoningEffort": "推理強度",
   "projects.activityInProgress": "{n} 項進行中",
   "projects.activityLastKnown": "上次紀錄：{n}",
   "projects.activityNone": "目前無進行中項目",

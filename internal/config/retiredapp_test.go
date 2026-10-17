@@ -158,13 +158,8 @@ func TestNothingSaysTheRetiredAppIsStillRunning(t *testing.T) {
 		if hasRecordMarker(text) {
 			return nil
 		}
-		for i, line := range strings.Split(text, "\n") {
-			if dated.MatchString(line) {
-				continue
-			}
-			if subject.MatchString(line) && liveness.MatchString(line) {
-				found = append(found, rel+":"+itoa(i+1)+": "+strings.TrimSpace(line))
-			}
+		for _, finding := range retiredClaimLines(text) {
+			found = append(found, rel+":"+finding)
 		}
 		return nil
 	})
@@ -191,4 +186,80 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(b)
+}
+
+// A subject must contain one of these spellings after Unicode lowercasing.
+// Long s is the additional simple-fold spelling of s used by Go's regexp.
+// This cheap prefilter only rejects impossible lines; the original regular
+// expressions still decide whether a candidate is a prohibited claim.
+func mayContainRetiredSubject(text string) bool {
+	lower := strings.ReplaceAll(strings.ToLower(text), "ſ", "s")
+	for _, spelling := range []string{"swift", "7717", "clawdline.app", "com.tsunamiworks.clawdline", "舊"} {
+		if strings.Contains(lower, spelling) {
+			return true
+		}
+	}
+	return false
+}
+
+func retiredClaimLines(text string) []string {
+	var found []string
+	if !mayContainRetiredSubject(text) {
+		return found
+	}
+	for i, line := range strings.Split(text, "\n") {
+		if mayContainRetiredSubject(line) && subject.MatchString(line) && liveness.MatchString(line) && !dated.MatchString(line) {
+			found = append(found, itoa(i+1)+": "+strings.TrimSpace(line))
+		}
+	}
+	return found
+}
+
+// Keep the original algorithm as an independent oracle for the optimization.
+func referenceRetiredClaimLines(text string) []string {
+	var found []string
+	for i, line := range strings.Split(text, "\n") {
+		if dated.MatchString(line) {
+			continue
+		}
+		if subject.MatchString(line) && liveness.MatchString(line) {
+			found = append(found, itoa(i+1)+": "+strings.TrimSpace(line))
+		}
+	}
+	return found
+}
+
+func TestRetiredClaimScanPreservesLineNumbersAndSentenceRules(t *testing.T) {
+	cases := []string{
+		"", "ordinary text\n\nfinal line", "Swift app is running", "\nSwift app is running\n",
+		"Swift app\nis running", "Swift app is running on 2026-09-19",
+		"ſWiFt daemon still runs", "com.tsunamiworKs.clawdline owns a port",
+		"  舊 app 還在跑  \r\nClawdline.app owns 7717\n\nSWIFT DAEMON still runs",
+		"prefix\nSwift app and Swift daemon are running\nSwift app is running\nlast",
+		strings.Repeat("ordinary source without a legacy subject\n", 100) + "\n7717 still answers",
+	}
+	for _, text := range cases {
+		got, want := retiredClaimLines(text), referenceRetiredClaimLines(text)
+		if strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Errorf("scan %q:\n got %v\nwant %v", text, got, want)
+		}
+	}
+}
+
+func BenchmarkRetiredClaimScan(b *testing.B) {
+	text := strings.Repeat("ordinary source without a legacy subject\n", 20000) + "\nSwift app is running\n"
+	for _, impl := range []struct {
+		name string
+		scan func(string) []string
+	}{{"original", referenceRetiredClaimLines}, {"prefilter", retiredClaimLines}} {
+		b.Run(impl.name, func(b *testing.B) {
+			b.ReportAllocs()
+			b.SetBytes(int64(len(text)))
+			for i := 0; i < b.N; i++ {
+				if len(impl.scan(text)) != 1 {
+					b.Fatal("the scan lost the claim")
+				}
+			}
+		})
+	}
 }

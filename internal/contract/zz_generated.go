@@ -5532,12 +5532,15 @@ type SessionInfoReply struct {
 type SessionInfoSession struct {
 	Assistant Assistant `json:"assistant,omitempty"`
 	CWD       string    `json:"cwd,omitempty"`
-	Icon      *Icon     `json:"icon,omitempty"`
-	ID        string    `json:"id"`
 
-	// The model the session is on, as its record last named it: the newest assistant
-	// turn's model, or a `/model` switch made after it. Absent when the record says
-	// nothing.
+	// The reasoning effort explicitly named by the newest Codex turn context, or its
+	// startup card before a turn context names it. Absent when unknown.
+	Effort string `json:"effort,omitempty"`
+	Icon   *Icon  `json:"icon,omitempty"`
+	ID     string `json:"id"`
+
+	// The model explicitly named by the session record, or by Codex's startup card
+	// before a record names it. Absent without evidence.
 	Model string `json:"model,omitempty"`
 
 	// The assistant selected in Settings for one-turn session naming. The confirmation

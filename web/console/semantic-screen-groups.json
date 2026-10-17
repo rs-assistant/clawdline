@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6014,
+  "englishContentKeys": 6015,
   "riskKeys": 2871,
-  "nonRiskCount": 3143,
+  "nonRiskCount": 3144,
   "groups": [
     {
       "name": "bar / other",
@@ -2111,7 +2111,7 @@
     },
     {
       "name": "next / other",
-      "count": 190,
+      "count": 191,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2147,6 +2147,7 @@
         "next.fontScaleTitle",
         "next.infoContext",
         "next.infoContextUsed",
+        "next.infoReasoningEffort",
         "next.infoResetsInMinutes",
         "next.machineDiskFree",
         "next.machineNeedsUpdateLink",
