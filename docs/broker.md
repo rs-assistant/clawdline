@@ -448,8 +448,7 @@ hosted console serves `<sha>` or later and then runs the CloudGate check
 ```bash
 go build -o /tmp/x/clawdline ./cmd/clawdline
 mkdir -p /tmp/x/dir && echo '{"terminal":"tmux"}' > /tmp/x/dir/config.json
-CLAWDLINE_NEXT_PORT=7794 CLAWDLINE_NEXT_DIR=/tmp/x/dir CLAWDLINE_NEXT_STANDALONE=1 \
-  CLAWDLINE_NEXT_OWN_SESSIONS=1 /tmp/x/clawdline serve
+CLAWDLINE_NEXT_PORT=7794 CLAWDLINE_NEXT_DIR=/tmp/x/dir /tmp/x/clawdline serve
 OT=$(cat /tmp/x/dir/orchestrator-token)
 # 1. whoami → 自己的 conversation id；2. inventory → generation 與 task_root
 # 3. 把 task.json 寫到 <task_root>/<id>/，再 POST /v1/orchestrator/tasks {task_id, secret, inventory_generation}

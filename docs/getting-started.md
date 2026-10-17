@@ -47,12 +47,6 @@ One variable: where the console's built files are. Without it the daemon still s
 the broker and the Cloud line do not need it — but `/` answers `501 no_web_root`, and the line under
 `listening` in its log says `console: NONE`.
 
-**If you are following an older note, it will tell you to set three.** Until 2026-09-19 this
-daemon ran in front of the Swift app it replaces and handed it every route it had not taken over;
-`CLAWDLINE_NEXT_STANDALONE=1` and `CLAWDLINE_NEXT_OWN_SESSIONS=1` were how you said "there is
-nothing behind me". The forwarding has since been removed, so neither variable is read any more;
-setting them is harmless.
-
 Two more you may want:
 
 | Variable | Default |

@@ -93,8 +93,7 @@ every route it had not taken over to port 7717, where the Swift app answered on 
 answered anywhere else, so `GET /v1/sessions` came back `502 upstream_unreachable` on a machine
 where the session list is the product. That forwarding has since been removed, so a stock Linux
 build refuses unimplemented routes by name and answers `/v1/sessions` itself with no variables at
-all. `CLAWDLINE_NEXT_STANDALONE=1` and `CLAWDLINE_NEXT_OWN_SESSIONS=1` are no longer read; the
-command line above keeps working with them in — they just change nothing.
+all; an older command line that still sets the two keeps working, since nothing reads them.
 
 State goes to `$XDG_CONFIG_HOME/clawdline-next`, else `~/.config/clawdline-next` — verified for
 both. The directory is created `0700` and `local-token`, `orchestrator-token` and the SQLite file

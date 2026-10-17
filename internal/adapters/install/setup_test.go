@@ -135,16 +135,16 @@ func TestSystemdUnitKeepsTheExistingUnitsShape(t *testing.T) {
 		`Environment=PATH="/home/user/.local/bin:/usr/bin"` + "\n",
 		`Environment=SHELL="/bin/bash"` + "\n",
 		`Environment=CLAWDLINE_NEXT_PORT="7727"` + "\n",
-		`Environment=CLAWDLINE_NEXT_STANDALONE="1"` + "\n",
-		`Environment=CLAWDLINE_NEXT_OWN_SESSIONS="1"` + "\n",
 	} {
 		if !strings.Contains(u, want) {
 			t.Errorf("unit lacks %q:\n%s", want, u)
 		}
 	}
 	// Only what setup resolved: never the console path the caller's
-	// environment carried, and no state dir or root for the real install.
-	for _, never := range []string{"CLAWDLINE_NEXT_WEB", "CLAWDLINE_NEXT_DIR", "CLAWDLINE_NEXT_INSTALL_ROOT"} {
+	// environment carried, no state dir or root for the real install, and
+	// none of the switches the retired upstream proxy read.
+	for _, never := range []string{"CLAWDLINE_NEXT_WEB", "CLAWDLINE_NEXT_DIR", "CLAWDLINE_NEXT_INSTALL_ROOT",
+		"CLAWDLINE_NEXT_STANDALONE", "CLAWDLINE_NEXT_OWN_SESSIONS"} {
 		if strings.Contains(u, never) {
 			t.Errorf("unit names %s:\n%s", never, u)
 		}
@@ -167,8 +167,6 @@ func TestLaunchdPlistAutostartAndNot(t *testing.T) {
 		"<key>RunAtLoad</key>\n\t<true/>\n\t<key>KeepAlive</key>\n\t<true/>",
 		"<key>ThrottleInterval</key>\n\t<integer>30</integer>",
 		"<key>AbandonProcessGroup</key>\n\t<true/>",
-		"<key>CLAWDLINE_NEXT_STANDALONE</key>\n\t\t<string>1</string>",
-		"<key>CLAWDLINE_NEXT_OWN_SESSIONS</key>\n\t\t<string>1</string>",
 		"<key>CLAWDLINE_NEXT_PORT</key>\n\t\t<string>7727</string>",
 		"<key>PATH</key>\n\t\t<string>/home/user/.local/bin:/usr/bin</string>",
 		"<key>StandardErrorPath</key>\n\t<string>/tmp/s/service.log</string>",
