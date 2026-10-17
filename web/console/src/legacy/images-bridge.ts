@@ -35,7 +35,7 @@ export interface ArtifactRef {
   state?: string
 }
 
-type Lightbox = { open: (trigger: Element, src: string, failed?: () => void) => void; close: () => void }
+type Lightbox = { open: (trigger: Element, src: string, failed?: () => void, name?: string) => void; close: () => void }
 
 const connectArtifactTile = connectArtifactTileOriginal as (
   tile: HTMLElement,
@@ -139,7 +139,9 @@ function imageLightbox(): Lightbox {
     dialog.innerHTML =
       '<div class="image-lightbox-frame">' +
       '<span id="image-lightbox-title" class="sr-only">Image preview</span>' +
+      '<div class="image-lightbox-actions">' +
       '<button id="image-lightbox-close" class="image-lightbox-close" type="button">Close preview</button>' +
+      '</div>' +
       '<img id="image-lightbox-image" alt="" draggable="false">' +
       "</div>"
     document.body.appendChild(dialog)
@@ -153,12 +155,13 @@ function imageLightbox(): Lightbox {
   const steps = attachLightboxSteps(dialog, image, {
     previous: nextWord("imagePreviewPrevious"),
     next: nextWord("imagePreviewNext"),
+    download: nextWord("imagePreviewDownload"),
     position: (index, count) => nextWord("imagePreviewPosition", { index, count }),
   })
   lightbox = {
-    open: (trigger, src, failed) => {
+    open: (trigger, src, failed, name = "clawdline-image.png") => {
       preview.open(trigger, src, failed)
-      steps.opened(trigger)
+      steps.opened(trigger, name)
     },
     close: preview.close,
   }
@@ -177,7 +180,10 @@ function hydrate(tiles: HTMLElement[], queue: (ArtifactRef | undefined)[], sessi
       expiredLabel: T.webImageExpired,
       unknownLabel: T.webImageUnknown,
       describeFailure: describeArtifactFailure,
-      open: (trigger: Element, src: string, expire: () => void) => imageLightbox().open(trigger, src, expire),
+      open: (trigger: Element, src: string, expire: () => void) => imageLightbox().open(
+        trigger, src, expire,
+        `clawdline-image-${artifact?.id ?? "unknown"}.${artifact?.media_type === "image/jpeg" ? "jpg" : "png"}`,
+      ),
     })
   }
 }

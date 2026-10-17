@@ -22,3 +22,18 @@
     pointer-events: none;
 }
 .image-lightbox-count[hidden] { display: none; }
+.image-lightbox-actions {
+    position: absolute; z-index: 2; top: 0; right: 0;
+    display: flex; align-items: center; gap: 8px;
+}
+.image-lightbox-actions .image-lightbox-close { position: static; }
+.image-lightbox-download {
+    min-height: 38px; padding: 0 14px;
+    display: inline-flex; align-items: center;
+    border: 1px solid rgba(255,255,255,0.25); border-radius: 999px;
+    background: rgba(15,15,18,0.90); color: white; cursor: pointer;
+    text-decoration: none;
+}
+.image-lightbox-download[hidden] { display: none; }
+.image-lightbox-download:hover { background: rgba(40,40,46,0.92); }
+.image-lightbox-download:focus-visible { outline: 2px solid white; outline-offset: 3px; }

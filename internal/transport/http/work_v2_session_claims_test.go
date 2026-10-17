@@ -143,6 +143,53 @@ func TestASessionClaimsAnItemOnThePersonsMessageAsIfThePersonAssignedIt(t *testi
 	}
 }
 
+func TestASessionConvertsAndClaimsAPlanInOneWrite(t *testing.T) {
+	for _, kind := range []string{"feature", "issue", "epic", "refactor"} {
+		t.Run(kind, func(t *testing.T) {
+			s, p, project := sessionItemServer(t)
+			plan := personItem(t, s, project, "plan", "person-plan")
+			run := issueTestRun(t, s, p, "Please take this Plan")
+			body := fmt.Sprintf(`{"expected_version":%d,"session_id":%q,"via":{"run":%q},"kind":%q}`,
+				plan.Version, p.s.ConversationID, run, kind)
+			rec := claim(s, plan.ID, body, "convert-claim-"+kind)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("claim: %d %s", rec.Code, rec.Body)
+			}
+			got := readItem(t, s, plan.ID)
+			if got.Kind != kind || got.Phase != "assigned" || got.OwnerSession == nil ||
+				*got.OwnerSession != p.s.ConversationID || got.Version != plan.Version+2 || len(got.Assignments) != 1 {
+				t.Fatalf("converted claim: %+v", got)
+			}
+			if len(got.Events) < 3 || got.Events[len(got.Events)-2].Kind != "item.converted" ||
+				got.Events[len(got.Events)-1].Kind != "item.assigned" {
+				t.Fatalf("history: %+v", got.Events)
+			}
+			replay := claim(s, plan.ID, body, "convert-claim-"+kind)
+			if replay.Code != http.StatusOK || replay.Body.String() != rec.Body.String() {
+				t.Fatalf("replay: %d %s", replay.Code, replay.Body)
+			}
+		})
+	}
+}
+
+func TestAFailedPlanClaimLeavesThePlanUnconverted(t *testing.T) {
+	s, p, project := sessionItemServer(t)
+	plan := personItem(t, s, project, "plan", "person-plan")
+	run := issueTestRun(t, s, p, "Please take this Plan")
+	for _, kind := range []string{"plan", "bogus"} {
+		body := fmt.Sprintf(`{"expected_version":%d,"session_id":%q,"via":{"run":%q},"kind":%q}`,
+			plan.Version, p.s.ConversationID, run, kind)
+		rec := claim(s, plan.ID, body, "invalid-plan-claim-"+kind)
+		if rec.Code != http.StatusConflict || codeOf(t, rec) != "conversion_kind_not_executable" {
+			t.Fatalf("%s: %d %s", kind, rec.Code, rec.Body)
+		}
+	}
+	got := readItem(t, s, plan.ID)
+	if got.Kind != "plan" || got.Version != plan.Version || got.OwnerSession != nil || len(got.Assignments) != 0 {
+		t.Fatalf("failed claim changed plan: %+v", got)
+	}
+}
+
 // The person's route stays the person's: a Session calling it is refused
 // whether or not it holds a run.
 func TestThePersonsAssignRouteStillRefusesASession(t *testing.T) {

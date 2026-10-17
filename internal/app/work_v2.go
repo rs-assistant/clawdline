@@ -933,13 +933,15 @@ func (w *WorkSystemV2) ConvertKind(ctx context.Context, id string, c ConvertKind
 
 type AssignWorkV2 struct {
 	ExpectedVersion int64
-	Mode            string
-	SessionID       string
-	TerminalID      string
-	Assistant       string
-	Model           string
-	Actor           string
-	AssignmentID    string
+	// ConvertKind converts an unassigned Plan as part of a Session claim.
+	ConvertKind  work.Kind
+	Mode         string
+	SessionID    string
+	TerminalID   string
+	Assistant    string
+	Model        string
+	Actor        string
+	AssignmentID string
 	// Claim is the person's message a Session claims the item on
 	// (ClaimFromSession), or, with Claim.Assigned, assigns it to a new
 	// Session on (RunAssignment); nil for a person's own assignment.
@@ -1042,7 +1044,15 @@ func (w *WorkSystemV2) Assign(ctx context.Context, id string, c AssignWorkV2, pe
 		if !VersionHolds(c.ExpectedVersion, prev.Version) {
 			return store.ErrConflict
 		}
-		if prev.Planning() {
+		if c.ConvertKind != "" {
+			if c.Claim == nil || c.Claim.Assigned || prev.Kind != work.KindPlan ||
+				prev.Phase != work.PhaseCreated || prev.ParentID != "" {
+				return work.RefuseV2("item_not_convertible", "Only a top-level item that has not entered implementation can be converted.")
+			}
+			if !c.ConvertKind.Executable() {
+				return work.RefuseV2("conversion_kind_not_executable", "Convert a Plan to an epic, feature, refactor, or issue.")
+			}
+		} else if prev.Planning() {
 			return work.RefuseV2("planning_not_assignable", "A Plan stays in Planning; convert it to executable work first.")
 		}
 		if prev.Phase.Terminal() {
@@ -1071,6 +1081,18 @@ func (w *WorkSystemV2) Assign(ctx context.Context, id string, c AssignWorkV2, pe
 		} else if awaited.ID != "" {
 			return work.RefuseV2("assignment_awaiting_dialog", "A new Session opened for this item is waiting "+
 				"for you to answer its first screen. Answer it, or close its tab, before assigning again.")
+		}
+		if c.ConvertKind != "" {
+			converted := prev
+			converted.Kind = c.ConvertKind
+			converted.UpdatedAt = w.now()
+			if err := tx.PutItem(prev, converted, "item.converted", c.Actor, payload(map[string]string{
+				"from": string(prev.Kind), "to": string(converted.Kind),
+			})); err != nil {
+				return err
+			}
+			prev = converted
+			prev.Version++
 		}
 		if c.AssignmentID == "" {
 			c.AssignmentID = newWorkID()

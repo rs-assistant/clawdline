@@ -15,6 +15,7 @@
 export interface LightboxStepWords {
   previous: string
   next: string
+  download: string
   position: (index: number, count: number) => string
 }
 
@@ -64,7 +65,7 @@ export function attachLightboxSteps(
   image: HTMLElement,
   words: LightboxStepWords,
   doc: Document = document,
-): { opened: (trigger: Element) => void } {
+): { opened: (trigger: Element, name: string) => void } {
   const frame = dialog.querySelector<HTMLElement>(".image-lightbox-frame") ?? dialog
   let current: (Tile & Element) | null = null
 
@@ -89,6 +90,15 @@ export function attachLightboxSteps(
   }
   const back = button(-1, words.previous, "‹")
   const on = button(1, words.next, "›")
+  const download = doc.createElement("a")
+  download.className = "image-lightbox-download"
+  download.textContent = words.download
+  download.setAttribute("aria-label", words.download)
+  download.hidden = true
+  for (const kind of ["touchstart", "touchend", "pointerdown"]) {
+    download.addEventListener(kind, (event) => event.stopPropagation())
+  }
+  frame.querySelector(".image-lightbox-actions")?.prepend(download)
   const count = doc.createElement("span")
   count.className = "image-lightbox-count"
   count.hidden = true
@@ -146,8 +156,11 @@ export function attachLightboxSteps(
   })
 
   return {
-    opened(trigger: Element) {
+    opened(trigger: Element, name: string) {
       current = trigger as Tile & Element
+      download.href = (image as HTMLImageElement).src
+      download.download = name
+      download.hidden = false
       show()
     },
   }

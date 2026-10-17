@@ -521,6 +521,26 @@ func TestItemClaimPostsTheLatestRunAndNoVersion(t *testing.T) {
 	}
 }
 
+func TestItemClaimSendsTheChosenPlanKind(t *testing.T) {
+	s, b := newStandIn(t, func(r *http.Request) (int, string) {
+		return 200, createdItem
+	})
+	var out, errs bytes.Buffer
+	if code := sessionItem(&out, &errs, b, "claim", itemFlags{run: itemRun, kind: "refactor"},
+		[]string{"item-1"}, thinConversation, "plan-claim-key", envOf(nil)); code != 0 {
+		t.Fatalf("claim: %d %s", code, errs.String())
+	}
+	seen := s.requests()
+	if len(seen) != 1 {
+		t.Fatalf("requests = %+v", seen)
+	}
+	var body map[string]any
+	if err := json.Unmarshal(seen[0].Body, &body); err != nil || body["kind"] != "refactor" ||
+		body["via"].(map[string]any)["run"] != itemRun {
+		t.Fatalf("body = %s", seen[0].Body)
+	}
+}
+
 // --run and --key are used as given; with no run at all nothing is claimed
 // and the person's own assignment is named; a refusal is said by its code.
 func TestItemClaimUsesTheNamedRunOrClaimsNothing(t *testing.T) {
