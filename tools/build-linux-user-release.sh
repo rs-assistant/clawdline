@@ -1,13 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
-  echo "usage: tools/build-linux-user-release.sh <release-dir> <commit>" >&2
+if [ "$#" -ne 2 ] && { [ "$#" -ne 3 ] || [ "$3" != --dev ]; }; then
+  echo "usage: tools/build-linux-user-release.sh <release-dir> <commit> [--dev]" >&2
   exit 2
 fi
 
 release=$1
 commit=$2
+dev=no
+[ "${3:-}" != --dev ] || dev=yes
 case "$commit" in
   *[!0-9a-f]* | "") echo "release commit must be a lowercase hexadecimal Git object" >&2; exit 2 ;;
 esac
@@ -40,10 +42,14 @@ unset VITE_HOSTED_CONSOLE || true
 # Several filesystem tests assert the requested public mode exactly. Keep the
 # private release umask out of their process; the release artifacts below stay
 # owner-only.
-( umask 022; go test ./... )
-go vet ./...
-CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -buildvcs=true -o "$stage/clawdline" ./cmd/clawdline
-( cd web && npm ci --ignore-scripts && npm run check && npm run build )
+if [ "$dev" = no ]; then
+  ( umask 022; go test ./... )
+  go vet ./...
+fi
+build_args=()
+if [ "$dev" = yes ]; then build_args=(-ldflags "-X main.releaseVersion=v0.0.0-dev.${commit:0:7}"); fi
+CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build ${build_args[@]+"${build_args[@]}"} -buildvcs=true -o "$stage/clawdline" ./cmd/clawdline
+( cd web && npm ci --ignore-scripts && { [ "$dev" = yes ] || npm run check; } && npm run build )
 cp -R web/console/dist "$stage/dist"
 # The tmux a release carries (docs/design-decisions.md D72), when one was
 # built for this machine with tools/release/tmux/build.sh and named in

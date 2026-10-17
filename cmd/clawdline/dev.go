@@ -22,14 +22,15 @@ import (
 const devUsage = `usage: clawdline dev install [--rev <commit>] [--port n]
 
 Builds a commit of this checkout and runs it on this machine in place of the
-installed release, to test it. Going back is the ordinary update: the version
+installed release or Linux source deployment, to test it. On a release install,
+going back is the ordinary update: the version
 panel's button, or clawdline update --apply. If the build does not start,
-Clawdline goes back to the release by itself.
+Clawdline restores the previous installation.
 
   --rev <commit>   the commit to build (default HEAD of this checkout)
-  --port <n>       the daemon's port (default CLAWDLINE_NEXT_PORT, else 7727)
+  --port <n>       release-install port; omit for a Linux source service
 
-Run it inside a clawdline checkout, on a machine installed from a release.
+Run it inside a clawdline checkout, on a release or Linux source installation.
 docs/updates.md says more.`
 
 // devCommand is `clawdline dev install`: a dev build, docs/updates.md.
@@ -93,8 +94,11 @@ func devInstall(stdout, stderr io.Writer, rev string, port int, r runner) int {
 		return fail("%v", err)
 	}
 	running, kind := env.Layout.CurrentRelease()
+	if kind == install.KindSourceDeploy {
+		return devSourceInstall(stdout, stderr, top, commit, runtime.GOOS, port, r)
+	}
 	if kind != install.KindRelease {
-		return fail(cliCopy("ops", "dev.not_release", "this machine is not installed from a release (current is %q); a dev build goes over a release install"), running)
+		return fail(cliCopy("ops", "dev.not_release", "this installation has no supported release or Linux source deployment (current is %q)"), running)
 	}
 	version, err := devVersion(running, commit)
 	if err != nil {
@@ -160,6 +164,20 @@ func devInstall(stdout, stderr io.Writer, rev string, port int, r runner) int {
 		fmt.Fprint(stdout, cliCopy("ops", "dev.way_back", "to go back: clawdline update --apply, or the version panel's button\n"))
 	}
 	return code
+}
+
+// devSourceInstall keeps the CLI entry point the same for Linux source installs.
+// The deployment script owns the service port, startup checks and rollback.
+func devSourceInstall(stdout, stderr io.Writer, top, commit, goos string, port int, r runner) int {
+	if goos != "linux" || port != 0 {
+		fmt.Fprintln(stderr, cliCopy("ops", "dev.source_config", "source dev installation requires Linux and the configured service port; omit --port"))
+		return 1
+	}
+	if err := r.run(top, stdout, stderr, "bash", filepath.Join(top, "tools", "deploy-linux-user.sh"), "--dev", "--rev", commit); err != nil {
+		fmt.Fprintf(stderr, cliCopy("ops", "dev.source_failed", "dev deployment failed; inspect the deployment output for build or rollback status: %v\n"), err)
+		return 1
+	}
+	return 0
 }
 
 // devTmux lays out the running release's tmux the way build.sh --tmux-from

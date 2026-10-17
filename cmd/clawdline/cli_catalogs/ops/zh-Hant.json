@@ -123,11 +123,11 @@
   "usage.unpriced": "未知（未定價）",
   "usage.unreadable": "無法讀取 daemon 的回應",
   "usage.verdict_prefix": "  判定：",
-  "dev.usage": "用法：clawdline dev install [--rev <commit>] [--port n]\n\n把這個 checkout 的某個 commit 建置出來，取代已安裝的 release 在這台機器上執行，用來測試。要回到 release 就走一般更新：版本面板上的按鈕，或 clawdline update --apply。建置版無法啟動時，Clawdline 會自動退回 release。\n\n  --rev <commit>   要建置的 commit（預設為這個 checkout 的 HEAD）\n  --port <n>       daemon 連接埠（預設 CLAWDLINE_NEXT_PORT，否則 7727）\n\n請在 clawdline checkout 裡、從 release 安裝的機器上執行。詳見 docs/updates.md。",
+  "dev.usage": "用法：clawdline dev install [--rev <commit>] [--port n]\n\n建置這個 checkout 的指定 commit，取代目前的正式版、dev 或 Linux 原始碼部署。正式版安裝可透過一般更新回到 release；Linux 原始碼部署保留原本的服務與回復流程。啟動檢查失敗時會回復前一版。\n\n  --rev <commit>   要建置的 commit（預設 HEAD）\n  --port <n>       正式版安裝的 daemon 連接埠；Linux 原始碼部署請省略，使用服務設定\n\n請在 clawdline checkout 內執行。詳見 docs/updates.md。",
   "dev.not_checkout": "請在 clawdline checkout 裡執行：%v",
   "dev.not_clawdline": "%s 不是 clawdline checkout（沒有 tools/release/build.sh）",
   "dev.no_commit": "%s 在這裡不是一個 commit：%v",
-  "dev.not_release": "這台機器不是從 release 安裝的（current 是 %q）；dev 版只能裝在 release 安裝之上",
+  "dev.not_release": "這個安裝沒有支援的 release 或 Linux 原始碼部署（current 是 %q）",
   "dev.already": "%s 已經在執行",
   "dev.building": "正在建置 %s（commit %s）…\n",
   "dev.build_failed": "建置失敗，沒有任何變動：%v",
@@ -135,5 +135,7 @@
   "dev.switch_failed": "切換沒有開始，%s 仍在執行：%v",
   "dev.switching": "正在切換到 %s\n",
   "dev.follow_unavailable": "clawdline：切換已交出；`clawdline update` 會顯示結果（%v）\n",
-  "dev.way_back": "要回到 release：clawdline update --apply，或版本面板上的按鈕\n"
+  "dev.way_back": "要回到 release：clawdline update --apply，或版本面板上的按鈕\n",
+  "dev.source_config": "原始碼 dev 安裝需要 Linux，並使用服務設定的連接埠；請省略 --port",
+  "dev.source_failed": "dev 部署失敗；請查看部署輸出中的建置或回復狀態：%v\n"
 }
