@@ -555,9 +555,8 @@ func (b Bridge) Undeliverable(cmd Command, limit int) Answer {
 	if parseErr != nil || word == "" {
 		return b.notice(cmd, full)
 	}
-	if b.contentReadChannel(cmd) && word != "info" && word != "transcript" {
-		return b.refuse(cmd, parsed, word, Refusal{Status: 403, Code: "read_only_channel",
-			Message: "This Cloud channel accepts only pinned Session content reads.", fixedCopy: true})
+	if b.contentReadChannel(cmd) {
+		return b.refuseContentRead(cmd, parsed, word, full)
 	}
 	o, known := catalog[word]
 	if known && !o.read {
@@ -591,9 +590,8 @@ func (b Bridge) Busy(cmd Command, limit int) Answer {
 	if parseErr != nil || word == "" {
 		return b.notice(cmd, busy)
 	}
-	if b.contentReadChannel(cmd) && word != "info" && word != "transcript" {
-		return b.refuse(cmd, parsed, word, Refusal{Status: 403, Code: "read_only_channel",
-			Message: "This Cloud channel accepts only pinned Session content reads.", fixedCopy: true})
+	if b.contentReadChannel(cmd) {
+		return b.refuseContentRead(cmd, parsed, word, busy)
 	}
 	o, known := catalog[word]
 	if known && o.read && cmd.Class == ClassCtl {
@@ -606,4 +604,36 @@ func (b Bridge) Busy(cmd Command, limit int) Answer {
 			Message: "Cloud commands are disabled on this machine.", fixedCopy: true})
 	}
 	return b.refuse(cmd, parsed, word, busy)
+}
+
+// refuseContentRead answers overloads with the same execution proof as an ordinary r/ reply.
+// The read lane can refuse a picture before serveContentRead decodes it, and a bare refusal has
+// no safe waiter name for an image. Without this proof, the browser waits for its timeout.
+func (b Bridge) refuseContentRead(cmd Command, parsed body, word string, refusal Refusal) Answer {
+	o, known := catalog[word]
+	if cmd.Class != ClassCtl || !known || !o.read || !contentReadWord(word) {
+		return b.refuse(cmd, parsed, word, Refusal{Status: 403, Code: "read_only_channel",
+			Message: "This Cloud channel accepts only pinned Session content reads.", fixedCopy: true})
+	}
+	if machine, ok := parsed.nonEmpty("machine_id"); !ok || machine != b.MachineID {
+		return b.refuse(cmd, parsed, word, Refusal{Status: 409, Code: "wrong_machine",
+			Message: "This Cloud request addresses another machine.", fixedCopy: true})
+	}
+	local := make(body, len(parsed)-1)
+	for key, value := range parsed {
+		if key != "machine_id" {
+			local[key] = value
+		}
+	}
+	p, ok := o.decode(local)
+	if !ok || (word != "sessions.list" && p.executionGeneration == "") {
+		return b.refuse(cmd, parsed, word, Refusal{Status: 400, Code: "malformed_read",
+			Message: "This Cloud read is malformed.", fixedCopy: true})
+	}
+	if word == "sessions.list" {
+		p.target = MachineReplySession
+	} else if word == "peer-inbox" {
+		p.id = b.MachineID
+	}
+	return b.contentReadAnswer(cmd, p, b.publish(cmd, p, refusal, nil))
 }

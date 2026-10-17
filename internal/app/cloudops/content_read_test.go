@@ -60,6 +60,34 @@ func TestPinnedImageUsesReadTranscriptAndTheExactSession(t *testing.T) {
 	}
 }
 
+func TestPinnedImageOverloadReturnsCorrelatedRefusal(t *testing.T) {
+	request := contentReadRequest(t, map[string]any{"type": "image", "session": pane,
+		"id": "picture-1", "expected_generation": pinnedGeneration})
+	b := open(localRouterFunc(func(context.Context, LocalRequest) (LocalResponse, error) {
+		t.Fatal("an overloaded image read reached the local route")
+		return LocalResponse{}, nil
+	}))
+	for _, tc := range []struct {
+		name   string
+		answer Answer
+		code   string
+	}{
+		{"ingress", b.Busy(request, 8), "cloud_ingress_busy"},
+		{"egress", b.Undeliverable(request, 1024), "cloud_read_busy"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.answer.Published() || tc.answer.Name != "image.picture-1" || tc.answer.Session != pane || tc.answer.Code != tc.code {
+				t.Fatalf("the image waiter cannot receive its refusal: %+v", tc.answer)
+			}
+			payload := answerOf(t, tc.answer)
+			if payload["machine_id"] != "mac-01" || payload["session_id"] != pane ||
+				payload["expected_generation"] != pinnedGeneration || payload["seq"] != float64(request.Sequence) {
+				t.Fatalf("the refusal cannot be matched to the selected read: %v", payload)
+			}
+		})
+	}
+}
+
 func contentReadAuthority(allowed bool) Authority {
 	return Authority{ClockReady: true, RosterReadable: true, RosterAllowsSender: true,
 		WriteGateAllows: true, ReadTranscriptAllows: allowed}

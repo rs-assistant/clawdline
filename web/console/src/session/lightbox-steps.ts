@@ -56,6 +56,22 @@ export function swipeStep(dx: number, dy: number): -1 | 0 | 1 {
   return dx < 0 ? 1 : -1
 }
 
+/** Start the platform's file sheet in the click itself; a completed fetch cannot borrow its activation. */
+export function saveImageFromClick(
+  file: File,
+  platform: Pick<Navigator, "share" | "canShare">,
+  fallback: () => void,
+): "native" | "download" {
+  if (typeof platform.share === "function" && platform.canShare?.({ files: [file] })) {
+    void platform.share({ files: [file] }).catch(() => {
+      // The person may dismiss the sheet. Keep the preview available for another press.
+    })
+    return "native"
+  }
+  fallback()
+  return "download"
+}
+
 /**
  * Put the two buttons and the count in the preview and answer the arrow keys
  * and a horizontal swipe. Call `opened` every time the preview opens on a tile.
@@ -90,15 +106,32 @@ export function attachLightboxSteps(
   }
   const back = button(-1, words.previous, "‹")
   const on = button(1, words.next, "›")
-  const download = doc.createElement("a")
+  const download = doc.createElement("button")
+  download.type = "button"
   download.className = "image-lightbox-download"
-  download.textContent = words.download
   download.setAttribute("aria-label", words.download)
+  download.title = words.download
+  download.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 17v4h14v-4"/></svg>'
   download.hidden = true
+  download.disabled = true
+  let file: File | null = null
+  let imageURL = ""
+  let imageName = ""
+  let imageRevision = 0
   for (const kind of ["touchstart", "touchend", "pointerdown"]) {
     download.addEventListener(kind, (event) => event.stopPropagation())
   }
-  frame.querySelector(".image-lightbox-actions")?.prepend(download)
+  download.addEventListener("click", () => {
+    if (!file) return
+    saveImageFromClick(file, navigator, () => {
+      // Browsers without file sharing keep the ordinary download path.
+      const link = doc.createElement("a")
+      link.href = imageURL
+      link.download = imageName
+      link.click()
+    })
+  })
+  frame.appendChild(download)
   const count = doc.createElement("span")
   count.className = "image-lightbox-count"
   count.hidden = true
@@ -158,9 +191,24 @@ export function attachLightboxSteps(
   return {
     opened(trigger: Element, name: string) {
       current = trigger as Tile & Element
-      download.href = (image as HTMLImageElement).src
-      download.download = name
+      const revision = ++imageRevision
+      imageURL = (image as HTMLImageElement).src
+      imageName = name
+      file = null
       download.hidden = false
+      download.disabled = true
+      // Cloud already holds a blob URL; the local console fetches its same-origin image. Do this
+      // while the preview opens so a later button press can synchronously open the native sheet.
+      void fetch(imageURL).then((response) => {
+        if (!response.ok) throw new Error("image bytes unavailable")
+        return response.blob()
+      }).then((blob) => {
+        if (revision !== imageRevision || !blob.size) return
+        file = new File([blob], name, { type: blob.type || (name.endsWith(".jpg") ? "image/jpeg" : "image/png") })
+        download.disabled = false
+      }).catch(() => {
+        if (revision === imageRevision) download.hidden = true
+      })
       show()
     },
   }

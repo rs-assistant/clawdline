@@ -23,6 +23,7 @@ import {
 } from "./js/view/transcript-images.js"
 import { nextWord } from "../next-strings.js"
 import { attachLightboxSteps } from "../session/lightbox-steps.js"
+import { newestImageTiles } from "./image-read-order.js"
 
 /** One picture as a transcript entry carries it (`ImageArtifact`). */
 export interface ArtifactRef {
@@ -172,7 +173,10 @@ function imageLightbox(): Lightbox {
 function hydrate(tiles: HTMLElement[], queue: (ArtifactRef | undefined)[], session: string | undefined,
   selected?: PictureSource): void {
   const source = selected ?? carried
-  for (const tile of tiles) {
+  // Artifact slots follow transcript time even when the reader reverses the visual order. Start
+  // with the newest pictures, which are at the bottom in the usual conversation layout, so the
+  // three Cloud image slots first serve what the reader is likely looking at now.
+  for (const tile of newestImageTiles(tiles)) {
     const artifact = queue[Number(tile.dataset.artifactSlot)]
     connectArtifactTile(tile, artifact, {
       ...(source && session ? { source: (a: ArtifactRef) => source(a, session) } : {}),

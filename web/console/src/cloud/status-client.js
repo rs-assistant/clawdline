@@ -1189,9 +1189,10 @@ export class StatusCloudClient extends CatalogCloudClient {
       typeof id !== "string" || !id || signal?.aborted) {
       return Promise.reject(refused("execution_target_required", "an exact Session image is required"))
     }
-    return this._read({ machine: machineID, session: sessionID }, "image", {
-      id, machine_id: machineID, expected_generation: executionGeneration,
-    }, "image." + id, undefined, { signal })
+    return this._whenImageSlotFree(() => this._read(
+      { machine: machineID, session: sessionID }, "image",
+      { id, machine_id: machineID, expected_generation: executionGeneration },
+      "image." + id, undefined, { signal }))
   }
 
   /** The original detail panels share this exact read adapter. */

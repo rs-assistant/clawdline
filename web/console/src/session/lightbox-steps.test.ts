@@ -2,7 +2,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see `session/order.test.ts`.
-import { stepFrom, swipeStep } from "./lightbox-steps.ts"
+import { saveImageFromClick, stepFrom, swipeStep } from "./lightbox-steps.ts"
 
 test("a step goes to the neighbour and stops at either end", () => {
   const list = ["a", "b", "c"]
@@ -28,4 +28,26 @@ test("a finger moving left is the next picture, right the previous", () => {
 test("a scroll or a wobble is not a swipe", () => {
   assert.equal(swipeStep(-60, 200), 0)
   assert.equal(swipeStep(-30, 0), 0)
+})
+
+test("a phone save press gives the native sheet the original image file immediately", () => {
+  const file = new File([new Uint8Array([137, 80, 78, 71])], "clawdline-image.png", { type: "image/png" })
+  const calls: unknown[] = []
+  const platform = {
+    canShare(data: ShareData) { calls.push(["canShare", data.files]); return true },
+    share(data: ShareData) { calls.push(["share", data.files]); return Promise.resolve() },
+  }
+  const fallback = () => calls.push(["download"])
+  assert.equal(saveImageFromClick(file, platform, fallback), "native")
+  assert.deepEqual(calls, [["canShare", [file]], ["share", [file]]])
+  assert.equal(file.type, "image/png")
+  assert.equal(file.size, 4)
+})
+
+test("a browser without file sharing keeps its download action", () => {
+  const file = new File(["png"], "clawdline-image.png", { type: "image/png" })
+  let downloads = 0
+  const platform = { canShare: () => false, share: () => Promise.resolve() }
+  assert.equal(saveImageFromClick(file, platform, () => { downloads++ }), "download")
+  assert.equal(downloads, 1)
 })
