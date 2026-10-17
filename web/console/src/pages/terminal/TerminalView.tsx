@@ -605,7 +605,10 @@ export function TerminalView({ id, shown, label, onBack, onOpenNew }: {
               <div><dt>{nextWord("terminalMachine")}</dt><dd className="terminal-machine">{machine || nextWord("devicesThisMachine")}</dd></div>
             </dl>
           </details>
-          <details className="terminal-action-more" ref={actionMenu}><summary aria-label={nextWord("terminalMoreActions")} title={nextWord("terminalMoreActions")}>⋯</summary><div className="terminal-more-actions">
+          <details className="terminal-action-more" ref={actionMenu}><summary aria-label={nextWord("terminalMoreActions")} title={nextWord("terminalMoreActions")}>⋯</summary>
+          <button className="terminal-menu-backdrop" type="button" aria-label={nextWord("terminalDismissMenu")}
+            onClick={() => actionMenu.current?.removeAttribute("open")} />
+          <div className="terminal-more-actions">
           <button className="board-button" type="button" aria-pressed={history !== null}
             onClick={() => { actionMenu.current?.removeAttribute("open"); history ? setHistory(null) : void showHistory() }}>
             {history ? nextWord("terminalHistoryBack") : nextWord("terminalHistory")}

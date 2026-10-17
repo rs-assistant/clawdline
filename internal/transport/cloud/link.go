@@ -29,13 +29,15 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/pion/webrtc/v4"
 	"net/http"
 	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/pion/ice/v4"
+	"github.com/pion/webrtc/v4"
 
 	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
 	"github.com/sainteye/clawdline/internal/adapters/cloudkeys"
@@ -59,6 +61,8 @@ type Status struct {
 	Enabled bool `json:"enabled"`
 	// Commands is the remote-write switch.
 	Commands bool `json:"commands"`
+	// TerminalDirect controls both Terminal and Session-read direct carriers.
+	TerminalDirect bool `json:"terminal_direct"`
 	// Configured is whether this machine has an identity and keys — that is,
 	// whether `clawdline cloud login` has ever completed here.
 	Configured bool `json:"configured"`
@@ -292,6 +296,7 @@ type Link struct {
 	directPeers         map[string]*directPeer
 	directOffers        map[string][]time.Time
 	directWebRTC        *webrtc.API
+	directUDPMux        ice.UDPMux
 	directLoopback      bool // tests only: two peers on one host
 	directNoSTUN        bool // tests only: no network beyond this host
 	terminalMu          sync.Mutex
@@ -870,6 +875,7 @@ func (l *Link) Run(ctx context.Context) error {
 	if !l.settings.Enabled {
 		return ErrDisabledLink
 	}
+	defer l.closeDirectMux()
 	for {
 		if l.transport == nil {
 			return errors.New("the cloud line could not be opened: " + l.lastError())
@@ -1380,17 +1386,18 @@ func (l *Link) SpoolRefusalReading() (capacity.Reading, bool) {
 func (l *Link) Status() Status {
 	l.mu.Lock()
 	out := Status{
-		Enabled:     l.settings.Enabled,
-		State:       l.state,
-		RelayURL:    l.settings.RelayURL,
-		APIBase:     l.settings.APIBase,
-		Account:     l.identity.AccountID,
-		MachineID:   l.identity.MachineID,
-		MachineName: machineName(l.identity, l.settings, HostName(), runtime.GOOS),
-		Fingerprint: l.fingerprint,
-		LastError:   l.lastErr,
-		Answered:    l.answered,
-		Refused:     l.refused,
+		Enabled:        l.settings.Enabled,
+		TerminalDirect: l.settings.TerminalDirect,
+		State:          l.state,
+		RelayURL:       l.settings.RelayURL,
+		APIBase:        l.settings.APIBase,
+		Account:        l.identity.AccountID,
+		MachineID:      l.identity.MachineID,
+		MachineName:    machineName(l.identity, l.settings, HostName(), runtime.GOOS),
+		Fingerprint:    l.fingerprint,
+		LastError:      l.lastErr,
+		Answered:       l.answered,
+		Refused:        l.refused,
 	}
 	out.LastErrorKind = string(l.lastKind)
 	if !l.lastErrAt.IsZero() {

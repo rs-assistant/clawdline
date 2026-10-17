@@ -646,14 +646,17 @@ func (s Snapshot) orchestratorTitle(terminalID string, live []Live) string {
 		}
 		found = a.Label
 	}
-	// A reused terminal id lends no task title to a session the task's
-	// recorded process contradicts; a task that recorded none still matches
-	// on the terminal alone.
+	// A finished task can name only its verified child conversation. Pane ids
+	// are reused, and an unbound old task must not rename the next session.
+	// While a task runs, its terminal is enough to show a provisional title.
 	taskAlive := func(t Task) bool {
-		if t.Assistant == "" && t.ChildPID == nil && t.ChildProcStart == nil && t.ChildSession == nil {
-			return true
-		}
 		for _, l := range live {
+			if isTerminalState(t.State) {
+				if taskMatches(t, l) {
+					return true
+				}
+				continue
+			}
 			if l.TerminalID != terminalID ||
 				(t.Assistant != "" && t.Assistant != l.Assistant) ||
 				(t.ChildPID != nil && *t.ChildPID != l.PID) ||

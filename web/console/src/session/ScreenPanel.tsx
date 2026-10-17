@@ -5,6 +5,7 @@ import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
 import { readFailure, type ReadState } from "../read-state.js"
 import { screenFailureWord, screenITermScanOff } from "./screen-state.js"
+import "./screen-skeleton.css"
 import {
   paintRows,
   readScreen,
@@ -232,11 +233,21 @@ export function ScreenPanel({
       return <div className="screen-note" role="status">{nextWord("screenITermScanOff")}</div>
     }
     if (!screen || screen.text == null) {
+      if (!screen || screen.readable !== false || screen.pending !== false) {
+        return <div className="screen-skeleton" role="status">
+          <span className="screen-skeleton-label">{T.webLoading}</span>
+          <div className="screen-skeleton-lines" aria-hidden="true">
+            {[62, 44, 78, 52, 35, 69, 46, 57].map((width, index) =>
+              <span className="screen-skeleton-line" style={{ width: `${width}%` }} key={index} />)}
+          </div>
+          <div className="screen-skeleton-footer" aria-hidden="true">
+            <span className="screen-skeleton-line" /><span className="screen-skeleton-line" />
+          </div>
+        </div>
+      }
       return (
         <div className="screen-note" role="status">
-          {screen && screen.readable === false && screen.pending === false
-            ? T.webScreenGone
-            : T.webLoading}
+          {T.webScreenGone}
         </div>
       )
     }

@@ -58,6 +58,7 @@ export type CloudPairing = {
 export type CloudStatus = {
   enabled: boolean
   commands: boolean
+  terminal_direct: boolean
   configured: boolean
   /** off | idle | connected | reconnecting | stopped */
   state: string
@@ -167,6 +168,10 @@ export function setCloudEnabled(enabled: boolean): Promise<{ enabled: boolean }>
 
 export function setCloudCommands(enabled: boolean): Promise<{ commands: boolean }> {
   return cloudCall("POST", "/v1/cloud/commands", { enabled })
+}
+
+export function setCloudDirect(enabled: boolean): Promise<{ terminal_direct: boolean }> {
+  return cloudCall("POST", "/v1/cloud/direct", { enabled })
 }
 
 /** Show a fresh one-time link. Whatever was waiting is replaced. */

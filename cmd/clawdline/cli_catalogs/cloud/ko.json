@@ -1,5 +1,5 @@
 {
-  "usage.overview": "사용법: clawdline cloud <status|preflight|on|off|commands|login|pair|devices|revoke|rotate|connect>",
+  "usage.overview": "사용법: clawdline cloud <status|preflight|on|off|commands|direct|login|pair|devices|revoke|rotate|connect>",
   "usage.status": "  status                 스위치, ID 및 연결 주소 표시",
   "usage.preflight": "  preflight              네트워크 연결 없이 본인의 단계만 남았는지 확인",
   "usage.switch": "  on | off               설정 파일에서 Cloud 연결 켜기 또는 끄기",

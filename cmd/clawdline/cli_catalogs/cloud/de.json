@@ -1,5 +1,5 @@
 {
-  "usage.overview": "Verwendung: clawdline cloud <status|preflight|on|off|commands|login|pair|devices|revoke|rotate|connect>",
+  "usage.overview": "Verwendung: clawdline cloud <status|preflight|on|off|commands|direct|login|pair|devices|revoke|rotate|connect>",
   "usage.status": "  status                 Schalter, Identität und Endpunkte anzeigen",
   "usage.preflight": "  preflight              ohne Netzwerk prüfen, ob nur noch der Schritt der Person aussteht",
   "usage.switch": "  on | off               Cloud-Verbindung in der Einstellungsdatei ein- oder ausschalten",

@@ -101,6 +101,96 @@ The daemon has no settings switch for launch-at-login yet. The tracked bootstrap
 `systemd --user` unit and enables linger once; the `launch_at_login` capability names that exact
 path instead of claiming the daemon can toggle it itself.
 
+### Let a Cloud browser connect directly to EC2
+
+The hosted browser first reaches the daemon through Cloud. It then tries a WebRTC UDP data channel
+for Terminal and Session reads. The browser uses public STUN servers to find its address. In the
+fixed-port EC2 setup below, the daemon publishes the instance's configured public IPv4 and uses
+one shared UDP listener instead of opening a STUN socket for every peer. The connection is direct
+only after its data channel opens. When it cannot open, the browser uses
+the Cloud relay ([wire contract](cloud-terminal-wire.md#direct-carrier)). No inbound HTTP port 7727,
+SSH port or TURN service is needed for this path.
+
+On an EC2 instance, check the following before changing a rule. Use the actual instance and Region;
+do not infer them from the CLI default profile. The EC2 console shows both, or the instance's IMDSv2
+instance-identity document names its `instanceId`, `region` and `accountId` without reading its IAM
+credentials. Compare that account with `aws sts get-caller-identity`. Then inspect the instance's
+network interface and its attached security groups, its subnet's network ACL and route table, and
+whether the instance has a public IPv4 address. A `0.0.0.0/0` route must lead to an attached
+Internet Gateway. An Internet Gateway is sufficient here; a NAT Gateway is not required. A network
+ACL is stateless, so a custom ACL must allow the UDP path in both directions and the reply ports.
+
+First find the instance's current public IPv4 address. Merge these keys into that machine user's
+existing `~/.config/clawdline-next/config.json`; keep its other settings and substitute the actual
+address for `PUBLIC_IPV4`:
+
+```json
+{
+  "cloud_terminal_direct": true,
+  "cloud_direct_udp_port": 3479,
+  "cloud_direct_public_ip": "PUBLIC_IPV4"
+}
+```
+
+The port and public IP must be set together. `clawdline cloud direct on` applies the file to a
+running daemon by briefly replacing its Cloud line; `clawdline cloud direct off` switches both
+Terminal and Session reads to the relay, and `clawdline cloud status` shows the persisted switch.
+The same switch is in this machine's local Settings → Remote page. A hosted browser cannot change
+the machine's settings. If EC2 assigns a different public IPv4 after a stop/start, update the
+setting and apply it again. When the two endpoint keys are absent, older installations continue
+using OS-selected UDP ports rather than this fixed-port path.
+
+For a phone whose public IP can change, allow UDP ingress from `0.0.0.0/0` only to the configured
+port. Allow UDP egress to the phone's dynamic ICE port; stateful security groups already allow
+replies to an accepted inbound packet. For port 3479, the rules are:
+
+| Direction | UDP destination ports | Peer CIDR | Reason |
+|---|---:|---|---|
+| Ingress | `3479` | `0.0.0.0/0` | A phone can initiate ICE checks to the shared listener. |
+| Egress | `1024-65535` | `0.0.0.0/0` | ICE checks to a phone's dynamic port can leave. |
+
+For example, after recording the current rules and confirming the target security group, apply:
+
+```sh
+aws ec2 authorize-security-group-ingress --region "$AWS_REGION" --group-id "$AWS_SG_ID" \
+  --protocol udp --port 3479 --cidr 0.0.0.0/0
+aws ec2 authorize-security-group-egress --region "$AWS_REGION" --group-id "$AWS_SG_ID" \
+  --protocol udp --port 1024-65535 --cidr 0.0.0.0/0
+```
+
+Set `AWS_REGION` and `AWS_SG_ID` from the inspected instance first. Substitute the configured
+port; do not add a duplicate rule. Review what listens on that port, and use a narrower source CIDR
+when the browser's public address is stable. Keep any existing broad ingress rule until a phone
+Terminal has been verified on the fixed port. Then remove that broad rule by its security-group
+rule ID, read back the group, and verify the phone Terminal again. Changing only the security group
+without configuring the daemon's listener breaks the direct path.
+
+Read back the security group after applying it. Check the host firewall (`ufw`, `nftables` or
+`iptables`) for UDP 3479. Inspect the daemon's answer SDP: it must publish the configured public
+IPv4 on port 3479 and contain no extra server-reflexive candidate on a random port. Finally open
+this machine's Terminal from the paired phone browser, preferably
+on mobile data. `cloud carrier=direct opened for a viewer's Session reads` proves the page's shared
+data channel opened. A Terminal may borrow that channel, or open its own, which logs
+`cloud terminal carrier=direct opened`. Confirm the Terminal's carrier is direct for the same
+machine; the absence of the second log line alone does not show it used the relay. A Terminal
+`input` or `resize` receipt with `outcome=ok_direct` confirms that operation used the direct
+carrier. A STUN success
+or a Terminal page that still works over the relay is not direct-path acceptance. If the channel
+still fails, compare the
+browser's actual ICE candidate pair with the daemon's candidates, host firewall and network flow
+records before broadening any rule.
+
+On 2026-10-17, before fixed-port support, an Ubuntu EC2 host used OS-selected UDP ports. Its
+ephemeral range was `32768 60999`, so the temporary ingress rule covered that range. Before the
+rule change, both daemon-side STUN requests timed out; afterward, both returned valid responses.
+A paired phone's Terminal `input` and `resize` receipts then had `outcome=ok_direct`. That measured
+result is the baseline for verifying the smaller rule, not evidence that the smaller rule works.
+
+Security group rules and the Internet Gateway have no separate hourly charge. An existing public
+IPv4 address and Internet-bound data transfer follow [AWS VPC pricing](https://aws.amazon.com/vpc/pricing/)
+and [EC2 data transfer pricing](https://aws.amazon.com/ec2/pricing/on-demand/); this procedure
+creates no NAT Gateway or additional public address.
+
 ### Give agents a local MongoDB replica set
 
 Some Cloud and integration tests need a real replica set rather than a standalone process. The

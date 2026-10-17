@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6009,
-  "riskKeys": 2870,
-  "nonRiskCount": 3139,
+  "englishContentKeys": 6014,
+  "riskKeys": 2871,
+  "nonRiskCount": 3143,
   "groups": [
     {
       "name": "bar / other",
@@ -2451,7 +2451,7 @@
     },
     {
       "name": "next / terminal",
-      "count": 99,
+      "count": 100,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2494,6 +2494,7 @@
         "next.terminalDiagnostics",
         "next.terminalDiagnosticsCopied",
         "next.terminalDiagnosticsCopy",
+        "next.terminalDismissMenu",
         "next.terminalEntry",
         "next.terminalEntryFor",
         "next.terminalExited",
@@ -3119,7 +3120,7 @@
     },
     {
       "name": "settings / other",
-      "count": 109,
+      "count": 112,
       "sources": [
         "src/pages/settings/window/copy.ts"
       ],
@@ -3128,6 +3129,9 @@
         "settings.cloudAccountReady",
         "settings.cloudAccountRetry",
         "settings.cloudCommandsOff",
+        "settings.cloudDirectOff",
+        "settings.cloudDirectOn",
+        "settings.cloudDirectTitle",
         "settings.cloudLineFailure",
         "settings.cloudLineOff",
         "settings.cloudLineOn",

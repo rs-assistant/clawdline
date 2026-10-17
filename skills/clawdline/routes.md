@@ -13,6 +13,7 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | `*` | `/v1/capacity` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/cloud/commands` | 9 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/devices/revoke` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
+| `*` | `/v1/cloud/direct` | 15 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/enabled` | 9 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/keys/rotate` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/login` | 9 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
