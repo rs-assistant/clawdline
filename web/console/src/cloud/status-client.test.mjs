@@ -404,6 +404,9 @@ test("opening one Session asks the machine for its fresh row", async () => {
 test("a transcript picture uses an exact image waiter and rejects a missing execution", async () => {
   const client = Object.create(StatusCloudClient.prototype)
   const calls = []
+  client.imageReadQueue = []
+  client.imageReadsRunning = 0
+  client.imageReadsInFlight = 3
   client._read = (...args) => { calls.push(args); return Promise.resolve({ id: "picture-1" }) }
   const destination = { machineID: "m", sessionID: "s", executionGeneration: genA }
   const signal = new AbortController().signal
@@ -414,6 +417,30 @@ test("a transcript picture uses an exact image waiter and rejects a missing exec
   assert.equal(calls[0][5].signal, signal)
   await assert.rejects(() => client.imageForGeneration({ ...destination, executionGeneration: "" }, "picture-1", signal),
     { code: "execution_target_required" })
+})
+
+test("pinned transcript pictures respect the three-read image lane", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  const calls = []
+  const releases = []
+  client.imageReadQueue = []
+  client.imageReadsRunning = 0
+  client.imageReadsInFlight = 3
+  client._read = (...args) => {
+    calls.push(args)
+    return new Promise((resolve) => releases.push(resolve))
+  }
+  const destination = { machineID: "m", sessionID: "s", executionGeneration: genA }
+  const images = Array.from({ length: 6 }, (_, index) => client.imageForGeneration(destination, `picture-${index}`))
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(calls.length, 3, "six images bypassed the image lane and filled the Mac's read slots")
+  releases.shift()({ id: "picture-0" })
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(calls.length, 4, "a freed image slot did not start the next picture")
+  for (const release of releases) release({})
+  await new Promise((resolve) => setImmediate(resolve))
+  for (const release of releases.slice(3)) release({})
+  await Promise.all(images)
 })
 
 test("original detail panels retain their read names on the exact r/ target", async () => {
