@@ -114,7 +114,7 @@ to live only as a copy inside the item's `item.phase_changed` payload — 233 of
 review (R3) counted them — a second truth beside the broker's records (D01). It is now one broker row, written in the same SQLite
 transaction as the phase change, keyed by item, repository, commit and target (the same four are the same row), and the
 event carries only its `landing_id`. Older events keep their `landing` copy; when the store opens, each copy is given the
-root row it would have been (same four keys, same id; `migrateLegacyLandings`), and no event is rewritten. `GET /v1/orchestrator/landings?work_id=<item>` and the item read list the same rows — bound tasks'
+root row it would have been (same four keys, same id; `migrateLegacyLandings`), and no event is rewritten. Two copies that share those four keys but name different tips become one row, the first written; on the machine this was measured on that folded 238 visible copies into 236. A binary older than this change, opening the same file after a rollback, reads both the row and the copy and lists such a landing twice. `GET /v1/orchestrator/landings?work_id=<item>` and the item read list the same rows — bound tasks'
 `landed`/`incorporated` records and root rows — from one function (`internal/app/work_v2_landings.go`).
 One item keeps 64 root rows (`work.root_landings_per_item`); the next is refused `landings_full`.
 

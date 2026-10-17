@@ -94,6 +94,10 @@ func TestLegacyLandingCopiesBecomeRootLandingsOnce(t *testing.T) {
 		{"w-b", `{"from":"merging","to":"deploying","landing_id":"rl-x","landing":{"commit":"c5","target":"main",` +
 			`"target_commit":"t","remote":"origin","remote_commit":"t"}}`},
 		{"w-b", `{"from":"implementing","to":"merging"}`},
+		// A repository that is not text was skipped by the old read; it is
+		// not made a row either.
+		{"w-b", `{"from":"merging","to":"deploying","landing":{"commit":"c6","target":"main",` +
+			`"target_commit":"t","remote":"origin","remote_commit":"t","repository":7}}`},
 	}
 	if err := s.WriteWorkV2(ctx, func(tx *WorkV2Tx) error {
 		for _, id := range []string{"w-a", "w-b"} {

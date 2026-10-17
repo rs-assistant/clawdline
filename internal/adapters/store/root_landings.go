@@ -25,8 +25,10 @@ import (
 // Idempotency-Key after a version reread, or Finish after `item phase` — is the
 // same row, and the first proof stands.
 //
-// An older daemon never reads this table. The events it wrote before it keep
-// their `landing` copy, and migrateLegacyLandings gives each copy its row.
+// The events an older daemon wrote keep their `landing` copy, and
+// migrateLegacyLandings gives each copy its row. An older binary opening the
+// same file reads both, so after a rollback a legacy landing is listed twice;
+// only the listing is affected.
 const rootLandingSchema = `
 CREATE TABLE IF NOT EXISTS broker_root_landings (
   id            TEXT    PRIMARY KEY,
@@ -183,6 +185,7 @@ func migrateLegacyLandings(db *sql.DB) error {
 	  FROM work_v2_events e JOIN work_v2_items i ON i.id = e.work_id
 	  WHERE e.kind = 'item.phase_changed' AND json_valid(e.payload)
 	    AND json_type(e.payload, '$.landing') = 'object' AND json_type(e.payload, '$.landing_id') IS NULL
+	    AND (json_type(e.payload, '$.landing.repository') IS NULL OR json_type(e.payload, '$.landing.repository') IN ('text', 'null'))
 	    AND json_type(e.payload, '$.landing.commit') = 'text' AND json_extract(e.payload, '$.landing.commit') != ''
 	    AND json_type(e.payload, '$.landing.target') = 'text' AND json_extract(e.payload, '$.landing.target') != ''
 	    AND json_type(e.payload, '$.landing.target_commit') = 'text' AND json_extract(e.payload, '$.landing.target_commit') != ''
@@ -249,8 +252,12 @@ func migrateLegacyLandings(db *sql.DB) error {
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("legacy landings: %w", err)
 	}
-	log.Printf("store: %d legacy landing copies became root landings; %d left out because their item already holds %d",
-		moved, full, WorkV2RootLandingLimit)
+	// Every open rescans; only an open that moved something says so, so an
+	// item already full does not repeat its line at every start.
+	if moved > 0 {
+		log.Printf("store: %d legacy landing copies became root landings; %d left out because their item already holds %d",
+			moved, full, WorkV2RootLandingLimit)
+	}
 	return nil
 }
 
