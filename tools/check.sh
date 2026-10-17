@@ -195,6 +195,7 @@ fi
 check "check planning and profiling tests" node --test tools/check-plan.test.mjs tools/check-profile.test.mjs tools/check-scope.test.mjs
 check "check modes integration" bash tools/test-check-modes.sh
 check "machine-word delta guard" bash tools/test-machine-words-changes.sh
+check "heavy handoff capability" bash tools/test-heavy-handoff.sh
 if [ "$(uname -s)" = Darwin ]; then
   check "Swift staged app watcher" sh tools/test-staged-app-watcher.sh
 fi
