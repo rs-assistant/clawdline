@@ -35,7 +35,13 @@ SCAN="tools/machine-words.py"
 [ -f "$ALLOW" ] || { echo "cannot check: no allow list at $ALLOW" >&2; exit 2; }
 [ -f "$SCAN" ] || { echo "cannot check: no scanner at $SCAN" >&2; exit 2; }
 
+if [ "$#" -gt 0 ]; then
+  [ "$1" != -- ] || shift
+  [ "$#" -gt 0 ] || { echo 'changed-file mode requires paths' >&2; exit 2; }
+  git ls-files --cached --others --exclude-standard -z -- "$@" | python3 "$SCAN" "$ALLOW" --changed
+else
 git ls-files -z -- '*.go' '*.ts' '*.tsx' \
   'web/console/public/catalogs/*.json' \
   'cmd/clawdline/cli_catalogs/*/*.json' \
   'internal/productcopy/*/*.json' | python3 "$SCAN" "$ALLOW"
+fi

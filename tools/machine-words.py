@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sys
+import os
 
 SKIP_PREFIX = (
     # Copied from the retired Swift app and compared byte for byte by
@@ -135,6 +136,8 @@ def main():
     found = []
     read = 0
     for path in sys.stdin.read().split("\0"):
+        if "--changed" in sys.argv and (not path.endswith((".go", ".ts", ".tsx")) and not (path.startswith(CATALOG_PREFIXES) and path.endswith(".json")) or not os.path.isfile(path)):
+            continue
         if not path or skipped(path):
             continue
         read += 1
@@ -158,6 +161,9 @@ def main():
                 if MAC.search(text) and (path, text) not in allowed:
                     found.append((path, number, text))
 
+    if read == 0 and "--changed" in sys.argv:
+        print("machine words: no changed scan inputs; whole-tree coverage stays in CI")
+        return 0
     if read == 0:
         print("checked nothing; a zero-file run is a failure, not a pass", file=sys.stderr)
         return 2

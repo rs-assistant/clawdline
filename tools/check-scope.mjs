@@ -76,6 +76,7 @@ export function guardPlan(paths, full) {
   const any = re => full || paths.some(p => re.test(p));
   return {
     format: any(/\.go$/),
+    machine: any(/\.(go|ts|tsx)$|^(web\/console\/public\/catalogs\/|cmd\/clawdline\/cli_catalogs\/|internal\/productcopy\/).*\.json$/),
     capacity: any(/\.go$|^api\/v1\/|^web\/console\/(public\/catalogs\/|src\/next-strings\.ts$)/),
     contract: any(/^api\/v1\/|^internal\/contract\/|^web\/contract\/|^tools\/contract-gen\//),
     legacy: any(/^web\/console\/(src\/legacy\/|public\/strings\/)/),
