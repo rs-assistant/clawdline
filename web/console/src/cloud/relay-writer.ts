@@ -99,8 +99,12 @@ export interface CloudWriteClient extends CloudReadClient {
   startPlace(place: string, assistant: string, model: string): Promise<unknown>
   resumePlace(place: string, past: string, assistant: string, requestId?: string): Promise<unknown>
   voice(audio: string, rate: number): Promise<unknown>
-  /** The planner follows dictation to the same explicitly chosen voice host. */
+  /** The fleet-wide fallback, including a person's explicit choice. */
   voiceHost?(): Promise<{ machine: string }>
+  /** The voice host for the Session currently shown by this relay reader. */
+  voiceHostFor?(machine: string): Promise<{ machine: string }>
+  /** Dictates using the same Session-aware routing decision as `voiceHostFor`. */
+  voiceFor?(machine: string, audio: string, rate: number): Promise<unknown>
   /**
    * The status line's read, and the Session info card's. The copied client has
    * had both since the Swift console; nothing here asked for them, so every
@@ -1292,7 +1296,9 @@ export class RelayWriter {
         if (typeof client.voiceHost !== "function") {
           throw failure("cloud_not_carried", "voice source", 501)
         }
-        const host = await client.voiceHost()
+        const host = typeof client.voiceHostFor === "function"
+          ? await client.voiceHostFor(this.host.machine)
+          : await client.voiceHost()
         const descriptor = client.machineDescriptor?.(host.machine)?.machine
         return {
           machine: host.machine,
@@ -1926,14 +1932,11 @@ export class RelayWriter {
     return client._read!(identity, "answer", { request: id, execution_generation: generation, answer: key, ...named }, "action:" + id, undefined, { retireUncertain: true })
   }
 
-  /**
-   * Dictation goes to the account's voice machine (`voiceHost`). With two machines and
-   * no choice made yet that is ambiguous, and the one this page is reading is
-   * the answer a person would give: it is chosen, once — `setVoiceHost` takes
-   * it only if it can transcribe, and keeps it for this browser and account,
-   * as choosing it on the Swift console's device sheet does.
-   */
+  /** Dictation follows the machine that owns this Session when it can transcribe. */
   private async dictate(client: CloudWriteClient, audio: string, rate: number): Promise<unknown> {
+    if (typeof client.voiceFor === "function") {
+      return client.voiceFor(this.host.machine, audio, rate)
+    }
     try {
       return await client.voice(audio, rate)
     } catch (error) {
