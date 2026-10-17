@@ -150,11 +150,14 @@ func (d *Daemon) Run(ctx context.Context) {
 
 // settleApp polls every AppSwapPollSecondsLimit until ctx ends; each poll
 // reads status.json and does nothing more unless an app bundle is staged.
+// While the app stays open, a poll asks after the pids it last saw instead
+// of listing every process (appWatch).
 func (d *Daemon) settleApp(ctx context.Context) {
 	t := time.NewTicker(AppSwapPollSecondsLimit * time.Second)
 	defer t.Stop()
+	w := &appWatch{env: d.Env, alive: processAlive}
 	for {
-		if swapped, err := d.Env.SettleApp(ctx); err != nil {
+		if swapped, err := d.Env.settleApp(ctx, w.running); err != nil {
 			d.logf("staged app not swapped in: %v", err)
 		} else if swapped {
 			d.logf("the staged app replaced the installed one")

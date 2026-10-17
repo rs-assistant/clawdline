@@ -1040,6 +1040,9 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		capacity.ReleaseAppSwapPollSeconds: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "a timing ceiling of the release updater; no retained buffer"}
 		},
+		capacity.ReleaseAppRelistSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "a timing ceiling of the release updater; no retained buffer"}
+		},
 		capacity.ReleaseAutoApplyRetrySeconds: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "a timing ceiling of the release updater; no retained buffer"}
 		},

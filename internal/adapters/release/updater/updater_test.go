@@ -736,7 +736,7 @@ func TestTheAppBundleIsSwappedOnlyWhenItIsNotRunning(t *testing.T) {
 	runFake := f.env.Run
 	f.env.Run = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		if name == "ps" {
-			return []byte("/sbin/launchd\n" + installed + "/Contents/MacOS/Clawdline Next\n"), nil
+			return []byte("    1 /sbin/launchd\n  812 " + installed + "/Contents/MacOS/Clawdline Next\n"), nil
 		}
 		return runFake(ctx, name, args...)
 	}

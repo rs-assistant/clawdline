@@ -75,7 +75,7 @@ func (e Env) Finish(ctx context.Context) error {
 			if err := e.clearPending(); err != nil {
 				return err
 			}
-			staged, aerr := e.swapApp(ctx, p.StagedApp, p.From)
+			staged, aerr := e.swapApp(ctx, p.StagedApp, p.From, e.appRunning)
 			var appErr *contract.UpdateApplyError
 			if aerr != nil {
 				appErr = &contract.UpdateApplyError{Code: "app_swap_deferred", Detail: aerr.Error()}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,26 +59,71 @@ func (e Env) stageApp(ctx context.Context, m release.Manifest, dir string) (stri
 
 // appRunning says whether any process runs from inside bundle.
 func (e Env) appRunning(ctx context.Context, bundle string) (bool, error) {
+	pids, err := e.appProcesses(ctx, bundle)
+	return len(pids) > 0, err
+}
+
+// appProcesses lists the pids of the processes running from inside bundle.
+func (e Env) appProcesses(ctx context.Context, bundle string) ([]int, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	out, err := e.Run(ctx, "ps", "-axo", "command=")
+	out, err := e.Run(ctx, "ps", "-axo", "pid=,command=")
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	prefix := bundle + "/Contents/"
+	var pids []int
 	for _, line := range strings.Split(string(out), "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
-			return true, nil
+		pid, command, ok := strings.Cut(strings.TrimSpace(line), " ")
+		if !ok || !strings.HasPrefix(strings.TrimSpace(command), prefix) {
+			continue
+		}
+		if n, err := strconv.Atoi(pid); err == nil {
+			pids = append(pids, n)
 		}
 	}
-	return false, nil
+	return pids, nil
+}
+
+// appWatch answers whether the app runs for a daemon that asks every
+// AppSwapPollSecondsLimit. It lists processes once and then asks the kernel
+// about the pids it found, listing again when every one of them is gone or
+// the listing is AppRelistSecondsLimit old. A quit and a reopen are still
+// seen within one poll: the old pids are gone, so the next look lists.
+type appWatch struct {
+	env    Env
+	alive  func(pid int) bool
+	bundle string
+	pids   []int
+	listed time.Time
+}
+
+func (w *appWatch) running(ctx context.Context, bundle string) (bool, error) {
+	now := time.Now()
+	if w.env.Now != nil {
+		now = w.env.Now()
+	}
+	if bundle == w.bundle && now.Sub(w.listed) < AppRelistSecondsLimit*time.Second {
+		for _, pid := range w.pids {
+			if w.alive(pid) {
+				return true, nil
+			}
+		}
+	}
+	pids, err := w.env.appProcesses(ctx, bundle)
+	if err != nil {
+		w.pids = nil
+		return false, err
+	}
+	w.bundle, w.pids, w.listed = bundle, pids, now
+	return len(pids) > 0, nil
 }
 
 // swapApp puts the staged bundle in place of the installed one when nothing
 // runs from it, keeping the replaced bundle in releases/<from>/app. It
 // answers the path still staged, "" once swapped. A running app keeps its
 // bundle: SettleApp swaps it after the app quits.
-func (e Env) swapApp(ctx context.Context, staged, from string) (string, error) {
+func (e Env) swapApp(ctx context.Context, staged, from string, running func(context.Context, string) (bool, error)) (string, error) {
 	app := e.installedApp()
 	if staged == "" || app == "" {
 		return "", nil
@@ -85,8 +131,8 @@ func (e Env) swapApp(ctx context.Context, staged, from string) (string, error) {
 	if _, err := os.Stat(staged); err != nil {
 		return "", nil
 	}
-	running, err := e.appRunning(ctx, app)
-	if err != nil || running {
+	busy, err := running(ctx, app)
+	if err != nil || busy {
 		return staged, err
 	}
 	keep := filepath.Join(e.Layout.ReleaseDir(from), "app", AppBundleName)
@@ -112,6 +158,10 @@ func (e Env) swapApp(ctx context.Context, staged, from string) (string, error) {
 // takes update.lock, so it never races an update; a held lock waits for the
 // next call.
 func (e Env) SettleApp(ctx context.Context) (bool, error) {
+	return e.settleApp(ctx, e.appRunning)
+}
+
+func (e Env) settleApp(ctx context.Context, running func(context.Context, string) (bool, error)) (bool, error) {
 	a, err := e.ReadApply()
 	if err != nil {
 		return false, err
@@ -123,7 +173,7 @@ func (e Env) SettleApp(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, nil
 	}
-	staged, err := e.swapApp(ctx, a.StagedApp, a.From)
+	staged, err := e.swapApp(ctx, a.StagedApp, a.From, running)
 	unlock()
 	if err != nil {
 		return false, err

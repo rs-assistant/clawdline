@@ -5604,6 +5604,8 @@
   "capacityRow.release.lock_stale_seconds.full": "標記還沒這麼舊之前，再按更新會被拒絕，說已經有更新在跑；超過之後就會接手，更新照常進行。你只要等就好。",
   "capacityRow.release.app_swap_poll_seconds.what": "新版 app 已下載好、等著換上時，Clawdline 多久看一次你是否已經關掉 app。app 只能在關閉時替換，間隔短才抓得到「關掉馬上又打開」。",
   "capacityRow.release.app_swap_poll_seconds.full": "這是檢查間隔，不會額滿。如果你關掉後在一次檢查之內又打開，這次還是舊版 app，下次關掉時就會換成新版。你不用做其他事。",
+  "capacityRow.release.app_relist_seconds.what": "新版 app 等著你關掉 app 時，Clawdline 會記住開著的 app 是哪幾個行程，之後只問它們還在不在。這是它最久多久就重新看一次全部行程。",
+  "capacityRow.release.app_relist_seconds.full": "這是檢查間隔，不會額滿。萬一記住的行程編號剛好被別的程式重用，新版最多晚這麼久才換上。你不用做其他事。",
   "capacityRow.release.auto_apply_retry_seconds.what": "自動更新因為有對話正在忙而暫停時，多久回頭看一次對話是否都閒下來了。這樣你停手後不久就能更新，不必等到幾小時後的下一次檢查。",
   "capacityRow.release.auto_apply_retry_seconds.full": "這是檢查間隔，不會額滿。只要某次檢查發現對話都閒著，更新就會開始。你不用做任何事。",
   "capacityRow.release.backups_kept.what": "每次更新前，Clawdline 會把它的資料（Board、待辦、設定等）完整備份一份，讓出問題的更新可以還原。每份都是完整副本，全部留著會把硬碟吃滿。",

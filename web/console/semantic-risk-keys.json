@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6050,
+  "englishKeys": 6052,
   "counts": {
-    "negation": 1922,
-    "state": 1079,
+    "negation": 1923,
+    "state": 1080,
     "permission": 374,
     "deletion": 157,
     "uncertainty": 175
   },
-  "unionCount": 2889,
+  "unionCount": 2891,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -235,6 +235,7 @@
       "capacityRow.proposals.open.full",
       "capacityRow.push.subscriptions.full",
       "capacityRow.push.subscriptions.what",
+      "capacityRow.release.app_relist_seconds.full",
       "capacityRow.release.app_swap_poll_seconds.full",
       "capacityRow.release.apply_follow_seconds.full",
       "capacityRow.release.archive_entries.full",
@@ -2110,6 +2111,7 @@
       "capacityRow.proposals.open.full",
       "capacityRow.push.subscriptions.full",
       "capacityRow.push.subscriptions.what",
+      "capacityRow.release.app_relist_seconds.what",
       "capacityRow.release.app_swap_poll_seconds.what",
       "capacityRow.release.apply_follow_seconds.what",
       "capacityRow.release.archive_entries.full",
@@ -4018,6 +4020,8 @@
     "capacityRow.proposals.open.full",
     "capacityRow.push.subscriptions.full",
     "capacityRow.push.subscriptions.what",
+    "capacityRow.release.app_relist_seconds.full",
+    "capacityRow.release.app_relist_seconds.what",
     "capacityRow.release.app_swap_poll_seconds.full",
     "capacityRow.release.app_swap_poll_seconds.what",
     "capacityRow.release.apply_follow_seconds.full",

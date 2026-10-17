@@ -302,6 +302,7 @@ const (
 	ReleaseStateFileBytes         = "release.state_file_bytes"
 	ReleaseApplyFollowSeconds     = "release.apply_follow_seconds"
 	ReleaseAppSwapPollSeconds     = "release.app_swap_poll_seconds"
+	ReleaseAppRelistSeconds       = "release.app_relist_seconds"
 	ReleaseAutoApplyRetrySeconds  = "release.auto_apply_retry_seconds"
 	UpdateApplyBodyBytes          = "update.apply_body_bytes"
 	// T4: where a person takes part.
@@ -1698,6 +1699,15 @@ func Register() []Entry {
 			Limit: 2, AtLimit: EvictOldest,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 			Sources: []string{"internal/adapters/release/updater.AppSwapPollSecondsLimit"},
+		},
+		{
+			// How long a daemon watching a running app trusts the pids it last
+			// listed before it runs `ps` again; a pid reused by another process
+			// delays the swap by at most this long.
+			Name: ReleaseAppRelistSeconds, Class: Cache, Unit: Seconds,
+			Limit: 60, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/release/updater.AppRelistSecondsLimit"},
 		},
 		{
 			// How often an auto-apply held back by a busy session looks again
