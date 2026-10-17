@@ -15,11 +15,12 @@ necessarily the executable opening the file. For repository work, use a named re
 `rg` rather than a recursive home-directory search. This avoids prompting for unrelated personal
 libraries and makes the search result relevant to the task.
 
-The local app bundle is signed ad hoc by `tools/package-macos.sh`. During the same audit, TCC
-reported that an existing code requirement did not match the newly installed bundle before it
-prompted again. A new bundle therefore needs its permissions checked as a new signed build; a
-stable signing identity is needed if grants must survive replacements. This does not make a broad
-filesystem search necessary.
+The local app bundle was signed ad hoc when this audit was made. Later builds
+used a self-signed certificate, but securityd still rejected it for WebKit's
+keychain item and added each build's cdhash to the ACL (2026-10-17). TCC also
+recorded the daemon's Automation grant by its resolved release path. The
+service now runs from one real path, and routine service updates retain the
+existing native App when its shell inputs are unchanged.
 
 ## The retired Swift checkout (before 2026-09-22)
 

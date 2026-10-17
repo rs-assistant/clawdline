@@ -102,9 +102,8 @@ jobs:
           done
 
       # Every macOS binary and the app are signed with the release's code
-      # signing certificate (tools/release/codesign.sh), so an update keeps the
-      # identity the person granted Dropbox, the local network and the
-      # keychain to. The .p12 is written to the runner's temporary directory
+      # Developer ID Application certificate (tools/release/codesign.sh).
+      # The .p12 is written to the runner's temporary directory
       # and removed with it.
       - name: Build every artifact
         env:

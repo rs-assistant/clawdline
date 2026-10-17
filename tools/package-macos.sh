@@ -112,6 +112,7 @@ cleanup() {
 . "$(dirname "$0")/release/codesign.sh"
 # The build's own exit status reaches cleanup, which reads it first.
 trap 's=$?; codesign_end; ( exit "$s" ); cleanup' EXIT
+codesign_begin
 
 # running_pids: the processes whose executable is inside the requested install
 # target — the shell and `clawdline serve` alike. A worktree build names the
@@ -172,6 +173,16 @@ cp "$TMUX_DIR"/licenses/*.txt "$BUILD/Contents/Resources/licenses/"
 # The shell's own files — the mascot packs its menu lists. Copied, like the
 # console below: nothing in the bundle points outside it.
 cp -R shell/darwin/Resources/. "$BUILD/Contents/Resources/"
+# This marker describes native shell inputs, excluding the bundled daemon and
+# web console. A service install can keep its existing App when only those
+# service-owned payloads change, preserving WebKit's keychain identity.
+{
+  find shell/darwin -type f -print | LC_ALL=C sort | while IFS= read -r file; do
+    shasum -a 256 "$file"
+  done
+  shasum -a 256 tools/package-macos.sh
+  printf '%s\n' "$(swiftc --version)" "$MACOS_MIN" "$CLAWDLINE_CODESIGN_ID"
+} | shasum -a 256 | awk '{print $1}' > "$BUILD/Contents/Resources/shell-revision"
 
 # The console travels with the app, copied and never linked: a bundle that
 # depends on a directory outside itself is not a bundle.
@@ -272,9 +283,9 @@ done
 # Signed as one bundle. The linker signs each binary on its own, but launch at
 # login (SMAppService) asks about the application, and an unsigned bundle is
 # one it may refuse. With a certificate (tools/release/codesign.sh) the
-# bundle keeps one identity across updates, so what the person allowed —
-# Dropbox, the local network, the keychain item WebKit keeps the Cloud keys
-# under — is not asked again; without one it is signed ad hoc, as before.
+# bundle keeps one code requirement across updates. WebKit's keychain grant
+# additionally requires an Apple-issued identity; official releases enforce
+# Developer ID Application in tools/release/build.sh.
 codesign_begin
 codesign_path "$BUILD/Contents/MacOS/clawdline" "$BUILD/Contents/Helpers/tmux" "$BUILD"
 

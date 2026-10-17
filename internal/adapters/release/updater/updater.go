@@ -283,6 +283,9 @@ func (e Env) restorePath() string { return filepath.Join(e.UpdateDir(), "restore
 // Running is the release this executable runs from: its releases/ entry and
 // its kind. A binary outside the layout is a source checkout with no name.
 func Running(l install.Layout, exe string) (string, install.Kind) {
+	if name, kind := l.ServiceRelease(exe); name != "" {
+		return name, kind
+	}
 	kind := l.KindOf(exe)
 	if kind != install.KindRelease && kind != install.KindSourceDeploy {
 		return "", kind
