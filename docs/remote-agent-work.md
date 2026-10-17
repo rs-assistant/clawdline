@@ -94,3 +94,31 @@ its body under the same ID, disconnect either machine, replace either Session
 execution, revoke the pair and drop each receipt in turn. Verify the exact
 state and that none of these cases creates a duplicate target Session or an
 unearned completion claim.
+
+
+## Paired-machine discovery
+
+`clawdline remote inspect --machine <id>` (also `remote projects` and `remote sessions`)
+reads the target's current Project catalog, Session projection and installed assistants.
+The Project IDs come from the exact catalog used by remote dispatch; no remembered target
+path or previous task is required. The reply also identifies the selected directed pair
+and the requesting Session execution. An omitted dispatch pair is selected only when one
+active outgoing pair matches; ambiguity is a typed refusal.
+
+Discovery has its own signed and encrypted `peer_discovery_publish` / `peer_discovery_envelope`
+request/reply domain. It uses the existing machine pair in both directions. Cloud checks
+the pair afresh before relaying; both daemons compare live pair metadata with their local
+pins. Replies must match a pending random request and its exact source execution. Query
+bodies and inventories remain encrypted; no viewer credential is created or required.
+The response body uses the existing peer body limit. Pending queries share the peer ingress
+bound, and each retains at most one reply. Duplicates are ignored and timeout releases the
+pending slot. Offline relay acknowledgments end a query without claiming target execution.
+Unknown capability or a lost response yields a timeout, never an empty successful inventory.
+
+The legacy peer CLI now accepts a machine pair as well as a Session grant. A received peer
+message is persisted before the broker delivers its idempotent wake to the exact current
+execution. The wake contains the request identity and `remote inbox <request-id>`, which
+checks the current execution before returning that exact message. Broker delivery failure
+remains unknown rather than earning an Agent observation or acknowledgment. This closes the
+previous gap where paired machines had no way to discover a dispatch Project and an inbox
+write could leave the intended Agent unaware of it.

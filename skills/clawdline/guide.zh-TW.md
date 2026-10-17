@@ -213,7 +213,7 @@ roster 與本機信任狀態；配對後要唯讀複查，也用這條。
 **不用瀏覽器就能把新 Agent 任務交給已配對機器。** 來源 Agent 在目前的 Session 執行
 `clawdline remote machines`，可列出本機固定的單向配對；此清單不證明目標在線，目標離線時
 會在派工時由 Relay 回報。選定目標機器已登錄的 Project ID，執行
-`clawdline remote dispatch --machine <id> --pair <id> --project <id> --assistant claude|codex --title <title> --instructions-file <path>`。
+`clawdline remote dispatch --machine <id> [--pair <id>] --project <id> --assistant claude|codex --title <title> --instructions-file <path>`。
 保留印出的任務 ID 與請求 ID。若回應不確定，重用這兩個 ID，或執行
 `clawdline remote retry <task-id>`；不要另建任務 ID。目標 Agent 讀取自己的私有任務說明，
 可以用 `clawdline remote send <task-id> <text>` 回覆，完成時用
@@ -221,6 +221,15 @@ roster 與本機信任狀態；配對後要唯讀複查，也用這條。
 用 `clawdline remote show <task-id>` 讀取已驗證的結果，向使用者報告，再用
 `clawdline remote ack <task-id>` 記錄已確認。`show` 記錄已讀；`ack` 必須在已讀之後。
 Relay 的交付狀態只證明 socket 傳送，不代表目標 Agent 已執行。
+
+**已配對機器的 Project 與 Session 探索**
+
+`clawdline remote machines` 列出已釘選的機器配對，不代表機器在線。
+接著執行 `clawdline remote inspect --machine <id>`（`remote projects` 與 `remote sessions` 是同義指令），透過相同機器配對讀取遠端可派工的 Project ID、Session 狀態與執行世代、可用助理，以及本機目前的 `source` 端點。不需要另外執行 viewer login。
+使用回傳的 Project ID 執行 `clawdline remote dispatch --machine <id> --project <id> --assistant claude|codex --title <title> --instructions-file <path>`。只有一份有效反向配對時會自動選取；有多份時須加上 `--pair <id>`。
+要傳訊息給既有 Session，使用探索結果中的完整端點執行 `clawdline cloud peer send <pair-id> <source-session> <source-generation> <target-machine> <target-session> <target-generation> message <text>`。接收端先持久保存訊息，再用冪等通知喚醒指定執行世代；通知會提供 `clawdline remote inbox <request-id>` 讀取該筆訊息。舊執行世代不能讀取新 Session 的資料。
+探索不會啟動 Session。離線、已撤銷、容量已滿、逾時與無法讀取會分別回報；舊版機器或 Relay 不支援探索時，不能當成遠端清單為空。Relay 送達只證明通道傳送，不代表 Agent 已閱讀。
+
 
 本機路由為 `POST /v1/cloud/peer/control`（`action`、配對或授權 ID、核對過的指紋、指定
 Session ID 與世代、範圍）、`POST /v1/cloud/peer/send`（`request` 內含兩端機器／Session／

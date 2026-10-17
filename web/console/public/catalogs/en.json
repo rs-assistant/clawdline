@@ -4240,7 +4240,7 @@
   "next.cloudPeerMachineOff": "Not connected",
   "next.cloudPeerMachineSwitch": "Connect {first} and {second}",
   "next.cloudPeerMachineChangeFailed": "Could not confirm the change on both machines. Refresh and try again.",
-  "next.cloudPeerAccessPurpose": "Choose which machines can exchange Agent messages and hand off work. This applies to every current Session on the connected machines.",
+  "next.cloudPeerAccessPurpose": "Choose which machines can discover Projects and Session status, exchange Agent messages, and assign or hand off work. Current Sessions on both machines can use this access.",
   "next.cloudPeerAccessCurrent": "Current permissions",
   "next.cloudPeerAccessReadFrom": "Read from {count} of {total} machines",
   "next.cloudPeerAccessNone": "No cross-machine permissions yet",
@@ -5993,5 +5993,7 @@
   "plan.control": "View and control Sessions from your phone",
   "plan.push": "Browser push notifications",
   "plan.webhooks": "Start saved schedules by webhook",
-  "plan.fine": "Local Sessions, the Board and built-in roles need no account and are always free. Both plans pair up to 5 phones or browsers, and a paired device keeps its slot while it is offline. Cloud provides the connection, not the compute: an offline machine runs nothing on either plan. Lemon Squeezy is the seller of record; cancel any time from the billing portal."
+  "plan.fine": "Local Sessions, the Board and built-in roles need no account and are always free. Both plans pair up to 5 phones or browsers, and a paired device keeps its slot while it is offline. Cloud provides the connection, not the compute: an offline machine runs nothing on either plan. Lemon Squeezy is the seller of record; cancel any time from the billing portal.",
+  "capacityRow.cloud.peer_discovery_reply.what": "Each inventory query retains one encrypted reply until its requesting Session reads it.",
+  "capacityRow.cloud.peer_discovery_reply.full": "Duplicate replies are ignored; a timed-out query releases its reply slot."
 }

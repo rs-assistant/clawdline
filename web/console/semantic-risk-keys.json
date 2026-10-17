@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 5993,
+  "englishKeys": 5995,
   "counts": {
     "negation": 1907,
     "state": 1066,
-    "permission": 373,
+    "permission": 374,
     "deletion": 156,
     "uncertainty": 174
   },
-  "unionCount": 2863,
+  "unionCount": 2864,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -3236,6 +3236,7 @@
       "next.cloudPeerAccessPairGone",
       "next.cloudPeerAccessPairProgress",
       "next.cloudPeerAccessPairUnconfirmed",
+      "next.cloudPeerAccessPurpose",
       "next.cloudPeerAccessRevokeDone",
       "next.cloudPeerAccessRevokeOne",
       "next.cloudPeerAccessRevokePairHere",
@@ -5823,6 +5824,7 @@
     "next.cloudPeerAccessPairUnconfirmed",
     "next.cloudPeerAccessPartialNone",
     "next.cloudPeerAccessPartialWhat",
+    "next.cloudPeerAccessPurpose",
     "next.cloudPeerAccessRevokeDone",
     "next.cloudPeerAccessRevokeOne",
     "next.cloudPeerAccessRevokePairHere",

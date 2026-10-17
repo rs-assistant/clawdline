@@ -99,3 +99,19 @@ func (s *Server) PeerTaskNotice(ctx context.Context, start agenthandoff.TaskStar
 		string(body), "remote-task-finish-"+start.TaskID)
 	return err
 }
+
+// PeerTaskMessageNotice wakes either owner of an existing remote task.
+func (s *Server) PeerTaskMessageNotice(ctx context.Context, event agenthandoff.TaskEvent) error {
+	if s.broker == nil || event.Recipient.MachineID != s.executionMachine() {
+		return errors.New("peer_task_notice_unavailable")
+	}
+	if err := s.AdmitExecutionTarget(ctx, event.Recipient.MachineID, event.Recipient.SessionID, event.Recipient.ExecutionGeneration); err != nil {
+		return err
+	}
+	body, err := json.Marshal(map[string]string{"protocol": "clawdline.remote_notice", "kind": "message", "task_id": event.Start.TaskID, "request_id": event.RequestID, "read_with": "clawdline remote show " + event.Start.TaskID})
+	if err != nil {
+		return err
+	}
+	_, err = s.broker.RemoteTaskNotice(ctx, event.Recipient.SessionID, string(body), "remote-task-message-"+event.Start.TaskID+"-"+event.RequestID)
+	return err
+}

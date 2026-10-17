@@ -1129,6 +1129,9 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		capacity.CloudPeerGrants: func() capacity.Reading { return s.peerStoreCapacity(capacity.CloudPeerGrants) },
 		capacity.CloudPeerInbox:  func() capacity.Reading { return s.peerStoreCapacity(capacity.CloudPeerInbox) },
 		capacity.CloudPeerOutbox: func() capacity.Reading { return s.peerStoreCapacity(capacity.CloudPeerOutbox) },
+		"cloud.peer_discovery_reply": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "one reply per pending machine inventory request"}
+		},
 		capacity.CloudPeerInboxPage: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "one item per pinned content read"}
 		},

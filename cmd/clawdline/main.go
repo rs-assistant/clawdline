@@ -348,16 +348,18 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		// The daemon's own routes, gate and all. A Cloud request is answered by
 		// exactly the handler a paired browser on this machine's own network
 		// reaches — one set of permission checks, not two.
-		Handler:           srv.Handler(),
-		TerminalService:   srv.CloudTerminalService,
-		TerminalProject:   srv.CloudTerminalProject,
-		DropTerminalGrant: srv.CloudDropTerminalGrant,
-		PeerReceipts:      srv.PeerReceipts(),
-		PeerAdmitTarget:   srv.AdmitExecutionTarget,
-		PeerExecute:       srv.PeerExecute,
-		PeerTaskStartOpen: srv.PeerTaskStartOpen,
-		PeerTaskProject:   srv.CloudTerminalProject,
-		PeerTaskNotice:    srv.PeerTaskNotice,
+		Handler:               srv.Handler(),
+		TerminalService:       srv.CloudTerminalService,
+		TerminalProject:       srv.CloudTerminalProject,
+		DropTerminalGrant:     srv.CloudDropTerminalGrant,
+		PeerReceipts:          srv.PeerReceipts(),
+		PeerAdmitTarget:       srv.AdmitExecutionTarget,
+		PeerExecute:           srv.PeerExecute,
+		PeerTaskStartOpen:     srv.PeerTaskStartOpen,
+		PeerTaskProject:       srv.CloudTerminalProject,
+		PeerInventory:         srv.PeerInventory,
+		PeerTaskMessageNotice: srv.PeerTaskMessageNotice,
+		PeerTaskNotice:        srv.PeerTaskNotice,
 		Authorize: func(r *http.Request) {
 			local, machine, err := srv.CloudCredentials()
 			if err != nil {

@@ -240,8 +240,8 @@ stand in for the peer machine signature or a current execution generation.
 **Assign a new Agent task to a paired machine without a browser.** In the source Agent's
 current Session, `clawdline remote machines` lists locally pinned directed pairs. It does not
 prove live presence; an offline target is reported by the relay when dispatch is attempted.
-Choose the target's registered Project ID, then run
-`clawdline remote dispatch --machine <id> --pair <id> --project <id> --assistant claude|codex --title <title> --instructions-file <path>`.
+Run `clawdline remote inspect --machine <id>` first (`remote projects` and `remote sessions` are aliases). It returns the target's dispatchable Project IDs, current Session status and execution generations, installed assistants, the selected pair ID, and your current `source` endpoint. It uses the machine pair, never a separate viewer login. Choose a returned Project ID, then run
+`clawdline remote dispatch --machine <id> [--pair <id>] --project <id> --assistant claude|codex --title <title> --instructions-file <path>`.
 Keep the printed task and request IDs. If the reply is uncertain, repeat with both IDs or use
 `clawdline remote retry <task-id>`; do not create a new task ID. The target Agent reads its
 private brief, can answer with `clawdline remote send <task-id> <text>`, and ends with
@@ -249,6 +249,7 @@ private brief, can answer with `clawdline remote send <task-id> <text>`, and end
 reads `clawdline remote show <task-id>` for the verified result, reports it to the person,
 then records `clawdline remote ack <task-id>`. `show` records observation; `ack` requires it.
 Relay delivery is only socket evidence, not proof that the target Agent ran.
+For an existing Session, use `clawdline cloud peer send <pair-id> <source-session> <source-generation> <target-machine> <target-session> <target-generation> message <text>` with the exact endpoints from `remote inspect`. The receiver persists its inbox entry and delivers one idempotent wake to that execution; the notice names `clawdline remote inbox <request-id>` to read the exact message. A replaced execution refuses the read. Inventory queries start no Session and have typed offline, revoked, busy, timeout and unavailable outcomes. An old machine or Relay that does not support discovery cannot be treated as an empty inventory.
 
 The local routes are `POST /v1/cloud/peer/control` (`action`, pair/grant id, compared fingerprint,
 exact Session ids and generations, scopes), `POST /v1/cloud/peer/send` (`request` with both

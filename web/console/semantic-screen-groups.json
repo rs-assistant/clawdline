@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 5993,
-  "riskKeys": 2863,
-  "nonRiskCount": 3130,
+  "englishContentKeys": 5995,
+  "riskKeys": 2864,
+  "nonRiskCount": 3131,
   "groups": [
     {
       "name": "bar / other",
@@ -43,7 +43,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 138,
+      "count": 140,
       "sources": [
         null
       ],
@@ -52,6 +52,8 @@
         "capacityRow.cache.session_skills.what",
         "capacityRow.callback.per_machine.what",
         "capacityRow.cloud.header_read_diagnostic_seconds.what",
+        "capacityRow.cloud.peer_discovery_reply.full",
+        "capacityRow.cloud.peer_discovery_reply.what",
         "capacityRow.cloud.peer_frame_bytes.what",
         "capacityRow.cloud.peer_inbox.what",
         "capacityRow.cloud.peer_inbox_page.what",
@@ -1814,7 +1816,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 216,
+      "count": 215,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1968,7 +1970,6 @@
         "next.cloudPeerAccessIntro",
         "next.cloudPeerAccessLoading",
         "next.cloudPeerAccessPairs",
-        "next.cloudPeerAccessPurpose",
         "next.cloudPeerAccessReadFrom",
         "next.cloudPeerAccessRefresh",
         "next.cloudPeerAccessScopesWhat",

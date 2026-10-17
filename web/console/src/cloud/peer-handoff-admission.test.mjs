@@ -98,7 +98,7 @@ test("the Cloud access page explains its purpose before any machine read or writ
       source: null, current: () => { writes++; return null },
     }))
     assert.match(html, /Cross-machine access/)
-    assert.match(html, /Choose which machines can exchange Agent messages/)
+    assert.match(html, /Choose which machines can discover Projects and Session status, exchange Agent messages/)
     assert.match(html, /Your machines/)
     assert.doesNotMatch(html, /Choose a Session|fingerprint|grant ID/i)
     assert.doesNotMatch(html, /Main · mac|Other · linux|Unpaired · new/)

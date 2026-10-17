@@ -73,12 +73,32 @@ func (s *Server) PeerReceipts() peerapp.Receipts { return s.store }
 // authority reads and a receipt claim. A message or handoff lands in a
 // separate inbox with its exact source and target execution identity.
 func (s *Server) PeerExecute(ctx context.Context, request peercontract.Request, body []byte) error {
+	if err := s.AdmitExecutionTarget(ctx, request.Target.MachineID, request.Target.SessionID, request.Target.ExecutionGeneration); err != nil {
+		return err
+	}
 	st, err := peerstore.Open(filepath.Join(s.cfg.Dir, cloudkeys.DirName))
 	if err != nil {
 		return err
 	}
 	defer st.Close()
-	return st.PutInbox(ctx, peerstore.InboxItem{Request: request, Body: string(body), At: time.Now().UTC()})
+	if err := st.PutInbox(ctx, peerstore.InboxItem{Request: request, Body: string(body), At: time.Now().UTC()}); err != nil {
+		return err
+	}
+	if s.broker == nil {
+		return errors.New("peer_session_delivery_unavailable")
+	}
+	// The broker's durable idempotency receipt prevents an uncertain send from
+	// being injected twice. Recheck the exact execution at the effect boundary.
+	if err := s.AdmitExecutionTarget(ctx, request.Target.MachineID, request.Target.SessionID, request.Target.ExecutionGeneration); err != nil {
+		return err
+	}
+	notice, err := json.Marshal(map[string]any{"protocol": "clawdline.peer_message", "request": request,
+		"read_with": "clawdline remote inbox " + request.RequestID})
+	if err != nil {
+		return err
+	}
+	_, err = s.broker.RemoteTaskNotice(ctx, request.Target.SessionID, string(notice), "peer-message-"+request.RequestID)
+	return err
 }
 
 func (s *Server) cloudPeerSendRoute(w http.ResponseWriter, r *http.Request) {

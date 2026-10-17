@@ -30,8 +30,20 @@ func remoteCommand(args []string) {
 			os.Exit(2)
 		}
 		err = remoteRequest(http.MethodGet, "/v1/remote/machines", nil)
+	case "inspect", "projects", "sessions":
+		err = remoteInspect(args[1:])
 	case "dispatch":
 		err = remoteDispatch(args[1:])
+	case "inbox":
+		if len(args) != 2 {
+			remoteUsage()
+			os.Exit(2)
+		}
+		var session string
+		session, err = remoteSession()
+		if err == nil {
+			err = remoteRequest(http.MethodGet, "/v1/remote/inbox/"+url.PathEscape(args[1])+"?session_id="+url.QueryEscape(session), nil)
+		}
 	case "show":
 		if len(args) != 2 {
 			remoteUsage()
@@ -70,8 +82,9 @@ func remoteCommand(args []string) {
 }
 
 func remoteUsage() {
+	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.inspect", "       clawdline remote inspect --machine ID [--pair ID] (Projects, Sessions and assistants)"))
 	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.machines", "usage: clawdline remote machines"))
-	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.dispatch", "       clawdline remote dispatch --machine ID --pair ID --project ID --assistant NAME --title TITLE --instructions-file PATH [--task-id UUID --request-id UUID]"))
+	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.dispatch", "       clawdline remote dispatch --machine ID [--pair ID] --project ID --assistant NAME --title TITLE --instructions-file PATH [--task-id UUID --request-id UUID]"))
 	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.show", "       clawdline remote show TASK-ID"))
 	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.send", "       clawdline remote send TASK-ID TEXT [--request-id UUID]"))
 	fmt.Fprintln(os.Stderr, cliCopy("remote", "usage.finish", "       clawdline remote finish TASK-ID TEXT [--request-id UUID]"))
@@ -100,8 +113,8 @@ func remoteDispatch(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if fs.NArg() != 0 || *machine == "" || *pair == "" || *project == "" || *assistant == "" || *title == "" || *file == "" {
-		return errors.New(cliCopy("remote", "error.dispatch_fields", "machine, pair, project, assistant, title and instructions file are required"))
+	if fs.NArg() != 0 || *machine == "" || *project == "" || *assistant == "" || *title == "" || *file == "" {
+		return errors.New(cliCopy("remote", "error.dispatch_fields", "machine, project, assistant, title and instructions file are required"))
 	}
 	if (*taskID == "") != (*requestID == "") {
 		return errors.New(cliCopy("remote", "error.retry_ids", "task ID and request ID must be supplied together"))
@@ -180,4 +193,21 @@ func remoteRequest(method, path string, body any) error {
 	}
 	fmt.Println(string(output))
 	return nil
+}
+
+func remoteInspect(args []string) error {
+	fs := flag.NewFlagSet("remote inspect", flag.ContinueOnError)
+	machine := fs.String("machine", "", "target machine")
+	pair := fs.String("pair", "", "pair (selected automatically when unambiguous)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 || *machine == "" {
+		return errors.New(cliCopy("remote", "error.machine", "a target machine is required"))
+	}
+	session, err := remoteSession()
+	if err != nil {
+		return err
+	}
+	return remoteRequest(http.MethodPost, "/v1/remote/inspect", map[string]any{"machine_id": *machine, "pair_id": *pair, "source_session": session})
 }
