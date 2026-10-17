@@ -70,6 +70,8 @@ go run ./tools/contract-gen -check      # Go and TypeScript are generated togeth
 tools/check-legacy-css.sh               # the byte-for-byte copies still match
 node web/console/tools/check-rounded-side-borders.mjs # no rounded surfaces with accent side borders
 tools/check-machine-words.sh            # no shown sentence calls the machine a Mac
+tools/heavy.sh bash tools/test-machine-words-changes.sh # delta scanning includes new files and preserves failures
+tools/heavy.sh bash tools/test-heavy-handoff.sh # capability discovery accepts help exit statuses
 tools/check-shell-expansions.sh         # no $name runs into a non-ASCII character
 tools/check-private.sh                  # nothing of the person's is in a public repo
 node tools/check-console-tests.mjs      # every console test file is run by npm test or npm run check

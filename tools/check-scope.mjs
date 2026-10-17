@@ -59,7 +59,9 @@ export function selectGoRuns(paths, packages, root, selected) {
     if (!changed.length || !inventory.length) return { package: name, pattern: '' };
     for (const path of changed) {
       if (!path.endsWith('.go')) return { package: name, pattern: '' };
-      const filename = path.slice(path.lastIndexOf('/')+1).replace(/(?:_test)?\.go$/, '_test.go');
+      // Server construction belongs to the route module; its handlers retain
+      // their own paired tests and CI retains the complete HTTP runtime suite.
+      const filename = path === 'internal/transport/http/server.go' ? 'routes_test.go' : path.slice(path.lastIndexOf('/')+1).replace(/(?:_test)?\.go$/, '_test.go');
       if (!inventory.includes(filename)) return { package: pkg.ImportPath, pattern: '' };
       files.add(filename);
     }
@@ -76,6 +78,7 @@ export function guardPlan(paths, full) {
   const any = re => full || paths.some(p => re.test(p));
   return {
     format: any(/\.go$/),
+    machine: any(/\.(go|ts|tsx)$|^(web\/console\/public\/catalogs\/|cmd\/clawdline\/cli_catalogs\/|internal\/productcopy\/).*\.json$/),
     capacity: any(/\.go$|^api\/v1\/|^web\/console\/(public\/catalogs\/|src\/next-strings\.ts$)/),
     contract: any(/^api\/v1\/|^internal\/contract\/|^web\/contract\/|^tools\/contract-gen\//),
     legacy: any(/^web\/console\/(src\/legacy\/|public\/strings\/)/),
@@ -111,7 +114,7 @@ export async function selectWeb(paths, root) {
   const tests = files.filter(p => p.startsWith('web/console/') && /\.test\.(ts|mjs)$/.test(p));
   // Catalogs, configuration and fixtures can be read without an import. Keep
   // their runtime coverage broad rather than guess about those dependencies.
-  if (paths.some(p => p.startsWith('web/') && !/^web\/console\/public\/(catalogs|strings)\//.test(p) && (!/\.(ts|tsx|js|mjs|css)$/.test(p) || !files.includes(p)))) return { tests, broad: true };
+  if (paths.some(p => p.startsWith('web/') && !/^web\/console\/public\/(catalogs|strings)\//.test(p) && !['web/console/semantic-risk-keys.json','web/console/semantic-screen-groups.json'].includes(p) && (!/\.(ts|tsx|js|mjs|css)$/.test(p) || !files.includes(p)))) return { tests, broad: true };
   const configFile = ts.readConfigFile(join(root, 'web/console/tsconfig.json'), ts.sys.readFile);
   if (configFile.error) throw new Error('unreadable TypeScript configuration');
   const config = ts.parseJsonConfigFileContent(configFile.config, ts.sys, join(root, 'web/console'));
@@ -128,7 +131,12 @@ export async function selectWeb(paths, root) {
       if (resolved && !resolved.includes('/node_modules/')) deps.push(relative(root, resolved));
     };
     const visit = node => {
-      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) add(node.moduleSpecifier.text);
+      if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteralLike(node.moduleSpecifier)) {
+        const clause = ts.isImportDeclaration(node) ? node.importClause : node;
+        const bindings = ts.isImportDeclaration(node) ? node.importClause?.namedBindings : node.exportClause;
+        const onlyTypes = clause?.isTypeOnly || bindings && 'elements' in bindings && bindings.elements.length > 0 && bindings.elements.every(e => e.isTypeOnly) && !(ts.isImportDeclaration(node) && node.importClause?.name);
+        if (!onlyTypes) add(node.moduleSpecifier.text);
+      }
       if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || ts.isIdentifier(node.expression) && node.expression.text === 'require')) {
         if (node.arguments.length === 1 && ts.isStringLiteralLike(node.arguments[0])) add(node.arguments[0].text);
         else { dynamic = true; deps.push(...paths); }

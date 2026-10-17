@@ -335,7 +335,10 @@ The console calls a persona a "Role" (角色). It reads `GET /v1/personas` once 
 temporarily draws no chips or bots. A transient transport, timeout, rate-limit or server failure
 is retried once per machine after five seconds; a successful catalog, including an empty one, is
 held. A machine that permanently refuses the route still shows the console it showed before this
-feature without a broken sheet.
+feature without a broken sheet. When Cloud changes the machine its reader points at, mounted
+Session rows subscribe again after the cache is cleared; a row that stays mounted must not keep
+an empty catalog from the previous reader. The viewer reports catalog read outcomes to the
+paired machine without sending role names.
 
 - **The team switcher.** The start sheet, its resume step and the Board's new-Session assignment
   draw one role row (`session/RoleRow.tsx`). When the catalog has personas in more than one team,

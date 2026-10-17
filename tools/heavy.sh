@@ -34,7 +34,7 @@ if [ -n "$cl" ] && { "$cl" 2>&1 || true; } | grep -q '|heavy|'; then
   if [ "${HEAVY_HANDOFF:-}" = 0 ]; then
     heavy_flags+=(--handoff=false)
   elif [ "${HEAVY_HANDOFF:-}" = 1 ]; then
-    if "$cl" heavy --help 2>&1 | grep -q -- '--handoff'; then
+    if { "$cl" heavy --help 2>&1 || true; } | grep -q -- '--handoff'; then
       heavy_flags+=(--handoff)
     else
       echo "tools/heavy.sh: this clawdline predates --handoff; waiting in place" >&2
