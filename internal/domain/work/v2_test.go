@@ -135,6 +135,51 @@ func TestAnUnassignedOrTerminalItemRejectsAgentProgress(t *testing.T) {
 	}
 }
 
+// The planning gate reads an Epic's plan documents in the order they were
+// written: a plan, then a review after the latest plan. Only the step from
+// assigned to implementing is gated.
+func TestPlanningGateReadsAnEpicsPlansInOrder(t *testing.T) {
+	epic := ItemV2{ID: "e", Kind: KindEpic, Phase: PhaseAssigned, OwnerSession: "s",
+		Cycle: 1, GateSnapshotCycle: 1, PlanningGate: true, AcceptanceCriteria: "done when it ships"}
+	docs := func(roles ...string) []DocumentV2 {
+		out := []DocumentV2{}
+		for _, r := range roles {
+			out = append(out, DocumentV2{Role: r})
+		}
+		return out
+	}
+	back := epic
+	back.Phase = PhaseVerifying
+	cases := []struct {
+		name  string
+		item  ItemV2
+		plans []DocumentV2
+		want  string
+	}{
+		{"nothing", epic, docs(), "epic_plan_required"},
+		{"a review alone", epic, docs(DocumentPlanReview), "epic_plan_required"},
+		{"a plan alone", epic, docs(DocumentPlan), "epic_plan_review_required"},
+		{"a review before the plan", epic, docs(DocumentPlanReview, DocumentPlan), "epic_plan_review_required"},
+		{"a rewritten plan", epic, docs(DocumentPlan, DocumentPlanReview, DocumentPlan), "epic_plan_review_required"},
+		{"a reviewed plan", epic, docs(DocumentPlan, DocumentPlanReview), ""},
+		{"a re-reviewed plan", epic, docs(DocumentPlan, DocumentPlanReview, DocumentPlan, DocumentPlanReview), ""},
+		{"a plan rewritten after two reviews", epic, docs(DocumentPlan, DocumentPlanReview, DocumentPlan, DocumentPlanReview, DocumentPlan), ""},
+		{"back from verifying", back, docs(), ""},
+	}
+	for _, c := range cases {
+		err := PlanningGate(c.item, PhaseImplementing, c.plans, PlanReviewSummary{})
+		got := ""
+		if r, ok := AsRefusalV2(err); ok {
+			got = r.Code
+		} else if err != nil {
+			t.Fatalf("%s: untyped %v", c.name, err)
+		}
+		if got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
 func TestPlanRolesApplyToAFeatureOrEpic(t *testing.T) {
 	for _, role := range []string{DocumentPlan, DocumentPlanReview} {
 		if !DocumentRoleValid(role) {
