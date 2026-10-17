@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="790" viewBox="0 0 1200 790" role="img" aria-labelledby="title desc">
+<title id="title">跨機器 Session 協作</title>
+<desc id="desc">Mac · 來源機器. Codex Session. 規劃任務 · 保留交付責任. 專案與 Session 探索. Clawdline Cloud. 端對端加密. 只轉送簽章密文. Linux · 配對機器. Claude Code Session. 在目標專案執行工作. 本機專案 · 執行環境 · 金鑰. 1  探索. 取得遠端 Project ID、Session 狀態與能力. 2  派工與對話. 開啟遠端 Session，或傳訊給既有 Session. 3  回傳並接續. 結果通知回到來源；Agent 讀取後繼續工作. 雙向配對與授權 · 兩台機器須在線 · 可撤銷連線. 程式碼、執行與內容金鑰留在各自機器上</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto-start-reverse"><path d="M0 0L8 4L0 8" fill="none" stroke="#91c9ff" stroke-width="1.4"/></marker></defs>
+<rect width="1200" height="790" rx="24" fill="#10151e"/>
+<g font-family="system-ui, -apple-system, sans-serif">
+<text x="48" y="64" font-size="34" fill="#e9edf5" font-weight="700" text-anchor="start">跨機器 Session 協作</text>
+<text x="48" y="104" font-size="21" fill="#abb9cc" font-weight="400" text-anchor="start">讓 Mac 與 Linux 上的 Agent 一起完成工作</text>
+<rect x="48" y="156" width="340" height="257" rx="16" fill="#1b2534" stroke="#40516a"/>
+<text x="72" y="196" font-size="23" fill="#e9edf5" font-weight="600" text-anchor="start">Mac · 來源機器</text>
+<rect x="68" y="220" width="300" height="112" rx="10" fill="#101a29" stroke="#596f8f"/>
+<text x="86" y="257" font-size="23" fill="#e9edf5" font-weight="600" text-anchor="start">Codex Session</text>
+<text x="86" y="292" font-size="16" fill="#b2c2d9" font-weight="400" text-anchor="start">規劃任務 · 保留交付責任</text>
+<text x="72" y="371" font-size="17" fill="#b2c2d9" font-weight="400" text-anchor="start">專案與 Session 探索</text>
+<rect x="812" y="156" width="340" height="257" rx="16" fill="#1b2534" stroke="#40516a"/>
+<text x="836" y="196" font-size="23" fill="#e9edf5" font-weight="600" text-anchor="start">Linux · 配對機器</text>
+<rect x="832" y="220" width="300" height="112" rx="10" fill="#101a29" stroke="#596f8f"/>
+<text x="850" y="257" font-size="23" fill="#e9edf5" font-weight="600" text-anchor="start">Claude Code Session</text>
+<text x="850" y="292" font-size="16" fill="#b2c2d9" font-weight="400" text-anchor="start">在目標專案執行工作</text>
+<text x="836" y="371" font-size="17" fill="#b2c2d9" font-weight="400" text-anchor="start">本機專案 · 執行環境 · 金鑰</text>
+<rect x="440" y="197" width="320" height="171" rx="30" fill="#172f3c" stroke="#70b7c7"/>
+<text x="600" y="243" font-size="25" fill="#e9edf5" font-weight="650" text-anchor="middle">Clawdline Cloud</text>
+<text x="600" y="286" font-size="21" fill="#98e3cc" font-weight="400" text-anchor="middle">端對端加密</text>
+<text x="600" y="323" font-size="17" fill="#b2c2d9" font-weight="400" text-anchor="middle">只轉送簽章密文</text>
+<path d="M394 269H432" stroke="#91c9ff" stroke-width="2.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<path d="M768 269H806" stroke="#91c9ff" stroke-width="2.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<path d="M64 450H1136" stroke="#33465f"/>
+<text x="60" y="495" font-size="23" fill="#98e3cc" font-weight="600" text-anchor="start">1  探索</text>
+<text x="320" y="495" font-size="21" fill="#e9edf5" font-weight="400" text-anchor="start">取得遠端 Project ID、Session 狀態與能力</text>
+<text x="60" y="570" font-size="23" fill="#98e3cc" font-weight="600" text-anchor="start">2  派工與對話</text>
+<text x="320" y="570" font-size="21" fill="#e9edf5" font-weight="400" text-anchor="start">開啟遠端 Session，或傳訊給既有 Session</text>
+<text x="60" y="645" font-size="23" fill="#98e3cc" font-weight="600" text-anchor="start">3  回傳並接續</text>
+<text x="320" y="645" font-size="21" fill="#e9edf5" font-weight="400" text-anchor="start">結果通知回到來源；Agent 讀取後繼續工作</text>
+<text x="60" y="718" font-size="19" fill="#bac8dc" font-weight="400" text-anchor="start">雙向配對與授權 · 兩台機器須在線 · 可撤銷連線</text>
+<text x="60" y="753" font-size="18" fill="#91a2ba" font-weight="400" text-anchor="start">程式碼、執行與內容金鑰留在各自機器上</text>
+</g></svg>
