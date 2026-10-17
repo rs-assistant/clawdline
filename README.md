@@ -22,6 +22,7 @@ One continuous console recording with sample data:
 - **Run work later:** Queue long commands with [callbacks](docs/user/clawdfather-and-dispatch.md#callbacks-for-long-commands) or start tasks with [schedules](docs/user/schedules.md). Cloud Pro adds webhook triggers.
 - **Bring your projects together:** [Register projects](docs/user/projects.md), share rules and skills across Claude Code and Codex with [unify](docs/project-files.md#unify), and see [usage](docs/user/usage.md).
 - **See every machine:** [Clawdline Cloud](docs/user/remote-access.md) shows Sessions from multiple machines together on your phone and connects through an end-to-end encrypted relay.
+- **Connect directly from your phone:** When ICE can reach your machine, live Terminal and Session reads use a direct WebRTC data channel. The encrypted relay remains available when direct connection fails. [Cloud connection](docs/cloud.md)
 
 Clawdline runs the daemon and console on your machine and works with Claude Code and Codex Sessions you already use. Cloud is optional; its relay carries encrypted data. [How it works](docs/architecture.md)
 
@@ -32,6 +33,14 @@ Let Codex on your Mac work with Claude Code on Linux. After reciprocal pairing, 
 ![Cross-machine collaboration: discovery, dispatch and messages, then a result notice; Cloud routes ciphertext only](docs/assets/cross-machine-sessions-en.svg)
 
 Both machines must be online and authorize the connection. Work runs on the target machine; code and content keys stay on your hardware. Pairing is revocable, and task completion does not mean changes have landed. **Available in dev builds today**; the release installer does not yet include the new discovery and Session wake-up features. [Usage and authority boundaries](docs/remote-agent-work.md)
+
+## A direct path from your phone to your machine (Cloud)
+
+For a paired phone, Clawdline first tries to open a direct WebRTC data channel to your Mac or Linux machine for live Terminal and Session reads. This removes the relay hop from those reads and can make the Terminal feel more responsive. Cloud still carries connection signalling and other commands; if ICE cannot connect directly, the end-to-end encrypted relay carries the reads instead.
+
+![A phone connects directly to a Mac or Linux machine for Terminal and Session reads, with Clawdline Cloud as encrypted signalling and fallback](docs/assets/phone-direct-en.svg)
+
+The machine can turn direct connections off in Settings → Remote or with `clawdline cloud direct off`. An AWS Linux host can bind ICE to one UDP port; see [the Cloud guide](docs/cloud.md#aws-linux-direct-connection) and [the full Linux procedure](docs/linux.md#let-a-cloud-browser-connect-directly-to-ec2). Fixed-port setup is currently in development builds.
 
 ## Install
 

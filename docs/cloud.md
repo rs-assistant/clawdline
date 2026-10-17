@@ -80,6 +80,44 @@ this machine switch. An EC2 instance can additionally set `cloud_direct_udp_port
 `cloud_direct_public_ip` together to multiplex direct ICE on one inbound UDP port; see
 [Linux setup](linux.md#let-a-cloud-browser-connect-directly-to-ec2).
 
+### AWS Linux direct connection
+
+For Terminal and Session reads from a paired phone, direct WebRTC removes the relay from the live
+data path when ICE succeeds. Cloud still carries signalling and other commands, and the encrypted
+relay takes over if direct ICE fails. To configure an EC2 Linux machine:
+
+1. Confirm its AWS account, Region, instance, network interface, security group, public IPv4,
+   Internet Gateway route and network ACL. A private IPv4 alone is not reachable from a phone on
+   mobile data. A public IPv4 may change after an EC2 stop/start; update the setting if it does.
+2. Merge the following keys into the Clawdline service user's existing
+   `~/.config/clawdline-next/config.json`, preserving other keys and replacing `PUBLIC_IPV4` with
+   the instance's actual public address:
+
+   ```json
+   {
+     "cloud_terminal_direct": true,
+     "cloud_direct_udp_port": 3479,
+     "cloud_direct_public_ip": "PUBLIC_IPV4"
+   }
+   ```
+
+3. On the instance's security group, permit **inbound UDP 3479** from the phone's public IP, or
+   `0.0.0.0/0` when that address changes. Permit outbound UDP to the phone's dynamic ICE port;
+   `1024-65535` is the general rule when its port is unknown. A custom stateless network ACL and
+   the host firewall must permit both directions. Do not open HTTP 7727, SSH, a NAT Gateway or a
+   broad inbound ephemeral UDP range for this connection.
+4. Run `clawdline cloud direct on` as the service user and check `clawdline cloud status` for
+   `direct true`. On Linux, `ss -lunp` should show Clawdline listening on UDP 3479 after a
+   direct offer. From the paired phone on mobile data, open the machine's Terminal and type a
+   harmless command. A daemon log `input` receipt with `outcome=ok_direct` proves that input used
+   the direct carrier. A working Terminal without that receipt may be using the relay.
+
+The port and public IP must be configured together. To pause direct use for development, run
+`clawdline cloud direct off`; the encrypted relay remains available. Security group rules and an
+Internet Gateway have no separate hourly charge, while an existing public IPv4 and Internet data
+transfer retain their usual AWS charges. See the [full EC2 procedure](linux.md#let-a-cloud-browser-connect-directly-to-ec2)
+for rule commands, a safe transition from older ephemeral rules and further verification.
+
 The connection backs off and reconnects. An outbound spool owns publish order and capacity, while inbound queues and per-channel answer reserves produce typed busy or refusal answers where possible. An accepted relay write is not the same as an executed command or an observed answer. Logs and status counters separate published, acknowledged, answered, refused and undeliverable work. Protocol and capacity details are in [cloud-wire.md](cloud-wire.md), [limits.md](limits.md), and the transport code; this overview does not promise delivery after every network or process failure.
 
 The hosted console also records a content-free `cloud.write.failed` viewer event for a refused write. Its word, code, layer, outcome, connection state and stage distinguish a refusal before publication from one whose envelope may have reached the relay or machine. The event carries no message text or request body and is delivered through `diagnostics.events` to the paired machine's daemon log. A read or mutation waiting for a complete command descriptor follows a replacement Cloud client instead of spending the remaining five-second wait on a retired one. A mutation checks that current client's descriptor again before publishing.
