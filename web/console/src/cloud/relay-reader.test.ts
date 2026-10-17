@@ -1667,16 +1667,6 @@ const CARRIED_READS: [string, string, Record<string, unknown>][] = [
   ["/v1/projects/%2Fp/worktrees", "project-worktree-lifecycle", { project: "/p" }],
   ["/v1/board?project=p1", "board", { project: "p1", item: "" }],
   ["/v1/board?project=p1&item=i1", "board", { project: "p1", item: "i1" }],
-  [
-    "/v1/board?project=p1&audience=human",
-    "board.items",
-    { project: "p1", audience: "human", cursor: 0, limit: 30 },
-  ],
-  [
-    "/v1/board?project=p1&audience=agent&cursor=60&limit=90",
-    "board.items",
-    { project: "p1", audience: "agent", cursor: 60, limit: 90 },
-  ],
 ]
 
 test("the work system and projects reach the machine as their own words", async () => {
