@@ -5368,6 +5368,8 @@
   "capacityRow.audit.security.full": "目前的檔案會收起來，接著開新檔繼續寫；舊檔案留在磁碟上，Clawdline 不會刪。功能不受影響。如果在意磁碟空間，可以自己封存或刪掉舊檔。",
   "capacityRow.store.db.what": "Clawdline 主要資料庫的大小，裡面有 Board 項目、派出去的工作紀錄和它們的落地紀錄。上限設在一般用量遠遠到不了的地方，碰到了就代表有東西寫入量異常。",
   "capacityRow.store.db.full": "目前額滿時不會拒絕任何寫入，唯一的效果是狀態頁顯示 Clawdline 不健康。請先查是什麼在長大，以免把磁碟塞滿。",
+  "capacityRow.store.events.what": "Clawdline 記錄「發生過什麼事」的流水帳保留幾列：工作狀態變化、送出的推播、關掉的 Session 等。超過兩週的列會刪掉，只留下 Clawdline 還會回頭讀的、每個 Session 最新的那一列。",
+  "capacityRow.store.events.full": "超過上限時先刪最舊的列，就算還不滿兩週也一樣。畫面上沒有東西依賴它們，你不用做任何事。",
   "capacityRow.session.executions.what": "Clawdline 為這台機器上多少個對話保留身分記號，讓從手機送出的訊息一定送到原本那個程式，而不是剛好用了同一個終端的新程式。",
   "capacityRow.session.executions.full": "關掉的對話會自己釋出名額。萬一額滿，從手機送訊息給對話會被拒絕，直到有對話關掉為止；舊的紀錄不會被偷偷丟掉。",
   "capacityRow.cache.session_execution_memo.what": "Clawdline 記住上一次核對過的開啟中對話清單。頁面開著時清單每兩秒左右重建一次，沒變就不必每次都寫資料庫。",

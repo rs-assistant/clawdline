@@ -68,7 +68,8 @@ const (
 	// before the sweep removes it.
 	ReferenceImageOrphanAgeLimit = time.Hour
 	// ReferenceImageSweepIntervalLimit is how often the daemon sweeps, after
-	// the sweep every Open runs.
+	// the sweep every Open runs; the events prune runs on the same clock
+	// (MaintainEvery).
 	ReferenceImageSweepIntervalLimit = 6 * time.Hour
 )
 
@@ -305,8 +306,13 @@ func (s *Store) noteSweep(now time.Time, removed int) {
 	s.images.mu.Unlock()
 }
 
-// SweepReferenceImagesEvery sweeps on a clock until ctx ends.
-func (s *Store) SweepReferenceImagesEvery(ctx context.Context, every time.Duration) {
+// MaintainEvery prunes the events table at once, then, on a clock until ctx
+// ends, sweeps reference-image files no row names and prunes events again.
+// Both are the store letting go of what nothing reads; one clock serves both.
+func (s *Store) MaintainEvery(ctx context.Context, every time.Duration) {
+	if _, err := s.PruneEvents(ctx, time.Now()); err != nil && ctx.Err() == nil {
+		log.Printf("store: the events prune failed: %v", err)
+	}
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
@@ -316,6 +322,9 @@ func (s *Store) SweepReferenceImagesEvery(ctx context.Context, every time.Durati
 		case now := <-t.C:
 			if _, err := s.SweepReferenceImages(ctx, now); err != nil && ctx.Err() == nil {
 				log.Printf("store: the reference-image sweep failed: %v", err)
+			}
+			if _, err := s.PruneEvents(ctx, now); err != nil && ctx.Err() == nil {
+				log.Printf("store: the events prune failed: %v", err)
 			}
 		}
 	}

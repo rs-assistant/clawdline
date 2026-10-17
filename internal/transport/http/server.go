@@ -794,7 +794,8 @@ func (s *Server) StartScheduler(ctx context.Context) {
 	}.Run(ctx)
 	log.Printf("scheduler ticking every %s", tick)
 	// Reference-image files no row names: swept at Open, then on this clock.
-	go s.store.SweepReferenceImagesEvery(ctx, store.ReferenceImageSweepIntervalLimit)
+	// Events past their retention: pruned now, then on the same clock.
+	go s.store.MaintainEvery(ctx, store.ReferenceImageSweepIntervalLimit)
 	// Whether this machine trails the cloud's latest build: read now and on
 	// its own clock, so GET /v1/update never waits on the network.
 	go s.runUpdateCheck(ctx)

@@ -50,11 +50,13 @@ type Store struct {
 	// images is where Board and to-do reference pictures keep their bytes
 	// (work_v2_image_files.go).
 	images *imageFiles
+	// prunes is the events prune's account (events_retention.go).
+	prunes eventPruneStats
 }
 
-// Event is one persisted fact. Events are never edited and never deleted: a
-// correction is another event, so that replay produces the same state a reader
-// saw at the time.
+// Event is one persisted fact. Events are never edited: a correction is another
+// event. They are deleted only by the retention rule (events_retention.go),
+// which keeps every row a reader still needs.
 type Event struct {
 	Seq     int64           `json:"seq"`
 	At      time.Time       `json:"at"`

@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6050,
+  "englishKeys": 6052,
   "counts": {
-    "negation": 1922,
-    "state": 1079,
+    "negation": 1923,
+    "state": 1080,
     "permission": 374,
-    "deletion": 157,
+    "deletion": 159,
     "uncertainty": 175
   },
-  "unionCount": 2889,
+  "unionCount": 2891,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -338,6 +338,7 @@
       "capacityRow.sse.screen_pending.full",
       "capacityRow.sse.screen_pending.what",
       "capacityRow.store.db.full",
+      "capacityRow.store.events.full",
       "capacityRow.store.read_connections.full",
       "capacityRow.store.read_connections.what",
       "capacityRow.store.receipts.full",
@@ -2209,6 +2210,7 @@
       "capacityRow.sse.screen_pending.full",
       "capacityRow.sse.screen_pending.what",
       "capacityRow.store.db.full",
+      "capacityRow.store.events.what",
       "capacityRow.store.read_connections.what",
       "capacityRow.store.receipts.full",
       "capacityRow.store.receipts.what",
@@ -3427,6 +3429,8 @@
       "capacityRow.squad.receipts.full",
       "capacityRow.squad.settings_rows.full",
       "capacityRow.squadpackage.file_bytes.full",
+      "capacityRow.store.events.full",
+      "capacityRow.store.events.what",
       "capacityRow.terminal.launch_scripts.full",
       "capacityRow.usage.work_cursor_rows.full",
       "capacityRow.usage.work_units_per_answer.full",
@@ -4164,6 +4168,8 @@
     "capacityRow.sse.screen_pending.full",
     "capacityRow.sse.screen_pending.what",
     "capacityRow.store.db.full",
+    "capacityRow.store.events.full",
+    "capacityRow.store.events.what",
     "capacityRow.store.read_connections.full",
     "capacityRow.store.read_connections.what",
     "capacityRow.store.receipts.full",

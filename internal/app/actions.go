@@ -308,7 +308,6 @@ func (a Actions) send(ctx context.Context, s session.Session, text string) (sess
 	if err := h.Send(ctx, s, text); err != nil {
 		return s, sendRefusal(s, err)
 	}
-	a.record(ctx, "session.typed", s.ID, map[string]any{"bytes": len(text)})
 	return s, nil
 }
 
@@ -393,7 +392,6 @@ func (a Actions) SendPrepared(ctx context.Context, id, text string, prepare orch
 	if err := h.Send(ctx, s, text); err != nil {
 		return s, sendRefusal(s, err)
 	}
-	a.record(ctx, "session.typed", s.ID, map[string]any{"bytes": len(text), "prepared": true})
 	return s, nil
 }
 
@@ -506,21 +504,17 @@ func (a Actions) SendWithPictures(ctx context.Context, id, text string, images [
 	if len(paths) == 0 {
 		return s, Refusal{Code: "bad_request", Detail: "None of those were images I could read."}
 	}
-	how, err := a.deliverPictures(ctx, s, h, text, paths)
-	if err != nil {
+	if err := a.deliverPictures(ctx, s, h, text, paths); err != nil {
 		a.Pictures.Drops.Discard(paths)
 		return s, err
 	}
-	a.record(ctx, "session.typed", s.ID, map[string]any{
-		"bytes": len(text), "images": len(paths), "skipped": len(images) - len(paths), "delivery": how,
-	})
 	return s, nil
 }
 
-// deliverPictures is `Targets.send(_ pieces:to:)`, and answers how the
-// pictures went: "paste" or "path".
+// deliverPictures is `Targets.send(_ pieces:to:)`: the pictures go as pastes
+// where the assistant takes them, as quoted paths otherwise.
 func (a Actions) deliverPictures(ctx context.Context, s session.Session, h ports.TerminalHost,
-	text string, paths []string) (string, error) {
+	text string, paths []string) error {
 	asPaths := func(pending []string) string {
 		parts := []string{}
 		if text != "" {
@@ -531,17 +525,17 @@ func (a Actions) deliverPictures(ctx context.Context, s session.Session, h ports
 		}
 		return strings.Join(parts, " ")
 	}
-	sendPaths := func() (string, error) {
+	sendPaths := func() error {
 		if err := h.Send(ctx, s, asPaths(paths)); err != nil {
-			return "", sendRefusal(s, err)
+			return sendRefusal(s, err)
 		}
-		return "path", nil
+		return nil
 	}
 	// Paths are one line, typed in the terminal's own turn (D22).
-	byPath := func() (string, error) {
+	byPath := func() error {
 		release, err := a.turn(ctx, s)
 		if err != nil {
-			return "", err
+			return err
 		}
 		defer release()
 		return sendPaths()
@@ -558,7 +552,7 @@ func (a Actions) deliverPictures(ctx context.Context, s session.Session, h ports
 
 	release, err := takePasteboard(ctx)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer release()
 	// Then the terminal's turn, for the whole prompt — words, pastes, Return
@@ -569,7 +563,7 @@ func (a Actions) deliverPictures(ctx context.Context, s session.Session, h ports
 	// the first thing a picture send meets.
 	turn, err := a.turn(ctx, s)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer turn()
 	// Once the pasteboard is ours the prompt is typed to the end, whatever the
@@ -592,7 +586,7 @@ func (a Actions) deliverPictures(ctx context.Context, s session.Session, h ports
 	typed := false
 	if text != "" {
 		if err := typer.Type(work, s, text); err != nil {
-			return "", Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
+			return Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
 		}
 		typed = true
 	}
@@ -606,25 +600,24 @@ func (a Actions) deliverPictures(ctx context.Context, s session.Session, h ports
 				words = " " + words
 			}
 			if err := typer.Type(work, s, words); err != nil {
-				return "", Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
+				return Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
 			}
 			typed = true
 			continue
 		}
 		if err := keys.Keystroke(work, s, keyPaste); err != nil {
-			return "", Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
+			return Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
 		}
 		typed = true
 		time.Sleep(pictureSettle)
 	}
 	if err := keys.Keystroke(work, s, keyReturn); err != nil {
-		return "", Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
+		return Refusal{RawDetail: true, Code: "send_failed", Detail: err.Error()}
 	}
 	if asPath > 0 {
 		log.Printf("send: %d image(s) went as paths", asPath)
-		return "paste+path", nil
 	}
-	return "paste", nil
+	return nil
 }
 
 // takePasteboard waits for the pasteboard, a little. The refusal says nothing

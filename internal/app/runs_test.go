@@ -105,3 +105,13 @@ func TestARunsExcerptSurvivesARestartAndOlderRunsHaveNone(t *testing.T) {
 		t.Fatalf("an older run: %+v %v %v", old, ok, err)
 	}
 }
+
+// The run and waiting readers ask for the newest row about a subject; the
+// events prune must keep that row for each of their kinds however old it is.
+func TestTheEventsPruneKeepsWhatRunsAndWaitingRead(t *testing.T) {
+	for _, kind := range []string{EventRunLatest, WaitingEvent} {
+		if !store.EventKindKeptLatest(kind) {
+			t.Errorf("%s is read through LatestEvents and the prune does not keep its newest row", kind)
+		}
+	}
+}

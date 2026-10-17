@@ -156,6 +156,7 @@ const (
 const (
 	AuditSecurity     = "audit.security"
 	StoreDB           = "store.db"
+	StoreEvents       = "store.events"
 	SessionExecutions = "session.executions"
 	SessionNoMovement = "session.no_movement_seconds"
 	// How often a Cloud Session row whose only change is volatile is re-sent.
@@ -636,6 +637,19 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics, Notice, Health},
 			EvictedBy: Person,
 			Projects:  true,
+		},
+		{
+			// The store's events table, the operational journal. Rows past
+			// EventAgeLimit are deleted except the newest per subject of each
+			// kind a program reads back; past this many rows the oldest of the
+			// rest go first, whatever their age. Pruned in batches on the
+			// reference-image sweep's clock (store.MaintainEvery).
+			Name: StoreEvents, Class: Journal, Unit: Rows,
+			Limit: 150_000, AtLimit: EvictOldest,
+			Told:      []Channel{Diagnostics},
+			EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/store.EventAgeLimit", "internal/adapters/store.EventKeepLimit",
+				"internal/adapters/store.EventPruneBatchLimit"},
 		},
 		{
 			// One durable identity per terminal id on this machine. Full
