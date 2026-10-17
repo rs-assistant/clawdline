@@ -454,6 +454,8 @@ func (s *Store) BrokerTaskHeadsSince(ctx context.Context, since time.Time) ([]Br
 // every write either adds a row or moves one row's version up by one, so two
 // equal tallies mean no write happened between them — whatever the writer's
 // clock said, which the updated_at a write carries cannot promise.
+// TestNoWriteBreaksTheBrokerTally reads every statement that names the table
+// and fails on one that does not keep this.
 type BrokerTally struct {
 	Rows     int64
 	Versions int64
