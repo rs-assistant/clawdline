@@ -743,7 +743,7 @@ func (p *Publisher) Pass(ctx context.Context) { p.tick(ctx) }
 // only the descriptor: its heartbeat is what a viewer arriving later needs
 // first, and the rows that viewer needs come from the `sessions.snapshot`
 // it asks on connecting (`relay-reader.ts`), which restatePass answers with
-// a list built then. Measured on 2026-10-17 (task a934ba81): 409 publications
+// a list built then. Measured on 2026-10-17: 409 publications
 // in ten minutes, every one fanned out to nobody, and with no local console
 // open each pass built the whole list (about 90 ms of CPU) to send them.
 func (p *Publisher) tick(ctx context.Context) {
