@@ -70,6 +70,7 @@ type ReadingScenario =
   | "callback-owner"
 let readingScenario: ReadingScenario = "normal"
 let callbackDone = false
+const callbackReason = "Go tests for a long command whose complete name cannot fit on a phone"
 let inlineDecisionFixture = false
 let inlineDecisionAnswers = 0
 const workflowID = "00000000-0000-4000-8000-000000000041"
@@ -169,7 +170,7 @@ function rows(): Row[] {
   if (readingScenario === "expired") return []
   if (readingScenario === "callback-owner") return [
     row(SAFE, "示範：Go 測試", safeCloseability(), Date.now() / 1000,
-      { heavy_work: callbackDone ? undefined : { task_id: "callback-heavy", reason: "Go tests", started_at: Math.floor(Date.now() / 1000) - 72 } }),
+      { heavy_work: callbackDone ? undefined : { task_id: "callback-heavy", reason: callbackReason, started_at: Math.floor(Date.now() / 1000) - 72 } }),
     row(BLOCKED, "Wait callback running", blockedCloseability(), 200),
     row(UNKNOWN, "Heavy callback queued", unknownCloseability(), 100),
   ]
@@ -756,7 +757,7 @@ function daemon(): Server {
         : readingScenario === "callback-owner" && !callbackDone
         ? [
             { id: "callback-heavy", kind: "callback", callback_intent: "heavy", state: "briefed", created: 1,
-              title: "Go tests", root: { terminalId: SAFE, sessionId: "conversation-" + SAFE } },
+              title: callbackReason, root: { terminalId: SAFE, sessionId: "conversation-" + SAFE } },
             { id: "callback-wait", kind: "callback", callback_intent: "wait", state: "briefed", created: 1,
               title: "Wait for CI", root: { terminalId: BLOCKED, sessionId: "conversation-" + BLOCKED } },
             { id: "callback-queued", kind: "callback", callback_intent: "heavy", state: "briefed", created: 1,
@@ -1286,8 +1287,8 @@ test("a phone marks only the Session whose heavy callback is running", () =>
           listWidth: document.querySelector("#list-scroll")?.scrollWidth,
           viewportWidth: window.innerWidth }
       })()`)
-      assert.equal(badge.text, "🏗️Go tests")
-      assert.ok(badge.title?.includes("Go tests"), JSON.stringify(badge))
+      assert.equal(badge.text, "🏗️" + callbackReason)
+      assert.ok(badge.title?.includes(callbackReason), JSON.stringify(badge))
       assert.equal(badge.visible, true)
       assert.ok(badge.spinnerWidth > 0, JSON.stringify(badge))
       assert.equal(badge.spinnerHidden, "true")
@@ -1300,15 +1301,29 @@ test("a phone marks only the Session whose heavy callback is running", () =>
         const read = () => {
           const mark = document.querySelector("#tx .tx-heavy")
           const spin = mark?.querySelector("canvas.spin")
-          if (mark && spin?.width) return resolve({ text: mark.textContent, width: spin.getBoundingClientRect().width,
+          const elapsed = mark?.querySelector(".elapsed")
+          const line = mark?.querySelector(".line")
+          if (mark && spin?.width && elapsed && line) return resolve({ text: mark.textContent,
+            width: spin.getBoundingClientRect().width, elapsed: elapsed.textContent,
+            elapsedVisible: elapsed.scrollWidth <= elapsed.clientWidth,
+            elapsedBeforeReason: elapsed.getBoundingClientRect().right < line.getBoundingClientRect().left,
+            reasonClipped: line.scrollWidth > line.clientWidth,
+            reasonTitle: line.getAttribute("title"),
+            oneLine: Math.abs(elapsed.getBoundingClientRect().top - line.getBoundingClientRect().top) < 2,
             nativeWorking: !!document.querySelector("#tx .tx-working:not(.tx-heavy)") })
           if (Date.now() >= deadline) return reject(new Error("heavy work did not appear inside the idle Session"))
           setTimeout(read, 25)
         }
         read()
       })`)
-      assert.match(inside.text, /^🏗️重工作業進行中 · Go tests · 1m \d+s$/)
+      assert.match(inside.text, /^🏗️1m \d+s重工作業進行中 · Go tests/)
       assert.ok(inside.width > 0)
+      assert.match(inside.elapsed, /^1m \d+s$/)
+      assert.equal(inside.elapsedVisible, true)
+      assert.equal(inside.elapsedBeforeReason, true)
+      assert.equal(inside.reasonClipped, true)
+      assert.equal(inside.reasonTitle, callbackReason)
+      assert.equal(inside.oneLine, true)
       assert.equal(inside.nativeWorking, false)
       callbackDone = true
       pushSessions()
