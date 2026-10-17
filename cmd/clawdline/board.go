@@ -14,22 +14,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sainteye/clawdline/internal/adapters/board"
 	"github.com/sainteye/clawdline/internal/domain/work"
 )
 
 // `clawdline board tracks`: the old cards on the three tracks of
 // docs/board-redesign.md, by the same rules as `GET /v1/board/tracks`.
 //
-// Without --store it asks the running daemon. With --store it reads a board
-// file itself — the Swift app's, or a copy of it — and the card logs beside
-// it, and writes nothing anywhere: that is how a saved snapshot is replayed,
-// and how the rules are checked against the numbers they were written from.
+// It asks the running daemon. The cards were the retired Swift app's, whose
+// board is no longer read (docs/cutover.md §7), so the replay of a board file
+// that `--store` offered is gone with it.
 
 func boardCommand(args []string) {
 	if len(args) == 0 || args[0] != "tracks" {
 		fmt.Fprintln(os.Stderr, cliCopy("workflow", "board.usage_clawdline_board_tracks_project_id_track_todo", "usage: clawdline board tracks [--project id] [--track todo|board|backlog] [--rows] [--json]"))
-		fmt.Fprintln(os.Stderr, cliCopy("workflow", "board.store_board_json_sessions_file_assume_complete_now", "                              [--store board.json [--sessions file [--assume-complete]] [--now time] [--stall-days n]]"))
 		os.Exit(2)
 	}
 	fs := flag.NewFlagSet("board tracks", flag.ExitOnError)
@@ -37,11 +34,6 @@ func boardCommand(args []string) {
 	track := fs.String("track", "", cliCopy("workflow", "board.list_the_rows_of_one_track_todo_board", "list the rows of one track: todo, board or backlog"))
 	rows := fs.Bool("rows", false, cliCopy("workflow", "board.list_the_cards_under_their_buckets", "list the cards under their buckets"))
 	asJSON := fs.Bool("json", false, cliCopy("workflow", "board.print_the_projection_as_json_every_row_included", "print the projection as JSON, every row included"))
-	store := fs.String("store", "", cliCopy("workflow", "board.read_this_board_file_instead_of_asking_the", "read this board file instead of asking the daemon (read-only)"))
-	sessions := fs.String("sessions", "", cliCopy("workflow", "board.with_store_a_saved_get_v1_sessions_answer", "with --store: a saved GET /v1/sessions answer, the reading of running sessions"))
-	assume := fs.Bool("assume-complete", false, cliCopy("workflow", "board.with_sessions_take_that_reading_as_complete_even", "with --sessions: take that reading as complete even where it says it was not"))
-	now := fs.String("now", "", cliCopy("workflow", "board.with_store_evaluate_at_this_time_rfc_3339", "with --store: evaluate at this time, RFC 3339 or Unix seconds"))
-	stallDays := fs.Float64("stall-days", work.DefaultStall.Hours()/24, cliCopy("workflow", "board.with_store_days_a_started_card_may_go", "with --store: days a started card may go without a fact"))
 	_ = fs.Parse(args[1:])
 	if fs.NArg() > 0 {
 		fail(fmt.Errorf(cliCopy("workflow", "board.unexpected_argument_q", "unexpected argument %q"), fs.Arg(0)))
@@ -52,25 +44,7 @@ func boardCommand(args []string) {
 		fail(fmt.Errorf(cliCopy("workflow", "board.a_track_is_todo_board_or_backlog_not", "a track is todo, board or backlog, not %q"), *track))
 	}
 
-	var t work.Tracks
-	var err error
-	if *store == "" {
-		if *sessions != "" || *assume || *now != "" || isSet(fs, "stall-days") {
-			fail(errors.New(cliCopy("workflow", "board.sessions_assume_complete_now_and_stall_days_replay", "--sessions, --assume-complete, --now and --stall-days replay a file; they need --store")))
-		}
-		t, err = daemonTracks(*project, work.Track(*track), *rows || *asJSON)
-	} else {
-		t, err = fileTracks(*store, *project, *sessions, *assume, *now, *stallDays)
-		if err == nil && *track != "" {
-			kept := []work.Row{}
-			for _, r := range t.Rows {
-				if r.Track == work.Track(*track) {
-					kept = append(kept, r)
-				}
-			}
-			t.Rows = kept
-		}
-	}
+	t, err := daemonTracks(*project, work.Track(*track), *rows || *asJSON)
 	if err != nil {
 		fail(err)
 	}
@@ -80,12 +54,6 @@ func boardCommand(args []string) {
 		return
 	}
 	printTracks(os.Stdout, t, *rows)
-}
-
-func isSet(fs *flag.FlagSet, name string) bool {
-	set := false
-	fs.Visit(func(f *flag.Flag) { set = set || f.Name == name })
-	return set
 }
 
 // daemonTracks reads the route, every page of it when the rows are wanted.
@@ -147,135 +115,6 @@ func daemonTracks(project string, track work.Track, all bool) (work.Tracks, erro
 		}
 		cursor = *body.Tracks.NextCursor
 	}
-}
-
-// fileTracks projects a board file without a daemon. Nothing is written: the
-// board and the logs are opened read-only and the answer goes to stdout.
-func fileTracks(path, project, sessionsPath string, assume bool, nowText string, stallDays float64) (work.Tracks, error) {
-	at := time.Now()
-	if nowText != "" {
-		parsed, err := parseInstant(nowText)
-		if err != nil {
-			return work.Tracks{}, err
-		}
-		at = parsed
-	}
-	if !(stallDays > 0 && stallDays <= 365) {
-		return work.Tracks{}, fmt.Errorf(cliCopy("workflow", "board.stall_days_is_more_than_0_and_at", "--stall-days is more than 0 and at most 365, not %v"), stallDays)
-	}
-	if assume && sessionsPath == "" {
-		return work.Tracks{}, errors.New(cliCopy("workflow", "board.assume_complete_needs_sessions", "--assume-complete needs --sessions"))
-	}
-
-	state, readAt, err := board.OpenLegacy(path).Read()
-	if errors.Is(err, board.ErrLegacyAbsent) {
-		return work.Tracks{}, fmt.Errorf(cliCopy("workflow", "board.no_board_at_s", "no board at %s"), path)
-	}
-	if err != nil {
-		return work.Tracks{}, err
-	}
-	ids := []string{}
-	for _, item := range state.Items {
-		if project == "" || item.ProjectID == project {
-			ids = append(ids, item.ID)
-		}
-	}
-	if project != "" && len(ids) == 0 {
-		known := false
-		for _, p := range state.Projects {
-			known = known || p.ID == project
-		}
-		if !known {
-			return work.Tracks{}, fmt.Errorf(cliCopy("workflow", "board.the_board_has_no_project_q", "the board has no project %q"), project)
-		}
-	}
-	histories, history := board.OpenHistory(board.HistoryDir(path)).Read(ids)
-	keep := map[string]bool{}
-	for _, id := range ids {
-		keep[id] = true
-	}
-	var cards []work.Card
-	for _, c := range board.TrackCards(state, histories) {
-		if keep[c.ID] {
-			cards = append(cards, c)
-		}
-	}
-
-	presence := work.Presence{}
-	presenceSource := work.PresenceSource{From: "none"}
-	if sessionsPath != "" {
-		presence, presenceSource, err = savedPresence(sessionsPath, assume)
-		if err != nil {
-			return work.Tracks{}, err
-		}
-	}
-
-	stall := time.Duration(stallDays * float64(24*time.Hour))
-	t := work.Tracks{Projection: work.Project(cards, presence, at, stall), Sources: work.Sources{
-		Board: work.BoardSource{Status: "ok", Revision: state.Revision, Cards: len(state.Items),
-			ReadAt: float64(readAt.UnixNano()) / 1e9},
-		History: history, Presence: presenceSource,
-	}}
-	if project != "" {
-		t.Project = &project
-	}
-	return t, nil
-}
-
-// savedPresence reads a saved `GET /v1/sessions` answer. The reading is
-// complete when its own scan says so and every assistant in it has a
-// conversation id — the rule the daemon applies to its live reading — or when
-// the person running this says so with --assume-complete, which is recorded.
-func savedPresence(path string, assume bool) (work.Presence, work.PresenceSource, error) {
-	file, err := os.OpenFile(path, os.O_RDONLY, 0)
-	if err != nil {
-		return work.Presence{}, work.PresenceSource{}, err
-	}
-	defer file.Close()
-	var snapshot struct {
-		Scan *struct {
-			Complete bool `json:"complete"`
-		} `json:"scan"`
-		Sessions []struct {
-			ID        string `json:"id"`
-			Assistant string `json:"assistant"`
-			SessionID string `json:"sessionId"`
-		} `json:"sessions"`
-	}
-	if err := json.NewDecoder(io.LimitReader(file, 16<<20)).Decode(&snapshot); err != nil {
-		return work.Presence{}, work.PresenceSource{}, fmt.Errorf(cliCopy("workflow", "board.s_is_not_a_get_v1_sessions_answer", "%s is not a GET /v1/sessions answer: %w"), path, err)
-	}
-	p := work.Presence{Complete: snapshot.Scan != nil && snapshot.Scan.Complete, Sessions: map[string]bool{}}
-	count := 0
-	for _, s := range snapshot.Sessions {
-		if s.Assistant == "" {
-			continue
-		}
-		count++
-		p.Sessions[strings.ToLower(s.ID)] = true
-		if s.SessionID == "" {
-			p.Complete = false
-			continue
-		}
-		p.Sessions[strings.ToLower(s.SessionID)] = true
-	}
-	source := work.PresenceSource{From: "file", Complete: p.Complete, Sessions: count}
-	if assume && !p.Complete {
-		p.Complete, source.Complete, source.Assumed = true, true, true
-	}
-	return p, source, nil
-}
-
-// parseInstant reads RFC 3339 or Unix seconds.
-func parseInstant(text string) (time.Time, error) {
-	if seconds, err := strconv.ParseFloat(text, 64); err == nil {
-		whole := int64(seconds)
-		return time.Unix(whole, int64((seconds-float64(whole))*1e9)), nil
-	}
-	if t, err := time.Parse(time.RFC3339Nano, text); err == nil {
-		return t, nil
-	}
-	return time.Time{}, fmt.Errorf(cliCopy("workflow", "board.now_is_rfc_3339_or_unix_seconds_not", "--now is RFC 3339 or Unix seconds, not %q"), text)
 }
 
 // printTracks is the §7.2 table, and the rows under it when asked.

@@ -166,7 +166,7 @@ func (s *Server) saveSessionTitle(item session.Session, raw string, now time.Tim
 func (s *Server) sessionDisplayLabel(ctx context.Context, item session.Session) string {
 	live := liveOf(item)
 	lives := []swiftstore.Live{live}
-	view := s.swift.Read()
+	view := swiftstore.Snapshot{}
 	if s.store != nil {
 		records, release := recordsContext(ctx)
 		own, err := s.ownOverlay(records, lives)

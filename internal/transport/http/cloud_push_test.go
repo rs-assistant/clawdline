@@ -57,7 +57,6 @@ func newPushStandIn(t *testing.T) *pushStandIn {
 func newPushStandInFor(t *testing.T, appOrigin string) *pushStandIn {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "clawdline-next")
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "swift"))
 	st, err := store.Open(dir)
 	if err != nil {
 		t.Fatal(err)

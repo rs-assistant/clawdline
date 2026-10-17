@@ -66,7 +66,6 @@ func TestAMissingRecordStaysNotFound(t *testing.T) {
 // tell a machine to update before it asks for what the machine lacks.
 func TestHealthSaysTheVersionAndTheAPILevel(t *testing.T) {
 	withoutInheritedNextEnv(t)
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "swift"))
 	t.Setenv("CLAWDLINE_NEXT_WEB", "")
 	cfg := config.Load()
 	cfg.Dir = filepath.Join(t.TempDir(), "next")

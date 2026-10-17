@@ -26,7 +26,6 @@ import (
 
 func capacityServer(t *testing.T) *Server {
 	t.Helper()
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "swift"))
 	dir := filepath.Join(t.TempDir(), "next")
 	st, err := store.Open(dir)
 	if err != nil {

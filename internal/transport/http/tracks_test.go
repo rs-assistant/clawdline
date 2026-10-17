@@ -12,7 +12,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -22,8 +21,9 @@ import (
 	"github.com/sainteye/clawdline/internal/domain/work"
 )
 
-// tracksFixture is a daemon with its own store, reading a board of 251 cards
-// and their logs from a directory of its own.
+// tracksFixture is a daemon with its own store, beside a canary: a retired
+// Swift board of 251 cards and their logs, where that app kept them and where
+// its override pointed. The route must read none of it (docs/cutover.md §7).
 type tracksFixture struct {
 	s       *Server
 	st      *store.Store
@@ -36,28 +36,30 @@ func newTracksFixture(t *testing.T) *tracksFixture {
 	t.Helper()
 	root := t.TempDir()
 	next := filepath.Join(root, "next")
-	boardPath := filepath.Join(root, "Clawdline", "project-board.json")
-	history := boardstore.HistoryDir(boardPath)
+	boardPath := filepath.Join(root, "Library", "Application Support", "Clawdline", "project-board.json")
+	history := filepath.Join(filepath.Dir(boardPath), "project-board-history")
 	if err := os.MkdirAll(history, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	state := boardstore.StoredState{SchemaVersion: 2, Revision: 42,
-		Projects: []boardstore.StoredProject{{ID: "p1", Name: "one"}, {ID: "p2", Name: "two"}, {ID: "p3", Name: "empty"}}}
+	t.Setenv("HOME", root)
+	t.Setenv("CLAWDLINE_BOARD_STORE", boardPath)
+	items := []map[string]any{}
 	for i := 0; i < 251; i++ {
 		project := "p1"
 		if i == 250 {
 			project = "p2"
 		}
 		id := fmt.Sprintf("card-%03d", i)
-		state.Items = append(state.Items, boardstore.StoredItem{ID: id, Key: fmt.Sprintf("CLA-%d", i),
-			ProjectID: project, Title: "work " + id, Type: "feature", State: "backlog",
-			CreatedAt: 1_789_000_000 + float64(i), UpdatedAt: 1_789_000_000 + float64(i)})
+		items = append(items, map[string]any{"id": id, "key": fmt.Sprintf("CLA-%d", i), "projectId": project,
+			"title": "work " + id, "type": "feature", "state": "backlog",
+			"createdAt": 1_789_000_000 + i, "updatedAt": 1_789_000_000 + i})
 		line := fmt.Sprintf(`{"kind":"item_created","at":%d}`+"\n", 1_789_000_000+i)
 		if err := os.WriteFile(filepath.Join(history, id+".jsonl"), []byte(line), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	body, _ := json.Marshal(state)
+	body, _ := json.Marshal(map[string]any{"schemaVersion": 2, "revision": 42, "items": items,
+		"projects": []map[string]any{{"id": "p1", "name": "one"}, {"id": "p2", "name": "two"}}})
 	if err := os.WriteFile(boardPath, body, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -68,10 +70,8 @@ func newTracksFixture(t *testing.T) *tracksFixture {
 	}
 	t.Cleanup(func() { st.Close() })
 	s := &Server{cfg: config.Config{Dir: next}, store: st}
-	boardByServer.Store(s, &boardDeps{legacy: boardstore.OpenLegacy(boardPath),
-		settings: boardstore.OpenSettings(next)})
+	boardByServer.Store(s, &boardDeps{settings: boardstore.OpenSettings(next)})
 	tracksByServer.Store(s, &tracksDeps{
-		history: boardstore.OpenHistory(history),
 		presence: func(context.Context) (work.Presence, work.PresenceSource) {
 			return work.Presence{}, work.PresenceSource{From: "inventory"}
 		},
@@ -100,51 +100,30 @@ func TestTracksRoute(t *testing.T) {
 	f := newTracksFixture(t)
 
 	rec, all := f.get(t, http.MethodGet, "/v1/board/tracks")
-	if rec.Code != http.StatusOK || all.Counts.Cards != 251 ||
-		all.Counts.Todo+all.Counts.Board+all.Counts.Backlog != 251 || all.Project != nil {
-		t.Fatalf("all: %d %+v", rec.Code, all.Counts)
+	if rec.Code != http.StatusOK || all.Counts.Cards != 0 || len(all.Rows) != 0 || all.NextCursor != nil || all.Project != nil {
+		t.Fatalf("the retired board's cards were read: %d %+v", rec.Code, all.Counts)
 	}
-	if all.Sources.Board != (work.BoardSource{Status: "ok", Revision: 42, Cards: 251, ReadAt: all.Sources.Board.ReadAt}) ||
-		all.Sources.History != (work.HistorySource{Status: "ok", Files: 251}) || all.Sources.Presence.From != "inventory" {
+	if all.Sources.Board != (work.BoardSource{Status: "disabled"}) ||
+		all.Sources.History != (work.HistorySource{Status: "disabled"}) || all.Sources.Presence.From != "inventory" {
 		t.Fatalf("sources: %+v", all.Sources)
 	}
-	if all.EvaluatedAt != 1_790_000_000 || all.Rules != work.RulesVersion || all.PageSize != TracksPageSize ||
-		len(all.Rows) != TracksPageSize || all.NextCursor == nil {
-		t.Fatalf("first page: %v %s %d rows, next %v", all.EvaluatedAt, all.Rules, len(all.Rows), all.NextCursor)
+	if all.EvaluatedAt != 1_790_000_000 || all.Rules != work.RulesVersion || all.PageSize != TracksPageSize {
+		t.Fatalf("projection: %v %s %d", all.EvaluatedAt, all.Rules, all.PageSize)
 	}
-	rec, second := f.get(t, http.MethodGet, "/v1/board/tracks?cursor="+*all.NextCursor)
-	if rec.Code != http.StatusOK || len(second.Rows) != 51 || second.NextCursor != nil || second.Counts != all.Counts {
-		t.Fatalf("second page: %d, %d rows, next %v", rec.Code, len(second.Rows), second.NextCursor)
-	}
-
-	rec, p2 := f.get(t, http.MethodGet, "/v1/board/tracks?project=p2&track=backlog")
-	if rec.Code != http.StatusOK || p2.Counts.Cards != 1 || *p2.Project != "p2" || p2.Sources.History.Files != 1 {
-		t.Fatalf("one project: %d %+v", rec.Code, p2)
-	}
-	if rec, p3 := f.get(t, http.MethodGet, "/v1/board/tracks?project=p3"); rec.Code != http.StatusOK || p3.Counts.Cards != 0 {
-		t.Fatalf("a project the board names and has no card in: %d %+v", rec.Code, p3.Counts)
-	}
-	rec, todo := f.get(t, http.MethodGet, "/v1/board/tracks?track=todo")
-	if rec.Code != http.StatusOK || len(todo.Rows) != todo.Counts.Todo || todo.Counts != all.Counts {
-		t.Fatalf("one track: %d rows of %d", len(todo.Rows), todo.Counts.Todo)
+	if rec, todo := f.get(t, http.MethodGet, "/v1/board/tracks?track=todo"); rec.Code != http.StatusOK || todo.Counts != all.Counts {
+		t.Fatalf("one track: %d %+v", rec.Code, todo.Counts)
 	}
 
 	for target, code := range map[string]string{
-		"/v1/board/tracks?project=nope":             "project_not_found",
-		"/v1/board/tracks?audience=human":           "bad_request",
-		"/v1/board/tracks?project=p1&project=p2":    "bad_request",
-		"/v1/board/tracks?project=":                 "bad_request",
-		"/v1/board/tracks?track=Board":              "invalid_track",
-		"/v1/board/tracks?cursor=0:1789000000:card": "",
-		"/v1/board/tracks?cursor=nine":              "invalid_cursor",
+		// p1 is a project of the canary board; no board this daemon reads has it.
+		"/v1/board/tracks?project=p1":            "project_not_found",
+		"/v1/board/tracks?audience=human":        "bad_request",
+		"/v1/board/tracks?project=p1&project=p2": "bad_request",
+		"/v1/board/tracks?project=":              "bad_request",
+		"/v1/board/tracks?track=Board":           "invalid_track",
+		"/v1/board/tracks?cursor=nine":           "invalid_cursor",
 	} {
 		rec, _ := f.get(t, http.MethodGet, target)
-		if code == "" {
-			if rec.Code != http.StatusOK {
-				t.Errorf("%s: %d %s", target, rec.Code, rec.Body)
-			}
-			continue
-		}
 		var refusal struct{ Error string }
 		_ = json.Unmarshal(rec.Body.Bytes(), &refusal)
 		if refusal.Error != code || rec.Code < 400 {
@@ -153,25 +132,6 @@ func TestTracksRoute(t *testing.T) {
 	}
 	if rec, _ := f.get(t, http.MethodPost, "/v1/board/tracks"); rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("POST: %d", rec.Code)
-	}
-}
-
-// With no Swift board on the machine the answer is zero cards, and says why.
-func TestTracksWithNoBoard(t *testing.T) {
-	f := newTracksFixture(t)
-	boardByServer.Store(f.s, &boardDeps{legacy: boardstore.OpenLegacy(filepath.Join(f.root, "absent.json")),
-		settings: boardstore.OpenSettings(f.next)})
-	rec, got := f.get(t, http.MethodGet, "/v1/board/tracks")
-	if rec.Code != http.StatusOK || got.Counts.Cards != 0 || got.Sources.Board.Status != "absent" {
-		t.Fatalf("%d %+v", rec.Code, got)
-	}
-	// A board that cannot be read is not an empty one.
-	broken := filepath.Join(f.root, "broken.json")
-	_ = os.WriteFile(broken, []byte("{"), 0o600)
-	boardByServer.Store(f.s, &boardDeps{legacy: boardstore.OpenLegacy(broken), settings: boardstore.OpenSettings(f.next)})
-	if rec, _ := f.get(t, http.MethodGet, "/v1/board/tracks"); rec.Code != http.StatusServiceUnavailable ||
-		!strings.Contains(rec.Body.String(), "board_store_corrupt") {
-		t.Fatalf("unreadable board: %d %s", rec.Code, rec.Body)
 	}
 }
 
@@ -264,7 +224,7 @@ func TestTracksWriteNothing(t *testing.T) {
 	before := stampTree(t, f.root)
 
 	var cursor string
-	for _, target := range []string{"/v1/board/tracks", "/v1/board/tracks?project=p2",
+	for _, target := range []string{"/v1/board/tracks", "/v1/board/tracks?project=p1",
 		"/v1/board/tracks?track=backlog", "/v1/board/tracks?project=nope", "/v1/board/tracks?cursor=nine"} {
 		rec, got := f.get(t, http.MethodGet, target)
 		if got.NextCursor != nil {

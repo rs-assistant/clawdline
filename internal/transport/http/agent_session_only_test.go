@@ -64,7 +64,6 @@ func shellPane(cwd string) touchPane {
 func wholeServer(t *testing.T, host ports.TerminalHost, screen ports.ScreenHost) (*Server, http.Handler, string, string) {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "clawdline-next")
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "swift"))
 	t.Setenv("CLAWDLINE_NEXT_WEB", "")
 	st, err := store.Open(dir)
 	if err != nil {

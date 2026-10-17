@@ -22,7 +22,6 @@ func projectCloudStandIn(t *testing.T) *standIn {
 	}
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home)
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(home, "swift"))
 	state := filepath.Join(home, "state")
 	project := filepath.Join(home, "project")
 	if err := os.MkdirAll(project, 0700); err != nil {

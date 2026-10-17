@@ -91,7 +91,6 @@ func TestCloudDirectSwitchReloadsAnEnabledLineAndKeepsOtherSettings(t *testing.T
 }
 
 func TestCloudOnboardingRoutesRejectPairedBrowsersThroughTheRealGate(t *testing.T) {
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "retired"))
 	s, err := New(config.Config{Dir: filepath.Join(t.TempDir(), "next"), Port: 7757})
 	if err != nil {
 		t.Fatal(err)

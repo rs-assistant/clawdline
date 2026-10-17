@@ -38,7 +38,6 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/skillmenu"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/adapters/subagents"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
 	"github.com/sainteye/clawdline/internal/adapters/updatecheck"
@@ -94,10 +93,6 @@ type Server struct {
 	icons *icon.Registry
 	// projectSync offers this machine's project settings and mirrors another's.
 	projectSync *psync.Service
-	// swift reads the Swift app's store, and only reads it: which session is
-	// Clawdfather, which task opened a tab, who waits on whom, what was
-	// delivered. See internal/adapters/swiftstore for the rules it keeps.
-	swift *swiftstore.Store
 	// pictures is this daemon's own picture stores, the pasteboard a send
 	// lends pictures to, and the Swift app's picture store, read-only.
 	pictures pictures
@@ -275,7 +270,6 @@ func New(cfg config.Config) (*Server, error) {
 		terminals:      terminal.Hosts(),
 		facts:          transcript.NewRecordFacts(),
 		icons:          icons,
-		swift:          swiftstore.Open(swiftstore.Dir()),
 		pictures:       newPictures(cfg.Dir),
 		thumbs:         artifacts.NewThumbnailCache(int(CapacityLimit(capacity.CacheImageThumbs))),
 		skillMenu:      skillmenu.NewCache(),

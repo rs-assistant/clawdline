@@ -6,14 +6,12 @@ import (
 	"mime"
 	"net/http"
 	"os"
-	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
 	"sync"
 
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
 	"github.com/sainteye/clawdline/internal/contract"
@@ -59,18 +57,13 @@ var notificationSettings = map[string]bool{
 // after transport (internal/app/cloudops.defaultModelsCloudBodyLimit).
 const settingsRequestBodyLimit = 64 << 10
 
-// settingsFile is this daemon's own config.json. The Swift app's directory is
-// refused by every name it may go by: the one swiftstore reads, and the fixed
-// one that app always uses whatever this process's environment says.
+// settingsFile is this daemon's own config.json. The retired Swift app's
+// directory is refused, spelled as the fixed path that app always used.
 func (s *Server) settingsFile() *nextconfig.File {
 	if f, ok := settingsFiles.Load(s.cfg.Dir); ok {
 		return f.(*nextconfig.File)
 	}
-	foreign := []string{swiftstore.Dir()}
-	if home, err := os.UserHomeDir(); err == nil {
-		foreign = append(foreign, filepath.Join(home, ".config", "clawdline"))
-	}
-	f, _ := settingsFiles.LoadOrStore(s.cfg.Dir, nextconfig.Open(s.cfg.Dir, foreign...))
+	f, _ := settingsFiles.LoadOrStore(s.cfg.Dir, nextconfig.Open(s.cfg.Dir, swiftDirs()...))
 	return f.(*nextconfig.File)
 }
 

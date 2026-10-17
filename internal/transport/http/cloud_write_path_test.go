@@ -7,7 +7,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app/cloudops"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/domain/auth"
@@ -143,7 +142,6 @@ func TestACloudAnswerIsTypedOnlyAtTheQuestionItNames(t *testing.T) {
 func TestACloudSendTriedAgainUnderItsRequestIsTypedOnce(t *testing.T) {
 	p := waitingPane("%4", "")
 	s := paneServer(t, p)
-	s.swift = swiftstore.Open(t.TempDir())
 	bridge := cloudBridge(s)
 	body := map[string]any{"type": "send", "session": "%4", "request": "card-1",
 		"text": "delete the build directory", "images": []any{}}

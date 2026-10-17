@@ -112,12 +112,10 @@
 #
 internal/adapters/artifacts.metadataLimit # read: one picture metadata record
 internal/adapters/board.DefaultPageLimit # page: the board's default page size
-internal/adapters/board.MaximumHistoryFileBytes # read: one card's log, refused past it rather than cut short; the log itself is the old app's, bounded there (limits N15)
 internal/adapters/board.MaximumCommandBytes # admission: one board command body
 internal/adapters/board.MaximumPageLimit # page: the board's largest page size
 internal/adapters/board.MaximumResponseBytes # page: one board answer
 internal/adapters/board.MaximumSnapshotBytes # page: the board snapshot budget, published as snapshotBudgetBytes
-internal/adapters/board.MaximumSnapshotItems # page: items in one board snapshot
 internal/adapters/board.MaximumStoreBytes # read: the old board-settings document, read once to carry it into clawdline.sqlite3 and never written (D37, T3); 503 past it. The board itself moved into the store (D02) and is measured by store.db and work.open
 internal/adapters/cloud.fenceLimit # read: the sequence fence file
 internal/adapters/cloud.maxFailureCodeBytes # admission: one word the relay or the control plane sent, copied into a failure code (D1)
@@ -153,7 +151,6 @@ internal/adapters/projects.rowLimit # page: project rows in one answer
 internal/adapters/projects.statusEntryLimit # read: git status entries read for one project
 internal/adapters/push.MaxPayload # admission: one push payload
 internal/adapters/push.secretLimit # read: the VAPID key file
-internal/adapters/swiftstore.maxBytes # read: one of the Swift app's files, read-only
 internal/adapters/transcript.ledgerFeedLimit # read: one token-ledger pass over a transcript; it stops between lines once past this and the next pass goes on from its offset, so a pass reads at most this plus one line and nothing accumulates (limits N42)
 internal/adapters/transcript.ledgerLineLimit # read: one transcript line the token ledger decodes; a longer one is skipped a limit at a time and counted in the state's overlong count, its category lost and its tokens still measured by the next call (limits N42)
 internal/adapters/transcript.maxShellID # admission: the longest background command id a route may name before it is refused as not found; Claude Code's are nine letters and digits (limits N50)

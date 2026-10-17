@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/session"
@@ -140,7 +139,6 @@ func TestReportedTurnSaysWhichBoardItemAwaitsAcceptance(t *testing.T) {
 		ConversationID: "10000000-0000-4000-8000-000000000009", State: session.StateIdle, PID: os.Getpid()}}
 	s := paneServer(t, p)
 	s.broker.Live = func(context.Context) []session.Session { return []session.Session{p.s} }
-	s.swift = swiftstore.Open(t.TempDir()) // an absent retired store: this daemon's records decide
 	sess := p.s
 	ctx := context.Background()
 	acceptance := func() *contract.SessionAcceptance {
@@ -217,7 +215,6 @@ func TestNewMessageSupersedesOnlyTheEarlierSessionReceipt(t *testing.T) {
 		ConversationID: "10000000-0000-4000-8000-000000000009", State: session.StateIdle, PID: os.Getpid()}}
 	s := paneServer(t, p)
 	s.broker.Live = func(context.Context) []session.Session { return []session.Session{p.s} }
-	s.swift = swiftstore.Open(t.TempDir())
 	ctx := context.Background()
 	state := func() (contract.WorkState, *contract.WorkDisposition) {
 		t.Helper()

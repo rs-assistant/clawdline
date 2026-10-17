@@ -4,14 +4,12 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/documents"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/contract"
 )
 
@@ -265,10 +263,8 @@ type taskRecord struct {
 // **The registry is what authorises a task directory, not the filesystem.**
 // `/tmp/.clawdline` holds a directory per task on this Mac, and a caller naming
 // one that no registry here dispatched gets the same refusal as a caller naming
-// a file that does not exist. Two registries are read, because this machine has
-// two brokers: the Swift app's store (read-only, as everything else here reads
-// it) and this daemon's own. An id in both is one record, the Swift one, since
-// that is the one whose directory the child was briefed with.
+// a file that does not exist. The registry is this daemon's own; the retired
+// Swift app's tasks are no longer read (docs/cutover.md §7).
 func (s *Server) documentTaskRecords(ctx context.Context, cwd string) []taskRecord {
 	records, _ := s.documentTaskRecordsCut(ctx, cwd)
 	return records
@@ -290,13 +286,6 @@ func (s *Server) documentTaskRecordsCut(ctx context.Context, cwd string) ([]task
 		seen[id] = true
 		found = append(found, dated{taskRecord{ID: id, Dir: dir, Title: title}, created})
 	}
-	snap := s.swift.Read()
-	for _, t := range snap.Tasks {
-		if !ownsProject(t, cwd) {
-			continue
-		}
-		add(t.ID, filepath.Join(swiftTaskRoot, t.ID), t.Title, t.Created.Unix())
-	}
 	if live, err := s.broker.LiveRecords(ctx); err == nil {
 		for _, t := range live {
 			if t.ProjectDir != cwd {
@@ -317,12 +306,6 @@ func (s *Server) documentTaskRecordsCut(ctx context.Context, cwd string) ([]task
 	}
 	return out, omitted
 }
-
-// swiftTaskRoot is where the Swift app puts a task's directory. The literal is
-// that app's, repeated here as it is repeated in
-// internal/adapters/swiftstore/tasklist.go, because it is a fact about the other
-// program rather than a setting of this one.
-const swiftTaskRoot = "/tmp/.clawdline"
 
 // isTaskID is the shape an id must have before it is allowed to name a
 // directory.
@@ -348,15 +331,6 @@ func isTaskID(id string) bool {
 		return false
 	}
 	return true
-}
-
-// ownsProject is the Swift app's own test: the task was dispatched for this
-// directory, or this directory *is* the isolated worktree it was given.
-func ownsProject(t swiftstore.Task, cwd string) bool {
-	if t.ProjectDir == cwd {
-		return true
-	}
-	return t.Worktree != nil && t.Worktree.Path == cwd
 }
 
 // taskDocumentDirectory is one task's directory, once a registry agrees it is

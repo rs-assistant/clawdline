@@ -48,7 +48,6 @@ func cloudStandIn(t *testing.T) *standIn {
 	recordPlace(t, home, project)
 	recordConversation(t, home, project, "c6000003-0000-4000-8000-000000000003", "look at the overnight runs")
 	state := filepath.Join(home, ".config", "clawdline-next")
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(home, "swift"))
 	if err := os.MkdirAll(state, 0o700); err != nil {
 		t.Fatal(err)
 	}

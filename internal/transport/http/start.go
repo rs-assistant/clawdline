@@ -304,7 +304,7 @@ func (s *Server) past(ctx context.Context, place projects.Place, assistant strin
 	}
 	orchestratorTitle := func(id string) string { return rootTitle(id).Label }
 	agentNamed := func(id string) bool { return rootTitle(id).AgentNamed }
-	snap := s.withOwnSessionTitles(s.swift.Read(), time.Now())
+	snap := s.withOwnSessionTitles(swiftstore.Snapshot{}, time.Now())
 	manual := func(id, custom string) string {
 		if !snap.TitlesKnown {
 			return ""

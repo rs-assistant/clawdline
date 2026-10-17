@@ -3,13 +3,11 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	boardstore "github.com/sainteye/clawdline/internal/adapters/board"
 	"github.com/sainteye/clawdline/internal/domain/work"
 )
 
@@ -17,17 +15,16 @@ import (
 // on the three tracks of docs/board-redesign.md (board / session to-do / backlog),
 // read-only (§9 step 1, design-decisions T1).
 //
-// It reads the board through the same reader `/v1/board` uses, the card logs
-// beside it, and this daemon's inventory; it writes nothing, keeps nothing but
-// the readers' caches, and has no command. The counts always cover every card
-// of the selection; the rows come a page at a time.
+// The cards and their logs were the retired Swift app's, and neither is read
+// any more (docs/cutover.md §7): both sources answer `disabled`, the word the
+// contract has for "not read, and known to hold nothing", and the projection
+// is over no cards. It writes nothing and has no command.
 
 // TracksPageSize is the fixed page: no byte budget and no size parameter
 // (design-decisions D34).
 const TracksPageSize = 200
 
 type tracksDeps struct {
-	history  *boardstore.History
 	presence func(context.Context) (work.Presence, work.PresenceSource)
 	now      func() time.Time
 }
@@ -39,7 +36,6 @@ func (s *Server) tracks() *tracksDeps {
 		return d.(*tracksDeps)
 	}
 	d, _ := tracksByServer.LoadOrStore(s, &tracksDeps{
-		history:  boardstore.OpenHistory(boardstore.HistoryDir(boardstore.LegacyPath())),
 		presence: s.tracksPresence,
 		now:      time.Now,
 	})
@@ -95,62 +91,16 @@ func (s *Server) boardTracks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	d := s.tracks()
-	state, readAt, err := s.board().legacy.Read()
-	board := work.BoardSource{Status: "ok"}
-	switch {
-	case errors.Is(err, boardstore.ErrLegacyAbsent):
-		// No Swift board on this machine: that is known, and it is zero cards.
-		board.Status, state = "absent", nil
-	case errors.Is(err, boardstore.ErrLegacyDisabled):
-		// Told not to read it (cutover B1): known, and zero cards read.
-		board.Status, state = "disabled", nil
-	case err != nil && !boardstore.IsStale(err):
-		writeBoardRefusal(w, err, false)
-		return
-	case err != nil:
-		board.Status = "stale"
-	}
-	if state != nil {
-		board.Revision, board.Cards = state.Revision, len(state.Items)
-		board.ReadAt = float64(readAt.UnixNano()) / 1e9
-	}
-
 	project := values.Get("project")
-	selected := []boardstore.StoredItem{}
-	if state != nil {
-		for _, item := range state.Items {
-			if project == "" || item.ProjectID == project {
-				selected = append(selected, item)
-			}
-		}
-	}
-	if project != "" && len(selected) == 0 && !knownProject(state, project) {
+	if project != "" {
 		writeRefusal(w, http.StatusNotFound, "project_not_found", "This board has no such project.")
 		return
 	}
-
-	ids := make([]string, 0, len(selected))
-	for _, item := range selected {
-		ids = append(ids, item.ID)
-	}
-	histories, history := d.history.Read(ids)
-	var cards []work.Card
-	if state != nil {
-		// Progress reads a card's relations across the whole board, so the
-		// selection is made after the cards are built from all of it.
-		keep := map[string]bool{}
-		for _, id := range ids {
-			keep[id] = true
-		}
-		for _, c := range boardstore.TrackCards(state, histories) {
-			if keep[c.ID] {
-				cards = append(cards, c)
-			}
-		}
-	}
+	board := work.BoardSource{Status: "disabled"}
+	history := work.HistorySource{Status: "disabled"}
 	presence, presenceSource := d.presence(r.Context())
 
-	projection := work.Project(cards, presence, d.now(), work.DefaultStall)
+	projection := work.Project(nil, presence, d.now(), work.DefaultStall)
 	rows, next, err := projection.Page(track, values.Get("cursor"), TracksPageSize)
 	if err != nil {
 		writeRefusal(w, http.StatusBadRequest, "invalid_cursor", "That cursor was not written by this route.")
@@ -159,9 +109,6 @@ func (s *Server) boardTracks(w http.ResponseWriter, r *http.Request) {
 	projection.Rows = rows
 	body := work.Tracks{Projection: projection, PageSize: TracksPageSize,
 		Sources: work.Sources{Board: board, History: history, Presence: presenceSource}}
-	if project != "" {
-		body.Project = &project
-	}
 	if next != "" {
 		body.NextCursor = &next
 	}
@@ -173,17 +120,4 @@ func (s *Server) boardTracks(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write(out)
-}
-
-// knownProject is a project the board names, whether or not it has cards.
-func knownProject(state *boardstore.StoredState, id string) bool {
-	if state == nil {
-		return false
-	}
-	for _, p := range state.Projects {
-		if p.ID == id {
-			return true
-		}
-	}
-	return false
 }
