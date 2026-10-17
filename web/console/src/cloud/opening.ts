@@ -57,8 +57,21 @@ export function openingFor(said: {
   everyMachineAddressed?: boolean
   /** The machine this tab chose before, from its own storage. */
   remembered?: string | null
+  /**
+   * Machines this tab or the account has forgotten. The relay keeps a revoked
+   * machine's last snapshots, so its row still reads as selectable; opened, it
+   * was a header naming a machine the picker under it left out, reading a line
+   * nothing answers (2026-10-17).
+   */
+  forgotten?: readonly string[]
+  /** The account has not yet said which machines it revoked: wait for it. */
+  rosterPending?: boolean
 }): Opening {
-  const readable = said.machines.filter((machine) => machine.selectable).map((machine) => machine.id)
+  if (said.rosterPending) return { at: "list" }
+  const forgotten = said.forgotten ?? []
+  const readable = said.machines
+    .filter((machine) => machine.selectable && !forgotten.includes(machine.id))
+    .map((machine) => machine.id)
   if (!readable.length) return { at: "list" }
   const fleet = readable.length >= 2
 

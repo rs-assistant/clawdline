@@ -422,6 +422,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const [pairState, setPairState] = useState<PairState>({ phase: "idle" })
   const [names, setNames] = useState<ReadonlyMap<string, AccountName>>(new Map())
   const [registered, setRegistered] = useState<ReadonlyMap<string, AccountName>>(new Map())
+  // Whether the account's roster has been asked for and not yet answered. The
+  // tab does not open a machine meanwhile: the relay can still list one the
+  // account revoked (`opening.ts`).
+  const [rosterPending, setRosterPending] = useState(transport.kind === "cloud")
   const [connectionVersion, setConnectionVersion] = useState(0)
   const pairingStore = useMemo(() => browserPendingPairings(), [])
 
@@ -432,6 +436,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     setAccountRosterStatus("loading")
     void accountMachineRoster(apiOrigin).then((roster) => {
       if (request !== rosterRequest.current) return
+      setRosterPending(false)
       if (!roster) {
         namesRef.current = new Map()
         registeredRef.current = new Map()
@@ -1171,11 +1176,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         : document ? { machine: document } : null,
       everyMachineAddressed: location.hash === "#all-machines",
       remembered: remembered(),
+      forgotten,
+      rosterPending,
     })
     if (opening.at !== "console") return
     setFleetScope(opening.fleet)
     choose(machines.find((machine) => machine.id === opening.machine)!, opening.remember)
-  }, [screen, managingMachines, machines, who, choose, remembered])
+  }, [screen, managingMachines, machines, who, choose, remembered, forgotten, rosterPending])
 
   /**
    * Leave the machine this tab chose and start again at the list. This drops
