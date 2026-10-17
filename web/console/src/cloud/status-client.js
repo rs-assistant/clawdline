@@ -460,12 +460,12 @@ export class StatusCloudClient extends CatalogCloudClient {
   }
 
   /**
-   * The Session owner is the automatic first choice. It is never persisted:
-   * moving to another Session must move dictation with it. If that machine is
-   * stale or cannot transcribe, the ordinary macOS-first fleet fallback applies.
+   * The Session owner is the first choice, including over an old saved host.
+   * It is never persisted: moving to another Session must move dictation with
+   * it. If that machine is stale or cannot transcribe, the person's saved host
+   * and then the ordinary macOS-first fleet fallback apply.
    */
   _sessionVoiceHost(machine) {
-    if (this._voiceHostChoice()) return this._voiceHost()
     const found = this._machinesFor("voice")
     const current = found.capable.find((row) => row.id === machine && row.freshness === "current")
     if (current) {
