@@ -119,6 +119,14 @@ func TestTheTaskListPageIsTheOneTheWholeHistoryGave(t *testing.T) {
 	put(orchestrator.Record{Protocol: orchestrator.Protocol, ID: "d0000000-0000-4000-8000-000000000000",
 		Assistant: "claude", Title: "new", State: orchestrator.StateQueued, CreatedAt: time.Now(),
 		Claims: []string{}, ProjectDir: "/repo"}, nil, nil)
+	// Both writes above carry a current updated_at, so the heads written since
+	// the last read show them and the tally agrees: this settles on the
+	// incremental path alone, before the clock-behind rewrite forces a scan.
+	check("after incremental writes")
+	if mid, _ := s.tasksPayload(ctx, 0, 50); mid.Page.Finished != 401 || mid.Page.Unfinished != 5 {
+		t.Errorf("after incremental writes the page is %+v, want 401 finished and 5 unfinished", mid.Page)
+	}
+
 	old, _, err := s.broker.Record(ctx, "a0000000-0000-4000-8000-000000000399")
 	if err != nil {
 		t.Fatal(err)
