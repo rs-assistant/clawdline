@@ -58,6 +58,14 @@ func stringPtr(v string) *string {
 // screen. err is set when any source failed; what the others said is still
 // returned, so the caller can list it under "unknown" (DG-7).
 func (s *Server) ownOverlay(ctx context.Context, lives []swiftstore.Live) (swiftstore.Own, error) {
+	records, unreadable, err := s.broker.Records(ctx)
+	return s.ownOverlayOf(ctx, lives, records, unreadable, err)
+}
+
+// ownOverlayOf is ownOverlay over tasks already read: the whole ledger, or
+// the part of it the sessions in lives can be told by (Broker.SessionTasks).
+func (s *Server) ownOverlayOf(ctx context.Context, lives []swiftstore.Live, records []orchestrator.Record,
+	unreadable []orchestrator.Unreadable, readErr error) (swiftstore.Own, error) {
 	var own swiftstore.Own
 	var failed bool
 	byTerminal := make(map[string]swiftstore.Live, len(lives))
@@ -66,7 +74,7 @@ func (s *Server) ownOverlay(ctx context.Context, lives []swiftstore.Live) (swift
 	}
 	terminalOf := conversationTerminals(lives)
 
-	if records, unreadable, err := s.broker.Records(ctx); err != nil || len(unreadable) > 0 {
+	if readErr != nil || len(unreadable) > 0 {
 		// A row that cannot be decoded may be any session's task: the list
 		// without it is not the list.
 		failed = true

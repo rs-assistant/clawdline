@@ -1,10 +1,13 @@
 package http
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -160,4 +163,97 @@ func BenchmarkSessionListWithHistory(bm *testing.B) {
 	for i := 0; i < bm.N; i++ {
 		s.sessionsPayloadFrom(ctx, inv)
 	}
+}
+
+// wholeLedger is the read the list made before it read SessionTasks: every
+// task the broker holds, from a broker of its own, so nothing the server's
+// broker holds stands in for reading the table.
+func wholeLedger(s *Server) sessionLedgerRead {
+	fresh := &orchestrator.Broker{Store: s.broker.Store, Tasks: s.broker.Tasks, Dir: s.broker.Dir}
+	return func(ctx context.Context, _ []session.Session) ([]orchestrator.Record, []orchestrator.Unreadable, error) {
+		return fresh.Records(ctx)
+	}
+}
+
+// sameMomentJSON is a snapshot as JSON with the build's own counters and
+// clocks taken out: two builds a moment apart differ in those and nothing
+// else.
+func sameMomentJSON(t *testing.T, snap sessionsSnapshotWire) []byte {
+	t.Helper()
+	snap.At, snap.Scan.Generation, snap.Scan.Completed.Sequence = 0, 0, 0
+	rows := make([]sessionRowWire, len(snap.Sessions))
+	for i, row := range snap.Sessions {
+		row.Closeability.SessionGeneration, row.Closeability.ObservedAt = 0, 0
+		rows[i] = row
+	}
+	snap.Sessions = rows
+	out, err := json.Marshal(snap)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// The Session list reads only the tasks its rows can be told by, and it is
+// the list the whole history gave: byte for byte, over 3,000 finished tasks
+// and 3 live ones with terminals on screen bound to some of each — and, with
+// an unreadable row deep in the history, the same "unknown" the whole
+// history gave.
+func TestTheSessionListIsTheOneTheWholeHistoryGave(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raws []string
+		want []string
+	}{
+		{name: "readable", want: []string{
+			// The newest finished task's child, by its delivery.
+			`"taskId":"e2222222-2222-4222-8222-000000000000"`,
+			// The root's live callback, as a shell of its own.
+			`"id":"` + callbackShellPrefix + "e1111111-1111-4111-8111-000000000001",
+			// The live child the root waits on.
+			`"code":"live_descendant_task"`,
+			// The pending landings the root owes, deep in the history.
+			`"code":"landing"`,
+			// The live child's terminal, named by its task.
+			`"label":"live child"`,
+		}},
+		{name: "unreadable", raws: []string{`{"task_id": "`}, want: []string{`"own_records_unreadable"`}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s, inv := sessionHistory(t, tc.raws...)
+			ctx := context.Background()
+			before := sameMomentJSON(t, s.sessionsPayloadRead(ctx, inv, wholeLedger(s)))
+			after := sameMomentJSON(t, s.sessionsPayloadFrom(ctx, inv))
+			if !bytes.Equal(before, after) {
+				t.Fatalf("the narrow read changed the list\nwhole:  %s\nnarrow: %s", before, after)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(string(after), want) {
+					t.Errorf("the fixture does not exercise %s:\n%s", want, after)
+				}
+			}
+			if len(inv.Sessions) != 3 {
+				t.Fatalf("%d sessions", len(inv.Sessions))
+			}
+		})
+	}
+}
+
+// The window is what it says: of 3,000 finished tasks, only the ones a row
+// can be told by.
+func TestSessionTasksLeavesTheRestOfTheHistoryUnread(t *testing.T) {
+	s, inv := sessionHistory(t)
+	ctx := context.Background()
+	whole, _, err := s.broker.Records(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	narrow, bad, err := s.sessionTasks(ctx, inv.Sessions)
+	if err != nil || len(bad) != 0 {
+		t.Fatalf("read: %v, %d unreadable", err, len(bad))
+	}
+	if len(whole) != 3004 || len(narrow) == 0 || len(narrow) > len(whole)/2 {
+		t.Fatalf("whole %d, narrow %d", len(whole), len(narrow))
+	}
+	t.Logf("whole %d, narrow %d", len(whole), len(narrow))
 }
