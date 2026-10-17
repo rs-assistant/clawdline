@@ -1311,7 +1311,9 @@ export class RelayWriter {
         if (typeof client.voiceHost !== "function" || typeof client._machineRequest !== "function") {
           throw failure("cloud_not_carried", "intents", 501)
         }
-        const host = await client.voiceHost()
+        const host = typeof client.voiceHostFor === "function"
+          ? await client.voiceHostFor(this.host.machine)
+          : await client.voiceHost()
         const answer = await client._machineRequest(host.machine, "intents", { text: String(body.text ?? "") }, "action", INTENT_TIMEOUT_MS)
         if (!answer || typeof answer !== "object") return answer
         const draft = (answer as { draft?: unknown }).draft

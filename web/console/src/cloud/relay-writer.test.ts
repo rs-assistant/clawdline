@@ -855,7 +855,7 @@ test("the voice source names the actual selected Whisper machine without sending
   assert.deepEqual(client.calls, [["voiceHost"]])
 })
 
-test("voice source and dictation both follow the machine that owns this Session", async () => {
+test("voice source, dictation and spoken intents follow the machine that owns this Session", async () => {
   const client = new FakeClient()
   client.descriptors.set("mac-a", { machine: { commands: ["voice"], name: "Linux host", platform: "linux" } })
   client.voiceHostFor = (machine: string) => {
@@ -872,9 +872,14 @@ test("voice source and dictation both follow the machine that owns this Session"
   assert.deepEqual(await json(source), { machine: "mac-a", name: "Linux host", platform: "linux" })
   const voice = await reader.fetch("/v1/voice", post({ audio: "AAAA", rate: 16000 }))
   assert.deepEqual(await json(voice), { text: "hello there", ms: 900 })
+  const intent = await reader.fetch("/v1/intents", post({ text: "start the review" }))
+  assert.equal((await json<{ draft: { place_id: string } }>(intent)).draft.place_id,
+    "cloud.WyJtYWMtYSIsInAxIl0")
   assert.deepEqual(client.calls, [
     ["voiceHostFor", "mac-a"],
     ["voiceFor", "mac-a", "AAAA", 16000],
+    ["voiceHostFor", "mac-a"],
+    ["_machineRequest", "mac-a", "intents", { text: "start the review" }, "action", 130_000],
   ])
 })
 
