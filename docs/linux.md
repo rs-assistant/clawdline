@@ -104,9 +104,10 @@ path instead of claiming the daemon can toggle it itself.
 ### Let a Cloud browser connect directly to EC2
 
 The hosted browser first reaches the daemon through Cloud. It then tries a WebRTC UDP data channel
-for Terminal and Session reads. The browser and daemon use `stun.cloudflare.com:3478` and
-`stun.l.google.com:19302` to find public addresses. A successful STUN reply is only one prerequisite;
-the connection is direct only after its data channel opens. When it cannot open, the browser uses
+for Terminal and Session reads. The browser uses public STUN servers to find its address. In the
+fixed-port EC2 setup below, the daemon publishes the instance's configured public IPv4 and uses
+one shared UDP listener instead of opening a STUN socket for every peer. The connection is direct
+only after its data channel opens. When it cannot open, the browser uses
 the Cloud relay ([wire contract](cloud-terminal-wire.md#direct-carrier)). No inbound HTTP port 7727,
 SSH port or TURN service is needed for this path.
 
@@ -119,40 +120,55 @@ whether the instance has a public IPv4 address. A `0.0.0.0/0` route must lead to
 Internet Gateway. An Internet Gateway is sufficient here; a NAT Gateway is not required. A network
 ACL is stateless, so a custom ACL must allow the UDP path in both directions and the reply ports.
 
-Today's daemon does not pin its ICE listener to a configured port: the direct API leaves Pion's UDP
-port range unset, so the OS selects a port. On an Ubuntu 24.04 EC2 host measured on 2026-10-17,
-`cat /proc/sys/net/ipv4/ip_local_port_range` returned `32768 60999`. Check the target host's range
-and actual ICE candidates instead of copying that number to another installation. For a phone whose public IP
-can change, the EC2 security group needs a UDP ingress rule from `0.0.0.0/0` to that listener range,
-plus UDP egress to `0.0.0.0/0` for STUN and the phone's dynamic ICE port. On the measured host, the
-two rules were:
+First find the instance's current public IPv4 address. Merge these keys into that machine user's
+existing `~/.config/clawdline-next/config.json`; keep its other settings and substitute the actual
+address for `PUBLIC_IPV4`:
+
+```json
+{
+  "cloud_terminal_direct": true,
+  "cloud_direct_udp_port": 3479,
+  "cloud_direct_public_ip": "PUBLIC_IPV4"
+}
+```
+
+The port and public IP must be set together. `clawdline cloud direct on` applies the file to a
+running daemon by briefly replacing its Cloud line; `clawdline cloud direct off` switches both
+Terminal and Session reads to the relay, and `clawdline cloud status` shows the persisted switch.
+The same switch is in this machine's local Settings → Remote page. A hosted browser cannot change
+the machine's settings. If EC2 assigns a different public IPv4 after a stop/start, update the
+setting and apply it again. When the two endpoint keys are absent, older installations continue
+using OS-selected UDP ports rather than this fixed-port path.
+
+For a phone whose public IP can change, allow UDP ingress from `0.0.0.0/0` only to the configured
+port. Allow UDP egress to the phone's dynamic ICE port; stateful security groups already allow
+replies to an accepted inbound packet. For port 3479, the rules are:
 
 | Direction | UDP destination ports | Peer CIDR | Reason |
 |---|---:|---|---|
-| Ingress | `32768-60999` | `0.0.0.0/0` | A phone can initiate ICE checks to the daemon's current port. |
-| Egress | `1024-65535` | `0.0.0.0/0` | STUN on 3478/19302 and ICE checks to the phone can leave. |
+| Ingress | `3479` | `0.0.0.0/0` | A phone can initiate ICE checks to the shared listener. |
+| Egress | `1024-65535` | `0.0.0.0/0` | ICE checks to a phone's dynamic port can leave. |
 
 For example, after recording the current rules and confirming the target security group, apply:
 
 ```sh
 aws ec2 authorize-security-group-ingress --region "$AWS_REGION" --group-id "$AWS_SG_ID" \
-  --protocol udp --port 32768-60999 --cidr 0.0.0.0/0
+  --protocol udp --port 3479 --cidr 0.0.0.0/0
 aws ec2 authorize-security-group-egress --region "$AWS_REGION" --group-id "$AWS_SG_ID" \
   --protocol udp --port 1024-65535 --cidr 0.0.0.0/0
 ```
 
-Set `AWS_REGION` and `AWS_SG_ID` from the inspected instance first. Substitute the host's actual
-listener range; do not add a duplicate rule. Security groups are stateful, so replies to an allowed
-flow need no separate reverse rule. These broad rules expose the host's UDP port range to the
-Internet. Review what else listens on that host, and use a narrower source CIDR when the browser's
-public address is stable. A single-port ingress rule will need a daemon change to multiplex ICE
-and publish a reachable public candidate on that same port; changing only the security group to one
-port does not make the current daemon use it.
+Set `AWS_REGION` and `AWS_SG_ID` from the inspected instance first. Substitute the configured
+port; do not add a duplicate rule. Review what listens on that port, and use a narrower source CIDR
+when the browser's public address is stable. Keep any existing broad ingress rule until a phone
+Terminal has been verified on the fixed port. Then remove that broad rule by its security-group
+rule ID, read back the group, and verify the phone Terminal again. Changing only the security group
+without configuring the daemon's listener breaks the direct path.
 
-Read back the security group after applying it. On the Linux host, send a STUN Binding Request to
-both servers and verify a success response with the request's transaction ID; a timeout does not by
-itself identify which network layer blocked UDP. Check the host firewall (`ufw`, `nftables` or
-`iptables`) as well. Finally open this machine's Terminal from the paired phone browser, preferably
+Read back the security group after applying it. Check the host firewall (`ufw`, `nftables` or
+`iptables`) for UDP 3479. Inspect the daemon's answer SDP: it must publish the configured public
+IPv4 on port 3479 and contain no extra server-reflexive candidate on a random port. Finally open
+this machine's Terminal from the paired phone browser, preferably
 on mobile data. `cloud carrier=direct opened for a viewer's Session reads` proves the page's shared
 data channel opened. A Terminal may borrow that channel, or open its own, which logs
 `cloud terminal carrier=direct opened`. Confirm the Terminal's carrier is direct for the same
@@ -164,10 +180,11 @@ still fails, compare the
 browser's actual ICE candidate pair with the daemon's candidates, host firewall and network flow
 records before broadening any rule.
 
-In the 2026-10-17 EC2 setup, both STUN requests timed out before the security group changes. Both
-returned valid responses afterward, and the Linux daemon logged a direct Session-read carrier.
-On a paired phone's subsequent Terminal session, its `input` and `resize` receipts had
-`outcome=ok_direct`, confirming the Terminal path as well.
+On 2026-10-17, before fixed-port support, an Ubuntu EC2 host used OS-selected UDP ports. Its
+ephemeral range was `32768 60999`, so the temporary ingress rule covered that range. Before the
+rule change, both daemon-side STUN requests timed out; afterward, both returned valid responses.
+A paired phone's Terminal `input` and `resize` receipts then had `outcome=ok_direct`. That measured
+result is the baseline for verifying the smaller rule, not evidence that the smaller rule works.
 
 Security group rules and the Internet Gateway have no separate hourly charge. An existing public
 IPv4 address and Internet-bound data transfer follow [AWS VPC pricing](https://aws.amazon.com/vpc/pricing/)

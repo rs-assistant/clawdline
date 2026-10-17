@@ -108,6 +108,13 @@ carrier and one was built as `devel`, and after both were updated to the same co
 one of them published the key and the other did not, because its own settings file had turned the
 switch off. With the switch on it opened a carrier in 927 ms.
 
+The machine's local Settings → Remote page and `clawdline cloud direct on|off` now expose that
+switch. Changing it replaces the active Cloud line, retiring open direct peers; the viewer can
+continue over the relay. For an EC2 private NIC with a public IPv4 mapping, setting both
+`cloud_direct_udp_port` and `cloud_direct_public_ip` makes Pion share one UDP listener and publish
+that external IPv4 at that port as a host candidate. The daemon then omits its STUN servers so it
+does not gather an extra server-reflexive candidate on an OS-selected port. See [Linux setup](linux.md#let-a-cloud-browser-connect-directly-to-ec2) for the security-group cutover and verification.
+
 **A machine that cannot send UDP answers the offer and still cannot connect.** The other updated
 machine, a cloud host whose network allows outbound TCP and DNS and no other UDP, answered every
 `carrier_offer` in about 3.5 s with a sealed answer SDP — authority, signalling and capability all

@@ -28,7 +28,7 @@ func onboardingRequest(t *testing.T, s *Server, route func(http.ResponseWriter, 
 
 func TestCloudOnboardingSwitchesRequireTheMachineAndAnApprovedIdentity(t *testing.T) {
 	s := &Server{cfg: config.Config{Dir: t.TempDir()}}
-	for _, route := range []func(http.ResponseWriter, *http.Request){s.cloudLoginRoute, s.cloudEnabledRoute, s.cloudCommandsRoute} {
+	for _, route := range []func(http.ResponseWriter, *http.Request){s.cloudLoginRoute, s.cloudEnabledRoute, s.cloudCommandsRoute, s.cloudDirectRoute} {
 		if rec := onboardingRequest(t, s, route, http.MethodPost, "/v1/cloud/anything", `{"enabled":true}`, false); rec.Code != http.StatusForbidden {
 			t.Fatalf("paired browser changed Cloud: %d %s", rec.Code, rec.Body)
 		}
@@ -59,6 +59,37 @@ func TestCloudOnboardingSwitchesRequireTheMachineAndAnApprovedIdentity(t *testin
 	}
 }
 
+func TestCloudDirectSwitchReloadsAnEnabledLineAndKeepsOtherSettings(t *testing.T) {
+	dir := t.TempDir()
+	file := nextconfig.Open(dir)
+	if _, err := file.Set(map[string]any{adaptercloud.KeyEnabled: true, adaptercloud.KeyCommands: true}); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{cfg: config.Config{Dir: dir}}
+	reloads := 0
+	s.SetCloudReload(func() error { reloads++; return nil })
+	for _, on := range []bool{false, true} {
+		body := `{"enabled":false}`
+		if on {
+			body = `{"enabled":true}`
+		}
+		rec := onboardingRequest(t, s, s.cloudDirectRoute, http.MethodPost, "/v1/cloud/direct", body, true)
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"terminal_direct":`) {
+			t.Fatalf("direct switch: %d %s", rec.Code, rec.Body)
+		}
+		settings, err := adaptercloud.ReadSettings(file)
+		if err != nil || settings.TerminalDirect != on || !settings.Enabled || !settings.Commands {
+			t.Fatalf("direct switch changed another setting: %+v %v", settings, err)
+		}
+	}
+	if reloads != 2 {
+		t.Fatalf("expected a live reload for each switch, got %d", reloads)
+	}
+	if rec := onboardingRequest(t, s, s.cloudDirectRoute, http.MethodPost, "/v1/cloud/direct", `{"enabled":"yes"}`, true); rec.Code != http.StatusBadRequest {
+		t.Fatalf("malformed direct switch: %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestCloudOnboardingRoutesRejectPairedBrowsersThroughTheRealGate(t *testing.T) {
 	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "retired"))
 	s, err := New(config.Config{Dir: filepath.Join(t.TempDir(), "next"), Port: 7757})
@@ -70,7 +101,7 @@ func TestCloudOnboardingRoutesRejectPairedBrowsersThroughTheRealGate(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/v1/cloud/login", "/v1/cloud/enabled", "/v1/cloud/commands"} {
+	for _, path := range []string{"/v1/cloud/login", "/v1/cloud/enabled", "/v1/cloud/commands", "/v1/cloud/direct"} {
 		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:7757"+path, strings.NewReader(`{"enabled":true}`))
 		req.Header.Set("Authorization", "Bearer "+viewer)
 		req.Header.Set("Content-Type", "application/json")

@@ -1,5 +1,5 @@
 {
-  "usage.overview": "用法：clawdline cloud <status|preflight|on|off|commands|login|pair|devices|revoke|rotate|connect>",
+  "usage.overview": "用法：clawdline cloud <status|preflight|on|off|commands|direct|login|pair|devices|revoke|rotate|connect>",
   "usage.status": "  status                 查看开关、身份和端点",
   "usage.preflight": "  preflight              不联网检查是否只剩本人需要完成的步骤",
   "usage.switch": "  on | off               在设置文件中开启或关闭 Cloud 连接",

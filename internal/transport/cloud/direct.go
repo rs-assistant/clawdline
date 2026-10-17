@@ -16,6 +16,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -125,11 +126,11 @@ type directMessage struct {
 // router's public address, or the relay carries it as before. Gathering still
 // binds the local interfaces — that asks nothing — because the public address
 // is learned through them.
-func (l *Link) directAPI() *webrtc.API {
+func (l *Link) directAPI() (*webrtc.API, error) {
 	l.directMu.Lock()
 	defer l.directMu.Unlock()
 	if l.directWebRTC != nil {
-		return l.directWebRTC
+		return l.directWebRTC, nil
 	}
 	se := webrtc.SettingEngine{}
 	se.SetICEMulticastDNSMode(ice.MulticastDNSModeDisabled)
@@ -140,8 +141,34 @@ func (l *Link) directAPI() *webrtc.API {
 	} else {
 		se.SetIncludeLoopbackCandidate(true)
 	}
+	if l.settings.DirectUDPPort != 0 {
+		muxOptions := []ice.UDPMuxFromPortOption{ice.UDPMuxFromPortWithNetworks(ice.NetworkTypeUDP4)}
+		if l.directLoopback {
+			muxOptions = append(muxOptions, ice.UDPMuxFromPortWithLoopback())
+		}
+		mux, err := ice.NewMultiUDPMuxFromPort(l.settings.DirectUDPPort, muxOptions...)
+		if err != nil {
+			return nil, fmt.Errorf("bind direct ICE UDP port %d: %w", l.settings.DirectUDPPort, err)
+		}
+		se.SetNetworkTypes([]webrtc.NetworkType{webrtc.NetworkTypeUDP4})
+		se.SetICEUDPMux(mux)
+		// EC2's public IPv4 is mapped to its private NIC. Publish the same
+		// fixed port on the public host candidate, without a separate STUN
+		// socket whose ephemeral port would need another ingress rule.
+		se.SetNAT1To1IPs([]string{l.settings.DirectPublicIP}, webrtc.ICECandidateTypeHost)
+		l.directUDPMux = mux
+	}
 	l.directWebRTC = webrtc.NewAPI(webrtc.WithSettingEngine(se))
-	return l.directWebRTC
+	return l.directWebRTC, nil
+}
+
+func (l *Link) closeDirectMux() {
+	l.directMu.Lock()
+	defer l.directMu.Unlock()
+	if l.directUDPMux != nil {
+		_ = l.directUDPMux.Close()
+		l.directUDPMux = nil
+	}
 }
 
 // directAddressAllowed is the rule for every address this machine will
@@ -291,10 +318,14 @@ func (l *Link) answerDirectOffer(viewer, owner string, carrier bool, sdp string)
 		return "", err
 	}
 	servers := []webrtc.ICEServer{{URLs: directSTUN}}
-	if l.directNoSTUN {
+	if l.directNoSTUN || l.settings.DirectUDPPort != 0 {
 		servers = nil
 	}
-	pc, err := l.directAPI().NewPeerConnection(webrtc.Configuration{ICEServers: servers})
+	api, err := l.directAPI()
+	if err != nil {
+		return "", terminal.Refuse(terminal.CodeUnreachable, err.Error())
+	}
+	pc, err := api.NewPeerConnection(webrtc.Configuration{ICEServers: servers})
 	if err != nil {
 		return "", terminal.Refuse(terminal.CodeUnreachable, "the direct connection could not be created")
 	}

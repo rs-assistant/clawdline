@@ -1,5 +1,5 @@
 {
-  "usage.overview": "使い方: clawdline cloud <status|preflight|on|off|commands|login|pair|devices|revoke|rotate|connect>",
+  "usage.overview": "使い方: clawdline cloud <status|preflight|on|off|commands|direct|login|pair|devices|revoke|rotate|connect>",
   "usage.status": "  status                 スイッチ、ID、接続先を表示",
   "usage.preflight": "  preflight              通信せずに、本人の操作だけが残っているか確認",
   "usage.switch": "  on | off               設定ファイルで Cloud 接続をオンまたはオフにする",
