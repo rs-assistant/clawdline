@@ -753,7 +753,6 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	}
 	s.brokerHealth(&h)
 	s.capacityHealth(&h)
-	s.workHealth(&h)
 	writeJSON(w, h)
 }
 

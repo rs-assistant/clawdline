@@ -72,27 +72,6 @@ func TestAnEmptyTaskListIsAnArray(t *testing.T) {
 	}
 }
 
-// What is waiting for a person is only as good as the clock it ages on.
-func TestWhatIsWaitingSaysWhetherItsClockIsTurning(t *testing.T) {
-	cases := []struct {
-		name                      string
-		running, noPassYet, stall bool
-		want                      contract.SourceFreshness
-	}{
-		{"the sweep is not running at all", false, true, false, contract.SourceFreshnessUnverified},
-		{"running, no pass finished yet", true, true, false, contract.SourceFreshnessUnverified},
-		{"running and stalled", true, false, true, contract.SourceFreshnessUnverified},
-		// The control: a sweep that is running and keeping up is the one case
-		// where "5 waiting for you" is a plain fact.
-		{"running and keeping up", true, false, false, contract.SourceFreshnessCurrent},
-	}
-	for _, c := range cases {
-		if got := participationFreshness(c.running, c.noPassYet, c.stall); got != c.want {
-			t.Errorf("%s: %q, want %q", c.name, got, c.want)
-		}
-	}
-}
-
 // The proposal and decision routes answer with that word on them.
 //
 // A field a reader is written against and the route does not send is found by

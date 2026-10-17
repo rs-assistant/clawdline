@@ -287,9 +287,6 @@ func serve() {
 	// The capacity register's beat: every bounded thing measured on the same
 	// tick, and health red when evidence has nowhere left to go.
 	srv.StartCapacity(context.Background())
-	// The board's sweep: a landing closes its item, a delivery waits to be
-	// closed, three quiet days send an item back to the Backlog.
-	srv.StartWork(context.Background())
 	// The token ledger: transcripts read, a bounded pass a minute, into what
 	// each session spent (docs/token-ledger.md).
 	srv.StartUsage(context.Background())

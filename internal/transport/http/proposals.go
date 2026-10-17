@@ -304,41 +304,20 @@ type decisionListWire struct {
 //
 // Both lists are read from the store exactly, every time, so "did the read
 // happen" is always yes and was never the interesting question. What ages
-// these rows is the sweep: a pending proposal leaves on its own when its
-// subject settles or when it expires, and an open decision defaults when its
-// clock runs out — and both of those are the sweep's doing. With the sweep
-// stopped the rows are still there and still say `pending` and `open`, which
-// is `unverified`: read in full, and resting on a clock that is not running.
+// these rows is the board's sweep: a pending proposal leaves on its own when
+// its subject settles or when it expires, and an open decision defaults when
+// its clock runs out. No sweep runs on a clock since work-system v2, so the
+// rows still say `pending` and `open` while resting on a clock that is not
+// turning, which is `unverified`.
 //
 // That is why this is not `stale`. Nothing is missing from the answer. What
 // may be wrong is the answer itself.
 func (s *Server) participationSource() contract.BearingsSource {
-	board := s.work()
-	pulse, _, running := board.Pulse()
 	return contract.BearingsSource{
 		ObservedAt: time.Now().Unix(),
 		Provenance: "work",
-		Freshness:  participationFreshness(running, pulse.At.IsZero(), board.Stalled()),
+		Freshness:  contract.SourceFreshnessUnverified,
 	}
-}
-
-// participationFreshness is that judgement with the board taken out of it, so
-// that each of the four ways it can be reached is a case somebody can write
-// down rather than a clock somebody has to run.
-//
-// Three of them are the same fact in three spellings — the clock these rows
-// age on is not turning — and all three are `unverified` rather than `stale`,
-// because nothing is missing from the answer. What may be wrong is the answer.
-func participationFreshness(running, noPassYet, stalled bool) contract.SourceFreshness {
-	switch {
-	case !running:
-		return contract.SourceFreshnessUnverified
-	case noPassYet:
-		return contract.SourceFreshnessUnverified
-	case stalled:
-		return contract.SourceFreshnessUnverified
-	}
-	return contract.SourceFreshnessCurrent
 }
 
 type digestWire struct {
