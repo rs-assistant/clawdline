@@ -935,21 +935,17 @@ func (p *Publisher) readProduct(ctx context.Context) ([]byte, bool) {
 }
 
 // owningSource names the source that would have seen this row again, which is
-// the only source whose silence means anything about it.
+// the only source whose silence means anything about it (session.OwningSource,
+// read off the row's wire id, backend and tty).
 //
-// The three are told apart the way the reading itself makes them: a tmux pane
-// id is spelled `%<n>` and nothing else is; an iTerm2 row carries that
-// backend and a GUID of its own; and a row whose id *is* its tty is the
-// degraded one the process table produced when the terminal could not be
-// asked, so the process table is what owns it.
+// A row no single source speaks for (a pty this daemon opened) is put to the
+// process table here, which lists every assistant's terminal, rather than to
+// the whole reading: inventoryIDs has already handled a whole reading.
 func owningSource(id string, row inventoriedRow) string {
-	if strings.HasPrefix(id, "%") {
-		return "tmux"
+	if source := session.OwningSource(session.Session{ID: id, Backend: session.Backend(row.backend), TTY: row.tty}); source != "" {
+		return source
 	}
-	if row.backend == "iterm" && id != row.tty {
-		return "iterm"
-	}
-	return "ps"
+	return session.ProcessSource
 }
 
 // publishSessions puts this machine's sessions in the viewer's list. The ids
