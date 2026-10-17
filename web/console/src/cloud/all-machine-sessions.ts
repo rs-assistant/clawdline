@@ -17,6 +17,8 @@ export interface FleetMachine {
   name: string
   platform: string
   freshness: "current" | "stale" | "unknown"
+  /** The newest signed report this browser opened from it (`machineIdentityFacts`), or null. */
+  seenAt?: number | null
   paired?: boolean
 }
 

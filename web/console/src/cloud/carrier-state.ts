@@ -13,8 +13,11 @@
  * Session reads on the carrier). The words name reads, and only reads.
  */
 
-/** What a machine's dot says. `unknown` is drawn as neither, because it is neither. */
-export type CarrierShow = "direct" | "relay" | "unknown"
+/**
+ * What a machine's dot says. `unknown` is drawn as neither, because it is neither;
+ * `offline` is a machine that has stopped reporting, whichever road it used to take.
+ */
+export type CarrierShow = "direct" | "relay" | "unknown" | "offline"
 
 export interface CarrierFacts {
   /** Whether this browser has read that machine's own descriptor at all. */
@@ -29,6 +32,7 @@ export interface CarrierReading {
   show: CarrierShow
   /** The word key the dot's tip uses, so the reason is said and not guessed. */
   word: "cloudCarrierDirect" | "cloudCarrierRelayMachineOff" | "cloudCarrierRelayNotOpen" | "cloudCarrierUnknown"
+    | "cloudCarrierOffline" | "cloudCarrierNoReport"
 }
 
 /**
@@ -41,4 +45,23 @@ export function carrierReading(facts: CarrierFacts): CarrierReading {
   if (!facts.known) return { show: "unknown", word: "cloudCarrierUnknown" }
   if (!facts.supported) return { show: "relay", word: "cloudCarrierRelayMachineOff" }
   return { show: "relay", word: "cloudCarrierRelayNotOpen" }
+}
+
+/**
+ * The dot a machine's row draws: whether it reports in first, its road second.
+ *
+ * The road alone made a closed MacBook look like a running Linux host: the
+ * descriptor it sent before it went quiet still says "relay", and relay was
+ * drawn green. `presence` is the roster's own freshness (`_machineRows`, the
+ * newest signed envelope this browser opened from that machine), the same
+ * fact the machine list's "Online" and every send's admission read, so the
+ * dot cannot say a machine is there while a send to it is refused as stale.
+ */
+export function machineLight(
+  presence: "current" | "stale" | "unknown",
+  carrier: CarrierReading | null,
+): CarrierReading | null {
+  if (presence === "stale") return { show: "offline", word: "cloudCarrierOffline" }
+  if (presence === "unknown") return { show: "unknown", word: "cloudCarrierNoReport" }
+  return carrier
 }
