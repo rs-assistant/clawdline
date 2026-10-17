@@ -278,6 +278,7 @@
 | `squadpackage.request_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `sse.screen_pending` | 64 | `rows` | `disconnect` | `diagnostics, notice` | — |
 | `store.db` | 1073741824 | `bytes` | `none` | `diagnostics, notice, health` | limits §7.1: C1 only measures this row. Its class refuses new writes at the limit (limits §4.4 step 5, 507 storage_exhausted); nothing refuses yet, and ok:false on /v1/health is the only effect of full. |
+| `store.events` | 150000 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `store.read_connections` | 4 | `rows` | `refuse` | `diagnostics` | — |
 | `store.receipts` | 4096 | `rows` | `refuse` | `diagnostics, notice` | — |
 | `terminal.body_bytes` | 6295552 | `bytes` | `refuse` | `diagnostics, sender` | — |
