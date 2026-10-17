@@ -52,6 +52,26 @@ func TestTheTaskListNamesTheRetiredStoreDisabledAndItsOwnListCurrent(t *testing.
 	}
 }
 
+// A machine with no task at all answers an empty list, not a missing one:
+// the schema's `tasks` is an array, and the first page is copied out of the
+// shared cache on its way to the wire.
+func TestAnEmptyTaskListIsAnArray(t *testing.T) {
+	p := &pane{s: session.Session{ID: "pane-1", Backend: session.BackendTmux, Assistant: session.AssistantClaude,
+		State: session.StateIdle}}
+	s := paneServer(t, p)
+	for _, target := range []string{"/v1/orchestrator/tasks", "/v1/orchestrator/tasks?limit=10"} {
+		rec := httptest.NewRecorder()
+		s.tasksList(rec, httptest.NewRequest(http.MethodGet, target, nil))
+		var body map[string]json.RawMessage
+		if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || rec.Code != http.StatusOK {
+			t.Fatalf("%s: %d %s", target, rec.Code, rec.Body)
+		}
+		if string(body["tasks"]) != "[]" {
+			t.Errorf("%s: tasks %s, want []", target, body["tasks"])
+		}
+	}
+}
+
 // What is waiting for a person is only as good as the clock it ages on.
 func TestWhatIsWaitingSaysWhetherItsClockIsTurning(t *testing.T) {
 	cases := []struct {

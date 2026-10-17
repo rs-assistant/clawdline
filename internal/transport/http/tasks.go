@@ -52,7 +52,9 @@ func (s *Server) tasksList(w http.ResponseWriter, r *http.Request) {
 		// `cloud.task_list_reread_seconds` floor
 		// (internal/transport/cloud tasklist.go).
 		list, err = s.lists().taskList()
-		list.Tasks = append([]contract.TaskRow(nil), list.Tasks...)
+		// A copy, because the cached page is shared; never nil, because an
+		// empty list is `[]` on the wire, not `null`.
+		list.Tasks = append(make([]contract.TaskRow, 0, len(list.Tasks)), list.Tasks...)
 	} else {
 		list, err = s.tasksPayload(r.Context(), cursor, limit)
 	}
