@@ -184,8 +184,11 @@ console 原本寫了 `viewport-fit=cover`，而它抄來的那份 stylesheet 在
 
 **機器怎麼知道它在等。** 讀數本來就知道：Claude 自己的狀態檔寫 `waiting`，或畫面上畫著選單
 （`AskUserQuestion`、權限詢問）。列表上畫成 🙋、`work_state: waiting_you` 的就是它。
-`internal/app/waiting.go` 跟 board sweep 同一個時鐘（15 秒），取的是手上最近一次、15 秒內的
-讀數（`InventoryReading.Within`）——broker 的 beat 每 5 秒本來就會讀一次，所以它不自己另外掃。
+`internal/app/waiting.go` 決定要不要推；時鐘在 `internal/transport/http/waiting.go`，每 15 秒看一次（daemon 的 `serve` 呼叫 `Server.StartWaiting`，有 broker 才啟動；單次讀取 panic 只記一行，下一次照跑），
+取的是手上最近一次、15 秒內的讀數（`InventoryReading.Within`）——broker 的 beat 每 5 秒本來就會讀一次，
+所以它不自己另外掃。2026-09-22 退休 v1 board sweep 時，啟動這個 watcher 的那一行跟著 sweep 一起被刪，
+從那天到 2026-10-17 這則推播一則都沒送；現在由 `TestServeStartsTheWaitingWatcher` 與
+`TestStartWaitingPushesAStandingQuestionOnce` 守著。
 這是舊版唯一一條由狀態變化觸發的推播（`StateHook.swift:341-360`），差在下面兩點。
 
 | | 值 | 為什麼 |
@@ -194,7 +197,7 @@ console 原本寫了 `viewport-fit=cover`，而它抄來的那份 stylesheet 在
 | 一次停頓一則 | 寫進 store | 停頓從第一個看到 `waiting` 的讀數，到第一個看到它在做別的事的讀數。決定（`pushed`、`over_budget`、`silent`）寫成 `session.waiting` event；`pushed` 跟推播的 outbox effect 在同一個 transaction（D08）。重啟後讀回來，不重新決定。outbox 的 recovery 對開始了沒結束的推播記 `unknown`、不重送。 |
 | 預算 `waitingPushHourLimit` | 6／小時 | 跟 agent 的 30、decision 的 30 分開算。一週裡單日最多 3 則；這個數是給「一整波 child 卡在同一個權限詢問」那種下午用的，那是一件事，不該是十則。超過的記 `over_budget`，之後也不補推。 |
 | 派出去的 child | 帶「時限還剩 N 分鐘」 | 那個分頁沒有人在看，它的 timeout 在倒數（`StateHook.swift:278-287`）。task 已經結束的分頁不推（記 `silent`）。 |
-| 開關 | `orchestrator_agent_notify` | 目前唯一一個管「session 在做什麼」的推播開關；關掉時停頓不決定，重新打開時還在等的會推。 |
+| 開關 | `push_on_waiting` | 沒設定時沿用舊的 `orchestrator_agent_notify`。關掉時停頓不決定，重新打開時還在等的會推。 |
 | 點開 | 那個 session | `terminal` 帶在推播上；tag 是 `waiting-<terminal>`，同一個 session 的新一則蓋掉舊的。 |
 
 **只有讀數能結束一次停頓。** `unknown` 不是「沒在等」；讀數看不到那個終端機（例如 iTerm2 沒回應）
