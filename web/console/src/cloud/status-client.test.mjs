@@ -219,7 +219,7 @@ test("a paired Mac remains the voice host while its cached command list is incom
   await assert.rejects(client.voiceHost(), { code: "cloud_voice_host_unavailable" })
 })
 
-test("voice follows the current Session machine, while an explicit choice still wins", async () => {
+test("voice follows the current Session machine even when an old saved host names another machine", async () => {
   const client = Object.create(StatusCloudClient.prototype)
   client._machineRows = () => [
     { id: "mac", pairing: "paired", freshness: "current" },
@@ -250,9 +250,9 @@ test("voice follows the current Session machine, while an explicit choice still 
   assert.deepEqual(await client.voiceFor("linux", "AAAA", 16000), { text: "hello" })
   assert.deepEqual(calls, [["linux", "voice", { audio: "AAAA", rate: 16000 }, "action", 360_000]])
 
-  client.voiceHostChoice = "linux"
-  assert.deepEqual(await client.voiceHostFor("mac"), {
-    machine: "linux", chosen: true, candidates: ["mac", "linux"],
+  client.voiceHostChoice = "mac"
+  assert.deepEqual(await client.voiceHostFor("linux"), {
+    machine: "linux", chosen: false, candidates: ["mac", "linux"],
   })
 })
 
