@@ -28,6 +28,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [input, output] = process.argv.slice(2);
   if (!input || !output) throw new Error('usage: node tools/check-profile.mjs events.jsonl summary.json');
   const report = await summarize(createInterface({ input: createReadStream(input), crlfDelay: Infinity }));
+  if (process.argv.includes('--require-tests') && report.tests.length === 0) throw new Error('Selected Go module ran no tests; use full package coverage');
   if (report.packages.length === 0) throw new Error('Go profile contains no completed packages');
   writeFileSync(output, JSON.stringify(report, null, 2) + '\n');
   console.log(`Go profile: ${report.packages.length} packages, ${report.tests.length} test results; details: ${output}`);

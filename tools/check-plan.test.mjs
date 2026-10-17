@@ -15,6 +15,7 @@ test('console and documents skip cross-builds, while tooling and unknown files f
   }
   assert.deepEqual([classify(['internal/app/app.go']).go, classify(['internal/app/app.go']).web], [true, false]);
   assert.equal(classify(['skills/clawdline/guide.md']).go, true);
+  assert.deepEqual([classify(['api/v1/routes.json']).go, classify(['api/v1/routes.json']).web], [true, false]);
   assert.equal(classify(['web/core/index.ts'], true).go, true);
   assert.equal(classify([], false, false).web, true);
   assert.equal(classify([]).go, true);
