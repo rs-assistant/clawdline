@@ -486,6 +486,7 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/cloud/login"}, s.cloudLoginRoute},
 		{Route{"*", "/v1/cloud/enabled"}, s.cloudEnabledRoute},
 		{Route{"*", "/v1/cloud/commands"}, s.cloudCommandsRoute},
+		{Route{"*", "/v1/cloud/direct"}, s.cloudDirectRoute},
 		// Pairing a browser with this Mac, and throwing one out again. Same rule:
 		// this machine's own token, because the first of them answers a link that
 		// hands over the account key.

@@ -19,6 +19,7 @@ import {
   readCloudStatus,
   revokeCloudViewer,
   setCloudCommands,
+  setCloudDirect,
   setCloudEnabled,
   startCloudLogin,
   type CloudLogin,
@@ -800,6 +801,11 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
             <Note dot="idle">{W.cloudCommandsHint}</Note>
             <Chip disabled={cloudSetupBusy} onClick={() => run(() => setCloudCommands(!cloud.commands))}>
               {cloud.commands ? W.cloudCommandsOff : W.cloudCommandsOn}
+            </Chip>
+            <Note dot={cloud.terminal_direct ? "live" : "idle"}>{W.cloudDirectTitle}</Note>
+            <Note dot="idle">{W.cloudDirectHint}</Note>
+            <Chip disabled={cloudSetupBusy} onClick={() => run(() => setCloudDirect(!cloud.terminal_direct))}>
+              {cloud.terminal_direct ? W.cloudDirectOff : W.cloudDirectOn}
             </Chip>
           </>
         )}

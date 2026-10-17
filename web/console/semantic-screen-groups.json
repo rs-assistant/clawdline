@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6002,
-  "riskKeys": 2868,
-  "nonRiskCount": 3134,
+  "englishContentKeys": 6006,
+  "riskKeys": 2869,
+  "nonRiskCount": 3137,
   "groups": [
     {
       "name": "bar / other",
@@ -3114,7 +3114,7 @@
     },
     {
       "name": "settings / other",
-      "count": 109,
+      "count": 112,
       "sources": [
         "src/pages/settings/window/copy.ts"
       ],
@@ -3123,6 +3123,9 @@
         "settings.cloudAccountReady",
         "settings.cloudAccountRetry",
         "settings.cloudCommandsOff",
+        "settings.cloudDirectOff",
+        "settings.cloudDirectOn",
+        "settings.cloudDirectTitle",
         "settings.cloudLineFailure",
         "settings.cloudLineOff",
         "settings.cloudLineOn",

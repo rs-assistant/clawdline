@@ -180,6 +180,41 @@ func newTestBrowser(t *testing.T) (*testBrowser, string) {
 	return b, pc.LocalDescription().SDP
 }
 
+func TestFixedDirectPortPublishesOnlyTheConfiguredPublicCandidate(t *testing.T) {
+	probe, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := probe.LocalAddr().(*net.UDPAddr).Port
+	_ = probe.Close()
+	f := newDirectFixture(t)
+	f.l.settings.DirectUDPPort = port
+	f.l.settings.DirectPublicIP = "198.51.100.10"
+	t.Cleanup(func() { f.l.closeAllDirectPeers(); f.l.closeDirectMux() })
+	_, offer := newTestBrowser(t)
+	if err := f.l.directOfferAdmitted("viewer"); err != nil {
+		t.Fatal(err)
+	}
+	answer, err := f.l.answerDirectOffer("viewer", testConnection, false, offer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(answer, fmt.Sprintf("198.51.100.10 %d typ host", port)) || strings.Contains(answer, " typ srflx ") {
+		t.Fatalf("fixed ICE candidate missing or an ephemeral STUN candidate leaked: %s", answer)
+	}
+	_, secondOffer := newTestBrowser(t)
+	if err := f.l.directOfferAdmitted("second-viewer"); err != nil {
+		t.Fatal(err)
+	}
+	secondAnswer, err := f.l.answerDirectOffer("second-viewer", testConnection, false, secondOffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(secondAnswer, fmt.Sprintf("198.51.100.10 %d typ host", port)) {
+		t.Fatalf("second viewer did not share the fixed ICE port: %s", secondAnswer)
+	}
+}
+
 // next reads one whole message from the machine, reassembling chunks.
 func (b *testBrowser) next(t *testing.T) directMessage {
 	t.Helper()

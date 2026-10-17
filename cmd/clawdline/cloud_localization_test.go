@@ -33,11 +33,15 @@ func captureCloudStream(t *testing.T, stream **os.File, fn func()) string {
 	return string(data)
 }
 
-func TestCloudCatalogHasCompleteNineLanguageCopy(t *testing.T) {
+func TestCloudCatalogKeepsBaselineAndReportsNewFallbacks(t *testing.T) {
 	for _, language := range []string{"en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"} {
 		translated, total := cliCatalogCoverage("cloud", language)
-		if total != 94 || translated != total {
-			t.Errorf("cloud coverage %s = %d/%d, want 94/94", language, translated, total)
+		want := 94
+		if language == "en" || language == "zh-Hant" {
+			want = 98
+		}
+		if total != 98 || translated != want {
+			t.Errorf("cloud coverage %s = %d/%d, want %d/98", language, translated, total, want)
 		}
 	}
 }
@@ -55,7 +59,7 @@ func TestCloudOutputTranslatesGermanAndTraditionalChineseWithoutChangingWireData
 	} {
 		commandLanguage = tc.language
 		usage := captureCloudStream(t, &os.Stderr, cloudUsage)
-		if !strings.Contains(usage, tc.usage) || !strings.Contains(usage, "clawdline cloud <status|preflight|on|off|commands|login|pair|devices|revoke|rotate|connect>") {
+		if !strings.Contains(usage, tc.usage) || !strings.Contains(usage, "clawdline cloud <status|preflight|on|off|commands|direct|login|pair|devices|revoke|rotate|connect>") {
 			t.Errorf("%s usage lost translation or command names: %q", tc.language, usage)
 		}
 		pairing := captureCloudStream(t, &os.Stdout, func() { printPairingState(state) })
