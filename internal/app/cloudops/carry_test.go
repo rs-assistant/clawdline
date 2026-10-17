@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-
 )
 
 // The console's carry table, and the one thing that notices when it and this
@@ -221,4 +220,3 @@ func moduleRoot(t *testing.T) string {
 		dir = parent
 	}
 }
-

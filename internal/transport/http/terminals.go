@@ -593,5 +593,3 @@ func writeTerminalRefusal(w http.ResponseWriter, err error, viewer *terminalView
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(out)
 }
-
-
