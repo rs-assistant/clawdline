@@ -4446,6 +4446,7 @@
   "next.voiceInstallPromptLater": "Not now",
   "next.voiceInstallPromptSetUp": "Set up Whisper",
   "next.voiceInstallPromptDone": "Done",
+  "next.codexAsyncAnswerHint": "Answer this question in Codex. This copy cannot submit an answer.",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

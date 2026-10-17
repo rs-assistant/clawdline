@@ -4446,6 +4446,7 @@
   "next.voiceInstallPromptLater": "稍後再說",
   "next.voiceInstallPromptSetUp": "設定 Whisper",
   "next.voiceInstallPromptDone": "完成",
+  "next.codexAsyncAnswerHint": "請在 Codex 回答；這裡顯示的副本無法送出答案。",
   "projects.activityInProgress": "{n} 項進行中",
   "projects.activityLastKnown": "上次紀錄：{n}",
   "projects.activityNone": "目前無進行中項目",
