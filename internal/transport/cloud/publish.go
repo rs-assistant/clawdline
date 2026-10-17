@@ -46,12 +46,11 @@ import (
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
-// The inventory marker's literal session id and the bound on how many ids it
-// may carry, `CloudAppBridge.swift:1373-1374`. A page holds this same literal
-// (`cloud-client.js`), so it is spelled here exactly once.
+// The inventory marker's session id and id bound, named here as well because
+// this package already spells them so. They are domaincloud's, not copies.
 const (
-	InventorySessionID = "__clawdline_inventory_v1__"
-	InventoryLimit     = 512
+	InventorySessionID = domaincloud.InventorySessionID
+	InventoryLimit     = domaincloud.InventoryLimit
 )
 
 // SnapshotInterval is how often the publisher looks. The Swift bridge publishes

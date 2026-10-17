@@ -1,4 +1,6 @@
 import {
+    SESSION_INVENTORY_ID,
+    SESSION_INVENTORY_LIMIT,
     boardReportSelection,
     channelSegment,
     decodedChannelSegment,
@@ -103,8 +105,6 @@ function missingSubject(what) {
 
 /** The transcript window the direct path asks for, so both transports show the same tail. */
 const TRANSCRIPT_LIMIT = 200;
-const SESSION_INVENTORY_ID = "__clawdline_inventory_v1__";
-const SESSION_INVENTORY_LIMIT = 512;
 
 /**
  * Asking a machine for its current Session rows (`docs/cloud.md`, *A page that reconnects asks for

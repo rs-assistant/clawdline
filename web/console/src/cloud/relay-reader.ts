@@ -28,7 +28,7 @@ import type { StreamHandle, StreamHandlers, StreamTransport } from "@clawdline/c
 import type { CloudWriteClient, WriteHost, WriteRoute } from "./relay-writer.js"
 import type { MachineListPresentation, MachineSessionProjection, SessionDestination, SessionListPresentation } from "./all-machine-sessions.js"
 import { authenticatedRefusalKey } from "./refusal-client.js"
-import { channelSegment } from "../legacy/js/net/client.js"
+import { SESSION_INVENTORY_ID, channelSegment } from "../legacy/js/net/client.js"
 
 /** One machine and one of its sessions, as the relay's channels name them. */
 export interface CloudIdentity {
@@ -1465,7 +1465,7 @@ export class RelayReader {
   }
 
   private statusSnapshotGeneration(): string | null {
-    const marker = this.client?.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+    const marker = this.client?.statusSnapshots?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as
       { payload?: { snapshot_generation?: unknown } } | undefined
     return typeof marker?.payload?.snapshot_generation === "string" ? marker.payload.snapshot_generation : null
   }
@@ -1693,7 +1693,7 @@ export class RelayReader {
     closed: string[]
     claims(): { inventory?: { at: number; sessions: string[] }; closed?: string[] }
   } {
-    const marker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+    const marker = client.statusSnapshots?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as
       | { payload?: { at?: unknown; complete?: unknown; inventory?: { version?: unknown; sessions?: unknown } } } | undefined
     const meta = marker?.payload
     const ids = meta?.inventory?.sessions
@@ -1738,7 +1738,7 @@ export class RelayReader {
     this.sayDrift()
     const recovering = (all.scan.recovering ?? []).includes(this.machine)
     const failed = (all.scan.failures ?? []).some((f) => f.machine === this.machine)
-    const statusMarker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+    const statusMarker = client.statusSnapshots?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as
       | { payload?: { at?: unknown; complete?: unknown; snapshot_generation?: unknown;
         inventory?: { version?: unknown; sessions?: unknown } } } | undefined
     const statusIDs = statusMarker?.payload?.complete === true && statusMarker.payload.inventory?.version === 1 &&
@@ -2310,7 +2310,7 @@ export class RelayReader {
       signal?.addEventListener("abort", done)
       off = client.events((event) => {
         if (event.type === "session_status" && event.identity?.machine === this.machine &&
-          event.identity?.session === "__clawdline_inventory_v1__") done()
+          event.identity?.session === SESSION_INVENTORY_ID) done()
       }) as (() => void) | null
     })
     if (signal?.aborted) throw new AbandonedRead(word)
@@ -2380,7 +2380,7 @@ export class RelayReader {
     if (signal?.aborted) return false
     const client = this.connected()
     if (typeof client.recoverStatusRow !== "function") return false
-    const marker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+    const marker = client.statusSnapshots?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as
       | { payload?: { snapshot_generation?: unknown } } | undefined
     const pass = marker?.payload?.snapshot_generation
     if (typeof pass !== "string" || !/^[0-9a-f]{32}$/u.test(pass)) return false
@@ -2389,7 +2389,7 @@ export class RelayReader {
 
   private pinnedSession(session: string): { machineID: string; sessionID: string; executionGeneration: string } {
     const held = this.connected().statusSnapshots
-    const marker = held?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+    const marker = held?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as
       | { payload?: { complete?: unknown; inventory?: { sessions?: unknown }; snapshot_generation?: unknown; at?: unknown } } | undefined
     const row = held?.get(JSON.stringify([this.machine, session])) as
       | { payload?: { snapshot_generation?: unknown; execution_generation?: unknown; projected_at?: unknown;
@@ -2752,7 +2752,7 @@ export class RelayReader {
         : "answered"
       const client = this.client
       const held = client?.statusSnapshots
-      const marker = held?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as { payload?: { at?: unknown } } | undefined
+      const marker = held?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as { payload?: { at?: unknown } } | undefined
       const row = read.session ? held?.get(JSON.stringify([this.machine, read.session])) as { payload?: { projected_at?: unknown } } | undefined : undefined
       const nowS = this.now() / 1000
       const age = (at: unknown) => typeof at === "number" && Number.isFinite(at) ? Math.round(nowS - at) : null

@@ -1,6 +1,6 @@
 import type { MachineSessionProjection, ProjectedSession } from "./all-machine-sessions.js"
+import { SESSION_INVENTORY_ID as INVENTORY } from "../legacy/js/net/client.js"
 
-const INVENTORY = "__clawdline_inventory_v1__"
 // The machine restates its Cloud status every 240 seconds; the existing viewer
 // freshness policy gives that heartbeat 300 seconds before it is stale.
 export const STATUS_FRESH_MS = 300_000
