@@ -39,6 +39,33 @@
         "script_tag": { "description": "The tag that decided `script`.", "type": "string" }
       }
     },
+    "VoiceSetup": {
+      "description": "GET /v1/voice/setup: what this machine has for local dictation, where it looked, and the exact supported way to add the missing pieces. Paths under the current home directory are written with ~ so this response carries no account path.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform", "status", "binary", "model", "binary_dirs", "model_dirs", "binary_install", "model_name", "model_bytes"],
+      "properties": {
+        "platform": { "description": "darwin, linux or windows.", "type": "string" },
+        "status": { "description": "ready, no_binary or no_model.", "type": "string" },
+        "binary": { "description": "The executable file name in use, or empty.", "type": "string" },
+        "model": { "description": "The model file name in use, or empty.", "type": "string" },
+        "binary_dirs": { "description": "Directories searched for whisper-cli, with the home directory written as ~.", "type": "array", "items": { "type": "string" } },
+        "model_dirs": { "description": "Directories searched for ggml models, with the home directory written as ~.", "type": "array", "items": { "type": "string" } },
+        "binary_install": { "description": "A command, or commands separated by newlines, that install the compatible whisper.cpp CLI on this platform. The Python openai-whisper command is intentionally never offered.", "type": "string" },
+        "model_name": { "description": "The pinned model the POST action downloads.", "type": "string" },
+        "model_bytes": { "description": "Its exact download size.", "type": "integer" }
+      }
+    },
+    "VoiceModelInstall": {
+      "description": "POST /v1/voice/setup after the pinned model has been downloaded, size-checked, SHA-256 checked and atomically installed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "model"],
+      "properties": {
+        "ok": { "type": "boolean" },
+        "model": { "description": "The installed model file name; its private path is not returned.", "type": "string" }
+      }
+    },
     "VoiceRefusal": {
       "description": "A refusal from this route. It is the ordinary refusal shape with one field added, because `no_whisper` covers two different afternoons: `brew install whisper-cpp` leaves a machine with the binary and no model, and a page told only \"no whisper\" sends somebody to check the thing they already did.",
       "type": "object",

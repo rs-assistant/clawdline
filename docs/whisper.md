@@ -1,7 +1,7 @@
 > **Retired Swift-generation record (through 2026-09-19):** The product reasoning is preserved, but Swift/AppKit/iTerm implementation details, source paths, route inventory, port 7717, `/tmp/.clawdline`, and claims about the running Mac app do not describe the Go daemon. References to unavailable retired files are rendered as code instead of live links.
 <!-- clawdline-doc: kind=record audience=both -->
 
-# Dictating in more than one language
+# Dictating locally in more than one language
 
 **Claude Code has its own dictation.** `/voice`, hold space, and it is good — so the honest
 question is not whether this exists but when you would want another one. Four answers, and they
@@ -9,7 +9,7 @@ are the reason this page exists:
 
 | | Claude Code `/voice` | Clawdline |
 |---|---|---|
-| where your voice is transcribed | Anthropic's servers, always — its docs say "audio is not processed locally" | this Mac: Whisper never leaves it, Apple only for languages you have not downloaded |
+| where your voice is transcribed | Anthropic's servers, always — its docs say "audio is not processed locally" | this machine: Whisper never leaves it; on macOS, Apple handles the live first pass |
 | account | a Claude.ai account; not an API key, Bedrock, Vertex or Foundry | any, or none |
 | **Chinese** | **not supported at all** as of 2026-08-17 — 20 languages, and Chinese is not one | yes |
 | two languages in one sentence | no — one `language` setting, and anything outside its list falls back to English | yes, and it is the point |
@@ -34,7 +34,7 @@ support — the binary itself said the above.)
 
 ---
 
-Clawdline's microphone uses Apple's speech recogniser by default. It needs nothing installed and
+On macOS, Clawdline's microphone uses Apple's speech recogniser by default. It needs nothing installed and
 the words appear as you say them — but it hears **one language at a time**. That is a property of
 the API, not a setting: neither `SFSpeechRecognizer` nor its replacement changes language
 mid-sentence. So this is a sentence it cannot be asked to hear:
@@ -103,6 +103,21 @@ largest `ggml-*.bin` in `~/.cache/whisper` or `~/models`, and switches over as s
 both. An existing model in the retired app's Application Support can be selected explicitly with
 `whisper_model`; it is no longer searched automatically because macOS may request access to the
 other app's data.
+
+### Linux
+
+The same `whisper-cli` backend runs on Linux; there is no Apple first pass there. Open **Settings → Machine → Voice input**.
+The page says independently whether the executable or model is missing, lists every directory this machine searched, and
+offers the model download. On Arch Linux the executable is one package:
+
+```bash
+sudo pacman -S --needed whisper-cpp
+```
+
+On Ubuntu, Debian, Fedora and other distributions where the package does not provide `whisper-cli`, the page gives the
+upstream CMake build command and a copy button. Do not install Python's `openai-whisper`: it has a different command-line
+interface and Clawdline cannot run it. The model button downloads the 547 MiB turbo Q5 model from the upstream repository,
+verifies its exact size and SHA-256, and places it in `~/.cache/whisper` only after verification succeeds.
 
 ### Models
 
@@ -260,16 +275,16 @@ A tunnel gives you https without doing anything else; a phone pointed at `http:/
 same wifi does not, and no setting on this side can change that. The page says which of the two it
 is in rather than leaving a dead button.
 
-**On the hosted console, one Mac transcribes, and Devices says which.** A recording made on
-`app.clawdline.com` goes to one machine on the account, and only a Mac can read it — an enrolled
-Linux executor has no Whisper and no `voice` handler. So an account with a Mac and Linux executors
-dictates to the Mac. With more than one Mac it is the one this browser chose under **Devices** in the
-sidebar: the card marked *Voice input* is where the recording goes, and *Use for voice input* on
-another Mac's card moves it there. With no choice made, the one Mac whose inventory is current is
-used; if that still leaves two, nothing is sent and the page asks you to choose under Devices
-(`cloud_voice_host_ambiguous`), and an account with no Mac this browser is paired with says so
-(`cloud_voice_host_unavailable`) instead of waiting on a machine that cannot answer. The choice is
-kept in this browser only, so a phone and a laptop can dictate to different Macs. The same resolver
+**On the hosted console, one machine transcribes, and Devices says which.** A recording made on
+`app.clawdline.com` goes to one machine on the account whose published commands include `voice`;
+that may be macOS or Linux when `whisper-cli` and a model are installed. With more than one capable
+machine it is the one this browser chose under **Devices** in the sidebar: the card marked *Voice
+input* is where the recording goes, and *Use for voice input* on another machine's card moves it
+there. With no choice made, the one capable machine whose inventory is current is used; if that
+still leaves two, nothing is sent and the page asks you to choose under Devices
+(`cloud_voice_host_ambiguous`), and an account with no capable machine this browser is paired with
+says so (`cloud_voice_host_unavailable`) instead of waiting on a machine that cannot answer. The
+choice is kept in this browser only, so a phone and a laptop can dictate to different machines. The same resolver
 chooses the machine for every other hosted-console feature that names none
 ([`cloud.md`](cloud.md), *Which machine a request goes to*); dictation adds only the choice.
 

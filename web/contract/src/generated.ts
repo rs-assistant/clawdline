@@ -10496,6 +10496,18 @@ export interface VoiceLanguage {
 }
 
 /**
+ * POST /v1/voice/setup after the pinned model has been downloaded, size-checked,
+ * SHA-256 checked and atomically installed.
+ */
+export interface VoiceModelInstall {
+  /**
+   * The installed model file name; its private path is not returned.
+   */
+  model: string
+  ok: boolean
+}
+
+/**
  * A refusal from this route. It is the ordinary refusal shape with one field added,
  * because `no_whisper` covers two different afternoons: `brew install whisper-cpp`
  * leaves a machine with the binary and no model, and a page told only "no whisper"
@@ -10540,6 +10552,60 @@ export interface VoiceRequest {
 export interface VoiceResult {
   ms: number
   text: string
+}
+
+/**
+ * GET /v1/voice/setup: what this machine has for local dictation, where it looked,
+ * and the exact supported way to add the missing pieces. Paths under the current
+ * home directory are written with ~ so this response carries no account path.
+ */
+export interface VoiceSetup {
+  /**
+   * The executable file name in use, or empty.
+   */
+  binary: string
+
+  /**
+   * Directories searched for whisper-cli, with the home directory written as ~.
+   */
+  binary_dirs: string[]
+
+  /**
+   * A command, or commands separated by newlines, that install the compatible
+   * whisper.cpp CLI on this platform. The Python openai-whisper command is
+   * intentionally never offered.
+   */
+  binary_install: string
+
+  /**
+   * The model file name in use, or empty.
+   */
+  model: string
+
+  /**
+   * Its exact download size.
+   */
+  model_bytes: number
+
+  /**
+   * Directories searched for ggml models, with the home directory written as ~.
+   */
+  model_dirs: string[]
+
+  /**
+   * The pinned model the POST action downloads.
+   */
+  model_name: string
+
+  /**
+   * darwin, linux or windows.
+   */
+  platform: string
+
+  /**
+   * ready, no_binary or no_model.
+   */
+  status: string
 }
 
 /**

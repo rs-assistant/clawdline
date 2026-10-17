@@ -143,15 +143,29 @@ type Transcriber struct {
 // stops it. The model is returned by its file name, which is what a person
 // recognises; the path stays inside.
 func (t Transcriber) Ready() (binary, model string, err error) {
-	binary, ok := t.findBinary()
-	if !ok {
-		return "", "", ErrNoBinary
+	binary, model = t.Found()
+	if binary == "" {
+		return "", model, ErrNoBinary
 	}
-	model, ok = t.findModel()
-	if !ok {
+	if model == "" {
 		return binary, "", ErrNoModel
 	}
 	return binary, model, nil
+}
+
+// Found reports each independently. Setup needs that distinction because a
+// model installed before the executable must stay visibly installed instead
+// of being hidden behind ErrNoBinary.
+func (t Transcriber) Found() (binary, model string) {
+	binary, ok := t.findBinary()
+	if !ok {
+		binary = ""
+	}
+	model, ok = t.findModel()
+	if !ok {
+		model = ""
+	}
+	return binary, model
 }
 
 // binaryNames are what whisper.cpp's command-line tool has been called.
