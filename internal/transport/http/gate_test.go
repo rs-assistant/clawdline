@@ -222,6 +222,7 @@ func TestGateCoversEveryChange(t *testing.T) {
 		"/v1/settings/notifications",
 		"/v1/settings/default-models",
 		"/v1/settings/work-gates",
+		"/v1/voice/setup",
 		"/v1/projects/p/worktrees/refresh",
 		"/v1/auth/pair", "/v1/auth/pair/confirm", "/v1/auth/adopt", "/v1/auth/password", "/v1/auth/logout",
 		"/v1/auth/devices/revoke-all", "/v1/auth/devices/browser", "/v1/auth/devices/password",

@@ -1,5 +1,14 @@
-import type { VoiceLanguage } from "@clawdline/contract"
+import type { VoiceLanguage, VoiceModelInstall, VoiceSetup } from "@clawdline/contract"
+import { RefusalError, TransportError, isRefusal } from "@clawdline/core"
 import { client } from "../../client.js"
+import { installVoiceModelAt, readVoiceSetupAt, type VoiceSetupFailures } from "./voice-setup-call.js"
+
+const setupFailures: VoiceSetupFailures = {
+  transport: (message, cause) => new TransportError(message, cause),
+  response: (status, parsed, path) => isRefusal(parsed)
+    ? new RefusalError(status, parsed, path)
+    : new TransportError(`${path} answered ${status} with no refusal in it`),
+}
 
 /**
  * `/v1/voice/language`, what this daemon will read the next recording as and
@@ -22,4 +31,14 @@ export async function readVoiceLanguage(): Promise<VoiceLanguage | null> {
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** What is installed and the exact paths and command this platform uses. */
+export async function readVoiceSetup(): Promise<VoiceSetup> {
+  return readVoiceSetupAt(client.url("/v1/voice/setup"), setupFailures)
+}
+
+/** Download the one pinned model. This can take minutes, so the request has no browser timer. */
+export async function installVoiceModel(): Promise<VoiceModelInstall> {
+  return installVoiceModelAt(client.url("/v1/voice/setup"), setupFailures)
 }

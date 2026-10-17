@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6026,
-  "riskKeys": 2878,
-  "nonRiskCount": 3148,
+  "englishContentKeys": 6042,
+  "riskKeys": 2883,
+  "nonRiskCount": 3159,
   "groups": [
     {
       "name": "bar / other",
@@ -3125,7 +3125,7 @@
     },
     {
       "name": "settings / other",
-      "count": 112,
+      "count": 123,
       "sources": [
         "src/pages/settings/window/copy.ts"
       ],
@@ -3217,9 +3217,20 @@
         "settings.settingsVoiceLanguageFollow",
         "settings.settingsWidth",
         "settings.statusTab",
+        "settings.voiceBinaryPaths",
+        "settings.voiceBinaryTitle",
+        "settings.voiceCommandCopied",
+        "settings.voiceCopyCommand",
+        "settings.voiceInstallModel",
+        "settings.voiceInstalledModel",
         "settings.voiceLanguageChinese",
         "settings.voiceLanguageFixed",
         "settings.voiceMachineLocale",
+        "settings.voiceModelHint",
+        "settings.voiceModelPaths",
+        "settings.voiceModelTitle",
+        "settings.voiceNoModel",
+        "settings.voiceReady",
         "settings.voiceWhyChosen",
         "settings.voiceWhyLanguage",
         "settings.voiceWhyMachine",

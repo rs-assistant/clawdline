@@ -235,6 +235,31 @@
   padding: 0 var(--sw-pad) 8px;
 }
 
+.sw-voice-command,
+.sw-voice-paths pre {
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0 0 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--sw-chip-edge);
+  border-radius: 7px;
+  background: var(--sw-chip-fill);
+  color: var(--sw-soft);
+  font: 10.5px/1.5 var(--sw-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.sw-voice-paths {
+  margin-top: 14px;
+  color: var(--sw-faint);
+  font-size: 10.5px;
+}
+.sw-voice-paths summary {
+  cursor: pointer;
+  margin-bottom: 7px;
+}
+
 /* The footer: where the file is, as plain selectable text. There is no "open
    the config file" button, and its absence is deliberate — see Settings.swift. */
 .sw-foot {

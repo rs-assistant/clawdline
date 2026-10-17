@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { SettingsSnapshot, TunnelStatus, VoiceLanguage } from "@clawdline/contract"
+import type { SettingsSnapshot, TunnelStatus, VoiceLanguage, VoiceSetup } from "@clawdline/contract"
 import {
   defaultModelOptions,
   readBrowserSettings,
@@ -29,7 +29,7 @@ import {
 } from "../cloud.js"
 import { DEFAULTS, reading, type SettingKey } from "./defaults.js"
 import { readTunnelStatus } from "../tunnel.js"
-import { readVoiceLanguage } from "../voice.js"
+import { installVoiceModel, readVoiceLanguage, readVoiceSetup } from "../voice.js"
 import {
   APP_EVENT,
   HOTKEY_EVENT,
@@ -126,6 +126,10 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   // Where the voice language landed, asked of the daemon while the voice tab is
   // open and again after every write — the General tab's language moves it too.
   const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage | null>(null)
+  const [voiceSetupState, setVoiceSetupState] = useState<VoiceSetup | null>(null)
+  const [voiceInstallBusy, setVoiceInstallBusy] = useState(false)
+  const [voiceInstallSaid, setVoiceInstallSaid] = useState("")
+  const [voiceCommandCopied, setVoiceCommandCopied] = useState(false)
   // The pairing card's own state. `pairingSaid` is whatever went wrong with the
   // last button press, which is separate from the line's `last_error`: one is
   // about this person's click and the other about the socket.
@@ -167,9 +171,17 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   useEffect(() => {
     if (!VOICE_ENABLED || tab !== voiceTab) return
     let live = true
-    void readVoiceLanguage().then((answer) => {
-      if (live) setVoiceLanguage(answer)
+    void readVoiceLanguage().then((language) => {
+      if (live) setVoiceLanguage(language)
     })
+    void readVoiceSetup().then(
+      (setup) => {
+        if (live) setVoiceSetupState(setup)
+      },
+      (error: unknown) => {
+        if (live) setVoiceInstallSaid(settingsFailureSentence(error))
+      },
+    )
     return () => {
       live = false
     }
@@ -692,6 +704,38 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
 
   function voicePane() {
     const dictation = shell?.dictation ?? window.__clawdlineShell?.settings?.dictation
+    const setupStatus = voiceSetupState
+      ? voiceSetupState.status === "ready"
+        ? fill(W.voiceReady, { model: voiceSetupState.model })
+        : voiceSetupState.status === "no_model"
+          ? W.voiceNoModel
+          : W.voiceNoBinary
+      : dictation
+        ? dictationStatus(dictation)
+        : ""
+    const installModel = () => {
+      setVoiceInstallBusy(true)
+      setVoiceInstallSaid(W.voiceInstallingModel)
+      void (async () => {
+        try {
+          await installVoiceModel()
+          const setup = await readVoiceSetup()
+          setVoiceSetupState(setup)
+          setVoiceInstallSaid(W.voiceInstalledModel)
+        } catch (error) {
+          setVoiceInstallSaid(settingsFailureSentence(error))
+        } finally {
+          setVoiceInstallBusy(false)
+        }
+      })()
+    }
+    const copyInstall = () => {
+      if (!voiceSetupState?.binary_install || !navigator.clipboard) return
+      void navigator.clipboard.writeText(voiceSetupState.binary_install).then(() => {
+        setVoiceCommandCopied(true)
+        window.setTimeout(() => setVoiceCommandCopied(false), 2500)
+      })
+    }
     return (
       <>
         <div className="sw-column">
@@ -705,14 +749,49 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
             />
           </Row>
           {voiceLanguage ? <p className="sw-said">{voiceLanguageSaid(voiceLanguage)}</p> : null}
+          {voiceSetupState?.status === "no_binary" ? (
+            <Block label={W.voiceBinaryTitle} hint={W.voiceBinaryHint}>
+              <pre className="sw-voice-command">{voiceSetupState.binary_install}</pre>
+              <Chip onClick={copyInstall}>{W.voiceCopyCommand}</Chip>
+              {voiceCommandCopied ? <p className="sw-said">{W.voiceCommandCopied}</p> : null}
+            </Block>
+          ) : null}
+          {voiceSetupState ? (
+            <details className="sw-voice-paths">
+              <summary>{W.voiceBinaryPaths}</summary>
+              <pre>{voiceSetupState.binary_dirs.join("\n")}</pre>
+            </details>
+          ) : null}
         </div>
         <div className="sw-column">
-          {dictation ? (
+          {setupStatus ? (
             <Block>
-              <Note dot={dictation.kind === "ready" ? "live" : "warn"}>
-                {dictationStatus(dictation)}
+              <Note dot={voiceSetupState?.status === "ready" || dictation?.kind === "ready" ? "live" : "warn"}>
+                {setupStatus}
               </Note>
             </Block>
+          ) : null}
+          {voiceSetupState ? (
+            <Block
+              label={W.voiceModelTitle}
+              hint={fill(W.voiceModelHint, {
+                name: voiceSetupState.model_name,
+                size: String(Math.round(voiceSetupState.model_bytes / 1048576)),
+              })}
+            >
+              {voiceSetupState.model ? (
+                <Mono>{voiceSetupState.model}</Mono>
+              ) : (
+                <Chip disabled={voiceInstallBusy} onClick={installModel}>{W.voiceInstallModel}</Chip>
+              )}
+              {voiceInstallSaid ? <p className="sw-said" role="status">{voiceInstallSaid}</p> : null}
+            </Block>
+          ) : null}
+          {voiceSetupState ? (
+            <details className="sw-voice-paths">
+              <summary>{W.voiceModelPaths}</summary>
+              <pre>{voiceSetupState.model_dirs.join("\n")}</pre>
+            </details>
           ) : null}
         </div>
       </>
