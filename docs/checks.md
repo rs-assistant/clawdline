@@ -26,6 +26,11 @@ tools/check.sh              # Run the local change gate.
 tools/check.sh --callers    # Also compile transitive callers' tests without running them.
 ```
 
+Scope discovery prepares ignored web dependencies before loading TypeScript,
+including on the first run in a new worktree. `--plan` may prepare these links,
+but runs no test suite and leaves stdout as JSON. Preparation failure stops with
+exit 2 rather than disguising a missing resolver as a reason for full testing.
+
 The plan includes committed changes since the merge base with `main`, staged
 changes (even when the working file was reverted), unstaged, deleted, renamed
 and untracked files. A known empty change set is different from unreadable Git
@@ -48,7 +53,8 @@ capacity-registration guards still run, uncached, even for
 documentation edits. Contract generation runs when schema/generated-contract inputs change.
 Capacity guards run for Go or capacity-copy inputs; CSS and shell guards follow
 their inputs. Tool self-tests run for tooling/full checks. Repository-copy,
-privacy and source guards remain; full CI retains complete validation.
+privacy and source guards remain; the machine-word guard scans changed source
+and catalog files, including new files, with whole-tree coverage in CI; full CI retains complete validation.
 
 For the console, TypeScript checks the entire project incrementally. Its build
 information stays in the ignored `web/.clawdline-check.tsbuildinfo` of this

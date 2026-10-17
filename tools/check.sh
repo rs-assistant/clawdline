@@ -61,6 +61,11 @@ if [ "$quick" = yes ]; then
 elif [ "${#packages[@]}" -ne 0 ] || [ -n "$run_pattern" ]; then
   echo 'package arguments require --quick' >&2; exit 2
 fi
+# The resolver needs TypeScript before choosing scope in a fresh worktree.
+# Keep --plan stdout machine-readable and fail preparation before any gate runs.
+if [ "$quick" != yes ]; then
+  node tools/ensure-web-deps.mjs >&2 || exit 2
+fi
 if [ "$plan_only" = yes ]; then
   args=(); [ "$full" = no ] && [ "$profile" = no ] || args+=(--full)
   [ "$web" = auto ] || args+=(--web)
@@ -169,7 +174,10 @@ if selected contract; then check "contract-gen -check" go run ./tools/contract-g
 if selected legacy; then check "check-legacy-css.sh" tools/check-legacy-css.sh; else summary+=("SKIP  check-legacy-css.sh  (inputs unchanged; full CI retains coverage)"); fi
 check "web dependencies" node tools/ensure-web-deps.mjs
 if selected borders; then check "check-rounded-side-borders.mjs" node web/console/tools/check-rounded-side-borders.mjs; else summary+=("SKIP  check-rounded-side-borders.mjs  (inputs unchanged; full CI retains coverage)"); fi
-check "check-machine-words.sh" tools/check-machine-words.sh
+if selected machine; then
+  if [ "$scope_full" = true ]; then check "check-machine-words.sh (whole tree)" tools/check-machine-words.sh
+  else check "check-machine-words.sh (changed files)" tools/check-machine-words.sh -- ${private_paths[@]+"${private_paths[@]}"}; fi
+fi
 if selected shell; then check "check-shell-expansions.sh" tools/check-shell-expansions.sh; else summary+=("SKIP  check-shell-expansions.sh  (inputs unchanged; full CI retains coverage)"); fi
 if [ "$scope_full" = true ]; then
   check "check-private.sh (whole tree)" tools/check-private.sh
@@ -186,6 +194,7 @@ if [ "$(uname -s)" = Linux ]; then
 fi
 check "check planning and profiling tests" node --test tools/check-plan.test.mjs tools/check-profile.test.mjs tools/check-scope.test.mjs
 check "check modes integration" bash tools/test-check-modes.sh
+check "machine-word delta guard" bash tools/test-machine-words-changes.sh
 if [ "$(uname -s)" = Darwin ]; then
   check "Swift staged app watcher" sh tools/test-staged-app-watcher.sh
 fi
