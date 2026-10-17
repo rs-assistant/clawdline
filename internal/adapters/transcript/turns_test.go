@@ -322,6 +322,29 @@ func TestCodexPlanIsReadAsLiterals(t *testing.T) {
 	}
 }
 
+func TestCodexAsyncQuestionCarriesItsOptions(t *testing.T) {
+	args := `{"questions":[{"title":" Which route? ","options":["Open <b>","Wait"]}]}`
+	path := writeRecord(t,
+		m{"type": "response_item", "payload": m{"type": "function_call", "name": "request_user_input_async", "arguments": args}},
+		m{"type": "response_item", "payload": m{"type": "function_call_output", "output": `{"accepted":true}`}},
+	)
+	want := AskMarker + `[{"q":"Which route?","o":[{"l":"Open <b>"},{"l":"Wait"}]}]`
+	page, err := ReadCodex(path, 10)
+	if err != nil || len(page.Entries) != 1 {
+		t.Fatalf("%v %+v", err, page.Entries)
+	}
+	if got := page.Entries[0]; got.Kind != KindTool || got.Tool != "request_user_input_async" || got.Text != want {
+		t.Fatalf("question: %+v, want %q", got, want)
+	}
+	if questions, ok := askedQuestions(page.Entries[0].Text); !ok || len(questions) != 1 || len(questions[0].Options) != 2 {
+		t.Fatalf("renderable question: %+v, %t", questions, ok)
+	}
+	after, err := ReadCodexAfter(path, 10, 0)
+	if err != nil || len(after.Entries) != 1 || after.Entries[0].Text != want {
+		t.Fatalf("incremental page: %v %+v", err, after.Entries)
+	}
+}
+
 func TestNoticeAndSessionMessage(t *testing.T) {
 	notice := `<clawdline-notice>{"audience":"parent","body":"Task done","child_may_still_write":false,"claims_released":true,"kind":"task_finished","outstanding":0,"protocol":"clawdline.notice","result_path":"/tmp/r.json","state":"success","task":{"id":"t1","title":"Do it"},"version":1}</clawdline-notice>`
 	message := `<clawdline-message>{"body":"hi","kind":"session_message","protocol":"clawdline.message","source":{"assistant":"codex","id":"%1","label":"Root"},"version":1}</clawdline-message>`
