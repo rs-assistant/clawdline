@@ -51,6 +51,8 @@ class FakeClient implements CloudWriteClient {
   signature = "1-1"
   fail: Record<string, Error | undefined> = {}
   listPresentationsForMachine?: (machine: string, signal: AbortSignal, options?: { fresh?: boolean }) => Promise<unknown>
+  voiceHostFor?: CloudWriteClient["voiceHostFor"]
+  voiceFor?: CloudWriteClient["voiceFor"]
   /** What `_machineRequestAs` settles with, as the copied client resolves a payload's `body`. */
   machineAnswer: unknown = undefined
   events(_listener: (event: CloudEvent) => void) {
@@ -851,6 +853,34 @@ test("the voice source names the actual selected Whisper machine without sending
   assert.equal(res.status, 200)
   assert.deepEqual(await json(res), { machine: "mac-a", name: "Build host", platform: "linux" })
   assert.deepEqual(client.calls, [["voiceHost"]])
+})
+
+test("voice source, dictation and spoken intents follow the machine that owns this Session", async () => {
+  const client = new FakeClient()
+  client.descriptors.set("mac-a", { machine: { commands: ["voice"], name: "Linux host", platform: "linux" } })
+  client.voiceHostFor = (machine: string) => {
+    client.calls.push(["voiceHostFor", machine])
+    return Promise.resolve({ machine })
+  }
+  client.voiceFor = (machine: string, audio: string, rate: number) => {
+    client.calls.push(["voiceFor", machine, audio, rate])
+    return Promise.resolve({ text: "hello there", ms: 900 })
+  }
+  const { reader } = seam(client)
+
+  const source = await reader.fetch("/v1/voice/source")
+  assert.deepEqual(await json(source), { machine: "mac-a", name: "Linux host", platform: "linux" })
+  const voice = await reader.fetch("/v1/voice", post({ audio: "AAAA", rate: 16000 }))
+  assert.deepEqual(await json(voice), { text: "hello there", ms: 900 })
+  const intent = await reader.fetch("/v1/intents", post({ text: "start the review" }))
+  assert.equal((await json<{ draft: { place_id: string } }>(intent)).draft.place_id,
+    "cloud.WyJtYWMtYSIsInAxIl0")
+  assert.deepEqual(client.calls, [
+    ["voiceHostFor", "mac-a"],
+    ["voiceFor", "mac-a", "AAAA", 16000],
+    ["voiceHostFor", "mac-a"],
+    ["_machineRequest", "mac-a", "intents", { text: "start the review" }, "action", 130_000],
+  ])
 })
 
 test("a spoken intent follows dictation to the chosen voice machine", async () => {
