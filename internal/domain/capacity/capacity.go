@@ -168,14 +168,18 @@ const (
 	BoardReceipts             = "board.receipts"
 	CloudRelayQueue           = "cloud.relay_queue"
 	StoreReceipts             = "store.receipts"
-	CloudPeerPairs            = "cloud.peer_pairs"
-	CloudPeerGrants           = "cloud.peer_grants"
-	CloudPeerInbox            = "cloud.peer_inbox"
-	CloudPeerInboxPage        = "cloud.peer_inbox_page"
-	CloudPeerOutbox           = "cloud.peer_outbox"
-	CloudPeerIngress          = "cloud.peer_ingress"
-	CloudPeerBody             = "cloud.peer_body_bytes"
-	CloudPeerFrame            = "cloud.peer_frame_bytes"
+	// How long the store keeps what nothing reads any more.
+	StoreDoneEffectRetention       = "store.done_effect_retention_seconds"
+	StoreReceiptTombstoneRetention = "store.receipt_tombstone_retention_seconds"
+	StoreRetentionPruneBatch       = "store.retention_prune_batch_rows"
+	CloudPeerPairs                 = "cloud.peer_pairs"
+	CloudPeerGrants                = "cloud.peer_grants"
+	CloudPeerInbox                 = "cloud.peer_inbox"
+	CloudPeerInboxPage             = "cloud.peer_inbox_page"
+	CloudPeerOutbox                = "cloud.peer_outbox"
+	CloudPeerIngress               = "cloud.peer_ingress"
+	CloudPeerBody                  = "cloud.peer_body_bytes"
+	CloudPeerFrame                 = "cloud.peer_frame_bytes"
 	// What a hosted page may report about its own failures (`diagnostics.events`).
 	CloudViewerEventsBatch = "cloud.viewer_events_batch_bytes"
 	CloudViewerEventsRows  = "cloud.viewer_events_logged_rows"
@@ -715,6 +719,34 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics, Notice},
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/adapters/store.ReceiptLimit"},
+		},
+		{
+			// A done outbox row is let go a week after it finished, except the
+			// newest row of each subject for the two kinds read by subject
+			// (capacity.push, session.pause.delivery). Failed and unknown rows
+			// stay.
+			Name: StoreDoneEffectRetention, Class: Journal, Unit: Seconds,
+			Limit: 604_800, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/store.DoneEffectRetentionSecondsLimit"},
+		},
+		{
+			// An expired receipt with a random key is deleted a week after its
+			// request was first claimed, well past the longest resend (a saved
+			// console card, 24 hours). A key derived from the request's content
+			// keeps its tombstone for good.
+			Name: StoreReceiptTombstoneRetention, Class: Idempotency, Unit: Seconds,
+			Limit: 604_800, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/store.ReceiptTombstoneRetentionSecondsLimit"},
+		},
+		{
+			// The most rows one maintenance pass prunes from one table; the
+			// oldest go first and the rest wait for the next pass.
+			Name: StoreRetentionPruneBatch, Class: Journal, Unit: Rows,
+			Limit: 500, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/store.RetentionPruneBatchLimit"},
 		},
 		{
 			// Locally pinned machine-to-machine pairs are authorization evidence.
