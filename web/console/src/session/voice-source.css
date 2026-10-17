@@ -1,0 +1,14 @@
+.voice .source {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 38%;
+  overflow: hidden;
+  color: var(--faint);
+  font: 10.5px/1.4 var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice .source[hidden] {
+  display: none;
+}

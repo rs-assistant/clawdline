@@ -401,6 +401,19 @@ func (s *Server) voiceLanguageRoute(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// voiceSourceRoute names the machine whose Whisper receives the next local
+// recording. A hosted console answers this route from its authenticated
+// machine descriptor instead (relay-writer.ts), so it names the selected
+// account voice host rather than the Session currently open on screen.
+func (s *Server) voiceSourceRoute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "GET")
+		return
+	}
+	name, _ := os.Hostname()
+	writeJSON(w, contract.VoiceSource{Name: name, Platform: runtime.GOOS})
+}
+
 // voiceCode is the machine-readable half of each failure, and the only part
 // anything branches on.
 func voiceCode(err error) string {

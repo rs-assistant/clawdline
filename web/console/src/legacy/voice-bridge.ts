@@ -102,6 +102,8 @@ export interface VoiceJob {
   sink: (said: string) => void
   /** A Cloud composer can use the account's existing voice host. Dictation never sends to a Session. */
   transcribe?: (audio: string, rate: number) => Promise<{ text?: string; ms?: number }>
+  /** The machine whose Whisper will receive this recording. Display-only. */
+  source?: () => Promise<{ label: string; description: string }>
   /** This job's own reason to give up early — the composer gone, a sheet shut. */
   guard: () => boolean
   /** A non-composer microphone can own its own icon and messages. */
@@ -151,6 +153,9 @@ let token = 0
  * the page is open could never use it.
  */
 let whisperless: string | null = null
+/** The quiet source label for this recording; its lookup never gates audio. */
+let source: { label: string; description: string } | null = null
+let sourceToken = 0
 
 /* The meter. `heard` is an audio context of its own, held open only while the
    microphone is. `level` is where the disc currently is between its two ends,
@@ -277,6 +282,13 @@ export function press(job?: VoiceJob): void {
   // and it says so.
   if (state !== "off") return
   activeJob = want
+  source = null
+  const lookup = ++sourceToken
+  void want.source?.().then((answer) => {
+    if (activeJob !== want || state === "off" || lookup !== sourceToken) return
+    source = answer
+    showSource()
+  }).catch(() => { /* A missing label must never prevent dictation. */ })
   if (whisperless) {
     const said = whisperless
     whisperless = null
@@ -953,6 +965,12 @@ function show(): void {
     what.appendChild(note)
     box.appendChild(what)
 
+    const sourceLabel = document.createElement("span")
+    sourceLabel.className = "source"
+    sourceLabel.hidden = true
+    box.appendChild(sourceLabel)
+    showSource()
+
     /**
      * The ways out, in the order this page puts every pair — the one that
      * undoes on the left, the one that goes on with it on the right.
@@ -975,6 +993,16 @@ function show(): void {
   }
   say()
   changed()
+}
+
+/** Update the already-drawn source without rebuilding buttons under a thumb. */
+function showSource(): void {
+  const label = activeJob?.host.querySelector<HTMLElement>(".source")
+  if (!label) return
+  label.hidden = !source
+  label.textContent = source?.label ?? ""
+  label.title = source?.description ?? ""
+  label.setAttribute("aria-label", source?.description ?? "")
 }
 
 /// One of them. The `mousedown` is the one Send and the attachment carry for

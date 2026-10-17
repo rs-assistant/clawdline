@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -18,6 +19,28 @@ import (
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/auth"
 )
+
+func TestVoiceSourceNamesThisMachine(t *testing.T) {
+	s := voiceServer(t)
+	rec := httptest.NewRecorder()
+	s.voiceSourceRoute(rec, httptest.NewRequest(http.MethodGet, "/v1/voice/source", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET: %d %s", rec.Code, rec.Body)
+	}
+	var got contract.VoiceSource
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Platform != runtime.GOOS || got.Name == "" || got.Machine != "" {
+		t.Fatalf("source = %+v", got)
+	}
+
+	rec = httptest.NewRecorder()
+	s.voiceSourceRoute(rec, httptest.NewRequest(http.MethodPost, "/v1/voice/source", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST: %d %s", rec.Code, rec.Body)
+	}
+}
 
 // voiceCall posts one body as a device with the capabilities named. The gate
 // is not in the way — its own refusals have their own tests — so what is being

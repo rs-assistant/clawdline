@@ -33,6 +33,8 @@ import { deliverUntilSeen, pendingSends } from "./send.js"
 import { Waiting } from "./Waiting.js"
 import { ImageMarkup } from "./ImageMarkup.js"
 import { ComposerBox } from "./ComposerBox.js"
+import { voiceSource } from "./voice-source.js"
+import "./voice-source.css"
 
 /**
  * The composer, as the original's `form#composer` is built.
@@ -427,6 +429,7 @@ export function Composer({
       composer: form.current,
       sink: (said) => sink.current(said),
       transcribe: remote?.transcribe,
+      source: voiceSource,
       changed: setVoice,
       say: toast,
       // **The composer has gone**, which is the original's `els.composer.hidden`:
