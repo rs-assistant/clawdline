@@ -26,9 +26,9 @@
  *   be stopped from scrolling that way. It does not have to be: the copied
  *   `.row[data-swipe]` carries `touch-action: pan-y`, which tells the browser
  *   the row pans vertically and nothing else, so the browser never takes a
- *   horizontal drag for a scroll and hands it to the page. That is why every
- *   listener here stays passive and the attribute is put on the row before the
- *   first move is read (`Sessions.tsx`, `arm`).
+ *   horizontal drag for a scroll and hands it to the page. `list-density.css`
+ *   applies that rule to actionable rows before touchstart; the attribute
+ *   added during touchstart only controls the visual swipe state.
  *
  * The two gestures are told apart the usual way: whichever axis the first real
  * movement is on owns the rest of that gesture, and the other one is told to
