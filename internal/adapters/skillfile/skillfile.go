@@ -347,6 +347,58 @@ func Uninstall(p Paths) (Removal, error) {
 	return out, nil
 }
 
+// State is what Status found at one target, read without changing anything.
+type State string
+
+const (
+	// StateCurrent is this build's stub, byte for byte.
+	StateCurrent State = "current"
+	// StateMissing is nothing at the path and no record: a plain install.
+	StateMissing State = "missing"
+	// StateStale is an earlier stub of ours, which Install would update.
+	StateStale State = "stale"
+	// StateChanged is a recorded install whose file somebody has since
+	// edited, moved or replaced; Install refuses it.
+	StateChanged State = "changed"
+	// StateOther is a file or link that was never ours. Install would back it
+	// up and replace it, which is a decision about somebody else's file.
+	StateOther State = "other"
+)
+
+// Status says what Install would meet at p, without writing anything.
+//
+// Only StateMissing and StateStale are changes a person can make with one
+// press: the first writes where nothing was, the second replaces bytes this
+// package wrote. The other two are somebody's file, and stay theirs to move.
+func Status(p Paths, stub []byte) (State, error) {
+	if err := p.checkState(); err != nil {
+		return "", err
+	}
+	if _, err := skillDirReady(p.skillDir(), false); err != nil {
+		return "", err
+	}
+	cur, err := look(p.stub())
+	if err != nil {
+		return "", err
+	}
+	if cur.kind == KindFile && cur.sum == digest(stub) {
+		return StateCurrent, nil
+	}
+	rec, recorded, err := readRecord(p.record())
+	if err != nil {
+		return "", err
+	}
+	switch {
+	case recorded && cur.kind == KindFile && cur.sum == rec.InstalledSHA256:
+		return StateStale, nil
+	case recorded:
+		return StateChanged, nil
+	case cur.kind == KindAbsent:
+		return StateMissing, nil
+	}
+	return StateOther, nil
+}
+
 // ReadRecord is the install record, and whether there is one.
 func ReadRecord(p Paths) (Record, bool, error) { return readRecord(p.record()) }
 

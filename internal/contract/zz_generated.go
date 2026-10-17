@@ -6483,6 +6483,12 @@ type SignedIn struct {
 	Token string `json:"token"`
 }
 
+// Every target, Claude Code's first. After an install, `state` is read again,
+// so it says what is there now.
+type SkillReply struct {
+	Targets []SkillTarget `json:"targets"`
+}
+
 // Where a skill came from. Claude's are read from `.claude/skills` in the
 // project (from the repository root down to the working directory),
 // `~/.claude/skills` and installed plugins; Codex's are the catalog its rollout
@@ -6499,6 +6505,26 @@ const (
 
 // SkillSourceValues is every value the contract allows, in contract order.
 var SkillSourceValues = []SkillSource{SkillSourceProject, SkillSourcePersonal, SkillSourcePlugin, SkillSourceAdmin, SkillSourceSystem}
+
+// One assistant's skill file.
+type SkillTarget struct {
+	// Which assistant reads this file: Claude Code reads ~/.claude/skills, Codex reads
+	// ~/.agents/skills.
+	Assistant string `json:"assistant"`
+
+	// POST only: what the install did here. `skipped` is a target that was current, or
+	// not ours to replace; `failed` is a write that did not complete.
+	Outcome string `json:"outcome,omitempty"`
+
+	// The SKILL.md path on this machine.
+	Path string `json:"path"`
+
+	// `current` is this build's stub; `missing` is nothing there; `stale` is an
+	// earlier stub of ours; `changed` is our install edited since; `other` is a file
+	// or link that was never ours; `unreadable` is a state that could not be read,
+	// which never authorises a write.
+	State string `json:"state"`
+}
 
 // The effective list, sorted by name, after the precedence a typed command
 // follows: a personal skill replaces a project skill of the same name, a deeper

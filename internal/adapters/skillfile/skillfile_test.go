@@ -283,3 +283,55 @@ func TestTheStableBinaryIsWrittenOnlyWhenItDiffers(t *testing.T) {
 		}
 	}
 }
+
+// Status names each case Install would meet, and reading it writes nothing:
+// a person decides from it before anything in their configuration changes.
+func TestStatusReadsWithoutWriting(t *testing.T) {
+	p := testPaths(t)
+	state := func() State {
+		t.Helper()
+		got, err := Status(p, stubV2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	if got := state(); got != StateMissing {
+		t.Fatalf("nothing there = %s", got)
+	}
+	if _, err := os.Lstat(filepath.Dir(StubPath(p.Home))); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("status made the skill directory: %v", err)
+	}
+	if _, err := Install(p, stubV1, when); err != nil {
+		t.Fatal(err)
+	}
+	if got := state(); got != StateStale {
+		t.Fatalf("an older stub of ours = %s", got)
+	}
+	if _, err := Install(p, stubV2, when); err != nil {
+		t.Fatal(err)
+	}
+	if got := state(); got != StateCurrent {
+		t.Fatalf("this build's stub = %s", got)
+	}
+	if err := os.WriteFile(StubPath(p.Home), []byte("edited\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := state(); got != StateChanged {
+		t.Fatalf("an edited stub = %s", got)
+	}
+
+	other := testPaths(t)
+	if err := os.MkdirAll(filepath.Dir(StubPath(other.Home)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(StubPath(other.Home), []byte("theirs\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Status(other, stubV2); err != nil || got != StateOther {
+		t.Fatalf("somebody's own file = %s %v", got, err)
+	}
+	if _, err := os.Stat(other.record()); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("status wrote a record: %v", err)
+	}
+}

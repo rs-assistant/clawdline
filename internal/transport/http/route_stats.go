@@ -61,7 +61,7 @@ var routeWords = func() map[string]bool {
 		devices devstacks diagnostics diff digests documents durable-reports edit entry events exit export
 		fail file files finish focus gate-decision gate-evidence gate-export gate-purge gate-result git
 		graphs handoffs head health history human human-interventions icon images inbox inflight info
-		input intents interrupt inventory items key keys landing landings language lease leases links
+		input install intents interrupt inventory items key keys landing landings language lease leases links
 		logout machine machines manifest memory memory-groups messages mirror motion next notes notify
 		obligations observed offer open orchestrator outbox pair pairing pairings password paste pauses
 		peer persona-suggestion personas phase places preview progress project project-sync projects

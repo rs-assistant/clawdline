@@ -7896,6 +7896,14 @@ export interface SignedIn {
 }
 
 /**
+ * Every target, Claude Code's first. After an install, `state` is read again, so it
+ * says what is there now.
+ */
+export interface SkillReply {
+  targets: SkillTarget[]
+}
+
+/**
  * Where a skill came from. Claude's are read from `.claude/skills` in the project
  * (from the repository root down to the working directory), `~/.claude/skills` and
  * installed plugins; Codex's are the catalog its rollout was started with, where
@@ -7909,6 +7917,36 @@ export type SkillSource =
   | "system"
 
 export const SkillSourceValues: readonly SkillSource[] = ["project", "personal", "plugin", "admin", "system"] as const
+
+/**
+ * One assistant's skill file.
+ */
+export interface SkillTarget {
+  /**
+   * Which assistant reads this file: Claude Code reads ~/.claude/skills, Codex
+   * reads ~/.agents/skills.
+   */
+  assistant: string
+
+  /**
+   * POST only: what the install did here. `skipped` is a target that was current,
+   * or not ours to replace; `failed` is a write that did not complete.
+   */
+  outcome?: string
+
+  /**
+   * The SKILL.md path on this machine.
+   */
+  path: string
+
+  /**
+   * `current` is this build's stub; `missing` is nothing there; `stale` is an
+   * earlier stub of ours; `changed` is our install edited since; `other` is a file
+   * or link that was never ours; `unreadable` is a state that could not be read,
+   * which never authorises a write.
+   */
+  state: string
+}
 
 /**
  * The effective list, sorted by name, after the precedence a typed command follows:

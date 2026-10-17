@@ -34,6 +34,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	psync "github.com/sainteye/clawdline/internal/adapters/projectsync"
 	"github.com/sainteye/clawdline/internal/adapters/release/updater"
+	"github.com/sainteye/clawdline/internal/adapters/skillfile"
 	"github.com/sainteye/clawdline/internal/adapters/skillmenu"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/adapters/subagents"
@@ -107,6 +108,11 @@ type Server struct {
 	// skillMenu holds each session's slash-menu skills for five minutes
 	// (skills.go), at most the `cache.session_skills` row's limit of them.
 	skillMenu *skillmenu.Cache
+	// skillPaths replaces this machine's home and state directory for the
+	// clawdline skill routes (skill_install.go); nil outside tests.
+	skillPaths func() skillfile.Paths
+	// skillMu serialises installs of the clawdline skill.
+	skillMu sync.Mutex
 	// links holds where each project can be opened (links.go), one reading per
 	// working directory, at most the `cache.session_links` row's limit of
 	// them. A held reading is served however old it is and refreshed behind
@@ -458,6 +464,10 @@ func (s *Server) routeTable() []route {
 		// paired device, as /v1/capacity.
 		{Route{"*", "/v1/update"}, s.updateRoute},
 		{Route{"*", "/v1/update/fresh"}, s.updateRoute},
+		// Whether this machine's assistants have the clawdline skill, and the
+		// press that installs it (skill_install.go). This machine's token only.
+		{Route{"*", "/v1/skill"}, s.skillRoute},
+		{Route{"*", "/v1/skill/install"}, s.skillInstallRoute},
 		// Installing a newer release on a release install (update.go). This
 		// machine's token, or a device that may send.
 		{Route{"*", "/v1/update/apply"}, s.updateApplyRoute},

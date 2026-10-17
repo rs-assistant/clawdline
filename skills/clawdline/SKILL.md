@@ -5,11 +5,13 @@ description: |
   and landing; to hand an existing line of work to another session; to open an independent Root
   for a new feature; to send a message or a picture to another live session; to show the person a
   picture instead of pasting a local path; to put a question and
-  suggested replies in a Note before asking the person to choose; to tell the person something
+  suggested replies in a Note before asking the person to choose, or to gather what needs the
+  person's decision or attention into Notes when they ask; to tell the person something
   through a notification; to pair or revoke a Clawdline Cloud browser; or to record this
   session's own finished turn as a delivery receipt — the check that says "delivered, awaiting
   approval" on Clawdline's screen, in any repository Clawdline watches. Triggers include
   "dispatch a task", "open a child session", "hand this off", "ask the person to choose",
+  "Clawdline Notes", "make Notes", "put this in a Note", 「便條紙」「整理成便條紙」「留便條給我」,
   "pair this browser", `clawdline
   cloud pair`, `/clawdline unify`, "share rules and skills between Claude and Codex", "report my milestone", "record this turn as delivered", "show the user this
   screenshot", "send me the picture", "show me the screenshot", and 「派任務」「開 child」「交接給下一個 session」「請使用者選擇」「配對瀏覽器」「回報這一輪做完了」
