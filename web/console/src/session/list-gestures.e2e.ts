@@ -2995,6 +2995,28 @@ test("rows travel to a changed sorted position instead of snapping there", () =>
 
 // ---- the swipe
 
+test("a closed short row reserves horizontal swipes before the finger lands", () =>
+  inTab(async (tab) => {
+    readingScenario = "unstarted-codex"
+    try {
+      await tab.go("/")
+      await tab.until("the short row arrives", (s) => s.order.join() === SAFE)
+      const row = await tab.run(`(() => {
+        const el = document.querySelector('#rows > li.row[data-id="${SAFE}"]')
+        return el && {
+          actions: el.querySelectorAll(".swipe-archive, .swipe-end").length,
+          state: el.dataset.swipe ?? "",
+          touchAction: getComputedStyle(el).touchAction,
+        }
+      })()`)
+      assert.deepEqual(row, { actions: 1, state: "", touchAction: "pan-y" })
+      const open = await swipeOpen(tab, SAFE)
+      assert.equal(open.swipeX, "-126px")
+    } finally {
+      readingScenario = "normal"
+    }
+  }))
+
 /** A left swipe on one row, finished. */
 async function swipeOpen(tab: Tab, id: string): Promise<Seen> {
   const from = await tab.centreOf(id)

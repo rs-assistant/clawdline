@@ -14,6 +14,14 @@
   overflow: hidden;
 }
 
+/* The browser decides who owns a touch from the styles in force when the
+ * finger lands. A swipe row must allow vertical scrolling before touchstart;
+ * adding data-swipe during that event is too late on WebKit, especially when
+ * a short row gives the finger little room before the browser cancels it. */
+@media (max-width: 899px) {
+  .row[data-swipe-width] { touch-action: pan-y; }
+}
+
 .row > .title,
 .row > .meta,
 .row > .state {
