@@ -17,7 +17,7 @@ import (
 // Everywhere else a Session creates a Board item only on a person's message
 // (session_items.go) and only a person assigns items to Sessions. An Epic is
 // the exception: it is large, its owner plans it, and the plan is reviewed
-// before implementing (work.EpicPlanGate). The person assigning the Epic to a
+// before implementing (work.PlanningGate). The person assigning the Epic to a
 // Session is the authority for that Session to break it into pieces and hand
 // them out, so no per-message run is needed — but only for that Epic, only
 // after its plan gate, only as Feature or Issue, and at most
