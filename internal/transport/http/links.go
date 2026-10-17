@@ -21,13 +21,11 @@ func linksPath(r *http.Request) (string, bool) {
 
 // projectLinksReader is built per walk rather than held, and the walk happens
 // at most once per directory per FreshFor — so what this costs is nothing, and
-// what it buys is that the home directory and the status directory are the
-// ones in force now. A reader held from the first request onwards would answer
+// what it buys is that the home directory is the one in force now. A reader held from the first request onwards would answer
 // every later one from wherever that first one happened to be.
 func projectLinksReader() *projectlinks.Reader {
 	home, _ := os.UserHomeDir()
-	config := swiftstore.OpenQuotaConfig(swiftstore.Dir())
-	reader := projectlinks.NewReader(home, func() string { return config.Read().StatusDir })
+	reader := projectlinks.NewReader(home, nil)
 	// Where a project says its health check lives. The result of that check is
 	// a fact about this minute and comes from the status cache; the endpoint
 	// is a fact about the project and comes from here.

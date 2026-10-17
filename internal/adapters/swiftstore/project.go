@@ -136,7 +136,6 @@ type workInputs struct {
 	hasSessionDelivery  bool
 	hasSessionLanding   bool
 	hasOutstandingChild bool
-	selfClaim           string
 }
 
 // projectWorkState is Orchestrator.projectSessionWorkState.
@@ -170,10 +169,6 @@ func projectWorkState(in workInputs) string {
 	if in.hasSessionDelivery {
 		return "milestone_complete"
 	}
-	switch in.selfClaim {
-	case "ready", "holding", "waiting_session":
-		return in.selfClaim
-	}
 	if in.assignmentAbsent {
 		return "ready"
 	}
@@ -187,19 +182,6 @@ func (s Snapshot) sessionDelivery(l Live) *SessionDelivery {
 	for i := range s.SessionDeliveries {
 		if s.SessionDeliveries[i].TerminalID == l.TerminalID {
 			found = &s.SessionDeliveries[i]
-		}
-	}
-	if found == nil || !found.Matches(l) {
-		return nil
-	}
-	return found
-}
-
-func (s Snapshot) selfState(l Live) *SessionSelfState {
-	var found *SessionSelfState
-	for i := range s.SessionSelfStates {
-		if s.SessionSelfStates[i].TerminalID == l.TerminalID {
-			found = &s.SessionSelfStates[i]
 		}
 	}
 	if found == nil || !found.Matches(l) {
@@ -271,17 +253,6 @@ func (s Snapshot) Work(l Live, terminalState string) Work {
 			outstanding = append(outstanding, t)
 		}
 	}
-	self := s.selfState(l)
-	var owed *contract.WorkOwed
-	if self != nil && self.Owed != nil {
-		owed = &contract.WorkOwed{
-			Note:         self.Owed.Note,
-			Since:        self.Owed.Since.Unix(),
-			PersonNeeded: self.Owed.PersonNeeded,
-			Provenance:   "self",
-			MovedBy:      deref(self.Owed.MovedBy),
-		}
-	}
 	in := workInputs{
 		terminalState:       terminalState,
 		task:                own,
@@ -292,26 +263,13 @@ func (s Snapshot) Work(l Live, terminalState string) Work {
 		hasSessionLanding:   landing != nil,
 		hasOutstandingChild: len(outstanding) > 0,
 	}
-	withoutClaim := projectWorkState(in)
-	if self != nil {
-		in.selfClaim = deref(self.Claim)
-	}
 	state := projectWorkState(in)
-	out := Work{State: state, Provenance: "broker", Owed: owed}
-	if state == "waiting_session" && state == withoutClaim && !in.hasWait {
+	out := Work{State: state, Provenance: "broker"}
+	if state == "waiting_session" && !in.hasWait {
 		out.Waiting = outstanding
 	}
 
 	if state != "milestone_complete" && state != "work_complete" {
-		if self != nil && self.Claim != nil && state != withoutClaim {
-			out.Provenance = "self"
-			out.Note = deref(self.Note)
-			if self.ClaimReportedAt != nil {
-				out.Since = self.ClaimReportedAt.Unix()
-			}
-			out.MovedBy = deref(self.MovedBy)
-			out.PersonNeeded = self.PersonNeeded
-		}
 		return out
 	}
 	if delivery != nil && own == nil {
@@ -332,7 +290,7 @@ func (s Snapshot) Work(l Live, terminalState string) Work {
 		return out
 	}
 	if own == nil {
-		return Work{State: "unknown", Provenance: "broker", Owed: owed}
+		return Work{State: "unknown", Provenance: "broker"}
 	}
 	d := &contract.WorkDisposition{
 		Scope:    "task",
@@ -872,24 +830,7 @@ func (s Snapshot) obligations(l Live) []contract.CloseReason {
 			out = append(out, reason("open_handoff", "obligation", "handoff", h.ID, moverSelf()))
 		}
 	}
-	if self := s.selfState(l); self != nil && self.Owed != nil {
-		m := moverSelf()
-		if self.Owed.PersonNeeded {
-			m = moverPerson()
-		}
-		out = append(out, reason("owed_decision", "obligation", "session", l.TerminalID, m))
-	}
 	return out
-}
-
-func (s Snapshot) attestation(l Live) *ClosureAttestation {
-	var found *ClosureAttestation
-	for i := range s.ClosureAttestations {
-		if s.ClosureAttestations[i].TerminalID == l.TerminalID {
-			found = &s.ClosureAttestations[i]
-		}
-	}
-	return found
 }
 
 // version is Orchestrator.closeabilityVersion.
@@ -938,9 +879,6 @@ func sameMover(a, b contract.CloseMover) bool { return a == b }
 func (s Snapshot) Closeability(in CloseInput) contract.Closeability {
 	l := in.Live
 	evidence := []contract.CloseReason{}
-	if !s.Usable() {
-		evidence = append(evidence, reason("swift_store_unreadable", "evidence", "", "", moverBroker()))
-	}
 	if !in.Bound {
 		evidence = append(evidence, reason("session_identity_unbound", "evidence", "", "", moverBroker()))
 	}
@@ -972,19 +910,10 @@ func (s Snapshot) Closeability(in CloseInput) contract.Closeability {
 	obligations = append(obligations, s.obligations(l)...)
 	obligations = append(obligations, in.Extra...)
 
-	activity := s.Activity[l.TerminalID]
-	obligationGen := s.ObligationGeneration
-	provenance := []string{"broker"}
-	var attestationID *string
-	att := s.attestation(l)
-	matched := att != nil && att.Matches(l)
-	if matched {
-		provenance = append(provenance, "self")
-		if att.ActivityGeneration == activity && att.ObligationGeneration == obligationGen {
-			id := att.ID
-			attestationID = &id
-		}
-	}
+	// The turn clock and the obligation generation were the retired Swift
+	// app's counters; nothing in this daemon advances them, so both are 0
+	// and a version changes only with identity, state and reasons.
+	var activity, obligationGen int64
 
 	// An idle Session with exact, fresh identity and no recorded responsibility
 	// is closeable. The retired app's extra attestation has no writer in this
@@ -1022,7 +951,7 @@ func (s Snapshot) Closeability(in CloseInput) contract.Closeability {
 		ActivityGeneration:   activity,
 		ObligationGeneration: obligationGen,
 		Version:              version(l, activity, obligationGen, state, reasons),
-		Provenance:           provenance,
+		Provenance:           []string{"broker"},
 		Source: contract.CloseSource{
 			Provenance:    "session_watch",
 			Freshness:     freshness,
@@ -1030,7 +959,6 @@ func (s Snapshot) Closeability(in CloseInput) contract.Closeability {
 			MaxAgeSeconds: int64(inventoryMaxAge / time.Second),
 		},
 		SessionGeneration: in.Generation,
-		AttestationID:     attestationID,
 		Mover:             mover,
 	}
 }

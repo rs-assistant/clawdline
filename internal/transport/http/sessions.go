@@ -252,10 +252,9 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 	// unreadable broker makes the projection incomplete, not wrong in one
 	// place: it is carried as missing evidence rather than as zero.
 	owed, owedErr := s.owed(records, inv.Sessions)
-	// One reading of the Swift app's store, for the same reason. It is history
-	// now (cutover B1): this daemon's own records are laid over it below, and
-	// with the legacy switch off it is read as holding nothing.
-	swift := s.swift.Read()
+	// The record set the projections read: this daemon's own, laid in below.
+	// The retired Swift app's store is no longer read (docs/cutover.md §7).
+	swift := swiftstore.Snapshot{}
 	// And of this daemon's own machine role (W5): when it holds one, the
 	// crown is drawn from it and from nothing else — one role, one source.
 	// An unreadable role draws no crown of its own and falls back to the
@@ -903,11 +902,10 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		row.ScreenReading = contract.SessionScreenReading(item.Screen)
 	}
 
-	// The records are usable when the Swift store was read or is known to
-	// hold nothing (absent, or switched off) and this daemon's own were read:
-	// then the Swift app's rules run over both. Otherwise the daemon's own
-	// projection answers with the evidence marked missing.
-	if in.swift.Usable() && in.ownErr == nil {
+	// When this daemon's own records were read, the Swift app's rules run
+	// over them. Otherwise the daemon's own projection answers with the
+	// evidence marked missing.
+	if in.ownErr == nil {
 		work := in.swift.Work(in.live, state)
 		// This daemon's own peer waits are an input the Swift store does not
 		// hold; they rank where the Swift app's coordination waits do.
@@ -934,14 +932,10 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 			}
 		}
 	} else {
-		// Without the store there is no reading of the task, the delivery or
-		// the declaration behind a state, and the honest projection is the
-		// daemon's own with that evidence marked missing.
-		missing := errSwiftUnknown
-		if in.ownErr != nil {
-			missing = in.ownErr
-		}
-		row.WorkState = contract.WorkState(workState(item, in.owed, missing))
+		// Without its own records there is no reading of the task, the
+		// delivery or the declaration behind a state, and the honest
+		// projection is the daemon's own with that evidence marked missing.
+		row.WorkState = contract.WorkState(workState(item, in.owed, in.ownErr))
 		row.WorkProvenance = contract.WorkProvenanceBroker
 	}
 	// A Feature Root or a wait that was read is a fact whatever else could
@@ -962,12 +956,10 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 	}
 	row.Coordination = in.swift.Coordination(item.ID, in.labelOf)
 
-	// One role, one source: this daemon's own when it holds one; otherwise
-	// the Swift app's, which is nobody's when that store is absent or off.
+	// One role, one source: this daemon's own. Without one, nobody wears the
+	// crown; the retired Swift app's coordinator record is no longer read.
 	if in.ownRole {
 		row.Coordinator = ownCrown(in.role, in.live)
-	} else {
-		row.Coordinator = in.swift.CoordinatorFor(in.live)
 	}
 
 	extra := ownCloseReasons(item, in.owed, in.owedErr)
@@ -1059,8 +1051,6 @@ func wireObservation(obs session.Observation) *contract.BearingsSource {
 		Freshness:  contract.SourceFreshness(obs.Freshness),
 	}
 }
-
-var errSwiftUnknown = errors.New("the Swift store could not be read")
 
 // ownWaitingOnPeer is this daemon's own record of a session parked on another.
 func ownWaitingOnPeer(item session.Session, owed []task.Obligation) bool {
@@ -1238,11 +1228,7 @@ var (
 func quotaReader() *limits.Reader {
 	limitsOnce.Do(func() {
 		home, _ := os.UserHomeDir()
-		config := swiftstore.OpenQuotaConfig(swiftstore.Dir())
-		limitsReader = limits.NewReader(home, func() limits.Settings {
-			q := config.Read()
-			return limits.Settings{StatusDir: q.StatusDir, CodexHome: q.CodexHome, LowThreshold: q.LowThreshold}
-		})
+		limitsReader = limits.NewReader(home, nil)
 	})
 	return limitsReader
 }

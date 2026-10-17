@@ -77,34 +77,25 @@ type PolicySource struct {
 	// Base is "next" (this daemon's projected copy) or "shipped" (the copy in
 	// the binary, when the projected file could not be read).
 	Base string
-	// Local is "next", "legacy" (the retired Swift app's, read while this
-	// daemon has none of its own) or "none".
+	// Local is "next" or "none". The retired Swift app's copy ("legacy") is
+	// no longer read (docs/cutover.md §7).
 	Local string
 }
 
 // ReadPolicy is the house rules for one dispatch: the projected base, and the
-// person's local file from this daemon's directory, or else the retired Swift
-// app's. legacyDir empty skips the fallback. The PolicySource it returns is
-// not decoration: it is the only way anyone learns that a briefing is carrying
-// rules out of a directory this daemon is retiring.
-func ReadPolicy(dir, legacyDir string) (base, local string, src PolicySource) {
+// person's local file from this daemon's directory. A local file that is
+// missing or cannot be read is an empty one: the policy is advice to a child.
+func ReadPolicy(dir string) (base, local string, src PolicySource) {
 	if held, err := os.ReadFile(filepath.Join(dir, PolicyBaseFile)); err == nil {
 		base, src.Base = string(held), "next"
 	} else {
 		base, src.Base = string(basePolicy), "shipped"
 	}
 	src.Local = "none"
-	held, err := os.ReadFile(filepath.Join(dir, PolicyLocalFile))
-	switch {
-	case err == nil:
+	if held, err := os.ReadFile(filepath.Join(dir, PolicyLocalFile)); err == nil {
 		return base, string(held), PolicySource{Base: src.Base, Local: "next"}
-	case !errors.Is(err, fs.ErrNotExist) || legacyDir == "":
-		return base, "", src
 	}
-	if held, err := os.ReadFile(filepath.Join(legacyDir, PolicyLocalFile)); err == nil {
-		local, src.Local = string(held), "legacy"
-	}
-	return base, local, src
+	return base, "", src
 }
 
 // ShippedPolicy is the base as it is compiled in.

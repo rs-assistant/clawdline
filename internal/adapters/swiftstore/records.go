@@ -14,16 +14,13 @@ import (
 
 // Orchestrator is ~/.config/clawdline/orchestrator.json.
 type Orchestrator struct {
-	Version              int                  `json:"version"`
-	Tasks                []Task               `json:"tasks"`
-	Handoffs             []Handoff            `json:"handoffs"`
-	HandoffLabels        []HandoffLabel       `json:"handoff_labels"`
-	RootAssignments      []RootAssignment     `json:"root_assignments"`
-	CoordinationWaits    []CoordinationWait   `json:"coordination_waits"`
-	SessionDeliveries    []SessionDelivery    `json:"session_deliveries"`
-	SessionSelfStates    []SessionSelfState   `json:"session_self_states"`
-	ClosureAttestations  []ClosureAttestation `json:"closure_attestations"`
-	ObligationGeneration int64                `json:"obligation_generation"`
+	Version           int                `json:"version"`
+	Tasks             []Task             `json:"tasks"`
+	Handoffs          []Handoff          `json:"handoffs"`
+	HandoffLabels     []HandoffLabel     `json:"handoff_labels"`
+	RootAssignments   []RootAssignment   `json:"root_assignments"`
+	CoordinationWaits []CoordinationWait `json:"coordination_waits"`
+	SessionDeliveries []SessionDelivery  `json:"session_deliveries"`
 }
 
 // Seconds is a Unix time the Swift app writes as a JSON number, sometimes with
@@ -200,26 +197,6 @@ type SessionDelivery struct {
 	Landing    *Landing `json:"landing"`
 }
 
-// SessionSelfState is what a session declared about itself.
-type SessionSelfState struct {
-	Identity
-	Claim           *string  `json:"claim"`
-	Note            *string  `json:"note"`
-	MovedBy         *string  `json:"moved_by"`
-	PersonNeeded    *bool    `json:"person_needed"`
-	ClaimReportedAt *Seconds `json:"claim_reported_at"`
-	ClaimSettled    bool     `json:"claim_settled"`
-	Owed            *Owed    `json:"owed"`
-}
-
-// Owed is the second axis a session can declare: something it is owed.
-type Owed struct {
-	Note         string  `json:"note"`
-	PersonNeeded bool    `json:"person_needed"`
-	Since        Seconds `json:"since"`
-	MovedBy      *string `json:"moved_by"`
-}
-
 // RootAssignment is an independently owned Feature Root.
 type RootAssignment struct {
 	ID         string                  `json:"id"`
@@ -258,16 +235,6 @@ type CoordinationWaiter struct {
 	Created            Seconds  `json:"created"`
 	RequestDeliveredAt *Seconds `json:"request_delivered_at"`
 	ReleaseDeliveredAt *Seconds `json:"release_delivered_at"`
-}
-
-// ClosureAttestation is a session's own "nothing is owed, I may be closed".
-type ClosureAttestation struct {
-	Identity
-	ID                   string  `json:"id"`
-	Note                 string  `json:"note"`
-	Created              Seconds `json:"created"`
-	ActivityGeneration   int64   `json:"activity_generation"`
-	ObligationGeneration int64   `json:"obligation_generation"`
 }
 
 // Coordinator is ~/.config/clawdline/coordinator.json: which live process is

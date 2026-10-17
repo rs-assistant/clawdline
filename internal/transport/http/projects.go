@@ -93,56 +93,6 @@ func (s *Server) projectReaders() *projectReaders {
 	return r
 }
 
-func secondsPtr(v *swiftstore.Seconds) *time.Time {
-	if v == nil {
-		return nil
-	}
-	t := v.Time()
-	return &t
-}
-
-func stringOrEmpty(v *string) string {
-	if v == nil {
-		return ""
-	}
-	return *v
-}
-
-// lifecycleTasks hands the lifecycle the task records it reads.
-func lifecycleTasks(snap swiftstore.Snapshot) projects.TaskEvidence {
-	out := projects.TaskEvidence{Authoritative: snap.Known && !snap.Stale}
-	for _, t := range snap.Tasks {
-		row := projects.Task{
-			ID: t.ID, State: t.State, Title: t.Title,
-			RootLabel: stringOrEmpty(t.RootLabel), RootSession: stringOrEmpty(t.RootSession),
-			ChildSession: stringOrEmpty(t.ChildSession), ChildTerminal: stringOrEmpty(t.ChildTerminal),
-			Created:   secondsPtr(&t.Created),
-			BriefedAt: secondsPtr(t.BriefedAt), SpawnedAt: secondsPtr(t.SpawnedAt),
-			FinishedAt: secondsPtr(t.FinishedAt),
-		}
-		row.Plan = stringOrEmpty(t.Plan)
-		// Orchestrator.Task: the newest progress note, or else the summary.
-		if n := len(t.Progress); n > 0 {
-			row.Status = t.Progress[n-1].Note
-		} else {
-			row.Status = t.Summary.Text
-		}
-		if t.Created == 0 {
-			row.Created = nil
-		}
-		if t.Landing != nil {
-			row.Landing = &projects.TaskLanding{State: t.Landing.State, Target: stringOrEmpty(t.Landing.Target),
-				Commit: stringOrEmpty(t.Landing.Commit)}
-		}
-		if t.Worktree != nil {
-			row.Worktree = &projects.TaskWorktree{Path: t.Worktree.Path, Branch: t.Worktree.Branch,
-				Base: t.Worktree.Base}
-		}
-		out.Tasks = append(out.Tasks, row)
-	}
-	return out
-}
-
 // liveEvidence is the lifecycle's Live port: every assistant session's
 // directory, and whether the reading was complete.
 func (s *Server) liveEvidence(ctx context.Context) projects.LiveEvidence {

@@ -423,8 +423,8 @@ func TestTheDetachedDoorTakesOnlyUnattendedBriefs(t *testing.T) {
 }
 
 // D23 ③: the shipped base is projected once, and the person's local file is
-// read — from this daemon's directory, else from the Swift app's — and never
-// written.
+// read from this daemon's directory only — the retired Swift app's copy is not
+// a fallback — and never written.
 func TestTheHouseRulesAreProjectedAndTheLocalOneIsNeverWritten(t *testing.T) {
 	dir, legacy := t.TempDir(), t.TempDir()
 	wrote, err := ProjectPolicy(dir)
@@ -437,14 +437,15 @@ func TestTheHouseRulesAreProjectedAndTheLocalOneIsNeverWritten(t *testing.T) {
 	if err := os.WriteFile(legacy+"/"+PolicyLocalFile, []byte("legacy local"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	base, local, src := ReadPolicy(dir, legacy)
-	if base != string(ShippedPolicy()) || local != "legacy local" || src.Local != "legacy" || src.Base != "next" {
+	t.Setenv("HOME", legacy)
+	base, local, src := ReadPolicy(dir)
+	if base != string(ShippedPolicy()) || local != "" || src.Local != "none" || src.Base != "next" {
 		t.Fatalf("read %d bytes/%q from %+v", len(base), local, src)
 	}
 	if err := os.WriteFile(dir+"/"+PolicyLocalFile, []byte("mine"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, local, src := ReadPolicy(dir, legacy); local != "mine" || src.Local != "next" {
+	if _, local, src := ReadPolicy(dir); local != "mine" || src.Local != "next" {
 		t.Fatalf("own local: %q %+v", local, src)
 	}
 	if _, err := os.Stat(legacy + "/" + PolicyBaseFile); !os.IsNotExist(err) {
