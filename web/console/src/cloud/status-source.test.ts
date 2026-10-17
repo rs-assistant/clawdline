@@ -714,6 +714,24 @@ test("a failed retained-row request keeps the machine in event_gap", async () =>
   assert.deepEqual(calls, ["recover-refused", "recover-refused", "recover-refused"])
 })
 
+test("a machine that stopped reporting is stale, not a gap that is being read again", async () => {
+  // A closed MacBook: its retained marker names a row the relay no longer has,
+  // and nothing from it has arrived inside the roster's window. Asking it to
+  // restate that row cannot succeed, and saying "reading again" never ends.
+  const { client, calls } = clientFixture()
+  client.readContentCapabilities.delete(machineID)
+  client.listPresentationsForMachine = async () => { throw new Error("older machine") }
+  client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]));
+  (client as { recoverStatusRow: (machine: string, session: string, generation: string) => Promise<boolean> }).recoverStatusRow = async () => {
+    calls.push("recover")
+    return false
+  }
+  client.machines = async () => ({ machines: [{ id: machineID, freshness: "stale" }], syncing: false, retryAfterMs: 0 })
+  const reading = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(reading.kind === "unavailable" && reading.reason, "stale")
+  assert.deepEqual(calls, [])
+})
+
 test("a stale machine refuses detail before subscribing to content", async () => {
   const { client, calls } = clientFixture()
   client.machines = async () => ({ machines: [{ id: machineID, freshness: "stale" }], syncing: false, retryAfterMs: 0 })

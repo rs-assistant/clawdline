@@ -35,6 +35,7 @@ import { askedSession } from "./session/asked-session.js"
 import type { StartAnswer, StartPlaceRow } from "./legacy/start-bridge.js"
 import { SidebarIcon, type SidebarIconName } from "./SidebarIcon.js"
 import { scanRecovering, sessionCountState, sessionReadingChinese, totalSessionWords } from "./session-reading.js"
+import type { MachineOffline } from "./session/machine-offline.js"
 import {
   ActionConfirm,
   BEFORE_PAGE_CHANGE,
@@ -205,7 +206,7 @@ function rowNode(id: string): HTMLElement | null {
  */
 export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
   fleetTargetIdentity = null, fleetReaderMachine = null,
-  cloudStartedRow = null, onCloudStartedObserved,
+  cloudStartedRow = null, onCloudStartedObserved, cloudMachineOffline = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
   hideSessionCounts = false, focusCloudSessions = false, onLeaveCloudSessions, onTitleSaved, confirmedTitle }: {
@@ -218,6 +219,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   fleetTargetIdentity?: Pick<ProjectedSession, "machineScope" | "coordinatorBound"> | null
   fleetReaderMachine?: string | null
   cloudStartedRow?: SessionRow | null
+  /** The machine this page reads has stopped reporting to the Cloud roster (`session/machine-offline.ts`). */
+  cloudMachineOffline?: MachineOffline | null
   onCloudStartedObserved?: (id: string) => void
   fleetDetailProblem?: FleetDetailProblem | null
   /** Whether the opened fleet Session's own row is still missing from this machine's rows. */
@@ -957,6 +960,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
           recovering={!!fleet.snapshot && scanRecovering(fleet.snapshot.scan)}
           partialCloudList={fleet.snapshot?.scan.provenance === "cloud" && !fleet.snapshot.scan.complete &&
             fleet.snapshot.sessions.length > 0}
+          offline={!!cloudMachineOffline}
           onOpen={() => setMachine(true)}
         />}
         {typeof aside === "function" ? aside(light) : (
@@ -1085,6 +1089,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         loaded={fleet.loaded}
         arrived={fleet.snapshot !== null}
         live={fleet.live}
+        machineOffline={cloudMachineOffline}
         emptyAuthoritative={fleet.snapshot?.scan.emptyAuthoritative ?? false}
         readingSource={fleet.snapshot?.scan.source}
         scanNotes={fleet.snapshot?.scan.notes}
@@ -1155,11 +1160,13 @@ function Counts({
   reading,
   recovering,
   partialCloudList,
+  offline,
   onOpen,
 }: {
   reading: ReturnType<typeof sessionCountState>
   recovering: boolean
   partialCloudList: boolean
+  offline: boolean
   onOpen: () => void
 }) {
   const T = L.strings
@@ -1177,7 +1184,10 @@ function Counts({
     shells += (s.shells ?? []).length
   }
   const bits: { cls: string; text: string }[] = []
-  if (reading.phase === "ready") bits.push({ cls: "part quiet", text: totalSessionWords(reading.value.length) })
+  // A machine that is off has no list on its way: "loading this machine's
+  // Sessions" there was a wait that could not end.
+  if (offline) bits.push({ cls: "part quiet", text: nextWord("sessionsMachineOfflineTitle") })
+  else if (reading.phase === "ready") bits.push({ cls: "part quiet", text: totalSessionWords(reading.value.length) })
   else if (reading.phase === "empty_authoritative") bits.push({ cls: "part quiet", text: totalSessionWords(0) })
   else if (reading.phase === "refused") {
     bits.push({ cls: "part quiet", text: L.failureSentence(reading.error, nextWord("sessionsListUnansweredTitle")) })
@@ -1201,7 +1211,7 @@ function Counts({
   // state, and `next-strings.ts` on why these are two words and not one).
   if (partialCloudList && reading.phase === "ready")
     bits.push({ cls: "part quiet", text: nextWord("sessionsListIncompleteTitle") })
-  else if (recovering && reading.phase === "ready")
+  else if (recovering && reading.phase === "ready" && !offline)
     bits.push({ cls: "part quiet", text: nextWord("sessionsListWaitTitle") })
   if (rows.length > 0 && !working && !waiting && !unknown && !shells && !recovering) {
     bits.push({ cls: "part quiet", text: catalogWord("literal", "1b40e6344265") })

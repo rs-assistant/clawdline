@@ -18,7 +18,8 @@ import { STATUS_GAP_RETRY_MS } from "./status-source.js"
 import { arrangeFleetRows, fleetWaitingKey } from "./fleet-order.js"
 import { matchesFleetFilter, type FleetFilter } from "./fleet-filters.js"
 import { CarrierDot } from "./CarrierDot.js"
-import type { CarrierReading } from "./carrier-state.js"
+import { machineLight, type CarrierReading } from "./carrier-state.js"
+import { machineSeenWord } from "./machine-seen.js"
 
 export type MachineToolbarAction = "terminal" | "voice" | "work" | "start" | "start_terminal"
 type Reading = { phase: "loading" } | { phase: "settled"; value: MachineSessionProjection }
@@ -392,7 +393,11 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
       </div>
       <div className="cloud-all-groups">
         {groups.map(({ machine, reading, rows, presentationFailed, presentationLoading }) => {
-          const carrier = carrierOf?.(machine.id) ?? null
+          const carrier = machineLight(machine.freshness, carrierOf?.(machine.id) ?? null)
+          // The roster has heard nothing from it inside its window: say that, and when,
+          // instead of the reading's own reason, which for a machine that is off is a
+          // retry that never ends ("reading this machine again").
+          const offline = machine.freshness === "stale"
           const isCollapsed = collapsed[machine.id] ?? emptyMachine(reading)
           return <section key={machine.id} className="cloud-all-group"
           aria-label={`${machine.name} ${machine.id}` + (carrier ? ` · ${nextWord(carrier.word, { machine: machine.name })}` : "")}>
@@ -416,12 +421,14 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               freshness changes. Its own completeness and row freshness are the
               authority here; an unrelated roster state must not leave a
               permanent "checking connection" banner above settled results. */}
-          {!reading || reading.phase === "loading" ? <p role="status">{nextWord("cloudAllLoading")}</p> : <>
+          {offline && <p role="status" className="cloud-all-offline">{nextWord("cloudAllMachineOffline",
+            { seen: machineSeenWord(machine.seenAt ?? null) })}</p>}
+          {!reading || reading.phase === "loading" ? !offline && <p role="status">{nextWord("cloudAllLoading")}</p> : <>
             {/* // refusal-ok: Unknown means the list is still being verified; its reason stays in the reading for the scheduled retry. */}
-            {reading.value.kind === "unavailable" && (reading.value.reason === "unknown"
+            {reading.value.kind === "unavailable" && !offline && (reading.value.reason === "unknown"
               ? !reading.value.rows?.length && <p role="status">{nextWord("cloudAllLoading")}</p>
               : <p role="status">{problemWord(reading.value.reason)}</p>)}
-            {reading.value.kind === "ready" && !reading.value.complete &&
+            {reading.value.kind === "ready" && !reading.value.complete && !offline &&
               <p role="status">{nextWord("cloudAllPartialMachine")}</p>}
             {presentationLoading && <p role="status">{nextWord("cloudAllLoading")}</p>}
             {presentationFailed && <p role="alert">{nextWord("cloudAllNameUnavailable")} <button type="button"

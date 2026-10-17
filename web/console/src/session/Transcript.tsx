@@ -703,7 +703,8 @@ function HeavyWorkLine({ reason, startedAt }: { reason: string; startedAt?: numb
     <div className="tx-working tx-heavy" role="status">
       <span aria-hidden="true">🏗️</span>
       <canvas className="spin" aria-hidden="true"></canvas>
-      <span className="line">{[nextWord("sessionCallbackActive"), reason, elapsed].filter(Boolean).join(" · ")}</span>
+      {elapsed && <span className="elapsed">{elapsed}</span>}
+      <span className="line" title={reason}>{[nextWord("sessionCallbackActive"), reason].filter(Boolean).join(" · ")}</span>
     </div>
   )
 }
