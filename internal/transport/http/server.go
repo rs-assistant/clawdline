@@ -721,6 +721,7 @@ func (s *Server) routeTable() []route {
 		// happens to it afterwards is the composer's business.
 		{Route{"*", "/v1/voice"}, s.voiceRoute},
 		{Route{"*", "/v1/voice/language"}, s.voiceLanguageRoute},
+		{Route{"*", "/v1/voice/setup"}, s.voiceSetupRoute},
 		// One transcribed sentence becomes an editable draft. This spends one
 		// local CLI model turn but starts no session (intent.go).
 		{Route{"*", "/v1/intents"}, s.intentRoute},

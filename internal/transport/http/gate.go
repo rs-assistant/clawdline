@@ -500,6 +500,12 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 		if !(v.Allowed && v.Local) {
 			return http.StatusForbidden, "forbidden", "Only this machine's own token may change its settings."
 		}
+	case p == "/v1/voice/setup":
+		// This writes a large local model file. A paired reader or sender may
+		// inspect readiness, but only the console on this machine may install it.
+		if !(v.Allowed && v.Local) {
+			return http.StatusForbidden, "forbidden", "Only this machine's own token may install its voice model."
+		}
 	case p == "/v1/settings/dispatch-policy":
 		if !(v.Allowed && v.Local) {
 			return http.StatusForbidden, "forbidden", "Only this machine may read or change its dispatch policy."
