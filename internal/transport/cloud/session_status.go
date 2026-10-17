@@ -192,7 +192,14 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 	// words to a read_sessions-only viewer.
 	displays := make([]map[string]any, 0, len(ids))
 	steadyDisplays := make([]map[string]any, 0, len(ids))
-	parents := statusParents(rows, p.tasks)
+	// The public task projection omits root.sessionId. When a screen scan
+	// cannot resolve root.terminalId, the original task record still names
+	// the owning conversation and can resolve it against this session list.
+	tasks := p.taskRows
+	if tasks == nil {
+		tasks = p.tasks
+	}
+	parents := statusParents(rows, tasks)
 	for _, id := range ids {
 		row := rows[id]
 		status := ProjectSessionStatus(p.MachineID, id, row, true, at)
@@ -349,7 +356,7 @@ func statusParents(rows map[string]map[string]any, tasks []map[string]any) map[s
 		root, _ := task["root"].(map[string]any)
 		kid, _ := child["terminalId"].(string)
 		owner, _ := root["terminalId"].(string)
-		if owner == "" {
+		if rows[owner] == nil {
 			conversation, _ := root["sessionId"].(string)
 			owner = conversations[conversation]
 		}

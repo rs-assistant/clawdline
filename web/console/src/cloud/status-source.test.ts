@@ -249,6 +249,27 @@ test("a cold pinned list retains an Epic child's visible parent", async () => {
   assert.equal(reading.rows?.find((row) => row.destination.sessionID === "child")?.parentSessionID, "root")
 })
 
+test("a pinned list during stale status replay retains the same execution's task parent", async () => {
+  const { client, row } = clientFixture()
+  Object.assign(row, { parent_session_id: "root" })
+  row.projected_at -= 600
+  const marker = client.statusSnapshots.get(JSON.stringify([machineID, inventory])) as {
+    payload: { at: number }
+  }
+  marker.payload.at -= 600
+  const original = client.listPresentationsForMachine
+  client.listPresentationsForMachine = async (machine) => {
+    const reply = await original(machine)
+    const child = reply.sessions[0]
+    return { ...reply, sessions: [
+      { ...child, id: "root", title: "Root" },
+      { ...child, id: sessionID, title: "Child" },
+    ] }
+  }
+  const reading = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(reading.rows?.find((entry) => entry.destination.sessionID === sessionID)?.parentSessionID, "root")
+})
+
 test("a cold browser asks once before the machine descriptor arrives", async () => {
   const { client, calls } = clientFixture()
   client.readContentCapabilities.delete(machineID)

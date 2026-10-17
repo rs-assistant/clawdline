@@ -405,9 +405,32 @@ func TestStatusResolvesTaskRootFromConversationWhenScreenLinkIsMissing(t *testin
 	if got := statusParents(rows, tasks)["child"]; got != "root" {
 		t.Fatalf("task root with a missing screen link: got %q, want root", got)
 	}
+	tasks[0]["root"].(map[string]any)["terminalId"] = "old-root-tab"
+	if got := statusParents(rows, tasks)["child"]; got != "root" {
+		t.Fatalf("task root with a stale screen link: got %q, want root", got)
+	}
 	rows["other"] = map[string]any{"sessionId": "root-conversation"}
 	if got := statusParents(rows, tasks)["child"]; got != "" {
 		t.Fatalf("ambiguous conversation invented a parent: %q", got)
+	}
+}
+
+func TestPublishedStatusUsesTaskConversationWhenProjectedTaskHasNoRootLink(t *testing.T) {
+	c := &collector{}
+	task := map[string]any{
+		"state": "running",
+		"child": map[string]any{"terminalId": "child"},
+		"root":  map[string]any{"sessionId": "root-conversation", "terminalId": ""},
+	}
+	p := &Publisher{MachineID: "mac_a", published: map[string][32]byte{}, sent: map[string]time.Time{}, Publish: c.publish,
+		taskRows: []map[string]any{task}, tasks: []map[string]any{cloudTaskProjection(task)}}
+	reading := sessionReading{sessions: []map[string]any{
+		{"id": "root", "sessionId": "root-conversation", "state": "working"},
+		{"id": "child", "state": "working"},
+	}, at: json.RawMessage(`100`), complete: true}
+	p.publishStatuses(context.Background(), reading, []string{"root", "child"})
+	if got := c.payload(t, "ss/mac_a/child")["parent_session_id"]; got != "root" {
+		t.Fatalf("published child parent = %v, want root", got)
 	}
 }
 

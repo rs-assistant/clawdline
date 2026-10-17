@@ -145,7 +145,7 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
       const before = known.get(String(row!.id) + "\u0000" + String(row!.execution_generation))
       return { destination: { machineID, sessionID: String(row!.id),
         executionGeneration: String(row!.execution_generation) }, state: String(status.state),
-      parentSessionID: parentSessionID && parentSessionID !== row!.id ? parentSessionID : undefined,
+      parentSessionID: parentSessionID && parentSessionID !== row!.id ? parentSessionID : before?.parentSessionID,
       machineScope: status.machine_scope === true || before?.machineScope === true,
       coordinatorBound: status.coordinator_bound === true || before?.coordinatorBound === true,
       freshness: "current" as const, observedAt: nowMs, snapshotGeneration }
