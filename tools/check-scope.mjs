@@ -48,6 +48,43 @@ export function selectGo(paths, packages, root) {
   };
 }
 
+// Local modules use explicitly paired test files. Ambiguous inputs retain
+// their entire package; CI still runs cross-file and transitive coverage.
+export function selectGoRuns(paths, packages, root, selected) {
+  return selected.map(name => {
+    const pkg = packages.find(p => p.ImportPath === name);
+    const changed = paths.filter(p => resolve(root,p).startsWith(resolve(pkg.Dir)+'/'));
+    const inventory = [...(pkg.TestGoFiles ?? []), ...(pkg.XTestGoFiles ?? [])];
+    const files = new Set();
+    if (!changed.length || !inventory.length) return { package: name, pattern: '' };
+    for (const path of changed) {
+      if (!path.endsWith('.go')) return { package: name, pattern: '' };
+      const filename = path.slice(path.lastIndexOf('/')+1).replace(/(?:_test)?\.go$/, '_test.go');
+      if (!inventory.includes(filename)) return { package: pkg.ImportPath, pattern: '' };
+      files.add(filename);
+    }
+    const names = new Set();
+    for (const file of files) {
+      const body = readFileSync(join(pkg.Dir,file),'utf8');
+      for (const match of body.matchAll(/^func\s+((?:Test|Fuzz)\w+|Example\w*)\s*\(/gm)) if (match[1] !== 'TestMain') names.add(match[1]);
+    }
+    return { package: pkg.ImportPath, pattern: names.size ? '^('+[...names].sort().join('|')+')$' : '' };
+  });
+}
+
+export function guardPlan(paths, full) {
+  const any = re => full || paths.some(p => re.test(p));
+  return {
+    format: any(/\.go$/),
+    capacity: any(/\.go$|^api\/v1\/|^web\/console\/(public\/catalogs\/|src\/next-strings\.ts$)/),
+    contract: any(/^api\/v1\/|^internal\/contract\/|^web\/contract\/|^tools\/contract-gen\//),
+    legacy: any(/^web\/console\/(src\/legacy\/|public\/strings\/)/),
+    borders: any(/^web\/.*\.css$/),
+    shell: any(/\.sh$/),
+    tooling: full,
+  };
+}
+
 export function affectedTests(changes, imports, tests) {
   const affected = new Set(changes);
   let grew = true;
@@ -113,19 +150,21 @@ async function plan(full) {
   const { paths, known } = changedPaths();
   const base = known && !paths.length && !full ? { go: false, web: false } : classify(paths, full, known);
   const broad = full || !known || paths.some(p => !/^(web\/|docs\/|README(?:\.[\w-]+)?\.md$|CHANGELOG\.md$|internal\/|cmd\/|skills\/|api\/v1\/)/.test(p));
-  const result = { paths, full: broad, reason: broad ? 'full integration or unclassified infrastructure inputs' : 'changed-package tests; caller and full runtime coverage stay in integration/CI', go: { tests: [], compile: [] }, web: base.web, webTests: [], webBroad: false };
+  const result = { paths, full: broad, reason: broad ? 'full integration or unclassified infrastructure inputs' : 'changed-package tests; caller and full runtime coverage stay in integration/CI', go: { tests: [], compile: [], runs: [] }, guards: guardPlan(paths,broad), web: base.web, webTests: [], webBroad: false };
   if (broad) { result.web = true; return result; }
   try {
     if (base.go) {
       const platformInputs = paths.filter(p => p.endsWith('.go') && (/_(windows|darwin|linux|unix|other)(?:_test)?\.go$/.test(p) || existsSync(p) && /^\/\/go:build /m.test(readFileSync(p, 'utf8'))));
       if (platformInputs.length) { result.platformInputs = platformInputs; result.reason += '; foreign-platform verification remains in integration/CI'; }
-      const listed = spawnSync('go', ['list', '-json=Dir,ImportPath,Imports,TestImports,XTestImports,Error,Incomplete', './...'], { encoding: 'utf8' });
+      const listed = spawnSync('go', ['list', '-json=Dir,ImportPath,Imports,TestImports,XTestImports,TestGoFiles,XTestGoFiles,Error,Incomplete', './...'], { encoding: 'utf8' });
       if (listed.status !== 0) throw new Error('Go package discovery failed');
-      result.go = selectGo(paths, decodePackages(listed.stdout), root);
+      const packages = decodePackages(listed.stdout);
+      result.go = selectGo(paths, packages, root);
+      result.go.runs = selectGoRuns(paths, packages, root, result.go.tests);
       if (!result.go.tests.length) throw new Error('no changed Go package could be selected');
     }
     if (base.web) { const web = await selectWeb(paths, root); result.webTests = web.tests; result.webBroad = web.broad; }
-  } catch (error) { result.full = true; result.web = true; result.reason = `conservative fallback: ${error.message}`; }
+  } catch (error) { result.full = true; result.web = true; result.guards = guardPlan(paths,true); result.reason = `conservative fallback: ${error.message}`; }
   return result;
 }
 
@@ -135,7 +174,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const data = JSON.parse(readFileSync(args[1], 'utf8'));
     let value = data;
     for (const part of args[2].split('.')) value = value[part];
-    if (args.includes('--nul')) process.stdout.write(value.map(v => args[2] === 'paths' ? `:(literal)${v}` : v).join('\0') + (value.length ? '\0' : ''));
+    if (args.includes('--nul')) process.stdout.write((args[2] === 'go.runs' ? value.flatMap(v => [v.package,v.pattern]) : value.map(v => args[2] === 'paths' ? `:(literal)${v}` : v)).join('\0') + (value.length ? '\0' : ''));
     else console.log(typeof value === 'string' ? value : JSON.stringify(value));
   } else {
     const result = await plan(args.includes('--full'));

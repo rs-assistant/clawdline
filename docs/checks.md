@@ -36,13 +36,19 @@ remains an explicit integration/CI requirement.
 Go package metadata identifies the changed packages and the transitive callers,
 including test imports. API schema and route inputs under `api/v1/` select
 contract-package tests and contract generation checks alongside changed packages;
-they do not force the full platform suite. The local gate runs the changed packages' tests. Caller
+they do not force the full platform suite. The local gate selects tests in files paired with changed Go source files,
+or directly edited test files. Ambiguous/shared inputs retain the entire package.
+The JSON test report must show actual test results; an empty selector is refused.
+This local module selection does not claim cross-file runtime coverage. Caller
 compilation can be requested with `--callers`; caller runtime suites wait for
 integration and CI. A deleted or unowned package cannot silently disappear.
 Selection is by path and tests execute the working tree; partial-hunk commits
 need exact-commit CI evidence; pending CI does not block dev installation. Repository-copy and
 capacity-registration guards still run, uncached, even for
-documentation edits. Generated contracts and the existing source guards remain.
+documentation edits. Contract generation runs when schema/generated-contract inputs change.
+Capacity guards run for Go or capacity-copy inputs; CSS and shell guards follow
+their inputs. Tool self-tests run for tooling/full checks. Repository-copy,
+privacy and source guards remain; full CI retains complete validation.
 
 For the console, TypeScript checks the entire project incrementally. Its build
 information stays in the ignored `web/.clawdline-check.tsbuildinfo` of this
