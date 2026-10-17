@@ -109,6 +109,8 @@ export interface VoiceJob {
   /** A non-composer microphone can own its own icon and messages. */
   changed?: (state: VoiceState) => void
   say?: (text: string, bad?: boolean) => void
+  /** A missing local engine needs an installation choice, not a transient toast. */
+  missingWhisper?: (failure: VoiceFailure) => void
 }
 
 /** What this module needs from the page it is drawn on. */
@@ -152,7 +154,7 @@ let token = 0
  * be told the same thing; kept forever, somebody who installs Whisper while
  * the page is open could never use it.
  */
-let whisperless: string | null = null
+let whisperless: VoiceFailure | null = null
 /** The quiet source label for this recording; its lookup never gates audio. */
 let source: { label: string; description: string } | null = null
 let sourceToken = 0
@@ -290,9 +292,10 @@ export function press(job?: VoiceJob): void {
     showSource()
   }).catch(() => { /* A missing label must never prevent dictation. */ })
   if (whisperless) {
-    const said = whisperless
+    const failure = whisperless
     whisperless = null
-    speak(said, true)
+    if (want.missingWhisper) want.missingWhisper(failure)
+    else speak(complain(failure), true)
     return
   }
   const no = why()
@@ -471,7 +474,13 @@ function landed(mine: number): void {
     .catch((e: VoiceFailure) => {
       if (mine !== token) return
       quit()
-      if (e && e.code === "no_whisper") whisperless = complain(e)
+      if (e && e.code === "no_whisper") {
+        whisperless = e
+        if (job?.missingWhisper) {
+          job.missingWhisper(e)
+          return
+        }
+      }
       speak(complain(e), !e || e.code !== "too_short")
     })
 }

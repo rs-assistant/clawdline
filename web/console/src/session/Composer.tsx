@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import type { ReactNode, RefObject } from "react"
 import type { AssistantSkill, SessionRow } from "@clawdline/contract"
 import { RefusalError } from "@clawdline/core"
-import { client } from "../client.js"
+import { client, followsRelay } from "../client.js"
 import * as L from "../legacy/bridge.js"
 import {
   Shots,
@@ -121,6 +121,8 @@ export function Composer({
   const shotsBusy = Shots.busy()
   const voiceRow = useRef<HTMLDivElement>(null)
   const voiceJob = useRef<V.VoiceJob | null>(null)
+  const voiceInstallDialog = useRef<HTMLDialogElement>(null)
+  const [voiceInstall, setVoiceInstall] = useState<{ reason?: string; help: boolean } | null>(null)
   const form = useRef<HTMLFormElement>(null)
   // What the microphone is doing, which is the whole of what `renderComposer`
   // reads back from `Voice`: `voiceBusy` for the two waits, `voiceLive` for
@@ -139,6 +141,13 @@ export function Composer({
   rowRef.current = row
 
   useKeyboardBar(msg)
+
+  useEffect(() => {
+    const dialog = voiceInstallDialog.current
+    if (!dialog) return
+    if (voiceInstall && !dialog.open) dialog.showModal()
+    if (!voiceInstall && dialog.open) dialog.close()
+  }, [voiceInstall])
 
   const machine = remote?.machineID ?? (row ? L.machineFor(row).id : "")
   const blockedCode = !remote && blocked?.machine === machine ? blocked.code : ""
@@ -430,6 +439,7 @@ export function Composer({
       sink: (said) => sink.current(said),
       transcribe: remote?.transcribe,
       source: voiceSource,
+      missingWhisper: (failure) => setVoiceInstall({ reason: failure.reason, help: false }),
       changed: setVoice,
       say: toast,
       // **The composer has gone**, which is the original's `els.composer.hidden`:
@@ -508,6 +518,7 @@ export function Composer({
   const pinned = sending && sendWidth.current.px ? { minWidth: `${sendWidth.current.px}px` } : undefined
 
   return (
+    <>
     <form
       ref={form}
       className="composer"
@@ -712,6 +723,51 @@ export function Composer({
         />
       ) : null}
     </form>
+    <dialog
+      ref={voiceInstallDialog}
+      className="voice-install-dialog"
+      aria-labelledby="voice-install-title"
+      aria-describedby="voice-install-description"
+      onCancel={(event) => { event.preventDefault(); setVoiceInstall(null) }}
+      onClose={() => setVoiceInstall(null)}
+    >
+      {voiceInstall && (
+        <>
+          <h2 id="voice-install-title">{nextWord("voiceInstallPromptTitle")}</h2>
+          <p id="voice-install-description">
+            {voiceInstall.help
+              ? nextWord("voiceInstallPromptRemoteHelp")
+              : nextWord(voiceInstall.reason === "no_model"
+                ? "voiceInstallPromptNoModel"
+                : "voiceInstallPromptNoBinary")}
+          </p>
+          <div className="voice-install-actions">
+            {voiceInstall.help ? (
+              <button type="button" className="chip" onClick={() => setVoiceInstall(null)}>
+                {nextWord("voiceInstallPromptDone")}
+              </button>
+            ) : (
+              <>
+                <button type="button" className="chip" onClick={() => setVoiceInstall(null)}>
+                  {nextWord("voiceInstallPromptLater")}
+                </button>
+                <button type="button" className="chip primary" onClick={() => {
+                  if (followsRelay()) {
+                    setVoiceInstall({ ...voiceInstall, help: true })
+                    return
+                  }
+                  window.open("/settings.html", "_blank", "noopener")
+                  setVoiceInstall(null)
+                }}>
+                  {nextWord("voiceInstallPromptSetUp")}
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </dialog>
+    </>
   )
 }
 

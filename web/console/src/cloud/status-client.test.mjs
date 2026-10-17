@@ -276,6 +276,66 @@ test("macOS is the fallback when the current Session machine cannot transcribe",
   assert.equal((await client.voiceHostFor("linux")).machine, "mac")
 })
 
+test("a Linux no_whisper refusal retries the same recording on macOS and remembers the working source", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  client._machineRows = () => [
+    { id: "mac", pairing: "paired", freshness: "current" },
+    { id: "linux", pairing: "paired", freshness: "current" },
+  ]
+  client.orchestratorSnapshots = new Map([
+    ["mac", { machine: { platform: "darwin", commands: ["voice"] } }],
+    ["linux", { machine: { platform: "linux", commands: ["voice"] } }],
+  ])
+  client.machineDescriptors = new Map()
+  client.machineLacks = new Map()
+  client.macCapabilities = new Map()
+  client.account = "account"
+  client.voiceHostStorage = null
+  client.voiceHostChoice = null
+  client.voiceUnavailable = new Set()
+  const calls = []
+  client._machineRequest = (machine, word, body) => {
+    calls.push([machine, word, body])
+    return machine === "linux"
+      ? Promise.reject({ code: "no_whisper", reason: "no_binary" })
+      : Promise.resolve({ text: "heard on the Mac" })
+  }
+
+  assert.deepEqual(await client.voiceFor("linux", "AAAA", 16000), { text: "heard on the Mac" })
+  assert.deepEqual(calls, [
+    ["linux", "voice", { audio: "AAAA", rate: 16000 }],
+    ["mac", "voice", { audio: "AAAA", rate: 16000 }],
+  ])
+  assert.equal((await client.voiceHostFor("linux")).machine, "mac")
+})
+
+test("no_whisper reaches the page only after every capable voice host refuses it", async () => {
+  const client = Object.create(StatusCloudClient.prototype)
+  client._machineRows = () => [
+    { id: "mac", pairing: "paired", freshness: "current" },
+    { id: "linux", pairing: "paired", freshness: "current" },
+  ]
+  client.orchestratorSnapshots = new Map([
+    ["mac", { machine: { platform: "darwin", commands: ["voice"] } }],
+    ["linux", { machine: { platform: "linux", commands: ["voice"] } }],
+  ])
+  client.machineDescriptors = new Map()
+  client.machineLacks = new Map()
+  client.macCapabilities = new Map()
+  client.account = "account"
+  client.voiceHostStorage = null
+  client.voiceHostChoice = null
+  client.voiceUnavailable = new Set()
+  const calls = []
+  client._machineRequest = (machine) => {
+    calls.push(machine)
+    return Promise.reject({ code: "no_whisper", reason: machine === "linux" ? "no_binary" : "no_model" })
+  }
+
+  await assert.rejects(client.voiceFor("linux", "AAAA", 16000), { code: "no_whisper", reason: "no_model" })
+  assert.deepEqual(calls, ["linux", "mac"])
+})
+
 test("a missing Whisper refusal records the selected machine without recording speech", async () => {
   const client = Object.create(StatusCloudClient.prototype)
   const rows = []

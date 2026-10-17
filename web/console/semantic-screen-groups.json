@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6042,
-  "riskKeys": 2883,
-  "nonRiskCount": 3159,
+  "englishContentKeys": 6049,
+  "riskKeys": 2888,
+  "nonRiskCount": 3161,
   "groups": [
     {
       "name": "bar / other",
@@ -2115,7 +2115,7 @@
     },
     {
       "name": "next / other",
-      "count": 191,
+      "count": 193,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2310,6 +2310,8 @@
         "next.updateTitle",
         "next.updateToVersion",
         "next.updateVerifying",
+        "next.voiceInstallPromptSetUp",
+        "next.voiceInstallPromptTitle",
         "next.worktreeRemoveClose"
       ]
     },
