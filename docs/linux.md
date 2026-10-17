@@ -64,6 +64,12 @@ git merge --ff-only origin/main
 tools/deploy-linux-user.sh
 ```
 
+For a dev iteration, use `clawdline dev install --rev <commit>` from the
+checkout. It selects `tools/deploy-linux-user.sh --dev` on a source installation:
+build only, then console/stamp checks and rollback. It does not repeat full
+Go or web checks. The same entry point installs the next source dev too.
+Full CI runs in the background; public Releases retain complete acceptance.
+
 Whether this machine trails the cloud's latest build is `clawdline update`; `clawdline update
 --apply` deploys that build with `tools/deploy-linux-user.sh --rev <stamp>` without moving the
 checkout's HEAD ([updates.md](updates.md)).

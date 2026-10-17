@@ -216,6 +216,19 @@ returns to the stable release when they are done.
 clawdline dev install [--rev <commit>]     # inside a clawdline checkout
 ```
 
+- **One entry point.** The same command works from a stable release, another
+  release-based dev build, or a Linux source deployment. A release-based dev keeps
+  the stable version base. A Linux source deployment uses the existing service
+  layout through `tools/deploy-linux-user.sh --dev --rev <commit>` and stamps
+  `v0.0.0-dev.<short commit>`; it remains a source install rather than pretending
+  to be a signed release. Omit `--port` on that path: the service configuration
+  owns the port. An unmanaged checkout is refused instead of guessing a service.
+  Source dev builds skip the complete Go tests, vet and web checks, then verify
+  the actual served stamp and console before accepting the switch. The existing
+  source rollback restores the previous `current` if startup fails. Returning
+  from a source dev follows the source deployment procedure, not the signed
+  release updater. Full CI remains visible; public Release still requires it.
+
 - **What it installs.** The commit is built in a disposable worktree by
   `tools/release/build.sh --channel dev --host-only` — this machine's os/arch only, unsigned,
   carrying the tmux of the running release (`--tmux-installed`) — and installed as

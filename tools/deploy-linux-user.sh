@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: tools/deploy-linux-user.sh [--stage-only] [--rev <commit>]" >&2
+  echo "usage: tools/deploy-linux-user.sh [--stage-only] [--dev] [--rev <commit>]" >&2
   exit 2
 }
 
@@ -10,10 +10,12 @@ usage() {
 # ephemeral checkout at the commit, so the shared checkout's HEAD never moves;
 # `clawdline update --apply` uses it to deploy the cloud's latest stamp
 # (docs/updates.md).
+dev_args=()
 stage_only=0
 rev=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --dev) dev_args=(--dev); shift ;;
     --stage-only) stage_only=1; shift ;;
     --rev) [ "$#" -ge 2 ] && [ -n "$2" ] || usage; rev=$2; shift 2 ;;
     *) usage ;;
@@ -37,7 +39,7 @@ release=$data_root/releases/$commit
 mkdir -p "$data_root/releases"
 
 HEAVY_HANDOFF=0 tools/check-worktrees.sh --ephemeral --rev "$commit" -- \
-  tools/heavy.sh tools/build-linux-user-release.sh "$release" "$commit"
+  tools/heavy.sh tools/build-linux-user-release.sh "$release" "$commit" ${dev_args[@]+"${dev_args[@]}"}
 
 if [ "$stage_only" -eq 1 ]; then
   current=$data_root/current

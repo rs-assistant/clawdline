@@ -167,6 +167,7 @@ check "check-mirror-tests.mjs" node tools/check-mirror-tests.mjs
 check "test-notify-release-success.sh" sh tools/test-notify-release-success.sh
 if [ "$(uname -s)" = Linux ]; then
   check "test-heavy-linux-cache.sh" bash tools/test-heavy-linux-cache.sh
+  check "test-linux-dev-build.sh" bash tools/test-linux-dev-build.sh
 fi
 check "check planning and profiling tests" node --test tools/check-plan.test.mjs tools/check-profile.test.mjs tools/check-scope.test.mjs
 check "check modes integration" bash tools/test-check-modes.sh
