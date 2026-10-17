@@ -361,7 +361,7 @@ Only macOS has `sips`. On Linux/Windows, HEIC, TIFF, WebP and BMP are all `unsup
 <!-- section:whisper owner:task-aaaaaaaa -->
 ### 4.4 How whisper-cli is installed
 
-`implemented` (search paths) / `implementable` (install guidance)
+`implemented`
 
 The search paths in `internal/adapters/whisper` are already written for all three platforms, and `ErrNoBinary` and `ErrNoModel`
 are two separate errors — the header of `whisper.go` already explains why they are kept apart: *Told only "off", a person goes and checks
@@ -370,18 +370,23 @@ the thing they already did.* **What is missing is not code but guidance.**
 | | Where the executable comes from | Search paths (already written) | Where the model comes from | Model paths (already written) |
 |---|---|---|---|---|
 | **macOS** | `brew install whisper-cpp` | `/opt/homebrew/bin`, `/usr/local/bin` | `download-ggml-model.sh`; an old app model can be selected explicitly with `whisper_model` | `~/.cache/whisper`, `~/models` |
-| **Linux** | **No mainstream distribution package.** In practice you build it: `git clone whisper.cpp && cmake -B build && cmake --build build -j` | `/usr/local/bin`, `/usr/bin`, `/opt/whisper.cpp/build/bin`, `~/.local/bin`, `~/whisper.cpp/build/bin` | Same as above | `~/.cache/whisper`, `~/.local/share/whisper`, `/usr/share/whisper`, `/opt/whisper.cpp/models` |
+| **Linux** | Arch: `sudo pacman -S --needed whisper-cpp`. Ubuntu/Debian and distributions whose package lacks `whisper-cli`: build upstream with CMake; Settings prints the exact command | `/usr/local/bin`, `/usr/bin`, `/opt/whisper.cpp/build/bin`, `~/.local/bin`, `~/whisper.cpp/build/bin` | Settings downloads and verifies the pinned upstream model | `~/.cache/whisper`, `~/.local/share/whisper`, `/usr/share/whisper`, `/opt/whisper.cpp/models` |
 | **Windows** | The official release has a prebuilt zip; unzip it into `%LOCALAPPDATA%\whisper.cpp\` | `%LOCALAPPDATA%\whisper.cpp[\bin]`, `%ProgramFiles%\whisper.cpp[\bin]` | Same as above | `%LOCALAPPDATA%\whisper`, `%LOCALAPPDATA%\whisper.cpp\models` |
 
-Three things to do:
+The Settings voice tab now does all three:
 
 1. **The settings page prints the paths.** Next to "whisper-cli not found", list **the directories this machine actually searched**,
    and this platform's install command, with a copy button. The user's commonest mistake is having installed it somewhere else.
 2. **Say plainly which one it does not take.** The `openai-whisper` installed by pip/uv is a different tool with different CLI arguments, **not compatible**.
    Linux users easily install that one and think it is broken. The error message has to name it.
-3. **The model can be downloaded for the user; the executable cannot.** Recommended: add `clawdline voice install-model <name>`, which downloads
-   `ggml-<name>.bin` into `~/.cache/whisper` (the first search location on all three platforms). The executable needs compiling,
-   and we don't do that for them — it can fail in a hundred places, and the failure's error message would become our responsibility.
+3. **The model is downloaded for the user; the executable is not.** The button downloads the pinned
+   `ggml-large-v3-turbo-q5_0.bin` into `~/.cache/whisper` (the first search location on all three platforms), bounds the response at
+   its exact 574,041,195 bytes, checks its SHA-256, and only then renames it into place. The executable may need a compiler or
+   administrator authority, so the page gives a copyable command instead of running it as the daemon.
+
+Arch's official package includes `/usr/bin/whisper-cli`. Fedora's `whisper-cpp` package was checked again on 2026-10-17: it
+packages the libraries but not the CLI, so Clawdline deliberately gives Fedora the upstream build instructions rather than a
+`dnf install` command that would still leave voice unavailable. Upstream releases still publish no general Linux CPU archive.
 
 **There is one more precondition on Linux**: for the browser to record, the page must be a secure context. `http://127.0.0.1:7727`
 counts (localhost is an exception), but **`http://192.168.x.x:7727`, reached over a LAN IP, does not**, and the browser will refuse

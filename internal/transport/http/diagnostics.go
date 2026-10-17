@@ -672,6 +672,9 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		capacity.SettingsRequestBodyBytes: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-request guard; no retained buffer"}
 		},
+		capacity.VoiceModelDownloadBytes: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-download guard; the temporary file is released after verification"}
+		},
 		capacity.NotificationRulesRows: func() capacity.Reading {
 			v, err := s.settingsFile().Read()
 			if err != nil {

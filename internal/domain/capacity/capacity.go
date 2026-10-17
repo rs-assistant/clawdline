@@ -382,6 +382,9 @@ const (
 	// one line that says when to read each.
 	MemoryGroups                = "memory.groups"
 	MemoryGroupDescriptionBytes = "memory.group_description_bytes"
+	// One optional whisper.cpp model download. The response is bounded before
+	// it can fill the machine, and no partial file becomes a usable model.
+	VoiceModelDownloadBytes = "voice.model_download_bytes"
 	// Which conversations were open in this boot and the one before it, so
 	// they can be offered back after a reboot (docs/session-restore.md).
 	SessionsRestoreRows    = "sessions.restore_rows"
@@ -2632,6 +2635,16 @@ func Register() []Entry {
 			Told:      []Channel{Diagnostics},
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/transport/http.namingTailLimit"},
+		},
+		{
+			// The one model offered in Settings. A response one byte larger than
+			// the pinned upstream object is refused, its partial file is removed,
+			// and the prior installed model (if any) stays untouched.
+			Name: VoiceModelDownloadBytes, Class: Buffer, Unit: Bytes,
+			Limit: 574041195, AtLimit: Refuse,
+			Told:      []Channel{Diagnostics, Sender},
+			EvictedBy: Daemon,
+			Sources:   []string{"internal/adapters/whisper.ModelDownloadBytesLimit"},
 		},
 		{
 			// The unprivileged Linux deploy keeps the previous release selected

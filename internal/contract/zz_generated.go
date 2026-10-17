@@ -8715,6 +8715,14 @@ type VoiceLanguage struct {
 	Tag string `json:"tag"`
 }
 
+// POST /v1/voice/setup after the pinned model has been downloaded,
+// size-checked, SHA-256 checked and atomically installed.
+type VoiceModelInstall struct {
+	// The installed model file name; its private path is not returned.
+	Model string `json:"model"`
+	OK    bool   `json:"ok"`
+}
+
 // A refusal from this route. It is the ordinary refusal shape with one field
 // added, because `no_whisper` covers two different afternoons: `brew install
 // whisper-cpp` leaves a machine with the binary and no model, and a page told
@@ -8748,6 +8756,41 @@ type VoiceRequest struct {
 type VoiceResult struct {
 	Ms   int64  `json:"ms"`
 	Text string `json:"text"`
+}
+
+// GET /v1/voice/setup: what this machine has for local dictation, where it
+// looked, and the exact supported way to add the missing pieces. Paths under
+// the current home directory are written with ~ so this response carries no
+// account path.
+type VoiceSetup struct {
+	// The executable file name in use, or empty.
+	Binary string `json:"binary"`
+
+	// Directories searched for whisper-cli, with the home directory written as ~.
+	BinaryDirs []string `json:"binary_dirs"`
+
+	// A command, or commands separated by newlines, that install the compatible
+	// whisper.cpp CLI on this platform. The Python openai-whisper command is
+	// intentionally never offered.
+	BinaryInstall string `json:"binary_install"`
+
+	// The model file name in use, or empty.
+	Model string `json:"model"`
+
+	// Its exact download size.
+	ModelBytes int64 `json:"model_bytes"`
+
+	// Directories searched for ggml models, with the home directory written as ~.
+	ModelDirs []string `json:"model_dirs"`
+
+	// The pinned model the POST action downloads.
+	ModelName string `json:"model_name"`
+
+	// darwin, linux or windows.
+	Platform string `json:"platform"`
+
+	// ready, no_binary or no_model.
+	Status string `json:"status"`
 }
 
 // One file wait, in the Swift app's camelCase. `ownerSessionId` and each

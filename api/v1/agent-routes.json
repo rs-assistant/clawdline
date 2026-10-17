@@ -628,6 +628,11 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/voice/setup",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/work/",
       "guide": "board"
     },

@@ -299,6 +299,7 @@
 | `usage.work_cursor_queue` | 1024 | `rows` | `refuse` | `diagnostics, log` | — |
 | `usage.work_cursor_rows` | 50000 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `usage.work_units_per_answer` | 500 | `rows` | `evict_oldest` | `diagnostics, sender` | — |
+| `voice.model_download_bytes` | 574041195 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `waits.open` | 256 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `work.assignments` | 4000 | `rows` | `refuse` | `diagnostics, sender, health` | — |
 | `work.completion_reason_bytes` | 8192 | `bytes` | `refuse` | `diagnostics, sender, health` | — |
