@@ -42,7 +42,8 @@ Go package metadata identifies the changed packages and the transitive callers,
 including test imports. API schema and route inputs under `api/v1/` select
 contract-package tests and contract generation checks alongside changed packages;
 they do not force the full platform suite. The local gate selects tests in files paired with changed Go source files,
-or directly edited test files. Ambiguous/shared inputs retain the entire package.
+or directly edited test files. Ambiguous/shared inputs retain the entire package. HTTP server construction
+belongs to the route test module, alongside each changed handler module.
 The JSON test report must show actual test results; an empty selector is refused.
 This local module selection does not claim cross-file runtime coverage. Caller
 compilation can be requested with `--callers`; caller runtime suites wait for
@@ -61,7 +62,9 @@ information stays in the ignored `web/.clawdline-check.tsbuildinfo` of this
 worktree and is removed with the checkout. The TypeScript resolver traces import,
 export and literal dynamic-import dependencies to affected tests. Filesystem
 readers and computed loaders remain conservative readers of changed inputs.
-Configuration/unknown fixture changes run the broader web test set. Catalogs
+Type-only imports are checked by whole-project TypeScript and do not expand
+runtime selection. Generated semantic inventories retain their validators and
+filesystem-reader tests; configuration/unknown fixtures run broader web tests. Catalogs
 retain their complete localization validators. The bundle build waits for
 integration/CI. A test selection is not a claim that unselected tests ran.
 
@@ -109,8 +112,10 @@ and tool bounds. Tool measurements are emitted by the wrapper, not invented as
 zero daemon usage or added to the daemon's capacity UI.
 
 Before and after each command, the wrapper measures its owned cache and disk.
-Only budget or disk pressure triggers reclamation: compiled entries first,
-modules only if needed. A still-low preflight refuses the build. Original command
+Only budget or disk pressure triggers reclamation: oldest recognized compiled-cache entries first,
+modules only if needed. Go refreshes entry mtimes on use; metadata sorting spills
+to disk instead of retaining an unbounded candidate list. Pressure no longer
+clears the entire build/test cache. Unknown files in the cache are retained. A still-low preflight refuses the build. Original command
 failure survives cleanup failure. Unknown ownership or measurement never
 permits deletion. This is a between-command budget, not an in-flight quota.
 

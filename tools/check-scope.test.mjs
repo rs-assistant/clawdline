@@ -82,3 +82,24 @@ test('paired Go tests retain whole-package fallback and guards follow their own 
     assert.equal(Object.values(guardPlan([],true)).every(Boolean),true);
   } finally {rmSync(root,{recursive:true,force:true});}
 });
+
+test('runtime scope excludes type-only imports and generated validation inventories stay selective', async () => {
+ const root=mkdtempSync(join(tmpdir(),'check-runtime-types-'));
+ const write=(p,s)=>{mkdirSync(join(root,p,'..'),{recursive:true});writeFileSync(join(root,p),s)};
+ try {
+  write('web/console/tsconfig.json',JSON.stringify({compilerOptions:{module:'ESNext',moduleResolution:'Bundler'},include:['src']}));
+  write('web/console/src/types.ts','export type Model = {id: string}; export const value=1;');
+  write('web/console/src/types.test.ts',"import type { Model } from './types.js'; export {};");
+  write('web/console/src/named-types.test.ts',"import { type Model } from './types.js'; export {};");
+  write('web/console/src/runtime.test.ts',"import { value } from './types.js'; console.log(value);");
+  write('web/console/src/reader.test.mjs',"import {readFileSync} from 'node:fs'; readFileSync('semantic-risk-keys.json');");
+  write('web/console/tools/fixture.mjs','export {};');write('web/core/src/index.ts','export {};');write('web/contract/src/index.ts','export {};');
+  let got=await selectWeb(['web/console/src/types.ts'],root);
+  assert.deepEqual(got.tests,['web/console/src/reader.test.mjs','web/console/src/runtime.test.ts']);
+  got=await selectWeb(['web/console/semantic-risk-keys.json'],root);
+  assert.deepEqual(got.tests,['web/console/src/reader.test.mjs']);
+  const pkg={Dir:join(root,'internal/transport/http'),ImportPath:'m/http',TestGoFiles:['routes_test.go']};
+  write('internal/transport/http/routes_test.go','package http\nfunc TestRouteTable(t *testing.T) {}\n');
+  assert.deepEqual(selectGoRuns(['internal/transport/http/server.go'],[pkg],root,['m/http']),[{package:'m/http',pattern:'^(TestRouteTable)$'}]);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});

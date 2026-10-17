@@ -8,7 +8,7 @@ scratch=$(mktemp -d)
 trap 'rm -rf -- "$scratch"' EXIT
 mkdir -p "$scratch/repo/tools" "$scratch/repo/web/console/tools" "$scratch/bin"
 cp tools/check.sh tools/check-plan.mjs tools/check-scope.mjs tools/check-profile.mjs "$scratch/repo/tools/"
-for name in check-legacy-css.sh check-machine-words.sh check-shell-expansions.sh check-private.sh test-notify-release-success.sh test-heavy-linux-cache.sh test-linux-dev-build.sh test-machine-words-changes.sh test-check-modes.sh test-staged-app-watcher.sh; do
+for name in check-legacy-css.sh check-machine-words.sh check-shell-expansions.sh check-private.sh test-notify-release-success.sh test-heavy-linux-cache.sh test-linux-dev-build.sh test-machine-words-changes.sh test-heavy-handoff.sh test-check-modes.sh test-staged-app-watcher.sh; do
   printf '#!/bin/sh\nexit 0\n' > "$scratch/repo/tools/$name"
   chmod +x "$scratch/repo/tools/$name"
 done

@@ -48,11 +48,33 @@ measure() {
   free=$(df -Pk -- "$root" | awk 'NR == 2 {print $4}') || return 1
   case "$used:$free" in *[!0-9:]*|:*|*:) return 1 ;; esac
 }
+# Go refreshes cache entry mtimes on use. Sort metadata on disk rather than
+# retaining an unbounded candidate list, and remove only recognized Go entries.
+trim_compiled() {
+  local manifest record rest file blocks need freed
+  need=$(( (used > cache_limit ? used - cache_limit : 0) * 1024 ))
+  if [ "$free" -lt "$reserve" ] && [ "$(((reserve - free) * 1024))" -gt "$need" ]; then need=$(((reserve - free) * 1024)); fi
+  manifest=$(mktemp "$root/.reclaim.XXXXXX") || return 2
+  if ! find "$GOCACHE" -mindepth 2 -maxdepth 2 -type f -printf '%T@ %b %p\0' | sort -z -n > "$manifest"; then
+    rm -f -- "$manifest"; return 2
+  fi
+  freed=0
+  while IFS= read -r -d '' record; do
+    rest=${record#* }; blocks=${rest%% *}; file=${rest#* }
+    [[ "$file" =~ /[0-9a-f]{2}/[0-9a-f]{64}-[ad]$ ]] || continue
+    case "$blocks" in ''|*[!0-9]*) rm -f -- "$manifest"; return 2 ;; esac
+    rm -- "$file" || { rm -f -- "$manifest"; return 2; }
+    freed=$((freed + blocks * 512))
+    [ "$freed" -lt "$need" ] || break
+  done < "$manifest"
+  rm -f -- "$manifest"
+}
+
 clear_owned() {
   echo "heavy_go_cache_reclaim: used_kib=$used free_kib=$free budget_kib=$cache_limit reserve_kib=$reserve" >&2
-  if [ "$owned_build" = yes ]; then go clean -cache -testcache -fuzzcache || return $?; fi
+  if [ "$owned_build" = yes ]; then trim_compiled || return $?; fi
   measure || return 2
-  # Keep downloaded modules when clearing compiled entries was sufficient.
+  # Keep downloaded modules when trimming older compiled entries was sufficient.
   if [ "$owned_mod" = yes ] && { [ "$used" -gt "$cache_limit" ] || [ "$free" -lt "$reserve" ]; }; then
     go clean -modcache || return $?
     mkdir -p -- "$GOMODCACHE" || return 2
