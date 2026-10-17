@@ -208,6 +208,10 @@ React 端要另外寫的只有 `useFleet.ts`——九行 `useSyncExternalStore`�
 （`orchestrator.json`）。這些是舊 app 自己的事實，新 app 沒有另一份來源；不讀，清單上就少了
 皇冠、task chip、協調等待與交付勾，標題也會不同。
 
+**2026-10-17：這條讀取已經整條拿掉**（`docs/cutover.md` §3 末段）。下面除了「圖片」那一條，都是當時的紀錄：
+`orchestrator.json`、`coordinator.json`、`config.json`、舊看板、家規 local 檔一個都不再開，皇冠、task chip、
+協調等待與交付勾只畫本專案自己的紀錄。
+
 讀的東西（全部在 `internal/adapters/swiftstore`）：
 - `~/.config/clawdline/orchestrator.json`、`coordinator.json`：上面那些事實。
 - `~/.config/clawdline/config.json`：只解 `session_titles`，以及方案額度要的 `status_dir`、`codex_home`、

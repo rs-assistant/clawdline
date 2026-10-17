@@ -18,7 +18,6 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/devices"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/tunnel"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/contract"
@@ -158,14 +157,14 @@ func (s *Server) gate() *gate {
 // than answering every request with a refusal.
 func (s *Server) AuthReady() error { return s.gate().err }
 
-// swiftDirs is the Swift app's directory by every name it may go by. Nothing
-// under it is opened, read or accepted here.
+// swiftDirs is the retired Swift app's directory, spelled as the fixed path
+// that app always used. Nothing under it is opened, read or accepted here.
 func swiftDirs() []string {
-	out := []string{swiftstore.Dir()}
-	if home, err := os.UserHomeDir(); err == nil {
-		out = append(out, filepath.Join(home, ".config", "clawdline"))
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil
 	}
-	return out
+	return []string{filepath.Join(home, ".config", "clawdline")}
 }
 
 func openGate(cfg config.Config) *gate {

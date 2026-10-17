@@ -32,7 +32,7 @@ func TestBoardSettingsMovedIntoTheStoreAndReplayTheirOwnRevision(t *testing.T) {
 	}
 	defer st.Close()
 	s := &Server{store: st}
-	boardByServer.Store(s, &boardDeps{legacy: boardstore.OpenLegacy(filepath.Join(dir, "absent.json")),
+	boardByServer.Store(s, &boardDeps{
 		settings: boardstore.OpenSettings(dir)})
 	ctx := context.Background()
 	got, err := s.boardSettings(ctx)
@@ -101,7 +101,7 @@ func TestAnUnreadableOldDocumentIsNotAFreshBoard(t *testing.T) {
 	}
 	defer st.Close()
 	s := &Server{store: st}
-	boardByServer.Store(s, &boardDeps{legacy: boardstore.OpenLegacy(filepath.Join(dir, "absent.json")),
+	boardByServer.Store(s, &boardDeps{
 		settings: boardstore.OpenSettings(dir)})
 	_, err = s.boardSettings(context.Background())
 	var refusal boardstore.Refusal

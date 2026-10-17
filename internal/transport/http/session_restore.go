@@ -15,6 +15,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/bootid"
 	"github.com/sainteye/clawdline/internal/adapters/store"
+	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
@@ -94,7 +95,7 @@ func (s *Server) restoreChildren(ctx context.Context, rows []session.Session) ma
 // restoreTitle is the manual title the list would show for this row, when
 // there is one. The recorder falls back to the session's own name.
 func (s *Server) restoreTitle(_ context.Context, row session.Session) string {
-	view := s.withOwnSessionTitles(s.swift.Read(), time.Now())
+	view := s.withOwnSessionTitles(swiftstore.Snapshot{}, time.Now())
 	return view.TitleOf(liveOf(row), row.CustomTitle, nil).Manual
 }
 

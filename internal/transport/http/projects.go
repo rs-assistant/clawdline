@@ -9,34 +9,29 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/projects"
-	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	"github.com/sainteye/clawdline/internal/domain/icon"
 )
 
-// The Projects page's routes: the start places, the Board store's Project
-// catalog, and one Project's worktree lifecycle. Every rule is the Swift app's
-// and lives in internal/adapters/projects; this file only wires the readers to
-// this daemon's inventory and to the Swift store, and encodes.
+// The Projects page's routes: the start places, the Project catalog, and one
+// Project's worktree lifecycle. Every rule is the Swift app's and lives in
+// internal/adapters/projects; this file only wires the readers to this
+// daemon's inventory and its own task records, and encodes.
 
 // projectReaders are built on first use and kept, because each one caches: the
-// places remember which folder stands for which directory, the catalog
-// remembers its last good reading, and the lifecycle's plain read answers from
-// the observation a refresh made.
+// places remember which folder stands for which directory, and the
+// lifecycle's plain read answers from the observation a refresh made.
 type projectReaders struct {
 	places    *projects.Places
 	repos     *projects.RepoLookup
 	setups    *setupLookup
 	registry  *projects.PlaceRegistry
-	catalog   *projects.Catalog
 	lifecycle *projects.Lifecycle
 	// busy bounds queued plus running lifecycle work, ProjectWorktreeHTTP.depth.
 	busy chan struct{}
@@ -74,7 +69,6 @@ func (s *Server) projectReaders() *projectReaders {
 		repos:    projects.NewRepoLookup(projects.OriginRepo),
 		setups:   newSetupLookup(projectSetup),
 		registry: registry,
-		catalog:  projects.NewCatalog(),
 		busy:     make(chan struct{}, 4),
 	}
 	r.lifecycle = projects.NewLifecycle(projects.Ports{
@@ -91,56 +85,6 @@ func (s *Server) projectReaders() *projectReaders {
 	})
 	projectReaderSets[s.cfg.Dir] = r
 	return r
-}
-
-func secondsPtr(v *swiftstore.Seconds) *time.Time {
-	if v == nil {
-		return nil
-	}
-	t := v.Time()
-	return &t
-}
-
-func stringOrEmpty(v *string) string {
-	if v == nil {
-		return ""
-	}
-	return *v
-}
-
-// lifecycleTasks hands the lifecycle the task records it reads.
-func lifecycleTasks(snap swiftstore.Snapshot) projects.TaskEvidence {
-	out := projects.TaskEvidence{Authoritative: snap.Known && !snap.Stale}
-	for _, t := range snap.Tasks {
-		row := projects.Task{
-			ID: t.ID, State: t.State, Title: t.Title,
-			RootLabel: stringOrEmpty(t.RootLabel), RootSession: stringOrEmpty(t.RootSession),
-			ChildSession: stringOrEmpty(t.ChildSession), ChildTerminal: stringOrEmpty(t.ChildTerminal),
-			Created:   secondsPtr(&t.Created),
-			BriefedAt: secondsPtr(t.BriefedAt), SpawnedAt: secondsPtr(t.SpawnedAt),
-			FinishedAt: secondsPtr(t.FinishedAt),
-		}
-		row.Plan = stringOrEmpty(t.Plan)
-		// Orchestrator.Task: the newest progress note, or else the summary.
-		if n := len(t.Progress); n > 0 {
-			row.Status = t.Progress[n-1].Note
-		} else {
-			row.Status = t.Summary.Text
-		}
-		if t.Created == 0 {
-			row.Created = nil
-		}
-		if t.Landing != nil {
-			row.Landing = &projects.TaskLanding{State: t.Landing.State, Target: stringOrEmpty(t.Landing.Target),
-				Commit: stringOrEmpty(t.Landing.Commit)}
-		}
-		if t.Worktree != nil {
-			row.Worktree = &projects.TaskWorktree{Path: t.Worktree.Path, Branch: t.Worktree.Branch,
-				Base: t.Worktree.Base}
-		}
-		out.Tasks = append(out.Tasks, row)
-	}
-	return out
 }
 
 // liveEvidence is the lifecycle's Live port: every assistant session's
@@ -278,19 +222,6 @@ func (s *Server) registeredPlacesRoute(w http.ResponseWriter, r *http.Request) {
 	}{true, rows})
 }
 
-func summarizeProjectWork(row contract.CatalogProject, projectPath string,
-	counts map[string]store.WorkV2ProjectCount, err error) contract.CatalogProject {
-	row.SummaryCoverage = "unknown"
-	if err != nil || projectPath == "" {
-		return row
-	}
-	count := counts[projectPath]
-	row.ItemCount = count.Items
-	row.ActiveItemCount = count.Open
-	row.SummaryCoverage = "complete"
-	return row
-}
-
 // projectCatalogRoute is the catalog half of ProjectBoardIntegration's
 // materializeReadModel: the store's Projects, each joined to the start place
 // that resolves to it, start places first in their own order.
@@ -303,85 +234,18 @@ func (s *Server) projectCatalogRoute(w http.ResponseWriter, r *http.Request) {
 		writeRefusal(w, http.StatusServiceUnavailable, "icon_store_unavailable", "Project icons could not be read.")
 		return
 	}
-	readers := s.projectReaders()
-	board := readers.catalog.Read()
+	// The catalog's projects were the retired Swift app's Board store, which
+	// is no longer read (docs/cutover.md §7): known, and it adds no projects.
+	// This is the answer that store gave when it was switched off (cutover
+	// B1).
 	catalog := contract.ProjectCatalog{
 		SchemaVersion: 1,
 		Projects:      []contract.CatalogProject{},
 		Source:        contract.CatalogSource{Ingestion: contract.CatalogIngestion{Status: "unknown"}},
+		ReadState:     contract.CatalogReadState{Status: contract.CatalogReadStatusReady},
+		Available:     true,
+		Mode:          "standard",
 	}
-	switch {
-	case !board.Known && (errors.Is(board.Err, projects.ErrCatalogDisabled) || errors.Is(board.Err, os.ErrNotExist)):
-		// No Swift board, or one this daemon was told not to read (cutover
-		// B1): known, and it adds no projects. The places are still this
-		// person's projects, so the page lists them rather than going blank.
-		catalog.ReadState = contract.CatalogReadState{Status: contract.CatalogReadStatusReady}
-	case !board.Known:
-		catalog.ReadState = contract.CatalogReadState{Status: contract.CatalogReadStatusError,
-			Error: &contract.CatalogError{Code: "board_unavailable", Message: "The Board store could not be read."}}
-		writeJSON(w, contract.ProjectCatalogAnswer{At: time.Now().Unix(), Catalog: catalog})
-		return
-	case board.Stale:
-		catalog.ReadState = contract.CatalogReadState{Status: contract.CatalogReadStatusStale,
-			ObservedAt: float64(board.ReadAt.UnixMilli()) / 1000,
-			Error:      &contract.CatalogError{Code: "board_store_unreadable", Message: "The newest read failed; an earlier reading is shown."}}
-	default:
-		catalog.ReadState = contract.CatalogReadState{Status: contract.CatalogReadStatusReady,
-			ObservedAt: float64(board.ReadAt.UnixMilli()) / 1000}
-	}
-	catalog.Available = true
-	catalog.Enabled = board.Enabled
-	catalog.Revision = board.Revision
-	catalog.Mode = "standard"
-	if board.Enabled {
-		catalog.Mode = "board"
-	}
-
-	type presentation struct {
-		label, path string
-		order       int
-	}
-	byID := map[string]presentation{}
-	for i, p := range readers.places.List(s.liveDirectories(r.Context()), 40) {
-		canonical, ok := projects.CanonicalProjectKey(p.Path)
-		if !ok {
-			continue
-		}
-		id := projects.ProjectID(canonical)
-		if _, seen := byID[id]; seen {
-			continue
-		}
-		// StartPoints.label(for:) of the canonical path, as projectPresentations does.
-		label := s.icons.Label(canonical)
-		if label == "" {
-			label = filepath.Base(canonical)
-		}
-		byID[id] = presentation{label: label, path: canonical, order: i}
-	}
-	workCounts, workCountsErr := s.store.WorkV2ProjectCounts(r.Context())
-	for _, p := range board.Projects {
-		pres, presented := byID[p.ID]
-		row := summarizeProjectWork(contract.CatalogProject{ID: p.ID, Name: p.Name, ItemCount: int64(p.ItemCount)}, pres.path,
-			workCounts, workCountsErr)
-		if presented {
-			row.IsStartPoint = true
-			row.Label = pres.label
-			row.DisplayPath = pres.path
-			row.Icon = wireIcon(s.icons.For(pres.path))
-		}
-		catalog.Projects = append(catalog.Projects, row)
-	}
-	sort.SliceStable(catalog.Projects, func(i, j int) bool {
-		a, aok := byID[catalog.Projects[i].ID]
-		b, bok := byID[catalog.Projects[j].ID]
-		switch {
-		case aok && bok:
-			return a.order < b.order
-		case aok != bok:
-			return aok
-		}
-		return strings.ToLower(catalog.Projects[i].Name) < strings.ToLower(catalog.Projects[j].Name)
-	})
 	writeJSON(w, contract.ProjectCatalogAnswer{At: time.Now().Unix(), Catalog: catalog})
 }
 

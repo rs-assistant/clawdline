@@ -26,7 +26,6 @@ type gateFixture struct {
 // answers 200 "reached", with a device of each kind.
 func newGateFixture(t *testing.T) (*gateFixture, http.Handler) {
 	t.Helper()
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "swift"))
 	g := openGate(config.Config{Dir: filepath.Join(t.TempDir(), "next"), Port: 7757})
 	if g.err != nil {
 		t.Fatal(g.err)

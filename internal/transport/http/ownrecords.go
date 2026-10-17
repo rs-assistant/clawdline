@@ -408,17 +408,17 @@ func ownTaskLinks(row *contract.TaskRow, t orchestrator.Record, screen []swiftst
 }
 
 // lifecycleEvidence is the task records the Projects page's worktree
-// lifecycle reads: the Swift store's, as before, and this daemon's own beside
-// them. It is authoritative only when both were read whole — the Swift store
-// read, or absent from this machine, and no stored task of ours undecodable —
-// because a worktree whose owner could be in the part not read must not be
-// offered for removal (DG-7). A Swift store switched off is not read: the
-// Swift app's worktrees may belong to records nobody looked at, so the switch
-// never makes this reading authoritative. Unknown never authorises a removal.
+// lifecycle reads: this daemon's own. It is authoritative only when they were
+// read whole — no stored task undecodable — because a worktree whose owner
+// could be in the part not read must not be offered for removal (DG-7).
+//
+// The retired Swift app's task records are no longer read (docs/cutover.md
+// §7). That does not make its worktrees removable: a checkout under its
+// managed root has no record here, so the lifecycle names its owner unknown
+// (`managed_path_without_task_record`). Unknown never authorises an automatic
+// removal; a person's explicit Delete still removes the checkout.
 func (s *Server) lifecycleEvidence() projects.TaskEvidence {
-	snap := s.swift.Read()
-	out := lifecycleTasks(snap)
-	out.Authoritative = (snap.Known && !snap.Stale) || snap.Source == swiftstore.SourceAbsent
+	out := projects.TaskEvidence{Authoritative: true}
 	records, unreadable, err := s.broker.Records(context.Background())
 	if err != nil || len(unreadable) > 0 {
 		out.Authoritative = false
@@ -447,14 +447,10 @@ func (s *Server) lifecycleEvidence() projects.TaskEvidence {
 	return out
 }
 
-// taskProjectDirs is every directory a task was dispatched for, the Swift
-// store's and this daemon's own: the places the lifecycle looks for
-// worktrees.
+// taskProjectDirs is every directory this daemon dispatched a task for: the
+// places the lifecycle looks for worktrees.
 func (s *Server) taskProjectDirs() []string {
 	dirs := []string{}
-	for _, t := range s.swift.Read().Tasks {
-		dirs = append(dirs, t.ProjectDir)
-	}
 	if s.broker != nil {
 		if records, _, err := s.broker.Records(context.Background()); err == nil {
 			for _, r := range records {

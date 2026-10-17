@@ -36,7 +36,6 @@ func withoutInheritedNextEnv(t *testing.T) {
 // read is the real routing decision behind the real gate.
 func upstreamFixture(t *testing.T, cfg config.Config) (http.Handler, string) {
 	t.Helper()
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "swift"))
 	t.Setenv("CLAWDLINE_NEXT_WEB", "")
 	cfg.Dir = filepath.Join(t.TempDir(), "next")
 	if cfg.Port == 0 {

@@ -9,7 +9,6 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/devstack"
 	"github.com/sainteye/clawdline/internal/adapters/projectfiles"
 	"github.com/sainteye/clawdline/internal/adapters/projectlinks"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/icon"
 )
@@ -20,10 +19,7 @@ import (
 // Start sheet reads its places.
 func projectSetup(cwd, repo string, iconSource icon.Source) *contract.ProjectSetup {
 	home, _ := os.UserHomeDir()
-	statusDir := swiftstore.OpenQuotaConfig(swiftstore.Dir()).Read().StatusDir
-	if statusDir == "" {
-		statusDir = filepath.Join(home, ".claude", "statusline-cache")
-	}
+	statusDir := filepath.Join(home, ".claude", "statusline-cache")
 
 	out := &contract.ProjectSetup{
 		Icon:           contract.ProjectIconSetup(iconSource),

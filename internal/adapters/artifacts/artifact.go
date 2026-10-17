@@ -11,7 +11,8 @@
 //
 // Both live under this daemon's own directory (`CLAWDLINE_NEXT_DIR`), with the
 // directory 0700 and every file 0600. Nothing here writes the Swift app's
-// caches; reading those is `internal/adapters/swiftstore`'s job and only that.
+// caches; reading its old session pictures is `internal/adapters/swiftstore`'s
+// job and only that.
 package artifacts
 
 import (

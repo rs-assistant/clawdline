@@ -23,7 +23,7 @@ func ownCloseInput(l Live) CloseInput {
 func strp(v string) *string { return &v }
 
 func TestIdleCloseabilityUsesEvidenceAndOutstandingWork(t *testing.T) {
-	base := Snapshot{Source: SourceDisabled, CoordinatorKnown: true}
+	base := Snapshot{}
 	clear := ownCloseInput(ownRootLive)
 	if got := base.Closeability(clear); got.State != "safe" || got.AttestationID != nil {
 		t.Fatalf("idle clear Session needs no attestation: %+v", got)
@@ -78,7 +78,7 @@ func ownFinishedTask() Task {
 // The control is the same records over an unreadable store, which stays
 // unknown.
 func TestOwnRecordsAloneDrawTheRow(t *testing.T) {
-	base := Snapshot{Source: SourceDisabled, CoordinatorKnown: true}
+	base := Snapshot{}
 	snap := base.With(Own{Tasks: []Task{ownFinishedTask()}})
 
 	w := snap.Work(ownChildLive, "idle")
@@ -92,16 +92,6 @@ func TestOwnRecordsAloneDrawTheRow(t *testing.T) {
 	closed := snap.Closeability(ownCloseInput(ownChildLive))
 	if closed.State != "safe" {
 		t.Fatalf("a finished idle child with no obligations is %s: %+v", closed.State, closed.Reasons)
-	}
-	for _, r := range closed.Reasons {
-		if r.Code == "swift_store_unreadable" {
-			t.Fatal("a switched-off store was read as unknown")
-		}
-	}
-
-	unread := Snapshot{Source: SourceUnreadable}.With(Own{Tasks: []Task{ownFinishedTask()}})
-	if c := unread.Closeability(ownCloseInput(ownChildLive)); c.State != "unknown" {
-		t.Fatalf("control: an unreadable store with own records is %s", c.State)
 	}
 
 	// A live child keeps its root waiting and holds the root open.
@@ -129,7 +119,7 @@ func TestOwnRecordsAloneDrawTheRow(t *testing.T) {
 // the root still reads as waiting on it, but it does not hold the root open.
 // The control is the same record without its callback intent, which does.
 func TestARootsOwnCallbackDoesNotHoldItOpen(t *testing.T) {
-	base := Snapshot{Source: SourceDisabled, CoordinatorKnown: true}
+	base := Snapshot{}
 	for _, intent := range []string{"heavy", "wait"} {
 		queued := Task{ID: "callback1", State: "queued", Kind: "callback", Title: "Queued heavy command finished",
 			Assistant: "claude", Created: 990, CallbackIntent: intent,
@@ -154,7 +144,7 @@ func TestARootsOwnCallbackDoesNotHoldItOpen(t *testing.T) {
 // task it counted, and none it did not. A row that is not waiting on tasks
 // names nothing, so no list can show a wait the state does not have.
 func TestAWaitingRootNamesExactlyTheTasksItCounted(t *testing.T) {
-	base := Snapshot{Source: SourceDisabled, CoordinatorKnown: true}
+	base := Snapshot{}
 	heavy := Task{ID: "heavy1", State: "queued", Kind: "callback", Title: "Queued heavy command finished",
 		Assistant: "claude", Created: 990, CallbackIntent: "heavy", RootSession: strp("conv-root"), RootAssistant: strp("claude")}
 	child := Task{ID: "child1", State: "briefed", Title: "Fix the list", Assistant: "codex", Created: 991,
@@ -194,7 +184,7 @@ func TestAgentNamedBoardConversationOutranksTaskFromReusedTerminal(t *testing.T)
 // conversation in the same terminal is not. A wait registered here parks the
 // waiter and is drawn on both rows.
 func TestAnOwnDeliveryAndAnOwnWaitAreDrawn(t *testing.T) {
-	base := Snapshot{Source: SourceAbsent, CoordinatorKnown: true}
+	base := Snapshot{}
 	start, pid := Seconds(1000), int64(50)
 	delivery := SessionDelivery{Identity: Identity{TerminalID: "%5", TTY: "ttys005", Assistant: strp("claude"),
 		PID: &pid, ProcessStart: &start, ConversationID: strp("conv-child")}, Summary: "shipped", ReportedAt: 3000}
@@ -235,7 +225,7 @@ func TestAnOwnDeliveryAndAnOwnWaitAreDrawn(t *testing.T) {
 func TestWithLeavesTheReadingAlone(t *testing.T) {
 	tasks := make([]Task, 1, 4)
 	tasks[0] = Task{ID: "swift"}
-	base := Snapshot{Orchestrator: Orchestrator{Tasks: tasks}, Known: true}
+	base := Snapshot{Orchestrator: Orchestrator{Tasks: tasks}}
 	merged := base.With(Own{Tasks: []Task{{ID: "own"}, {ID: "swift"}}})
 	if len(merged.Tasks) != 2 || merged.Tasks[1].ID != "own" {
 		t.Fatalf("merged tasks: %+v", merged.Tasks)

@@ -32,7 +32,6 @@ type squadFixture struct {
 
 func newSquadFixture(t *testing.T) *squadFixture {
 	t.Helper()
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "retired"))
 	dir := t.TempDir()
 	st, err := store.Open(dir)
 	if err != nil {

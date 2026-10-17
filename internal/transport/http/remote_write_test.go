@@ -15,7 +15,6 @@ import (
 // A legacy caller may ask for a read-only credential, but the authority
 // issues Read+Send and the HTTP gate admits it without a device-level switch.
 func TestEveryPairedDeviceCanSend(t *testing.T) {
-	t.Setenv("CLAWDLINE_SWIFT_DIR", filepath.Join(t.TempDir(), "swift"))
 	dir := filepath.Join(t.TempDir(), "next")
 	g := openGate(config.Config{Dir: dir, Port: 7757})
 	if g.err != nil {

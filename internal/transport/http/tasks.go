@@ -52,7 +52,9 @@ func (s *Server) tasksList(w http.ResponseWriter, r *http.Request) {
 		// `cloud.task_list_reread_seconds` floor
 		// (internal/transport/cloud tasklist.go).
 		list, err = s.lists().taskList()
-		list.Tasks = append([]contract.TaskRow(nil), list.Tasks...)
+		// A copy, because the cached page is shared; never nil, because an
+		// empty list is `[]` on the wire, not `null`.
+		list.Tasks = append(make([]contract.TaskRow, 0, len(list.Tasks)), list.Tasks...)
 	} else {
 		list, err = s.tasksPayload(r.Context(), cursor, limit)
 	}
@@ -134,15 +136,18 @@ func (s *Server) tasksPayload(ctx context.Context, cursor, limit int) (contract.
 		}
 	}
 
-	snap := s.swift.Read()
-	rows, page := snap.TaskPage(screen, own, cursor, limit)
+	rows, page := swiftstore.TaskPage(own, cursor, limit)
 	now := time.Now()
 	return contract.TaskList{
-		At:     now.Unix(),
-		Tasks:  rows,
-		Page:   page,
-		Store:  storeReading(snap),
-		Source: taskListSource(now, snap),
+		At:    now.Unix(),
+		Tasks: rows,
+		Page:  page,
+		// The retired Swift app's store is no longer read (docs/cutover.md
+		// §7). `disabled` is the word the contract has for "not read, and
+		// known to contribute nothing": the list is this daemon's own tasks,
+		// whole, so its source is current.
+		Store:  contract.StoreReadingDisabled,
+		Source: contract.BearingsSource{ObservedAt: now.Unix(), Provenance: "broker", Freshness: contract.SourceFreshnessCurrent},
 	}, nil
 }
 
@@ -151,48 +156,6 @@ func callbackIntentOf(t orchestrator.Record) string {
 		return ""
 	}
 	return t.Callback.Intent
-}
-
-// taskListSource says what the whole list is worth, in the vocabulary every
-// source on this daemon answers in (`SourceFreshness`).
-//
-// It is a second reading of `store` rather than a second fact, and it exists
-// so that a screen showing this list beside a landing ledger and a proposal
-// list can print all three the same way. `store` names which store was read;
-// this names what that leaves the answer worth:
-//
-//   - `stale` — the Swift store could not be read, so the list is this
-//     daemon's own tasks and is short by however many the other store held.
-//     Short, not empty: the rows here are real.
-//   - `unverified` — an earlier reading of that store was carried because the
-//     newest one was half-written. Every row is here and any of them may have
-//     moved since.
-//   - `current` — including a machine that has no Swift store or was told not
-//     to read one. Absent is a known quantity and reads as nothing missing.
-func taskListSource(now time.Time, snap swiftstore.Snapshot) contract.BearingsSource {
-	freshness := contract.SourceFreshnessCurrent
-	switch storeReading(snap) {
-	case contract.StoreReadingUnknown:
-		freshness = contract.SourceFreshnessStale
-	case contract.StoreReadingStale:
-		freshness = contract.SourceFreshnessUnverified
-	}
-	return contract.BearingsSource{ObservedAt: now.Unix(), Provenance: "broker", Freshness: freshness}
-}
-
-// storeReading says how the Swift store was read for an answer.
-func storeReading(snap swiftstore.Snapshot) contract.StoreReading {
-	switch {
-	case snap.Source == swiftstore.SourceDisabled:
-		return contract.StoreReading(swiftstore.SourceDisabled)
-	case snap.Source == swiftstore.SourceAbsent:
-		return contract.StoreReading(swiftstore.SourceAbsent)
-	case !snap.Known:
-		return contract.StoreReadingUnknown
-	case snap.Stale:
-		return contract.StoreReadingStale
-	}
-	return contract.StoreReadingCurrent
 }
 
 // screen is the sessions on screen, for resolving which tab a task's root is

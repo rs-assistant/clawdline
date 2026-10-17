@@ -237,3 +237,13 @@ func commandDigest(raw []byte) string {
 	sum := sha256.Sum256([]byte(b.String()))
 	return hex.EncodeToString(sum[:])
 }
+
+// StoredReceipt is one applied command, kept so a retry is free.
+type StoredReceipt struct {
+	Actor     string `json:"actor"`
+	Digest    string `json:"digest"`
+	ItemID    string `json:"itemId"`
+	RequestID string `json:"requestId"`
+	Revision  int64  `json:"revision"`
+	Status    int    `json:"status"`
+}

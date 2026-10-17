@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 )
 
@@ -22,10 +21,6 @@ var dispatchPolicySettingsMu sync.Mutex
 func (s *Server) dispatchPolicySettings(w http.ResponseWriter, r *http.Request) {
 	dispatchPolicySettingsMu.Lock()
 	defer dispatchPolicySettingsMu.Unlock()
-	legacy := ""
-	if home, err := os.UserHomeDir(); err == nil && !swiftstore.Disabled() {
-		legacy = filepath.Join(home, ".config", "clawdline")
-	}
 	path := filepath.Join(s.cfg.Dir, orchestrator.PolicyLocalFile)
 	read := func() (string, string, string, string, error) {
 		if info, err := os.Lstat(path); err == nil {
@@ -38,7 +33,7 @@ func (s *Server) dispatchPolicySettings(w http.ResponseWriter, r *http.Request) 
 		} else if !os.IsNotExist(err) {
 			return "", "", "", "", err
 		}
-		base, local, source := orchestrator.ReadPolicy(s.cfg.Dir, legacy)
+		base, local, source := orchestrator.ReadPolicy(s.cfg.Dir)
 		digest := sha256.Sum256([]byte(source.Local + "\n" + local))
 		return base, local, source.Local, hex.EncodeToString(digest[:]), nil
 	}

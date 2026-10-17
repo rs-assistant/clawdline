@@ -143,7 +143,6 @@ func TestPersonCloseRecordsOnlyTheBoundRootExecutor(t *testing.T) {
 	p.s.TTY = "ttys004"
 	p.s.ConversationID = "20000000-0000-4000-8000-000000000002"
 	s := paneServer(t, p)
-	s.swift = swiftstore.Open(t.TempDir())
 	a := orchestrator.RootAssignment{ID: "10000000-0000-4000-8000-000000000001", State: orchestrator.AssignmentBriefed,
 		Assistant: "claude", ProjectDir: t.TempDir(), BriefedAt: start.Unix() + 1,
 		BriefPath: s.broker.AssignmentRoot() + "/brief/ASSIGNMENT.md"}

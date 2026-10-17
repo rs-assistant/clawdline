@@ -114,8 +114,6 @@ var Allowed = []Allowance{
 		Why: "the anchor GitHub generates for the heading \"Turn on Clawdline Cloud (optional)\" — the product's name in a link, not the repository"},
 	{Path: "web/console/src/legacy/js/net/cloud-failure.js", Rule: "private-repo", Text: "clawdline-" + "cloud",
 		Why: "a byte copy of the original's own file, which the copy guard compares with its source; changing it here would make that guard red instead"},
-	{Path: "internal/adapters/swiftstore/legacy_test.go", Rule: "uuid", Text: "0f0e0d0c-0b0a-4908-" + "8706-050403020100",
-		Why: "a counted-down fixture id written by hand in this test, not an id from anyone's machine"},
 }
 
 // Scanner holds the person's own words; the rest of the rules are fixed.

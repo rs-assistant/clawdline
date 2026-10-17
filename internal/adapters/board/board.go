@@ -37,9 +37,6 @@ const (
 	// MaximumSnapshotBytes is the budget the items list is cut to, and the
 	// number published as `snapshotBudgetBytes`.
 	MaximumSnapshotBytes = 1_000_000
-	// MaximumSnapshotItems caps one page of items regardless of size, so a
-	// project of small cards cannot make one response unbounded.
-	MaximumSnapshotItems = 500
 	// MaximumResponseBytes is the final guard on the serialized body. The item
 	// cut happens before `responsibility`, `viewer` and `readState` are added,
 	// so the body legitimately exceeds the snapshot budget and this is the real
