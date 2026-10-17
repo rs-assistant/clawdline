@@ -754,5 +754,7 @@ func idempotencyKey(cmd Command, plan plan) string {
 
 // ChannelSegment is the one channel-segment encoder in internal/domain/cloud,
 // named here as well because this package and the publisher already spell it
-// cloudops.ChannelSegment. It is the same function, not a copy.
-var ChannelSegment = domaincloud.ChannelSegment
+// cloudops.ChannelSegment. It is the same function, not a copy, and a function
+// rather than a variable so nothing can reassign it and let the publisher and
+// the viewer encode differently.
+func ChannelSegment(value string) string { return domaincloud.ChannelSegment(value) }
