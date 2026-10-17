@@ -541,6 +541,56 @@ func (b *Broker) TaskWindow(ctx context.Context, finished int) (TaskWindow, erro
 	return out, nil
 }
 
+// SessionTasks reads what the Session list's rows can be told by, and no
+// more of the history: every task not yet finished, every task whose landing
+// is still pending, every task whose child terminal is one of terminals, and
+// every row that could not be decoded — in Records' order, each the Record
+// Records would have answered.
+//
+// A finished task reaches a row only through its child terminal: the root a
+// task names holds that Session open only while the task runs or while its
+// landing is pending (Owed), and every other fact a row shows of a finished
+// task is read through the terminal its child was in. What it does not do is
+// build a Record and read the notice of every other task that ever finished.
+func (b *Broker) SessionTasks(ctx context.Context, terminals []string) ([]Record, []Unreadable, error) {
+	onScreen := make(map[string]bool, len(terminals))
+	for _, id := range terminals {
+		onScreen[id] = true
+	}
+	l := &b.snapshot
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.sync(ctx, b.Store); err != nil {
+		return nil, nil, storeError(err)
+	}
+	out := []Record{}
+	bad := []Unreadable{}
+	ids := []string{}
+	for _, id := range l.order {
+		d := l.rows[id]
+		if d.err != nil {
+			bad = append(bad, unreadableRow(*d.row, d.err))
+			continue
+		}
+		r := d.record
+		if r.State.Terminal() && (r.Landing == nil || r.Landing.State != LandingPending) && !onScreen[r.ChildTerminalID] {
+			continue
+		}
+		out = append(out, r)
+		ids = append(ids, id)
+	}
+	notices, err := b.Store.BrokerNoticesFor(ctx, ids)
+	if err != nil {
+		return nil, nil, storeError(err)
+	}
+	for i := range out {
+		if n, ok := notices[out[i].ID]; ok {
+			out[i].Notice = noticeOf(n)
+		}
+	}
+	return out, bad, nil
+}
+
 func unreadableRow(row store.BrokerRow, err error) Unreadable {
 	return Unreadable{
 		ID: row.ID, Project: row.Project, Repository: row.Repository, Assistant: row.Assistant,

@@ -218,17 +218,50 @@ func (s *Server) sessionsPayload(ctx context.Context) sessionsSnapshotWire {
 // (orchestrator.go): one reading, so a row and the source completeness read
 // with it are of the same moment.
 func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory) sessionsSnapshotWire {
+	return s.sessionsPayloadRead(ctx, inv, s.sessionTasks)
+}
+
+// sessionLedgerRead reads the broker's tasks one build of the list projects
+// from, for the sessions in a reading.
+type sessionLedgerRead func(ctx context.Context, sessions []session.Session) ([]orchestrator.Record, []orchestrator.Unreadable, error)
+
+// sessionTasks is the part of the ledger the sessions can be told by
+// (Broker.SessionTasks): the list is rebuilt every two seconds, and the whole
+// history it used to read three times a build is thousands of finished tasks
+// no row projects.
+func (s *Server) sessionTasks(ctx context.Context, sessions []session.Session) ([]orchestrator.Record, []orchestrator.Unreadable, error) {
+	if s.broker == nil {
+		return nil, nil, nil
+	}
+	terminals := make([]string, 0, len(sessions))
+	for _, item := range sessions {
+		terminals = append(terminals, item.ID)
+	}
+	return s.broker.SessionTasks(ctx, terminals)
+}
+
+// sessionsPayloadRead is sessionsPayloadFrom with the tasks read by read.
+func (s *Server) sessionsPayloadRead(ctx context.Context, inv session.Inventory, read sessionLedgerRead) sessionsSnapshotWire {
 	// This daemon's own records get a clock of their own, and not what the
 	// terminal scan left of the request's (recordsContext).
 	records, releaseRecords := recordsContext(ctx)
 	defer releaseRecords()
+
+	// One reading of the broker's tasks for the whole build: what is owed,
+	// the callbacks each root runs and the tasks the rows project are all
+	// cut from it, so no two of them describe different moments.
+	tasks, unreadableTasks, tasksErr := read(records, inv.Sessions)
 
 	// One reading of what is owed, for the whole list, against this same
 	// reading of the sessions. Asking per row would ask the same question
 	// eight times and let two rows disagree about the same moment. An
 	// unreadable broker makes the projection incomplete, not wrong in one
 	// place: it is carried as missing evidence rather than as zero.
-	owed, owedErr := s.owed(records, inv.Sessions)
+	var owed []task.Obligation
+	owedErr := tasksErr
+	if tasksErr == nil && s.broker != nil {
+		owed, owedErr = s.broker.OwedOf(tasks, unreadableTasks, inv.Sessions)
+	}
 	// The record set the projections read: this daemon's own, laid in below.
 	// The retired Swift app's store is no longer read (docs/cutover.md §7).
 	swift := swiftstore.Snapshot{}
@@ -265,7 +298,10 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 		}
 	}
 	heavySession, heavyWork, heavyPlaces := s.runningHeavyCallback(records)
-	callbacks, callbacksKnown := s.callbackShells(records, heavyPlaces)
+	callbacks, callbacksKnown := map[string][]contract.SessionShell{}, true
+	if s.broker != nil {
+		callbacks, callbacksKnown = callbackShells(tasks, unreadableTasks, tasksErr, heavyPlaces)
+	}
 	// One database read for the entire fleet. An error leaves the count
 	// unknown on every row, rather than turning it into zero.
 	attentionCounts, attentionErr := s.store.OpenHumanInterventionCounts(records)
@@ -309,7 +345,7 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 	// in the Swift store's shape, so the one set of rules reads both
 	// (ownrecords.go). A source of ours that could not be read is evidence
 	// missing for every row, as an unreadable Swift store is.
-	own, ownErr := s.ownOverlay(records, lives)
+	own, ownErr := s.ownOverlayOf(records, lives, tasks, unreadableTasks, tasksErr)
 	swift = swift.With(own)
 	// A delivery is historical. A later message typed by the person starts new
 	// work, even when the terminal has already gone idle again. Read the run
