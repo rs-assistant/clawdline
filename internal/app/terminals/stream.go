@@ -236,7 +236,10 @@ func (w *Watch) run(ctx context.Context, heartbeat time.Duration, send func(Even
 		if err := s.allowed(w.v.who); revoked(err) {
 			return true, send(revokedEvent())
 		} else if err != nil {
+			// A pause, not a refusal: look again soon, as before the signal
+			// drove frames, rather than at the next signal or heartbeat.
 			owed = true
+			arm(pollEvery)
 			return false, nil
 		}
 		if wait := CaptureGap - s.now().Sub(last.At); wait > 0 && !last.At.IsZero() {
@@ -271,6 +274,7 @@ func (w *Watch) run(ctx context.Context, heartbeat time.Duration, send func(Even
 				return true, send(revokedEvent())
 			} else if err != nil {
 				owed = true
+				arm(pollEvery)
 				return false, nil
 			}
 			if err := send(Event{Kind: EventFrame, Frame: frame}); errors.Is(err, ErrFrameDeferred) {

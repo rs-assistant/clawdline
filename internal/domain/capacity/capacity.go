@@ -733,8 +733,10 @@ func Register() []Entry {
 		{
 			// An expired receipt with a random key is deleted a week after its
 			// request was first claimed, well past the longest resend (a saved
-			// console card, 24 hours). A key derived from the request's content
-			// keeps its tombstone for good.
+			// console card, 24 hours). A CLI command retried with the same --key
+			// after this runs again; that is the horizon, and the row's copy
+			// says so. A key derived from the request's content keeps its
+			// tombstone for good.
 			Name: StoreReceiptTombstoneRetention, Class: Idempotency, Unit: Seconds,
 			Limit: 604_800, AtLimit: Expire,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,

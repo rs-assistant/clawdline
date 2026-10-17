@@ -47,26 +47,27 @@ func TestAPublisherNobodyWatchesKeepsOnlyTheDescriptorHeartbeat(t *testing.T) {
 	}
 	out.reset()
 
-	// Five minutes of passes: no list is built, and the only publication is
-	// the descriptor's heartbeat.
-	for elapsed := time.Duration(0); elapsed < Heartbeat+time.Minute; elapsed += SnapshotInterval {
+	// Five minutes of passes: the list is built only by the probe, once per
+	// UnwatchedProbe instead of once per SnapshotInterval.
+	window := Heartbeat + time.Minute
+	for elapsed := time.Duration(0); elapsed < window; elapsed += SnapshotInterval {
 		at = at.Add(SnapshotInterval)
 		p.Pass(ctx)
 	}
-	if n := builds.Load(); n != 1 {
-		t.Fatalf("an unwatched publisher built the Session list %d more times", n-1)
-	}
-	if got := strings.Join(out.channels(), " "); got != "orch/mac-01" {
-		t.Fatalf("an unwatched publisher published %q, want one descriptor heartbeat", got)
+	probes := int32(window / UnwatchedProbe)
+	if n := builds.Load() - 1; n < probes-1 || n > probes {
+		t.Fatalf("an unwatched publisher built the Session list %d more times in %s; want about %d probes, not %d passes",
+			n, window, probes, window/SnapshotInterval)
 	}
 	out.reset()
 
 	// A viewer is heard from: the next pass states everything again.
+	before := builds.Load()
 	p.Seen("phone-01")
 	at = at.Add(SnapshotInterval)
 	p.Pass(ctx)
 	got := strings.Join(out.channels(), " ")
-	if builds.Load() != 2 || !strings.Contains(got, "ss/mac-01/") || !strings.Contains(got, InventorySessionID) {
+	if builds.Load() != before+1 || !strings.Contains(got, "ss/mac-01/") || !strings.Contains(got, InventorySessionID) {
 		t.Fatalf("after a viewer was heard from: %d builds, published %q", builds.Load(), got)
 	}
 }
@@ -116,4 +117,50 @@ func TestAPageConnectingAfterAnIdlePeriodGetsACompleteSnapshotAtOnce(t *testing.
 	}
 	cancel()
 	<-done
+}
+
+// A fan-out of zero can be the relay's mistake while a phone is connected. The
+// probe still makes a full pass every UnwatchedProbe, so a row that changed is
+// sent within that, not only at the next heartbeat.
+func TestAnUnwatchedPublisherStillSendsAChangedRowWithinOneProbe(t *testing.T) {
+	at := time.Unix(1_700_000_000, 0)
+	out := &collector{}
+	var builds atomic.Int32
+	p := newPublisher(&fixedRouter{body: completeScan}, out)
+	p.Now = func() time.Time { return at }
+	countedSessions(p, &builds)
+	nobodyWatching(p, out)
+	ctx := context.Background()
+	p.firstPass(ctx)
+	at = at.Add(SnapshotInterval)
+	p.Pass(ctx)
+	if p.Watched() {
+		t.Fatal("every receipt fanned out to nobody, yet the publisher believes it is watched")
+	}
+	changed := strings.Replace(completeScan, `"tty":"ttys001"`, `"tty":"ttys009"`, 1)
+	if changed == completeScan {
+		t.Fatal("the fixture has no row to change")
+	}
+	p.Sessions = func(context.Context) ([]byte, bool) {
+		builds.Add(1)
+		return []byte(changed), true
+	}
+	out.reset()
+	sent := false
+	for elapsed := time.Duration(0); elapsed <= UnwatchedProbe && !sent; elapsed += SnapshotInterval {
+		at = at.Add(SnapshotInterval)
+		p.Pass(ctx)
+		for _, ch := range out.channels() {
+			// The fixture's change is in the full row (s/); a status change
+			// would ride ss/. Either is the probe's full pass reaching out.
+			if (strings.HasPrefix(ch, "s/mac-01/") || strings.HasPrefix(ch, "ss/mac-01/")) &&
+				!strings.HasSuffix(ch, InventorySessionID) {
+				sent = true
+			}
+		}
+	}
+	if !sent {
+		t.Fatalf("a changed row was not sent within %s while the relay answered nobody; published %v",
+			UnwatchedProbe, out.channels())
+	}
 }

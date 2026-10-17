@@ -233,6 +233,13 @@ type Publisher struct {
 	// unwatched is what the last pass decided, so the log says it once per
 	// change rather than every pass. The publisher goroutine's.
 	unwatched bool
+	// probedAt is the last full pass made while unwatched. A fan-out of zero
+	// can be the relay's mistake — it answers zero while its revocation
+	// authority is not durable, with a phone still connected — so an
+	// unwatched machine still makes a full pass every UnwatchedProbe: a
+	// connected viewer's rows are then at most that stale, not a heartbeat's,
+	// and its delivered acks reopen the gate. The publisher goroutine's.
+	probedAt time.Time
 
 	// inventoried is the last inventory this publisher stated, by id, with
 	// enough of each row to decide later which source would have seen it
@@ -314,6 +321,10 @@ type inventoriedRow struct {
 // runtime re-states its descriptor every 240 seconds for this reason; the
 // viewer's staleness threshold is 300.
 const Heartbeat = 240 * time.Second
+
+// UnwatchedProbe is how often a machine that believes nobody watches still
+// makes a full pass (Publisher.probedAt).
+const UnwatchedProbe = 30 * time.Second
 
 // freshnessOnlySessionRowFields are the row paths that move with every reading
 // of this machine whether or not the row's content moved
@@ -757,7 +768,13 @@ func (p *Publisher) tick(ctx context.Context) {
 	}
 	if !p.unwatched {
 		p.unwatched = true
+		p.probedAt = p.now()
 		p.logf("cloud: no viewer is connected; Session rows wait until one is, and the descriptor keeps its heartbeat")
+	}
+	if p.now().Sub(p.probedAt) >= UnwatchedProbe {
+		p.probedAt = p.now()
+		_, _, _ = p.pass(ctx)
+		return
 	}
 	p.unsent = 0
 	p.refreshTasks(ctx)

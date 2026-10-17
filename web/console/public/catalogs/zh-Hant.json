@@ -5385,7 +5385,7 @@
   "capacityRow.store.done_effect_retention_seconds.what": "背景步驟（打出一則訊息、關掉一個分頁、送出一則通知）成功之後，Clawdline 保留它的紀錄多久。失敗或結果不明的步驟會一直保留。",
   "capacityRow.store.done_effect_retention_seconds.full": "這是保留期限，不會額滿。比它舊的成功紀錄會分批清掉；每則通知與每個暫停中的 Session 都會留下最新的一筆。你不用做什麼。",
   "capacityRow.store.receipt_tombstone_retention_seconds.what": "請求的一天重送期過了之後，Clawdline 還記得「這個請求已經執行過」多久，讓很晚才重送的請求仍然會被拒絕，不會執行兩次。",
-  "capacityRow.store.receipt_tombstone_retention_seconds.full": "這是保留期限，不會額滿。過了之後，舊請求的紀錄就會清掉。用請求內容算出 key 的請求會永久記住。你不用做什麼。",
+  "capacityRow.store.receipt_tombstone_retention_seconds.full": "這是保留期限，不會額滿。過了之後，舊請求的紀錄就會清掉，所以超過一週才用同一個 --key 重試的指令會再執行一次。用請求內容算出 key 的請求會永久記住。你不用做什麼。",
   "capacityRow.store.retention_prune_batch_rows.what": "Clawdline 一次最多從一張表清掉多少筆舊紀錄，讓清理很長的歷史時不會卡住其他工作。",
   "capacityRow.store.retention_prune_batch_rows.full": "這是每一輪的上限，不會額滿。剩下的會在幾分鐘後的下一輪清掉。你不用做什麼。",
   "capacityRow.cloud.peer_pairs.what": "這台機器保存多少組機器之間的授權，來自 Cloud 的「跨機器存取」開關。每一組決定兩台機器上的對話能不能互傳訊息或交接，所以不會為了騰空間而丟掉。",
