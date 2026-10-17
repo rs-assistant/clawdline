@@ -4240,7 +4240,7 @@
   "next.cloudPeerMachineOff": "Not connected",
   "next.cloudPeerMachineSwitch": "Connect {first} and {second}",
   "next.cloudPeerMachineChangeFailed": "Could not confirm the change on both machines. Refresh and try again.",
-  "next.cloudPeerAccessPurpose": "Choose which machines can exchange Agent messages and hand off work. This applies to every current Session on the connected machines.",
+  "next.cloudPeerAccessPurpose": "Choose which machines can discover Projects and Session status, exchange Agent messages, and assign or hand off work. Current Sessions on both machines can use this access.",
   "next.cloudPeerAccessCurrent": "Current permissions",
   "next.cloudPeerAccessReadFrom": "Read from {count} of {total} machines",
   "next.cloudPeerAccessNone": "No cross-machine permissions yet",
@@ -6002,10 +6002,12 @@
   "plan.push": "Browser push notifications",
   "plan.webhooks": "Start saved schedules by webhook",
   "plan.fine": "Local Sessions, the Board and built-in roles need no account and are always free. Both plans pair up to 5 phones or browsers, and a paired device keeps its slot while it is offline. Cloud provides the connection, not the compute: an offline machine runs nothing on either plan. Lemon Squeezy is the seller of record; cancel any time from the billing portal.",
-  "next.cloudCarrierOffline": "{machine} is offline: nothing has reported from it recently, so nothing can be read from or sent to it.",
   "next.cloudCarrierNoReport": "This browser has not seen {machine} report in yet.",
+  "next.sessionsMachineOfflineLine": "This machine is offline ({seen}). These are the Sessions it last reported; nothing can be sent to it until it is back.",
   "next.cloudAllMachineOffline": "Offline · {seen}. Sessions below are from its last report.",
+  "capacityRow.cloud.peer_discovery_reply.full": "Duplicate replies are ignored; a timed-out query releases its reply slot.",
+  "next.cloudCarrierOffline": "{machine} is offline: nothing has reported from it recently, so nothing can be read from or sent to it.",
   "next.sessionsMachineOfflineTitle": "This machine is offline",
-  "next.sessionsMachineOfflineHint": "It has not reported recently ({seen}). Once it is on and connected, its Sessions appear here on their own.",
-  "next.sessionsMachineOfflineLine": "This machine is offline ({seen}). These are the Sessions it last reported; nothing can be sent to it until it is back."
+  "capacityRow.cloud.peer_discovery_reply.what": "Each inventory query retains one encrypted reply until its requesting Session reads it.",
+  "next.sessionsMachineOfflineHint": "It has not reported recently ({seen}). Once it is on and connected, its Sessions appear here on their own."
 }

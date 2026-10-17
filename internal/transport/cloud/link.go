@@ -194,10 +194,12 @@ type LinkOptions struct {
 	// PeerTaskStartOpen is the target-owned effect. Facts can be injected for
 	// isolated tests; the built-in facts fail closed until a source execution
 	// challenge can be verified.
-	PeerTaskStartFacts func(context.Context, peercontract.TaskStart, peercontract.Principal) (peercontract.TaskStartFacts, error)
-	PeerTaskStartOpen  func(context.Context, peercontract.TaskStart, []byte) (string, string, error)
-	PeerTaskProject    func(context.Context, string) (string, bool)
-	PeerTaskNotice     func(context.Context, peercontract.TaskStart) error
+	PeerTaskStartFacts    func(context.Context, peercontract.TaskStart, peercontract.Principal) (peercontract.TaskStartFacts, error)
+	PeerTaskStartOpen     func(context.Context, peercontract.TaskStart, []byte) (string, string, error)
+	PeerTaskProject       func(context.Context, string) (string, bool)
+	PeerTaskNotice        func(context.Context, peercontract.TaskStart) error
+	PeerInventory         func(context.Context) ([]byte, error)
+	PeerTaskMessageNotice func(context.Context, peercontract.TaskEvent) error
 	// Authorize stamps the credential the gate judges an in-process request by.
 	Authorize func(*http.Request)
 	// Version is this build, for the machine registration record.
@@ -313,6 +315,7 @@ type Link struct {
 	peerTaskStarts     chan []byte
 	peerTaskProbes     chan []byte
 	peerTaskPending    map[string]pendingTaskProof
+	peerDiscovery      map[string]pendingDiscovery
 	terminalLists      chan Inbound
 	terminalRefusals   chan Inbound
 }
@@ -722,6 +725,8 @@ func (l *Link) wire() error {
 		PeerTaskProbeInbound: l.enqueuePeer,
 		PeerTaskProbeAck:     l.enqueuePeerAck,
 		PeerTaskEventInbound: l.enqueuePeer,
+		PeerDiscoveryInbound: l.enqueuePeer,
+		PeerDiscoveryStatus:  l.enqueuePeerAck,
 		PeerTaskEventAck:     l.enqueuePeerAck,
 		OnDisconnect:         l.closeAllTerminalConnections,
 		OnSettled:            l.terminalReceiptSettled,

@@ -4240,7 +4240,7 @@
   "next.cloudPeerMachineOff": "尚未互通",
   "next.cloudPeerMachineSwitch": "設定 {first} 與 {second} 互通",
   "next.cloudPeerMachineChangeFailed": "無法確認兩台機器都完成變更。請重新讀取後再試。",
-  "next.cloudPeerAccessPurpose": "選擇哪些機器可以互傳 Agent 訊息與交接工作。開啟後，兩台機器上目前的 Session 都能使用。",
+  "next.cloudPeerAccessPurpose": "選擇哪些機器可以查看 Project 與 Session 狀態、互傳 Agent 訊息，以及派工與交接工作。開啟後，兩台機器上目前的 Session 都能使用。",
   "next.cloudPeerAccessCurrent": "目前的權限",
   "next.cloudPeerAccessReadFrom": "已讀取 {count}／{total} 台機器",
   "next.cloudPeerAccessNone": "目前沒有跨機器權限",
@@ -6002,10 +6002,12 @@
   "plan.push": "瀏覽器推播通知",
   "plan.webhooks": "用 Webhook 啟動已儲存的排程",
   "plan.fine": "本機的 Session、看板與內建角色不需要帳號，永遠免費。兩種方案都能配對 5 個手機或瀏覽器，已配對的裝置即使離線也占一個名額。Cloud 提供連線，不提供運算：機器離線時，兩種方案都無法執行工作。Lemon Squeezy 是正式賣方，可隨時在帳務入口取消訂閱。",
-  "next.cloudCarrierOffline": "{machine} 已離線：最近沒有收到它的回報，無法讀取或傳送。",
   "next.cloudCarrierNoReport": "這個瀏覽器還沒看過 {machine} 回報。",
+  "next.sessionsMachineOfflineLine": "這台機器離線（{seen}）。下方是它最後一次回報的 Session；在它回來之前無法傳送。",
   "next.cloudAllMachineOffline": "離線 · {seen}。下方 Session 是它最後一次回報的內容。",
+  "capacityRow.cloud.peer_discovery_reply.full": "重複回覆會被忽略；查詢逾時後會釋放回覆空間。",
+  "next.cloudCarrierOffline": "{machine} 已離線：最近沒有收到它的回報，無法讀取或傳送。",
   "next.sessionsMachineOfflineTitle": "這台機器離線",
-  "next.sessionsMachineOfflineHint": "最近沒有收到它的回報（{seen}）。開機並連上網路後，它的 Session 會自動出現在這裡。",
-  "next.sessionsMachineOfflineLine": "這台機器離線（{seen}）。下方是它最後一次回報的 Session；在它回來之前無法傳送。"
+  "capacityRow.cloud.peer_discovery_reply.what": "每次機器清單查詢最多保留一份加密回覆，供發出查詢的 Session 讀取。",
+  "next.sessionsMachineOfflineHint": "最近沒有收到它的回報（{seen}）。開機並連上網路後，它的 Session 會自動出現在這裡。"
 }

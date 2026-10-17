@@ -32,11 +32,12 @@ const (
 func (l *Link) PeerIngressUsage() (int, bool) {
 	l.mu.Lock()
 	requests, acks, starts, probes := l.peerRequests, l.peerAcks, l.peerTaskStarts, l.peerTaskProbes
+	pending := len(l.peerDiscovery)
 	l.mu.Unlock()
 	if requests == nil || acks == nil || starts == nil || probes == nil {
 		return 0, false
 	}
-	return max(len(requests), len(acks), len(starts), len(probes)), true
+	return max(len(requests), len(acks), len(starts), len(probes), pending), true
 }
 
 type pendingTaskProof struct {
@@ -129,6 +130,8 @@ func (l *Link) runPeer(ctx context.Context) {
 			}
 			if json.Unmarshal(frame, &header) == nil && header.Type == "peer_task_event_envelope" {
 				l.receivePeerTaskEvent(requestCtx, frame)
+			} else if header.Type == "peer_discovery_envelope" {
+				l.receiveDiscovery(requestCtx, frame)
 			} else {
 				l.receivePeer(requestCtx, frame)
 			}
@@ -173,6 +176,7 @@ func (l *Link) runTaskNotices(ctx context.Context) {
 	defer ticker.Stop()
 	for {
 		l.deliverTaskNotices(ctx)
+		l.deliverTaskMessages(ctx)
 		select {
 		case <-ctx.Done():
 			return
@@ -198,7 +202,7 @@ func (l *Link) deliverTaskNotices(ctx context.Context) {
 		if i >= PeerIngressLimit || ctx.Err() != nil {
 			return
 		}
-		if row.Event.Start.Source.MachineID != l.identity.MachineID {
+		if row.Event.Start.Source.MachineID != l.identity.MachineID || !l.taskNoticeAuthorized(ctx, st, row.Event.Start) {
 			continue
 		}
 		noticeCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -212,7 +216,48 @@ func (l *Link) deliverTaskNotices(ctx context.Context) {
 	}
 }
 
+func (l *Link) deliverTaskMessages(ctx context.Context) {
+	if ctx.Err() != nil || l.keys == nil || l.opts.PeerTaskMessageNotice == nil {
+		return
+	}
+	st, err := peerstore.Open(l.keys.Dir())
+	if err != nil {
+		return
+	}
+	defer st.Close()
+	rows, err := st.PendingTaskMessages(ctx)
+	if err != nil {
+		return
+	}
+	for i, row := range rows {
+		if i >= PeerIngressLimit || ctx.Err() != nil {
+			return
+		}
+		if row.Event.Recipient.MachineID != l.identity.MachineID || !l.taskNoticeAuthorized(ctx, st, row.Event.Start) {
+			continue
+		}
+		noticeCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+		err := l.opts.PeerTaskMessageNotice(noticeCtx, row.Event)
+		cancel()
+		if err == nil {
+			if err := st.MarkTaskMessageNotified(ctx, row.Event); err != nil {
+				l.logf("cloud peer task message: notice remains pending: %v", err)
+			}
+		}
+	}
+}
+
+func (l *Link) taskNoticeAuthorized(ctx context.Context, st *peerstore.Store, start peercontract.TaskStart) bool {
+	pair, err := st.Pair(ctx, start.PairID)
+	if err != nil || pair.TargetSignature == "" || !pair.RevokedAt.IsZero() || !l.opts.Now().Before(pair.ExpiresAt) {
+		return false
+	}
+	auth, err := adaptercloud.NewAccountClient(l.settings.APIBase).AuthorizePeerTaskStart(ctx, l.identity.MachineCredential, start, pair.SourcePublicKey)
+	return err == nil && auth.Authorized && auth.PairID == pair.ID && auth.SourcePublicKey == pair.SourcePublicKey && auth.TargetMachineID == pair.TargetMachineID
+}
+
 func (l *Link) recordPeerAck(ctx context.Context, raw []byte) {
+	l.recordDiscoveryStatus(raw)
 	var ack peerAck
 	if json.Unmarshal(raw, &ack) != nil || ack.RequestID == "" ||
 		(ack.Status != "delivered" && ack.Status != "machine_offline" && ack.Status != "unknown") {

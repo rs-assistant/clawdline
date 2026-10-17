@@ -482,6 +482,8 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/cloud/peer/inbox"}, s.cloudPeerInboxRoute},
 		{Route{"*", "/v1/cloud/peer/outbox/"}, s.cloudPeerOutboxRoute},
 		{Route{"*", "/v1/remote/machines"}, s.remoteMachinesRoute},
+		{Route{"*", "/v1/remote/inspect"}, s.remoteInspectRoute},
+		{Route{"*", "/v1/remote/inbox/"}, s.remoteInboxRoute},
 		{Route{"*", "/v1/remote/tasks"}, s.remoteTasksRoute},
 		{Route{"*", "/v1/remote/tasks/"}, s.remoteTaskRoute},
 		{Route{"*", "/v1/cloud/viewer/status"}, s.cloudViewerRoute},
