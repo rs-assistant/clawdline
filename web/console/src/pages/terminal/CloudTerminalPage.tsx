@@ -388,7 +388,10 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
         <strong className="terminal-context" title={label}>{label}</strong>
         {snapshot.carrier === "direct" && <span className="terminal-note terminal-carrier" title={nextWord("terminalCarrierDirectHelp")}
           aria-label={nextWord("terminalCarrierDirectHelp")}>{nextWord("terminalCarrierDirect")}</span>}
-        <details className="terminal-action-more" ref={actionMenu}><summary aria-label={nextWord("terminalMoreActions")} title={nextWord("terminalMoreActions")}>⋯</summary><div className="terminal-more-actions">
+        <details className="terminal-action-more" ref={actionMenu}><summary aria-label={nextWord("terminalMoreActions")} title={nextWord("terminalMoreActions")}>⋯</summary>
+        <button className="terminal-menu-backdrop" type="button" aria-label={nextWord("terminalDismissMenu")}
+          onClick={() => actionMenu.current?.removeAttribute("open")} />
+        <div className="terminal-more-actions">
           <button className="board-button" type="button" disabled={!!busy} onClick={() => { actionMenu.current?.removeAttribute("open"); void run("history", async () => setHistory(history ? null : await session!.history())) }}>{history ? nextWord("terminalHistoryBack") : nextWord("terminalHistory")}</button>
           <button className="board-button terminal-reader" type="button" aria-pressed={reader} onClick={() => { actionMenu.current?.removeAttribute("open"); setReader((value) => !value) }}><span>{nextWord("terminalReaderMode")}</span><small>{nextWord("terminalReaderModeHelp")}</small></button>
           <button className="board-button terminal-danger" type="button" ref={closeOpener}

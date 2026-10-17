@@ -103,6 +103,79 @@ The daemon has no settings switch for launch-at-login yet. The tracked bootstrap
 `systemd --user` unit and enables linger once; the `launch_at_login` capability names that exact
 path instead of claiming the daemon can toggle it itself.
 
+### Let a Cloud browser connect directly to EC2
+
+The hosted browser first reaches the daemon through Cloud. It then tries a WebRTC UDP data channel
+for Terminal and Session reads. The browser and daemon use `stun.cloudflare.com:3478` and
+`stun.l.google.com:19302` to find public addresses. A successful STUN reply is only one prerequisite;
+the connection is direct only after its data channel opens. When it cannot open, the browser uses
+the Cloud relay ([wire contract](cloud-terminal-wire.md#direct-carrier)). No inbound HTTP port 7727,
+SSH port or TURN service is needed for this path.
+
+On an EC2 instance, check the following before changing a rule. Use the actual instance and Region;
+do not infer them from the CLI default profile. The EC2 console shows both, or the instance's IMDSv2
+instance-identity document names its `instanceId`, `region` and `accountId` without reading its IAM
+credentials. Compare that account with `aws sts get-caller-identity`. Then inspect the instance's
+network interface and its attached security groups, its subnet's network ACL and route table, and
+whether the instance has a public IPv4 address. A `0.0.0.0/0` route must lead to an attached
+Internet Gateway. An Internet Gateway is sufficient here; a NAT Gateway is not required. A network
+ACL is stateless, so a custom ACL must allow the UDP path in both directions and the reply ports.
+
+Today's daemon does not pin its ICE listener to a configured port: the direct API leaves Pion's UDP
+port range unset, so the OS selects a port. On an Ubuntu 24.04 EC2 host measured on 2026-10-17,
+`cat /proc/sys/net/ipv4/ip_local_port_range` returned `32768 60999`. Check the target host's range
+and actual ICE candidates instead of copying that number to another installation. For a phone whose public IP
+can change, the EC2 security group needs a UDP ingress rule from `0.0.0.0/0` to that listener range,
+plus UDP egress to `0.0.0.0/0` for STUN and the phone's dynamic ICE port. On the measured host, the
+two rules were:
+
+| Direction | UDP destination ports | Peer CIDR | Reason |
+|---|---:|---|---|
+| Ingress | `32768-60999` | `0.0.0.0/0` | A phone can initiate ICE checks to the daemon's current port. |
+| Egress | `1024-65535` | `0.0.0.0/0` | STUN on 3478/19302 and ICE checks to the phone can leave. |
+
+For example, after recording the current rules and confirming the target security group, apply:
+
+```sh
+aws ec2 authorize-security-group-ingress --region "$AWS_REGION" --group-id "$AWS_SG_ID" \
+  --protocol udp --port 32768-60999 --cidr 0.0.0.0/0
+aws ec2 authorize-security-group-egress --region "$AWS_REGION" --group-id "$AWS_SG_ID" \
+  --protocol udp --port 1024-65535 --cidr 0.0.0.0/0
+```
+
+Set `AWS_REGION` and `AWS_SG_ID` from the inspected instance first. Substitute the host's actual
+listener range; do not add a duplicate rule. Security groups are stateful, so replies to an allowed
+flow need no separate reverse rule. These broad rules expose the host's UDP port range to the
+Internet. Review what else listens on that host, and use a narrower source CIDR when the browser's
+public address is stable. A single-port ingress rule will need a daemon change to multiplex ICE
+and publish a reachable public candidate on that same port; changing only the security group to one
+port does not make the current daemon use it.
+
+Read back the security group after applying it. On the Linux host, send a STUN Binding Request to
+both servers and verify a success response with the request's transaction ID; a timeout does not by
+itself identify which network layer blocked UDP. Check the host firewall (`ufw`, `nftables` or
+`iptables`) as well. Finally open this machine's Terminal from the paired phone browser, preferably
+on mobile data. `cloud carrier=direct opened for a viewer's Session reads` proves the page's shared
+data channel opened. A Terminal may borrow that channel, or open its own, which logs
+`cloud terminal carrier=direct opened`. Confirm the Terminal's carrier is direct for the same
+machine; the absence of the second log line alone does not show it used the relay. A Terminal
+`input` or `resize` receipt with `outcome=ok_direct` confirms that operation used the direct
+carrier. A STUN success
+or a Terminal page that still works over the relay is not direct-path acceptance. If the channel
+still fails, compare the
+browser's actual ICE candidate pair with the daemon's candidates, host firewall and network flow
+records before broadening any rule.
+
+In the 2026-10-17 EC2 setup, both STUN requests timed out before the security group changes. Both
+returned valid responses afterward, and the Linux daemon logged a direct Session-read carrier.
+On a paired phone's subsequent Terminal session, its `input` and `resize` receipts had
+`outcome=ok_direct`, confirming the Terminal path as well.
+
+Security group rules and the Internet Gateway have no separate hourly charge. An existing public
+IPv4 address and Internet-bound data transfer follow [AWS VPC pricing](https://aws.amazon.com/vpc/pricing/)
+and [EC2 data transfer pricing](https://aws.amazon.com/ec2/pricing/on-demand/); this procedure
+creates no NAT Gateway or additional public address.
+
 ### Give agents a local MongoDB replica set
 
 Some Cloud and integration tests need a real replica set rather than a standalone process. The

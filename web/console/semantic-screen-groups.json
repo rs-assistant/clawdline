@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6002,
+  "englishContentKeys": 6003,
   "riskKeys": 2868,
-  "nonRiskCount": 3134,
+  "nonRiskCount": 3135,
   "groups": [
     {
       "name": "bar / other",
@@ -2446,7 +2446,7 @@
     },
     {
       "name": "next / terminal",
-      "count": 99,
+      "count": 100,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2489,6 +2489,7 @@
         "next.terminalDiagnostics",
         "next.terminalDiagnosticsCopied",
         "next.terminalDiagnosticsCopy",
+        "next.terminalDismissMenu",
         "next.terminalEntry",
         "next.terminalEntryFor",
         "next.terminalExited",

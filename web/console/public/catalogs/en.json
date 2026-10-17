@@ -4024,6 +4024,7 @@
   "next.terminalDiagnosticsCopy": "Copy diagnostics",
   "next.terminalDiagnosticsCopyFailed": "Could not copy; select the text instead.",
   "next.terminalDiagnosticsNote": "Stage codes only: no screen, keys, or real device, connection or request identifiers.",
+  "next.terminalDismissMenu": "Close menu",
   "next.terminalDropped": "{bytes} not yet typed were dropped.",
   "next.terminalEntry": "Terminal",
   "next.terminalEntryFor": "Terminal for {project}",
