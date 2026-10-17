@@ -105,3 +105,14 @@ scratch. The default shared Go caches are not cleared or migrated. The old share
 cache needs the owner/idle-process review in `docs/disk-lifecycle.md`. Persistent
 wrapper caches and the per-worktree TypeScript build information follow their
 stated lifecycle instead of per-command Session cleanup.
+
+## Seeing a background check
+
+Daemon callbacks appear in their owning Session's existing background-work strip,
+including Codex callbacks whose assistant has returned to idle. Open a command
+like a provider shell to read its command, working directory, phase and recent
+output. Queue placement is distinct from execution. Reads use the existing
+Session-shell route and Cloud capability with the current Session identity; they
+do not acknowledge completion. Logs use the registered callback tail bound and
+remain outside repository source. Closing the panel stops reads. An expired or
+unreadable log is reported instead of being treated as successful completion.

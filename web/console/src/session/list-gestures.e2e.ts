@@ -170,7 +170,7 @@ function rows(): Row[] {
   if (readingScenario === "expired") return []
   if (readingScenario === "callback-owner") return [
     row(SAFE, "示範：Go 測試", safeCloseability(), Date.now() / 1000,
-      { heavy_work: callbackDone ? undefined : { task_id: "callback-heavy", reason: callbackReason, started_at: Math.floor(Date.now() / 1000) - 72 } }),
+      { shells: callbackDone ? [] : [{ id: "callback-heavy", kind: "callback", state: "queued", at: Math.floor(Date.now()/1000)-75, command: "go test ./...", what: "Verify the dev" }], background_reading: "complete", heavy_work: callbackDone ? undefined : { task_id: "callback-heavy", reason: callbackReason, started_at: Math.floor(Date.now() / 1000) - 72 } }),
     row(BLOCKED, "Wait callback running", blockedCloseability(), 200),
     row(UNKNOWN, "Heavy callback queued", unknownCloseability(), 100),
   ]
@@ -750,6 +750,7 @@ function daemon(): Server {
       }
       return json(res, 200, answer)
     }
+    if (path.includes("/shells/callback-heavy")) return json(res, 200, { shell: { id: "callback-heavy", kind: "callback", state: callbackDone ? "success" : "running", at: Math.floor(Date.now()/1000)-75, started_at: Math.floor(Date.now()/1000)-72, command: "go test ./...", directory: "/tmp/fixture", what: "Verify the dev" }, text: callbackDone ? "verification passed\n" : "compiling the changed module\n", signature: callbackDone ? "done" : "running", ended: callbackDone })
     if (path === "/v1/orchestrator/tasks") {
       const tasks = readingScenario === "session-gap"
         ? [{ id: "task-gap-fixture", state: "briefed", created: 1,
@@ -1267,6 +1268,27 @@ test("an incomplete session reading keeps a confirmed root and its child togethe
       sessionGapComplete = false
       readingScenario = "normal"
     }
+  }))
+
+test("a phone opens a daemon callback in the existing background shell panel", () =>
+  inTab(async (tab) => {
+    readingScenario="callback-owner";callbackDone=false
+    try {
+      await tab.go("/")
+      await tab.until("callback Session appears", seen=>seen.callbackRows.join()===SAFE)
+      await tab.press(`#rows > li.row[data-id="${SAFE}"]`)
+      await tab.press("#bg-strip-line")
+      await tab.press('[data-shell="callback-heavy"]')
+      const visible = await tab.run(`new Promise((resolve,reject)=>{const deadline=Date.now()+8000;const read=()=>{const panel=document.querySelector('#shell-panel');if(panel && !panel.hidden && panel.textContent.includes('compiling the changed module'))return resolve({text:panel.textContent,width:panel.scrollWidth,viewport:window.innerWidth});if(Date.now()>deadline)return reject(new Error('callback output did not appear'));setTimeout(read,25)};read()})`)
+      assert.ok(visible.text.includes("go test ./..."))
+      assert.ok(visible.text.includes("執行中"))
+      assert.ok(visible.width<=visible.viewport)
+      await tab.shotArea("callback-output-zh-Hant", "#shell-panel")
+      callbackDone=true;pushSessions()
+      const done=await tab.run(`new Promise((resolve,reject)=>{const deadline=Date.now()+8000;const read=()=>{const text=document.querySelector('#shell-panel')?.textContent||'';if(text.includes('verification passed') && text.includes('已成功完成'))return resolve(text);if(Date.now()>deadline)return reject(new Error('callback completion did not appear'));setTimeout(read,25)};read()})`)
+      assert.ok(done.includes("已成功完成"))
+      await tab.press("#shell-close")
+    } finally {readingScenario="normal";callbackDone=false;pushSessions()}
   }))
 
 test("a phone marks only the Session whose heavy callback is running", () =>

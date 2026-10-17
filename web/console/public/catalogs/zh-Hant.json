@@ -6007,5 +6007,13 @@
   "next.cloudCarrierOffline": "{machine} 已離線：最近沒有收到它的回報，無法讀取或傳送。",
   "next.sessionsMachineOfflineTitle": "這台機器離線",
   "capacityRow.cloud.peer_discovery_reply.what": "每次機器清單查詢最多保留一份加密回覆，供發出查詢的 Session 讀取。",
-  "next.sessionsMachineOfflineHint": "最近沒有收到它的回報（{seen}）。開機並連上網路後，它的 Session 會自動出現在這裡。"
+  "next.sessionsMachineOfflineHint": "最近沒有收到它的回報（{seen}）。開機並連上網路後，它的 Session 會自動出現在這裡。",
+  "next.bgQueued": "排隊中",
+  "next.bgRunning": "執行中",
+  "next.bgSuccess": "已成功完成",
+  "next.bgFailure": "執行失敗",
+  "next.bgTimeout": "已逾時",
+  "next.bgCancelled": "已取消",
+  "next.bgUnavailable": "無法讀取背景工作狀態",
+  "next.bgMore": "尚有其他背景工作未列出"
 }

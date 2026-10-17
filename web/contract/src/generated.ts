@@ -6841,6 +6841,16 @@ export interface SessionRow {
    */
   attention_count?: number
   backend: Backend
+
+  /**
+   * Additional callbacks beyond the registered per-root display bound.
+   */
+  background_omitted?: number
+
+  /**
+   * Whether daemon-owned callback rows could be read.
+   */
+  background_reading?: string
   closeability: Closeability
   coordination?: SessionCoordination
   coordinator?: SessionCoordinator
@@ -6917,9 +6927,9 @@ export interface SessionRow {
   sessionId?: string
 
   /**
-   * The commands this session left running in the background, newest first, at most
-   * six. Absent rather than empty when there are none, as the Swift app sends it;
-   * always absent for Codex, which keeps no record of them.
+   * Active provider shells followed by daemon-owned callbacks. Provider shells
+   * retain their existing display bound; callbacks use MaxCallbacksPerRoot and are
+   * available for every assistant.
    */
   shells?: SessionShell[]
 
@@ -6996,9 +7006,9 @@ export type SessionScreenReading =
 export const SessionScreenReadingValues: readonly SessionScreenReading[] = ["read", "unavailable"] as const
 
 /**
- * One background command a session started and has not finished: its output file
- * has no ending written under it, and the session's transcript announced its id as
- * a background command. `at` is when it last printed something.
+ * One provider background shell or daemon-owned callback. Callback ids start with
+ * callback-. Callback rows remain readable after completion while their output is
+ * retained.
  */
 export interface SessionShell {
   /**
@@ -7013,6 +7023,11 @@ export interface SessionShell {
   command?: string
 
   /**
+   * The callback working directory.
+   */
+  directory?: string
+
+  /**
    * The last line it printed, clipped to 160 characters.
    */
   doing?: string
@@ -7021,6 +7036,21 @@ export interface SessionShell {
    * Claude Code's own id for it.
    */
   id: string
+
+  /**
+   * Daemon-owned background work, read through the same Shell panel.
+   */
+  kind?: string
+
+  /**
+   * Unix seconds when command execution started; absent while queued.
+   */
+  started_at?: number
+
+  /**
+   * Callback phase: queued, running, success, failure, timeout or cancelled.
+   */
+  state?: string
 
   /**
    * The description written beside the command, when there was one.

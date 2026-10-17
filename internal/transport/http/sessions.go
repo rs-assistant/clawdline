@@ -17,6 +17,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app"
+	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/coordinator"
 	"github.com/sainteye/clawdline/internal/domain/icon"
@@ -96,26 +97,28 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 		// snapshot, including the fields used by the original row status line.
 		// No transcript, menu or Git data leaves this route.
 		type status struct {
-			SessionID        string                        `json:"sessionId,omitempty"`
-			EpicParent       *contract.EpicSessionParent   `json:"epic_parent,omitempty"`
-			Persona          string                        `json:"persona,omitempty"`
-			State            contract.SessionState         `json:"state"`
-			WorkState        contract.WorkState            `json:"work_state"`
-			WorkNote         string                        `json:"work_note,omitempty"`
-			WorkProvenance   contract.WorkProvenance       `json:"work_provenance,omitempty"`
-			WorkMovedBy      string                        `json:"work_moved_by,omitempty"`
-			WorkPersonNeeded *bool                         `json:"work_person_needed,omitempty"`
-			Line             string                        `json:"line,omitempty"`
-			Shells           []contract.SessionShell       `json:"shells,omitempty"`
-			HeavyWork        *contract.SessionHeavyWork    `json:"heavy_work,omitempty"`
-			Source           *contract.BearingsSource      `json:"source,omitempty"`
-			Activity         *contract.SessionActivity     `json:"activity,omitempty"`
-			Identity         contract.IdentityBinding      `json:"identity,omitempty"`
-			AttentionCount   *int64                        `json:"attention_count,omitempty"`
-			Owed             *contract.WorkOwed            `json:"owed,omitempty"`
-			Acceptance       *contract.SessionAcceptance   `json:"acceptance,omitempty"`
-			Disposition      *contract.WorkDisposition     `json:"disposition,omitempty"`
-			Coordination     *contract.SessionCoordination `json:"coordination,omitempty"`
+			SessionID         string                        `json:"sessionId,omitempty"`
+			EpicParent        *contract.EpicSessionParent   `json:"epic_parent,omitempty"`
+			Persona           string                        `json:"persona,omitempty"`
+			State             contract.SessionState         `json:"state"`
+			WorkState         contract.WorkState            `json:"work_state"`
+			WorkNote          string                        `json:"work_note,omitempty"`
+			WorkProvenance    contract.WorkProvenance       `json:"work_provenance,omitempty"`
+			WorkMovedBy       string                        `json:"work_moved_by,omitempty"`
+			WorkPersonNeeded  *bool                         `json:"work_person_needed,omitempty"`
+			Line              string                        `json:"line,omitempty"`
+			BackgroundReading string                        `json:"background_reading,omitempty"`
+			BackgroundOmitted int64                         `json:"background_omitted,omitempty"`
+			Shells            []contract.SessionShell       `json:"shells,omitempty"`
+			HeavyWork         *contract.SessionHeavyWork    `json:"heavy_work,omitempty"`
+			Source            *contract.BearingsSource      `json:"source,omitempty"`
+			Activity          *contract.SessionActivity     `json:"activity,omitempty"`
+			Identity          contract.IdentityBinding      `json:"identity,omitempty"`
+			AttentionCount    *int64                        `json:"attention_count,omitempty"`
+			Owed              *contract.WorkOwed            `json:"owed,omitempty"`
+			Acceptance        *contract.SessionAcceptance   `json:"acceptance,omitempty"`
+			Disposition       *contract.WorkDisposition     `json:"disposition,omitempty"`
+			Coordination      *contract.SessionCoordination `json:"coordination,omitempty"`
 			// The signed ss/ rows carry these two; this list stands in for
 			// them while ss/ has a gap, and without them the machine's
 			// Clawdfather was drawn as an ordinary Session under its own title.
@@ -138,7 +141,7 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 				Icon: row.Icon, ExecutionGeneration: row.ExecutionGeneration,
 				Status: status{SessionID: row.SessionID, EpicParent: row.EpicParent, Persona: row.Persona, State: row.State, WorkState: row.WorkState, WorkNote: row.WorkNote,
 					WorkProvenance: row.WorkProvenance, WorkMovedBy: row.WorkMovedBy,
-					WorkPersonNeeded: row.WorkPersonNeeded, Line: row.Line, Shells: row.Shells,
+					WorkPersonNeeded: row.WorkPersonNeeded, Line: row.Line, Shells: row.Shells, BackgroundReading: row.BackgroundReading, BackgroundOmitted: row.BackgroundOmitted,
 					HeavyWork: row.HeavyWork, Source: row.Source, Activity: row.Activity,
 					Identity: row.Identity, AttentionCount: row.AttentionCount,
 					Owed: row.Owed, Acceptance: row.Acceptance,
@@ -287,6 +290,7 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 		}
 	}
 	heavySession, heavyWork, heavyPlaces := s.runningHeavyCallback(records)
+	callbacks, callbacksKnown := s.callbackShells(records, heavyPlaces)
 	// One database read for the entire fleet. An error leaves the count
 	// unknown on every row, rather than turning it into zero.
 	attentionCounts, attentionErr := s.store.OpenHumanInterventionCounts(records)
@@ -416,6 +420,17 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 			row.Source != nil && row.Source.Freshness == contract.SourceFreshnessCurrent {
 			row.HeavyWork = heavyWork
 		}
+		row.BackgroundReading = "unavailable"
+		if callbacksKnown && item.ConversationID != "" && conversationMatches[item.ConversationID] == 1 && row.Source != nil && row.Source.Freshness == contract.SourceFreshnessCurrent {
+			row.BackgroundReading = "complete"
+			jobs := callbacks[item.ConversationID]
+			if len(jobs) > orchestrator.MaxCallbacksPerRoot {
+				row.BackgroundOmitted = int64(len(jobs) - orchestrator.MaxCallbacksPerRoot)
+				jobs = jobs[:orchestrator.MaxCallbacksPerRoot]
+			}
+			row.Shells = append(row.Shells, jobs...)
+		}
+
 		if item.State == session.StateWorking && item.Line != "" {
 			at := item.Observation.ObservedAt
 			if at.IsZero() {

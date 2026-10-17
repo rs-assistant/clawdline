@@ -6007,5 +6007,13 @@
   "next.cloudCarrierOffline": "{machine} is offline: nothing has reported from it recently, so nothing can be read from or sent to it.",
   "next.sessionsMachineOfflineTitle": "This machine is offline",
   "capacityRow.cloud.peer_discovery_reply.what": "Each inventory query retains one encrypted reply until its requesting Session reads it.",
-  "next.sessionsMachineOfflineHint": "It has not reported recently ({seen}). Once it is on and connected, its Sessions appear here on their own."
+  "next.sessionsMachineOfflineHint": "It has not reported recently ({seen}). Once it is on and connected, its Sessions appear here on their own.",
+  "next.bgQueued": "Queued",
+  "next.bgRunning": "Running",
+  "next.bgSuccess": "Completed successfully",
+  "next.bgFailure": "Failed",
+  "next.bgTimeout": "Timed out",
+  "next.bgCancelled": "Cancelled",
+  "next.bgUnavailable": "Background work could not be read",
+  "next.bgMore": "Additional background work is not shown"
 }
