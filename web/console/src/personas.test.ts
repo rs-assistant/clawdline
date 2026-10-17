@@ -59,6 +59,32 @@ test("a catalog read that throws is an empty one", async () => {
     throw new TypeError("Failed to fetch")
   }) as typeof fetch
   assert.deepEqual(await fresh.loadPersonas(offline), [])
+  fresh.forgetPersonas()
+})
+
+test("a transient catalog failure can recover without reloading the page", async () => {
+  // @ts-expect-error -- a `.ts` path is required by Node's native type stripping.
+  const fresh = (await import("./personas.ts?recovers")) as typeof import("./personas.js")
+  let reads = 0
+  const read = (async () => {
+    reads++
+    return reads === 1
+      ? new Response("unavailable", { status: 503 })
+      : new Response(JSON.stringify({ personas: [catalog[0]] }), { status: 200 })
+  }) as typeof fetch
+  assert.deepEqual(await fresh.loadPersonas(read, "machine-a"), [])
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => { off(); reject(new Error("the catalog was not retried")) }, 6_500)
+    const off = fresh.onPersonas(() => {
+      if (!fresh.personasNow("machine-a")?.length) return
+      clearTimeout(timeout)
+      off()
+      resolve()
+    })
+  })
+  assert.deepEqual(fresh.personasNow("machine-a")?.map((p) => p.id), ["architect"])
+  assert.equal(reads, 2)
+  fresh.forgetPersonas()
 })
 
 test("a catalog read keeps only well-formed personas", async () => {
