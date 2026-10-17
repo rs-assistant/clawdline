@@ -3069,7 +3069,6 @@ export interface Diagnostics {
   scheduler: SchedulerPulse
   served_by: string
   terminals?: TerminalDiagnostics
-  upstream: number
   usage?: UsageDiagnostics
 }
 
@@ -5382,7 +5381,6 @@ export interface Refusal {
   detail_key?: string
   error: string
   route?: string
-  upstream?: string
 }
 
 /**

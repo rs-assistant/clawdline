@@ -50,15 +50,8 @@ the broker and the Cloud line do not need it — but `/` answers `501 no_web_roo
 **If you are following an older note, it will tell you to set three.** Until 2026-09-19 this
 daemon ran in front of the Swift app it replaces and handed it every route it had not taken over;
 `CLAWDLINE_NEXT_STANDALONE=1` and `CLAWDLINE_NEXT_OWN_SESSIONS=1` were how you said "there is
-nothing behind me". That is now the default. Both are still read and still mean what they meant,
-so an older script keeps working — they just no longer change anything on a machine with nothing
-behind this daemon:
-
-| Variable | What it does | Since 2026-09-19 |
-| --- | --- | --- |
-| `CLAWDLINE_NEXT_WEB` | where the console's built files are | still required |
-| `CLAWDLINE_NEXT_STANDALONE=1` | never forward an unimplemented route; answer `501 not_implemented` and name the route | the default; setting it changes nothing |
-| `CLAWDLINE_NEXT_OWN_SESSIONS=1` | answer `/v1/sessions` and its event stream here | the default while nothing is behind this daemon |
+nothing behind me". The forwarding has since been removed, so neither variable is read any more;
+setting them is harmless.
 
 Two more you may want:
 
@@ -66,7 +59,6 @@ Two more you may want:
 | --- | --- |
 | `CLAWDLINE_NEXT_PORT` | `7727` |
 | `CLAWDLINE_NEXT_DIR`, the state directory | `$XDG_CONFIG_HOME/clawdline-next`, else `~/.config/clawdline-next`. On Windows, `%APPDATA%\clawdline-next` |
-| `CLAWDLINE_NEXT_UPSTREAM_PORT`, another daemon to hand unowned routes to | none. Set it only if you are deliberately running this one in front of another that answers; it was `7717` by default until 2026-09-19, when the Swift app that held that port was stopped |
 
 The daemon binds `127.0.0.1` only. Its log goes to `logs/daemon.log` in the state directory, and
 the first line it prints says so. Binding is the first thing it does: if something already holds
@@ -274,7 +266,6 @@ personal `~/.claude/skills`.
 | You see | It means |
 | --- | --- |
 | `501 not_implemented` on a `/v1/` route | This daemon has not taken that route over yet. The body names the route; nothing is wrong with your setup |
-| `502 upstream_unreachable` | You set `CLAWDLINE_NEXT_UPSTREAM_PORT` and nothing is listening on that port. The body names the address it tried. Unset it unless you are deliberately running this daemon in front of another one |
 | `501 no_web_root` on `/` | `CLAWDLINE_NEXT_WEB` is not set. The daemon's log says `console: NONE` under `listening` |
 | `500 no_document` on `/` | `CLAWDLINE_NEXT_WEB` is set and has no `index.html`: the console was not built, or its bundle is being rebuilt. The log says `console: BROKEN` |
 | The daemon exits with status 3 | Another process holds the port. `logs/daemon.log` names it — pid, command, since when, and what its `/v1/health` and `/` answer. Stop that process by its pid, or start this one with another `CLAWDLINE_NEXT_PORT` |

@@ -2631,7 +2631,6 @@ type Diagnostics struct {
 	Scheduler SchedulerPulse       `json:"scheduler"`
 	ServedBy  string               `json:"served_by"`
 	Terminals *TerminalDiagnostics `json:"terminals,omitempty"`
-	Upstream  int64                `json:"upstream"`
 	Usage     *UsageDiagnostics    `json:"usage,omitempty"`
 }
 
@@ -4594,7 +4593,6 @@ type Refusal struct {
 	DetailKey string `json:"detail_key,omitempty"`
 	Error     string `json:"error"`
 	Route     string `json:"route,omitempty"`
-	Upstream  string `json:"upstream,omitempty"`
 }
 
 // Why nothing can be offered. `boot_unknown`: this machine cannot read its boot

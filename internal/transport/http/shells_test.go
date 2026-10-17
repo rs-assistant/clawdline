@@ -40,7 +40,6 @@ func TestShellPathSplitsBeforeItDecodes(t *testing.T) {
 // transcript announced a background command, and the output folder Claude Code
 // keeps for it under /tmp/claude-<uid>/<project>/<session>/tasks.
 func TestTheShellRouteServesAnnouncedCommandsOnly(t *testing.T) {
-	t.Setenv("CLAWDLINE_NEXT_OWN_SESSIONS", "1")
 	home := t.TempDir()
 	work := t.TempDir()
 	const conv = "5a1d0c7e-0000-4000-8000-0000000051e1"

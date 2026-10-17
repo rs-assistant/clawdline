@@ -43,10 +43,6 @@ func projectLinksReader() *projectlinks.Reader {
 // Swift route carries and the reason `GET /v1/sessions` stays at its
 // hundredth of a second.
 func (s *Server) sessionLinksRoute(w http.ResponseWriter, r *http.Request, id string) {
-	if !s.ownsSessions() {
-		s.forwardUpstream(w, r)
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	item, err := s.actions().Find(ctx, id)

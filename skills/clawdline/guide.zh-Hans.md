@@ -206,12 +206,8 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
   `retry_after` 等额外栏位位于 `error` 中。
 - `{"error":"<code>","detail":"…"}`：路由不存在、方法错误及部分读取请求。
 
-此守护进程不负责的路由会收到 `501 not_implemented`，拒绝消息会指出路由。
-在一般机器上，这就是最终回复。只有有人刻意用 `CLAWDLINE_NEXT_UPSTREAM_PORT`
-在此程序后面设定另一个守护进程时，请求才会转送；若上游没有回应，
-`502 upstream_unreachable` 会指出无回应的地址。两者都不是此守护进程提供的路由回复。
-2026-09-19 以前，转送预设开启并指向端口 7717 的 Swift 应用程序，因此当时的笔记可能写着
-不属于此程序的路由会抵达旧应用程序；现在不会。
+此守护进程不负责的路由会收到 `501 not_implemented`，拒绝消息会指出路由；
+不会转送给其他守护进程。
 
 ### 设置 Project 的 Clawdline 显示信息
 

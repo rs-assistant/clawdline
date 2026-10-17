@@ -243,7 +243,6 @@
 | `unsupported_image` | `internal/transport/http/work_v2_reference_images.go`, `internal/transport/http/work_v2_session_todos.go` |
 | `unsupported_media_type` | `internal/transport/http/dispatch_policy_settings.go`, `internal/transport/http/gate.go`, `internal/transport/http/notification_rules.go`, `internal/transport/http/settings.go` |
 | `update_failed` | `internal/transport/http/update.go` |
-| `upstream_unreachable` | `internal/transport/http/events.go`, `internal/transport/http/server.go` |
 | `verification_gate_on` | `internal/domain/work/v2.go` |
 | `version_conflict` | `internal/transport/http/work_v2_persona_suggestion.go` |
 | `via_is_for_sessions` | `internal/transport/http/work.go` |

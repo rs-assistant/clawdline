@@ -335,11 +335,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":"<code>","detail":"…"}` — route misses, wrong methods and some reads.
 
 A route this daemon does not own is refused as `501 not_implemented`, and the refusal names the
-route. That is the answer on any ordinary machine. It is only forwarded when somebody deliberately
-put another daemon behind this one with `CLAWDLINE_NEXT_UPSTREAM_PORT`, and then a `502
-upstream_unreachable` names the address that did not answer. Neither is an answer from this
-daemon. Before 2026-09-19 the forwarding was on by default and went to the Swift app on 7717, so a
-note written then will say an unowned route reaches that app; it does not.
+route. Nothing is forwarded to another daemon.
 
 ### Set up a Project's Clawdline display
 

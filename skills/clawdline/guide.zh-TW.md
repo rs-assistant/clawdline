@@ -305,11 +305,8 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
   `retry_after` 這類額外欄位放在 `error` 裡面。
 - `{"error":"<code>","detail":"…"}`——找不到路由、HTTP method 錯誤，以及部分讀取用這種。
 
-不歸這個 daemon 管的路由會回 `501 not_implemented`，而且拒絕訊息會說出那條路由的名字——
-一般機器上就是這個答案。只有在有人刻意用 `CLAWDLINE_NEXT_UPSTREAM_PORT` 在它後面擺了另一個
-daemon 時才會轉送出去，轉不到則回 `502 upstream_unreachable`，並說出打不通的位址。兩種都不是
-這個 daemon 給的答案。2026-09-19 之前轉送是預設開著、且指向 7717 的 Swift app，所以當時寫的筆記
-會說沒接管的路由會跑到那個 app——現在不會。
+不歸這個 daemon 管的路由會回 `501 not_implemented`，而且拒絕訊息會說出那條路由的名字；
+不會轉送給其他 daemon。
 
 ### 設定 Project 在 Clawdline 裡的顯示
 

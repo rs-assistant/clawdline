@@ -21,7 +21,7 @@ import (
 // 501 and name the route, through the one helper the fallback uses.
 func TestAnUnknownSubrouteNamesItselfLikeAnUnknownRoute(t *testing.T) {
 	withoutInheritedNextEnv(t)
-	h, token := upstreamFixture(t, config.Load())
+	h, token := daemonFixture(t, config.Load())
 	for _, ask := range []struct{ method, path string }{
 		{http.MethodGet, "/v1/a-route-nobody-has-written-yet"},
 		{http.MethodGet, "/v1/work/nosuch"},
@@ -50,7 +50,7 @@ func TestAnUnknownSubrouteNamesItselfLikeAnUnknownRoute(t *testing.T) {
 // update".
 func TestAMissingRecordStaysNotFound(t *testing.T) {
 	withoutInheritedNextEnv(t)
-	h, token := upstreamFixture(t, config.Load())
+	h, token := daemonFixture(t, config.Load())
 	for _, path := range []string{
 		"/v1/verifications/no-such-verification",
 		"/v1/orchestrator/schedules/no-such-schedule",

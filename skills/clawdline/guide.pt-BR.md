@@ -142,7 +142,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":{"code":"…","message":"…","request_id":"…", …extras}}` — o mecanismo de admissão e o broker. Extras como `retry_after` ficam dentro do `error`.
 - `{"error":"<code>","detail":"…"}` — erros de rota, métodos errados e algumas leituras.
 
-Uma rota que este daemon não possui é recusada como `501 not_implemented` e a recusa nomeia a rota. Essa é a resposta em qualquer máquina comum. Ele só é encaminhado quando alguém deliberadamente coloca outro daemon atrás deste com `CLAWDLINE_NEXT_UPSTREAM_PORT`, e então um `502 upstream_unreachable` nomeia o endereço que não respondeu. Nem é uma resposta deste daemon. Antes de 19/09/2026, o encaminhamento estava ativado por padrão e ia para o aplicativo Swift em 7717, portanto, uma nota escrita então dirá que uma rota sem proprietário chega a esse aplicativo; isso não acontece.
+Uma rota que este daemon não possui é recusada como `501 not_implemented` e a recusa nomeia a rota. Nada é encaminhado a outro daemon.
 
 ### Configurar o display Clawdline de um projeto
 

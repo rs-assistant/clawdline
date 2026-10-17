@@ -243,11 +243,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":"<code>","detail":"…"}` — rutas inexistentes, métodos equivocados y algunas lecturas.
 
 Una ruta que no es de este daemon se rechaza como `501 not_implemented`, y el rechazo nombra la
-ruta. Esa es la respuesta en cualquier máquina normal. Solo se reenvía cuando alguien puso a
-propósito otro daemon detrás de este con `CLAWDLINE_NEXT_UPSTREAM_PORT`, y entonces un `502
-upstream_unreachable` nombra la dirección que no respondió. Ninguna de las dos es una respuesta de
-este daemon. Antes del 2026-09-19 el reenvío venía activado por defecto e iba a la app Swift en el
-7717, así que una nota escrita entonces dirá que una ruta sin dueño llega a esa app; no es así.
+ruta. Nada se reenvía a otro daemon.
 
 ### Configurar la presentación de un Project en Clawdline
 

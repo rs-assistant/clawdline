@@ -138,7 +138,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":{"code":"…","message":"…","request_id":"…", …extras}}` — 게이트와 브로커의 응답입니다. `retry_after` 같은 추가 필드는 `error` 안에 있습니다.
 - `{"error":"<code>","detail":"…"}` — 없는 경로, 잘못된 메서드, 일부 읽기의 응답입니다.
 
-이 데몬이 소유하지 않는 경로는 경로 이름을 포함한 `501 not_implemented`로 거부됩니다. 일반적인 컴퓨터에서는 이것이 최종 응답입니다. 누군가 `CLAWDLINE_NEXT_UPSTREAM_PORT`를 설정해 다른 데몬을 뒤에 둔 경우에만 전달됩니다. 그 데몬이 응답하지 않으면 응답하지 않은 주소와 함께 `502 upstream_unreachable`가 나옵니다. 두 응답 모두 이 데몬이 해당 기능을 제공한다는 뜻은 아닙니다. 2026-09-19 이전에는 기본 전달 대상이 포트 7717의 Swift 앱이었으므로 당시 기록에는 소유하지 않는 경로가 그 앱에 닿는다고 쓰였을 수 있지만, 지금은 그렇지 않습니다.
+이 데몬이 소유하지 않는 경로는 경로 이름을 포함한 `501 not_implemented`로 거부됩니다. 다른 데몬으로 전달되지 않습니다.
 
 ### 프로젝트의 Clawdline 표시 설정
 

@@ -215,8 +215,7 @@ Des éléments supplémentaires tels que `retry_after` sont inclus dans `error`.
 - `{"error":"<code>","detail":"…"}` — erreurs de routage, méthodes incorrectes et certaines lectures.
 
 Un itinéraire qui n'appartient pas à ce démon est refusé sous la forme `501 not_implemented`, et le refus nomme l'itinéraire.
-C'est la réponse sur n'importe quelle machine standard. Le transfert n'est effectué que lorsqu'un utilisateur a délibérément placé un autre démon derrière celui-ci (`CLAWDLINE_NEXT_UPSTREAM_PORT`), puis qu'un autre démon (`502
-upstream_unreachable`) spécifie l'adresse qui n'a pas répondu. Ce démon ne répond pas non plus. Avant le 19/09/2026, le transfert était activé par défaut et redirigeait vers l'application Swift sur le port 7717. Par conséquent, une note écrite à cette époque indiquerait qu'une route non gérée atteint cette application ; ce qui est faux.
+Rien n'est transféré à un autre démon.
 
 ### Configurer l'affichage Clawdline d'un projet
 

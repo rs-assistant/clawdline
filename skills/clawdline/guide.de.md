@@ -240,12 +240,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":"<code>","detail":"…"}` – nicht gefundene Routen, falsche Methoden und manche Lesezugriffe.
 
 Eine Route, die diesem Daemon nicht gehört, wird mit `501 not_implemented` abgelehnt, und die Ablehnung
-nennt die Route. Das ist die Antwort auf jedem gewöhnlichen Rechner. Weitergeleitet wird nur, wenn
-jemand absichtlich mit `CLAWDLINE_NEXT_UPSTREAM_PORT` einen anderen Daemon hinter diesen gesetzt hat, und
-dann nennt ein `502
-upstream_unreachable` die Adresse, die nicht geantwortet hat. Keines von beiden ist eine Antwort dieses
-Daemons. Vor dem 2026-09-19 war die Weiterleitung standardmäßig an und ging an die Swift-App auf 7717;
-eine damals geschriebene Notiz sagt deshalb, eine fremde Route erreiche jene App. Das tut sie nicht.
+nennt die Route. An einen anderen Daemon wird nichts weitergeleitet.
 
 ### Die Clawdline-Anzeige eines Projects einrichten
 

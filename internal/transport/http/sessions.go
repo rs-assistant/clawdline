@@ -25,25 +25,6 @@ import (
 	"github.com/sainteye/clawdline/internal/domain/task"
 )
 
-// ownsSessions reports whether this daemon answers /v1/sessions itself.
-//
-// With nobody behind it — the ordinary case since the Swift app was stopped on
-// 2026-09-19 — the answer is yes and there is nothing to decide: handing the
-// route to an upstream that does not exist is how `/v1/sessions` came to answer
-// `502 upstream_unreachable` on a machine where the session list is the whole
-// product.
-//
-// With an upstream configured, the switch means what it always meant. Taking a
-// route over is the one change that can break the console for a person who is
-// working, so while there is something behind this daemon it stays a switch
-// that can be turned back within a second rather than a property of the build.
-func (s *Server) ownsSessions() bool {
-	if !s.proxying() {
-		return true
-	}
-	return os.Getenv("CLAWDLINE_NEXT_OWN_SESSIONS") == "1"
-}
-
 // epoch identifies this process. A client that reconnects to a restarted daemon
 // must be able to tell that the generation counter started over rather than
 // went backwards.
@@ -53,10 +34,6 @@ var generation atomic.Int64
 
 // sessions answers the route the console actually reads.
 func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
-	if !s.ownsSessions() {
-		s.forwardUpstream(w, r)
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
 	// The product every stream reads, when it is not older than one tick
 	// (producer.go): a page's first read, the Cloud fleet's and the streams'

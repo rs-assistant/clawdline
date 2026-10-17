@@ -60,15 +60,10 @@ func markFixedRefusalKey(w http.ResponseWriter, key string) {
 	}
 }
 
-// writeRefusalAbout is writeRefusal for the two refusals that can name what
-// they were pointed at: a route this daemon does not own, and an upstream it
-// could not reach.
+// writeRefusalAbout is writeRefusal for a refusal that can name what it was
+// pointed at: a route this daemon does not own.
 func writeRefusalAbout(w http.ResponseWriter, status int, code, detail string, about contract.Refusal) {
 	writeRefusalAboutWithSource(w, status, code, detail, about, true)
-}
-
-func writeRawRefusalAbout(w http.ResponseWriter, status int, code, detail string, about contract.Refusal) {
-	writeRefusalAboutWithSource(w, status, code, detail, about, false)
 }
 
 func writeRefusalAboutWithSource(w http.ResponseWriter, status int, code, detail string, about contract.Refusal, fixed bool) {
