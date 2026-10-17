@@ -20,6 +20,7 @@ cat > "$scratch/bin/du" <<'MOCK'
 #!/bin/bash
 [ "${DU_EXIT:-0}" = 0 ] || exit "$DU_EXIT"
 [ ! -e "$XDG_CACHE_HOME/fail-measure" ] || exit 23
+if [ -e "$XDG_CACHE_HOME/trim-canary" ] && [ ! -e "$XDG_CACHE_HOME/clawdline/heavy-go-v1/build/ab/$(printf '%064d' 0)-d" ]; then printf 0 > "$USED_FILE"; fi
 printf '%s\tcache\n' "$(cat "$USED_FILE")"
 MOCK
 cat > "$scratch/bin/df" <<'MOCK'
@@ -38,9 +39,20 @@ run=tools/run-heavy-linux.sh
 [ ! -s "$CALLS" ]
 # Read the bound from its production source; no duplicated test ceiling.
 limit=$(sed -n 's/^const MaxHeavyGoCacheKiB = \([0-9][0-9]*\)$/\1/p' internal/domain/capacity/heavy_cache.go)
+mkdir -p "$XDG_CACHE_HOME/clawdline/heavy-go-v1/build/ab"
+old="$XDG_CACHE_HOME/clawdline/heavy-go-v1/build/ab/$(printf '%064d' 0)-d"
+recent="$XDG_CACHE_HOME/clawdline/heavy-go-v1/build/ab/$(printf '%064d' 1)-d"
+printf old > "$old"
+printf recent > "$recent"
+touch -d '2 hours ago' "$old"
+touch "$XDG_CACHE_HOME/trim-canary"
 printf '%s' "$((limit + 1))" > "$USED_FILE"
 "$run" true
-[ "$(cat "$CALLS")" = 'clean -cache -testcache -fuzzcache' ]
+[ ! -s "$CALLS" ]
+[ ! -e "$old" ]
+[ "$(cat "$recent")" = recent ]
+[ "$(cat "$XDG_CACHE_HOME/clawdline/heavy-go-v1/build/proof")" = retained ]
+rm "$XDG_CACHE_HOME/trim-canary"
 [ -f "$XDG_CACHE_HOME/clawdline/heavy-go-v1/mod/proof" ]
 # Cleanup is conditional after a failed build and preserves its failure.
 : > "$CALLS"
