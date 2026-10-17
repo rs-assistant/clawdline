@@ -111,7 +111,7 @@ this wrapper. Its cache is not a Session-owned disposable directory.
 
 The registered managed-cache budget is 4 GiB, with a 2 GiB filesystem reserve.
 Before and after the command, the wrapper measures disk and cache usage. Only
-budget or disk pressure triggers reclamation, compiled entries first and
+budget or disk pressure triggers reclamation, oldest recognized compiled entries first and
 modules only if needed. A still-low preflight refuses the build. Command
 failure survives cleanup failure; unreadable ownership or measurements never
 authorize deletion. This is a between-command budget, not an in-flight quota.

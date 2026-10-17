@@ -112,8 +112,10 @@ and tool bounds. Tool measurements are emitted by the wrapper, not invented as
 zero daemon usage or added to the daemon's capacity UI.
 
 Before and after each command, the wrapper measures its owned cache and disk.
-Only budget or disk pressure triggers reclamation: compiled entries first,
-modules only if needed. A still-low preflight refuses the build. Original command
+Only budget or disk pressure triggers reclamation: oldest recognized compiled-cache entries first,
+modules only if needed. Go refreshes entry mtimes on use; metadata sorting spills
+to disk instead of retaining an unbounded candidate list. Pressure no longer
+clears the entire build/test cache. Unknown files in the cache are retained. A still-low preflight refuses the build. Original command
 failure survives cleanup failure. Unknown ownership or measurement never
 permits deletion. This is a between-command budget, not an in-flight quota.
 
