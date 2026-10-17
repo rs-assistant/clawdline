@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/install"
 	"github.com/sainteye/clawdline/internal/adapters/release"
 	"github.com/sainteye/clawdline/internal/contract"
 )
@@ -48,6 +49,9 @@ func (e Env) stageApp(ctx context.Context, m release.Manifest, dir string) (stri
 	staged := filepath.Join(dir, "app", AppBundleName)
 	if info, err := os.Stat(staged); err != nil || !info.IsDir() {
 		return "", fail(CodeArchiveUnsafe, "%s has no %s at its root", a.Name, AppBundleName)
+	}
+	if install.SameAppShell(e.installedApp(), staged) {
+		return "", nil
 	}
 	return staged, nil
 }

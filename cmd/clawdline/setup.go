@@ -391,6 +391,10 @@ func runSetup(h setupHost, o setupOptions) int {
 	sf := install.ServiceFile{Port: o.port, Root: place.layout.Root, File: unitFile, Channel: o.channel}
 	gui := false
 	if h.goos == "darwin" {
+		if err := place.layout.InstallServiceBinary(name); err != nil {
+			return setupRefuse(h, err)
+		}
+		spec.Exec = place.layout.ServiceBin
 		spec.LogPath = filepath.Join(place.stateDir, "service.log")
 		domain, isGUI := launchdDomain(h)
 		gui = isGUI
@@ -897,6 +901,9 @@ func placeApp(h setupHost, archive, target, staging, version string) (string, er
 	bundle := filepath.Join(unpacked, appName)
 	if _, err := os.Stat(filepath.Join(bundle, "Contents", "MacOS")); err != nil {
 		return "", fmt.Errorf(cliCopy("setup", "app_archive_missing", "the app archive holds no %s"), appName)
+	}
+	if install.SameAppShell(target, bundle) {
+		return target, nil
 	}
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return "", err

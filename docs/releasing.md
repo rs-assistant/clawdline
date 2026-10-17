@@ -75,28 +75,28 @@ published binary trusts a key that is not in `keys.go`.
 
 ## The code-signing certificate
 
-Every macOS binary of a release — the daemon in each darwin archive, the tmux beside it, and the
-app with the daemon and tmux inside it — is signed with one self-signed code-signing certificate
-(`tools/release/codesign.sh`), not ad hoc. An ad hoc signature's identity is its cdhash, so each
-build was another program to macOS: after a reinstall or an update the person was asked again to
-let Clawdline read a Dropbox folder, reach the local network, and use the keychain item WebKit keeps
-the Cloud console's keys under ("Clawdline Next WebCrypto Master Key"), measured 2026-10-16. Signed
-with the certificate, the designated requirement is `identifier … and certificate leaf = H"…"`,
-the same for every build, so what was allowed once stays allowed.
+Official macOS releases require a Developer ID Application identity
+(`tools/release/codesign.sh`). The earlier self-signed identity preserved some
+code requirements but did not preserve WebKit's keychain grant: securityd
+rejected the client as not Apple-signed and added a new cdhash ACL entry for
+each App replacement (observed 2026-10-17). A release build now fails before
+compilation if the selected identity is not Developer ID Application.
 
 - **It is not the release key.** It proves only that two builds are the same program to macOS; the
   Ed25519 key below is what an install trusts an update by.
-- **Untrusted is enough.** codesign signs with it from a private keychain on the search list, and
-  macOS checks the requirement without trusting the certificate. Gatekeeper is not involved: the
-  installer does not quarantine what it downloads.
+- **Credential transition.** Replace the release environment's old self-signed
+  signing secret with an authorized Developer ID Application certificate and
+  private key. Dev builds that must replace the native App need the same
+  identity. Verify certificate ownership before exporting or uploading it.
 - **Where it lives**: the `release` environment's `CLAWDLINE_CODESIGN_P12_BASE64` and
   `CLAWDLINE_CODESIGN_PASSWORD` secrets, which the Release workflow requires; and, on the
   maintainer's Mac, `<state dir>/signing/codesign.p12` with `codesign.password` beside it (mode
   0600 in a 0700 directory), which `clawdline dev install` signs dev builds with so a dev build
   and a release stay one program. Keep an offline copy of the .p12 and its password.
 - **Without it**, a build signs ad hoc as before: a clone builds and runs with no one's certificate.
-- **Replacing it** changes the identity once: every machine is asked once more after the update
-  that carries the new certificate.
+- **Replacing it** changes the identity once: macOS can ask for the keychain
+  password and Automation permission once after the transition. Validate two
+  successive signed builds on one Mac before claiming prompts are gone.
 
 ## The signing key
 

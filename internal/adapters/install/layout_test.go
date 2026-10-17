@@ -69,6 +69,60 @@ func TestTheRunningBinarySaysWhichInstallationItBelongsTo(t *testing.T) {
 	}
 }
 
+func TestStableServicePathIdentifiesTheActualBinaryAcrossSwitches(t *testing.T) {
+	l := NewLayout(t.TempDir(), t.TempDir())
+	unpack(t, l, "v0.10.0")
+	unpack(t, l, "v0.11.0")
+	if err := l.SwitchCurrent("v0.10.0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := l.InstallServiceBinary("v0.10.0"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := l.ServiceRelease(l.ServiceBin); got != "v0.10.0" {
+		t.Fatalf("initial service: %s", got)
+	}
+	if err := l.SwitchCurrent("v0.11.0"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := l.ServiceRelease(l.ServiceBin); got != "v0.10.0" {
+		t.Fatalf("current switched before service binary: %s", got)
+	}
+	if err := l.InstallServiceBinary("v0.11.0"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := l.ServiceRelease(l.ServiceBin); got != "v0.11.0" {
+		t.Fatalf("new service: %s", got)
+	}
+}
+
+func TestSameAppShellRequiresARealMatchingMarker(t *testing.T) {
+	a, b := t.TempDir(), t.TempDir()
+	marker := filepath.Join("Contents", "Resources", "shell-revision")
+	for _, dir := range []string{a, b} {
+		if err := os.MkdirAll(filepath.Join(dir, "Contents", "Resources"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if SameAppShell(a, b) {
+		t.Fatal("unmarked app was treated as unchanged")
+	}
+	for _, dir := range []string{a, b} {
+		if err := os.WriteFile(filepath.Join(dir, marker), []byte(strings.Repeat("a", 64)+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !SameAppShell(a, b) {
+		t.Fatal("same native shell would replace the app")
+	}
+	if err := os.WriteFile(filepath.Join(b, marker), []byte(strings.Repeat("b", 64)+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if SameAppShell(a, b) {
+		t.Fatal("changed native shell would be skipped")
+	}
+}
+
 func TestTheServiceFileRoundTripsAndRefusesAnUnknownSupervisor(t *testing.T) {
 	dir := t.TempDir()
 	if _, err := ReadServiceFile(dir); !os.IsNotExist(err) {

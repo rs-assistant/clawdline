@@ -41,6 +41,9 @@ func (e Env) Finish(ctx context.Context) error {
 		// which needs no restart because nothing switched it yet, or will
 		// be started by whoever starts the daemon next.
 		_ = e.Layout.SwitchCurrent(p.From)
+		if e.GOOS == "darwin" {
+			_ = e.Layout.InstallServiceBinary(p.From)
+		}
 		return e.settleRolledBack(p, &contract.UpdateApplyError{Code: CodeNoService, Detail: serr.Error()})
 	}
 	p.SupervisorRuns++
@@ -96,6 +99,12 @@ func (e Env) trySwitch(ctx context.Context, svc install.ServiceFile, p Pending) 
 	if err := e.Layout.SwitchCurrent(p.To); err != nil {
 		return &contract.UpdateApplyError{Code: CodeSwitchFailed, Detail: err.Error()}
 	}
+	if e.GOOS == "darwin" {
+		if err := e.Layout.InstallServiceBinary(p.To); err != nil {
+			_ = e.Layout.SwitchCurrent(p.From)
+			return &contract.UpdateApplyError{Code: CodeSwitchFailed, Detail: err.Error()}
+		}
+	}
 	if err := e.restartService(ctx, svc); err != nil {
 		return &contract.UpdateApplyError{Code: CodeSupervisorFailed, Detail: "restarting the service: " + err.Error()}
 	}
@@ -130,6 +139,11 @@ func (e Env) rollback(ctx context.Context, svc install.ServiceFile, p Pending) e
 			return nil
 		}
 		return err
+	}
+	if e.GOOS == "darwin" {
+		if err := e.Layout.InstallServiceBinary(p.From); err != nil {
+			return err
+		}
 	}
 	if p.NonAdditive && p.Snapshot != "" {
 		if err := writeJSON(e.restorePath(), restoreMarker{From: p.From, To: p.To, Snapshot: p.Snapshot}); err != nil {
@@ -204,6 +218,11 @@ func (e Env) BootGuard(exe string) (exit bool, note string, err error) {
 	}
 	if err := e.Layout.SwitchCurrent(p.From); err != nil {
 		return false, note, fmt.Errorf("switching back to %s: %w", p.From, err)
+	}
+	if e.GOOS == "darwin" {
+		if err := e.Layout.InstallServiceBinary(p.From); err != nil {
+			return true, note, fmt.Errorf("restoring the service binary for %s: %w", p.From, err)
+		}
 	}
 	if p.NonAdditive && p.Snapshot != "" {
 		if err := writeJSON(e.restorePath(), restoreMarker{From: p.From, To: p.To, Snapshot: p.Snapshot}); err != nil {
