@@ -8793,6 +8793,21 @@ type VoiceSetup struct {
 	Status string `json:"status"`
 }
 
+// GET /v1/voice/source: the machine whose Whisper will read the next recording.
+// The composer uses this only as a quiet source label; a failure to read it
+// never prevents dictation.
+type VoiceSource struct {
+	// The authenticated Cloud machine id, or empty on a page served directly by this
+	// machine.
+	Machine string `json:"machine"`
+
+	// The machine's display name, bounded by the UI before it is shown.
+	Name string `json:"name"`
+
+	// darwin, linux or windows.
+	Platform string `json:"platform"`
+}
+
 // One file wait, in the Swift app's camelCase. `ownerSessionId` and each
 // waiter's `sessionId` are conversation ids.
 type Wait struct {

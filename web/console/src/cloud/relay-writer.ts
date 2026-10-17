@@ -74,7 +74,7 @@ interface CloudFailureLike {
 
 /** The machine's descriptor as `CloudClient.machineDescriptor` returns it. */
 interface RememberedDescriptor {
-  machine?: { commands?: unknown }
+  machine?: { commands?: unknown; name?: unknown; platform?: unknown }
 }
 
 /**
@@ -269,6 +269,7 @@ export type WriteRoute =
   | { op: "start"; word: Carried<"start">; place: string; assistant: string; model: string; persona: string }
   | { op: "resume"; word: Carried<"resume">; place: string; assistant: string; past: string; persona: string }
   | { op: "voice"; word: Carried<"voice"> }
+  | { op: "voice-source"; word: Carried<"voice"> }
   | { op: "intents"; word: Carried<"intents"> }
   | { op: "places"; word: Carried<"places"> }
   | { op: "past"; word: Carried<"past-sessions">; place: string; assistant: string }
@@ -449,6 +450,7 @@ const HTTP_STATUS: Readonly<Record<string, number>> = {
  * refused at once, so nothing pressed during the gap is sent after it.
  */
 export const CARRIED_READS: ReadonlySet<WriteRoute["op"]> = new Set<WriteRoute["op"]>([
+  "voice-source",
   "work-v2-image",
   "usage-compare",
   "usage-work-samples",
@@ -489,6 +491,9 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
   }
   const [head, a, b, c, d] = segments
   if (method === "GET") {
+    if (head === "voice" && a === "source" && segments.length === 2) {
+      return { op: "voice-source", word: "voice" }
+    }
     if (head === "sessions" && a && b === "cloud-receipts" && c && segments.length === 4) {
       return { op: "session-receipt", word: "session-receipt", session: a, request: c }
     }
@@ -801,7 +806,7 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
     }
     return null
   }
-  if (head === "voice" && segments.length === 1) return { op: "voice", word: "voice" }
+  if (method === "POST" && head === "voice" && segments.length === 1) return { op: "voice", word: "voice" }
   if (head === "intents" && segments.length === 1) return { op: "intents", word: "intents" }
   // The three requests that change something about notifications. `key` is
   // not among them: it is a read, and `relay-reader.ts` answers it.
@@ -1282,6 +1287,18 @@ export class RelayWriter {
       case "voice": {
         const body = await bodyOf(init)
         return this.dictate(client, String(body.audio ?? ""), Number(body.rate))
+      }
+      case "voice-source": {
+        if (typeof client.voiceHost !== "function") {
+          throw failure("cloud_not_carried", "voice source", 501)
+        }
+        const host = await client.voiceHost()
+        const descriptor = client.machineDescriptor?.(host.machine)?.machine
+        return {
+          machine: host.machine,
+          name: typeof descriptor?.name === "string" ? descriptor.name : "",
+          platform: typeof descriptor?.platform === "string" ? descriptor.platform : "",
+        }
       }
       case "intents": {
         const body = await bodyOf(init)
