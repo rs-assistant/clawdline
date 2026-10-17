@@ -168,7 +168,7 @@ tree equality 能回答的問題：語意整合本來就會讓兩棵樹不同。
 |---|---|---|---|
 | task 目錄 | `/tmp/.clawdline/<id>` | `<CLAWDLINE_NEXT_DIR>/tasks/<id>` | 兩個 broker 寫同一個 task 目錄，就是 plan.md §4 要避免的「兩個 app 搶同一份狀態」。inventory 多回一個 `task_root`，caller 才知道 task.json 要寫在哪 |
 | worktree 位置 | `~/Library/Application Support/Clawdline/worktrees/<slug>/<id>` | `<CLAWDLINE_NEXT_DIR>/worktrees/<slug>/<id>` | 兩個 broker 共用一個 worktrees 根目錄會互相 prune。slug 規則照舊 |
-| task 紀錄 | `~/.config/clawdline/orchestrator.json` | 自己的 SQLite `broker_tasks` | 新派的 task 完全存在新版自己的地方；舊 store 只讀、只用來畫舊 app 的 task |
+| task 紀錄 | `~/.config/clawdline/orchestrator.json` | 自己的 SQLite `broker_tasks` | 新派的 task 完全存在新版自己的地方；舊 store 從 2026-10-17 起不再讀 |
 | tmux 的 child | （舊版開 iTerm 分頁） | 每個 child 一個新的 detached session，名字 `clawdline-task-<id 前 8 碼>` | `new-window` 不指定 session 會落在 tmux 最後用過的那個——這台機器上是有人正在用的 `clawdline`（25 個視窗）。broker 不可以把 child 放到別人的鍵盤前 |
 | 派工前 root 必須在 | 會解析 | 會解析（`root_unresolved`、`conversation_ambiguous`） | 一樣。root 不在，完成通知就沒有收件人 |
 | 4 分鐘時鐘 | 沒有 progress note 就 `spawn_failed` | 分頁還活著就不判 `spawn_failed`；分頁不見才判。第一個畫面是對話框的 child 不歸這個時鐘管，留給人回答（下面「A dialog is the person's」） | 見下面「實測抓到的三件事」第二條 |

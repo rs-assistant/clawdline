@@ -104,7 +104,7 @@ claims `internal/app/orchestrator`、`internal/adapters/store`、`taskdir`、`su
 
 | 檔案／目錄 | 大小 | 今天誰寫 | 新版今天怎麼用 | 退役後誰寫 | 遷移方式 |
 |---|---|---|---|---|---|
-| `~/.config/clawdline/orchestrator.json` | 6.4 MB | 舊 app | **不再讀**（2026-10-17 起；之前是 `swiftstore` 唯讀） | 新 daemon 的 `clawdline.sqlite3` 事件流 | **不要轉檔**。把它當成凍結的歷史：新 daemon 從空的 store 開始，舊檔留著給 `swiftstore` 讀舊 task 的標題與交付紀錄，直到畫面不再需要 |
+| `~/.config/clawdline/orchestrator.json` | 6.4 MB | 舊 app | **不再讀**（2026-10-17 起；之前是 `swiftstore` 唯讀） | 新 daemon 的 `clawdline.sqlite3` 事件流 | **不要轉檔**。把它當成凍結的歷史：新 daemon 從空的 store 開始，新 daemon 從 2026-10-17 起不再讀它；舊檔只是凍結的歷史 |
 | `coordinator.json` | 3.8 KB | 舊 app | 不再讀（2026-10-17 起；之前唯讀，給皇冠） | 新 daemon 的 `coordinator` 表 | 重新註冊一次即可，不轉檔 |
 | `landing-queue.json` | 70 KB | 舊 app | 未讀 | 新 daemon | 250 個 repo 的 landing path 是有用的歷史；建議匯入成 read-only 參考，不要當權威 |
 | `owned-storage.jsonl` | 228 KB | 舊 app | 未讀 | 新 daemon | 同上 |
@@ -141,7 +141,7 @@ Feature Root、coordinator 表，以及自己從 transcript 算的用量），�
 這個 daemon 自己的紀錄，經 `Snapshot.With`）、`ProcessStart`，與 B3 的舊圖片讀取。
 **一處刻意不照 `off`**：Projects 頁的 worktree 生命週期。`off` 時 task 紀錄永遠不算權威，所有 worktree 都不能
 清；現在以自己的紀錄為權威——舊 app 的 worktree 在這裡沒有紀錄，生命週期把它的擁有者判成 unknown
-（`managed_path_without_task_record`），unknown 一律不准刪，所以它們仍然不會被清掉。
+（`managed_path_without_task_record`）。unknown 不會讓任何東西被自動清掉；使用者在 Projects 頁明確按下 Delete 時，仍然會刪除那個 checkout。
 `~/.config/clawdline` 底下的資料本身沒有動；拒絕寫進去的防護（gate、設定、log、技能安裝、Cloud viewer）照留。
 
 ---

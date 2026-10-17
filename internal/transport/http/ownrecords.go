@@ -415,8 +415,8 @@ func ownTaskLinks(row *contract.TaskRow, t orchestrator.Record, screen []swiftst
 // The retired Swift app's task records are no longer read (docs/cutover.md
 // §7). That does not make its worktrees removable: a checkout under its
 // managed root has no record here, so the lifecycle names its owner unknown
-// (`managed_path_without_task_record`), and unknown never authorises a
-// removal.
+// (`managed_path_without_task_record`). Unknown never authorises an automatic
+// removal; a person's explicit Delete still removes the checkout.
 func (s *Server) lifecycleEvidence() projects.TaskEvidence {
 	out := projects.TaskEvidence{Authoritative: true}
 	records, unreadable, err := s.broker.Records(context.Background())

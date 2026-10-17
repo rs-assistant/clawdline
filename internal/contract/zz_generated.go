@@ -6878,10 +6878,10 @@ type StartPlaceList struct {
 // Whether the Swift app's store was read for this answer: `current`; `stale`,
 // an earlier reading carried because the newest one was half-written;
 // `unknown`, nothing could be read; `absent`, there is no Swift store on this
-// machine; or `disabled`, this daemon was told not to read it
-// (CLAWDLINE_NEXT_LEGACY_STORE=off, cutover B1). Unknown is never the same as
-// empty; absent and disabled are known, and the list is then this daemon's own
-// tasks only.
+// machine; or `disabled`, which every answer now carries: since 2026-10-17 this
+// daemon never reads the retired store. Unknown is never the same as empty;
+// absent and disabled are known, and the list is then this daemon's own tasks
+// only.
 type StoreReading string
 
 const (
