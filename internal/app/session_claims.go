@@ -28,6 +28,7 @@ type ClaimWorkV2 struct {
 	// run (Runs.Relay).
 	Run             work.Run
 	ExpectedVersion int64
+	ConvertKind     work.Kind
 	// SessionID, TerminalID and Assistant are the live, non-child Session the
 	// run was said to.
 	SessionID  string
@@ -47,7 +48,8 @@ func (w *WorkSystemV2) ClaimFromSession(ctx context.Context, id string, c ClaimW
 	}
 	return w.Assign(ctx, id, AssignWorkV2{ExpectedVersion: c.ExpectedVersion, Mode: "existing_session",
 		SessionID: c.SessionID, TerminalID: c.TerminalID, Assistant: c.Assistant, Actor: c.Run.Actor(),
-		Claim: &work.CreatedViaV2{Run: c.Run.ID, Session: c.SessionID, At: c.Run.At.Unix(), Excerpt: c.Run.Excerpt}},
+		ConvertKind: c.ConvertKind,
+		Claim:       &work.CreatedViaV2{Run: c.Run.ID, Session: c.SessionID, At: c.Run.At.Unix(), Excerpt: c.Run.Excerpt}},
 		false, file)
 }
 

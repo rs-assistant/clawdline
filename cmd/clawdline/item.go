@@ -233,6 +233,7 @@ func itemCommand(args []string) {
 		}
 		rest = positional
 		f.run = *run
+		f.kind = *kind
 	case "name":
 		if len(positional) != 2 {
 			fmt.Fprintln(os.Stderr, cliCopy("item", "argument.name", "clawdline item name: takes an item id and the Session's task name"))
@@ -361,7 +362,7 @@ func itemUsage() {
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.add_steps", "                          [--step <text>]… [--steps-file f] [--description-file f | stdin] [--acceptance-file f]"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.add_assign", "                          [--assign-self | --assign-terminal <terminal id> | --assign-new [--assistant a] [--model m] [--persona id]]"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.add_options", "                          [--deploy policy] [--run id] [--conversation id] [--key k] [--port n]"))
-	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.claim", "       clawdline item claim [--run id] [--conversation id] [--key k] [--port n] <item id>"))
+	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.claim", "       clawdline item claim [--kind feature|issue|epic|refactor] [--run id] [--conversation id] [--key k] [--port n] <item id>"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.name", "       clawdline item name [--conversation id] [--port n] <item id> <Session task name>"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.child", "       clawdline item child --kind <feature|issue> --title <t> [--step <text>]… [--steps-file f] [--acceptance-file f]"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.child_description", "                          [--description-file f | stdin] [--deploy policy]"))
@@ -391,6 +392,7 @@ func itemUsage() {
 	fmt.Fprintln(os.Stderr, cliCopy("item", "guide.add_self", "  assigns it to this Session, only when the person's message asks this Session to do the work now;"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "guide.claim_permission", "  claim assigns an existing item to this Session only because the person's message through"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "guide.claim_limit", "  Clawdline told it to take that item; never on its own initiative;"))
+	fmt.Fprintln(os.Stderr, cliCopy("item", "guide.claim_plan", "  for a Plan, choose its executable kind and use claim --kind feature|issue|epic|refactor; conversion and claim commit together;"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "guide.name", "  name lets an assigned new Feature Root choose its own task name once, after reading the item;"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "guide.child_plan", "  child breaks an Epic this Session owns, after its reviewed plan (implementing or later), into a"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "guide.child_assignment", "  feature or issue item, assigned to the Session in that terminal, to a new one, or to nobody yet;"))
@@ -700,6 +702,9 @@ func sessionItem(stdout, stderr io.Writer, b *broker, op string, f itemFlags, ar
 			return code
 		}
 		body = map[string]any{"session_id": conversation, "via": map[string]string{"run": run}}
+		if f.kind != "" {
+			body["kind"] = f.kind
+		}
 		path = "/v1/work/v2/agent/items/" + url.PathEscape(itemID) + "/claim"
 	case "step-done":
 		itemID, stepID := strings.TrimSpace(args[0]), strings.TrimSpace(args[1])
