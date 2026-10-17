@@ -168,15 +168,40 @@ func (l *Link) runTaskProbes(ctx context.Context) {
 	}
 }
 
+// taskNoticeEvery is how often the notice loop looks for task finishes and
+// messages owed to this machine's Sessions; openPeerStore is how it opens the
+// peer store. Both are variables for the tests.
+var (
+	taskNoticeEvery = 10 * time.Second
+	openPeerStore   = peerstore.Open
+)
+
 func (l *Link) runTaskNotices(ctx context.Context) {
 	if l.opts.PeerTaskNotice == nil || l.keys == nil {
 		return
 	}
-	ticker := time.NewTicker(10 * time.Second)
+	// One store for the loop's life, opened by its first pass that can and
+	// closed when the line stops: before, each pass opened and closed it
+	// twice — a MkdirAll, an OpenFile and a dozen CREATE … IF NOT EXISTS —
+	// every ten seconds whether anything was owed or not.
+	var st *peerstore.Store
+	defer func() {
+		if st != nil {
+			_ = st.Close()
+		}
+	}()
+	ticker := time.NewTicker(taskNoticeEvery)
 	defer ticker.Stop()
 	for {
-		l.deliverTaskNotices(ctx)
-		l.deliverTaskMessages(ctx)
+		if st == nil {
+			if opened, err := openPeerStore(l.keys.Dir()); err == nil {
+				st = opened
+			}
+		}
+		if st != nil {
+			l.deliverTaskNotices(ctx, st)
+			l.deliverTaskMessages(ctx, st)
+		}
 		select {
 		case <-ctx.Done():
 			return
@@ -185,15 +210,10 @@ func (l *Link) runTaskNotices(ctx context.Context) {
 	}
 }
 
-func (l *Link) deliverTaskNotices(ctx context.Context) {
-	if ctx.Err() != nil || l.keys == nil || l.opts.PeerTaskNotice == nil {
+func (l *Link) deliverTaskNotices(ctx context.Context, st *peerstore.Store) {
+	if ctx.Err() != nil || l.opts.PeerTaskNotice == nil {
 		return
 	}
-	st, err := peerstore.Open(l.keys.Dir())
-	if err != nil {
-		return
-	}
-	defer st.Close()
 	rows, err := st.PendingTaskFinishes(ctx)
 	if err != nil {
 		return
@@ -216,15 +236,10 @@ func (l *Link) deliverTaskNotices(ctx context.Context) {
 	}
 }
 
-func (l *Link) deliverTaskMessages(ctx context.Context) {
-	if ctx.Err() != nil || l.keys == nil || l.opts.PeerTaskMessageNotice == nil {
+func (l *Link) deliverTaskMessages(ctx context.Context, st *peerstore.Store) {
+	if ctx.Err() != nil || l.opts.PeerTaskMessageNotice == nil {
 		return
 	}
-	st, err := peerstore.Open(l.keys.Dir())
-	if err != nil {
-		return
-	}
-	defer st.Close()
 	rows, err := st.PendingTaskMessages(ctx)
 	if err != nil {
 		return

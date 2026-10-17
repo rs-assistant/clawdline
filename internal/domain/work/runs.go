@@ -25,7 +25,8 @@ import (
 //
 // A relay rests on four things, each checked, each refused by name:
 //
-//   - the run exists: this daemon issued it (run_unknown otherwise);
+//   - the run exists: this daemon issued it and the events journal still
+//     keeps it, two weeks (store.EventAgeLimit); run_unknown otherwise;
 //   - it is recent: issued within RelayWindow of the relay (run_expired);
 //   - it was said to the session the answer belongs to, when the answer
 //     belongs to one — a proposal or a decision is a question put to one

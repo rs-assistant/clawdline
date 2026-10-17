@@ -736,6 +736,14 @@ func (s *Server) capacityMeasures() map[string]func() capacity.Reading {
 		// The file's size and the disk's room, and this handle's own account
 		// of the writes the database refused (limits N2).
 		capacity.StoreDB: func() capacity.Reading { return s.store.Reading(s.cfg.Dir) },
+		capacity.StoreEvents: func() capacity.Reading {
+			n, err := s.store.EventCount(context.Background(), "")
+			if err != nil {
+				return capacity.Unmeasured(err.Error())
+			}
+			removed, _ := s.store.EventPruneStats()
+			return capacity.Reading{Known: true, Used: int64(n), Counters: capacity.Counters{Evicted: removed}}
+		},
 		capacity.SessionExecutions: func() capacity.Reading {
 			used, err := s.store.ExecutionCount(context.Background(), s.executionMachine())
 			if err != nil {

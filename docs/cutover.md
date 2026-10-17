@@ -124,6 +124,12 @@ claims `internal/app/orchestrator`、`internal/adapters/store`、`taskdir`、`su
 今天新版對前者只有 `O_RDONLY`，退役後應該連讀都不要——這條讀取是一個獨立 adapter
 （`internal/adapters/swiftstore`），設計上就是要能整條拿掉。
 
+**`~/.config/clawdline/secrets/` is live.** Clawdline does not read it, but other programs and
+scheduled jobs on the machine do. No cleanup may delete or move it, and the old directory must
+never be moved or deleted as a whole: on 2026-10-17 a cleanup moved all of `~/.config/clawdline`
+to the Trash, and those programs failed until `secrets/` was restored. Clean the old directory
+file by file, and only files proved to be the retired app's.
+
 **B1 之後（2026-09-19）**：新版**先用自己的 store**（broker 的 task、waits、`session.delivered`、handoff、
 Feature Root、coordinator 表，以及自己從 transcript 算的用量），舊 store 只當「歷史補充」；
 `CLAWDLINE_NEXT_LEGACY_STORE=off` 把整條舊讀取關掉——`orchestrator.json`、`coordinator.json`、`config.json`、
@@ -459,7 +465,7 @@ Feature Root、coordinator 表，以及自己從 transcript 算的用量），�
 | **4** | **遠端與手機**：tunnel 或 Cloud 擇一當手機的 origin、push 四條路由＋送出器、`/sw.js` 與圖示、PWA 重裝；**broker 交接面**（handoffs、root-assignments、graphs、storage／maintenance）；URL scheme；hook 的結論；worktree 回收 | C1–C6、E4、E5、B4 | **這一波的手機部分退不回去**（origin 換了）。先在一台手機上試，確認再換第二台 |
 | **5** | **B1／B2 拆掉對舊 store 的依賴**＋看板、時間軸、驗證帳本、常用句、durable reports | B1、B2、F1 全部 | 把 `swiftstore` 打開即可暫時退回 |
 | **6** | **退役日**：停舊 app、從 `~/.claude/settings.json` 移除舊 hook、取消舊 app 的登入時啟動、把舊 Mac 從 Cloud 帳號撤掉（如果決定撤）、資料改標「歷史」 | 上面全部打勾 | 舊 app 重開即可——只要**沒有刪掉** `~/.config/clawdline` |
-| **7** | 清理：刪 `.build`、回收 worktree、決定要不要保留 `~/.config/clawdline` | — | — |
+| **7** | 清理：刪 `.build`、回收 worktree、決定要不要保留 `~/.config/clawdline`（only file by file: its `secrets/` is read by other programs and stays, see §3） | — | — |
 
 ### 8.3 先切哪一半？
 

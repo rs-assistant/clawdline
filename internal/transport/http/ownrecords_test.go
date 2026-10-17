@@ -164,3 +164,11 @@ func TestReusedTmuxPaneDoesNotInheritOpenedSessionLabels(t *testing.T) {
 		})
 	}
 }
+
+// The session list reads a delivered receipt as the newest row per terminal;
+// the events prune must keep that row however old it is.
+func TestTheEventsPruneKeepsTheDeliveredReceipt(t *testing.T) {
+	if !store.EventKindKeptLatest(eventSessionDelivered) {
+		t.Fatalf("%s is read through LatestEvents and the prune does not keep its newest row", eventSessionDelivered)
+	}
+}
