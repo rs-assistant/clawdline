@@ -17,6 +17,7 @@ package cloud
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 
@@ -46,10 +47,14 @@ const (
 	// letting somebody read a session list and letting them run code on this
 	// Mac are two different decisions, and one switch cannot carry both.
 	KeyCommands = "cloud_commands"
-	// KeyTerminalDirect lets a Cloud viewer's terminal move onto a direct
-	// data channel to this machine (docs/cloud-terminal-wire.md, Direct
-	// carrier). Absent is on; false keeps every terminal on the relay.
+	// KeyTerminalDirect lets a Cloud viewer's Terminal and Session reads
+	// use a direct data channel (docs/cloud-terminal-wire.md). Absent is on;
+	// false keeps both on the relay.
 	KeyTerminalDirect = "cloud_terminal_direct"
+	// KeyDirectUDPPort and KeyDirectPublicIP opt this machine into one shared
+	// ICE UDP listener. Both must be set; EC2's public IPv4 is not on its NIC.
+	KeyDirectUDPPort  = "cloud_direct_udp_port"
+	KeyDirectPublicIP = "cloud_direct_public_ip"
 )
 
 // The production endpoints, `CloudBridgeLifecycle.swift:397`.
@@ -78,6 +83,8 @@ type Settings struct {
 	MachineName string
 	// TerminalDirect is KeyTerminalDirect, true unless the file says false.
 	TerminalDirect bool
+	DirectUDPPort  int
+	DirectPublicIP string
 }
 
 // ReadSettings answers what the settings file says now.
@@ -113,6 +120,23 @@ func ReadSettings(file *nextconfig.File) (Settings, error) {
 			return Settings{}, fmt.Errorf("%s must be true or false", KeyTerminalDirect)
 		}
 		settings.TerminalDirect = direct
+	}
+	if raw, ok := values.Raw[KeyDirectUDPPort]; ok {
+		if err := json.Unmarshal(raw, &settings.DirectUDPPort); err != nil || settings.DirectUDPPort < 1024 || settings.DirectUDPPort > 65535 {
+			return Settings{}, fmt.Errorf("%s must be an integer from 1024 to 65535", KeyDirectUDPPort)
+		}
+	}
+	if raw, ok := values.Raw[KeyDirectPublicIP]; ok {
+		if err := json.Unmarshal(raw, &settings.DirectPublicIP); err != nil {
+			return Settings{}, fmt.Errorf("%s must be a public IPv4 address", KeyDirectPublicIP)
+		}
+		ip := net.ParseIP(settings.DirectPublicIP)
+		if ip == nil || ip.To4() == nil || !ip.IsGlobalUnicast() || ip.IsPrivate() {
+			return Settings{}, fmt.Errorf("%s must be a public IPv4 address", KeyDirectPublicIP)
+		}
+	}
+	if (settings.DirectUDPPort == 0) != (settings.DirectPublicIP == "") {
+		return Settings{}, fmt.Errorf("%s and %s must be set together", KeyDirectUDPPort, KeyDirectPublicIP)
 	}
 	if relay, ok := values.String(KeyRelayURL); ok && relay != "" {
 		if err := ValidateRelayURL(relay); err != nil {
@@ -150,6 +174,12 @@ func SetEnabled(file *nextconfig.File, enabled bool) error {
 // up, not about this one session.
 func SetCommands(file *nextconfig.File, allowed bool) error {
 	_, err := file.Set(map[string]any{KeyCommands: allowed})
+	return err
+}
+
+// SetTerminalDirect keeps the transport choice across daemon restarts.
+func SetTerminalDirect(file *nextconfig.File, enabled bool) error {
+	_, err := file.Set(map[string]any{KeyTerminalDirect: enabled})
 	return err
 }
 

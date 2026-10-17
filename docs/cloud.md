@@ -72,6 +72,14 @@ An incoming request arrives on `ctl/<machine>`. The transport verifies and decry
 
 Every signed-in viewer paired with the target machine may send. The machine verifies the viewer's account identity and decrypts its request with that machine's content key before handling it. A machine-local key pin, when present, takes precedence over the account roster; a local or account revocation refuses the viewer. This also admits older browsers that hold the machine key from a pairing completed before local pins existed. `cloud_commands` is checked for each effectful request. `clawdline cloud commands on|off` changes that machine switch without restarting the daemon. A Cloud command uses the same in-process HTTP handler and authorization gate as a direct request.
 
+The separate `cloud_terminal_direct` switch controls the WebRTC carrier for Terminal and Session
+reads. It defaults on; `clawdline cloud direct on|off` or this machine's local Settings → Remote
+page changes it. The local-only `POST /v1/cloud/direct` route persists the choice and replaces the
+Cloud line so existing peers close and the relay remains available. A hosted browser cannot change
+this machine switch. An EC2 instance can additionally set `cloud_direct_udp_port` and
+`cloud_direct_public_ip` together to multiplex direct ICE on one inbound UDP port; see
+[Linux setup](linux.md#let-a-cloud-browser-connect-directly-to-ec2).
+
 The connection backs off and reconnects. An outbound spool owns publish order and capacity, while inbound queues and per-channel answer reserves produce typed busy or refusal answers where possible. An accepted relay write is not the same as an executed command or an observed answer. Logs and status counters separate published, acknowledged, answered, refused and undeliverable work. Protocol and capacity details are in [cloud-wire.md](cloud-wire.md), [limits.md](limits.md), and the transport code; this overview does not promise delivery after every network or process failure.
 
 The hosted console also records a content-free `cloud.write.failed` viewer event for a refused write. Its word, code, layer, outcome, connection state and stage distinguish a refusal before publication from one whose envelope may have reached the relay or machine. The event carries no message text or request body and is delivered through `diagnostics.events` to the paired machine's daemon log. A read or mutation waiting for a complete command descriptor follows a replacement Cloud client instead of spending the remaining five-second wait on a retired one. A mutation checks that current client's descriptor again before publishing.

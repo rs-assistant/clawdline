@@ -38,7 +38,7 @@ including test imports. The local gate runs the changed packages' tests. Caller
 compilation can be requested with `--callers`; caller runtime suites wait for
 integration and CI. A deleted or unowned package cannot silently disappear.
 Selection is by path and tests execute the working tree; partial-hunk commits
-need exact-commit CI evidence before landing. Repository-copy and
+need exact-commit CI evidence; pending CI does not block dev installation. Repository-copy and
 capacity-registration guards still run, uncached, even for
 documentation edits. Generated contracts and the existing source guards remain.
 
@@ -53,8 +53,8 @@ integration/CI. A test selection is not a claim that unselected tests ran.
 
 Privacy checks on ordinary commits read the changed files through literal Git
 pathspecs, including untracked files. They still require the private-word list;
-undetermined is not a pass. Whole-tree checks and the existing incoming-commit
-history guard remain mandatory before publication. A local delta check does not
+undetermined is not a pass. Whole-tree checks remain mandatory at Release; the existing incoming-commit
+history privacy guard still applies to pushes. A local delta check does not
 certify old commits or an unchanged tree against a changed private-word list.
 
 ## Integration, CI, dev and releases
@@ -64,13 +64,17 @@ tools/check.sh --full
 tools/check.sh --full --profile
 ```
 
-Run the full gate once on the final integrated tree before landing a batch on
-`main`, publishing or installing dev/release artifacts. Full CI evidence for the
-same tree can satisfy the integration requirement. Do not repeat the full gate
-after every intermediate local commit; repeat it when code, failures or missing
-coverage require it. CI's full platform matrix, complete Go and console suites,
-cross-builds, whole-tree privacy and release acceptance remain authoritative.
-`--web` explicitly requests the complete web gate locally.
+Full suites, platform checks and bundles run in background CI after integration.
+Do not block local commits, landing on `main` or dev installation on a full local
+gate. Show pending or failed CI explicitly and fix failures. The public Release
+gate requires successful complete verification of its exact tree, whole-tree
+privacy and release acceptance. `--full` remains available for diagnosis and
+manual integration verification; `--web` requests the complete web gate locally.
+
+Dev installation builds the selected commit without repeating full verification.
+After switching, verify the running version and served stamp, `GET /` returning
+200 and existing Sessions remaining available. Startup failure rolls back through
+the updater. Passing these checks does not certify pending CI or Release coverage.
 
 Profile mode forces uncached Go tests with JSON events and retains logs and
 `go-profile.json`. Package times overlap; subtests overlap parents. Neither sum

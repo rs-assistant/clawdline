@@ -63,6 +63,28 @@ func TestTheDefaultsArePublicClawdline(t *testing.T) {
 	if settings.RelayURL != DefaultRelayURL || settings.APIBase != DefaultAPIBase {
 		t.Fatalf("endpoints: %s %s", settings.RelayURL, settings.APIBase)
 	}
+	if !settings.TerminalDirect || settings.DirectUDPPort != 0 || settings.DirectPublicIP != "" {
+		t.Fatalf("direct defaults: %+v", settings)
+	}
+}
+
+func TestFixedDirectEndpointRequiresAPublicIPv4AndPort(t *testing.T) {
+	t.Parallel()
+	settings, err := ReadSettings(settingsFile(t, `{"cloud_direct_udp_port":3479,"cloud_direct_public_ip":"198.51.100.10"}`))
+	if err != nil || settings.DirectUDPPort != 3479 || settings.DirectPublicIP != "198.51.100.10" {
+		t.Fatalf("fixed endpoint: %+v %v", settings, err)
+	}
+	for _, body := range []string{
+		`{"cloud_direct_udp_port":3479}`,
+		`{"cloud_direct_public_ip":"198.51.100.10"}`,
+		`{"cloud_direct_udp_port":80,"cloud_direct_public_ip":"198.51.100.10"}`,
+		`{"cloud_direct_udp_port":3479,"cloud_direct_public_ip":"127.0.0.1"}`,
+		`{"cloud_direct_udp_port":3479,"cloud_direct_public_ip":"invalid"}`,
+	} {
+		if _, err := ReadSettings(settingsFile(t, body)); err == nil {
+			t.Fatalf("accepted incomplete or unsafe endpoint: %s", body)
+		}
+	}
 }
 
 // A malformed endpoint stops the line and says so. The alternative is a

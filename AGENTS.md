@@ -43,12 +43,14 @@ commit**. Run the smallest relevant package/test while editing with
 **`tools/check.sh` is the local commit gate.** It runs changed Go packages, affected console tests,
 incremental whole-project type checking, changed-file privacy and repository guards. `--plan`
 explains the direct scope and transitive callers; `--callers` also compiles those callers' tests.
-Caller runtime suites, cross-platform builds/vet, complete suites, whole-tree privacy and bundles
-run once on the **final integrated tree before landing a batch on main, publishing or installing
-dev/release artifacts**, or are satisfied by full CI evidence for the same tree. Do not repeat full
-verification after every intermediate local commit. Unknown/tooling/policy inputs, unreliable
-scope discovery fail closed to full verification. Platform inputs remain named in the plan;
-foreign-platform validation is mandatory at integration/CI.
+Caller runtime suites, cross-platform builds/vet, complete suites and bundles run in background
+CI after integration. They do not block a local commit, landing on main or a dev installation.
+A public Release requires complete verification of its exact tree and release acceptance.
+Dev installation builds the selected commit, then checks the running version, console and existing
+Sessions; a failed startup rolls back. Report pending or failed CI explicitly and fix failures.
+Unknown/tooling/policy inputs and unreliable scope discovery conservatively select full checks
+when requesting a local check, but are not a dev-install prerequisite. Platform inputs remain
+named in the plan; foreign-platform validation belongs to CI and the Release gate.
 
 Every selected check must be green; unknown is not a pass. **`tools/check.sh --full` runs every
 check below**, once inside `tools/heavy.sh`, and prints individual outcomes and elapsed times.

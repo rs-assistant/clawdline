@@ -283,6 +283,45 @@ func (s *Server) cloudCommandsRoute(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"commands": on})
 }
 
+// cloudDirectRoute changes the machine's shared Terminal and Session carrier.
+// Replacing an enabled line retires its current direct peers immediately.
+func (s *Server) cloudDirectRoute(w http.ResponseWriter, r *http.Request) {
+	if !requireLocal(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeAuthRefusal(w, http.StatusMethodNotAllowed, "bad_request", "The direct connection switch is changed with POST.")
+		return
+	}
+	on, ok := readCloudSwitch(w, r)
+	if !ok {
+		return
+	}
+	file := nextconfig.Open(s.cfg.Dir)
+	settings, err := adaptercloud.ReadSettings(file)
+	if err != nil {
+		writeCloudOnboardingFailure(w, err)
+		return
+	}
+	if settings.Enabled && s.cloudReload == nil {
+		writeAuthRefusal(w, http.StatusServiceUnavailable, "cloud_runtime_unavailable", "The Cloud connection is not available in this daemon.")
+		return
+	}
+	if settings.TerminalDirect != on {
+		if err := adaptercloud.SetTerminalDirect(file, on); err != nil {
+			writeCloudOnboardingFailure(w, err)
+			return
+		}
+	}
+	if settings.Enabled {
+		if err := s.cloudReload(); err != nil {
+			writeCloudOnboardingFailure(w, err)
+			return
+		}
+	}
+	writeJSON(w, map[string]bool{"terminal_direct": on})
+}
+
 func readCloudSwitch(w http.ResponseWriter, r *http.Request) (bool, bool) {
 	var body struct {
 		Enabled *bool `json:"enabled"`
