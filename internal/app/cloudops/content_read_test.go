@@ -155,7 +155,6 @@ func TestReadContentRailPinsTheSelectedExecution(t *testing.T) {
 		name string
 	}{
 		{map[string]any{"type": "info", "session": pane, "parts": "full", "expected_generation": pinnedGeneration}, "info.full"},
-		{map[string]any{"type": "info", "session": pane, "parts": "list", "expected_generation": pinnedGeneration}, "info.list"},
 		{map[string]any{"type": "skills", "session": pane, "expected_generation": pinnedGeneration}, "skills"},
 		{map[string]any{"type": "transcript", "session": pane, "limit": 100, "expected_generation": pinnedGeneration}, "transcript"},
 		{map[string]any{"type": "transcript", "session": pane, "limit": 100, "before": 12345,
@@ -177,9 +176,6 @@ func TestReadContentRailPinsTheSelectedExecution(t *testing.T) {
 		}
 		if input.name == "transcript.before.12345" && r.last().Query["before"] != "12345" {
 			t.Fatalf("pinned transcript cursor: %+v", r.last().Query)
-		}
-		if input.name == "info.list" && r.last().Query["parts"] != "list" {
-			t.Fatalf("pinned list title query: %+v", r.last().Query)
 		}
 		if got := answerOf(t, a); got["machine_id"] != "mac-01" || got["session_id"] != pane ||
 			got["expected_generation"] != pinnedGeneration || got["seq"] != float64(411) {
@@ -365,5 +361,21 @@ func TestPeerInboxRequiresThePinnedContentRailAndCurrentViewerGrant(t *testing.T
 	}
 	if answer := b.Handle(context.Background(), read); answer.Code != "read_transcript_required" || len(r.seen) != 0 {
 		t.Fatalf("revoked viewer read crossed content gate: %+v, %+v", answer, r.seen)
+	}
+}
+
+// The per-Session `info` `parts:"list"` read had no sender left once every
+// console moved to `sessions.list`; it is now malformed like any other unknown
+// part, and nothing is routed.
+func TestTheRetiredListInfoReadIsMalformed(t *testing.T) {
+	r := &router{}
+	b := open(r)
+	b.TranscriptAuthority = func(context.Context, string, ed25519.PublicKey) Authority {
+		return contentReadAuthority(true)
+	}
+	a := b.Handle(context.Background(), contentReadRequest(t,
+		map[string]any{"type": "info", "session": pane, "parts": "list", "expected_generation": pinnedGeneration}))
+	if a.OK() || a.Code != "malformed_read" || len(r.seen) != 0 {
+		t.Fatalf("a list info read: answer=%+v routes=%+v", a, r.seen)
 	}
 }

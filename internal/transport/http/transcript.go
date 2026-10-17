@@ -431,22 +431,6 @@ func (s *Server) sessionInfoRoute(w http.ResponseWriter, r *http.Request, id str
 		writeActionRefusal(w, err)
 		return
 	}
-	// The list form contains only the display name for this pinned execution.
-	// It does not walk transcript, repository or shell state for every row.
-	if r.URL.Query().Get("parts") == "list" {
-		info := contract.SessionInfo{Session: contract.SessionInfoSession{
-			ID: item.ID, Title: s.sessionDisplayLabel(ctx, item), Assistant: contract.Assistant(item.Assistant),
-			CWD: item.CWD,
-		}, Models: []contract.SessionModel{}}
-		if s.icons != nil {
-			info.Session.Icon = wireIcon(s.icons.For(item.CWD))
-		}
-		if !s.admitPinnedTarget(w, r, id) {
-			return
-		}
-		writeJSON(w, contract.SessionInfoReply{Info: info})
-		return
-	}
 	home, _ := os.UserHomeDir()
 	info := contract.SessionInfo{
 		Session: contract.SessionInfoSession{
