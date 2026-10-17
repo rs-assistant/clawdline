@@ -159,6 +159,7 @@ func ownTasks(records []orchestrator.Record, byTerminal map[string]swiftstore.Li
 
 			ChildTerminal: stringPtr(r.ChildTerminalID),
 			ChildBackend:  stringPtr(r.ChildBackend),
+			ChildSession:  stringPtr(r.ChildConversationID),
 		}
 		if r.Callback != nil {
 			t.CallbackIntent = r.Callback.Intent
@@ -200,7 +201,9 @@ func ownTasks(records []orchestrator.Record, byTerminal map[string]swiftstore.Li
 					LandedAt: secondsPtrOf(l.At)}
 			}
 		}
-		if live, ok := byTerminal[r.ChildTerminalID]; ok && r.ChildTerminalID != "" && ownChild(r, live) {
+		if live, ok := byTerminal[r.ChildTerminalID]; ok && r.ChildTerminalID != "" &&
+			(r.ChildConversationID == live.ConversationID || (r.ChildConversationID == "" && !r.State.Terminal())) &&
+			ownChild(r, live) {
 			tty, pid, conv := live.TTY, live.PID, live.ConversationID
 			start := secondsOf(live.ProcessStart)
 			t.ChildTTY, t.ChildPID, t.ChildProcStart, t.ChildSession = &tty, &pid, &start, &conv

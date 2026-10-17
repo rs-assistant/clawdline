@@ -18,12 +18,12 @@ import (
 // its tab. The person's rule is that a scheduled Session ends when it reports
 // a delivery or a failure, and not because a clock ran out mid-task.
 
-// noteChildConversation records the conversation the child's tab holds, the
-// first time a reading binds one, so a finished scheduled run can be resumed
-// after its tab has gone. Only scheduled runs are asked: nothing else resumes
-// a child's conversation, and every other task's beat stays a pure read.
+// noteChildConversation records the conversation the child's tab holds the
+// first time a reading binds one. Scheduled runs need it for resume; every
+// task needs it so a finished task cannot rename a later conversation in a
+// reused terminal.
 func (b *Broker) noteChildConversation(ctx context.Context, rd reading, r Record) Record {
-	if r.ScheduleID == "" || r.ChildTerminalID == "" || r.ChildConversationID != "" || r.State.Terminal() {
+	if r.ChildTerminalID == "" || r.ChildConversationID != "" || r.State.Terminal() {
 		return r
 	}
 	s, ok := rd.session(r.ChildTerminalID)

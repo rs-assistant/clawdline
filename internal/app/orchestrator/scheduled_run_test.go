@@ -49,7 +49,7 @@ func TestAScheduledRunAtWorkIsNotEndedByItsClock(t *testing.T) {
 		pane("%1", session.StateWorking, "c1111111-1111-4111-8111-111111111111"),
 		pane("%2", session.StateWaiting, ""),
 		pane("%3", session.StateIdle, ""),
-		pane("%4", session.StateWorking, ""),
+		pane("%4", session.StateWorking, "c4444444-4444-4444-8444-444444444444"),
 	}}
 	b.Reading = func(context.Context) session.Inventory { return inv }
 
@@ -69,8 +69,8 @@ func TestAScheduledRunAtWorkIsNotEndedByItsClock(t *testing.T) {
 	if got := record(working).ChildConversationID; got != "c1111111-1111-4111-8111-111111111111" {
 		t.Errorf("the scheduled child's conversation is %q, want the one its tab held", got)
 	}
-	if got := record(unscheduled).ChildConversationID; got != "" {
-		t.Errorf("a dispatched task recorded the conversation %q; only scheduled runs keep one", got)
+	if got := record(unscheduled).ChildConversationID; got != "c4444444-4444-4444-8444-444444444444" {
+		t.Errorf("a dispatched task lost the conversation it ran in: %q", got)
 	}
 
 	// The child's tab is gone: the clock ends the run as before.
