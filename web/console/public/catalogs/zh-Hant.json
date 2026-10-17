@@ -4403,6 +4403,7 @@
   "next.scheduleWebhookDetailsHide": "收合",
   "next.imagePreviewPrevious": "上一張",
   "next.imagePreviewNext": "下一張",
+  "next.imagePreviewDownload": "下載圖片",
   "next.imagePreviewPosition": "{index} / {count}",
   "next.updateToVersion": "更新到 {latest}",
   "next.updateRunningDev": "dev {commit}",
