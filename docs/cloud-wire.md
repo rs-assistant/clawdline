@@ -610,6 +610,8 @@ Go daemon 另外發布 `ss/<machine>/<session>`。每個 JSON 僅有 `machine_id
 
 `presentation_generation` 是機器端顯示事實（工作行、work state、shell、attention 等）的雜湊，本身不含內容。viewer 看到它變才重讀該機器的 pinned 清單（標題、圖示、work note）。這一欄是可加的：沒有這一欄的頁面沿用 `snapshot_generation` 當重讀鍵，而沒有這一欄的機器其 `snapshot_generation` 本來就隨每次顯示變動而變，所以新頁面對舊機器會退回同樣的行為（`web/console/src/cloud/all-machine-sessions.ts` 的 `presentationPass`）。
 
+A viewer that asks a machine to restate its Session rows (a manual refresh) gets a reply that may carry an optional `snapshot_generation`: the pass id of the `ss/` inventory marker that restatement sent or kept. It is present only when every row of that pass was sent and the marker followed them; a partial read or a failed row send leaves it out. The viewer answers the refresh once it holds that marker and every row carries the same pass, which is immediate when the Session set has not changed. The field is additive: a viewer that does not know it ignores it, and a viewer talking to a machine that does not send it keeps the older rule of waiting for a pass newer than the one it holds (`web/console/src/cloud/relay-reader.ts`).
+
 因為列先發、標記後發，瀏覽器逐封開啟時，同一批還沒到齊的那幾毫秒裡會同時持有「新一批的列」與「舊一批的標記」。固定世代讀取遇到這種 `pass_mismatch` 時，頁面會等這台機器的下一個標記（最多 `PASS_SETTLE_MS`，2 秒）再判斷一次；等不到仍照舊拒絕，且不送出任何請求（`web/console/src/cloud/relay-reader.ts` `coherentSession`）。2026-10-10 以一小時、每 15 秒一批、十個 Session 重播：封包間隔 20 ms 時頁面原本自己拒絕 2 次、50 ms 時 7 次，修正後皆為 0（`read-replay.test.ts`）。
 
 私有 Cloud relay 的相容版 `b6d3740` 已部署，允許並預設推送 `ss/`，同時保留現有 `s/` 接收方式。`f7e309e` 已實作表中的目標接收規則，但尚未部署；Console 用 `ss/` 清單、按需訂閱 `s/` 詳情後，再啟用 `s/` 明確訂閱與 `read_transcript` 權限。權限收緊前 relay 仍依 `read_sessions` 接收完整 `s/`；不能把該 row 當成僅狀態資料。完整 `s/` 可選擇發布時仍帶 `execution_generation`，舊快取缺這欄時不得用於固定世代的內容讀取。
