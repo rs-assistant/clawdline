@@ -37,7 +37,7 @@ func (s *Server) sessionTail(item session.Session) (transcript.Page, error) {
 	if s.sessionTailRead != nil {
 		return s.sessionTailRead(item)
 	}
-	path := recordPath(item)
+	path := s.recordPath(item)
 	if path == "" {
 		return transcript.Page{}, transcript.ErrNoRecord
 	}

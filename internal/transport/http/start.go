@@ -202,12 +202,11 @@ type startReading struct {
 func (s *Server) readForStart(ctx context.Context) startReading {
 	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	return startReadingFrom(s.freshReading(ctx))
+	return s.startReadingFrom(s.freshReading(ctx))
 }
 
 // startReadingFrom is readForStart over a reading the caller already took.
-func startReadingFrom(inv session.Inventory) startReading {
-	home, _ := os.UserHomeDir()
+func (s *Server) startReadingFrom(inv session.Inventory) startReading {
 	out := startReading{openClaude: map[string]bool{}, openCodex: map[string]bool{}}
 	for _, item := range inv.Sessions {
 		if !item.IsAssistant() {
@@ -221,10 +220,10 @@ func startReadingFrom(inv session.Inventory) startReading {
 		}
 		switch item.Assistant {
 		case session.AssistantClaude:
-			if item.CWD == "" {
+			path := s.recordPath(item)
+			if path == "" {
 				continue
 			}
-			path := transcript.ClaudePath(home, item.CWD, item.ConversationID)
 			if resolved, err := filepath.EvalSymlinks(path); err == nil {
 				path = resolved
 			}

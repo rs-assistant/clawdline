@@ -239,7 +239,7 @@ func (s *Server) restoreSessions(w http.ResponseWriter, raw []byte) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	inv := s.freshReading(ctx)
-	reading := startReadingFrom(inv)
+	reading := s.startReadingFrom(inv)
 	results, err := s.restore.Restore(ctx, ids, inv, func(ctx context.Context, row store.RestoreRow) (app.Started, error) {
 		return s.resumeRestorable(ctx, reading, row)
 	})

@@ -19,17 +19,11 @@ import (
 // as the only source. All of the call's questions come back; which one is on
 // screen is only the screen's to say (session.ShowingQuestion).
 func (h *Host) OpenQuestions(ctx context.Context, s session.Session) ([]session.AskedQuestion, bool) {
-	if s.Assistant != session.AssistantClaude || s.ConversationID == "" {
+	path, ok := h.claudeTranscript(s)
+	if !ok {
 		return nil, false
 	}
-	cwd := s.CWD
-	if r, ok := h.claudeFor(s.PID); ok && r.CWD != "" {
-		cwd = r.CWD
-	}
-	if cwd == "" {
-		return nil, false
-	}
-	page, err := ReadClaude(ClaudePath(h.Home, cwd, s.ConversationID), 1)
+	page, err := ReadClaude(path, 1)
 	if err != nil || len(page.Entries) == 0 {
 		return nil, false
 	}

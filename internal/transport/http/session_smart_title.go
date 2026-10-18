@@ -105,7 +105,7 @@ func (s *Server) firstRequest(item session.Session) (string, error) {
 	if s.firstSessionRequest != nil {
 		return s.firstSessionRequest(item)
 	}
-	path := recordPath(item)
+	path := s.recordPath(item)
 	if path == "" {
 		return "", transcript.ErrNoRecord
 	}
