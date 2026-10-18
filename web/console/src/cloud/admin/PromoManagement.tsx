@@ -7,6 +7,7 @@ import {
   type CampaignDraft, type CampaignPhase, type CodePage, type DraftProblem, type Failure, type ListedCampaign, type PromoCampaign, type Read,
 } from "./promo-api.js"
 import { adminPath, type AdminWord, type Say } from "./words.js"
+import { guardCodeNavigation } from "./navigation-guard.js"
 
 /*
  * `/admin/promotions`: what the codes have done, and the three things an
@@ -671,6 +672,19 @@ function OneTimeCode({ code, codeId, say, onDone }: { code: string; codeId: stri
     field.current?.select()
   }, [])
 
+  useEffect(() => {
+    const release = guardCodeNavigation(() => window.confirm(say("revealLeaveWarning")))
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ""
+    }
+    window.addEventListener("beforeunload", beforeUnload)
+    return () => {
+      release()
+      window.removeEventListener("beforeunload", beforeUnload)
+    }
+  }, [say])
+
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(code)
@@ -684,7 +698,7 @@ function OneTimeCode({ code, codeId, say, onDone }: { code: string; codeId: stri
 
   return (
     <div className="adm-reveal" role="group" aria-labelledby={id + "h"}>
-      <p id={id + "h"} className="adm-reveal-title">{say("revealTitle")}</p>
+      <h3 id={id + "h"} className="adm-reveal-title">{say("revealTitle")}</h3>
       <p className="adm-reveal-warn"><span aria-hidden="true">⚠ </span>{say("revealWarning")}</p>
       <div className="adm-reveal-row">
         <label htmlFor={id + "c"} className="adm-visually-hidden">{say("revealLabel")}</label>

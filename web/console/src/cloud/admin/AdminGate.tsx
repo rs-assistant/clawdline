@@ -5,6 +5,7 @@ import { bootCatalog } from "../../catalog.js"
 import { catalogURL } from "../strings.js"
 import { AccountsPage, OverviewPage, RouteLink, UsagePage, type Go } from "./AdminDashboard.js"
 import { PromoManagement } from "./PromoManagement.js"
+import { mayLeaveCode } from "./navigation-guard.js"
 import { loadOverview, type Overview } from "./api.js"
 import { ADMIN_ROUTES, adminLocale, adminPath, adminRoute, adminWords, type AdminRoute, type Say } from "./words.js"
 import "./admin.css"
@@ -223,6 +224,7 @@ function useAdminRoute() {
   const read = () => ({ route: adminRoute(location.pathname), search: location.search })
   const [where, setWhere] = useState(read)
   const [moved, setMoved] = useState(0)
+  const currentAddress = useRef(location.pathname + location.search)
 
   useEffect(() => {
     // An address under /admin that names no page opens the overview in its place.
@@ -231,6 +233,11 @@ function useAdminRoute() {
       setWhere(read())
     }
     const onPop = () => {
+      if (!mayLeaveCode()) {
+        history.pushState(null, "", currentAddress.current)
+        return
+      }
+      currentAddress.current = location.pathname + location.search
       setWhere(read())
       setMoved((m) => m + 1)
     }
@@ -242,7 +249,9 @@ function useAdminRoute() {
   const go = useCallback((href: string) => {
     const target = new URL(href, location.href)
     if (target.pathname + target.search === location.pathname + location.search) return
+    if (!mayLeaveCode()) return
     history.pushState(null, "", target.pathname + target.search)
+    currentAddress.current = target.pathname + target.search
     setWhere(read())
     setMoved((m) => m + 1)
     scrollTo({ top: 0 })

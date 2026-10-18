@@ -10,6 +10,8 @@
   background: var(--bg);
   color: var(--ink);
   font-family: var(--ui);
+  --adm-chart: #a39283;
+  --adm-link: #eca080;
 }
 
 .adm-visually-hidden {
@@ -187,12 +189,12 @@
 .adm-insight-mark { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); transform: translateY(-1px); }
 .adm-insight-up { background: var(--ok); }
 .adm-insight-down { background: var(--warn); }
-.adm-insight-flat, .adm-insight-note { background: var(--peer); }
+.adm-insight-flat, .adm-insight-note { background: var(--adm-chart); }
 .adm-insight-link, .adm-crumb {
   display: inline-flex; align-items: center; min-height: 32px; padding: 0 6px; border-radius: 6px;
-  color: var(--peer); font-size: 13px; text-decoration: none; white-space: nowrap;
+  color: var(--adm-link); font-size: 13px; text-decoration: none; white-space: nowrap;
 }
-.adm-insight-link:hover, .adm-crumb:hover { background: var(--peer-in); color: var(--ink); }
+.adm-insight-link:hover, .adm-crumb:hover { background: var(--accent-in); color: var(--ink); }
 .adm-crumb { justify-self: start; margin-left: -6px; }
 .adm-dest { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .adm-dest-item { min-width: 0; display: flex; }
@@ -205,7 +207,7 @@
 .adm-dest-card:hover { border-color: var(--accent-ed); background: var(--card-hi); }
 .adm-dest-title { font-size: 15px; font-weight: 620; }
 .adm-dest-body { color: var(--dim); font-size: 13px; line-height: 1.5; }
-.adm-dest-go { color: var(--peer); font-size: 13px; margin-top: 4px; }
+.adm-dest-go { color: var(--adm-link); font-size: 13px; margin-top: 4px; }
 
 .adm-chart-body { position: relative; }
 .adm-chart-max { position: absolute; top: -2px; right: 0; color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -217,7 +219,8 @@
 .adm-table-compare td { width: 34%; }
 .adm-measured { display: grid; gap: 6px; }
 .adm-measured-num { font-weight: 580; }
-.adm-meter-now > span { background: var(--peer); }
+.adm-table-compare .adm-meter > span { background: var(--adm-chart); }
+.adm-table-compare .adm-meter-now > span { background: var(--accent); }
 
 /* ---- promotions --------------------------------------------------------- */
 .adm-panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
@@ -323,7 +326,7 @@
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   display: flex; flex-direction: column; gap: 6px;
 }
-.adm-tile-lead { background: linear-gradient(var(--accent-in), var(--accent-in)), var(--card); border-color: var(--accent-ed); }
+.adm-tile-lead { background: var(--card); border-color: var(--line); box-shadow: inset 0 3px var(--accent); }
 .adm-tile-label { margin: 0; color: var(--dim); font-size: 13px; }
 .adm-tile-value {
   margin: 0; font-size: 32px; font-weight: 620; line-height: 1.1; letter-spacing: -0.02em;
@@ -350,7 +353,7 @@
 .adm-chart-range { color: var(--dim); font-size: 12.5px; }
 .adm-svg { width: 100%; height: 120px; display: block; }
 .adm-axis { stroke: var(--line); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.adm-bar { fill: var(--peer); opacity: .55; }
+.adm-bar { fill: var(--adm-chart); opacity: .72; }
 .adm-bar-peak { fill: var(--accent); opacity: 1; }
 .adm-chart-scale { display: flex; justify-content: space-between; color: var(--dim); font-size: 11.5px; font-variant-numeric: tabular-nums; margin-top: -4px; }
 .adm-chart-summary { margin: 0; font-size: 13px; color: var(--ink); }
@@ -375,7 +378,7 @@
 .adm-capped { color: var(--ink); }
 .adm-cname { overflow-wrap: anywhere; }
 .adm-unnamed { color: var(--dim); font-style: italic; }
-.adm-when { color: var(--dim); overflow-wrap: anywhere; }
+.adm-when { color: var(--dim); overflow-wrap: normal; }
 .adm-fillnum { display: block; white-space: nowrap; }
 .adm-meter { display: block; width: 100%; max-width: 140px; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .adm-meter > span { display: block; height: 100%; background: var(--accent); }
@@ -385,7 +388,7 @@
 .adm-status-ok .adm-dot { background: var(--ok); }
 .adm-status-warn .adm-dot { background: var(--warn); }
 .adm-status-bad .adm-dot { background: var(--bad); }
-.adm-status-calm .adm-dot { background: var(--peer); }
+.adm-status-calm .adm-dot { background: var(--adm-chart); }
 .adm-status-dim { color: var(--dim); }
 
 /* ---- usage ------------------------------------------------------------ */

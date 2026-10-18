@@ -123,8 +123,9 @@ export function insights(overview: Overview, say: Say, locale: string): Insight[
   out.push({ key: "accounts7", ...a7, route: "accounts", linkKey: "seeAccounts" })
   if (accounts.daily.length) {
     const peak = accounts.daily.reduce((best, d) => (d.count > best.count ? d : best), accounts.daily[0])
+    const tied = accounts.daily.filter((d) => d.count === peak.count).length
     out.push(peak.count > 0
-      ? { key: "peak", text: say("insightPeak", { day: longDay(peak.day, locale), count: n.format(peak.count), days: accounts.daily.length }), tone: "note", route: "accounts", linkKey: "seeAccounts" }
+      ? { key: "peak", text: say(tied > 1 ? "insightPeakTie" : "insightPeak", { day: longDay(peak.day, locale), count: n.format(peak.count), days: accounts.daily.length, tied: n.format(tied) }), tone: "note", route: "accounts", linkKey: "seeAccounts" }
       : { key: "peak", text: say("insightNoSignups", { days: accounts.daily.length }), tone: "note", route: "accounts", linkKey: "seeAccounts" })
   }
   const r30 = changeSentence(promotions.redeemed_30d, say, n, { up: "insightRedeemedUp", down: "insightRedeemedDown", flat: "insightRedeemedFlat" })
@@ -173,6 +174,7 @@ export function AccountsPage({ overview, say, locale }: PageProps) {
   const yesterday = days.length ? days[days.length - 1] : null
   const sum = days.reduce((s, d) => s + d.count, 0)
   const peak = days.length ? days.reduce((best, d) => (d.count > best.count ? d : best), days[0]) : null
+  const peakTies = peak ? days.filter((d) => d.count === peak.count).length : 0
   const quiet = days.filter((d) => d.count === 0).length
   return (
     <div className="adm-page">
@@ -193,7 +195,7 @@ export function AccountsPage({ overview, say, locale }: PageProps) {
           <h2 id="adm-acc-stats" className="adm-h2">{say("accountsPattern")}</h2>
           <div className="adm-tiles adm-tiles-3">
             <Stat label={say("statDailyAverage")} value={one.format(sum / days.length)} note={say("statOverDays", { days: days.length })} />
-            <Stat label={say("statBusiest")} value={peak ? n.format(peak.count) : "—"} note={peak ? longDay(peak.day, locale) : ""} />
+            <Stat label={say("statBusiest")} value={peak ? n.format(peak.count) : "—"} note={peak ? peakTies > 1 ? say("statBusiestTie", { days: n.format(peakTies) }) : longDay(peak.day, locale) : ""} />
             <Stat label={say("statQuietDays")} value={n.format(quiet)} note={say("statQuietNote", { days: days.length })} />
           </div>
         </section>
