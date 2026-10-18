@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/sainteye/clawdline/internal/domain/cloudvocab"
 	httptransport "github.com/sainteye/clawdline/internal/transport/http"
 )
 
@@ -123,7 +124,17 @@ func main() {
 		fatal("refusal reference: %v", err)
 	}
 
+	vocabulary, err := cloudvocab.Operations()
+	if err != nil {
+		fatal("%v", err)
+	}
+	decoders, err := renderCloudDecoders(vocabulary)
+	if err != nil {
+		fatal("cloud decoders: %v", err)
+	}
+
 	want := map[string][]byte{
+		filepath.Join(root, "internal", "app", "cloudops", "zz_decode_generated.go"): decoders,
 		filepath.Join(root, "internal", "contract", "zz_generated.go"): renderGo(names),
 		filepath.Join(root, "web", "contract", "src", "generated.ts"):  renderTS(names),
 		routesPath: renderRoutes(routes),
