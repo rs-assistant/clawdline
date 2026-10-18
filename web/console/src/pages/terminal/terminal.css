@@ -71,7 +71,9 @@
 .terminal-entry[open] { padding-bottom: 14px; }
 
 /* one terminal */
-.terminal-page[data-view="one"] { display: flex; flex-direction: column; overflow: hidden; padding: 10px clamp(10px, 2vw, 24px) max(10px, env(safe-area-inset-bottom)); }
+/* `--indicator`, not `env(safe-area-inset-bottom)`: the page has no `viewport-fit=cover`, so env()
+   is zero and the key row sat under the home indicator, out of reach (legacy/tokens.css). */
+.terminal-page[data-view="one"] { display: flex; flex-direction: column; overflow: hidden; padding: 10px clamp(10px, 2vw, 24px) calc(10px + var(--indicator)); }
 .terminal-page[data-view="one"][hidden] { display: none; }
 /* One terminal in the Session page's second column (TerminalPane.tsx): the column the open
    session takes otherwise, which stays mounted and is put away while the list shows terminals. */
@@ -192,7 +194,7 @@
        on-screen keyboard: iOS does not shrink the layout viewport for it.
        `--vvh` is legacy/js/core/env.js's, as legacy/base.css uses it. */
     .terminal-page[data-view="one"] {
-        padding: 8px 8px max(8px, env(safe-area-inset-bottom));
+        padding: 8px 8px calc(8px + var(--indicator));
         bottom: auto; height: calc(var(--vvh, 100dvh) - var(--head-h, 52px));
     }
     /* One terminal on a phone keeps its rows for the screen: the notes are on the list. */
