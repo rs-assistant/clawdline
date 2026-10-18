@@ -1,6 +1,6 @@
 import { useId } from "react"
 import { campaignFill, trend, type CampaignRow, type Comparison, type DailyCount, type Overview, type UsagePeriod } from "./api.js"
-import type { Say } from "./strings.js"
+import type { Say } from "./words.js"
 
 /*
  * The overview, drawn. Three sections in the order an operator asks: are
@@ -33,6 +33,7 @@ export function AdminDashboard({ overview, say, locale, stale }: {
           <TrendTile label={say("accountsNew7")} value={accounts.new_7d} say={say} n={n} />
           <TrendTile label={say("accountsNew30")} value={accounts.new_30d} say={say} n={n} />
         </div>
+        <p className="adm-fine">{say("comparisonNote")}</p>
         <DailyChart title={say("chartAccounts")} days={accounts.daily} say={say} locale={locale} />
       </section>
 
@@ -44,18 +45,19 @@ export function AdminDashboard({ overview, say, locale, stale }: {
           <TrendTile label={say("redeemed7")} value={promotions.redeemed_7d} say={say} n={n} />
           <TrendTile label={say("redeemed30")} value={promotions.redeemed_30d} say={say} n={n} />
         </div>
+        <p className="adm-fine">{say("comparisonNote")}</p>
         <p className="adm-fine">
           {say("promoInventory", { campaigns: n.format(promotions.campaigns_total), codes: n.format(promotions.codes_total) })}
         </p>
         <DailyChart title={say("chartRedemptions")} days={promotions.daily} say={say} locale={locale} />
-        <Campaigns rows={promotions.campaigns.rows} total={promotions.campaigns.total} say={say} locale={locale} n={n} />
+        <Campaigns rows={promotions.campaigns.rows} total={promotions.campaigns.total} say={say} n={n} />
       </section>
 
       <section className="adm-section" aria-labelledby="adm-usage">
         <h2 id="adm-usage" className="adm-h2">{say("sectionUsage")}</h2>
         <div className="adm-usage">
-          <UsageCard heading={say("usageCurrent")} period={usage.current} say={say} locale={locale} n={n} />
-          <UsageCard heading={say("usagePrevious")} period={usage.previous} say={say} locale={locale} n={n} />
+          <UsageCard heading={say("usageCurrent")} period={usage.current} say={say} locale={locale} n={n} current asOf={overview.generated_at} />
+          <UsageCard heading={say("usagePrevious")} period={usage.previous} say={say} locale={locale} n={n} asOf={overview.generated_at} />
         </div>
         <p className="adm-fine">{say("usageNoGrowth")}</p>
       </section>
@@ -170,10 +172,10 @@ function DailyChart({ title, days, say, locale }: { title: string; days: DailyCo
   )
 }
 
-function campaignWindow(row: CampaignRow, say: Say, locale: string): string {
-  const f = new Intl.DateTimeFormat(locale, { timeZone: "UTC", year: "numeric", month: "numeric", day: "numeric" })
-  const from = row.not_before ? f.format(new Date(row.not_before)) : null
-  const to = row.expires_at ? f.format(new Date(row.expires_at)) : null
+function campaignWindow(row: CampaignRow, say: Say): string {
+  const utc = (value: string) => new Date(value).toISOString().replace("T", " ").replace(/\.000Z$/, "Z")
+  const from = row.not_before ? utc(row.not_before) : null
+  const to = row.expires_at ? utc(row.expires_at) : null
   if (from && to) return say("windowRange", { from, to })
   if (from) return say("windowFrom", { date: from })
   if (to) return say("windowUntil", { date: to })
@@ -190,10 +192,11 @@ const STATUS_TONE: Record<CampaignRow["status"], string> = {
   unknown: "dim",
 }
 
-function Campaigns({ rows, total, say, locale, n }: { rows: CampaignRow[]; total: number; say: Say; locale: string; n: Intl.NumberFormat }) {
+function Campaigns({ rows, total, say, n }: { rows: CampaignRow[]; total: number; say: Say; n: Intl.NumberFormat }) {
   return (
     <div className="adm-panel adm-campaigns">
       <h3 className="adm-h3">{say("campaignsTitle")}</h3>
+      <p className="adm-fine">{say("campaignEligibilityNote")}</p>
       {total > rows.length ? (
         <p className="adm-fine adm-capped">{say("campaignsCapped", { shown: n.format(rows.length), total: n.format(total) })}</p>
       ) : null}
@@ -224,7 +227,7 @@ function Campaigns({ rows, total, say, locale, n }: { rows: CampaignRow[]; total
                         <span className="adm-dot" aria-hidden="true" />{say(`status_${row.status}`)}
                       </span>
                     </td>
-                    <td data-label={say("campaignWindow")} className="adm-when">{campaignWindow(row, say, locale)}</td>
+                    <td data-label={say("campaignWindow")} className="adm-when">{campaignWindow(row, say)}</td>
                     <td data-label={say("campaignRedeemed")}>
                       <span className="adm-fillnum">
                         {row.redemption_limit === null
@@ -264,7 +267,7 @@ function monthName(period: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { timeZone: "UTC", year: "numeric", month: "long" }).format(new Date(period + "-01T00:00:00Z"))
 }
 
-function UsageCard({ heading, period, say, locale, n }: { heading: string; period: UsagePeriod; say: Say; locale: string; n: Intl.NumberFormat }) {
+function UsageCard({ heading, period, say, locale, n, current = false, asOf }: { heading: string; period: UsagePeriod; say: Say; locale: string; n: Intl.NumberFormat; current?: boolean; asOf: string }) {
   const rows: [string, number | null, (v: number) => string][] = [
     [say("usageActive"), period.active_accounts, (v) => n.format(v)],
     [say("usageDispatches"), period.counters.dispatches, (v) => n.format(v)],
@@ -278,6 +281,7 @@ function UsageCard({ heading, period, say, locale, n }: { heading: string; perio
         <h3 className="adm-h3">{heading}<span className="adm-month">{monthName(period.period, locale)}</span></h3>
         {period.coverage === "partial" ? <span className="adm-status adm-status-warn"><span className="adm-dot" aria-hidden="true" />{say("usagePartial")}</span> : null}
       </div>
+      <p className="adm-fine">{current ? say("usageInProgress", { time: new Date(asOf).toISOString().replace("T", " ").replace(/\.000Z$/, "Z") }) : say("usageEnded")}</p>
       {period.coverage === "partial" ? <p className="adm-fine">{say("usagePartialNote")}</p> : null}
       <dl className="adm-dl">
         {rows.map(([label, value, format]) => (

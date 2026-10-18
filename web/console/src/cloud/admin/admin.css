@@ -101,8 +101,7 @@
   font-weight: 600; font-variant-numeric: tabular-nums;
   border: 1px solid var(--line); color: var(--dim);
 }
-.adm-chip-up { color: var(--ok); border-color: rgba(95, 158, 115, .4); background: rgba(95, 158, 115, .1); }
-.adm-chip-down { color: var(--warn); border-color: rgba(176, 138, 74, .4); background: rgba(176, 138, 74, .1); }
+.adm-chip-up, .adm-chip-down { color: var(--dim); border-color: var(--line); background: var(--card-hi); }
 .adm-trend-prev { color: var(--dim); font-variant-numeric: tabular-nums; }
 
 /* ---- panels and chart ------------------------------------------------- */
@@ -142,12 +141,12 @@
 .adm-capped { color: var(--ink); }
 .adm-cname { overflow-wrap: anywhere; }
 .adm-unnamed { color: var(--dim); font-style: italic; }
-.adm-when { color: var(--dim); white-space: nowrap; }
+.adm-when { color: var(--dim); overflow-wrap: anywhere; }
 .adm-fillnum { display: block; white-space: nowrap; }
 .adm-meter { display: block; width: 100%; max-width: 140px; height: 4px; margin-top: 6px; border-radius: 2px; background: var(--line); overflow: hidden; }
 .adm-meter > span { display: block; height: 100%; background: var(--accent); }
 
-.adm-status { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; color: var(--ink); font-size: 13px; }
+.adm-status { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); font-size: 13px; }
 .adm-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
 .adm-status-ok .adm-dot { background: var(--ok); }
 .adm-status-warn .adm-dot { background: var(--warn); }

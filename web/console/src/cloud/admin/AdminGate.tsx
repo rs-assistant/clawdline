@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { chooseTransport, cloudViewerDeviceMetadata, newCloudSession, readCloudConfig, type CloudConfig, type EnsuredSession } from "../copied.js"
 import { DeviceLimitPanel } from "../DeviceLimitPanel.js"
+import { bootCatalog } from "../../catalog.js"
+import { catalogURL } from "../strings.js"
 import { AdminDashboard } from "./AdminDashboard.js"
 import { loadOverview, type Overview } from "./api.js"
-import { adminLocale, adminWords, type Say } from "./strings.js"
+import { adminLocale, adminWords, type Say } from "./words.js"
 import "./admin.css"
 
 /*
@@ -48,6 +50,7 @@ export function AdminGate({ declared }: { declared: string }) {
   const locale = useMemo(() => adminLocale(navigator.languages?.length ? navigator.languages : [navigator.language]), [])
   const say: Say = useMemo(() => adminWords(locale), [locale])
   const [phase, setPhase] = useState<Phase>(config ? { kind: "checking" } : { kind: "misdeclared" })
+  const [catalogReady, setCatalogReady] = useState(false)
   const session = useRef<SessionHandle | null>(null)
   const generation = useRef(0)
 
@@ -57,6 +60,17 @@ export function AdminGate({ declared }: { declared: string }) {
     document.title = say("docTitle")
     document.documentElement.classList.remove("booting")
   }, [locale, say])
+
+  useEffect(() => {
+    if (!config) return
+    let active = true
+    void bootCatalog((tag) => catalogURL(config, tag, document.baseURI)).finally(() => {
+      if (!active) return
+      document.documentElement.lang = locale
+      setCatalogReady(true)
+    })
+    return () => { active = false }
+  }, [config, locale])
 
   const fetchOverview = useCallback(async (keep: Overview | null) => {
     if (!config) return
@@ -154,7 +168,7 @@ export function AdminGate({ declared }: { declared: string }) {
         </div>
       </header>
       <main className="adm-main" aria-live="polite" aria-busy={phase.kind === "checking" || phase.kind === "loading"}>
-        <Body phase={phase} say={say} locale={locale} session={session.current} onRetry={start} />
+        <Body phase={phase} say={say} locale={locale} session={session.current} onRetry={start} catalogReady={catalogReady} />
       </main>
     </div>
   )
@@ -166,12 +180,13 @@ function stamp(iso: string, locale: string): string {
   }).format(new Date(iso))
 }
 
-function Body({ phase, say, locale, session, onRetry }: {
+function Body({ phase, say, locale, session, onRetry, catalogReady }: {
   phase: Phase
   say: Say
   locale: string
   session: SessionHandle | null
   onRetry: () => void
+  catalogReady: boolean
 }) {
   switch (phase.kind) {
     case "misdeclared":
@@ -186,6 +201,7 @@ function Body({ phase, say, locale, session, onRetry }: {
         </Notice>
       )
     case "device_limit":
+      if (!catalogReady) return <Skeleton label={say("loading")} />
       return (
         <section className="adm-notice adm-notice-wide">
           <DeviceLimitPanel session={session} tier={phase.tier} limit={phase.limit} onContinue={onRetry} signInLabel={say("deviceLimitSignIn")} />

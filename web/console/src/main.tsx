@@ -79,11 +79,9 @@ const declared = import.meta.env.VITE_HOSTED_CONSOLE as string | undefined
 const operations = location.pathname === "/admin" || location.pathname === "/admin/"
 if (declared && operations) {
   void import("./cloud/admin/AdminGate.js").then(({ AdminGate }) =>
-    createRoot(host).render(
-      <StrictMode>
-        <AdminGate declared={declared} />
-      </StrictMode>,
-    ),
+    // Session establishment registers a revocable viewer device. React's
+    // development-only StrictMode effect replay must not register it twice.
+    createRoot(host).render(<AdminGate declared={declared} />),
   )
 } else if (declared) {
   void import("./cloud/CloudGate.js").then(({ CloudGate }) =>

@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/forget.test.ts.
 import { completeDays, loadOverview, parseOverview, trend } from "./api.ts"
 // @ts-expect-error -- a `.ts` path, for node.
-import { adminLocale, adminWords } from "./strings.ts"
+import { adminLocale, adminWords } from "./words.ts"
 
 function body(over: Record<string, unknown> = {}) {
   const counters = { dispatches: 12, connect_minutes: 340, bytes_in: 1_200_000, bytes_out: 5_000 }
