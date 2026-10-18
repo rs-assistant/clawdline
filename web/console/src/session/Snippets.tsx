@@ -44,8 +44,8 @@ import {
   updateSnippet,
   updateWorkflow,
 } from "./snippets-api.js"
-import * as V from "../legacy/voice-bridge.js"
-import { voiceSource } from "./voice-source.js"
+import { VoiceTextarea } from "../pages/work/VoiceTextarea.js"
+import { WorkIcon } from "../pages/work/WorkIcon.js"
 import { RefusalError } from "@clawdline/core"
 import { createDirectTodoV2, directTodoActionV2 } from "../pages/work/api.js"
 import { workflowTodoText } from "./workflow-run.js"
@@ -55,6 +55,7 @@ import { workflowSourceMatches, workflowSourceText, workflowSourceTitle } from "
 import { ClawdfatherActions, clawdfatherWord } from "./ClawdfatherActions.js"
 import { ResourceCoordination } from "./ResourceCoordination.js"
 import { catalogWord } from "../catalog.js"
+import "../pages/work/work.css"
 import "./workflow.css"
 
 /**
@@ -186,9 +187,6 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
   const [workflowSaveError, setWorkflowSaveError] = useState("")
   const [workflowSaving, setWorkflowSaving] = useState(false)
   const [workflowDeleting, setWorkflowDeleting] = useState(false)
-  const [workflowVoice, setWorkflowVoice] = useState<V.VoiceState>("off")
-  const workflowVoiceRow = useRef<HTMLDivElement>(null)
-  const workflowVoiceActive = useRef(false)
   const [workflowSourceStatus, setWorkflowSourceStatus] = useState<"checking" | "ready" | "unavailable" | "scope">("checking")
   const [workflowPreview, setWorkflowPreview] = useState<{ id: string; body: string; name: string; version: string } | null>(null)
   const [projectUnresolved, setProjectUnresolved] = useState(false)
@@ -605,9 +603,6 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
   }
 
   const closeWorkflowEditor = () => {
-    if (workflowVoiceActive.current) V.cancel()
-    workflowVoiceActive.current = false
-    setWorkflowVoice("off")
     setWorkflowDraft(null)
     setWorkflowSaveError("")
   }
@@ -622,18 +617,6 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
     } catch (cause) {
       setWorkflowError(cause instanceof SnippetFailure && cause.status !== null && cause.status < 500 ? W("deleteRefused") : W("deleteUnknown"))
     } finally { setWorkflowDeleting(false) }
-  }
-
-  const dictateWorkflow = () => {
-    const host = workflowVoiceRow.current
-    if (!host || !workflowDraft || workflowDraft.source) return
-    V.press({
-      host, composer: null, source: voiceSource,
-      sink: (heard) => setWorkflowDraft((draft) => draft ? { ...draft, body: V.appendedText(draft.body, heard) } : draft),
-      guard: () => !host.isConnected,
-      changed: (state) => { workflowVoiceActive.current = state !== "off"; setWorkflowVoice(state) },
-      say: (message) => setWorkflowSaveError(message),
-    })
   }
 
   const save = () => {
@@ -769,8 +752,10 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
         {tab === "clawdfather" && coordination ? null : tab === "workflow" && currentWorkflow ? <div className="workflow-detail-nav">
           <button type="button" onClick={() => setSelectedWorkflow(null)}>← {W("backToWorkflows")}</button>
           <span className="workflow-detail-actions">
-            <button type="button" disabled={workflowDeleting || startingWorkflow} onClick={() => { setWorkflowSaveError(""); setWorkflowDraft({ id: currentWorkflow.id, title: currentWorkflow.title, body: currentWorkflow.body, global: !currentWorkflow.project, source: currentWorkflow.source }) }}>{W("editAction")}</button>
-            <button type="button" className="workflow-delete" disabled={workflowDeleting || startingWorkflow} onClick={() => void removeWorkflow()}>{W("delete")}</button>
+            <button type="button" aria-label={W("editAction")} title={W("editAction")} disabled={workflowDeleting || startingWorkflow}
+              onClick={() => { setWorkflowSaveError(""); setWorkflowDraft({ id: currentWorkflow.id, title: currentWorkflow.title, body: currentWorkflow.body, global: !currentWorkflow.project, source: currentWorkflow.source }) }}><WorkIcon name="edit" /></button>
+            <button type="button" className="workflow-delete" aria-label={W("delete")} title={W("delete")} disabled={workflowDeleting || startingWorkflow}
+              onClick={() => void removeWorkflow()}><WorkIcon name="delete" /></button>
           </span>
         </div> : <div className="snippets-tabs" role="tablist" aria-label={tabs.map(tabLabel).join(" / ")}
           onKeyDown={(event) => {
@@ -989,13 +974,11 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
           <div className="block"><label className="field-label" htmlFor="workflow-quick-name">{W("name")}</label>
             <input className="find" id="workflow-quick-name" type="text" maxLength={200} value={workflowDraft.title}
               onChange={(event) => setWorkflowDraft({ ...workflowDraft, title: event.target.value })} /></div>
-          <div className="block"><label className="field-label" htmlFor="workflow-quick-message">{W("message")}</label>
-            <textarea className="find" id="workflow-quick-message" rows={6} maxLength={4000} readOnly={!!workflowDraft.source} value={workflowDraft.body}
-              onChange={(event) => setWorkflowDraft({ ...workflowDraft, body: event.target.value })} /></div>
+          {workflowDraft.source ? <div className="block"><label className="field-label" htmlFor="workflow-quick-message">{W("message")}</label>
+            <textarea className="find" id="workflow-quick-message" rows={6} maxLength={4000} readOnly value={workflowDraft.body} /></div>
+            : <div className="block workflow-quick-message"><VoiceTextarea label={W("message")} id="workflow-quick-message" className="find" rows={6} maxLength={4000}
+              value={workflowDraft.body} onValue={(body) => setWorkflowDraft((draft) => draft ? { ...draft, body } : draft)} /></div>}
           {workflowDraft.source && <p className="workflow-linked-hint">{W("linkedMessageHint")}</p>}
-          {!workflowDraft.source && <div className="workflow-quick-voice"><div className="voice" ref={workflowVoiceRow} role="status" hidden />
-            <button type="button" className="chip" aria-pressed={workflowVoice === "recording"} disabled={workflowVoice === "opening" || workflowVoice === "reading"} onClick={dictateWorkflow}>{workflowVoice === "recording" ? L.strings.webVoiceStop : L.strings.webVoiceStart}</button>
-          </div>}
           {!workflowDraft.id && <div className="block"><span className="field-label">{W("availability")}</span><div className="row">
             {!!projectKey && !projectUnresolved && <button type="button" className={"chip" + (!workflowDraft.global ? " on" : "")}
               aria-pressed={!workflowDraft.global} onClick={() => setWorkflowDraft({ ...workflowDraft, global: false })}>{W("projectOnly")}</button>}
