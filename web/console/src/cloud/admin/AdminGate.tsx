@@ -5,6 +5,8 @@ import { bootCatalog } from "../../catalog.js"
 import { catalogURL } from "../strings.js"
 import { AccountsPage, OverviewPage, RouteLink, UsagePage, type Go } from "./AdminDashboard.js"
 import { PromoManagement } from "./PromoManagement.js"
+import { DemoPromotions } from "./DemoPromotions.js"
+import { demoOverview } from "./demo.js"
 import { mayLeaveCode } from "./navigation-guard.js"
 import { loadOverview, type Overview } from "./api.js"
 import { ADMIN_ROUTES, adminLocale, adminPath, adminRoute, adminWords, type AdminRoute, type Say } from "./words.js"
@@ -55,6 +57,8 @@ export function AdminGate({ declared }: { declared: string }) {
   const say: Say = useMemo(() => adminWords(locale), [locale])
   const [phase, setPhase] = useState<Phase>(config ? { kind: "checking" } : { kind: "misdeclared" })
   const [catalogReady, setCatalogReady] = useState(false)
+  const [demo, setDemo] = useState(false)
+  const sample = useMemo(() => demoOverview(), [])
   const session = useRef<SessionHandle | null>(null)
   const generation = useRef(0)
 
@@ -188,22 +192,31 @@ export function AdminGate({ declared }: { declared: string }) {
 
   return (
     <Shell route={route} go={go} say={say} consoleHref={consoleHref}
-      stampText={phase.kind === "ready" ? say("generated", { time: stamp(phase.overview.generated_at, locale) }) : null}
-      refreshing={phase.kind === "ready" && phase.refreshing} onRefresh={phase.kind === "ready" ? refresh : null}>
+      stampText={phase.kind === "ready" ? demo ? say("demoStamp") : say("generated", { time: stamp(phase.overview.generated_at, locale) }) : null}
+      refreshing={phase.kind === "ready" && phase.refreshing} onRefresh={phase.kind === "ready" && !demo ? refresh : null}>
       <PageHead route={route} say={say} moved={moved} />
+      {phase.kind === "ready" ? (
+        <div className={demo ? "adm-demo-control adm-demo-active" : "adm-demo-control"}>
+          <div><strong>{demo ? say("demoTitle") : say("liveTitle")}</strong><p>{demo ? say("demoDescription") : say("liveDescription")}</p></div>
+          <button type="button" className="adm-btn adm-btn-small" aria-pressed={demo} onClick={() => { if (mayLeaveCode()) setDemo((value) => !value) }}>
+            {demo ? say("showLive") : say("showDemo")}
+          </button>
+        </div>
+      ) : null}
       {phase.kind === "loading" ? (
         <Skeleton label={say("loading")} />
       ) : (
         <>
-          {phase.stale ? (
+          {!demo && phase.stale ? (
             <p className="adm-stale" role="status">
               {say("staleNote", { code: phase.stale.code, time: new Intl.DateTimeFormat(locale, { timeZone: "UTC", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(phase.overview.generated_at)) })}
             </p>
           ) : null}
-          {route === "overview" ? <OverviewPage overview={phase.overview} say={say} locale={locale} go={go} /> : null}
-          {route === "accounts" ? <AccountsPage overview={phase.overview} say={say} locale={locale} go={go} /> : null}
-          {route === "usage" ? <UsagePage overview={phase.overview} say={say} locale={locale} go={go} /> : null}
-          {route === "promotions" && config ? (
+          {route === "overview" ? <OverviewPage overview={demo ? sample : phase.overview} say={say} locale={locale} go={go} /> : null}
+          {route === "accounts" ? <AccountsPage overview={demo ? sample : phase.overview} say={say} locale={locale} go={go} /> : null}
+          {route === "usage" ? <UsagePage overview={demo ? sample : phase.overview} say={say} locale={locale} go={go} /> : null}
+          {route === "promotions" && demo ? <DemoPromotions overview={sample} say={say} locale={locale} /> : null}
+          {route === "promotions" && !demo && config ? (
             <PromoManagement overview={phase.overview} apiOrigin={config.apiOrigin} say={say} locale={locale}
               search={search} go={go} onChanged={reread} onLostAccess={() => void start()} />
           ) : null}
