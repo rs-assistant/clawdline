@@ -174,7 +174,10 @@ Item-local steps are a lightweight Agent aid:
 On a successful assignment, an executable item with no existing steps treats two or more
 top-level Markdown list rows in its description as explicit subitems and atomically seeds one step
 per row. A single list row is left as prose, nested rows are not promoted, and reassignment never
-duplicates existing steps. The description remains the authoritative full text; an overlong step
+duplicates existing steps. An item that was a Plan seeds nothing — whether a Session claimed it
+with a conversion or the person converted it and assigned it later — because a Plan's description
+is analysis, not a checklist; its owner adds steps explicitly. Any `item.converted` event in the
+item's history marks it, since every conversion has a Plan on one side. The description remains the authoritative full text; an overlong step
 label is shortened only for the bounded TODO presentation.
 
 Steps do not create Board items, do not assign Sessions, and do not automatically advance the
@@ -645,7 +648,8 @@ One transaction writes the item with `created_by = user_via_session:<run>` and a
 event carrying `via_run` and `session_id`. For Feature, Refactor, Issue and Epic it also writes its steps:
 the explicit `steps` in order, or — when there are none — the description's two or more top-level
 list rows exactly as a person's assignment seeds them. Explicit steps replace that seeding, and a
-later assignment seeds nothing when steps exist, so no step is written twice. A Plan is created
+later assignment seeds nothing when steps exist, so no step is written twice. An item that was a
+Plan never seeds from its description, so a converted Plan carries only steps its owner adds. A Plan is created
 unassigned in Planning, as a person's would be.
 
 *(Amended 2026-09-30.)* The executable item is created **unassigned**, in `created`, where an
@@ -789,7 +793,8 @@ create another Board item.
 
 Successful activation is also the claim boundary for structured subitems: when the item has no
 steps and its description has at least two top-level Markdown list rows, activation seeds those
-steps in the same transaction as ownership. A failed opening seeds nothing.
+steps in the same transaction as ownership. A failed opening seeds nothing, and neither does an
+item that was a Plan.
 
 For a first assignment, failure returns the item to `created` with `assignment_failed`; the failed
 assignment remains in history and no owner is projected.
