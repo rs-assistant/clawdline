@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6051,
+  "englishKeys": 6052,
   "counts": {
-    "negation": 1922,
+    "negation": 1923,
     "state": 1082,
     "permission": 372,
     "deletion": 159,
     "uncertainty": 176
   },
-  "unionCount": 2893,
+  "unionCount": 2894,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1605,6 +1605,7 @@
       "next.restoreRefused",
       "next.restoreUnknownOutcome",
       "next.roleCreateFailed",
+      "next.scheduleMachineReadFailed",
       "next.scheduleMoveCopyLeft",
       "next.scheduleMoveCreateFailedDisabled",
       "next.scheduleMoveHookBindFailed",
@@ -6071,6 +6072,7 @@
     "next.roleCreateFailed",
     "next.roleCreateIntro",
     "next.scheduleForceRunConfirmation",
+    "next.scheduleMachineReadFailed",
     "next.scheduleMachineUnread",
     "next.scheduleMoveCopyLeft",
     "next.scheduleMoveCreateFailed",
