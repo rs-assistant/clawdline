@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 // @ts-expect-error -- `.ts` paths let Node's strip-types runner execute this test.
-import { acquireVisibleTerminal, beginCloudTerminal, cloudTerminalBody, keyRefusalControl, keyRefusalNotice, reconnectCloudTerminal, shownKeyRefusal, type CloudTerminalStarter } from "./cloud-view.ts"
+import { acquireVisibleTerminal, beginCloudTerminal, cloudTerminalBody, cloudTerminalPhase, composerSend, defaultInputMode, keyRefusalControl, keyRefusalNotice, reconnectCloudTerminal, shownKeyRefusal, type CloudTerminalStarter } from "./cloud-view.ts"
 
 // `cloud/terminal-session.ts` uses constructor parameter properties, which
 // Node's strip-types runner refuses, so the start path is driven through a fake
@@ -110,4 +110,42 @@ test("a refused key's notice goes away once control changes", () => {
   assert.equal(shownKeyRefusal(refusal, mine), null, "after this tab took over it no longer says another tab holds it")
   assert.equal(shownKeyRefusal(refusal, null), null)
   assert.equal(shownKeyRefusal(null, mine), null)
+})
+
+const live = { state: "live", error: "", status: "running", closeStatus: "", retrying: false, frameTimedOut: false, needsReview: false,
+  canType: true, hasFrame: true, control: { held: true, epoch: 1, holder: { same_client: true } } } as Parameters<typeof cloudTerminalPhase>[0]
+
+test("a terminal the machine says is gone is ended, whatever else the page holds", () => {
+  // 2026-10-18: the shell had exited and the page offered Take control and Reconnect instead.
+  assert.equal(cloudTerminalPhase({ ...live, error: "terminal_closed", canType: false }), "ended")
+  assert.equal(cloudTerminalPhase({ ...live, state: "closed" }), "ended")
+  assert.equal(cloudTerminalPhase({ ...live, status: "exited" }), "ended")
+  assert.equal(cloudTerminalPhase({ ...live, closeStatus: "ok" }), "ended")
+  assert.equal(cloudTerminalPhase({ ...live, error: "terminal_closed", state: "stale", retrying: true }), "ended")
+})
+
+test("each other situation has its own phase, in the order the page must say them", () => {
+  assert.equal(cloudTerminalPhase(live), "typing")
+  assert.equal(cloudTerminalPhase({ ...live, error: "terminal_access_revoked" }), "denied")
+  assert.equal(cloudTerminalPhase({ ...live, state: "stale", canType: false }), "reconnecting")
+  assert.equal(cloudTerminalPhase({ ...live, retrying: true, canType: false }), "reconnecting")
+  assert.equal(cloudTerminalPhase({ ...live, state: "offline", canType: false }), "offline")
+  assert.equal(cloudTerminalPhase({ ...live, error: "terminal_receipt_timeout", canType: false }), "error")
+  assert.equal(cloudTerminalPhase({ ...live, frameTimedOut: true, canType: false }), "error")
+  assert.equal(cloudTerminalPhase({ ...live, state: "unknown", canType: false }), "needs_review")
+  assert.equal(cloudTerminalPhase({ ...live, canType: false, hasFrame: false, control: null }), "loading")
+  assert.equal(cloudTerminalPhase({ ...live, canType: false, control: { held: true, epoch: 2, holder: { same_client: false, name: "iPad" } } } as typeof live), "other_holder")
+  assert.equal(cloudTerminalPhase({ ...live, canType: false, control: { held: false, epoch: 2 } } as typeof live), "watching")
+})
+
+test("Send types the text as a paste and then Enter; an empty box sends Enter alone", () => {
+  assert.deepEqual(composerSend("git status"), { paste: "git status", enter: new Uint8Array([0x0d]) })
+  assert.deepEqual(composerSend(""), { paste: null, enter: new Uint8Array([0x0d]) })
+})
+
+test("a real pointer types directly, a phone uses the text box, and a browser that cannot tell uses the box", () => {
+  assert.equal(defaultInputMode(() => ({ matches: true })), "direct")
+  assert.equal(defaultInputMode(() => ({ matches: false })), "composer")
+  assert.equal(defaultInputMode(undefined), "composer")
+  assert.equal(defaultInputMode(() => { throw new Error("no matchMedia") }), "composer")
 })
