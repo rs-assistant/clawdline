@@ -114,7 +114,7 @@ claims `internal/app/orchestrator`、`internal/adapters/store`、`taskdir`、`su
 | `schedules/*.json` | 6 檔 | 舊 app | 只讀 `schedule_id` 與 `title`（給用量頁） | 新 daemon | **要人工搬**：5 個啟用中的營運排程 |
 | `snippets/*.json` | 5 檔 | 舊 app | 未讀 | 新 daemon | 小、可手動重建 |
 | `usage.sqlite3` | 6.4 MB＋3 MB WAL | 舊 app | 不再讀（讀取器已在 `0957d7448` 刪除；之前是唯讀副本） | 新 daemon 要有自己的帳本 | 舊檔＝歷史；退役後新 daemon 若沒有自己的帳本，用量頁會退回 transcript 計算（已實作） |
-| `~/Library/Caches/com.tsunamiworks.clawdline/session-images/` | 86 項 | 舊 app | 唯讀（對話裡的 `<clawdline-image id>` 標記沒有第二份來源） | 新 daemon（自己的 `CLAWDLINE_NEXT_DIR/session-images`，已實作，先查自己再問舊的） | 舊圖留著，否則舊對話裡的圖變成一行文字 |
+| `~/Library/Caches/com.tsunamiworks.clawdline/session-images/` | 86 項 | 舊 app | **不再讀**（2026-10-18 起；之前唯讀，對話裡的 `<clawdline-image id>` 標記沒有第二份來源） | 新 daemon（自己的 `CLAWDLINE_NEXT_DIR/session-images`，已實作） | 舊圖留著，否則舊對話裡的圖變成一行文字 |
 | `durable-reports/` | 44 KB | 舊 app | 未讀 | 新 daemon | 升級過的報告，量少 |
 | `~/Library/Application Support/Clawdline/worktrees/` | **434 MB**（6 repo） | 舊 app（`ProjectWorktreeLifecycle`） | 未管理 | 新 daemon | **退役前要決定誰清**。今天沒人清＝硬碟慢慢長大 |
 | `remote-audit.jsonl` | 6.4 MB | 舊 app | 新版有自己的（448 bytes） | 各自 | 不合併 |
@@ -145,6 +145,8 @@ Feature Root、coordinator 表，以及自己從 transcript 算的用量），�
 `off` 時的答案：task 列表 `store: disabled`、`/v1/board/tracks` 的 `sources.board/history.status: disabled`、
 `/v1/board` 與 `/v1/projects` 的 catalog 是空的。`swiftstore` 套件留下來的是投影規則（`project.go`，現在只讀
 這個 daemon 自己的紀錄，經 `Snapshot.With`）、`ProcessStart`，與 B3 的舊圖片讀取。
+**2026-10-18**：B3 的舊圖片讀取也刪了（`images.go`、`CLAWDLINE_SESSION_IMAGE_DIR`），套件改名為
+`internal/adapters/ownrecords`；舊 app 的圖片 id 現在答「未知」。
 **一處刻意不照 `off`**：Projects 頁的 worktree 生命週期。`off` 時 task 紀錄永遠不算權威，所有 worktree 都不能
 清；現在以自己的紀錄為權威——舊 app 的 worktree 在這裡沒有紀錄，生命週期把它的擁有者判成 unknown
 （`managed_path_without_task_record`）。unknown 不會讓任何東西被自動清掉；使用者在 Projects 頁明確按下 Delete 時，仍然會刪除那個 checkout。

@@ -1,6 +1,6 @@
 //go:build linux
 
-package swiftstore
+package ownrecords
 
 import (
 	"os"

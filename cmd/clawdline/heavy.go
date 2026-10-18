@@ -22,7 +22,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/sainteye/clawdline/internal/adapters/machineusage"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
 )
@@ -235,7 +235,7 @@ func runHeavy(opts heavyOptions, argv []string, d heavyDeps) int {
 			SessionID: heavyConversation(d.getenv), CallbackTaskID: d.getenv("CLAWDLINE_CALLBACK_TASK_ID"),
 			PID: int64(d.pid), Phase: "waiting",
 		}
-		if at := swiftstore.ProcessStart(d.pid); !at.IsZero() {
+		if at := ownrecords.ProcessStart(d.pid); !at.IsZero() {
 			req.ProcessStart = at.Unix()
 		}
 		if code := slot.acquire(req, deadline, opts.wait, d, tryHandoff); code != 0 {

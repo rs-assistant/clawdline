@@ -6,7 +6,7 @@ import (
 	"sort"
 	"sync/atomic"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 )
 
@@ -22,8 +22,8 @@ import (
 // assignment could not be read is left out and the first error is returned
 // beside what the others said.
 func (s *Server) boardTitles(ctx context.Context, projectPath, assistant string, conversations []string,
-	known []orchestrator.RootAssignment) (map[string]swiftstore.BoardTitle, error) {
-	out := map[string]swiftstore.BoardTitle{}
+	known []orchestrator.RootAssignment) (map[string]ownrecords.BoardTitle, error) {
+	out := map[string]ownrecords.BoardTitle{}
 	if s.store == nil || s.broker == nil || len(conversations) == 0 {
 		return out, nil
 	}
@@ -50,7 +50,7 @@ func (s *Server) boardTitles(ctx context.Context, projectPath, assistant string,
 			labels[id] = a
 		}
 		if root.Label != "" {
-			out[conversation] = swiftstore.BoardTitle{Assistant: assistant, ConversationID: conversation,
+			out[conversation] = ownrecords.BoardTitle{Assistant: assistant, ConversationID: conversation,
 				Label: root.Label, AgentNamed: root.AgentNamed}
 		}
 	}
@@ -66,7 +66,7 @@ var boardTitleErrorLogged atomic.Bool
 // asks nothing. A Board that cannot be read costs the rows this rung only —
 // they keep the names they had before it existed — so it is not counted as
 // this daemon's records missing, which would hold every row's closing.
-func (s *Server) ownBoardTitles(ctx context.Context, lives []swiftstore.Live, known []orchestrator.RootAssignment) []swiftstore.BoardTitle {
+func (s *Server) ownBoardTitles(ctx context.Context, lives []ownrecords.Live, known []orchestrator.RootAssignment) []ownrecords.BoardTitle {
 	byAssistant := map[string][]string{}
 	seen := map[string]bool{}
 	for _, l := range lives {
@@ -77,7 +77,7 @@ func (s *Server) ownBoardTitles(ctx context.Context, lives []swiftstore.Live, kn
 		seen[key] = true
 		byAssistant[l.Assistant] = append(byAssistant[l.Assistant], l.ConversationID)
 	}
-	out := []swiftstore.BoardTitle{}
+	out := []ownrecords.BoardTitle{}
 	for assistant, conversations := range byAssistant {
 		titles, err := s.boardTitles(ctx, "", assistant, conversations, known)
 		if err != nil && boardTitleErrorLogged.CompareAndSwap(false, true) {

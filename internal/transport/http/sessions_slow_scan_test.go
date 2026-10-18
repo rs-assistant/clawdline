@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/domain/icon"
@@ -78,7 +78,7 @@ func TestASlowScanDoesNotCostARowItsBrokerTitle(t *testing.T) {
 
 	// The control: on the context the scan has just emptied, this daemon's own
 	// records cannot be read at all. That is the failure being fixed.
-	if _, err := s.ownOverlay(ctx, []swiftstore.Live{liveOf(row)}); err == nil {
+	if _, err := s.ownOverlay(ctx, []ownrecords.Live{liveOf(row)}); err == nil {
 		t.Fatal("the control did not fail: the records were readable on a dead context")
 	}
 

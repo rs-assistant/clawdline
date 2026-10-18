@@ -14,7 +14,6 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/artifacts"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/domain/work"
 )
 
@@ -30,7 +29,7 @@ func TestAStoredPhotographIsServedAsAJPEG(t *testing.T) {
 	if err := os.WriteFile(src, photo.Bytes(), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{pictures: pictures{store: artifacts.NewStore(t.TempDir()), swift: swiftstore.OpenImages(t.TempDir())}}
+	s := &Server{pictures: pictures{store: artifacts.NewStore(t.TempDir())}}
 	stored, err := s.pictures.store.ImportPaths(context.Background(), []string{src}, time.Now())
 	if err != nil {
 		t.Fatal(err)

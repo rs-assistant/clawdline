@@ -101,7 +101,9 @@ The store defaults to 24-hour TTL, 64 live artifacts and 64 MiB total, with a 12
 normalized-image cap, 12,000-pixel edge cap and 40-megapixel decoded cap. Tombstones are bounded
 and retained long enough to distinguish deletion from an unknown id. Pruning removes only files
 whose opaque ids and metadata belong to this store; its directory is mode `0700` and its files are
-`0600`. `CLAWDLINE_SESSION_IMAGE_DIR` moves the whole deleting store, including for isolated tests.
+`0600`. The store lives in `CLAWDLINE_NEXT_DIR/session-images`. Until 2026-10-18 an id this store
+did not know was also looked up, read-only, in the retired Swift app's picture cache (moved by
+`CLAWDLINE_SESSION_IMAGE_DIR`); that reader and the variable are gone, so such an id is unknown.
 
 ## Pictures a session shows the person
 

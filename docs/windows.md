@@ -210,7 +210,7 @@ refusal it should always have met (§4.3).
 **This is a class, not a spelling.** Counted in this tree, outside tests, the same
 `strings.HasPrefix(x, "/")` test for "is this absolute" stands at **18 sites** — the one above
 plus 17 more, in `adapters/projects/identity.go` (×4), `adapters/projects/lifecycle.go`,
-`adapters/projects/places.go`, `adapters/swiftstore/project.go`,
+`adapters/projects/places.go`, `adapters/ownrecords/project.go`,
 `adapters/transcript/turns.go` (×2), `adapters/documents/documents.go`,
 `app/cloudops/ops.go`, `app/orchestrator/draft.go:341`, `app/orchestrator/inventory.go` (×2),
 `domain/schedule/schedule.go` (×2) and `transport/http/timeline.go`. Some of those refuse a

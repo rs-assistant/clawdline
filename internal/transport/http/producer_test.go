@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
@@ -207,7 +207,7 @@ func TestAnOldShapedPageStillReadsTheRow(t *testing.T) {
 
 // An unchanged scan opens no write transaction; a changed one does.
 func TestAnUnchangedExecutionScanIsNotWritten(t *testing.T) {
-	if swiftstore.ProcessStart(os.Getpid()).IsZero() {
+	if ownrecords.ProcessStart(os.Getpid()).IsZero() {
 		t.Skip("this platform has no kernel process-start reader")
 	}
 	p := &pane{s: session.Session{ID: "%19", Backend: session.BackendTmux,
@@ -218,7 +218,7 @@ func TestAnUnchangedExecutionScanIsNotWritten(t *testing.T) {
 	observe := func() map[string]string {
 		inv := s.freshReading(ctx)
 		items := inv.Assistants()
-		lives := make([]swiftstore.Live, len(items))
+		lives := make([]ownrecords.Live, len(items))
 		for i, item := range items {
 			lives[i] = liveOf(item)
 		}

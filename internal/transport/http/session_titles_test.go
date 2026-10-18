@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/planner"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/contract"
@@ -287,9 +287,9 @@ func TestAnOverlongSessionTitleChangesNothing(t *testing.T) {
 
 func TestSessionTitleRowsExpireAndKeepTheNewestBound(t *testing.T) {
 	now := time.Unix(2_000_000_000, 0)
-	old := swiftstore.Seconds(float64(now.Add(-91 * 24 * time.Hour).Unix()))
-	newer := swiftstore.Seconds(float64(now.Add(-time.Hour).Unix()))
-	rows := []swiftstore.SessionTitle{
+	old := ownrecords.Seconds(float64(now.Add(-91 * 24 * time.Hour).Unix()))
+	newer := ownrecords.Seconds(float64(now.Add(-time.Hour).Unix()))
+	rows := []ownrecords.SessionTitle{
 		{Title: "expired", TerminalID: "%1", UpdatedAt: &old},
 		{Title: "kept", TerminalID: "%2", UpdatedAt: &newer},
 	}
@@ -458,10 +458,10 @@ func TestSessionTitlesFollowConversationWhenTerminalIsReused(t *testing.T) {
 // conversation twice; reading them keeps only the newest.
 func TestDuplicateConversationTitleRowsKeepTheNewest(t *testing.T) {
 	now := time.Unix(2_000_000_000, 0)
-	older := swiftstore.Seconds(float64(now.Add(-2 * time.Hour).Unix()))
-	newer := swiftstore.Seconds(float64(now.Add(-time.Hour).Unix()))
+	older := ownrecords.Seconds(float64(now.Add(-2 * time.Hour).Unix()))
+	newer := ownrecords.Seconds(float64(now.Add(-time.Hour).Unix()))
 	conv := "conv-a"
-	rows := []swiftstore.SessionTitle{
+	rows := []ownrecords.SessionTitle{
 		{Title: "newer", TerminalID: "%2", SessionID: &conv, UpdatedAt: &newer},
 		{Title: "older", TerminalID: "%1", SessionID: &conv, UpdatedAt: &older},
 		{Title: "legacy", TerminalID: "%3", UpdatedAt: &older},

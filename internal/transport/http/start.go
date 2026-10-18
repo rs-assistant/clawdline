@@ -15,9 +15,9 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/adapters/terminal/owned"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
@@ -286,10 +286,10 @@ func (s *Server) starter(reading startReading) app.Starter {
 // past is StartPoints.past(in:assistant:limit:). A Codex index that cannot be
 // asked is an empty list, as it is in the Swift app.
 func (s *Server) past(ctx context.Context, place projects.Place, assistant string, reading startReading, limit int) []projects.Past {
-	rootTitles := map[string]swiftstore.BoardTitle{}
+	rootTitles := map[string]ownrecords.BoardTitle{}
 	queriedRootTitle := map[string]bool{}
 	loggedRootTitleError := false
-	rootTitle := func(id string) swiftstore.BoardTitle {
+	rootTitle := func(id string) ownrecords.BoardTitle {
 		if queriedRootTitle[id] {
 			return rootTitles[id]
 		}
@@ -304,7 +304,7 @@ func (s *Server) past(ctx context.Context, place projects.Place, assistant strin
 	}
 	orchestratorTitle := func(id string) string { return rootTitle(id).Label }
 	agentNamed := func(id string) bool { return rootTitle(id).AgentNamed }
-	snap := s.withOwnSessionTitles(swiftstore.Snapshot{}, time.Now())
+	snap := s.withOwnSessionTitles(ownrecords.Snapshot{}, time.Now())
 	manual := func(id, custom string) string {
 		if !snap.TitlesKnown {
 			return ""
@@ -341,7 +341,7 @@ func (s *Server) past(ctx context.Context, place projects.Place, assistant strin
 	return projects.ClaudePast(place, reading.openClaude, titles, limit, 400)
 }
 
-type swiftTitle = swiftstore.SessionTitle
+type swiftTitle = ownrecords.SessionTitle
 
 // manualConversationTitle is Config.sessionTitle(conversationID:): the last
 // typed name for that conversation, unless a `/rename` has superseded it.

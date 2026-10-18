@@ -1,4 +1,4 @@
-package swiftstore
+package ownrecords
 
 import (
 	"encoding/json"

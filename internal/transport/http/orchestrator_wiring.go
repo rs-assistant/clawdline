@@ -11,9 +11,9 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/git"
 	"github.com/sainteye/clawdline/internal/adapters/limits"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/taskdir"
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
@@ -241,7 +241,7 @@ func newBroker(s *Server) *orchestrator.Broker {
 		// unreadable is the setting's default, on.
 		NotifyEnabled: s.agentNotifyEnabled,
 		PushEnabled:   s.notificationEnabled,
-		ProcessStart:  swiftstore.ProcessStart,
+		ProcessStart:  ownrecords.ProcessStart,
 		LeaseLine:     int(CapacityLimit(capacity.LeasesQueue)),
 		OpenWaits:     int(CapacityLimit(capacity.WaitsOpen)),
 		Port:          s.cfg.Port,

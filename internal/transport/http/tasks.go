@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/session"
@@ -98,7 +98,7 @@ func (s *Server) tasksPayload(ctx context.Context, cursor, limit int) (contract.
 		return contract.TaskList{}, err
 	}
 	own := s.ownTaskRows(window.Unreadable, append(window.Live, window.Finished...), s.screen(ctx))
-	rows, page := swiftstore.TaskPage(own, cursor, limit)
+	rows, page := ownrecords.TaskPage(own, cursor, limit)
 	// TaskPage counted only the finished rows it was given; the page is of
 	// all of them.
 	end := int(page.Cursor) + len(rows) - int(page.Unfinished)
@@ -122,7 +122,7 @@ func (s *Server) tasksPayload(ctx context.Context, cursor, limit int) (contract.
 
 // ownTaskRows is the broker's tasks as the list's rows: every unreadable row,
 // then the records, in the order given.
-func (s *Server) ownTaskRows(unreadable []orchestrator.Unreadable, records []orchestrator.Record, screen []swiftstore.OnScreen) []contract.TaskRow {
+func (s *Server) ownTaskRows(unreadable []orchestrator.Unreadable, records []orchestrator.Record, screen []ownrecords.OnScreen) []contract.TaskRow {
 	own := []contract.TaskRow{}
 	for _, u := range unreadable {
 		created := u.CreatedAt.Unix()
@@ -186,7 +186,7 @@ func callbackIntentOf(t orchestrator.Record) string {
 // screen is the sessions on screen, for resolving which tab a task's root is
 // in. The session list keeps the last one it built; a task list asked for when
 // nobody has read the sessions lately reads the machine itself.
-func (s *Server) screen(ctx context.Context) []swiftstore.OnScreen {
+func (s *Server) screen(ctx context.Context) []ownrecords.OnScreen {
 	if held := s.lastScreen.Load(); held != nil && time.Since(held.at) < screenMaxAge {
 		return held.rows
 	}
@@ -200,11 +200,11 @@ const screenMaxAge = 10 * time.Second
 
 type screenReading struct {
 	at   time.Time
-	rows []swiftstore.OnScreen
+	rows []ownrecords.OnScreen
 }
 
-func onScreen(items []session.Session) []swiftstore.OnScreen {
-	out := make([]swiftstore.OnScreen, 0, len(items))
+func onScreen(items []session.Session) []ownrecords.OnScreen {
+	out := make([]ownrecords.OnScreen, 0, len(items))
 	for _, item := range items {
 		if !item.IsAssistant() {
 			continue
@@ -215,7 +215,7 @@ func onScreen(items []session.Session) []swiftstore.OnScreen {
 		if item.Observation.Freshness == session.FreshnessUnverified || item.Observation.Freshness == session.FreshnessMissing {
 			continue
 		}
-		out = append(out, swiftstore.OnScreen{
+		out = append(out, ownrecords.OnScreen{
 			TerminalID:     item.ID,
 			Assistant:      string(item.Assistant),
 			ConversationID: item.ConversationID,

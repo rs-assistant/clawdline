@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
@@ -37,7 +37,7 @@ func (s *Server) coordinator() *app.Coordinator {
 		Read: func(ctx context.Context) session.Inventory {
 			return s.reading(ctx)
 		},
-		ProcessStart: swiftstore.ProcessStart,
+		ProcessStart: ownrecords.ProcessStart,
 		Broker:       s.broker,
 	}
 }
@@ -450,14 +450,14 @@ func wireBearings(b app.Bearings, st app.State) contract.CoordinatorBearings {
 // matching rule and the command table are Coordinator.sessionProjection's,
 // which the Swift store's reader already ports; handing it this store's
 // record keeps one rule for both sources rather than a second copy of it.
-func ownCrown(rec *coordinator.Record, live swiftstore.Live) *contract.SessionCoordinator {
+func ownCrown(rec *coordinator.Record, live ownrecords.Live) *contract.SessionCoordinator {
 	if rec == nil {
 		return nil
 	}
 	pid := int64(rec.PID)
-	start := swiftstore.Seconds(rec.ProcessStart.Unix())
+	start := ownrecords.Seconds(rec.ProcessStart.Unix())
 	conversation := rec.ConversationID
-	snap := swiftstore.Snapshot{Coordinator: &swiftstore.Coordinator{
+	snap := ownrecords.Snapshot{Coordinator: &ownrecords.Coordinator{
 		Version: 1, ID: rec.ID, Label: coordinator.Label, SessionID: rec.TerminalID, Assistant: rec.Assistant,
 		TTY: rec.TTY, PID: &pid, ProcessStart: &start, ConversationID: &conversation, CWD: rec.CWD,
 	}}

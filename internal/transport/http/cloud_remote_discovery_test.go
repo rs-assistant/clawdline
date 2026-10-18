@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/domain/agenthandoff"
 	"github.com/sainteye/clawdline/internal/domain/auth"
 	"github.com/sainteye/clawdline/internal/domain/session"
@@ -17,7 +17,7 @@ import (
 
 func peerMessageServer(t *testing.T) (*Server, *pane, agenthandoff.Request) {
 	t.Helper()
-	if swiftstore.ProcessStart(os.Getpid()).IsZero() {
+	if ownrecords.ProcessStart(os.Getpid()).IsZero() {
 		t.Skip("no kernel process-start reader")
 	}
 	p := &pane{s: session.Session{ID: "%19", Assistant: session.AssistantCodex, Backend: session.BackendTmux,

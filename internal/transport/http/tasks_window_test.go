@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/session"
@@ -78,7 +78,7 @@ func TestTheTaskListPageIsTheOneTheWholeHistoryGave(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		rows, page := swiftstore.TaskPage(s.ownTaskRows(unreadable, records, s.screen(ctx)), cursor, limit)
+		rows, page := ownrecords.TaskPage(s.ownTaskRows(unreadable, records, s.screen(ctx)), cursor, limit)
 		return contract.TaskList{Tasks: rows, Page: page}
 	}
 	check := func(what string) {

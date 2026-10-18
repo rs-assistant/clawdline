@@ -10,7 +10,7 @@
 // Nothing in this package writes. The lifecycle observation runs git with
 // optional locks off and never fetches, the Board catalog is read as a file and
 // never locked, and nothing under ~/.config/clawdline is opened here — task
-// records arrive through a port, from internal/adapters/swiftstore, which is
+// records arrive through a port, from internal/adapters/ownrecords, which is
 // the one reader of that store.
 package projects
 

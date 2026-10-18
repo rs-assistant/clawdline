@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/cloudkeys"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/peerstore"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/domain/agenthandoff"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
@@ -57,7 +57,7 @@ func (s *Server) PeerTaskStartOpen(ctx context.Context, start agenthandoff.TaskS
 	// pin. An uncertain observation never turns into a claimed opening.
 	inv := s.freshReading(ctx)
 	items := make([]session.Session, 0, len(inv.Sessions))
-	lives := make([]swiftstore.Live, 0, len(inv.Sessions))
+	lives := make([]ownrecords.Live, 0, len(inv.Sessions))
 	for _, item := range inv.Sessions {
 		if item.IsAssistant() {
 			items = append(items, item)

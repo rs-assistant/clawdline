@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/taskdir"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
@@ -52,7 +52,7 @@ func sessionHistory(tb testing.TB, raws ...string) (*Server, session.Inventory) 
 	ctx := context.Background()
 
 	pid := os.Getpid()
-	procStart := swiftstore.ProcessStart(pid)
+	procStart := ownrecords.ProcessStart(pid)
 	if procStart.IsZero() {
 		tb.Skip("this process's start time cannot be read")
 	}

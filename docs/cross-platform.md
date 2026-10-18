@@ -835,9 +835,9 @@ already comes close). Go's `os` adds `\\?\` to absolute paths automatically, but
 `implemented`
 
 **As of 2026-10-17 the daemon no longer reads the old app's state at all** (`docs/cutover.md` §3): what
-`internal/adapters/swiftstore` keeps is the projection rules, which run over this daemon's own records on every
-platform, `ProcessStart`, and the read-only cache of the old app's session images. The rest of this section is the
-record of how it read before then.
+`internal/adapters/ownrecords` (named `swiftstore` until 2026-10-18) keeps is the projection rules, which run over
+this daemon's own records on every platform, and `ProcessStart`. Its read-only reader of the old app's session images
+was removed on 2026-10-18. The rest of this section is the record of how it read before then.
 
 `internal/adapters/swiftstore` read the old app's `~/.config/clawdline`, read-only (who Clawdfather is, the task list,
 delivery records, session titles and images). **On Linux and Windows the old app does not exist, so this whole area
@@ -1078,7 +1078,7 @@ This section is the honest boundary. Every item below affects the recommendation
 | Secrets | `internal/adapters/cloudkeys/`, `internal/adapters/devices/`, `nofollow_*.go` |
 | Paths and the state directory | `internal/config/config.go` |
 | The documents route's boundary | `internal/adapters/documents/documents.go` |
-| The old app's store | `internal/adapters/swiftstore/` (`procstart_*.go`) |
+| Process start times | `internal/adapters/ownrecords/` (`procstart_*.go`) |
 | Opening a browser | `openURL` in `cmd/clawdline/auth.go` |
 | macOS native shell | `shell/darwin/` (`HotKey.swift`, `SMAppService` in `main.swift`, `Browser.swift`) |
 | The old Swift app (read-only reference) | `~/code/clawdline/Sources/`: `LiveScreen.swift`, `WebPush.swift`, `NotchIsland.swift`, `Whisper.swift`, `CloudKeys.swift`, `Targets.swift` |
