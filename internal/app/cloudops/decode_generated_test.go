@@ -3,119 +3,25 @@ package cloudops
 import (
 	"encoding/json"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
-	"os"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/sainteye/clawdline/internal/domain/cloudvocab"
 )
 
-// The generated decoders (zz_decode_generated.go, from the vocabulary table)
-// against the hand-written decoders and routes they will replace.
-//
-// Each row is driven with every body the table lists, every body one field
-// away from one (a field dropped, or one added — every field the table names
-// and every key any hand-written decoder's key-set check spells, so a decoder
-// that starts taking a brand-new field is caught by the name it took), and
-// every listed body with one value swapped for a probe: wrong types, empty
-// and odd strings, and values at and one past each limit the table states.
-// For each, both decoders must agree: both refuse, or both accept with the
-// same answer identity and the same local request, byte for byte.
-func TestGeneratedDecodersDecideAsTheHandWrittenOnes(t *testing.T) {
-	ops, err := cloudvocab.Operations()
-	if err != nil {
-		t.Fatal(err)
-	}
-	universe := bodyKeyUniverse(t, ops)
-	_, compared := handWrittenLiterals(t)
-	examples := map[string]any{}
-	for _, row := range ops {
-		for key, value := range row.Example {
-			if _, ok := examples[key]; !ok {
-				examples[key] = value
-			}
-		}
-	}
-	generated, hand := 0, 0
-	for _, row := range ops {
-		decode, isGenerated := generatedDecoders[row.Op]
-		_, isHand := handDecoded[row.Op]
-		if isGenerated == isHand {
-			t.Errorf("%s: generated=%v and hand=%v; a row is exactly one", row.Op, isGenerated, isHand)
-			continue
-		}
-		if isHand {
-			hand++
-			continue
-		}
-		generated++
-		o, ok := catalog[row.Op]
-		if !ok {
-			t.Errorf("%s: generated, and this machine registers no such word", row.Op)
-			continue
-		}
-		t.Run(row.Op, func(t *testing.T) {
-			failures := 0
-			for _, b := range decoderProbes(row, universe, examples, compared) {
-				if msg := compareDecoders(o, decode, b); msg != "" {
-					failures++
-					if failures <= 6 {
-						t.Errorf("body %s: %s", describeBody(b), msg)
-					}
-				}
-			}
-			if failures > 6 {
-				t.Errorf("…and %d more bodies the two decoders disagree on", failures-6)
-			}
-		})
-	}
-	if len(generatedDecoders) != generated || len(handDecoded) != hand {
-		t.Errorf("the generated file names %d generated and %d hand words; the table %d and %d",
-			len(generatedDecoders), len(handDecoded), generated, hand)
-	}
-	t.Logf("%d words generated, %d decoded by hand", generated, hand)
-}
-
-// compareDecoders is "" when both decoders decide b alike, or how they differ.
-func compareDecoders(o op, decode genDecoder, b body) string {
-	oldPlan, oldOK := o.decode(cloneBody(b))
-	newPlan, newReq, newOK := decode(cloneBody(b))
-	if oldOK != newOK {
-		return fmt.Sprintf("hand-written accepts=%v, generated accepts=%v", oldOK, newOK)
-	}
-	if !oldOK {
-		return ""
-	}
-	if got, want := planIdentity(o, newPlan), planIdentity(o, oldPlan); got != want {
-		return fmt.Sprintf("identity: generated %s, hand-written %s", got, want)
-	}
-	var oldReq LocalRequest
-	if o.route != nil {
-		oldReq = o.route(oldPlan)
-	}
-	if got, want := describeRequest(newReq), describeRequest(oldReq); got != want {
-		return fmt.Sprintf("local request:\n  generated    %s\n  hand-written %s", got, want)
-	}
-	return ""
-}
-
 // planIdentity is the answer identity, and every other plan field the
 // production code reads for o once the local request is built: a guard's
-// key, question and typed words, a shaped picture's id, an info read's parts
-// (the content read rail admits only full), a viewer event batch.
+// key, question and whether it names typed words, a shaped picture's id, an
+// info read's parts (the content read rail admits only full), a viewer event
+// batch.
 func planIdentity(o op, p plan) string {
 	out := fmt.Sprintf("session=%q name=%q request=%q target=%q generation=%q",
 		p.session, p.name, p.request, p.target, p.executionGeneration)
 	if o.guard != nil {
-		out += fmt.Sprintf(" key=%q expect=%q typed=%q/%v", p.key, p.expect, p.typed, p.namesTyped)
+		out += fmt.Sprintf(" key=%q expect=%q typed=%v", p.key, p.expect, p.namesTyped)
 	}
 	if o.shape != nil {
 		out += fmt.Sprintf(" id=%q", p.id)
@@ -190,10 +96,8 @@ func cloneValue(v any) any {
 }
 
 // bodyKeyUniverse is every key a probe may add: each field the table names,
-// each key any hand-written key-set check (`has`, `hasOneOf`) spells, and one
-// name nothing anywhere spells.
-func bodyKeyUniverse(t *testing.T, ops []cloudvocab.Operation) []string {
-	t.Helper()
+// each key a recorded body holds, and one name nothing anywhere spells.
+func bodyKeyUniverse(ops []cloudvocab.Operation, recorded []goldenCase) ([]string, error) {
 	keys := map[string]bool{"brand_new_field": true}
 	for _, row := range ops {
 		for _, shape := range row.Shapes {
@@ -202,8 +106,14 @@ func bodyKeyUniverse(t *testing.T, ops []cloudvocab.Operation) []string {
 			}
 		}
 	}
-	for key := range handWrittenBodyKeys(t) {
-		keys[key] = true
+	for _, c := range recorded {
+		b, err := goldenBody(c.Body)
+		if err != nil {
+			return nil, err
+		}
+		for key := range b {
+			keys[key] = true
+		}
 	}
 	delete(keys, "type")
 	out := make([]string, 0, len(keys))
@@ -211,97 +121,11 @@ func bodyKeyUniverse(t *testing.T, ops []cloudvocab.Operation) []string {
 		out = append(out, key)
 	}
 	sort.Strings(out)
-	return out
-}
-
-// handWrittenBodyKeys is every string literal inside a `has` or `hasOneOf`
-// call in this package's own source.
-func handWrittenBodyKeys(t *testing.T) map[string]bool {
-	t.Helper()
-	keys, _ := handWrittenLiterals(t)
-	return keys
-}
-
-// handWrittenLiterals reads this package's own source once: every string
-// literal inside a `has` or `hasOneOf` call (a body key), and every one a
-// value is compared with by `==`, `!=` or a `case` (an allowed value), so a
-// value a hand-written decoder still allows and the table dropped is probed.
-func handWrittenLiterals(t *testing.T) (keys, compared map[string]bool) {
-	t.Helper()
-	literalsOnce.Do(func() { literalKeys, literalCompared, literalErr = scanHandWrittenLiterals() })
-	if literalErr != nil {
-		t.Fatal(literalErr)
-	}
-	if len(literalKeys) < 50 || len(literalCompared) < 20 {
-		t.Fatalf("found %d keys and %d compared values; the source scan is not reading this package",
-			len(literalKeys), len(literalCompared))
-	}
-	return literalKeys, literalCompared
-}
-
-var (
-	literalsOnce                 sync.Once
-	literalKeys, literalCompared map[string]bool
-	literalErr                   error
-)
-
-func scanHandWrittenLiterals() (map[string]bool, map[string]bool, error) {
-	files, err := filepath.Glob("*.go")
-	if err != nil {
-		return nil, nil, err
-	}
-	keys, compared := map[string]bool{}, map[string]bool{}
-	collect := func(into map[string]bool, n ast.Node) {
-		ast.Inspect(n, func(n ast.Node) bool {
-			if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-				if value, err := strconv.Unquote(lit.Value); err == nil {
-					into[value] = true
-				}
-			}
-			return true
-		})
-	}
-	fset := token.NewFileSet()
-	for _, name := range files {
-		if strings.HasSuffix(name, "_test.go") || strings.HasPrefix(name, "zz_") {
-			continue
-		}
-		file, err := parser.ParseFile(fset, name, nil, 0)
-		if err != nil {
-			return nil, nil, err
-		}
-		ast.Inspect(file, func(n ast.Node) bool {
-			switch n := n.(type) {
-			case *ast.CallExpr:
-				if selector, ok := n.Fun.(*ast.SelectorExpr); ok &&
-					(selector.Sel.Name == "has" || selector.Sel.Name == "hasOneOf") {
-					for _, arg := range n.Args {
-						collect(keys, arg)
-					}
-				}
-			case *ast.BinaryExpr:
-				if n.Op == token.EQL || n.Op == token.NEQ {
-					for _, side := range []ast.Expr{n.X, n.Y} {
-						if lit, ok := side.(*ast.BasicLit); ok {
-							collect(compared, lit)
-						}
-					}
-				}
-			case *ast.CaseClause:
-				for _, value := range n.List {
-					if lit, ok := value.(*ast.BasicLit); ok {
-						collect(compared, lit)
-					}
-				}
-			}
-			return true
-		})
-	}
-	return keys, compared, nil
+	return out, nil
 }
 
 // decoderProbes is every body one row is tried with.
-func decoderProbes(row cloudvocab.Operation, universe []string, examples map[string]any, compared map[string]bool) []body {
+func decoderProbes(row cloudvocab.Operation, universe []string, examples map[string]any) []body {
 	out := []body{}
 	for _, shape := range row.Shapes {
 		example := row.Example
@@ -338,11 +162,6 @@ func decoderProbes(row cloudvocab.Operation, universe []string, examples map[str
 			values := genericProbes()
 			if rule, ok := row.Decode.Fields[field]; ok {
 				values = append(values, ruleProbes(rule, base[field])...)
-			}
-			if _, isString := base[field].(string); isString {
-				for value := range compared {
-					values = append(values, value)
-				}
 			}
 			for _, value := range values {
 				swapped := cloneBody(base)
@@ -482,29 +301,23 @@ func ruleProbes(rule cloudvocab.Field, valid any) []any {
 	return out
 }
 
-// The equivalence test must see a decoder that changed: the two mutants
-// that survived the vocabulary table's first tests, applied here to a copy of
-// the hand-written decoder rather than to the source.
-func TestTheEquivalenceTestSeesAChangedDecoder(t *testing.T) {
-	ops, err := cloudvocab.Operations()
-	if err != nil {
-		t.Fatal(err)
+// The golden must see a decoder that changed: the two mutants that survived
+// the vocabulary table's first tests, applied here to a copy of the served
+// decoder rather than to the source.
+func TestTheGoldenSeesAChangedDecoder(t *testing.T) {
+	recorded := map[string][]goldenCase{}
+	for _, c := range readDecoderGolden(t) {
+		recorded[c.Op] = append(recorded[c.Op], c)
 	}
-	rows := map[string]cloudvocab.Operation{}
-	for _, row := range ops {
-		rows[row.Op] = row
-	}
-	examples := map[string]any{}
 	for name, mutant := range map[string]struct {
 		word   string
 		decode func(body) (plan, bool)
-		key    string
 	}{
 		// archive-session starts accepting a field no row names.
-		"a brand-new field": {word: "archive-session", key: "zzz_new", decode: func(b body) (plan, bool) {
-			if _, ok := b["zzz_new"]; ok && len(b) == 5 {
+		"a brand-new field": {word: "archive-session", decode: func(b body) (plan, bool) {
+			if _, ok := b["brand_new_field"]; ok && len(b) == 5 {
 				trimmed := cloneBody(b)
-				delete(trimmed, "zzz_new")
+				delete(trimmed, "brand_new_field")
 				return catalog["archive-session"].decode(trimmed)
 			}
 			return catalog["archive-session"].decode(b)
@@ -519,77 +332,23 @@ func TestTheEquivalenceTestSeesAChangedDecoder(t *testing.T) {
 	} {
 		o := catalog[mutant.word]
 		o.decode = mutant.decode
-		universe := []string{"brand_new_field"}
-		if mutant.key != "" {
-			universe = append(universe, mutant.key)
-		}
 		caught := false
-		for _, b := range decoderProbes(rows[mutant.word], universe, examples, nil) {
-			if compareDecoders(o, generatedDecoders[mutant.word], b) != "" {
+		for _, c := range recorded[mutant.word] {
+			b, err := goldenBody(c.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := goldenAnswer(o, served(o), c.Op, b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if goldenDiff(got, c) != "" {
 				caught = true
 				break
 			}
 		}
 		if !caught {
-			t.Errorf("%s: the equivalence test does not see %s changed", name, mutant.word)
+			t.Errorf("%s: the golden does not see %s changed", name, mutant.word)
 		}
 	}
-	// And the mutant field is in the universe only because the source scan
-	// would read it: the real source names no such key.
-	if handWrittenBodyKeys(t)["zzz_new"] {
-		t.Fatal("this package's source already spells zzz_new; pick a mutant key nothing spells")
-	}
-}
-
-// TestRecordHandWrittenGolden writes the golden from the hand-written
-// decoders, over the probe set above. Run once, before they are removed.
-func TestRecordHandWrittenGolden(t *testing.T) {
-	if os.Getenv("CLAWDLINE_RECORD_HAND_GOLDEN") != "1" {
-		t.Skip("set CLAWDLINE_RECORD_HAND_GOLDEN=1")
-	}
-	ops, err := cloudvocab.Operations()
-	if err != nil {
-		t.Fatal(err)
-	}
-	universe := bodyKeyUniverse(t, ops)
-	_, compared := handWrittenLiterals(t)
-	examples := map[string]any{}
-	for _, row := range ops {
-		for key, value := range row.Example {
-			if _, ok := examples[key]; !ok {
-				examples[key] = value
-			}
-		}
-	}
-	cases := []goldenCase{}
-	for _, row := range ops {
-		if _, ok := generatedDecoders[row.Op]; !ok {
-			continue
-		}
-		o := catalog[row.Op]
-		hand := func(b body) (plan, LocalRequest, bool) {
-			p, ok := o.decode(b)
-			if !ok {
-				return plan{}, LocalRequest{}, false
-			}
-			var req LocalRequest
-			if o.route != nil {
-				req = o.route(p)
-			}
-			return p, req, true
-		}
-		seen := map[string]bool{}
-		for _, b := range decoderProbes(row, universe, examples, compared) {
-			c, err := goldenAnswer(o, hand, row.Op, b)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if seen[string(c.Body)] {
-				continue
-			}
-			seen[string(c.Body)] = true
-			cases = append(cases, c)
-		}
-	}
-	writeDecoderGolden(t, cases)
 }

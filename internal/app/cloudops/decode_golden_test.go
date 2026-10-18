@@ -8,6 +8,8 @@ import (
 	"os"
 	"sort"
 	"testing"
+
+	"github.com/sainteye/clawdline/internal/domain/cloudvocab"
 )
 
 // decoderGolden is what the hand-written decoders answered, before they were
@@ -30,6 +32,22 @@ type goldenCase struct {
 	Accept  bool            `json:"accept"`
 	Plan    string          `json:"plan,omitempty"`
 	Request string          `json:"request,omitempty"`
+}
+
+// served is the decoder the bridge runs for o: its decode, then its route
+// when it has one.
+func served(o op) genDecoder {
+	return func(b body) (plan, LocalRequest, bool) {
+		p, ok := o.decode(b)
+		if !ok {
+			return plan{}, LocalRequest{}, false
+		}
+		var req LocalRequest
+		if o.route != nil {
+			req = o.route(p)
+		}
+		return p, req, true
+	}
 }
 
 // goldenAnswer is one decoder's decision on b, in the golden's terms.
@@ -110,28 +128,19 @@ func writeDecoderGolden(t *testing.T, cases []goldenCase) {
 	t.Logf("wrote %d cases, %d bytes", len(cases), buf.Len())
 }
 
-// Every generated decoder decides every recorded body as the golden says.
+// Every word with a generated decoder, as the bridge serves it, decides every
+// recorded body as the golden says.
 func TestGeneratedDecodersKeepTheGolden(t *testing.T) {
 	cases := readDecoderGolden(t)
 	if os.Getenv("CLAWDLINE_DECODER_GOLDEN") == "record" {
-		for i, c := range cases {
-			b, err := goldenBody(c.Body)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if cases[i], err = goldenAnswer(catalog[c.Op], generatedDecoders[c.Op], c.Op, b); err != nil {
-				t.Fatal(err)
-			}
-		}
-		writeDecoderGolden(t, cases)
+		writeDecoderGolden(t, recordDecoderGolden(t, cases))
 		return
 	}
 	perWord := map[string]int{}
 	failures := map[string]int{}
 	for _, c := range cases {
 		perWord[c.Op]++
-		decode, ok := generatedDecoders[c.Op]
-		if !ok {
+		if _, ok := generatedDecoders[c.Op]; !ok {
 			t.Errorf("%s: recorded, and no generated decoder has the word", c.Op)
 			continue
 		}
@@ -139,7 +148,7 @@ func TestGeneratedDecodersKeepTheGolden(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", c.Op, err)
 		}
-		got, err := goldenAnswer(catalog[c.Op], decode, c.Op, b)
+		got, err := goldenAnswer(catalog[c.Op], served(catalog[c.Op]), c.Op, b)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -161,6 +170,70 @@ func TestGeneratedDecodersKeepTheGolden(t *testing.T) {
 		}
 	}
 	t.Logf("%d recorded bodies over %d words", len(cases), len(perWord))
+}
+
+// recordDecoderGolden is every recorded body, and every probe the table's
+// rows give that is not recorded yet, decided by the served decoders. A
+// word no longer generated drops out.
+func recordDecoderGolden(t *testing.T, recorded []goldenCase) []goldenCase {
+	t.Helper()
+	ops, err := cloudvocab.Operations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	universe, err := bodyKeyUniverse(ops, recorded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	examples := map[string]any{}
+	for _, row := range ops {
+		for key, value := range row.Example {
+			if _, ok := examples[key]; !ok {
+				examples[key] = value
+			}
+		}
+	}
+	bodies := map[string][]body{}
+	seen := map[string]bool{}
+	keep := func(word string, b body) {
+		encoded, err := json.Marshal(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if key := word + "\x00" + string(encoded); !seen[key] {
+			seen[key] = true
+			bodies[word] = append(bodies[word], b)
+		}
+	}
+	for _, c := range recorded {
+		b, err := goldenBody(c.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		keep(c.Op, b)
+	}
+	for _, row := range ops {
+		if _, ok := generatedDecoders[row.Op]; ok {
+			for _, b := range decoderProbes(row, universe, examples) {
+				keep(row.Op, b)
+			}
+		}
+	}
+	out := []goldenCase{}
+	for _, row := range ops {
+		if _, ok := generatedDecoders[row.Op]; !ok {
+			continue
+		}
+		o := catalog[row.Op]
+		for _, b := range bodies[row.Op] {
+			c, err := goldenAnswer(o, served(o), row.Op, b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func goldenDiff(got, want goldenCase) string {

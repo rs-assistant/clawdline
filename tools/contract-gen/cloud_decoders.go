@@ -34,6 +34,15 @@ func renderCloudDecoders(ops []cloudvocab.Operation) ([]byte, error) {
 		fmt.Fprintf(&b, "%q: %s,\n", name, decoderName(name))
 	}
 	b.WriteString("}\n\n")
+	b.WriteString("// generatedUnrouted is every generated word whose decode states no local\n")
+	b.WriteString("// request: its answer is not a route's, so its op has no route.\n")
+	b.WriteString("var generatedUnrouted = map[string]bool{\n")
+	for _, o := range ops {
+		if o.Decode.Hand == "" && o.Decode.Route == nil {
+			fmt.Fprintf(&b, "%q: true,\n", o.Op)
+		}
+	}
+	b.WriteString("}\n\n")
 	b.WriteString("// handDecoded is every word whose decoder stays hand-written, and why.\n")
 	b.WriteString("var handDecoded = map[string]string{\n")
 	for _, o := range ops {
@@ -115,7 +124,7 @@ func renderDecoder(b *bytes.Buffer, o cloudvocab.Operation) error {
 		case cloudvocab.IntoExpect:
 			fmt.Fprintf(b, "if v, named := b[%q]; named {\np.expect = genText(v)\n}\n", field)
 		case cloudvocab.IntoTyped:
-			fmt.Fprintf(b, "if v, named := b[%q]; named {\np.typed, p.namesTyped = genText(v), true\n}\n", field)
+			fmt.Fprintf(b, "if _, named := b[%q]; named {\np.namesTyped = true\n}\n", field)
 		case cloudvocab.IntoDocument:
 			fmt.Fprintf(b, "if _, named := b[%q]; named {\np.document = b.genObject(%q)\n}\n", field, field)
 		}

@@ -104,6 +104,87 @@ type Field struct {
 	MaxKeys    int              `json:"max_keys,omitempty"`
 	// Into names the identity field this value also becomes.
 	Into Into `json:"into,omitempty"`
+	// Copies names, for a limit above, the Go constant its number is a copy
+	// of (`max_bytes` → `projectfiles.MaxWriteBytes`), so a test can hold the
+	// two equal and a constant cannot change while the table keeps the old
+	// number. A limit no constant states names none.
+	Copies map[string]string `json:"copies,omitempty"`
+}
+
+// CopiedLimit is one limit a Field states and the constant it copies.
+type CopiedLimit struct {
+	// Path is the field, then `.property` or `[]` down to the rule.
+	Path     string
+	Limit    string
+	Value    int64
+	Constant string
+}
+
+// CopiedLimits is every limit the rule f at path copies, nested rules
+// included.
+func CopiedLimits(path string, f Field) []CopiedLimit {
+	out := []CopiedLimit{}
+	for _, limit := range sortedLimitNames(f.Copies) {
+		value, _ := f.limit(limit)
+		out = append(out, CopiedLimit{Path: path, Limit: limit, Value: value, Constant: f.Copies[limit]})
+	}
+	if f.Items != nil {
+		out = append(out, CopiedLimits(path+"[]", *f.Items)...)
+	}
+	keys := make([]string, 0, len(f.Properties))
+	for key := range f.Properties {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		out = append(out, CopiedLimits(path+"."+key, f.Properties[key])...)
+	}
+	return out
+}
+
+func sortedLimitNames(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for key := range m {
+		out = append(out, key)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// limit is the number a limit name states, and whether f states it.
+func (f Field) limit(name string) (int64, bool) {
+	count := func(n int) (int64, bool) { return int64(n), n > 0 }
+	pointer := func(n *int64) (int64, bool) {
+		if n == nil {
+			return 0, false
+		}
+		return *n, true
+	}
+	items := func(n *int) (int64, bool) {
+		if n == nil {
+			return 0, false
+		}
+		return int64(*n), true
+	}
+	switch name {
+	case "max_bytes":
+		return count(f.MaxBytes)
+	case "length":
+		return count(f.Length)
+	case "min":
+		return pointer(f.Min)
+	case "max":
+		return pointer(f.Max)
+	case "min_items":
+		return items(f.MinItems)
+	case "max_items":
+		return items(f.MaxItems)
+	case "min_keys":
+		return count(f.MinKeys)
+	case "max_keys":
+		return count(f.MaxKeys)
+	}
+	return 0, false
 }
 
 // Into is an identity field a body value is copied to.
@@ -118,9 +199,9 @@ const (
 	// The rest are the few values the answer side reads after the local
 	// request is built, so they travel in the plan beside it: a picture's
 	// id (named in its payload), an info read's parts (which the content
-	// read rail admits only in full), a menu answer's key, question and
-	// typed words (which its guard checks), and a viewer event batch (which
-	// is written here rather than routed).
+	// read rail admits only in full), a menu answer's key and question and
+	// whether it names typed words (which its guard checks), and a viewer
+	// event batch (which is written here rather than routed).
 	IntoID       Into = "id"
 	IntoParts    Into = "parts"
 	IntoKey      Into = "key"
@@ -400,6 +481,14 @@ func validateField(f Field, known func(string) bool) error {
 		}
 	default:
 		return fmt.Errorf("into %q", f.Into)
+	}
+	for limit, constant := range f.Copies {
+		if _, stated := f.limit(limit); !stated {
+			return fmt.Errorf("copies %s for %s, a limit it does not state", constant, limit)
+		}
+		if constant == "" {
+			return fmt.Errorf("copies no constant for %s", limit)
+		}
 	}
 	if f.Items != nil {
 		if err := validateField(*f.Items, known); err != nil {

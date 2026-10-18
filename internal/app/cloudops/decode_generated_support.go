@@ -14,9 +14,9 @@ import (
 // tools/contract-gen; these are the few pieces they share, so that a rule in
 // the table is read by one function here rather than by a hundred copies.
 //
-// Nothing in production calls a generated decoder yet:
-// `TestGeneratedDecodersDecideAsTheHandWrittenOnes` holds each one equal to
-// the hand-written decoder and route it will replace.
+// Every word the table states the decoder of is served by its generated
+// decoder (register). `TestGeneratedDecodersKeepTheGolden` holds each one to
+// what the hand-written decoder it replaced answered.
 
 // genDecoder is one generated decoder: the plan's identity fields (where the
 // answer goes and what it is pinned to), the local request, and whether the
@@ -44,6 +44,35 @@ type genRule struct {
 	closed     bool
 	minKeys    int
 	maxKeys    int
+}
+
+// withGeneratedDecoder gives o the decoder the table states for its word, and
+// a route that hands on the local request that decoder built.
+func withGeneratedDecoder(o op) op {
+	decode := generatedDecoders[o.name]
+	o.decode = func(b body) (plan, bool) {
+		p, req, ok := decode(b)
+		p.local = req
+		return p, ok
+	}
+	if !generatedUnrouted[o.name] {
+		o.route = routeLocal
+	}
+	return o
+}
+
+// routeLocal is the request a generated decoder built. Its header map is a
+// copy: the bridge adds headers to what a route returns.
+func routeLocal(p plan) LocalRequest {
+	req := p.local
+	if req.Header != nil {
+		header := make(map[string]string, len(req.Header))
+		for key, value := range req.Header {
+			header[key] = value
+		}
+		req.Header = header
+	}
+	return req
 }
 
 func genInt(v int64) *int64 { return &v }

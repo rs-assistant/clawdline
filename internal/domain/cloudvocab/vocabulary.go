@@ -10,14 +10,13 @@
 // transport package can depend on it without pulling the bridge or an adapter
 // with it.
 //
-// Today nothing at run time reads it. It is held equal to the two hand-written
-// sides by `TestTheVocabularyTableIsTheBridgesCatalog`
-// (internal/app/cloudops) and `vocabulary.test.ts` (web/console/src/cloud),
-// so that switching either side to it later is a change with a fixed target.
+// Nothing at run time reads the file itself. It is held equal to the two
+// hand-written sides by `TestTheVocabularyTableIsTheBridgesCatalog`
+// (internal/app/cloudops) and `vocabulary.test.ts` (web/console/src/cloud).
 // Each row's `decode` is the machine's decoder as data: `tools/contract-gen`
-// generates Go decoders from it, which
-// `TestGeneratedDecodersDecideAsTheHandWrittenOnes` holds equal to the
-// hand-written ones they will replace.
+// generates the Go decoders the bridge serves from it, and
+// `TestGeneratedDecodersKeepTheGolden` holds them to what the hand-written
+// decoders they replaced answered.
 package cloudvocab
 
 import (

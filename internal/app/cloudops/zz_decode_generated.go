@@ -161,6 +161,17 @@ var generatedDecoders = map[string]genDecoder{
 	"work.v2.todo-image-create":          genDecodeWorkV2TodoImageCreate,
 }
 
+// generatedUnrouted is every generated word whose decode states no local
+// request: its answer is not a route's, so its op has no route.
+var generatedUnrouted = map[string]bool{
+	"diagnostics.events":        true,
+	"diagnostics.report":        true,
+	"session-receipt":           true,
+	"sessions.row":              true,
+	"sessions.snapshot":         true,
+	"sessions.snapshot.initial": true,
+}
+
 // handDecoded is every word whose decoder stays hand-written, and why.
 var handDecoded = map[string]string{
 	"dispatch":                 "its body is open: every field is accepted, and a body naming no request still decodes",
@@ -240,8 +251,8 @@ func genDecodeAnswer(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expect"]; named {
 		p.expect = genText(v)
 	}
-	if v, named := b["typed"]; named {
-		p.typed, p.namesTyped = genText(v), true
+	if _, named := b["typed"]; named {
+		p.namesTyped = true
 	}
 	path := "/v1/sessions/" + segment(genText(b["session"])) + "/key"
 	req := LocalRequest{Method: "POST", Path: path}
@@ -763,8 +774,8 @@ func genDecodeKey(b body) (plan, LocalRequest, bool) {
 	if v, named := b["key"]; named {
 		p.key = genText(v)
 	}
-	if v, named := b["typed"]; named {
-		p.typed, p.namesTyped = genText(v), true
+	if _, named := b["typed"]; named {
+		p.namesTyped = true
 	}
 	path := "/v1/sessions/" + segment(genText(b["session"])) + "/key"
 	req := LocalRequest{Method: "POST", Path: path}

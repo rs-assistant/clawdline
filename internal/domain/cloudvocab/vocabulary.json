@@ -98,7 +98,7 @@
       "shapes": [
         {"body": ["command", "request", "session"], "path": "/v1/board", "local_body": ["enabled", "expectedRevision", "operation", "policy", "provider", "requestId"]}
       ],
-      "decode": {"reply": "action", "fields": {"command": {"type": "object", "max_bytes": 65536, "required": ["requestId"], "properties": {"requestId": {"type": "string", "checks": ["request_name"], "same_as": "request"}}}}, "route": {"path": "/v1/board", "body": {"object": "command"}}}
+      "decode": {"reply": "action", "fields": {"command": {"type": "object", "max_bytes": 65536, "required": ["requestId"], "properties": {"requestId": {"type": "string", "checks": ["request_name"], "same_as": "request"}}, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/board", "body": {"object": "command"}}}
     },
     {
       "op": "capacity",
@@ -182,7 +182,7 @@
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/settings/default-models", "local_body": ["claude_default_model"]}
       ],
-      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "max_keys": 3, "properties": {"codex_default_model": {"type": "string", "nullable": true}, "claude_default_model": {"type": "string", "nullable": true}, "codex_default_effort": {"type": "string", "nullable": true}}}}, "route": {"path": "/v1/settings/default-models", "body": {"object": "changes"}}}
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "max_keys": 3, "properties": {"codex_default_model": {"type": "string", "nullable": true}, "claude_default_model": {"type": "string", "nullable": true}, "codex_default_effort": {"type": "string", "nullable": true}}, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/settings/default-models", "body": {"object": "changes"}}}
     },
     {
       "op": "diagnostics.events",
@@ -196,7 +196,7 @@
       "shapes": [
         {"body": ["batch", "request", "session"]}
       ],
-      "decode": {"reply": "action", "fields": {"batch": {"type": "object", "max_bytes": 262144, "into": "document"}}}
+      "decode": {"reply": "action", "fields": {"batch": {"type": "object", "max_bytes": 262144, "into": "document", "copies": {"max_bytes": "ViewerEventsBatchBytesLimit"}}}}
     },
     {
       "op": "diagnostics.report",
@@ -396,7 +396,7 @@
       "shapes": [
         {"body": ["request", "session", "text"], "path": "/v1/intents", "local_body": ["text"]}
       ],
-      "decode": {"reply": "action", "fields": {"text": {"type": "string", "max_bytes": 4096}}, "route": {"path": "/v1/intents", "body": {"fields": {"text": {"from": "text"}}}}}
+      "decode": {"reply": "action", "fields": {"text": {"type": "string", "max_bytes": 4096, "copies": {"max_bytes": "intentTextLimit"}}}, "route": {"path": "/v1/intents", "body": {"fields": {"text": {"from": "text"}}}}}
     },
     {
       "op": "interrupt",
@@ -469,7 +469,7 @@
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/notification-rules", "local_body": ["action", "id"]}
       ],
-      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536}}, "route": {"path": "/v1/notification-rules", "body": {"object": "changes"}}}
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/notification-rules", "body": {"object": "changes"}}}
     },
     {
       "op": "notification-settings",
@@ -497,7 +497,7 @@
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/settings/notifications", "local_body": ["push_on_waiting"]}
       ],
-      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "properties": {"push_on_waiting": {"type": "bool", "nullable": true}, "orchestrator_agent_notify": {"type": "bool", "nullable": true}, "push_on_board_decision": {"type": "bool", "nullable": true}, "push_on_board_done": {"type": "bool", "nullable": true}, "push_on_schedule_failure": {"type": "bool", "nullable": true}, "push_on_capacity": {"type": "bool", "nullable": true}, "push_on_dead_letter": {"type": "bool", "nullable": true}, "push_on_app_release_success": {"type": "bool", "nullable": true}, "push_on_cloud_release_success": {"type": "bool", "nullable": true}, "push_on_release_failure": {"type": "bool", "nullable": true}}}}, "route": {"path": "/v1/settings/notifications", "body": {"object": "changes"}}}
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "properties": {"push_on_waiting": {"type": "bool", "nullable": true}, "orchestrator_agent_notify": {"type": "bool", "nullable": true}, "push_on_board_decision": {"type": "bool", "nullable": true}, "push_on_board_done": {"type": "bool", "nullable": true}, "push_on_schedule_failure": {"type": "bool", "nullable": true}, "push_on_capacity": {"type": "bool", "nullable": true}, "push_on_dead_letter": {"type": "bool", "nullable": true}, "push_on_app_release_success": {"type": "bool", "nullable": true}, "push_on_cloud_release_success": {"type": "bool", "nullable": true}, "push_on_release_failure": {"type": "bool", "nullable": true}}, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/settings/notifications", "body": {"object": "changes"}}}
     },
     {
       "op": "pair-agent-start",
@@ -694,7 +694,7 @@
       "shapes": [
         {"body": ["file", "item", "project", "request", "session"], "path": "/v1/projects/{project}/files/{file}", "local_body": ["content", "expected_version"]}
       ],
-      "decode": {"reply": "action", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}, "file": {"type": "string", "length": 32, "checks": ["lower_hex"]}, "item": {"type": "object", "max_bytes": 262144}}, "route": {"path": "/v1/projects/{project}/files/{file}", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}, "file": {"type": "string", "length": 32, "checks": ["lower_hex"]}, "item": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "projectfiles.MaxWriteBytes"}}}, "route": {"path": "/v1/projects/{project}/files/{file}", "body": {"object": "item"}}}
     },
     {
       "op": "project-folders",
@@ -765,7 +765,7 @@
       "shapes": [
         {"body": ["item", "request", "session"], "path": "/v1/project-sync/mirror", "local_body": []}
       ],
-      "decode": {"reply": "action", "fields": {"item": {"type": "object", "max_bytes": 4194304}}, "route": {"path": "/v1/project-sync/mirror", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"item": {"type": "object", "max_bytes": 4194304, "copies": {"max_bytes": "projectSyncCloudBodyLimit"}}}, "route": {"path": "/v1/project-sync/mirror", "body": {"object": "item"}}}
     },
     {
       "op": "project-mirror-detach",
@@ -1037,7 +1037,7 @@
       "shapes": [
         {"body": ["request", "schedule", "session"], "path": "/v1/orchestrator/schedules", "local_body": ["title"]}
       ],
-      "decode": {"reply": "action", "fields": {"schedule": {"type": "object", "max_bytes": 262144}}, "route": {"path": "/v1/orchestrator/schedules", "body": {"object": "schedule"}}}
+      "decode": {"reply": "action", "fields": {"schedule": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "scheduleMaximumBytes"}}}, "route": {"path": "/v1/orchestrator/schedules", "body": {"object": "schedule"}}}
     },
     {
       "op": "schedule-delete",
@@ -1080,7 +1080,7 @@
       "shapes": [
         {"body": ["id", "request", "schedule", "session"], "path": "/v1/orchestrator/schedules/{id}", "local_body": ["title"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true}, "schedule": {"type": "object", "max_bytes": 262144}}, "route": {"path": "/v1/orchestrator/schedules/{id}", "body": {"object": "schedule"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true}, "schedule": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "scheduleMaximumBytes"}}}, "route": {"path": "/v1/orchestrator/schedules/{id}", "body": {"object": "schedule"}}}
     },
     {
       "op": "schedule-webhook-bind-v1",
@@ -1169,7 +1169,7 @@
       "shapes": [
         {"body": ["request", "row", "session"], "path": "/v1/snippets", "query": ["session"]}
       ],
-      "decode": {"reply": "machine", "fields": {"row": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}}, "route": {"path": "/v1/snippets", "query": {"session": {"from": "row"}}}}
+      "decode": {"reply": "machine", "fields": {"row": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target", "copies": {"max_bytes": "SessionRowIDBytesLimit"}}}, "route": {"path": "/v1/snippets", "query": {"session": {"from": "row"}}}}
     },
     {
       "op": "sessions.list",
@@ -1199,7 +1199,7 @@
       "shapes": [
         {"body": ["request", "row", "session"]}
       ],
-      "decode": {"reply": "machine", "fields": {"row": {"type": "string", "non_empty": true, "max_bytes": 256}}}
+      "decode": {"reply": "machine", "fields": {"row": {"type": "string", "non_empty": true, "max_bytes": 256, "copies": {"max_bytes": "SessionRowIDBytesLimit"}}}}
     },
     {
       "op": "sessions.snapshot",
@@ -1292,7 +1292,7 @@
       "shapes": [
         {"body": ["request", "session", "snippet"], "path": "/v1/snippets", "local_body": ["body", "scope", "title"]}
       ],
-      "decode": {"reply": "action", "fields": {"snippet": {"type": "object", "max_bytes": 65536}}, "route": {"path": "/v1/snippets", "body": {"object": "snippet"}}}
+      "decode": {"reply": "action", "fields": {"snippet": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "snippetMaximumBytes"}}}, "route": {"path": "/v1/snippets", "body": {"object": "snippet"}}}
     },
     {
       "op": "snippet-delete",
@@ -1320,7 +1320,7 @@
       "shapes": [
         {"body": ["ordering", "request", "session"], "path": "/v1/snippets/order", "local_body": ["order", "scope"]}
       ],
-      "decode": {"reply": "action", "fields": {"ordering": {"type": "object", "max_bytes": 65536}}, "route": {"path": "/v1/snippets/order", "body": {"object": "ordering"}}}
+      "decode": {"reply": "action", "fields": {"ordering": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "snippetMaximumBytes"}}}, "route": {"path": "/v1/snippets/order", "body": {"object": "ordering"}}}
     },
     {
       "op": "snippet-update",
@@ -1334,7 +1334,7 @@
       "shapes": [
         {"body": ["id", "request", "session", "snippet"], "path": "/v1/snippets/{id}", "local_body": ["body", "scope", "title"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true}, "snippet": {"type": "object", "max_bytes": 65536}}, "route": {"path": "/v1/snippets/{id}", "body": {"object": "snippet"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true}, "snippet": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "snippetMaximumBytes"}}}, "route": {"path": "/v1/snippets/{id}", "body": {"object": "snippet"}}}
     },
     {
       "op": "snippets",
@@ -1377,7 +1377,7 @@
       "shapes": [
         {"body": ["after", "limit", "request", "session"], "path": "/v1/squad/events", "query": ["after", "limit"]}
       ],
-      "decode": {"reply": "machine", "fields": {"after": {"type": "integer", "min": 0}, "limit": {"type": "integer", "min": 1, "max": 100}}, "route": {"path": "/v1/squad/events", "query": {"after": {"from": "after"}, "limit": {"from": "limit"}}}}
+      "decode": {"reply": "machine", "fields": {"after": {"type": "integer", "min": 0}, "limit": {"type": "integer", "min": 1, "max": 100, "copies": {"max": "store.MaxSquadEventPageRows"}}}, "route": {"path": "/v1/squad/events", "query": {"after": {"from": "after"}, "limit": {"from": "limit"}}}}
     },
     {
       "op": "squad-session-bindings",
@@ -1433,7 +1433,7 @@
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/squad/catalog", "local_body": ["expected_version"]}
       ],
-      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144}}, "route": {"path": "/v1/squad/catalog", "body": {"object": "changes"}}}
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "squad.MaxSquadRequestBytes"}}}, "route": {"path": "/v1/squad/catalog", "body": {"object": "changes"}}}
     },
     {
       "op": "squad.definition",
@@ -1462,7 +1462,7 @@
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/squad/motion", "local_body": ["expected_version"]}
       ],
-      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144}}, "route": {"path": "/v1/squad/motion", "body": {"object": "changes"}}}
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "squad.MaxSquadRequestBytes"}}}, "route": {"path": "/v1/squad/motion", "body": {"object": "changes"}}}
     },
     {
       "op": "squad.packages.adopt",
@@ -1476,7 +1476,7 @@
       "shapes": [
         {"body": ["package", "request", "session"], "path": "/v1/squad-packages/adopt", "local_body": []}
       ],
-      "decode": {"reply": "action", "fields": {"package": {"type": "object", "max_bytes": 1048576}}, "route": {"path": "/v1/squad-packages/adopt", "body": {"object": "package"}}}
+      "decode": {"reply": "action", "fields": {"package": {"type": "object", "max_bytes": 1048576, "copies": {"max_bytes": "squadpack.MaxRequestBytes"}}}, "route": {"path": "/v1/squad-packages/adopt", "body": {"object": "package"}}}
     },
     {
       "op": "squad.packages.export",
@@ -1490,7 +1490,7 @@
       "shapes": [
         {"body": ["package", "request", "session"], "path": "/v1/squad-packages/export", "local_body": ["confirm_private", "private_scopes"]}
       ],
-      "decode": {"reply": "machine", "fields": {"package": {"type": "object", "max_bytes": 1048576, "closed": true, "required": ["confirm_private", "private_scopes"], "properties": {"confirm_private": {"type": "bool", "equals": false}, "private_scopes": {"type": "list", "items": {"type": "any"}, "max_items": 0}}}}, "route": {"path": "/v1/squad-packages/export", "body": {"object": "package"}}}
+      "decode": {"reply": "machine", "fields": {"package": {"type": "object", "max_bytes": 1048576, "closed": true, "required": ["confirm_private", "private_scopes"], "properties": {"confirm_private": {"type": "bool", "equals": false}, "private_scopes": {"type": "list", "items": {"type": "any"}, "max_items": 0}}, "copies": {"max_bytes": "squadpack.MaxRequestBytes"}}}, "route": {"path": "/v1/squad-packages/export", "body": {"object": "package"}}}
     },
     {
       "op": "squad.packages.export.private",
@@ -1505,7 +1505,7 @@
       "shapes": [
         {"body": ["package", "request", "session"], "path": "/v1/squad-packages/export", "local_body": ["confirm_private", "private_scopes"]}
       ],
-      "decode": {"reply": "action", "fields": {"package": {"type": "object", "max_bytes": 1048576, "closed": true, "required": ["confirm_private", "private_scopes"], "properties": {"confirm_private": {"type": "bool", "equals": true}, "private_scopes": {"type": "list", "items": {"type": "string", "non_empty": true}, "min_items": 1}}}}, "route": {"path": "/v1/squad-packages/export", "body": {"object": "package"}}}
+      "decode": {"reply": "action", "fields": {"package": {"type": "object", "max_bytes": 1048576, "closed": true, "required": ["confirm_private", "private_scopes"], "properties": {"confirm_private": {"type": "bool", "equals": true}, "private_scopes": {"type": "list", "items": {"type": "string", "non_empty": true}, "min_items": 1}}, "copies": {"max_bytes": "squadpack.MaxRequestBytes"}}}, "route": {"path": "/v1/squad-packages/export", "body": {"object": "package"}}}
     },
     {
       "op": "squad.packages.preview",
@@ -1519,7 +1519,7 @@
       "shapes": [
         {"body": ["package", "request", "session"], "path": "/v1/squad-packages/preview", "local_body": []}
       ],
-      "decode": {"reply": "machine", "fields": {"package": {"type": "object", "max_bytes": 1048576}}, "route": {"path": "/v1/squad-packages/preview", "body": {"object": "package"}}}
+      "decode": {"reply": "machine", "fields": {"package": {"type": "object", "max_bytes": 1048576, "copies": {"max_bytes": "squadpack.MaxRequestBytes"}}}, "route": {"path": "/v1/squad-packages/preview", "body": {"object": "package"}}}
     },
     {
       "op": "squad.role-draft",
@@ -1533,7 +1533,7 @@
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/squad/role-draft", "local_body": ["description"]}
       ],
-      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144}}, "route": {"path": "/v1/squad/role-draft", "body": {"object": "changes"}}}
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "squad.MaxSquadRequestBytes"}}}, "route": {"path": "/v1/squad/role-draft", "body": {"object": "changes"}}}
     },
     {
       "op": "squad.scopes",
@@ -1577,7 +1577,7 @@
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/squad/settings", "local_body": ["expected_version"]}
       ],
-      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144}}, "route": {"path": "/v1/squad/settings", "body": {"object": "changes"}}}
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "squad.MaxSquadRequestBytes"}}}, "route": {"path": "/v1/squad/settings", "body": {"object": "changes"}}}
     },
     {
       "op": "squad.skill-sources",
@@ -1806,7 +1806,7 @@
       "shapes": [
         {"body": ["id", "request", "session", "verification"], "path": "/v1/verifications/{id}/close", "local_body": ["reason", "status"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["verification_id"]}, "verification": {"type": "object", "max_bytes": 65536}}, "route": {"path": "/v1/verifications/{id}/close", "body": {"object": "verification"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["verification_id"]}, "verification": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "verificationCloudBodyLimit"}}}, "route": {"path": "/v1/verifications/{id}/close", "body": {"object": "verification"}}}
     },
     {
       "op": "verification.create",
@@ -1820,7 +1820,7 @@
       "shapes": [
         {"body": ["request", "session", "verification"], "path": "/v1/verifications", "local_body": ["criteria", "due_at", "title"]}
       ],
-      "decode": {"reply": "action", "fields": {"verification": {"type": "object", "max_bytes": 65536}}, "route": {"path": "/v1/verifications", "body": {"object": "verification"}}}
+      "decode": {"reply": "action", "fields": {"verification": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "verificationCloudBodyLimit"}}}, "route": {"path": "/v1/verifications", "body": {"object": "verification"}}}
     },
     {
       "op": "verification.criterion",
@@ -1834,7 +1834,7 @@
       "shapes": [
         {"body": ["id", "index", "request", "session", "verification"], "path": "/v1/verifications/{id}/criteria/{index}", "local_body": ["state"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["verification_id"]}, "index": {"type": "integer", "min": 0, "max": 11}, "verification": {"type": "object", "max_bytes": 65536}}, "route": {"path": "/v1/verifications/{id}/criteria/{index}", "body": {"object": "verification"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["verification_id"]}, "index": {"type": "integer", "min": 0, "max": 11, "copies": {"max": "verificationCriteriaMaximum-1"}}, "verification": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "verificationCloudBodyLimit"}}}, "route": {"path": "/v1/verifications/{id}/criteria/{index}", "body": {"object": "verification"}}}
     },
     {
       "op": "verification.delete",
@@ -1890,7 +1890,7 @@
       "shapes": [
         {"body": ["id", "request", "session", "verification"], "path": "/v1/verifications/{id}/notes", "local_body": ["text"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["verification_id"]}, "verification": {"type": "object", "max_bytes": 65536}}, "route": {"path": "/v1/verifications/{id}/notes", "body": {"object": "verification"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["verification_id"]}, "verification": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "verificationCloudBodyLimit"}}}, "route": {"path": "/v1/verifications/{id}/notes", "body": {"object": "verification"}}}
     },
     {
       "op": "voice",
@@ -1904,7 +1904,7 @@
       "shapes": [
         {"body": ["audio", "rate", "request", "session"], "path": "/v1/voice", "local_body": ["audio", "rate"]}
       ],
-      "decode": {"reply": "action", "fields": {"audio": {"type": "string", "non_empty": true}, "rate": {"type": "integer", "min": 16000, "max": 16000}}, "route": {"path": "/v1/voice", "body": {"fields": {"audio": {"from": "audio"}, "rate": {"from": "rate"}}}}}
+      "decode": {"reply": "action", "fields": {"audio": {"type": "string", "non_empty": true}, "rate": {"type": "integer", "min": 16000, "max": 16000, "copies": {"min": "voiceRate", "max": "voiceRate"}}}, "route": {"path": "/v1/voice", "body": {"fields": {"audio": {"from": "audio"}, "rate": {"from": "rate"}}}}}
     },
     {
       "op": "work-gate-settings",
@@ -1932,7 +1932,7 @@
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/settings/work-gates", "local_body": ["planning_gate", "verify_gate"]}
       ],
-      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "max_keys": 2, "properties": {"planning_gate": {"type": "bool", "nullable": true}, "verify_gate": {"type": "bool", "nullable": true}}}}, "route": {"path": "/v1/settings/work-gates", "body": {"object": "changes"}}}
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "max_keys": 2, "properties": {"planning_gate": {"type": "bool", "nullable": true}, "verify_gate": {"type": "bool", "nullable": true}}, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/settings/work-gates", "body": {"object": "changes"}}}
     },
     {
       "op": "work.decision",
@@ -2016,7 +2016,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/assign", "local_body": ["mode", "terminal"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}/assign", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/assign", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.cancel",
@@ -2030,7 +2030,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/cancel", "local_body": ["expected_version", "reason"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}/cancel", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/cancel", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.complete",
@@ -2044,7 +2044,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/complete", "local_body": ["expected_version"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}/complete", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/complete", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.convert",
@@ -2058,7 +2058,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/convert", "local_body": ["expected_version", "kind"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}/convert", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/convert", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.create",
@@ -2072,7 +2072,7 @@
       "shapes": [
         {"body": ["item", "request", "session"], "path": "/v1/work/v2/items", "local_body": ["kind", "project_id", "title"]}
       ],
-      "decode": {"reply": "action", "fields": {"item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.edit",
@@ -2086,7 +2086,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}", "local_body": ["expected_version", "title"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.gate-decision",
@@ -2100,7 +2100,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/gate-decision", "local_body": ["action", "direction", "expected_version", "reason"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}/gate-decision", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/gate-decision", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.gate-export",
@@ -2128,7 +2128,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/gate-purge", "local_body": ["expected_version", "sha256"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}/gate-purge", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/gate-purge", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.human-intervention-action",
@@ -2142,7 +2142,7 @@
       "shapes": [
         {"body": ["action", "id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/human-interventions/{terminal}/{id}/{action}", "local_body": ["value"]}
       ],
-      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "action": {"type": "string", "enum": ["read", "resolve", "reopen", "handoff"]}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/human-interventions/{terminal}/{id}/{action}", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "action": {"type": "string", "enum": ["read", "resolve", "reopen", "handoff"]}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/human-interventions/{terminal}/{id}/{action}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.human-interventions",
@@ -2186,7 +2186,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/images", "local_body": ["data_url", "expected_version"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 18874368}}, "route": {"path": "/v1/work/v2/items/{id}/images", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 18874368, "copies": {"max_bytes": "workV2CloudImageBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/images", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.image-delete",
@@ -2200,7 +2200,7 @@
       "shapes": [
         {"body": ["id", "image", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/images/{image}", "local_body": ["expected_version"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "image": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}/images/{image}", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "image": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/images/{image}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.item",
@@ -2243,7 +2243,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/persona-suggestion", "local_body": ["expected_version"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}/persona-suggestion", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/persona-suggestion", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.proposal-resolve",
@@ -2257,7 +2257,7 @@
       "shapes": [
         {"body": ["decision", "id", "item", "request", "session"], "path": "/v1/work/v2/proposals/{id}/{decision}", "local_body": []}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "decision": {"type": "string", "enum": ["accept", "reject"]}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/proposals/{id}/{decision}", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "decision": {"type": "string", "enum": ["accept", "reject"]}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/proposals/{id}/{decision}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.proposals",
@@ -2285,7 +2285,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/remind", "local_body": ["expected_version"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}/remind", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/remind", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.search",
@@ -2314,7 +2314,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/seen", "local_body": ["phase"]}
       ],
-      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/items/{id}/seen", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/seen", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.session-todos",
@@ -2343,7 +2343,7 @@
       "shapes": [
         {"body": ["action", "id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}/{id}/{action}", "local_body": []}
       ],
-      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "action": {"type": "string", "enum": ["send", "complete", "reopen", "delete", "edit"]}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}/{id}/{action}", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "action": {"type": "string", "enum": ["send", "complete", "reopen", "delete", "edit"]}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}/{id}/{action}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.todo-create",
@@ -2357,7 +2357,7 @@
       "shapes": [
         {"body": ["item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}", "local_body": ["text"]}
       ],
-      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "item": {"type": "object", "max_bytes": 98304}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.todo-image-create",
@@ -2371,7 +2371,7 @@
       "shapes": [
         {"body": ["id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}/{id}/images", "local_body": ["data_url", "expected_version"]}
       ],
-      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 18874368}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}/{id}/images", "body": {"object": "item"}}}
+      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 18874368, "copies": {"max_bytes": "workV2CloudImageBodyLimit"}}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}/{id}/images", "body": {"object": "item"}}}
     }
   ]
 }
