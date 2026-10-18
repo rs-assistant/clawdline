@@ -28,6 +28,10 @@ export function recordSendDiagnostic(code: string): boolean {
   if (!activeReader) return false
   return activeReader.recordSendDiagnostic(code)
 }
+/** The Board's Session list read failed; the local console has no reader and records nothing. */
+export function recordSessionListFailure(failure: { code: string; elapsedMs: number }): boolean {
+  return activeReader?.reportSessionListFailure(failure) ?? false
+}
 export function setCloudConnectionRetry(retry: (() => void) | null): void {
   cloudConnectionRetry = retry
 }
