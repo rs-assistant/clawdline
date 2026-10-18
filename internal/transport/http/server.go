@@ -259,6 +259,9 @@ func New(cfg config.Config) (*Server, error) {
 			Activity: app.NewActivityReads(),
 		},
 	}
+	// Background agents live beside the Session's own record, so they are
+	// found through the same resolver as the conversation itself.
+	agents.Record = srv.recordPath
 	localPlanner := planner.New()
 	localPlanner.Timeout = time.Duration(CapacityLimit(capacity.IntentPlannerSeconds)) * time.Second
 	srv.planIntent = localPlanner.Draft

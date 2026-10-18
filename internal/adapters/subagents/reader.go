@@ -91,6 +91,11 @@ type noticeCache struct {
 type Reader struct {
 	Home string
 	Now  func() time.Time
+	// Record answers where a Session's own conversation record is. The
+	// daemon sets it to the transcript host's resolver, which prefers the
+	// directory a Claude Session was launched in over the one it is in now;
+	// nil composes the path from the scan's directory.
+	Record func(session.Session) string
 
 	mu       sync.Mutex
 	limit    int
@@ -222,11 +227,26 @@ type candidate struct {
 	root     *verdict
 }
 
+// claudeRecord is the Claude conversation record whose folder holds the
+// Session's background agents, or "" when nothing names one.
+func (r *Reader) claudeRecord(s session.Session) string {
+	if s.ConversationID == "" {
+		return ""
+	}
+	if r.Record != nil {
+		return r.Record(s)
+	}
+	if s.CWD == "" {
+		return ""
+	}
+	return transcript.ClaudePath(r.Home, s.CWD, s.ConversationID)
+}
+
 func (r *Reader) readClaude(s session.Session, cost *Measurement) ([]session.Agent, session.AgentReading) {
-	if s.CWD == "" || s.ConversationID == "" {
+	record := r.claudeRecord(s)
+	if record == "" {
 		return nil, unknown(session.AgentsNoRecord)
 	}
-	record := transcript.ClaudePath(r.Home, s.CWD, s.ConversationID)
 	folder := strings.TrimSuffix(record, filepath.Ext(record))
 	folder = filepath.Join(folder, "subagents")
 	cost.Stats++
@@ -729,10 +749,11 @@ func (r *Reader) AgentPath(s session.Session, id string) (string, bool) {
 	}
 	switch s.Assistant {
 	case session.AssistantClaude:
-		if s.CWD == "" {
+		record := r.claudeRecord(s)
+		if record == "" {
 			return "", false
 		}
-		root := strings.TrimSuffix(transcript.ClaudePath(r.Home, s.CWD, s.ConversationID), ".jsonl")
+		root := strings.TrimSuffix(record, ".jsonl")
 		folder := filepath.Join(root, "subagents")
 		return contained(folder, filepath.Join(folder, "agent-"+id+".jsonl"))
 	case session.AssistantCodex:
