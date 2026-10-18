@@ -1,0 +1,2207 @@
+{
+  "version": 1,
+  "operations": [
+    {
+      "op": "agent",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/{id}/agents/{agent}?limit=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "special": ["content_read"],
+      "example": {"agent": "ag_4", "before": 17, "expected_generation": "0123456789abcdef0123456789abcdef", "limit": 200, "session": "%19"},
+      "shapes": [
+        {"body": ["agent", "limit", "session"], "path": "/v1/sessions/{session}/agents/{agent}", "query": ["limit"]},
+        {"body": ["agent", "before", "limit", "session"], "path": "/v1/sessions/{session}/agents/{agent}", "query": ["before", "limit"]},
+        {"body": ["agent", "expected_generation", "limit", "session"], "path": "/v1/sessions/{session}/agents/{agent}", "query": ["limit"]},
+        {"body": ["agent", "before", "expected_generation", "limit", "session"], "path": "/v1/sessions/{session}/agents/{agent}", "query": ["before", "limit"]}
+      ]
+    },
+    {
+      "op": "answer",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/{id}/key",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "special": ["guard", "session_receipt"],
+      "example": {"answer": "1", "expect": "8eca80fffc9359d5f0fca31f3e36b741bd50218b658fc086f05931747bd4c5ce", "request": "req-1", "session": "%19", "typed": "please read CHILD.md"},
+      "shapes": [
+        {"body": ["answer", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["key"]},
+        {"body": ["answer", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["key"]},
+        {"body": ["answer", "expect", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["expect", "key"]},
+        {"body": ["answer", "request", "session", "typed"], "path": "/v1/sessions/{session}/key", "local_body": ["key", "typed"]}
+      ]
+    },
+    {
+      "op": "archive-session",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/{id}/archive",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "special": ["session_receipt"],
+      "example": {"expected_closeability_version": "cl1-current", "force": false, "request": "req-archive", "session": "%19"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/sessions/{session}/archive", "local_body": ["force"]},
+        {"body": ["expected_closeability_version", "request", "session"], "path": "/v1/sessions/{session}/archive", "local_body": ["expected_closeability_version", "force"]},
+        {"body": ["force", "request", "session"], "path": "/v1/sessions/{session}/archive", "local_body": ["force"]},
+        {"body": ["expected_closeability_version", "force", "request", "session"], "path": "/v1/sessions/{session}/archive", "local_body": ["expected_closeability_version", "force"]}
+      ]
+    },
+    {
+      "op": "archived-sessions",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/archived",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-archived", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/sessions/archived"}
+      ]
+    },
+    {
+      "op": "board",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/board?project=&item=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "special": ["divergence"],
+      "example": {"item": "", "project": "clawdline-go", "request": "req-board", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["item", "project", "request", "session"], "path": "/v1/board", "query": ["project"]}
+      ]
+    },
+    {
+      "op": "board-command",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/board",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"command": {"enabled": true, "expectedRevision": 4, "operation": "set_ai_consent", "policy": "board-reading-v1", "provider": "codex", "requestId": "board-setting-1"}, "request": "board-setting-1", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["command", "request", "session"], "path": "/v1/board", "local_body": ["enabled", "expectedRevision", "operation", "policy", "provider", "requestId"]}
+      ]
+    },
+    {
+      "op": "capacity",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/capacity",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/capacity"}
+      ]
+    },
+    {
+      "op": "coordination.leases",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/orchestrator/leases",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-leases", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/orchestrator/leases"}
+      ]
+    },
+    {
+      "op": "coordination.pauses",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/orchestrator/pauses",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-pauses", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/orchestrator/pauses"}
+      ]
+    },
+    {
+      "op": "coordination.waits",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/orchestrator/waits",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-waits", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/orchestrator/waits"}
+      ]
+    },
+    {
+      "op": "default-models",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/settings/default-models",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-read", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/settings/default-models"}
+      ]
+    },
+    {
+      "op": "default-models-update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/settings/default-models",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"changes": {"claude_default_model": "claude-sonnet-4-5"}, "request": "req-write", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["changes", "request", "session"], "path": "/v1/settings/default-models", "local_body": ["claude_default_model"]}
+      ]
+    },
+    {
+      "op": "diagnostics.events",
+      "kind": "command",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "cloud-client.js _deliverViewerEvents (after a recorded failure)",
+      "console_seam": "client",
+      "special": ["read_level", "viewer_events"],
+      "example": {"batch": {"rows": []}, "request": "req-events", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["batch", "request", "session"]}
+      ]
+    },
+    {
+      "op": "diagnostics.report",
+      "kind": "command",
+      "write_gate": false,
+      "console": "no_machine_route",
+      "special": ["read_level", "unavailable"],
+      "example": {"report": {"page": "session"}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["report", "request", "session"]}
+      ]
+    },
+    {
+      "op": "dismiss-restorable",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/restorable/dismiss",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"conversations": ["018f2f7a"], "request": "req-dismiss", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/sessions/restorable/dismiss", "local_body": []},
+        {"body": ["conversations", "request", "session"], "path": "/v1/sessions/restorable/dismiss", "local_body": ["conversations"]}
+      ]
+    },
+    {
+      "op": "dispatch",
+      "kind": "command",
+      "write_gate": true,
+      "console": "no_machine_route",
+      "special": ["any_class", "open_body", "refused:cloud_dispatch_unpinned", "unavailable"],
+      "example": {"request": "req-dispatch", "session": "__clawdline_machine__", "task": {}},
+      "shapes": [
+        {"body": []},
+        {"body": ["request"]},
+        {"body": ["session"]},
+        {"body": ["task"]},
+        {"body": ["request", "session"]},
+        {"body": ["request", "task"]},
+        {"body": ["session", "task"]},
+        {"body": ["request", "session", "task"]}
+      ]
+    },
+    {
+      "op": "document",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/{id}/documents/{scope}/{path}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "special": ["content_read", "shaped_answer"],
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "path": "report.md", "request": "req", "scope": "task", "session": "%19", "task": "7a000000-0000-4000-8000-000000000001"},
+      "shapes": [
+        {"body": ["path", "request", "scope", "session", "task"], "path": "/v1/sessions/{session}/documents/{scope}/{task}/{path}"},
+        {"body": ["expected_generation", "path", "request", "scope", "session", "task"], "path": "/v1/sessions/{session}/documents/{scope}/{task}/{path}"}
+      ]
+    },
+    {
+      "op": "documents",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/{id}/documents",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "special": ["content_read", "shaped_answer"],
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "session": "%19"},
+      "shapes": [
+        {"body": ["session"], "path": "/v1/sessions/{session}/documents"},
+        {"body": ["expected_generation", "session"], "path": "/v1/sessions/{session}/documents"}
+      ]
+    },
+    {
+      "op": "end",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/{id}/close",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "special": ["session_receipt"],
+      "example": {"accept_loss": false, "expected_closeability_version": "", "request": "req-end", "session": "%19"},
+      "shapes": [
+        {"body": ["accept_loss", "expected_closeability_version", "request", "session"], "path": "/v1/sessions/{session}/close", "local_body": ["force"]}
+      ]
+    },
+    {
+      "op": "focus",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/{id}/focus",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"execution_generation": "0123456789abcdef0123456789abcdef", "request": "req-focus", "session": "%19"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/sessions/{session}/focus"},
+        {"body": ["execution_generation", "request", "session"], "path": "/v1/sessions/{session}/focus"}
+      ]
+    },
+    {
+      "op": "forget-archived",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/archived/forget",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"conversation": "018f2f7a", "request": "req-forget-archive", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["conversation", "request", "session"], "path": "/v1/sessions/archived/forget", "local_body": ["conversation"]}
+      ]
+    },
+    {
+      "op": "git",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/{id}/git",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "special": ["content_read"],
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "session": "%19"},
+      "shapes": [
+        {"body": ["session"], "path": "/v1/sessions/{session}/git"},
+        {"body": ["expected_generation", "session"], "path": "/v1/sessions/{session}/git"}
+      ]
+    },
+    {
+      "op": "git-diff",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/{id}/git/diff?path=",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "special": ["content_read"],
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "path": "web/console/src/session/Detail.tsx", "request": "req-diff", "session": "%19"},
+      "shapes": [
+        {"body": ["path", "request", "session"], "path": "/v1/sessions/{session}/git/diff", "query": ["path"]},
+        {"body": ["expected_generation", "path", "request", "session"], "path": "/v1/sessions/{session}/git/diff", "query": ["path"]}
+      ]
+    },
+    {
+      "op": "image",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/artifacts/images/{id}?session={id}",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "special": ["content_read", "shaped_answer"],
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "id": "img_7f3a", "session": "%19"},
+      "shapes": [
+        {"body": ["id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]},
+        {"body": ["expected_generation", "id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]}
+      ]
+    },
+    {
+      "op": "info",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/{id}/info[?parts=summary]",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "special": ["content_read", "divergence"],
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "parts": "summary", "session": "%19"},
+      "shapes": [
+        {"body": ["parts", "session"], "path": "/v1/sessions/{session}/info", "query": ["parts"]},
+        {"body": ["expected_generation", "parts", "session"], "path": "/v1/sessions/{session}/info", "query": ["parts"]}
+      ]
+    },
+    {
+      "op": "intents",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/intents",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"request": "req-intents", "session": "__clawdline_machine__", "text": "start the review"},
+      "shapes": [
+        {"body": ["request", "session", "text"], "path": "/v1/intents", "local_body": ["text"]}
+      ]
+    },
+    {
+      "op": "interrupt",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/{id}/interrupt",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "special": ["session_receipt"],
+      "example": {"request": "req-interrupt", "session": "%19"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/sessions/{session}/interrupt", "local_body": []}
+      ]
+    },
+    {
+      "op": "key",
+      "kind": "command",
+      "write_gate": true,
+      "console": "deferred",
+      "local": {"method": "POST"},
+      "special": ["guard", "session_receipt"],
+      "example": {"expect": "8eca80fffc9359d5f0fca31f3e36b741bd50218b658fc086f05931747bd4c5ce", "key": "1", "request": "req-1", "session": "%19"},
+      "shapes": [
+        {"body": ["key", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["key"]},
+        {"body": ["key", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["key"]},
+        {"body": ["expect", "key", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["expect", "key"]}
+      ]
+    },
+    {
+      "op": "machine-usage",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/machine/usage",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/machine/usage"}
+      ]
+    },
+    {
+      "op": "notification-rules",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/notification-rules",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-read", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/notification-rules"}
+      ]
+    },
+    {
+      "op": "notification-rules-update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/notification-rules",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"changes": {"action": "delete", "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "request": "req-write", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["changes", "request", "session"], "path": "/v1/notification-rules", "local_body": ["action", "id"]}
+      ]
+    },
+    {
+      "op": "notification-settings",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/settings/notifications",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-notifications", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/settings/notifications"}
+      ]
+    },
+    {
+      "op": "notification-settings-update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/settings/notifications",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"changes": {"push_on_waiting": false}, "request": "req-notifications-write", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["changes", "request", "session"], "path": "/v1/settings/notifications", "local_body": ["push_on_waiting"]}
+      ]
+    },
+    {
+      "op": "pair-agent-start",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/cloud/pairing/agent",
+      "console_seam": "reader",
+      "local": {"method": "POST", "headers": ["Idempotency-Key"]},
+      "example": {"machine_id": "mac_target", "machine_name": "Target", "offer": "opaque", "request": "req-pair-agent-start", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["machine_id", "machine_name", "offer", "request", "session"], "path": "/v1/cloud/pairing/agent", "local_body": ["machine_id", "machine_name", "offer"]}
+      ]
+    },
+    {
+      "op": "pair-agent-status",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/cloud/pairing/agent/{task}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-pair-status", "session": "__clawdline_machine__", "task_id": "7a000000-0000-4000-8000-000000000001"},
+      "shapes": [
+        {"body": ["request", "session", "task_id"], "path": "/v1/cloud/pairing/agent/{task_id}"}
+      ]
+    },
+    {
+      "op": "past-sessions",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/places/{id}/sessions[/{assistant}]",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"assistant": "codex", "place": "/Users/sean/code/clawdline-go", "request": "req-past", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["assistant", "place", "request", "session"], "path": "/v1/places/{place}/sessions/{assistant}"}
+      ]
+    },
+    {
+      "op": "peer-control",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/cloud/peer/control",
+      "console_seam": "reader",
+      "local": {"method": "POST"},
+      "example": {"control": {"action": "status"}, "request": "req-peer-control", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["control", "request", "session"], "path": "/v1/cloud/peer/control", "local_body": ["action"]}
+      ]
+    },
+    {
+      "op": "peer-inbox",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/cloud/peer/inbox?machine_id=&session_id=&execution_generation=&before=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "special": ["content_read"],
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "request": "inbox-1", "session": "%19"},
+      "shapes": [
+        {"body": ["expected_generation", "request", "session"], "path": "/v1/cloud/peer/inbox", "query": ["execution_generation", "machine_id", "session_id"]}
+      ]
+    },
+    {
+      "op": "peer-outbox",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/cloud/peer/outbox/{request}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-peer-outbox", "session": "__clawdline_machine__", "target_request": "req-peer-send"},
+      "shapes": [
+        {"body": ["request", "session", "target_request"], "path": "/v1/cloud/peer/outbox/{target_request}"}
+      ]
+    },
+    {
+      "op": "peer-send",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/cloud/peer/send",
+      "console_seam": "reader",
+      "local": {"method": "POST"},
+      "example": {"body": "fixture", "header": {"body_digest": "0000000000000000000000000000000000000000000000000000000000000000", "grant_id": "grant-1", "kind": "message", "request_id": "req-peer-send", "source": {"execution_generation": "11111111111111111111111111111111", "machine_id": "mac-01", "session_id": "source"}, "target": {"execution_generation": "22222222222222222222222222222222", "machine_id": "mac-02", "session_id": "target"}}, "request": "req-peer-send", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["body", "header", "request", "session"], "path": "/v1/cloud/peer/send", "local_body": ["body", "request"]}
+      ]
+    },
+    {
+      "op": "personas",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/personas",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/personas"}
+      ]
+    },
+    {
+      "op": "places",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/places",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-places", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/places"}
+      ]
+    },
+    {
+      "op": "project-add",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/places?machine=",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"path": "/projects/example", "request": "req-add", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["path", "request", "session"], "path": "/v1/places", "local_body": ["paths"]}
+      ]
+    },
+    {
+      "op": "project-entry",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/project-sync/entry?repo=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"repo": "github.com/o/n", "request": "req-entry", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["repo", "request", "session"], "path": "/v1/project-sync/entry", "query": ["repo"]}
+      ]
+    },
+    {
+      "op": "project-file-list",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/projects/{project}/files",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"project": "p1", "request": "req-file-list", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["project", "request", "session"], "path": "/v1/projects/{project}/files"}
+      ]
+    },
+    {
+      "op": "project-file-read",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/projects/{project}/files/{file}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"file": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "project": "p1", "request": "read-1", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["file", "project", "request", "session"], "path": "/v1/projects/{project}/files/{file}"}
+      ]
+    },
+    {
+      "op": "project-file-save",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "PUT /v1/projects/{project}/files/{file}",
+      "console_seam": "reader",
+      "local": {"method": "PUT", "device": true},
+      "example": {"file": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "item": {"content": "updated", "expected_version": "v1"}, "project": "p1", "request": "req-file-save", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["file", "item", "project", "request", "session"], "path": "/v1/projects/{project}/files/{file}", "local_body": ["content", "expected_version"]}
+      ]
+    },
+    {
+      "op": "project-folders",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/project-folders?path=&machine=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"path": "/projects", "request": "req-folders", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/project-folders", "query": ["path"]},
+        {"body": ["path", "request", "session"], "path": "/v1/project-folders", "query": ["path"]}
+      ]
+    },
+    {
+      "op": "project-hide",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "DELETE /v1/places",
+      "console_seam": "writer",
+      "local": {"method": "DELETE", "device": true},
+      "example": {"path": "/projects/example", "request": "req-hide", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["path", "request", "session"], "path": "/v1/places", "local_body": ["paths"]}
+      ]
+    },
+    {
+      "op": "project-manifest",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/project-sync/manifest",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-manifest", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/project-sync/manifest"}
+      ]
+    },
+    {
+      "op": "project-mirror",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/project-sync/mirror",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-mirror", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/project-sync/mirror"}
+      ]
+    },
+    {
+      "op": "project-mirror-apply",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/project-sync/mirror",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"item": {}, "request": "req-apply", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["item", "request", "session"], "path": "/v1/project-sync/mirror", "local_body": []}
+      ]
+    },
+    {
+      "op": "project-mirror-detach",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "DELETE /v1/project-sync/mirror?repo=",
+      "console_seam": "writer",
+      "local": {"method": "DELETE", "device": true},
+      "example": {"repo": "github.com/o/n", "request": "req-detach", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["repo", "request", "session"], "path": "/v1/project-sync/mirror", "query": ["repo"]}
+      ]
+    },
+    {
+      "op": "project-tree-list",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/projects/{project}/tree?directory=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"directory": "src/nested", "project": "p1", "request": "req-tree-list", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["directory", "project", "request", "session"], "path": "/v1/projects/{project}/tree", "query": ["directory"]}
+      ]
+    },
+    {
+      "op": "project-tree-read",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/projects/{project}/tree/file?path=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"path": "src/page.ts", "project": "p1", "request": "tree-1", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["path", "project", "request", "session"], "path": "/v1/projects/{project}/tree/file", "query": ["path"]}
+      ]
+    },
+    {
+      "op": "project-unify-apply",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/projects/{project}/unify",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "special": ["partial_answer"],
+      "example": {"item": {"version": "v1"}, "project": "p1", "request": "apply-1", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["item", "project", "request", "session"], "path": "/v1/projects/{project}/unify", "local_body": ["version"]}
+      ]
+    },
+    {
+      "op": "project-unify-plan",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/projects/{project}/unify",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"project": "p1", "request": "plan-1", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["project", "request", "session"], "path": "/v1/projects/{project}/unify"}
+      ]
+    },
+    {
+      "op": "project-worktree-lifecycle",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/projects/{project}/worktrees",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"project": "/Users/sean/code/clawdline-go", "request": "req-lifecycle", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["project", "request", "session"], "path": "/v1/projects/{project}/worktrees"}
+      ]
+    },
+    {
+      "op": "project-worktree-lifecycle-refresh",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/projects/{project}/worktrees/refresh",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"project": "/workspace/example", "request": "req-lifecycle-refresh", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["project", "request", "session"], "path": "/v1/projects/{project}/worktrees/refresh", "local_body": []}
+      ]
+    },
+    {
+      "op": "project-worktree-remove",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "DELETE /v1/projects/{project}/worktrees/{worktree}",
+      "console_seam": "reader",
+      "local": {"method": "DELETE"},
+      "example": {"project": "project-abc", "request": "req-worktree-remove", "session": "__clawdline_machine__", "worktree": "wt-0123456789abcdef01234567"},
+      "shapes": [
+        {"body": ["project", "request", "session", "worktree"], "path": "/v1/projects/{project}/worktrees/{worktree}"}
+      ]
+    },
+    {
+      "op": "projects",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/projects",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-projects", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/projects"}
+      ]
+    },
+    {
+      "op": "push-key",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/push/key",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/push/key"}
+      ]
+    },
+    {
+      "op": "push-subscribe",
+      "kind": "command",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "POST /v1/push/subscribe",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "special": ["divergence", "read_level"],
+      "example": {"cloud_subscription_id": "c1000000-0000-4000-8000-000000000001", "request": "req", "session": "__clawdline_machine__", "subscription": {"endpoint": "https://web.push.apple.com/QW", "keys": {"auth": "c2VjcmV0", "p256dh": "BPk"}}},
+      "shapes": [
+        {"body": ["request", "session", "subscription"], "path": "/v1/push/subscribe", "local_body": ["endpoint", "keys"]},
+        {"body": ["cloud_subscription_id", "request", "session", "subscription"], "path": "/v1/push/subscribe", "local_body": ["cloud_subscription_id", "endpoint", "keys"]}
+      ]
+    },
+    {
+      "op": "push-test",
+      "kind": "command",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "POST /v1/push/test",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "special": ["read_level"],
+      "example": {"request": "req", "session": "__clawdline_machine__", "target": ""},
+      "shapes": [
+        {"body": ["request", "session", "target"], "path": "/v1/push/test", "local_body": []}
+      ]
+    },
+    {
+      "op": "push-unsubscribe",
+      "kind": "command",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "POST /v1/push/unsubscribe",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "special": ["read_level"],
+      "example": {"id": "9f1c0b3a4d5e6f708192a3b4c5d6e7f8", "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/push/unsubscribe", "local_body": ["id"]}
+      ]
+    },
+    {
+      "op": "restorable-sessions",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/restorable",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-offer", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/sessions/restorable"}
+      ]
+    },
+    {
+      "op": "restore-archived",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/archived/restore",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"conversations": ["018f2f7a"], "request": "req-unarchive", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["conversations", "request", "session"], "path": "/v1/sessions/archived/restore", "local_body": ["conversations"]}
+      ]
+    },
+    {
+      "op": "restore-sessions",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/restorable/restore",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"conversations": ["018f2f7a"], "request": "req-restore", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["conversations", "request", "session"], "path": "/v1/sessions/restorable/restore", "local_body": ["conversations"]}
+      ]
+    },
+    {
+      "op": "resume",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/places/{id}/resume[/{assistant}]/{past}[/as/{persona}]",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"assistant": "claude", "past": "abc", "persona": "backend", "place": "/tmp", "request": "req-resume", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["assistant", "past", "place", "request", "session"], "path": "/v1/places/{place}/resume/{assistant}/{past}", "local_body": []},
+        {"body": ["assistant", "past", "persona", "place", "request", "session"], "path": "/v1/places/{place}/resume/{assistant}/{past}/as/{persona}", "local_body": []}
+      ]
+    },
+    {
+      "op": "schedule",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/orchestrator/schedules/{id}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"id": "5c000000-0000-4000-8000-000000000002", "request": "req-schedule", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/orchestrator/schedules/{id}"}
+      ]
+    },
+    {
+      "op": "schedule-create",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/orchestrator/schedules",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"request": "req-schedule-create", "schedule": {"title": "morning"}, "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "schedule", "session"], "path": "/v1/orchestrator/schedules", "local_body": ["title"]}
+      ]
+    },
+    {
+      "op": "schedule-delete",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "DELETE /v1/orchestrator/schedules/{id}",
+      "console_seam": "writer",
+      "local": {"method": "DELETE", "device": true},
+      "example": {"id": "5c000000-0000-4000-8000-000000000002", "request": "req-schedule-delete", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/orchestrator/schedules/{id}"}
+      ]
+    },
+    {
+      "op": "schedule-run",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/orchestrator/schedules/{id}/run",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"force": true, "id": "5c000000-0000-4000-8000-000000000002", "request": "req-schedule-run", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/orchestrator/schedules/{id}/run", "local_body": []},
+        {"body": ["force", "id", "request", "session"], "path": "/v1/orchestrator/schedules/{id}/run", "local_body": ["force"]}
+      ]
+    },
+    {
+      "op": "schedule-update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "PATCH /v1/orchestrator/schedules/{id}",
+      "console_seam": "writer",
+      "local": {"method": "PATCH", "device": true},
+      "example": {"id": "5c000000-0000-4000-8000-000000000002", "request": "req-schedule-update", "schedule": {"title": "morning"}, "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "schedule", "session"], "path": "/v1/orchestrator/schedules/{id}", "local_body": ["title"]}
+      ]
+    },
+    {
+      "op": "schedule-webhook-bind-v1",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/orchestrator/schedule-webhooks/bind",
+      "console_seam": "reader",
+      "local": {"method": "POST", "device": true},
+      "example": {"hook_id": "swh_00000000000000000000000000", "hook_revision": 2, "replace_hook_id": null, "request_id": "5c000000-0000-4000-8000-000000000003", "schedule_id": "5c000000-0000-4000-8000-000000000002"},
+      "shapes": [
+        {"body": ["hook_id", "replace_hook_id", "request_id", "schedule_id"], "path": "/v1/orchestrator/schedule-webhooks/bind", "local_body": ["hook_id", "replace_hook_id", "request_id", "schedule_id"]},
+        {"body": ["hook_id", "hook_revision", "replace_hook_id", "request_id", "schedule_id"], "path": "/v1/orchestrator/schedule-webhooks/bind", "local_body": ["hook_id", "hook_revision", "replace_hook_id", "request_id", "schedule_id"]}
+      ]
+    },
+    {
+      "op": "schedules",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/orchestrator/schedules",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/orchestrator/schedules"}
+      ]
+    },
+    {
+      "op": "screen",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/{id}/screen",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "special": ["content_read"],
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "session": "%19"},
+      "shapes": [
+        {"body": ["session"], "path": "/v1/sessions/{session}/screen"},
+        {"body": ["expected_generation", "session"], "path": "/v1/sessions/{session}/screen"}
+      ]
+    },
+    {
+      "op": "send",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/{id}/send",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "special": ["session_receipt"],
+      "example": {"images": [], "request": "req-send", "session": "%19", "text": "hello"},
+      "shapes": [
+        {"body": ["images", "session", "text"], "path": "/v1/sessions/{session}/send", "local_body": ["images", "text"]},
+        {"body": ["images", "request", "session", "text"], "path": "/v1/sessions/{session}/send", "local_body": ["images", "text"]}
+      ]
+    },
+    {
+      "op": "session-receipt",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/{id}/cloud-receipts/{request}?action=&execution_generation=",
+      "console_seam": "writer",
+      "special": ["receipt_lookup"],
+      "example": {"action": "send", "execution_generation": "0123456789abcdef0123456789abcdef", "request": "req-receipt", "session": "%19", "target_request": "req-send"},
+      "shapes": [
+        {"body": ["action", "execution_generation", "request", "session", "target_request"]}
+      ]
+    },
+    {
+      "op": "session-snippets",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/workflow-project?session={id}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-session-snippets", "row": "session-one", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "row", "session"], "path": "/v1/snippets", "query": ["session"]}
+      ]
+    },
+    {
+      "op": "sessions.list",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions?parts=list (one machine-level display read)",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "special": ["content_read"],
+      "example": {"fresh": true, "request": "batch-1", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/sessions", "query": ["parts"]},
+        {"body": ["fresh", "request", "session"], "path": "/v1/sessions", "query": ["fresh", "parts"]}
+      ]
+    },
+    {
+      "op": "sessions.row",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "relay-reader.ts askForOpenedQuestion (when advertised)",
+      "console_seam": "client",
+      "special": ["session_publisher"],
+      "example": {"request": "req-1", "row": "%19", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "row", "session"]}
+      ]
+    },
+    {
+      "op": "sessions.snapshot",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "cloud-client.js _recoverSessions (on connect)",
+      "console_seam": "client",
+      "special": ["session_publisher"],
+      "example": {"initial": false, "orchestrator": true, "request": "req-1", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"]},
+        {"body": ["initial", "request", "session"]},
+        {"body": ["orchestrator", "request", "session"]},
+        {"body": ["initial", "orchestrator", "request", "session"]}
+      ]
+    },
+    {
+      "op": "sessions.snapshot.initial",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "cloud-client.js first _recoverSessions attempt (when advertised)",
+      "console_seam": "client",
+      "special": ["session_publisher"],
+      "example": {"orchestrator": true, "request": "req-1", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"]},
+        {"body": ["orchestrator", "request", "session"]}
+      ]
+    },
+    {
+      "op": "shell",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/{id}/shells/{shell}?bytes=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "special": ["content_read"],
+      "example": {"bytes": 65536, "expected_generation": "0123456789abcdef0123456789abcdef", "session": "%19", "shell": "b0aau3e6s"},
+      "shapes": [
+        {"body": ["bytes", "session", "shell"], "path": "/v1/sessions/{session}/shells/{shell}", "query": ["bytes"]},
+        {"body": ["bytes", "expected_generation", "session", "shell"], "path": "/v1/sessions/{session}/shells/{shell}", "query": ["bytes"]}
+      ]
+    },
+    {
+      "op": "skills",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/sessions/{id}/skills",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "special": ["content_read"],
+      "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "session": "%19"},
+      "shapes": [
+        {"body": ["session"], "path": "/v1/sessions/{session}/skills"},
+        {"body": ["expected_generation", "session"], "path": "/v1/sessions/{session}/skills"}
+      ]
+    },
+    {
+      "op": "smart-title",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/{id}/smart-title",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"execution_generation": "0123456789abcdef0123456789abcdef", "request": "req-smart-title", "session": "%19"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/sessions/{session}/smart-title", "local_body": []},
+        {"body": ["execution_generation", "request", "session"], "path": "/v1/sessions/{session}/smart-title", "local_body": []}
+      ]
+    },
+    {
+      "op": "snippet-create",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/snippets",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"request": "req-snippet-create", "session": "__clawdline_machine__", "snippet": {"body": "a body", "scope": "global", "title": "a title"}},
+      "shapes": [
+        {"body": ["request", "session", "snippet"], "path": "/v1/snippets", "local_body": ["body", "scope", "title"]}
+      ]
+    },
+    {
+      "op": "snippet-delete",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "DELETE /v1/snippets/{id}",
+      "console_seam": "writer",
+      "local": {"method": "DELETE", "device": true},
+      "example": {"id": "3b000000-0000-4000-8000-000000000004", "request": "req-snippet-delete", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/snippets/{id}"}
+      ]
+    },
+    {
+      "op": "snippet-order",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/snippets/order",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"ordering": {"order": ["3b000000-0000-4000-8000-000000000004"], "scope": "global"}, "request": "req-snippet-order", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["ordering", "request", "session"], "path": "/v1/snippets/order", "local_body": ["order", "scope"]}
+      ]
+    },
+    {
+      "op": "snippet-update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "PATCH /v1/snippets/{id}",
+      "console_seam": "writer",
+      "local": {"method": "PATCH", "device": true},
+      "example": {"id": "3b000000-0000-4000-8000-000000000004", "request": "req-snippet-update", "session": "__clawdline_machine__", "snippet": {"body": "a body", "scope": "global", "title": "a title"}},
+      "shapes": [
+        {"body": ["id", "request", "session", "snippet"], "path": "/v1/snippets/{id}", "local_body": ["body", "scope", "title"]}
+      ]
+    },
+    {
+      "op": "snippets",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/snippets",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "special": ["divergence"],
+      "example": {"request": "req-snippets", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/snippets"}
+      ]
+    },
+    {
+      "op": "squad-event-head",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/squad/events/head",
+      "console_seam": "reader",
+      "local": {"method": "GET", "device": true},
+      "example": {"request": "req-event-head", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/squad/events/head"}
+      ]
+    },
+    {
+      "op": "squad-events",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/squad/events?after=&limit=",
+      "console_seam": "reader",
+      "local": {"method": "GET", "device": true},
+      "example": {"after": 7, "limit": 50, "request": "req-events", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["after", "limit", "request", "session"], "path": "/v1/squad/events", "query": ["after", "limit"]}
+      ]
+    },
+    {
+      "op": "squad-session-bindings",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/squad/session-bindings",
+      "console_seam": "reader",
+      "local": {"method": "GET", "device": true},
+      "example": {"request": "req-bindings", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/squad/session-bindings"}
+      ]
+    },
+    {
+      "op": "squad-session-snapshot",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/squad/session-snapshots/{conversation}",
+      "console_seam": "reader",
+      "local": {"method": "GET", "device": true},
+      "example": {"conversation": "conversation-a", "request": "req-role-snapshot", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["conversation", "request", "session"], "path": "/v1/squad/session-snapshots/{conversation}"}
+      ]
+    },
+    {
+      "op": "squad.catalog",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/squad/catalog",
+      "console_seam": "reader",
+      "local": {"method": "GET", "device": true},
+      "example": {"request": "req-squad-catalog", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/squad/catalog"}
+      ]
+    },
+    {
+      "op": "squad.catalog.update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/squad/catalog",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"changes": {"expected_version": 0}, "request": "req-squad-catalog-write", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["changes", "request", "session"], "path": "/v1/squad/catalog", "local_body": ["expected_version"]}
+      ]
+    },
+    {
+      "op": "squad.definition",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/squad/definitions/{id}[?version=]",
+      "console_seam": "reader",
+      "local": {"method": "GET", "device": true},
+      "example": {"definition_id": "backend", "request": "req-squad-definition", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["definition_id", "request", "session"], "path": "/v1/squad/definitions/{definition_id}"}
+      ]
+    },
+    {
+      "op": "squad.motion.update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "PUT /v1/squad/motion",
+      "console_seam": "writer",
+      "local": {"method": "PUT", "device": true},
+      "example": {"changes": {"expected_version": 0}, "request": "req-squad-motion-write", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["changes", "request", "session"], "path": "/v1/squad/motion", "local_body": ["expected_version"]}
+      ]
+    },
+    {
+      "op": "squad.packages.adopt",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/squad-packages/adopt",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"package": {}, "request": "req-package-adopt", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["package", "request", "session"], "path": "/v1/squad-packages/adopt", "local_body": []}
+      ]
+    },
+    {
+      "op": "squad.packages.export",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "POST /v1/squad-packages/export",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"package": {"confirm_private": false, "private_scopes": []}, "request": "req-package-export", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["package", "request", "session"], "path": "/v1/squad-packages/export", "local_body": ["confirm_private", "private_scopes"]}
+      ]
+    },
+    {
+      "op": "squad.packages.export.private",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/squad-packages/export (private scopes)",
+      "console_seam": "writer",
+      "console_parsed_as": "squad.packages.export",
+      "local": {"method": "POST", "device": true},
+      "example": {"package": {"confirm_private": true, "private_scopes": ["global"]}, "request": "req-package-export-private", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["package", "request", "session"], "path": "/v1/squad-packages/export", "local_body": ["confirm_private", "private_scopes"]}
+      ]
+    },
+    {
+      "op": "squad.packages.preview",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "POST /v1/squad-packages/preview",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"package": {}, "request": "req-package-preview", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["package", "request", "session"], "path": "/v1/squad-packages/preview", "local_body": []}
+      ]
+    },
+    {
+      "op": "squad.role-draft",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/squad/role-draft",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"changes": {"description": "Review release notes"}, "request": "req-squad-role-draft", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["changes", "request", "session"], "path": "/v1/squad/role-draft", "local_body": ["description"]}
+      ]
+    },
+    {
+      "op": "squad.scopes",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/squad/scopes",
+      "console_seam": "reader",
+      "local": {"method": "GET", "device": true},
+      "example": {"request": "req-squad-scopes", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/squad/scopes"}
+      ]
+    },
+    {
+      "op": "squad.settings",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/squad/settings[?place_id=|scope_id=]",
+      "console_seam": "reader",
+      "local": {"method": "GET", "device": true},
+      "example": {"place_id": "place-a", "request": "req-squad-settings", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/squad/settings"},
+        {"body": ["place_id", "request", "session"], "path": "/v1/squad/settings", "query": ["place_id"]}
+      ]
+    },
+    {
+      "op": "squad.settings.update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "PUT /v1/squad/settings",
+      "console_seam": "writer",
+      "local": {"method": "PUT", "device": true},
+      "example": {"changes": {"expected_version": 0}, "request": "req-squad-settings-write", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["changes", "request", "session"], "path": "/v1/squad/settings", "local_body": ["expected_version"]}
+      ]
+    },
+    {
+      "op": "squad.skill-sources",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/squad/skill-sources?provider=&place_id=&id=&folder=",
+      "console_seam": "reader",
+      "local": {"method": "GET", "device": true},
+      "example": {"folder": "true", "id": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "place_id": "place-a", "provider": "codex", "request": "req-squad-sources", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["provider", "request", "session"], "path": "/v1/squad/skill-sources", "query": ["provider"]},
+        {"body": ["place_id", "provider", "request", "session"], "path": "/v1/squad/skill-sources", "query": ["place_id", "provider"]},
+        {"body": ["folder", "id", "provider", "request", "session"], "path": "/v1/squad/skill-sources", "query": ["folder", "id", "provider"]},
+        {"body": ["folder", "id", "place_id", "provider", "request", "session"], "path": "/v1/squad/skill-sources", "query": ["folder", "id", "place_id", "provider"]}
+      ]
+    },
+    {
+      "op": "start",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/places/{id}/start[/{assistant}[/{model}][/as/{persona}]]",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"assistant": "claude", "model": "", "persona": "architect", "place": "/tmp", "request": "req-start", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["assistant", "model", "place", "request", "session"], "path": "/v1/places/{place}/start/{assistant}", "local_body": []},
+        {"body": ["assistant", "model", "persona", "place", "request", "session"], "path": "/v1/places/{place}/start/{assistant}/as/{persona}", "local_body": []}
+      ]
+    },
+    {
+      "op": "title",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/sessions/{id}/title",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"request": "req-title", "session": "%19", "text": "New name"},
+      "shapes": [
+        {"body": ["request", "session", "text"], "path": "/v1/sessions/{session}/title", "local_body": ["title"]}
+      ]
+    },
+    {
+      "op": "transcript",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/transcript?session={id}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "special": ["content_read", "divergence"],
+      "example": {"before": 12345, "expected_generation": "0123456789abcdef0123456789abcdef", "limit": 200, "priority": "foreground", "session": "%19"},
+      "shapes": [
+        {"body": ["limit", "session"], "path": "/v1/transcript", "query": ["limit", "session"]},
+        {"body": ["before", "limit", "session"], "path": "/v1/transcript", "query": ["before", "limit", "session"]},
+        {"body": ["expected_generation", "limit", "session"], "path": "/v1/transcript", "query": ["expected_generation", "limit", "session"]},
+        {"body": ["limit", "priority", "session"], "path": "/v1/transcript", "query": ["limit", "session"]},
+        {"body": ["before", "expected_generation", "limit", "session"], "path": "/v1/transcript", "query": ["before", "expected_generation", "limit", "session"]},
+        {"body": ["before", "limit", "priority", "session"], "path": "/v1/transcript", "query": ["before", "limit", "session"]},
+        {"body": ["expected_generation", "limit", "priority", "session"], "path": "/v1/transcript", "query": ["expected_generation", "limit", "session"]},
+        {"body": ["before", "expected_generation", "limit", "priority", "session"], "path": "/v1/transcript", "query": ["before", "expected_generation", "limit", "session"]}
+      ]
+    },
+    {
+      "op": "update",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/update",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/update"}
+      ]
+    },
+    {
+      "op": "update-apply",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/update/apply",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"request": "req-apply", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/update/apply", "local_body": []}
+      ]
+    },
+    {
+      "op": "update-fresh",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/update/fresh",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-update-fresh", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/update/fresh"}
+      ]
+    },
+    {
+      "op": "usage.compare-compaction",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/usage/compare-compaction[?since=]",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__", "since": "14d"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/usage/compare-compaction"},
+        {"body": ["request", "session", "since"], "path": "/v1/usage/compare-compaction", "query": ["since"]}
+      ]
+    },
+    {
+      "op": "usage.compare-handoff",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/usage/compare-handoff[?since=]",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-usage-handoff", "session": "__clawdline_machine__", "since": "14d"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/usage/compare-handoff"},
+        {"body": ["request", "session", "since"], "path": "/v1/usage/compare-handoff", "query": ["since"]}
+      ]
+    },
+    {
+      "op": "usage.item",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/usage/items/{id}",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"id": "w1", "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/usage/items/{id}"}
+      ]
+    },
+    {
+      "op": "usage.session",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/usage/sessions/{conversation}",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"id": "w1", "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/usage/sessions/{id}"}
+      ]
+    },
+    {
+      "op": "usage.task",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/usage/tasks/{id}",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"id": "w1", "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/usage/tasks/{id}"}
+      ]
+    },
+    {
+      "op": "usage.work-samples",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/usage/work-samples[?since=&until=]",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__", "since": "14d", "until": "1790000000"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/usage/work-samples"},
+        {"body": ["request", "session", "since"], "path": "/v1/usage/work-samples", "query": ["since"]},
+        {"body": ["request", "session", "until"], "path": "/v1/usage/work-samples", "query": ["until"]},
+        {"body": ["request", "session", "since", "until"], "path": "/v1/usage/work-samples", "query": ["since", "until"]}
+      ]
+    },
+    {
+      "op": "usage.work-units",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/usage/work-units[?since=]",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-usage-work", "session": "__clawdline_machine__", "since": "36h"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/usage/work-units"},
+        {"body": ["request", "session", "since"], "path": "/v1/usage/work-units", "query": ["since"]}
+      ]
+    },
+    {
+      "op": "verification.close",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/verifications/{id}/close",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "7e000000-0000-4000-8000-000000000006", "request": "req-verify-close", "session": "__clawdline_machine__", "verification": {"reason": "it held", "status": "accepted"}},
+      "shapes": [
+        {"body": ["id", "request", "session", "verification"], "path": "/v1/verifications/{id}/close", "local_body": ["reason", "status"]}
+      ]
+    },
+    {
+      "op": "verification.create",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/verifications",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"request": "req-verify-add", "session": "__clawdline_machine__", "verification": {"criteria": ["it holds"], "due_at": 1790000000, "title": "a check"}},
+      "shapes": [
+        {"body": ["request", "session", "verification"], "path": "/v1/verifications", "local_body": ["criteria", "due_at", "title"]}
+      ]
+    },
+    {
+      "op": "verification.criterion",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/verifications/{id}/criteria/{index}",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "7e000000-0000-4000-8000-000000000006", "index": 2, "request": "req-verify-mark", "session": "__clawdline_machine__", "verification": {"state": "passed"}},
+      "shapes": [
+        {"body": ["id", "index", "request", "session", "verification"], "path": "/v1/verifications/{id}/criteria/{index}", "local_body": ["state"]}
+      ]
+    },
+    {
+      "op": "verification.delete",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "DELETE /v1/verifications/{id}[?force=1]",
+      "console_seam": "writer",
+      "local": {"method": "DELETE", "device": true},
+      "example": {"force": false, "id": "7e000000-0000-4000-8000-000000000006", "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["force", "id", "request", "session"], "path": "/v1/verifications/{id}"}
+      ]
+    },
+    {
+      "op": "verification.get",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/verifications/{id}",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"id": "7e000000-0000-4000-8000-000000000006", "request": "req-verify-get", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/verifications/{id}"}
+      ]
+    },
+    {
+      "op": "verification.list",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/verifications",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/verifications"}
+      ]
+    },
+    {
+      "op": "verification.note",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/verifications/{id}/notes",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "7e000000-0000-4000-8000-000000000006", "request": "req-verify-note", "session": "__clawdline_machine__", "verification": {"text": "looked"}},
+      "shapes": [
+        {"body": ["id", "request", "session", "verification"], "path": "/v1/verifications/{id}/notes", "local_body": ["text"]}
+      ]
+    },
+    {
+      "op": "voice",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/voice",
+      "console_seam": "writer",
+      "local": {"method": "POST"},
+      "example": {"audio": "AAAA", "rate": 16000, "request": "req-voice", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["audio", "rate", "request", "session"], "path": "/v1/voice", "local_body": ["audio", "rate"]}
+      ]
+    },
+    {
+      "op": "work-gate-settings",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/settings/work-gates",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req-read", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/settings/work-gates"}
+      ]
+    },
+    {
+      "op": "work-gate-settings-update",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/settings/work-gates",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"changes": {"planning_gate": false, "verify_gate": true}, "request": "req-write", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["changes", "request", "session"], "path": "/v1/settings/work-gates", "local_body": ["planning_gate", "verify_gate"]}
+      ]
+    },
+    {
+      "op": "work.decision",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/decisions/{id}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"id": "10000000-0000-4000-8000-000000000001", "request": "req-work-decision", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/work/decisions/{id}"}
+      ]
+    },
+    {
+      "op": "work.decision-answer",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/decisions/{id}",
+      "console_seam": "reader",
+      "local": {"method": "POST", "device": true},
+      "example": {"answer": "Proceed", "id": "10000000-0000-4000-8000-000000000001", "request": "press-1", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["answer", "id", "request", "session"], "path": "/v1/work/decisions/{id}", "local_body": ["answer"]}
+      ]
+    },
+    {
+      "op": "work.decisions",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/decisions",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-work-decisions", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/work/decisions"}
+      ]
+    },
+    {
+      "op": "work.digests",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/digests?kind=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"kind": "daily", "request": "req-work-digests", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["kind", "request", "session"], "path": "/v1/work/digests", "query": ["kind"]}
+      ]
+    },
+    {
+      "op": "work.proposals",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/proposals[?project=]",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"project": "", "request": "req-work-proposals", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["project", "request", "session"], "path": "/v1/work/proposals"}
+      ]
+    },
+    {
+      "op": "work.v2.assign",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items/{id}/assign",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "w1", "item": {"mode": "existing", "terminal": "%19"}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/assign", "local_body": ["mode", "terminal"]}
+      ]
+    },
+    {
+      "op": "work.v2.cancel",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items/{id}/cancel",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "w1", "item": {"expected_version": 3, "reason": "Deleted"}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/cancel", "local_body": ["expected_version", "reason"]}
+      ]
+    },
+    {
+      "op": "work.v2.complete",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items/{id}/complete",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "w1", "item": {"expected_version": 4}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/complete", "local_body": ["expected_version"]}
+      ]
+    },
+    {
+      "op": "work.v2.convert",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items/{id}/convert",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "w1", "item": {"expected_version": 2, "kind": "plan"}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/convert", "local_body": ["expected_version", "kind"]}
+      ]
+    },
+    {
+      "op": "work.v2.create",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"item": {"kind": "feature", "project_id": "p1", "title": "A"}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["item", "request", "session"], "path": "/v1/work/v2/items", "local_body": ["kind", "project_id", "title"]}
+      ]
+    },
+    {
+      "op": "work.v2.edit",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "PATCH /v1/work/v2/items/{id}",
+      "console_seam": "writer",
+      "local": {"method": "PATCH", "device": true},
+      "example": {"id": "w1", "item": {"expected_version": 2, "title": "Edited"}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}", "local_body": ["expected_version", "title"]}
+      ]
+    },
+    {
+      "op": "work.v2.gate-decision",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items/{id}/gate-decision",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "w1", "item": {"action": "direction", "direction": "Repair", "expected_version": 5, "reason": "Explain"}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/gate-decision", "local_body": ["action", "direction", "expected_version", "reason"]}
+      ]
+    },
+    {
+      "op": "work.v2.gate-export",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/v2/items/{id}/gate-export",
+      "console_seam": "reader",
+      "local": {"method": "GET", "device": true},
+      "example": {"id": "w1", "request": "req-gate-export", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/work/v2/items/{id}/gate-export"}
+      ]
+    },
+    {
+      "op": "work.v2.gate-purge",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items/{id}/gate-purge",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "w1", "item": {"expected_version": 5, "sha256": "abc"}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/gate-purge", "local_body": ["expected_version", "sha256"]}
+      ]
+    },
+    {
+      "op": "work.v2.human-intervention-action",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/human-interventions/{conversation}/{id}/{action}",
+      "console_seam": "reader",
+      "local": {"method": "POST", "device": true},
+      "example": {"action": "handoff", "id": "10000000-0000-4000-8000-000000000003", "item": {"value": "SAFE_FIXTURE"}, "request": "req-secret-handoff", "session": "__clawdline_machine__", "terminal": "conversation:10000000-0000-4000-8000-000000000002"},
+      "shapes": [
+        {"body": ["action", "id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/human-interventions/{terminal}/{id}/{action}", "local_body": ["value"]}
+      ]
+    },
+    {
+      "op": "work.v2.human-interventions",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/v2/human-interventions/{conversation}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-human-interventions", "session": "__clawdline_machine__", "terminal": "conversation:10000000-0000-4000-8000-000000000002"},
+      "shapes": [
+        {"body": ["request", "session", "terminal"], "path": "/v1/work/v2/human-interventions/{terminal}"}
+      ]
+    },
+    {
+      "op": "work.v2.image",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/v2/images/{id}[?size=thumb]",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "special": ["shaped_answer"],
+      "example": {"id": "img1", "request": "req-work-v2-image", "session": "__clawdline_machine__", "size": "thumb"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/work/v2/images/{id}"},
+        {"body": ["id", "request", "session", "size"], "path": "/v1/work/v2/images/{id}", "query": ["size"]}
+      ]
+    },
+    {
+      "op": "work.v2.image-create",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items/{id}/images",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "w1", "item": {"data_url": "data:image/png;base64,cG5n", "expected_version": 1}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/images", "local_body": ["data_url", "expected_version"]}
+      ]
+    },
+    {
+      "op": "work.v2.image-delete",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "DELETE /v1/work/v2/items/{id}/images/{image}",
+      "console_seam": "writer",
+      "local": {"method": "DELETE", "device": true},
+      "example": {"id": "w1", "image": "img1", "item": {"expected_version": 2}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "image", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/images/{image}", "local_body": ["expected_version"]}
+      ]
+    },
+    {
+      "op": "work.v2.item",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/v2/items/{id}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"id": "w1", "request": "req-work-v2-item", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "request", "session"], "path": "/v1/work/v2/items/{id}"}
+      ]
+    },
+    {
+      "op": "work.v2.items",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/v2/items?project=&cursor=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"cursor": "page-2", "project": "p1", "request": "req-work-v2-items", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["project", "request", "session"], "path": "/v1/work/v2/items", "query": ["project"]},
+        {"body": ["cursor", "project", "request", "session"], "path": "/v1/work/v2/items", "query": ["cursor", "project"]}
+      ]
+    },
+    {
+      "op": "work.v2.persona-suggestion",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items/{id}/persona-suggestion",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "w1", "item": {"expected_version": 1}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/persona-suggestion", "local_body": ["expected_version"]}
+      ]
+    },
+    {
+      "op": "work.v2.proposal-resolve",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/proposals/{id}/{accept|reject}",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"decision": "accept", "id": "pr1", "item": {}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["decision", "id", "item", "request", "session"], "path": "/v1/work/v2/proposals/{id}/{decision}", "local_body": []}
+      ]
+    },
+    {
+      "op": "work.v2.proposals",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/v2/proposals?state=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-work-v2-proposals", "session": "__clawdline_machine__", "state": "pending"},
+      "shapes": [
+        {"body": ["request", "session", "state"], "path": "/v1/work/v2/proposals", "query": ["state"]}
+      ]
+    },
+    {
+      "op": "work.v2.remind",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items/{id}/remind",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "w1", "item": {"expected_version": 2}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/remind", "local_body": ["expected_version"]}
+      ]
+    },
+    {
+      "op": "work.v2.search",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/v2/items?project=&status=&q=&cursor=",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"cursor": "page-3", "project": "p1", "query": "needle", "request": "req-work-v2-search", "session": "__clawdline_machine__", "status": "done"},
+      "shapes": [
+        {"body": ["project", "query", "request", "session", "status"], "path": "/v1/work/v2/items", "query": ["project", "q", "status"]},
+        {"body": ["cursor", "project", "query", "request", "session", "status"], "path": "/v1/work/v2/items", "query": ["cursor", "project", "q", "status"]}
+      ]
+    },
+    {
+      "op": "work.v2.seen",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/items/{id}/seen",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "w1", "item": {"phase": "done"}, "request": "req", "session": "__clawdline_machine__"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/seen", "local_body": ["phase"]}
+      ]
+    },
+    {
+      "op": "work.v2.session-todos",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/work/v2/session-todos/{terminal}",
+      "console_seam": "reader",
+      "local": {"method": "GET"},
+      "example": {"request": "req-work-v2-todos", "session": "__clawdline_machine__", "terminal": "%19"},
+      "shapes": [
+        {"body": ["request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}"}
+      ]
+    },
+    {
+      "op": "work.v2.todo-action",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/session-todos/{terminal}/{id}/{action}",
+      "console_seam": "reader",
+      "local": {"method": "POST", "device": true},
+      "example": {"action": "reopen", "id": "td1", "item": {}, "request": "req-work-v2-todo-reopen", "session": "__clawdline_machine__", "terminal": "%19"},
+      "shapes": [
+        {"body": ["action", "id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}/{id}/{action}", "local_body": []}
+      ]
+    },
+    {
+      "op": "work.v2.todo-create",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/session-todos/{terminal}",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"item": {"text": "Ship it"}, "request": "req", "session": "__clawdline_machine__", "terminal": "%19"},
+      "shapes": [
+        {"body": ["item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}", "local_body": ["text"]}
+      ]
+    },
+    {
+      "op": "work.v2.todo-image-create",
+      "kind": "command",
+      "write_gate": true,
+      "console": "carried",
+      "console_route": "POST /v1/work/v2/session-todos/{terminal}/{id}/images",
+      "console_seam": "writer",
+      "local": {"method": "POST", "device": true},
+      "example": {"id": "td1", "item": {"data_url": "data:image/png;base64,cG5n", "expected_version": 1}, "request": "req", "session": "__clawdline_machine__", "terminal": "%19"},
+      "shapes": [
+        {"body": ["id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}/{id}/images", "local_body": ["data_url", "expected_version"]}
+      ]
+    }
+  ]
+}
