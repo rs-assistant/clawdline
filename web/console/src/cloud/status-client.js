@@ -217,23 +217,18 @@ export class StatusCloudClient extends CatalogCloudClient {
     return remembered
   }
 
-  // The copied client delivers this page's failure log to the one paired
-  // machine that takes it and refuses two as ambiguous. Every current daemon
-  // takes it, so an account with two machines would deliver nothing at all.
-  // Each row names its machine, so any one of them may hold the record: the
+  // The copied client sends a row about no machine it can reach to the one
+  // paired machine that takes viewer events, and refuses two as ambiguous.
+  // Every current daemon takes them, so an account with two machines would
+  // deliver those rows nowhere. A row about a machine goes to that machine
+  // first (`_viewerEventRoute`); this is only the account-wide fallback: the
   // machine this page is reading if it is one of them, else the first by id.
   _viewerEventTarget(remember) {
     try {
       return super._viewerEventTarget(remember)
     } catch (error) {
       if (error?.code !== "cloud_machine_ambiguous") throw error
-      const candidates = []
-      this.viewerVerified.forEach((seen, machine) => {
-        if (this._machineImplements(machine, "diagnostics.events", { learned: false }) === "yes") {
-          candidates.push({ machine, sender: seen.sender, capable: true })
-        }
-      })
-      candidates.sort((a, b) => a.machine < b.machine ? -1 : a.machine > b.machine ? 1 : 0)
+      const candidates = this._viewerEventCandidates()
       // A fleet page has no single classicSessionMachine. Prefer the paired
       // Mac's durable diagnostic log over an incidental Linux test machine
       // whose id sorts first; a Linux-only account still has a recipient.

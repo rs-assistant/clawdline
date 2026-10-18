@@ -361,3 +361,44 @@ func TestARowTheRelayRefusedIsNotAnsweredAsStated(t *testing.T) {
 		t.Fatalf("the refused row was not tried again on the next pass: %v", out.channels())
 	}
 }
+
+// A refresh of an unchanged set states the pass id the viewer already holds.
+// The id hashes the set (statusGeneration), so no new id is coming; the answer
+// names it, which is what lets the page answer its refresh at once instead of
+// waiting for a pass that never comes.
+func TestARestatementOfAnUnchangedSetNamesThePassItsMarkerCarries(t *testing.T) {
+	out := &collector{}
+	router := &fixedRouter{body: scanBody(t, true, map[string]bool{"ps": true, "tmux": true, "iterm": true},
+		scanRow{id: "%19", tty: "ttys001", backend: "tmux"})}
+	publisher := newPublisher(router, out)
+	publisher.Every = 20 * time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { _ = publisher.Run(ctx); close(done) }()
+	marker := "ss/mac-01/" + InventorySessionID
+	waitFor(t, "the first status marker", func() bool {
+		for _, name := range out.channels() {
+			if name == marker {
+				return true
+			}
+		}
+		return false
+	})
+	held, _ := out.payload(t, marker)["snapshot_generation"].(string)
+	time.Sleep(3 * publisher.Every)
+	out.reset()
+
+	stated, refusal := publisher.Snapshot(ctx)
+	if refusal != nil {
+		t.Fatalf("refused: %+v", *refusal)
+	}
+	restated, _ := out.payload(t, marker)["snapshot_generation"].(string)
+	if held == "" || stated.Generation != held || restated != held {
+		t.Fatalf("the viewer holds pass %q; the restated marker says %q and the answer names %q",
+			held, restated, stated.Generation)
+	}
+
+	cancel()
+	<-done
+}

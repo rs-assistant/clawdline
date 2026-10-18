@@ -957,6 +957,51 @@ test("refresh waits for a resumed Session even when its id has not changed", asy
   assert.equal((await refreshed).sessions[0]?.execution_generation, resumed)
 })
 
+test("refreshing an unchanged Session set answers as soon as the machine names the pass it holds", async () => {
+  // The pass id hashes the set, so an unchanged set restates the id the page
+  // already holds. Before the machine named it, the refresh waited for a newer
+  // id until the request deadline (15 s on the page).
+  const client = new FakeClient()
+  const generation = "a".repeat(32)
+  client.rows = [row("mac-a", "s1", { execution_generation: generation })]
+  client.statusSnapshots = statusPass("mac-a", generation, "s1")
+  client.readAnswer = async () => ({ sessions: ["s1"], complete: true, snapshot_generation: generation })
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000 })
+  r.attach(client)
+  await r.fetch("/v1/sessions", { signal: new AbortController().signal })
+  const deadline = new AbortController()
+  let answered = false
+  const refreshed = r.fetch("/v1/sessions", { signal: deadline.signal })
+    .then((response) => { answered = true; return body<SessionsSnapshot>(response) })
+  await settled()
+  await settled()
+  const early = answered
+  deadline.abort()
+  assert.deepEqual((await refreshed).sessions.map((session) => session.id), ["s1"])
+  assert.equal(early, true, "the held marker names the confirmed pass; nothing newer is coming")
+})
+
+test("a named pass the page does not hold yet is still waited for", async () => {
+  const client = new FakeClient()
+  const previous = "a".repeat(32)
+  const resumed = "b".repeat(32)
+  client.rows = [row("mac-a", "s1", { execution_generation: previous })]
+  client.statusSnapshots = statusPass("mac-a", previous, "s1")
+  client.readAnswer = async () => ({ sessions: ["s1"], complete: true, snapshot_generation: resumed })
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000 })
+  r.attach(client)
+  await r.fetch("/v1/sessions", { signal: new AbortController().signal })
+  let answered = false
+  const refreshed = r.fetch("/v1/sessions", { signal: new AbortController().signal })
+    .then((response) => { answered = true; return body<SessionsSnapshot>(response) })
+  await settled()
+  assert.equal(answered, false, "the same ids under an older pass are not the stated list")
+  client.rows = [row("mac-a", "s1", { execution_generation: resumed })]
+  client.statusSnapshots = statusPass("mac-a", resumed, "s1")
+  client.emit({ type: "sessions", identity: { machine: "mac-a" } })
+  assert.equal((await refreshed).sessions[0]?.execution_generation, resumed)
+})
+
 /**
  * The account has two Macs; the Board item's Project is on `mac-b`, the one
  * under the console. `mac-a` hears every read and never answers. The page's

@@ -282,6 +282,12 @@ type SessionsStated struct {
 	// s/ while the page held no subscription to it (`fanout=0`), and the
 	// answer only said the row had been asked for. Nil for every other word.
 	Row json.RawMessage
+	// Generation is the ss/ pass id the status marker of this pass named,
+	// empty when the pass stated no status marker. The pass id hashes the set
+	// (`statusGeneration` in internal/transport/cloud), so a refresh of an
+	// unchanged set states the id the viewer already holds; naming it here is
+	// what lets that viewer answer at once instead of waiting for a new id.
+	Generation string
 }
 
 // Vocabulary is every operation word this bridge knows, sorted. It is what a
@@ -534,7 +540,8 @@ func (b Bridge) stateSessions(ctx context.Context, cmd Command, parsed body, p p
 }
 
 // statedAnswer is `{"sessions":[ids],"complete":bool}`, after the rows went
-// out, with `"row"` beside them when a `sessions.row` pass had the Session.
+// out, with `"row"` beside them when a `sessions.row` pass had the Session and
+// `"snapshot_generation"` when the pass stated its ss/ marker.
 func (b Bridge) statedAnswer(cmd Command, p plan, stated SessionsStated) Answer {
 	ids := stated.IDs
 	if ids == nil {
@@ -543,6 +550,9 @@ func (b Bridge) statedAnswer(cmd Command, p plan, stated SessionsStated) Answer 
 	answer := map[string]any{"sessions": ids, "complete": stated.Complete}
 	if len(stated.Row) > 0 {
 		answer["row"] = stated.Row
+	}
+	if stated.Generation != "" {
+		answer["snapshot_generation"] = stated.Generation
 	}
 	body, err := json.Marshal(answer)
 	if err != nil {
