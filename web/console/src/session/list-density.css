@@ -199,16 +199,14 @@
  * row is active and where it belongs.
  */
 @media (max-width: 480px) {
-  /* Give the heavy callback and the separate Session wait their own lines.
-   * Shrinking the callback to its two fixed glyphs crowds the spinner against
-   * the hourglass; the waiting reason and shell count can share line two. */
-  .row .state:has(> .session-callback-active):has(> .coordination-wait) {
-    flex-wrap: wrap;
-    row-gap: 4px;
+  /* Keep both states on the original line. Their fixed glyphs and spinner
+   * need their own width even when the adjacent words are ellipsised. */
+  .row .state:has(> .session-callback-active):has(> .coordination-wait) > .session-callback-active {
+    min-width: 38px;
   }
 
-  .row .state:has(> .session-callback-active):has(> .coordination-wait) > .session-callback-active {
-    flex: 1 0 calc(100% - 21px);
+  .row .state:has(> .session-callback-active):has(> .coordination-wait) > .coordination-wait {
+    min-width: 18px;
   }
 
   .row .state:has(> .session-callback-active) > .persona-state {
