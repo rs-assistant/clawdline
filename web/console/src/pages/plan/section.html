@@ -55,6 +55,19 @@
             </article>
         </div>
 
+        <section class="plan-promo" aria-labelledby="plan-promo-title">
+            <h2 id="plan-promo-title">Redeem three months of Pro</h2>
+            <form id="plan-promo-form">
+                <label id="plan-promo-label" for="plan-promo-code">Official redemption code</label>
+                <div class="plan-promo-entry">
+                    <input id="plan-promo-code" name="code" type="text" autocomplete="off" spellcheck="false" required maxlength="200" />
+                    <button class="plan-go" id="plan-promo-submit" type="submit">Redeem</button>
+                </div>
+            </form>
+            <p id="plan-promo-message" role="status" aria-live="polite"></p>
+            <a id="plan-promo-cloud" href="https://app.clawdline.com/#page=plan" hidden>app.clawdline.com</a>
+        </section>
+
         <p class="plan-offer-fine" id="plan-offer-fine"></p>
 
         <section class="plan-simulation" id="plan-simulation" hidden>
