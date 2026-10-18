@@ -514,6 +514,10 @@ const Schedules = (() => {
         if (requestedMachines !== machineKey()) return
         answers.set(machine.id, (data.schedules ?? []).filter((row) => row.machine === machine.id))
         at = Math.max(at, data.at ?? 0)
+        // An answer is proof the machine is reachable now; without this, a Mac
+        // that was offline when the page opened and came back would still be
+        // called offline the next time a read times out.
+        noteScheduleMachineAnswered(machine.id)
       } catch (error) {
         failures.set(machine.id, { machine: machine.id,
           code: typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
