@@ -67,7 +67,7 @@ GOOS=windows tools/heavy.sh go vet ./...      # the Windows-only files, and ever
 tools/heavy.sh go test ./...
 tools/heavy.sh go test -count=1 ./internal/config # uncached repository copy guards
 go run ./tools/contract-gen -check      # Go and TypeScript are generated together
-tools/check-legacy-css.sh               # the byte-for-byte copies still match
+tools/check-legacy-css.sh               # the pinned CSS copies still match; legacy JS is owned code
 node web/console/tools/check-rounded-side-borders.mjs # no rounded surfaces with accent side borders
 tools/check-machine-words.sh            # no shown sentence calls the machine a Mac
 tools/heavy.sh bash tools/test-machine-words-changes.sh # delta scanning includes new files and preserves failures

@@ -152,7 +152,7 @@ tree equality 能回答的問題：語意整合本來就會讓兩棵樹不同。
 3. 逐一走過 projection：inventory 是否 settled、session 待辦與 board 是否關閉、graph、timeline、舊 task projection，以及 reclaim
    是否真的有足夠證據刪東西。這些讀者不一定該把新字當 `landed`；要各自說明。
 4. 改 `api/v1/orchestrator.schema.json`，執行 `go run ./tools/contract-gen` 同時產生 Go 與 TypeScript contract；不要手改 generated file。
-5. 在非 legacy 的 console 加人能看懂的字。`web/console/src/legacy/js/**` 與 copied string catalog 是 byte-for-byte 資產，不在這條路上改。
+5. 在非 legacy 的 console 加人能看懂的字。`web/console/src/legacy/js/**` 雖然已是 console 自己的程式碼（`web/console/src/legacy/README.md`），新字仍放在非 legacy 的 console 與它自己的字串目錄，不加進 `public/strings/zh-Hant.json`。
 6. 測試要一正一反地釘住每一個 proof gate、wire evidence、derived closing 行為與 replay；最後跑 `contract-gen -check` 和 web checks。
 
 錯誤碼與文字照舊版，包括信封：`{"error":{"code","message","request_id", …extra}}`，**extra 放在 `error` 裡面**。

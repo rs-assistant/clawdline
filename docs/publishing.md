@@ -36,8 +36,8 @@ what keeps the publication path below usable.
 compiles and tests Darwin-only paths on a macOS runner. The Linux job also
 cross-builds and vets Windows.
 
-The copied-console check is complete in GitHub Actions. `check-legacy-css.sh`
-hashes every copy and compares it with the checksum pinned in
+The copied-stylesheet check is complete in GitHub Actions. `check-legacy-css.sh`
+hashes every copied stylesheet and compares it with the checksum pinned in
 `web/console/src/legacy/MANIFEST.json`; the retired application's repository is
 not required. When `CLAWDLINE_WEB_SOURCE_TREE` names an available tree (or the
 old default path still exists), the check also reports files that changed there

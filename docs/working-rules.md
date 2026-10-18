@@ -40,9 +40,11 @@ That tree is kept for two purposes, both read-only:
 
 **Never modify `~/code/clawdline`.** Not a file, not a commit, not a `git add`. If work you were
 given seems to belong there, say so and stop; do not do it quietly. Two mechanisms read that tree
-on purpose and are the only ones allowed to: `tools/check-legacy-css.sh` compares
-`web/console/src/legacy/` against its `Resources/web` byte for byte, and `web/console/src/legacy/
-MANIFEST.json` records where each copy came from.
+on purpose and are the only ones allowed to: `tools/check-legacy-css.sh` compares the stylesheets
+in `web/console/src/legacy/` against its `Resources/web/app/css` byte for byte, and
+`web/console/src/legacy/MANIFEST.json` records where each copy came from. The JavaScript in
+`web/console/src/legacy/js/` came from the same tree but is this console's own code now and is
+not compared (`web/console/src/legacy/README.md`).
 
 A sentence in this repository that says the Swift app is running, holds a port, or is somewhere
 traffic goes is false. `TestNothingSaysTheRetiredAppIsStillRunning` (`internal/config/`) fails on
