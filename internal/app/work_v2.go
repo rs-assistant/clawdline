@@ -1001,9 +1001,17 @@ func descriptionStepTitles(description string) []string {
 	return titles
 }
 
+// seedDescriptionSteps turns the description's list into steps for an item
+// that has none. An item that was a Plan seeds nothing: its description is
+// analysis, not a checklist, so its owner adds steps explicitly. Every
+// conversion has a Plan on one side (ConvertKind, and a claim's ConvertKind in
+// Assign), so any item.converted event in the history means it was one.
 func seedDescriptionSteps(tx *store.WorkV2Tx, item work.ItemV2, session string, at time.Time) ([]work.StepV2, error) {
 	existing, err := tx.Steps(item.ID)
 	if err != nil || len(existing) > 0 {
+		return nil, err
+	}
+	if converted, _, err := tx.LatestEventOf(item.ID, "item.converted"); err != nil || converted != "" {
 		return nil, err
 	}
 	titles := descriptionStepTitles(item.Description)

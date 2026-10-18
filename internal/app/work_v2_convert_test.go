@@ -148,3 +148,100 @@ func TestConversionWaitsForAnInFlightReassignment(t *testing.T) {
 		t.Fatalf("conversion during reassignment = %v", err)
 	}
 }
+
+// planAnalysis has the shape a Plan's description takes: a list of measured
+// facts, a numbered list of points to discuss, and a legend list. None of its
+// rows is work.
+const planAnalysis = `## Measured problem
+- The send path holds the lock for 40 ms on every keystroke.
+- Three packages each carry their own copy of the retry loop.
+- The cache has no bound.
+
+## Items to discuss
+1. Move the retry loop into one package.
+2. Bound the cache.
+3. Drop the lock before the network call.
+
+## Legend
+- **A internal only**: no behaviour changes.
+- **B visible**: the person sees a difference.
+- **D deferred**: not in this round.`
+
+func TestAPlanTurnedIntoWorkSeedsNoStepsFromItsAnalysis(t *testing.T) {
+	ctx := context.Background()
+	if got := len(descriptionStepTitles(planAnalysis)); got < 8 {
+		t.Fatalf("the analysis parses into %d rows; the test needs the real shape", got)
+	}
+	newPlan := func(t *testing.T, w *WorkSystemV2) WorkV2View {
+		t.Helper()
+		plan, err := w.Create(ctx, NewWorkV2{ProjectID: "p", ProjectPath: "/p", Kind: work.KindPlan,
+			Title: "Refactor the send path", Description: planAnalysis, Actor: "local"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return plan
+	}
+	stored := func(t *testing.T, w *WorkSystemV2, id string) []work.StepV2 {
+		t.Helper()
+		full, err := w.Item(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return full.Steps
+	}
+
+	t.Run("claimed with conversion", func(t *testing.T) {
+		w := newWorkV2Test(t)
+		plan := newPlan(t, w)
+		owned, err := w.Assign(ctx, plan.Item.ID, AssignWorkV2{ExpectedVersion: plan.Item.Version,
+			ConvertKind: work.KindRefactor, Mode: "existing_session", SessionID: "session-a",
+			TerminalID: "terminal-a", Actor: "user_via_session:run-a", Claim: &work.CreatedViaV2{Run: "run-a"}}, false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if owned.Item.Kind != work.KindRefactor || len(owned.Steps) != 0 {
+			t.Fatalf("claim seeded %d steps: %+v", len(owned.Steps), owned.Steps)
+		}
+		if steps := stored(t, w, plan.Item.ID); len(steps) != 0 {
+			t.Fatalf("claim stored %d steps: %+v", len(steps), steps)
+		}
+	})
+
+	t.Run("converted by the person, then assigned", func(t *testing.T) {
+		w := newWorkV2Test(t)
+		plan := newPlan(t, w)
+		converted, err := w.ConvertKind(ctx, plan.Item.ID, ConvertKindV2{
+			ExpectedVersion: plan.Item.Version, Kind: work.KindFeature, Actor: "local"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		owned, err := w.Assign(ctx, plan.Item.ID, AssignWorkV2{ExpectedVersion: converted.Item.Version,
+			Mode: "existing_session", SessionID: "session-a", TerminalID: "terminal-a", Actor: "local"}, false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(owned.Steps) != 0 {
+			t.Fatalf("assignment seeded %d steps: %+v", len(owned.Steps), owned.Steps)
+		}
+		if steps := stored(t, w, plan.Item.ID); len(steps) != 0 {
+			t.Fatalf("assignment stored %d steps: %+v", len(steps), steps)
+		}
+	})
+
+	t.Run("a feature that was never a Plan still seeds", func(t *testing.T) {
+		w := newWorkV2Test(t)
+		feature, err := w.Create(ctx, NewWorkV2{ProjectID: "p", ProjectPath: "/p", Kind: work.KindFeature,
+			Title: "Refactor the send path", Description: planAnalysis, Actor: "local"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		owned, err := w.Assign(ctx, feature.Item.ID, AssignWorkV2{ExpectedVersion: feature.Item.Version,
+			Mode: "existing_session", SessionID: "session-a", TerminalID: "terminal-a", Actor: "local"}, false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := len(descriptionStepTitles(planAnalysis)); len(owned.Steps) != want {
+			t.Fatalf("never-Plan feature seeded %d steps, want %d", len(owned.Steps), want)
+		}
+	})
+}
