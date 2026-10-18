@@ -582,7 +582,8 @@ export interface RelayReaderOptions {
   onAnswer?: (row: SeamRow) => void
   /**
    * What this bundle carries, and what it says about what it does not
-   * (`carry.ts`, handed in by `CloudGate`).
+   * (`carry.ts`, whose word lists `carry-generated.ts` generates from the
+   * vocabulary table, handed in by `CloudGate`).
    *
    * It is handed in rather than imported because nothing in this file is
    * imported at run time — that is what lets `node --test` load it as it is —
