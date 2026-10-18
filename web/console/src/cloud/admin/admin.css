@@ -139,6 +139,15 @@
 .adm-page { display: grid; gap: 18px; min-width: 0; }
 .adm-page > .adm-stats { margin-top: 10px; }
 .adm-stale { margin-bottom: 18px; }
+.adm-demo-control {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  margin: -4px 0 22px; padding: 12px 16px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--card);
+}
+.adm-demo-control strong { display: block; font-size: 13px; color: var(--ink); }
+.adm-demo-control p { margin: 3px 0 0; color: var(--dim); font-size: 12.5px; line-height: 1.45; }
+.adm-demo-control .adm-btn { flex: none; }
+.adm-demo-active { border-color: var(--accent-ed); background: var(--accent-in); }
 .adm-scrim { display: none; }
 
 @media (max-width: 899px) {
@@ -168,6 +177,7 @@
   .adm-drawer-open .adm-side { transform: none; visibility: visible; transition: transform .22s var(--ease); }
   .adm-scrim { display: block; position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, .55); }
   .adm-pagehead h1 { font-size: 24px; }
+  .adm-demo-control { align-items: flex-start; flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) {
   .adm-side, .adm-drawer-open .adm-side { transition: none; }

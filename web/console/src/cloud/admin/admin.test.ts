@@ -6,6 +6,8 @@ import assert from "node:assert/strict"
 import { completeDays, loadOverview, parseOverview, trend } from "./api.ts"
 // @ts-expect-error -- a `.ts` path, for node.
 import { ADMIN_ROUTES, adminLocale, adminPath, adminRoute, adminWords, type AdminWord } from "./words.ts"
+// @ts-expect-error -- a `.ts` path, for node.
+import { demoOverview } from "./demo.ts"
 
 function body(over: Record<string, unknown> = {}) {
   const counters = { dispatches: 12, connect_minutes: 340, bytes_in: 1_200_000, bytes_out: 5_000 }
@@ -43,6 +45,20 @@ test("a v1 overview is read field for field, and a null counter stays unknown, n
   assert.equal(o.usage.previous.counters.dispatches, 12)
   assert.equal(o.promotions.campaigns.total, 51)
   assert.equal(o.promotions.campaigns.shown, 1)
+})
+
+test("illustrative periods agree with their daily charts and campaign totals", () => {
+  const o = demoOverview(new Date("2026-10-18T09:30:00Z"))
+  const sum = (rows: { count: number }[]) => rows.reduce((total, row) => total + row.count, 0)
+  assert.equal(o.accounts.daily.length, 30)
+  assert.equal(o.accounts.daily.at(-1)?.day, "2026-10-17")
+  assert.equal(o.accounts.new_7d.current, sum(o.accounts.daily.slice(-7)))
+  assert.equal(o.accounts.new_30d.current, sum(o.accounts.daily))
+  assert.equal(o.promotions.redeemed_7d.current, sum(o.promotions.daily.slice(-7)))
+  assert.equal(o.promotions.redeemed_30d.current, sum(o.promotions.daily))
+  assert.equal(o.promotions.redemptions_total, o.promotions.campaigns.rows.reduce((total, row) => total + row.redeemed_count, 0))
+  assert.equal(o.usage.current.period, "2026-10")
+  assert.equal(o.usage.previous.period, "2026-09")
 })
 
 test("an answer that is not the contract is refused with the field that was wrong", () => {
