@@ -513,10 +513,12 @@ func (t *Transport) handle(conn *Conn, data []byte) error {
 		if t.opts.PeerDiscoveryStatus != nil {
 			t.opts.PeerDiscoveryStatus(data)
 		}
+		return nil
 	case "peer_discovery_envelope":
 		if t.opts.PeerDiscoveryInbound != nil {
 			t.opts.PeerDiscoveryInbound(data)
 		}
+		return nil
 	case "peer_task_start_envelope":
 		if t.opts.PeerTaskStartInbound != nil {
 			t.opts.PeerTaskStartInbound(data)
