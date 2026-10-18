@@ -1,8 +1,8 @@
 // The schedules' part of the bridge.
 //
-// Four files under `js/` are the Swift app's, byte for byte: `view/schedules.js`
+// Four files under `js/` began as the Swift app's: `view/schedules.js`
 // (the list's rows and a schedule's retained runs), `net/schedules.js` (the
-// list's one-minute lane and the project labels), `net/schedule-webhooks.js`
+// project labels and the places cache), `net/schedule-webhooks.js`
 // (the Cloud webhook panel's words and helpers), `input/schedule-run.js`
 // (Run now's words).
 //
@@ -12,8 +12,8 @@
 //
 // What is imported touches no DOM when it is called: the run rows'
 // renderer and the place lookup (`view/schedules.js` — its three
-// `getElementById` calls run at import, find nothing yet, and are only read by
-// `renderSchedules`, which is not used), the project labels and the places
+// `getElementById` calls run at import, find nothing yet, and are read by
+// nothing), the project labels and the places
 // cache (`net/schedules.js`), and the words and helpers of the other two.
 //
 // The transport is `net/live.js`'s `schedules`, `schedule`, `createSchedule`,
@@ -38,7 +38,6 @@ import {
   loadScheduleProjects as loadScheduleProjectsOriginal,
 } from "./js/net/schedules.js"
 import {
-  scheduleRunConfirmation as scheduleRunConfirmationOriginal,
   scheduleRunCopy as scheduleRunCopyOriginal,
   scheduleRunMessage as scheduleRunMessageOriginal,
 } from "./js/input/schedule-run.js"

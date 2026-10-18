@@ -1,24 +1,10 @@
 import { T, fill } from "../core/i18n.js";
 import { S } from "../core/state.js";
 import { sessionSelectionKey } from "../session/selection.js";
-import { callSessionUI } from "../session/ui.js";
 
 /* ==========================================================================
    6. Deriving what to show
    ========================================================================== */
-
-var RANK = { waiting: 0, working: 1, idle: 2, unknown: 3 };
-
-function rankOf(s) { return RANK[s.state] == null ? 9 : RANK[s.state]; }
-
-function coordinatorSession(s) {
-    var value = s && s.coordinator;
-    return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-export function coordinatorFirst(a, b) {
-    return (coordinatorSession(a) ? 0 : 1) - (coordinatorSession(b) ? 0 : 1);
-}
 
 var SESSION_WORK_STATES = {
     ready: true, working: true, holding: true, waiting_you: true, waiting_session: true,
@@ -246,16 +232,6 @@ export function closeabilityPlainReasons(s) {
     return groups;
 }
 
-/** The opaque CAS token a proven close hands back, and only when the client itself agrees the
- *  frame says safe. A page that failed the projection closed sends nothing and gets the
- *  unchanged gate. */
-export function closeabilityVersion(s) {
-    var projected = projectSessionCloseability(s);
-    if (projected.state !== "safe") return null;
-    var version = projected.block && projected.block.version;
-    return typeof version === "string" && version ? version : null;
-}
-
 /** Everything in the badge whose identity can change its rendered words. */
 export function sessionCloseabilityShape(s) {
     var projected = projectSessionCloseability(s);
@@ -342,12 +318,6 @@ export function sessionSuggestedReply(s, now = Date.now() / 1000) {
         || reply.conversationId !== s.sessionId) return null;
     return { text: reply.text, key: JSON.stringify([reply.version, reply.id, reply.text,
         machine, reply.conversationId, reply.expiresAt]) };
-}
-
-/** Keep native button activation; do not let global Enter shortcuts open/resume a Session. */
-export function suggestedReplyKeydown(event) {
-    if ((event.key === "Enter" || event.key === " ") && event.target.closest
-        && event.target.closest("button[data-reply-key]")) event.stopPropagation();
 }
 
 /** This is a composer pin, not a fallback lookup: duplicate bare IDs are not addressable. */
@@ -471,56 +441,6 @@ export function sessionWorkStateHTML(s) {
     return said + owedBadgeHTML(s);
 }
 
-/**
- * The order is held still while the pointer is inside the list.
- *
- * A list that sorts itself is a list that can move a row out from under a click, and the click
- * still lands — on whatever slid into its place. Holding the order costs nothing while somebody
- * is reading, and it is given up the moment the set of waiting sessions changes: a new question
- * outranks a steady list, and getting to the top is the entire point of that state.
- */
-var hold = null;
-
-function waitingKey() {
-    return S.sessions.filter(function (s) { return s.state === "waiting"; })
-        .map(function (s) { return s.id; }).sort().join(",");
-}
-export function freezeOrder() {
-    if (!hold) hold = { order: ordered().map(function (s) { return s.id; }), waiting: waitingKey() };
-}
-export function thawOrder() {
-    if (!hold) return;
-    hold = null;
-    callSessionUI("renderList");
-}
-
-/** Waiting first, always. The list exists to answer "which one stopped and wants me", and
- *  an answer that is third from the bottom is not one. Within a state, alphabetical, so a
- *  row that has not changed does not move. */
-export function ordered() {
-    if (hold && hold.waiting !== waitingKey()) hold = null;
-    var q = S.filter.trim().toLowerCase();
-    var list = S.sessions.filter(function (s) {
-        if (!q) return true;
-        return ((s.label || "") + " " + (s.cwd || "") + " " + (s.tty || "") + " " + (s.backend || ""))
-            .toLowerCase().indexOf(q) >= 0;
-    });
-    if (hold) {
-        var at = {};
-        hold.order.forEach(function (id, i) { at[id] = i; });
-        return grouped(list.sort(function (a, b) {
-            var ai = at[a.id] == null ? 1e9 : at[a.id], bi = at[b.id] == null ? 1e9 : at[b.id];
-            return coordinatorFirst(a, b) || (ai - bi) || (rankOf(a) - rankOf(b))
-                || (a.label || "").localeCompare(b.label || "");
-        }));
-    }
-    return grouped(list.sort(function (a, b) {
-        return coordinatorFirst(a, b)
-            || (rankOf(a) - rankOf(b))
-            || (a.label || "").localeCompare(b.label || "")
-            || (a.id < b.id ? -1 : 1);
-    }));
-}
 
 /* ---- dispatched work ----------------------------------------------------
    A task is a session the app started because another session asked it to.
@@ -577,27 +497,6 @@ export function rootAssignmentOf(session) {
     return value;
 }
 
-/**
- * How far a row is indented: one step for the session that asked for it, another if that session
- * is somebody's child too. Two is the floor, matching the app — and it stops early at a link
- * pointing off screen, because an indent is a claim about the row above and there isn't one.
- */
-export function rowDepth(id) {
-    if (coordinatorSession(byId(id))) return 0;
-    if (rootAssignmentOf(byId(id))) return 0;
-    var n = 0, at = id, seen = {};
-    while (n < 2) {
-        var t = taskOfChild(at);
-        if (!t || !taskShaping(t) || !t.root || !t.root.terminalId) break;
-        var up = t.root.terminalId;
-        if (up === at || seen[up] || !byId(up)) break;
-        seen[at] = true;
-        at = up;
-        n++;
-    }
-    return n;
-}
-
 /** The tasks a session is the root of, of the ones still shaping the list. */
 export function tasksOfRoot(id) {
     return S.tasks.filter(function (t) {
@@ -649,66 +548,6 @@ export function taskWord(t) {
     return t && t.state === "success" ? T.webTaskDone : T.webTaskFailed;
 }
 
-/**
- * The children, pulled up under the sessions that asked for them.
- *
- * Done after the sort rather than inside it, because it is not a sort: a child sits under its
- * root wherever the root landed, whatever state the child is in. A waiting child still reaches
- * the top of the list — it is carried there by its root, which is where somebody looking for it
- * would start.
- *
- * A child whose root is not on screen — filtered out, or a session that has since closed — is
- * left exactly where the sort put it. It is still somebody's session, and hiding it or floating
- * it to the top would be this feature deciding something it was not asked to decide.
- */
-function grouped(list) {
-    if (!S.tasks.length || list.length < 2) return list;
-
-    var childOf = {};                       // child row id → the root row it belongs under
-    var here = {}, sessionsByID = {};
-    list.forEach(function (s) { here[s.id] = true; sessionsByID[s.id] = s; });
-    S.tasks.forEach(function (t) {
-        if (!taskShaping(t) || !t.child || !t.root) return;
-        var kid = t.child.terminalId, root = t.root.terminalId;
-        if (!kid || !root || kid === root) return;
-        if (!here[kid] || !here[root]) return;
-        if (coordinatorSession(sessionsByID[kid])) return;
-        childOf[kid] = root;
-    });
-    // Two levels, the same floor the app dispatches to. A link that would put a row deeper than
-    // that, or that leads round in a circle, is a record this page has no business believing:
-    // the link is dropped and the row stands on its own rather than being threaded onto a chain
-    // nobody can follow. Depths are read off the original links in one pass, so a broken chain
-    // costs its own rows their indent and never anybody else's.
-    Object.keys(childOf).forEach(function (kid) {
-        var n = 0, at = kid, seen = {};
-        while (childOf[at] && n <= 2) {
-            if (seen[at]) { n = 99; break; }
-            seen[at] = true;
-            at = childOf[at];
-            n++;
-        }
-        if (n > 2) delete childOf[kid];
-    });
-    var moved = Object.keys(childOf);
-    if (!moved.length) return list;
-
-    var kids = {};
-    list.forEach(function (s) {
-        var root = childOf[s.id];
-        if (root) (kids[root] || (kids[root] = [])).push(s);
-    });
-    var out = [];
-    var place = function (s) {
-        out.push(s);
-        if (kids[s.id]) kids[s.id].forEach(place);
-    };
-    list.forEach(function (s) { if (!childOf[s.id]) place(s); });
-    // Nothing this does is worth a row going missing. If the count moved, the grouping was
-    // wrong about something and the ungrouped list is the honest answer.
-    return out.length === list.length ? out : list;
-}
-
 export function byId(id) {
     if (id && typeof id === "object") {
         var explicit = sessionSelectionKey(id);
@@ -740,7 +579,3 @@ export function bySessionId(id) {
     }
     return null;
 }
-
-/** What has to be the same for a transcript to still be current. The line is in it because a
- *  session that is still working is still writing. */
-export function revisionOf(s) { return s ? s.state + "|" + (s.line || "") + "|" + (s.label || "") : ""; }

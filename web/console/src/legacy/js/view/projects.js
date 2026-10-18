@@ -2,16 +2,6 @@ import { T, fill } from "../core/i18n.js";
 import { failureSentence, unansweredSentence } from "../core/failure-text.js";
 import { bindWorktreeLifecycle } from "./worktrees.js";
 
-/** The local places route has an authenticated implicit machine. Attach it at the UI adapter
-    boundary so historical Session lookup uses the same strict (machine, conversation) locator
-    as Cloud, without teaching a Cloud response with a missing identity to masquerade as local. */
-export function localProjectPlaces(answer, machine) {
-    if (!answer || !Array.isArray(answer.places) || typeof machine !== "string" || !machine)
-        return answer;
-    return { ...answer, places: answer.places.map(place => place && typeof place === "object"
-        ? { ...place, machine } : place) };
-}
-
 /* ==========================================================================
    The Projects page
 
@@ -499,57 +489,6 @@ function renderPlaces(context, places) {
         }
         rows.appendChild(item);
     });
-}
-
-// Mode is a successful store fact, not an inference from a failed read. A broken Board must not
-// remove a transport's independently authorized baseline Projects reader.
-export async function readProjectPlaces(transport, onMode) {
-    var baseline = typeof transport.places === "function"
-        && typeof transport.projectWorktrees === "function";
-    if (typeof transport.board === "function") {
-        try {
-            var answer = await transport.board();
-            var board = answer && answer.board;
-            if (!board || board.available === false || typeof board.enabled !== "boolean"
-                || !Array.isArray(board.projects)) {
-                var invalid = new Error("Board unavailable");
-                invalid.code = board && board.error && board.error.code || "board_unavailable";
-                throw invalid;
-            }
-            if (onMode) onMode(board);
-            // A Cloud Board answer names the machine it came from; each Project keeps it, so what
-            // the row opens — its Board, its Timeline, its worktrees — goes to that same machine.
-            var machine = answer && typeof answer.machine === "string" && answer.machine ? answer.machine : null;
-            if (board.enabled) return { places: board.projects.filter(function (project) {
-                // Membership comes from the Mac's durable Start Point catalog, not historical
-                // task existence. displayPath is the older server's same trusted exact join.
-                return project.isStartPoint === true || (project.isStartPoint !== false
-                    && typeof project.displayPath === "string" && project.displayPath.length > 0);
-            }).map(function (project) {
-                return Object.assign({ id: project.id, boardProjectId: project.id, label: project.label || project.name,
-                    icon: project.icon, path: project.displayPath || "", itemCount: project.itemCount,
-                    activeItemCount: project.activeItemCount, summaryCoverage: project.summaryCoverage,
-                    activitySourcePartial: !!(board.source && (board.source.truncated
-                        || (board.source.ingestion && board.source.ingestion.status !== "complete"))),
-                    activityReadStatus: board.readState && board.readState.status }, machine ? { machine: machine } : {});
-            }), boardMode: true, readState: board.readState };
-        } catch (error) {
-            // An account-level Board read that could not pick one machine — two Macs — is not a
-            // broken Projects page: every machine can still list its own Projects.
-            var unpicked = /^(cloud_machine_ambiguous|cloud_machine_unsupported|cloud_feature_unavailable)$/.test(error.code || "");
-            if (!baseline || !(unpicked || /^(board_|http_503$)/.test(error.code || "") || error.status === 503)) throw error;
-            var fallback = await transport.places();
-            return Object.assign({}, fallback, { boardUnavailable: {
-                code: error.code || "board_unavailable", message: "Board unavailable"
-            } });
-        }
-    }
-    if (!baseline) {
-        var unavailable = new Error("Projects are unavailable on this connection in standard mode.");
-        unavailable.code = "projects_unavailable";
-        throw unavailable;
-    }
-    return transport.places();
 }
 
 export function bindProjectsPage(elements, environment) {

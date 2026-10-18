@@ -53,12 +53,6 @@ function errorFrom(result, fallbackCode, fallbackMessage) {
     );
 }
 
-/** The tiers that are not free. `effectiveTier` on the server is the authority; this is the
- *  question the page asks of its answer — "is this account paying for something". */
-export function isPaidTier(tier) {
-    return typeof tier === "string" && tier !== "" && tier !== "free";
-}
-
 export function planSimulationWords(language) {
     return String(language || "").toLowerCase() === "zh-tw" ? {
         title: "超級使用者方案模擬", actual: "實際方案", effective: "生效方案",

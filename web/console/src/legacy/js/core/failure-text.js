@@ -167,9 +167,6 @@ export function unansweredSentence(answer) {
 
 var opener = null;
 
-/** The Cloud status sheet registers itself here; until it does, a failure line is only text. */
-export function setFailureOpener(open) { opener = typeof open === "function" ? open : null; }
-
 /** A press that opens the status sheet at this failure's `ref`, or null where there is none. */
 export function failureOpener(error) {
     if (!opener) return null;
@@ -197,26 +194,4 @@ export function bindFailureLine(element, error) {
             if (open) element.setAttribute("title", T.webFailTap); else element.removeAttribute("title");
         }
     } catch (e) { /* the words are already on the line */ }
-}
-
-/**
- * Draw one failure into an element: the sentence, then the tag in small type, and the whole
- * line pressable when a status sheet is there to open. Plain text is the fallback wherever the
- * element cannot hold children.
- */
-export function renderFailure(element, error, fallback) {
-    if (!element) return null;
-    var said = describeFailure(error, { fallback: fallback });
-    var doc = element.ownerDocument || (typeof document !== "undefined" ? document : null);
-    if (!doc || typeof doc.createElement !== "function" || typeof element.appendChild !== "function") {
-        element.textContent = fill(T.webFailWithTag, { text: said.text, tag: said.tag });
-        return said;
-    }
-    element.textContent = said.text + " ";
-    var tag = doc.createElement("small");
-    tag.className = "failure-tag";
-    tag.textContent = said.tag;
-    element.appendChild(tag);
-    bindFailureLine(element, error);
-    return said;
 }

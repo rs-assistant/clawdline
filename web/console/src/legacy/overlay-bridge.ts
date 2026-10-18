@@ -17,7 +17,6 @@ import {
   sessionStatusGlyphHTML,
   sessionWorkStateHTML,
   suggestedReplyButtonHTML as suggestedReplyButtonHTMLOriginal,
-  suggestedReplyKeydown as suggestedReplyKeydownOriginal,
 } from "./js/view/derive.js"
 
 /** A session as the copied modules hold it: the wire row, loosely. */
@@ -49,7 +48,6 @@ export const selfReportedPeerWaitCopy = selfReportedPeerWaitCopyOriginal as (s: 
 export const statusGlyphHTML = sessionStatusGlyphHTML as (icon: string, copy: string) => string
 export const workStateBadgeHTML = sessionWorkStateHTML as (s: unknown) => string
 export const suggestedReplyButtonHTML = suggestedReplyButtonHTMLOriginal as (s: unknown, options: Record<string, unknown>) => string
-export const suggestedReplyKeydown = suggestedReplyKeydownOriginal as (ev: KeyboardEvent) => void
 
 /**
  * `setConfirmSpin` and the first draw `ActionConfirm.sync` gives it: the

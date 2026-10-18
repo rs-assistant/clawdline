@@ -18,28 +18,6 @@ import { T } from "../core/i18n.js";
    ========================================================================== */
 
 /**
- * Which of the five snippet routes this transport actually has.
- *
- * The direct path has all of them; the relay has the reading half only, because the list rides
- * the orchestrator snapshot and there is no envelope class for a write. So a control is drawn
- * from what the transport can do rather than from what the feature can do — the same shape
- * `/v1/places` and `/v1/push/key` are already asked about, and for the same reason: a button
- * that fails when pressed is worse than a button that is not there.
- */
-export function snippetControls(client) {
-    function has(name) {
-        return !!client && typeof client[name] === "function";
-    }
-    return {
-        read: has("snippets"),
-        create: has("createSnippet"),
-        update: has("updateSnippet"),
-        remove: has("deleteSnippet"),
-        order: has("orderSnippets")
-    };
-}
-
-/**
  * Which controls this sheet may draw, once the transport's routes and this device's write
  * switch have both been asked.
  *

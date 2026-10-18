@@ -1,6 +1,5 @@
 import { T, fill } from "./i18n.js";
 import { els } from "./dom.js";
-import { failureOpener, failureSentence } from "./failure-text.js";
 
 /* ==========================================================================
    2. Small helpers
@@ -79,12 +78,4 @@ export function toast(text, bad, onPress) {
     clearTimeout(toastTimer);
     // A failure that can be pressed stays long enough to be pressed.
     toastTimer = setTimeout(function () { els.toast.hidden = true; }, onPress ? 6000 : 3200);
-}
-
-/**
- * A failure as a toast: its sentence and `code · ref` (`core/failure-text.js`), never its
- * `message`, and a press on it opens the Cloud status sheet at that ref where there is one.
- */
-export function toastFailure(error, fallback) {
-    toast(failureSentence(error, fallback), true, failureOpener(error));
 }

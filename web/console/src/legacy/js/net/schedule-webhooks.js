@@ -265,12 +265,6 @@ export function scheduleWebhookReceiptHeads(deliveries) {
     return heads;
 }
 
-export function scheduleWebhookLatestReceipt(deliveries) {
-    return scheduleWebhookReceiptHeads(deliveries).reduce(function (latest, value) {
-        return !latest || value.receiptVersion > latest.receiptVersion ? value : latest;
-    }, null);
-}
-
 export function scheduleWebhookTimelineHTML(rows, observed, language) {
     var words = scheduleWebhookCopy(language);
     var stateLabels = words.states;
@@ -341,14 +335,4 @@ export async function generateAndBindScheduleWebhook(client, bind, machineID, sc
     if (!activeHook || activeHook.state !== "active") throw new Error("hook activation unavailable");
     made.hook = activeHook;
     return made;
-}
-
-/* A small invariant checker used by the focused suite and diagnostics: callers may keep the
-   capability in a lexical variable for Copy, but it cannot appear in serialized surfaces. */
-export function scheduleWebhookSecretIsEphemeral(secret, surfaces) {
-    if (!secret || !surfaces) return false;
-    return ![surfaces.html, JSON.stringify(surfaces.localStorage || {}),
-        JSON.stringify(surfaces.sessionStorage || {})].some(function (value) {
-        return String(value || "").includes(secret);
-    });
 }
