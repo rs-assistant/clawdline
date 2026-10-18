@@ -1118,6 +1118,8 @@ func parseCodex(r io.ReaderAt, size int64, limit int) ([]Entry, int64) {
 func codexInterestingLine(line []byte) bool {
 	return bytes.Contains(line, []byte("item_completed")) ||
 		bytes.Contains(line, []byte("task_complete")) ||
+		bytes.Contains(line, []byte("turn_aborted")) ||
+		(bytes.Contains(line, []byte("custom_tool_call_output")) && bytes.Contains(line, []byte("Rejected("))) ||
 		bytes.Contains(line, []byte("tools.update_plan(")) ||
 		bytes.Contains(line, []byte("request_user_input_async"))
 }
@@ -1151,6 +1153,18 @@ func codexEntries(line []byte) []Entry {
 		}
 		return nil
 	}
+	if rowType == "event_msg" && payloadType == "turn_aborted" {
+		if reason, _ := payload.str("reason"); reason == "interrupted" {
+			return []Entry{{Kind: KindError, Text: "Conversation interrupted", At: at}}
+		}
+		return nil
+	}
+	if rowType == "response_item" && payloadType == "custom_tool_call_output" {
+		if reason := codexToolDenial(payload["output"]); reason != "" {
+			return []Entry{{Kind: KindError, Text: reason, At: at}}
+		}
+		return nil
+	}
 	if rowType == "response_item" && payloadType == "function_call" {
 		name, _ := payload.str("name")
 		if name == "request_user_input_async" {
@@ -1175,6 +1189,33 @@ func codexEntries(line []byte) []Entry {
 		return nil
 	}
 	return []Entry{{Kind: KindTool, Text: "Updated Plan", Tool: "plan", At: at, Plan: steps}}
+}
+
+// Codex does not write its terminal's "Request denied" line as an event.
+// The rejected tool's output does contain the approval review's reason. Keep
+// only that reason, not the tool wrapper or an arbitrary command's output.
+func codexToolDenial(raw json.RawMessage) string {
+	parts, ok := rawObjects(raw)
+	if !ok {
+		return ""
+	}
+	for _, part := range parts {
+		message, ok := part.str("text")
+		if !ok || !strings.Contains(message, "Script error:\nexec_command failed: CreateProcess") ||
+			!strings.Contains(message, "Rejected(") {
+			continue
+		}
+		start := strings.Index(message, "Reason: ")
+		if start < 0 {
+			continue
+		}
+		reason := message[start+len("Reason: "):]
+		if end := strings.Index(reason, `\\n`); end >= 0 {
+			reason = reason[:end]
+		}
+		return strings.TrimSpace(reason)
+	}
+	return ""
 }
 
 // Codex's async question is recorded as a function call. The result only

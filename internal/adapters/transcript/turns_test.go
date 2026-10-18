@@ -284,6 +284,31 @@ func TestCodexTurnFailureIsAVisibleEntry(t *testing.T) {
 	}
 }
 
+func TestCodexRejectedToolAndInterruptedTurnAreVisible(t *testing.T) {
+	denied := m{"timestamp": "2026-10-18T03:34:48.410Z", "type": "response_item", "payload": m{
+		"type": "custom_tool_call_output", "output": []m{
+			{"type": "input_text", "text": "Script failed\nWall time 3.5 seconds\nOutput:\n"},
+			{"type": "input_text", "text": `Script error:
+exec_command failed: CreateProcess { message: "Rejected(\"This action was rejected.\\nReason: ownership was not proved.\\nDo not retry.\")" }`},
+		},
+	}}
+	aborted := m{"timestamp": "2026-10-18T03:34:56.579Z", "type": "event_msg", "payload": m{
+		"type": "turn_aborted", "reason": "interrupted",
+	}}
+	unrelated := m{"timestamp": "2026-10-18T03:34:51.598Z", "type": "response_item", "payload": m{
+		"type": "custom_tool_call_output", "output": []m{{"type": "input_text", "text": "A quoted Rejected(example) is ordinary tool output."}},
+	}}
+	page, err := ReadCodex(writeRecord(t, denied, unrelated, aborted), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Entries) != 2 || page.Entries[0].Kind != KindError ||
+		page.Entries[0].Text != "ownership was not proved." ||
+		page.Entries[1].Kind != KindError || page.Entries[1].Text != "Conversation interrupted" {
+		t.Fatalf("rejected tool and aborted turn: %+v", page.Entries)
+	}
+}
+
 func TestCodexUserMessageCountsLocalImage(t *testing.T) {
 	path := writeRecord(t, codexItem(m{"type": "UserMessage", "content": []m{
 		{"type": "local_image", "path": "/tmp/example.png"},
