@@ -1,0 +1,22 @@
+.plan-promo {
+  margin: 24px 0;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.plan-promo h2 { margin: 0 0 14px; font-size: 18px; }
+.plan-promo form { display: grid; gap: 10px; }
+.plan-promo label { font-size: 14px; }
+.plan-promo-entry { display: flex; flex-wrap: wrap; gap: 10px; }
+.plan-promo input {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+}
+.plan-promo #plan-promo-message { min-height: 1.4em; margin: 12px 0 0; }

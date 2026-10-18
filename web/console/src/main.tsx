@@ -2,6 +2,7 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { DoorGate } from "./door/Door.js"
 import { keepSamePageLinksHere } from "./same-page-links.js"
+import { capturePromoLink } from "./pages/plan/promo.js"
 
 // The original stylesheet, all of it, in the order index.html links it. These
 // are byte-for-byte copies (see legacy/README.md). The first cut copied only the
@@ -47,6 +48,7 @@ import { restoreFontScale } from "./font-scale.js"
 // The body remains hidden behind `html.booting` until its words arrive, so a
 // remembered size is in place before the first visible layout.
 restoreFontScale()
+capturePromoLink(window)
 
 const host = document.getElementById("root")
 if (!host) throw new Error("no #root in the document")

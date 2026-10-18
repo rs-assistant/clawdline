@@ -4,6 +4,8 @@ import { bindPlan, type PlanPage } from "../legacy/plan-bridge.js"
 import { useCloudAccount } from "../cloud/account-context.js"
 import sectionMarkup from "./plan/section.html?raw"
 import "./plan/offers.css"
+import { bindPromoForm } from "./plan/promo.js"
+import "./plan/promo.css"
 
 /**
  * The Plan page: `section#plan` in the Swift app's `index.html`, drawn by its
@@ -31,12 +33,17 @@ function PlanPageView({ shown }: { shown: boolean }) {
   const boundOrigin = useRef<string | null>(null)
   const entered = useRef(false)
   const checkoutReturn = useRef(location.pathname === "/billing/done")
+  const unbindPromo = useRef<(() => void) | null>(null)
 
   useLayoutEffect(() => {
     const origin = account?.apiOrigin ?? null
     if (!page.current || boundOrigin.current !== origin) {
+      unbindPromo.current?.()
       page.current?.leave()
       page.current = bindPlan(document, origin)
+      unbindPromo.current = bindPromoForm(document, origin, async () => {
+        await page.current?.enter()
+      })
       boundOrigin.current = origin
       entered.current = false
     }
