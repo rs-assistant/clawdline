@@ -108,8 +108,10 @@ test('runtime scope excludes type-only imports and generated validation inventor
 // capacity reference went stale, and the local gate skipped contract-gen.
 test('a capacity, refusal-source or reference change selects contract-gen', () => {
   for (const path of ['internal/domain/capacity/capacity.go', 'internal/domain/work/v2.go',
-    'internal/app/orchestrator/dispatch.go', 'internal/transport/http/server.go', 'skills/clawdline/capacity.md']) {
+    'internal/app/orchestrator/dispatch.go', 'internal/transport/http/server.go', 'skills/clawdline/capacity.md',
+    'internal/domain/cloudvocab/vocabulary.json', 'internal/app/cloudops/zz_decode_generated.go']) {
     assert.equal(guardPlan([path], false).contract, true, path)
   }
   assert.equal(guardPlan(['internal/adapters/store/sqlite.go'], false).contract, false)
+  assert.equal(guardPlan(['internal/app/cloudops/ops.go'], false).contract, false)
 })

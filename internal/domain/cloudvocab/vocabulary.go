@@ -10,10 +10,13 @@
 // transport package can depend on it without pulling the bridge or an adapter
 // with it.
 //
-// Today nothing at run time reads it. It is held equal to the two hand-written
-// sides by `TestTheVocabularyTableIsTheBridgesCatalog`
-// (internal/app/cloudops) and `vocabulary.test.ts` (web/console/src/cloud),
-// so that switching either side to it later is a change with a fixed target.
+// Nothing at run time reads the file itself. It is held equal to the two
+// hand-written sides by `TestTheVocabularyTableIsTheBridgesCatalog`
+// (internal/app/cloudops) and `vocabulary.test.ts` (web/console/src/cloud).
+// Each row's `decode` is the machine's decoder as data: `tools/contract-gen`
+// generates the Go decoders the bridge serves from it, and
+// `TestGeneratedDecodersKeepTheGolden` holds them to what the hand-written
+// decoders they replaced answered.
 package cloudvocab
 
 import (
@@ -77,8 +80,11 @@ type Operation struct {
 	Special []string `json:"special,omitempty"`
 	// Example holds a value for every body field any shape names.
 	Example map[string]any `json:"example"`
-	// Shapes is every body key set (without `type`) the machine accepts.
+	// Shapes is every body key set (without `type`) the word's decoder
+	// accepts. In production a wrapper may require more (Wrapper).
 	Shapes []Shape `json:"shapes"`
+	// Decode is how the decoder reads those bodies.
+	Decode *Decode `json:"decode"`
 }
 
 // Local is the route an operation becomes on this machine.
@@ -106,8 +112,10 @@ type Shape struct {
 }
 
 type table struct {
-	Version    int         `json:"version"`
-	Operations []Operation `json:"operations"`
+	Version     int          `json:"version"`
+	Wrappers    []Wrapper    `json:"wrappers"`
+	Idempotency *Idempotency `json:"idempotency"`
+	Operations  []Operation  `json:"operations"`
 }
 
 // Version is the table format this package reads.
@@ -134,7 +142,25 @@ func parse(raw []byte) ([]Operation, error) {
 	if err := validate(t.Operations); err != nil {
 		return nil, err
 	}
+	if err := validateWrappers(t); err != nil {
+		return nil, err
+	}
 	return t.Operations, nil
+}
+
+// Wrappers is the production rules around the decoders, and the idempotency
+// key every local request that is not a read carries.
+func Wrappers() ([]Wrapper, Idempotency, error) {
+	dec := json.NewDecoder(bytes.NewReader(vocabularyJSON))
+	dec.UseNumber()
+	var t table
+	if err := dec.Decode(&t); err != nil {
+		return nil, Idempotency{}, fmt.Errorf("cloudvocab: %w", err)
+	}
+	if err := validateWrappers(t); err != nil {
+		return nil, Idempotency{}, err
+	}
+	return t.Wrappers, *t.Idempotency, nil
 }
 
 func validate(ops []Operation) error {
@@ -175,6 +201,11 @@ func validate(ops []Operation) error {
 		if o.ConsoleParsedAs != "" && o.ConsoleSeam != Writer {
 			return fmt.Errorf("cloudvocab: %s names a parsed word outside the writer", o.Op)
 		}
+		for _, tag := range o.Special {
+			if !validSpecial(tag) {
+				return fmt.Errorf("cloudvocab: %s has special %q, which is not one of cloudvocab.Specials", o.Op, tag)
+			}
+		}
 		if len(o.Shapes) == 0 {
 			return fmt.Errorf("cloudvocab: %s has no accepted body", o.Op)
 		}
@@ -210,6 +241,9 @@ func validate(ops []Operation) error {
 			if !named[field] {
 				return fmt.Errorf("cloudvocab: %s has an example for %s, which no shape names", o.Op, field)
 			}
+		}
+		if err := validateDecode(o); err != nil {
+			return err
 		}
 	}
 	return nil

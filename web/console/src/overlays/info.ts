@@ -3,6 +3,7 @@ import { client } from "../client.js"
 import * as L from "../legacy/bridge.js"
 import { smartTitle as requestSmartTitle } from "../legacy/command-bridge.js"
 import { nextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import { pressKey } from "../press-key.js"
 import { contextCell } from "../session/context.js"
 import { resetWhen } from "../session/reset-when.js"
@@ -659,7 +660,7 @@ export const Info = {
     said("")
     overlay.hidden = false
     load(forId, force)
-    ;(node("info-close") as HTMLButtonElement | null)?.focus({ preventScroll: true })
+    focusModalContainer(node("info-sheet"))
   },
 
   isOpen(): boolean {

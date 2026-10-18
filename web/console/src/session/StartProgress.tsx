@@ -1,6 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from "react"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
+import { showModalWithoutChoice } from "../modal-focus.js"
 import { Start, type StartProgress } from "./Start.js"
 import "./start-progress.css"
 
@@ -25,8 +26,7 @@ export function StartProgressDialog() {
     const node = dialog.current
     if (!node) return
     if (shown && !node.open) {
-      node.showModal()
-      action.current?.focus({ preventScroll: true })
+      showModalWithoutChoice(node)
     }
     if (!shown && node.open) node.close()
   }, [shown])

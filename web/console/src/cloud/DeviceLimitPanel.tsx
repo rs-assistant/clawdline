@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { nextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import { DeviceLimitRun, knownTier, type DeviceLimitState, type RecoveryDevice, type RecoverySession } from "./device-limit.js"
 
 /**
@@ -20,7 +21,7 @@ export function DeviceLimitPanel(props: {
   const { session, tier, limit, onContinue, signInLabel } = props
   const [state, setState] = useState<DeviceLimitState>({ phase: "loading" })
   const run = useRef<DeviceLimitRun | null>(null)
-  const keep = useRef<HTMLButtonElement>(null)
+  const askDialog = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!session) return
     const next = new DeviceLimitRun(session, { onState: setState, continueSignIn: onContinue, tier, limit })
@@ -32,9 +33,8 @@ export function DeviceLimitPanel(props: {
     }
   }, [session, tier, limit, onContinue])
   const asking = state.phase === "listed" ? state.asking : null
-  // The safe answer holds the focus, as on the machine list's Forget question.
   useLayoutEffect(() => {
-    if (asking) keep.current?.focus({ preventScroll: true })
+    if (asking) focusModalContainer(askDialog.current)
   }, [asking])
 
   const shownTier = state.phase === "listed" ? state.tier : knownTier(tier)
@@ -59,12 +59,12 @@ export function DeviceLimitPanel(props: {
             <span className="cloud-device-name">{device.name}</span>
             <span className="cloud-device-facts">{facts(device)}</span>
             {listed.asking === device.id ? (
-              <div className="cloud-device-ask" role="alertdialog" aria-describedby={"cloud-device-ask-" + device.id}>
+              <div className="cloud-device-ask" role="alertdialog" ref={askDialog} aria-describedby={"cloud-device-ask-" + device.id}>
                 <p className="say" id={"cloud-device-ask-" + device.id}>
                   {nextWord("cloudDeviceRemoveAsk", { name: device.name })}
                 </p>
                 <div className="buttons">
-                  <button type="button" className="chip" ref={keep} onClick={() => run.current?.ask(null)}>
+                  <button type="button" className="chip" onClick={() => run.current?.ask(null)}>
                     {nextWord("cloudDeviceRemoveCancel")}
                   </button>
                   <button type="button" className="chip confirm-go" onClick={() => void run.current?.revoke(device.id)}>

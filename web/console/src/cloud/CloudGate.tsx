@@ -7,6 +7,7 @@ import { BRAND_MARK } from "../brand-mark.js"
 import type { ConnectionLight } from "../connection-state.js"
 import * as L from "../legacy/bridge.js"
 import { nextWord, type NextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import { bootCatalog } from "../catalog.js"
 import { cardsAreFor } from "../session/send.js"
 import { namesSession, sessionFragment } from "../session/address.js"
@@ -1886,29 +1887,22 @@ function GateCard(props: {
   const { asking, forgetting, forgotten, told, reading, onAsk, onForget, onLeave, onCloseMachinePicker } = props
   const { naming, renaming, renamed, onName, onRename, pairing, onPair } = props
   const mark = useRef<HTMLCanvasElement>(null)
+  const card = useRef<HTMLDivElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
   const go = useRef<HTMLButtonElement>(null)
   useLayoutEffect(() => {
     L.paintIcon(mark.current, BRAND_MARK, 3)
   }, [])
-  // Cancel, not the destructive button, holds the focus the question opens
-  // with. `#schedule-delete-confirm` focuses its own Delete, and that sheet is
-  // reached from a form somebody opened for one schedule; this question is one
-  // press away from a list whose rows are pressed to *use* a machine, so the
-  // safe answer is the one under the return key.
   useLayoutEffect(() => {
-    if (asking) cancel.current?.focus({ preventScroll: true })
+    if (asking) focusModalContainer(card.current)
   }, [asking])
-  // The same rule for renaming, which is reached from the same rows: the
-  // question opens on Cancel, not on the field and not on the button that
-  // writes to the account. The field is one Tab away for whoever wants it.
   const nameCancel = useRef<HTMLButtonElement>(null)
   const nameGo = useRef<HTMLButtonElement>(null)
   const [typed, setTyped] = useState("")
   useLayoutEffect(() => {
     if (!naming) return
     setTyped(naming.name || "")
-    nameCancel.current?.focus({ preventScroll: true })
+    focusModalContainer(card.current)
   }, [naming])
   const T = L.strings
   // The question belongs to the list it was asked from. A line that drops
@@ -1922,6 +1916,7 @@ function GateCard(props: {
       data-pair-console={pairing && screen.at === "console" ? "true" : undefined}>
       <div
         className="door-card"
+        ref={card}
         role={question || nameQuestion ? "alertdialog" : "dialog"}
         aria-modal="true"
         aria-label={pairing ? undefined : "clawdline"}

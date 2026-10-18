@@ -43,11 +43,6 @@ export function PairScanner({ onScanned, onUseCode, startRef }: {
   const [issue, setIssue] = useState<CameraIssue | null>(null)
 
   useLayoutEffect(() => {
-    if (state === "opening") cancelRef.current?.focus({ preventScroll: true })
-    if (state === "idle" && issue) startRef.current?.focus({ preventScroll: true })
-  }, [state, issue, startRef])
-
-  useLayoutEffect(() => {
     alive.current = true
     if (!video.current || !canvas.current) return
     camera.current = new PairCamera({

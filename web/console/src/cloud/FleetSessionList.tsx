@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { nextWord } from "../next-strings.js"
+import { showModalWithoutChoice } from "../modal-focus.js"
 import * as L from "../legacy/bridge.js"
 import { ProjectedRow } from "../session/List.js"
 import { onAttentionRead } from "../session/attention-changed.js"
@@ -105,7 +106,6 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   const [statusFilter, setStatusFilter] = useState<FleetFilter>("all")
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const machineDialog = useRef<HTMLDialogElement | null>(null)
-  const machineDialogTitle = useRef<HTMLHeadingElement | null>(null)
   const searchField = useRef<HTMLInputElement | null>(null)
   const listScroll = useRef<HTMLDivElement | null>(null)
   const swipe = useRef(new Swipes()).current
@@ -120,10 +120,8 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   })
 
   useEffect(() => {
-    if (machineAction) {
-      machineDialog.current?.showModal()
-      machineDialogTitle.current?.focus()
-    } else machineDialog.current?.close()
+    if (machineAction) showModalWithoutChoice(machineDialog.current)
+    else machineDialog.current?.close()
   }, [machineAction])
 
   useEffect(() => {
@@ -492,7 +490,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
           setMachineAction(null)
         }
       }}>
-      <h2 ref={machineDialogTitle} tabIndex={-1}>{nextWord(machineAction === "start" ? "cloudStartWhere" : "cloudSwitch")}</h2>
+      <h2>{nextWord(machineAction === "start" ? "cloudStartWhere" : "cloudSwitch")}</h2>
       <p className="cloud-all-machine-help">{nextWord(machineAction === "start" ? "cloudStartWhereHelp" : "cloudSwitchWhereHelp")}</p>
       <div className="cloud-all-machine-options">{machines.map((machine) => <button className="cloud-all-machine-option" key={machine.id} type="button" onClick={() => {
         const action = machineAction

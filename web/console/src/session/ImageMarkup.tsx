@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from "react"
 import { nextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import {
   clampView,
   fitImage,
@@ -156,7 +157,7 @@ export function ImageMarkup({
     // Capture, so a dialog underneath that also closes on Escape — a Board
     // or to-do sheet this was opened from — never hears the key.
     document.addEventListener("keydown", key, true)
-    cancelRef.current?.focus()
+    focusModalContainer(dialogRef.current)
     return () => {
       document.removeEventListener("keydown", key, true)
       before?.focus?.()

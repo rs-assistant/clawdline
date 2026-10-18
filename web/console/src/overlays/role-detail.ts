@@ -2,6 +2,7 @@ import type { Persona } from "@clawdline/contract"
 import { client } from "../client.js"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import { personaName, personaSummary, personaTeams } from "../personas.js"
 import type { WireCatalog, WireDefinition, WireNames } from "../pages/squad/wire.js"
 
@@ -153,7 +154,7 @@ export const RoleDetail = {
     paint(persona)
     node("role-detail")!.hidden = false
     ;(node("info") as HTMLElement | null)?.setAttribute("inert", "")
-    ;(node("role-detail-close") as HTMLButtonElement | null)?.focus({ preventScroll: true })
+    focusModalContainer(node("role-detail")?.querySelector<HTMLElement>(".role-detail-sheet"))
     load()
   },
   close(restore = true): void {
