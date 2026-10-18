@@ -176,10 +176,27 @@ export const cloudViewerDeviceMetadata = cloudViewerDeviceMetadataOriginal as (s
  */
 export type RecoverableCloudSession = CloudSession & RecoverySession
 
-export function newCloudSession(options: { config: CloudConfig; deviceKind: string; deviceName: string }): RecoverableCloudSession {
+/** What `ensureSession` comes to when it does not throw (`cloud-boot.js`). */
+export type EnsuredSession =
+  | { state: "ready"; accountID: string; deviceID: string }
+  | { state: "sign_in"; url: string }
+  | { state: "device_limit_reached"; tier: string; limit: number | null; message: string }
+
+/**
+ * `returnTo` is where the GitHub sign-in comes back to; the copied session
+ * defaults it to the console's root, which a page of its own (`/admin`) overrides.
+ */
+export function newCloudSession(options: {
+  config: CloudConfig
+  deviceKind: string
+  deviceName: string
+  returnTo?: string
+}): RecoverableCloudSession & { ensureSession(): Promise<EnsuredSession> } {
   // `handlers` is the Swift page's render seam (`net/handlers.js`, not copied):
   // this console draws from the client's events instead, so none is given.
-  return new CloudViewerSessionOriginal({ ...options, Client: PairedCloudClient, handlers: null }) as unknown as RecoverableCloudSession
+  return new CloudViewerSessionOriginal({ ...options, Client: PairedCloudClient, handlers: null }) as unknown as RecoverableCloudSession & {
+    ensureSession(): Promise<EnsuredSession>
+  }
 }
 
 export const keepConnected = keepConnectedOriginal as (
