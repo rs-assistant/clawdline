@@ -9,14 +9,14 @@ import { ViewerEventLog } from "../legacy/js/net/cloud-viewer-events.js"
 const FIRST = "mac_c58e0000"
 const SECOND = "mac_c6c20000"
 
-function twoMacs({ verified = [FIRST, SECOND], page = null, refuse = null } = {}) {
+function twoMacs({ verified = [FIRST, SECOND], page = null, refuse = null, storage = null } = {}) {
   const clock = { t: 1_700_000_000_000 }
   const client = Object.create(StatusCloudClient.prototype)
   client.viewerVerified = new Map(verified.map((machine) => [machine, { sender: "agent-" + machine }]))
   client._machineImplements = () => "yes"
   client._evidentMac = () => true
   client.classicSessionMachine = page
-  client.viewerEvents = new ViewerEventLog({ now: () => clock.t })
+  client.viewerEvents = new ViewerEventLog({ now: () => clock.t, storage })
   client.ready = true
   client.tabID = "tab-1"
   client.deviceID = "web_device"
@@ -128,4 +128,69 @@ test("a refused Mac's hold names that Mac, and a sealed batch is resent to the M
     ["blocked", SECOND, "unknown_command"],
     ["blocked", SECOND, "unknown_command"],
   ])
+})
+
+// A store holding what an earlier page of this device left: its stored state and its journal.
+function storeWith(state, journal) {
+  const items = new Map([["clawdline.cloud.viewer-events.v1", JSON.stringify(state)],
+    ["clawdline.cloud.viewer-events.v1:journal", JSON.stringify(journal)]])
+  return {
+    getItem: (name) => (items.has(name) ? items.get(name) : null),
+    setItem: (name, value) => { items.set(name, String(value)) },
+    removeItem: (name) => { items.delete(name) },
+  }
+}
+
+const storedRow = (n, machine) => ({ n, at_ms: 1_699_999_000_000, event: "cloud.read.failed", tab: "tab-0",
+  data: { machine, word: "sessions.list", code: "cloud_read_timeout" } })
+
+function storedState({ rows, nextN, overflow }) {
+  return {
+    v: 1, next_n: nextN, cursor: 1, counting_since_ms: 1_699_999_000_000, rows, rate_limited_total: 0,
+    counts: { rate_limited: 0, overflow, storage_errors: 0, refused: 0, unflushed: 0 },
+    rate: {}, outbox: null, sends: [], blocked: null, target: null, acknowledged: null,
+    refusals: 0, deliveries: [],
+  }
+}
+
+// Each batch says which of its missing numbers the row bound cut (overflow) and which a killed
+// page never wrote (unflushed). A batch that ends at a row bound for another Mac must count the
+// gaps below that row by what they are, whichever comes first, not just in the right total.
+for (const tc of [
+  {
+    name: "an overflow gap below the cut and the unflushed gap above it",
+    // n2 was cut by the bound before the page was killed; n4 and n5 were never written.
+    stored: storedState({ rows: [storedRow(1, FIRST), storedRow(3, SECOND)], nextN: 4, overflow: 1 }),
+    journal: { n: 6, rl: 0 },
+    then: [FIRST],
+    want: [[FIRST, 1, 2, 1, 1, 0], [SECOND, 3, 5, 1, 0, 2], [FIRST, 6, 6, 1, 0, 0]],
+  },
+  {
+    name: "the unflushed gap below the cut and an overflow gap above it",
+    // n2 and n3 were never written; then the bound of four rows cuts n5 from the middle.
+    rows: 4,
+    stored: storedState({ rows: [storedRow(1, FIRST)], nextN: 2, overflow: 0 }),
+    journal: { n: 4, rl: 0 },
+    then: [SECOND, SECOND, SECOND, FIRST],
+    want: [[FIRST, 1, 3, 1, 0, 2], [SECOND, 4, 6, 2, 1, 0], [FIRST, 7, 7, 1, 0, 0]],
+  },
+]) {
+  test(`a batch cut at another Mac's row counts each gap below it as what it is: ${tc.name}`, async () => {
+    const { client, sent, deliver } = twoMacs({ storage: storeWith(tc.stored, tc.journal) })
+    if (tc.rows) client.viewerEvents.limits.rows = tc.rows
+    for (const machine of tc.then) readFailed(client.viewerEvents, machine)
+    while ((await deliver()).state === "delivered") { /* drain */ }
+    // [machine, n_from, n_to, rows, dropped_overflow, dropped_unflushed]
+    assert.deepEqual(sent.map(({ machine, batch: { completeness: c } }) =>
+      [machine, c.n_from, c.n_to, c.rows, c.dropped_overflow, c.dropped_unflushed]), tc.want)
+  })
+}
+
+test("the log keeps the newest sixteen delivery outcomes and lets the older ones go", () => {
+  const log = new ViewerEventLog({ now: () => 1_700_000_000_000 })
+  for (let i = 1; i <= 20; i += 1) {
+    log.noteDelivery({ state: "delivered", machine: FIRST, route: "row_machine", batch_id: "batch-" + i, rows: 1 })
+  }
+  const kept = log.snapshot().deliveries.map((entry) => entry.batch_id)
+  assert.deepEqual(kept, Array.from({ length: 16 }, (_, i) => "batch-" + (i + 5)))
 })
