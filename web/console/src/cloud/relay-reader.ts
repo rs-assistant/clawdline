@@ -734,6 +734,24 @@ export class RelayReader {
   }
 
   /**
+   * The Board's Session list read failed (`SessionListReader`, pages/work).
+   * Its word, this machine, the failure's code and how long it took go to the
+   * machine's log as `cloud: viewer reported:`, so the next failure on a
+   * phone is read there and not from a screenshot.
+   */
+  reportSessionListFailure(failure: { code: string; elapsedMs: number }): boolean {
+    try {
+      const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } } | null)?.viewerEvents
+      if (typeof log?.record !== "function") return false
+      log.record("work.sessions.read_failed", {
+        word: "sessions.snapshot", machine: this.machine, code: failure.code, elapsed_ms: Math.round(failure.elapsedMs),
+        connection: !this.client ? "none" : this.client.ready === false ? "not_ready" : "ready",
+      }, ["work.sessions.read_failed", this.machine, failure.code].join("|"))
+      return true
+    } catch { return false }
+  }
+
+  /**
    * What `relay-writer.ts` is given of this seam: the machine, the client, the
    * log, and `wrote`, which is how a write reaches the reads after it.
    */

@@ -7,6 +7,7 @@ import { createPortal } from "react-dom"
 import type { Assistant, SessionRow } from "@clawdline/contract"
 import { RefusalError, asMachineNeedsUpdate, type MachineNeedsUpdate } from "@clawdline/core"
 import { NeedsUpdate } from "../../machine/NeedsUpdate.js"
+import { recordSessionListFailure } from "../../cloud/install.js"
 import * as L from "../../legacy/bridge.js"
 import { isPicture, prepareReferencePicture } from "../../legacy/shots-bridge.js"
 import { sessionFragment } from "../../session/address.js"
@@ -116,6 +117,7 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
     publish: (state) => { setSessions(state.sessions); setSessionList(state.reading) },
     words: failureWords,
     recovered: (notice) => setFailure((current) => current === notice ? "" : current),
+    failed: recordSessionListFailure,
   }))
   const [sessionList, setSessionList] = useState<SessionListReading>(() => sessionReader.state.reading)
   const [proposals, setProposals] = useState<WorkV2Proposal[]>([])
@@ -1243,7 +1245,9 @@ function SessionAssignmentPicker({ choices, onRetry, value, onChange, autoFocus 
         selected={session.id === value} onChoose={() => choose(session.id)} />)}
       {/* Only a complete answer says the Project has none; loading, failed and
           incomplete lists say so instead (session-assignment.ts). */}
-      {said && <p className="work-project-empty" role={choices.phase === "failed" ? "alert" : "status"}>{said}</p>}
+      {said && <p className={"work-project-empty" + (choices.phase === "loading" ? " work-session-loading" : "")}
+        role={choices.phase === "failed" ? "alert" : "status"} aria-busy={choices.phase === "loading" || undefined}>
+        {choices.phase === "loading" && <span className="work-assignment-spinner" aria-hidden="true" />}{said}</p>}
       {choices.phase === "failed" && <button className="chip work-session-retry" type="button" onClick={onRetry}>{workWord("assignSessionsRetry")}</button>}
     </div>}
     </div>

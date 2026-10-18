@@ -13,6 +13,10 @@ import { arrangeSessions } from "../session/order.ts"
 import { RelayReader, headerReadDiagnostics, ROW_RESTATE_MS, TRANSCRIPT_LINE_REREAD_MS, TRANSCRIPT_MAX_REUSE_MS, type CloudEvent, type CloudIdentity, type CloudReadClient, type CloudRow, type CloudSchedules, type CloudSnippets } from "./relay-reader.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { acceptSnapshot } from "../../../core/src/fleet-accept.ts"
+// @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
+import { fetchWithDeadline } from "../pages/work/fetch-deadline.ts"
+// @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
+import { SESSION_LIST_READ } from "../pages/work/session-assignment.ts"
 
 test("a failed send can queue a private-free phone diagnostic while reconnecting", () => {
   const reader = new RelayReader("mac-a")
@@ -951,6 +955,70 @@ test("refresh waits for a resumed Session even when its id has not changed", asy
   client.statusSnapshots = statusPass("mac-a", resumed, "s1")
   client.emit({ type: "sessions", identity: { machine: "mac-a" } })
   assert.equal((await refreshed).sessions[0]?.execution_generation, resumed)
+})
+
+/**
+ * The account has two Macs; the Board item's Project is on `mac-b`, the one
+ * under the console. `mac-a` hears every read and never answers. The page's
+ * own session list has already read `mac-b` once.
+ */
+async function boardOnSecondMac(sessions: string[], held: string[]) {
+  const client = new FakeClient()
+  const generation = "a".repeat(32)
+  client.machineRows = [{ id: "mac-a", freshness: "current" }, { id: "mac-b", freshness: "current" }]
+  client.rows = held.map((session) => row("mac-b", session, { execution_generation: generation }))
+  client.statusSnapshots = statusPass("mac-b", generation, ...sessions)
+  client._machineRequest = (machine, word, reqBody) => {
+    client.reads.push({ machine, word, body: reqBody })
+    return machine === "mac-b" ? Promise.resolve({ sessions, complete: true }) : new Promise(() => {})
+  }
+  const r = new RelayReader("mac-b", { classicStatus: true, now: () => 1000 })
+  r.attach(client)
+  const first = new AbortController()
+  setTimeout(() => first.abort(), 20)
+  await r.fetch("/v1/sessions", { signal: first.signal, headers: { "X-Clawdline-Initial-Read": "1" } })
+  client.reads = []
+  return { client, r }
+}
+
+/** The Board's Session list read, as `readSessionsForWorkV2` sends it, through `r`, with a short deadline. */
+async function boardSessionRead(r: RelayReader, timeoutMs: number): Promise<SessionsSnapshot> {
+  const saved = globalThis.fetch
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => r.fetch(input, init)) as typeof fetch
+  try {
+    const res = await fetchWithDeadline(SESSION_LIST_READ.path, { headers: SESSION_LIST_READ.headers }, timeoutMs, SESSION_LIST_READ.answerMs)
+    return await body<SessionsSnapshot>(res)
+  } finally { globalThis.fetch = saved }
+}
+
+test("the Board's Session list answers at once when the machine's set has not changed", async () => {
+  const { client, r } = await boardOnSecondMac(["s1"], ["s1"])
+  const started = Date.now()
+  const snap = await boardSessionRead(r, 200)
+  assert.deepEqual(snap.sessions.map((session) => session.id), ["s1"])
+  assert.equal(snap.scan.complete, true)
+  assert.ok(Date.now() - started < 200, "a held complete list is not a wait for the machine's next pass")
+  assert.ok(client.reads.every((read) => read.machine === "mac-b"), "only the Project's machine is asked")
+})
+
+test("the Board's Session list is the held list, incomplete, when the machine's new pass does not come", async () => {
+  const { client, r } = await boardOnSecondMac(["s1", "s2"], ["s1"])
+  const snap = await boardSessionRead(r, 30)
+  assert.deepEqual(snap.sessions.map((session) => session.id), ["s1"])
+  assert.equal(snap.scan.complete, false, "a list missing a row says it is incomplete, not that it failed")
+  assert.deepEqual(client.reads.map((read) => read.machine), ["mac-b"], "the silent machine is never asked")
+})
+
+test("the Board's Session list failure is recorded for the machine's log without anything of the person's", () => {
+  const rows: { event: string; data: Record<string, unknown>; key?: string }[] = []
+  const client = new FakeClient()
+  client.viewerEvents = { record(event, data, key) { rows.push({ event, data, key }); return { n: rows.length } } }
+  const r = new RelayReader("mac-b")
+  assert.equal(r.reportSessionListFailure({ code: "timeout", elapsedMs: 15000.4 }), false)
+  r.attach(client)
+  assert.equal(r.reportSessionListFailure({ code: "timeout", elapsedMs: 15000.4 }), true)
+  assert.deepEqual(rows, [{ event: "work.sessions.read_failed", key: "work.sessions.read_failed|mac-b|timeout",
+    data: { word: "sessions.snapshot", machine: "mac-b", code: "timeout", elapsed_ms: 15000, connection: "ready" } }])
 })
 
 test("reopening a complete list reads the relay once without restating every Session", async () => {

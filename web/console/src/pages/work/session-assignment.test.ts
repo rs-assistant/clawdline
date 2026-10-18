@@ -3,7 +3,7 @@ import test from "node:test"
 import type { SessionRow } from "@clawdline/contract"
 import type { SessionWorkV2 } from "./api.js"
 // @ts-expect-error -- a `.ts` path is required by Node's native type stripping.
-import { ASSIGNMENT_SETTLE_MS, SessionListReader, assignmentCandidates, assignmentChoiceRows, assignmentChoices, assignmentChoicesWords, assistantName, sessionListComplete, awaitsAcceptance, rememberAssistant, rememberedAssistant, sessionActivityName, sessionWorkCounts, sessionWorkLabel, sessionWorkStateName } from "./session-assignment.ts"
+import { ASSIGNMENT_SETTLE_MS, SessionListReader, sessionListFailureCode, assignmentCandidates, assignmentChoiceRows, assignmentChoices, assignmentChoicesWords, assistantName, sessionListComplete, awaitsAcceptance, rememberAssistant, rememberedAssistant, sessionActivityName, sessionWorkCounts, sessionWorkLabel, sessionWorkStateName } from "./session-assignment.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { withCatalog } from "../../catalog-testing.ts"
 
@@ -283,4 +283,24 @@ test("only deploying and done items wait for the person to look", () => {
   assert.equal(awaitsAcceptance("done"), true)
   assert.equal(awaitsAcceptance("verifying"), false)
   assert.equal(awaitsAcceptance("cancelled"), false)
+})
+
+test("a failed Session list read is reported with its code and how long it took", settled, async () => {
+  const reads = pendingReads()
+  const failures: unknown[] = []
+  let t = 1000
+  const it = new SessionListReader({ read: reads.read, now: () => t, words: String, publish: () => {},
+    failed: (failure) => { failures.push(failure) } })
+  const outcome = it.refresh()
+  t = 16_000
+  reads.calls[0].reject(Object.assign(new Error("GET /v1/sessions did not complete"), { name: "TransportError", cause: new DOMException("Timed out", "AbortError") }))
+  await outcome
+  assert.deepEqual(failures, [{ code: "timeout", elapsedMs: 15_000 }])
+})
+
+test("a Session list failure code is the refusal's code or what kind of failure, never its message", () => {
+  assert.equal(sessionListFailureCode(Object.assign(new Error("x"), { code: "cloud_reconnecting" })), "cloud_reconnecting")
+  assert.equal(sessionListFailureCode(new DOMException("Timed out", "AbortError")), "timeout")
+  assert.equal(sessionListFailureCode(Object.assign(new Error("/private/path"), { name: "TransportError" })), "transport")
+  assert.equal(sessionListFailureCode(null), "unknown")
 })

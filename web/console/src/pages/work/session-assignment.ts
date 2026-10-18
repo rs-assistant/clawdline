@@ -159,6 +159,46 @@ export interface SessionListAnswer {
   scan: Pick<Scan, "complete" | "sources">
 }
 
+/**
+ * How the Board reads the Session list it picks from.
+ *
+ * Over Cloud a plain `/v1/sessions` is a person's refresh of the session list:
+ * the relay reader asks the machine to restate its Sessions and then waits for
+ * a new pass (`initialSnapshot`, cloud/relay-reader.ts). A machine publishes a
+ * new pass only when its set changes, so with nothing changed that wait lasted
+ * until the deadline every time, and the deadline threw away the list the
+ * reader answered with when it fired. The Board is another view of the list
+ * the page already holds: `X-Clawdline-Initial-Read` answers a complete held
+ * list at once and asks the machine only when it is incomplete. `answerMs` is
+ * how long the reader's answer at the deadline is waited for
+ * (`fetchWithDeadline`). The machine's own daemon ignores the header.
+ */
+export const SESSION_LIST_READ = {
+  path: "/v1/sessions",
+  headers: { "X-Clawdline-Initial-Read": "1" },
+  timeoutMs: 15_000,
+  answerMs: 5_000,
+} as const
+
+/**
+ * A failed Session list read as one word for the page's diagnostics: the
+ * refusal's code, `timeout` for a deadline, otherwise the error's name. Never
+ * its message, which can carry a path.
+ */
+export function sessionListFailureCode(error: unknown): string {
+  const failure = (error ?? null) as { code?: unknown; name?: unknown; cause?: { name?: unknown } | null } | null
+  if (typeof failure?.code === "string" && failure.code) return failure.code
+  if (failure?.name === "AbortError" || failure?.cause?.name === "AbortError") return "timeout"
+  if (failure?.name === "TransportError") return "transport"
+  return typeof failure?.name === "string" && failure.name ? failure.name : "unknown"
+}
+
+/** A failed read of the Session list, for the page's diagnostics. */
+export interface SessionListFailure {
+  code: string
+  elapsedMs: number
+}
+
 /** What one read of the Session list did: whether it reached the page, and its failure. */
 export interface SessionListOutcome {
   applied: boolean
@@ -177,6 +217,8 @@ export interface SessionListReaderOptions {
   words: (error: unknown) => string
   /** A newer answer arrived after this failure was shown: its notice is stale. */
   recovered?: (failure: string) => void
+  /** A read failed: what it failed with and how long it took, whether or not it is shown. */
+  failed?: (failure: SessionListFailure) => void
   now?: () => number
 }
 
@@ -215,10 +257,15 @@ export class SessionListReader {
 
   private async ask(): Promise<SessionListOutcome> {
     const sequence = ++this.issued
+    const clock = this.options.now ?? Date.now
+    const started = clock()
     let answer: SessionListAnswer
     try {
       answer = await this.options.read()
     } catch (error) {
+      try {
+        this.options.failed?.({ code: sessionListFailureCode(error), elapsedMs: Math.max(0, clock() - started) })
+      } catch { /* diagnostics cannot fail the read */ }
       if (sequence <= this.shown) return { applied: false }
       this.shown = sequence
       const words = this.options.words(error)
@@ -228,7 +275,7 @@ export class SessionListReader {
     }
     if (sequence <= this.shown) return { applied: false }
     this.shown = sequence
-    const now = (this.options.now ?? Date.now)()
+    const now = clock()
     const seen = new Map<string, number>()
     for (const row of answer.sessions) seen.set(row.id, this.firstSeen.get(row.id) ?? now)
     this.firstSeen = seen
