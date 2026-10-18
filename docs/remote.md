@@ -33,7 +33,8 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
 
 這份清單是 Go 版剛起步時的記錄，不是今天的狀態。今天這台機器回應哪些字，看 `cloudops.Implemented()`
 與 `docs/cloud-wire.md` 的操作表；hosted console 會問哪些，看 `web/console/src/cloud/carry.ts` 的
-`CARRIED`（Go 測試 `TestTheConsoleCarryTableMatchesThisMachinesVocabulary` 讓兩邊對得上）。例如
+`CARRIED`（由 `tools/contract-gen` 從 `internal/domain/cloudvocab/vocabulary.json` 產生到
+`carry-generated.ts`，`TestTheVocabularyTableIsTheBridgesCatalog` 讓那張表與機器對得上）。例如
 `screen`：機器這邊早就接上，hosted console 則到 2026-09-26 才開始問，在那之前手機上的「即時畫面」
 只會叫人回機器上看。
 

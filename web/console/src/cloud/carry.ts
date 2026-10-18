@@ -9,8 +9,9 @@
 // every cloud session said "Loading…" for as long as that was true, and the
 // machine's log held no refusal, because the refusal was this page's own.
 //
-// So the words live here, once, in three lists that together must be exactly
-// the machine's vocabulary:
+// So the words live in one place, the vocabulary table
+// (internal/domain/cloudvocab/vocabulary.json), and reach this console as
+// three lists that together are exactly the machine's vocabulary:
 //
 //   `CARRIED`           — asked of the machine, with the console route that asks.
 //   `DEFERRED`          — the machine answers it; this console does not ask
@@ -18,280 +19,38 @@
 //   `NO_MACHINE_ROUTE`  — in the machine's vocabulary with nothing behind it
 //                         there.
 //
-// **What makes this sourced rather than written down twice** is
-// `TestTheConsoleCarryTableMatchesThisMachinesVocabulary`
-// (internal/app/cloudops/carry_test.go). It reads this file and compares its
-// three key sets with `Implemented()` and `Vocabulary()`. A word added to the
-// catalog and to neither list here fails that test by name, and so does a word
-// here that the machine has stopped knowing. The runtime half is
+// **The lists are generated, not written here.** `tools/contract-gen` renders
+// them into `carry-generated.ts` from each row's `console`, `console_route`
+// and `console_sentence`, and `go run ./tools/contract-gen -check` fails while
+// that file and the table disagree. The table is held to the machine by
+// `TestTheVocabularyTableIsTheBridgesCatalog` (internal/app/cloudops): a word
+// the machine registers with no row, or a row whose class says the machine
+// answers it when it does not, fails there by name. Adding a word is therefore
+// a row in the table and the route that asks for it, and nothing else. What
+// stays here is what the console does with the lists. The runtime half is
 // `RelayReader.drift()`, which asks the machine's own descriptor the same
-// question on the page, for a machine running ahead of the bundle it is being read
-// from.
+// question on the page, for a machine running ahead of the bundle it is being
+// read from.
 //
-// Nothing is imported here, so both the console and `node --test` read it as it
-// is.
+// **A sentence in `DEFERRED` is a decision, and a decision expires.** `git`
+// sat there saying the working tree was not read over Cloud yet, months after
+// this machine began answering the word and after `legacy/git-bridge.ts` had
+// been copied in and was asking for the route on every press of 「Git 變更」;
+// the page refused its own request and the person was told "無法讀取 Git 變更".
+// `schedules` sat there the same way and for the same length of time. Neither
+// was caught, because the guard only ever asked whether a word was
+// *classified*, never whether the sentence was still true. `DEFERRED_ASKED` is
+// the half of that question a machine can answer.
+//
+// Only the generated lists are imported here, and they import nothing, so both
+// the console and `node --test` read this file as it is.
 
-/** One word of the machine's Cloud vocabulary. */
-export type CloudWord = CarriedWord | keyof typeof DEFERRED | keyof typeof NO_MACHINE_ROUTE
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { CARRIED, DEFERRED, NO_MACHINE_ROUTE } from "./carry-generated.ts"
+import type { CloudWord } from "./carry-generated.js"
 
-/**
- * A word this console asks a machine for.
- *
- * `relay-writer.ts` declares each of its routes' words through this type, so a
- * route that names a word missing from `CARRIED` is a compile error rather than
- * a fourteenth place the vocabulary is written down.
- */
-export type CarriedWord = keyof typeof CARRIED
-
-/**
- * The words this console asks a machine for, and the console route that asks.
- *
- * The value is documentation and the key is the contract: `writeRoute` and the
- * reader's own cases name these keys, and TypeScript refuses a word that is not
- * one of them.
- */
-export const CARRIED = {
-  agent: "GET /v1/sessions/{id}/agents/{agent}?limit=",
-  answer: "POST /v1/sessions/{id}/key",
-  board: "GET /v1/board?project=&item=",
-  "board-command": "POST /v1/board",
-  // The capacity block on Settings (`pages/settings/CapacityBlock.tsx`), which
-  // every capacity push names: a machine read with no parameter.
-  capacity: "GET /v1/capacity",
-  "default-models": "GET /v1/settings/default-models",
-  "default-models-update": "POST /v1/settings/default-models",
-  "notification-rules": "GET /v1/notification-rules",
-  "notification-rules-update": "POST /v1/notification-rules",
-  document: "GET /v1/sessions/{id}/documents/{scope}/{path}",
-  documents: "GET /v1/sessions/{id}/documents",
-  "work-gate-settings": "GET /v1/settings/work-gates",
-  "work-gate-settings-update": "POST /v1/settings/work-gates",
-  "notification-settings": "GET /v1/settings/notifications",
-  "notification-settings-update": "POST /v1/settings/notifications",
-  // The dashboard behind the session counts (`machine/`): CPU, memory, disk
-  // space and grouped reclaim backlog, a machine read with no parameter.
-  "machine-usage": "GET /v1/machine/usage",
-  // The Settings page's update panel and the list's banner (`machine/update.ts`):
-  // whether this machine trails the latest build, a machine read with no parameter.
-  update: "GET /v1/update",
-  "update-fresh": "GET /v1/update/fresh",
-  // The Settings page's 「立即更新」 (`machine/UpdatePanel.tsx`): install the
-  // newest release of the machine's channel, a machine command with no body.
-  "update-apply": "POST /v1/update/apply",
-  end: "POST /v1/sessions/{id}/close",
-  focus: "POST /v1/sessions/{id}/focus",
-  git: "GET /v1/sessions/{id}/git",
-  "git-diff": "GET /v1/sessions/{id}/git/diff?path=",
-  image: "GET /v1/artifacts/images/{id}?session={id}",
-  info: "GET /v1/sessions/{id}/info[?parts=summary]",
-  skills: "GET /v1/sessions/{id}/skills",
-  interrupt: "POST /v1/sessions/{id}/interrupt",
-  intents: "POST /v1/intents",
-  "past-sessions": "GET /v1/places/{id}/sessions[/{assistant}]",
-  places: "GET /v1/places",
-  "project-folders": "GET /v1/project-folders?path=&machine=",
-  "project-add": "POST /v1/places?machine=",
-  "project-hide": "DELETE /v1/places",
-  // The built-in personas a start may name (docs/personas.md): a machine read
-  // with no parameter. A machine that does not list it is refused by the copied
-  // client before anything leaves (`_unsupportedRefusal`).
-  personas: "GET /v1/personas",
-  "squad.catalog": "GET /v1/squad/catalog",
-  "squad.definition": "GET /v1/squad/definitions/{id}[?version=]",
-  "squad.scopes": "GET /v1/squad/scopes",
-  "squad.skill-sources": "GET /v1/squad/skill-sources?provider=&place_id=&id=&folder=",
-  "squad.settings": "GET /v1/squad/settings[?place_id=|scope_id=]",
-  "squad.settings.update": "PUT /v1/squad/settings",
-  "squad.motion.update": "PUT /v1/squad/motion",
-  "squad.catalog.update": "POST /v1/squad/catalog",
-  "squad.role-draft": "POST /v1/squad/role-draft",
-  "squad-session-bindings": "GET /v1/squad/session-bindings",
-  "squad-session-snapshot": "GET /v1/squad/session-snapshots/{conversation}",
-  "squad-event-head": "GET /v1/squad/events/head",
-  "squad-events": "GET /v1/squad/events?after=&limit=",
-  "squad.packages.preview": "POST /v1/squad-packages/preview",
-  "squad.packages.adopt": "POST /v1/squad-packages/adopt",
-  "squad.packages.export": "POST /v1/squad-packages/export",
-  "squad.packages.export.private": "POST /v1/squad-packages/export (private scopes)",
-  "project-worktree-lifecycle": "GET /v1/projects/{project}/worktrees",
-  "project-file-list": "GET /v1/projects/{project}/files",
-  "project-file-read": "GET /v1/projects/{project}/files/{file}",
-  "project-file-save": "PUT /v1/projects/{project}/files/{file}",
-  // The 「Claude 與 Codex 共用」 block in Project settings
-  // (`pages/projects/ProjectUnify.tsx`, docs/project-files.md §Unify): the
-  // plan is a read, and apply carries the press's Idempotency-Key.
-  "project-unify-plan": "GET /v1/projects/{project}/unify",
-  "project-unify-apply": "POST /v1/projects/{project}/unify",
-  "project-tree-list": "GET /v1/projects/{project}/tree?directory=",
-  "project-tree-read": "GET /v1/projects/{project}/tree/file?path=",
-  // Project settings sync (docs/project-sync.md). The two source reads are
-  // also asked of *another* paired machine by `cloud/project-sync.ts`, which
-  // is how a mirror reads its source without either machine reaching the other.
-  "project-manifest": "GET /v1/project-sync/manifest",
-  "project-entry": "GET /v1/project-sync/entry?repo=",
-  "project-mirror": "GET /v1/project-sync/mirror",
-  "project-mirror-apply": "POST /v1/project-sync/mirror",
-  "project-mirror-detach": "DELETE /v1/project-sync/mirror?repo=",
-  "project-worktree-lifecycle-refresh": "POST /v1/projects/{project}/worktrees/refresh",
-  "project-worktree-remove": "DELETE /v1/projects/{project}/worktrees/{worktree}",
-  projects: "GET /v1/projects",
-  "pair-agent-start": "POST /v1/cloud/pairing/agent",
-  "pair-agent-status": "GET /v1/cloud/pairing/agent/{task}",
-  "peer-control": "POST /v1/cloud/peer/control",
-  "peer-send": "POST /v1/cloud/peer/send",
-  "peer-outbox": "GET /v1/cloud/peer/outbox/{request}",
-  "peer-inbox": "GET /v1/cloud/peer/inbox?machine_id=&session_id=&execution_generation=&before=",
-  "push-key": "GET /v1/push/key",
-  "push-subscribe": "POST /v1/push/subscribe",
-  "push-test": "POST /v1/push/test",
-  "push-unsubscribe": "POST /v1/push/unsubscribe",
-  resume: "POST /v1/places/{id}/resume[/{assistant}]/{past}[/as/{persona}]",
-  // The live screen (`session/ScreenPanel.tsx`). It sat in `DEFERRED` and in
-  // `DEFERRED_ASKED` while this machine answered it, so 「即時畫面」 on a phone
-  // only ever said to go and look on the machine — including from the Waiting
-  // card that sends a person there to read the question.
-  screen: "GET /v1/sessions/{id}/screen",
-  // The sessions a reboot took away (docs/session-restore.md), offered where
-  // the empty session list stands (`session/Restore.tsx`). The read is the
-  // machine's; the two commands carry the sheet's press key as their request.
-  "restorable-sessions": "GET /v1/sessions/restorable",
-  "restore-sessions": "POST /v1/sessions/restorable/restore",
-  "dismiss-restorable": "POST /v1/sessions/restorable/dismiss",
-  // Archived Sessions (docs/session-archive.md): the swipe's 封存 on a row
-  // (`session/List.tsx`) and the sidebar's Archive page (`pages/archive.tsx`).
-  // The archive rides the Session's own channel, as `end` does; the list is a
-  // machine read and the restore a machine command under the press's key.
-  "archive-session": "POST /v1/sessions/{id}/archive",
-  "archived-sessions": "GET /v1/sessions/archived",
-  "restore-archived": "POST /v1/sessions/archived/restore",
-  "forget-archived": "POST /v1/sessions/archived/forget",
-  "coordination.leases": "GET /v1/orchestrator/leases",
-  "coordination.waits": "GET /v1/orchestrator/waits",
-  "coordination.pauses": "GET /v1/orchestrator/pauses",
-  "schedule-create": "POST /v1/orchestrator/schedules",
-  "schedule-delete": "DELETE /v1/orchestrator/schedules/{id}",
-  "schedule-webhook-bind-v1": "POST /v1/orchestrator/schedule-webhooks/bind",
-  "schedule-run": "POST /v1/orchestrator/schedules/{id}/run",
-  "schedule-update": "PATCH /v1/orchestrator/schedules/{id}",
-  schedule: "GET /v1/orchestrator/schedules/{id}",
-  schedules: "GET /v1/orchestrator/schedules",
-  send: "POST /v1/sessions/{id}/send",
-  "session-receipt": "GET /v1/sessions/{id}/cloud-receipts/{request}?action=&execution_generation=",
-  // The Shell panel (`session/ShellPanel.tsx`): the tail of one background
-  // command's output, polled while the panel is open.
-  shell: "GET /v1/sessions/{id}/shells/{shell}?bytes=",
-  "sessions.list": "GET /v1/sessions?parts=list (one machine-level display read)",
-  // No console route asks this: the copied client does, on every connection
-  // that did not take over a live socket (`_recoverSessions`), so a list
-  // opened after a relay eviction is sent every row rather than whichever
-  // changed.
-  "sessions.snapshot": "cloud-client.js _recoverSessions (on connect)",
-  // A page's own failures, delivered by the copied client with nobody
-  // pressing anything once a row is recorded (`cloud-viewer-events.js`);
-  // a failed carried read is one (`cloud.read.failed`, `relay-reader.ts`).
-  "diagnostics.events": "cloud-client.js _deliverViewerEvents (after a recorded failure)",
-  "sessions.snapshot.initial": "cloud-client.js first _recoverSessions attempt (when advertised)",
-  // An opened waiting Session whose question has not come asks for its one row
-  // (`relay-reader.ts` askForOpenedQuestion), when the machine advertises it.
-  "sessions.row": "relay-reader.ts askForOpenedQuestion (when advertised)",
-  "smart-title": "POST /v1/sessions/{id}/smart-title",
-  title: "POST /v1/sessions/{id}/title",
-  "snippet-create": "POST /v1/snippets",
-  "snippet-delete": "DELETE /v1/snippets/{id}",
-  "snippet-order": "POST /v1/snippets/order",
-  "snippet-update": "PATCH /v1/snippets/{id}",
-  snippets: "GET /v1/snippets",
-  "session-snippets": "GET /v1/workflow-project?session={id}",
-  start: "POST /v1/places/{id}/start[/{assistant}[/{model}][/as/{persona}]]",
-  transcript: "GET /v1/transcript?session={id}",
-  // The token bill (`pages/work/TokenBill.tsx`). Machine reads, not session
-  // reads: a conversation id is the ledger's key and not a row this page holds.
-  // Whether compacting early paid (docs/token-ledger.md "Did compacting early
-  // pay"): a machine read with its one query field.
-  "usage.compare-compaction": "GET /v1/usage/compare-compaction[?since=]",
-  // Whether handing over paid (docs/token-ledger.md "Did handing over pay"):
-  // the same one query field. No page asks it yet; `clawdline usage
-  // --compare-handoff` does.
-  "usage.compare-handoff": "GET /v1/usage/compare-handoff[?since=]",
-  // The raw samples a before/after report is folded from (docs/token-ledger.md
-  // "Did a change make one unit of work cheaper"): a machine read with its two
-  // query fields. No page asks it yet; `clawdline usage --work-report` does.
-  "usage.work-samples": "GET /v1/usage/work-samples[?since=&until=]",
-  "usage.item": "GET /v1/usage/items/{id}",
-  "usage.session": "GET /v1/usage/sessions/{conversation}",
-  "usage.task": "GET /v1/usage/tasks/{id}",
-  // What each unit of work added (docs/token-ledger.md "One unit of work").
-  "usage.work-units": "GET /v1/usage/work-units[?since=]",
-  // Things waiting to be verified (`pages/verify.tsx`, docs/verifications.md):
-  // the phone is where the person reads them, so every route crosses. Two
-  // machine reads and five commands, each with its body as the route reads it.
-  "verification.close": "POST /v1/verifications/{id}/close",
-  "verification.create": "POST /v1/verifications",
-  "verification.criterion": "POST /v1/verifications/{id}/criteria/{index}",
-  "verification.delete": "DELETE /v1/verifications/{id}[?force=1]",
-  "verification.get": "GET /v1/verifications/{id}",
-  "verification.list": "GET /v1/verifications",
-  "verification.note": "POST /v1/verifications/{id}/notes",
-  voice: "POST /v1/voice",
-  "work.decisions": "GET /v1/work/decisions",
-  "work.decision": "GET /v1/work/decisions/{id}",
-  "work.decision-answer": "POST /v1/work/decisions/{id}",
-  "work.digests": "GET /v1/work/digests?kind=",
-  "work.proposals": "GET /v1/work/proposals[?project=]",
-  "work.v2.assign": "POST /v1/work/v2/items/{id}/assign",
-  "work.v2.convert": "POST /v1/work/v2/items/{id}/convert",
-  "work.v2.persona-suggestion": "POST /v1/work/v2/items/{id}/persona-suggestion",
-  "work.v2.remind": "POST /v1/work/v2/items/{id}/remind",
-  "work.v2.cancel": "POST /v1/work/v2/items/{id}/cancel",
-  "work.v2.complete": "POST /v1/work/v2/items/{id}/complete",
-  "work.v2.seen": "POST /v1/work/v2/items/{id}/seen",
-  "work.v2.create": "POST /v1/work/v2/items",
-  "work.v2.edit": "PATCH /v1/work/v2/items/{id}",
-  "work.v2.gate-export": "GET /v1/work/v2/items/{id}/gate-export",
-  "work.v2.gate-decision": "POST /v1/work/v2/items/{id}/gate-decision",
-  "work.v2.gate-purge": "POST /v1/work/v2/items/{id}/gate-purge",
-  "work.v2.image-create": "POST /v1/work/v2/items/{id}/images",
-  "work.v2.image-delete": "DELETE /v1/work/v2/items/{id}/images/{image}",
-  "work.v2.image": "GET /v1/work/v2/images/{id}[?size=thumb]",
-  "work.v2.item": "GET /v1/work/v2/items/{id}",
-  "work.v2.items": "GET /v1/work/v2/items?project=&cursor=",
-  "work.v2.search": "GET /v1/work/v2/items?project=&status=&q=&cursor=",
-  "work.v2.proposal-resolve": "POST /v1/work/v2/proposals/{id}/{accept|reject}",
-  "work.v2.proposals": "GET /v1/work/v2/proposals?state=",
-  "work.v2.session-todos": "GET /v1/work/v2/session-todos/{terminal}",
-  "work.v2.human-interventions": "GET /v1/work/v2/human-interventions/{conversation}",
-  "work.v2.human-intervention-action": "POST /v1/work/v2/human-interventions/{conversation}/{id}/{action}",
-  "work.v2.todo-action": "POST /v1/work/v2/session-todos/{terminal}/{id}/{action}",
-  "work.v2.todo-create": "POST /v1/work/v2/session-todos/{terminal}",
-  "work.v2.todo-image-create": "POST /v1/work/v2/session-todos/{terminal}/{id}/images",
-} as const
-
-/**
- * Words this machine answers that this console does not ask for yet.
- *
- * Each sentence is what a person reading a refusal needs: what is missing and
- * where the thing can be done instead. They are here rather than in a document
- * because this is the list the drift guard reads, so a word cannot be quietly
- * left out of both.
- *
- * **A sentence here is a decision, and a decision expires.** `git` sat here
- * saying the working tree was not read over Cloud yet, months after this machine
- * began answering the word and after `legacy/git-bridge.ts` had been copied in
- * and was asking for the route on every press of 「Git 變更」; the page refused
- * its own request and the person was told "無法讀取 Git 變更". `schedules` sat
- * here the same way and for the same length of time. Neither was caught,
- * because the guard below only ever asked whether a word was *classified*,
- * never whether the sentence was still true. `DEFERRED_ASKED` is the half of
- * that question a machine can answer.
- */
-export const DEFERRED = {
-  // `key` and `answer` are one command under two names on the wire. This
-  // console sends a waiting card's press as `answer`, because only that
-  // spelling carries `expect`, the fingerprint of the question the press was
-  // chosen for (F1, `RelayWriter.press`). `key` is the older spelling and is
-  // deliberately never sent.
-  key: "A waiting card's press is sent as `answer`, which names the question it answers; `key` is the older spelling of the same command.",
-} as const
+export { CARRIED, DEFERRED, NO_MACHINE_ROUTE }
+export type { CarriedWord, CloudWord } from "./carry-generated.js"
 
 /**
  * The deferred words a screen in this console already asks for.
@@ -312,20 +71,6 @@ export const DEFERRED = {
  * had to say so.
  */
 export const DEFERRED_ASKED: readonly (keyof typeof DEFERRED)[] = []
-
-/**
- * Words the machine knows and has nothing behind. Asking for one is answered
- * `unknown_command` by the bridge, so the console does not ask: the sentence
- * here is what it says instead.
- *
- * A word that gains a route on the machine fails the drift guard until it is moved
- * into `CARRIED` or `DEFERRED`, which is the whole reason this list is a list
- * and not a comment.
- */
-export const NO_MACHINE_ROUTE = {
-  "diagnostics.report": "This machine does not take a diagnostic report over Clawdline Cloud.",
-  dispatch: "Dispatching a task over Clawdline Cloud has no pinned wire shape on this machine: dispatch it on the machine.",
-} as const
 
 /**
  * Own-origin routes this seam answers itself, with no Cloud word behind them.

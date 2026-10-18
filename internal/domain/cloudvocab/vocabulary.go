@@ -10,9 +10,11 @@
 // transport package can depend on it without pulling the bridge or an adapter
 // with it.
 //
-// Nothing at run time reads the file itself. It is held equal to the two
-// hand-written sides by `TestTheVocabularyTableIsTheBridgesCatalog`
-// (internal/app/cloudops) and `vocabulary.test.ts` (web/console/src/cloud).
+// Nothing at run time reads the file itself. It is held to the bridge's
+// catalog by `TestTheVocabularyTableIsTheBridgesCatalog` (internal/app/cloudops)
+// and to the console's route parsing by `vocabulary.test.ts`
+// (web/console/src/cloud). The console's carry lists are generated from each
+// row's `console_*` fields into `web/console/src/cloud/carry-generated.ts`.
 // Each row's `decode` is the machine's decoder as data: `tools/contract-gen`
 // generates the Go decoders the bridge serves from it, and
 // `TestGeneratedDecodersKeepTheGolden` holds them to what the hand-written
@@ -68,12 +70,19 @@ type Operation struct {
 	Kind      Kind    `json:"kind"`
 	WriteGate bool    `json:"write_gate"`
 	Console   Console `json:"console"`
-	// ConsoleRoute is the `CARRIED` entry of `carry.ts`, verbatim.
+	// ConsoleRoute is the word's `CARRIED` entry in `carry-generated.ts`.
 	ConsoleRoute string `json:"console_route,omitempty"`
 	ConsoleSeam  Seam   `json:"console_seam,omitempty"`
 	// ConsoleParsedAs is the word `writeRoute` names for ConsoleRoute when
 	// that is not Op: one console route standing for two words.
 	ConsoleParsedAs string `json:"console_parsed_as,omitempty"`
+	// ConsoleSentence is what the console says instead of asking for a word
+	// it does not carry: why it is missing and where the thing can be done.
+	// Every deferred and unrouted word has one; a carried word has none.
+	ConsoleSentence string `json:"console_sentence,omitempty"`
+	// ConsoleNote is the reason a person reading `carry-generated.ts` needs
+	// beside the word, emitted there as a comment and read by nothing else.
+	ConsoleNote string `json:"console_note,omitempty"`
 	// Local is nil for a word with no local route behind it.
 	Local *Local `json:"local,omitempty"`
 	// Special names each way this word is handled outside decode-then-route.
@@ -117,6 +126,10 @@ type table struct {
 	Idempotency *Idempotency `json:"idempotency"`
 	Operations  []Operation  `json:"operations"`
 }
+
+// minConsoleSentence is the shortest console sentence that can say both what is
+// missing and where it can be done instead.
+const minConsoleSentence = 40
 
 // Version is the table format this package reads.
 const Version = 1
@@ -191,9 +204,17 @@ func validate(ops []Operation) error {
 			if o.ConsoleSeam != Writer && o.ConsoleSeam != Reader && o.ConsoleSeam != Client {
 				return fmt.Errorf("cloudvocab: %s has console seam %q", o.Op, o.ConsoleSeam)
 			}
+			if o.ConsoleSentence != "" {
+				return fmt.Errorf("cloudvocab: %s is carried and says why it is not", o.Op)
+			}
 		case Deferred, NoMachineRoute:
 			if o.ConsoleRoute != "" || o.ConsoleSeam != "" || o.ConsoleParsedAs != "" {
 				return fmt.Errorf("cloudvocab: %s is not carried and names a console route", o.Op)
+			}
+			// The sentence is what a person reads out of a refusal, so it has
+			// to say something they can act on.
+			if len(o.ConsoleSentence) < minConsoleSentence {
+				return fmt.Errorf("cloudvocab: %s is not carried and its console sentence %q says too little to act on", o.Op, o.ConsoleSentence)
 			}
 		default:
 			return fmt.Errorf("cloudvocab: %s has console %q", o.Op, o.Console)

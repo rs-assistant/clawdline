@@ -132,10 +132,15 @@ func main() {
 	if err != nil {
 		fatal("cloud decoders: %v", err)
 	}
+	carryTable, err := renderCarryTable(vocabulary)
+	if err != nil {
+		fatal("console carry table: %v", err)
+	}
 
 	want := map[string][]byte{
 		filepath.Join(root, "internal", "app", "cloudops", "zz_decode_generated.go"): decoders,
 		filepath.Join(root, "internal", "contract", "zz_generated.go"):               renderGo(names),
+		filepath.Join(root, "web", "console", "src", "cloud", "carry-generated.ts"):  carryTable,
 		filepath.Join(root, "web", "contract", "src", "generated.ts"):                renderTS(names),
 		routesPath: renderRoutes(routes),
 		filepath.Join(root, "skills", "clawdline", "routes.md"):         renderAgentRoutes(routes, agentRoutes, false),

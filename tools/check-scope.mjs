@@ -82,9 +82,10 @@ export function guardPlan(paths, full) {
     capacity: any(/\.go$|^api\/v1\/|^web\/console\/(public\/catalogs\/|src\/next-strings\.ts$)/),
     // contract-gen also renders the capacity, route and refusal references in
     // skills/clawdline from these packages, and the Cloud decoders in
-    // internal/app/cloudops from the vocabulary table; a change to one of them
-    // can leave those files stale while api/ is untouched.
-    contract: any(/^api\/v1\/|^internal\/contract\/|^web\/contract\/|^tools\/contract-gen\/|^internal\/domain\/capacity\/|^internal\/domain\/work\/|^internal\/domain\/cloudvocab\/|^internal\/app\/cloudops\/zz_|^internal\/app\/orchestrator\/|^internal\/transport\/http\/|^skills\/clawdline\/(capacity|routes|refusals)/),
+    // internal/app/cloudops and the console's carry lists from the vocabulary
+    // table; a change to one of them can leave those files stale while api/ is
+    // untouched.
+    contract: any(/^api\/v1\/|^internal\/contract\/|^web\/contract\/|^tools\/contract-gen\/|^internal\/domain\/capacity\/|^internal\/domain\/work\/|^internal\/domain\/cloudvocab\/|^internal\/app\/cloudops\/zz_|^web\/console\/src\/cloud\/carry-generated\.ts$|^internal\/app\/orchestrator\/|^internal\/transport\/http\/|^skills\/clawdline\/(capacity|routes|refusals)/),
     legacy: any(/^web\/console\/(src\/legacy\/|public\/strings\/)/),
     borders: any(/^web\/.*\.css$/),
     shell: any(/\.sh$/),

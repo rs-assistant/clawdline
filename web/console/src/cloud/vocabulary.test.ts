@@ -3,15 +3,14 @@
 //
 // The Go half (internal/app/cloudops/vocabulary_test.go) drives every row
 // through the machine's decode and route. This half holds the same rows to
-// `carry.ts` and to `writeRoute`: one word, one list, the same console route
-// spelled the same way, and the seam that parses that route naming the word.
+// `writeRoute`: the seam a carried row names parses its console route as the
+// word. `carry.ts`'s lists are generated from these rows (`carry-generated.ts`,
+// `go run ./tools/contract-gen -check`), so they are not compared here again.
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-// @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
-import { CARRIED, DEFERRED, NO_MACHINE_ROUTE } from "./carry.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { writeRoute } from "./relay-writer.ts"
 
@@ -34,7 +33,7 @@ function rows(): Row[] {
 }
 
 /**
- * One concrete request for a `CARRIED` route as `carry.ts` spells it, or null
+ * One concrete request for a carried row's console route, or null
  * for an entry that names no route (the copied client asks on its own).
  * Optional parts in `[…]` and the query are dropped; `{a|b}` takes `a`; every
  * other placeholder is "1", which every parser here takes as an id or index.
@@ -50,33 +49,18 @@ function sample(route: string): { method: string; path: string } | null {
   return { method, path }
 }
 
-test("the table and carry.ts hold the same words in the same lists", () => {
-  const lists: Record<Row["console"], Record<string, string>> = {
-    carried: CARRIED,
-    deferred: DEFERRED,
-    no_machine_route: NO_MACHINE_ROUTE,
-  }
-  const table = rows()
-  for (const [name, list] of Object.entries(lists)) {
-    const inTable = table.filter((row) => row.console === name).map((row) => row.op).sort()
-    assert.deepEqual(inTable, Object.keys(list).sort(), `the table's ${name} words are carry.ts's`)
-  }
-  assert.equal(new Set(table.map((row) => row.op)).size, table.length, "a word is in the table twice")
-})
-
-test("every carried row spells carry.ts's route and is parsed as its word", () => {
+test("every carried row's console route is parsed as its word", () => {
   for (const row of rows()) {
     if (row.console !== "carried") {
       assert.equal(row.console_route, undefined, `${row.op} is not carried and names a console route`)
       continue
     }
-    assert.equal(row.console_route, (CARRIED as Record<string, string>)[row.op], `${row.op}: the console route`)
     const asked = sample(row.console_route!)
     if (row.console_seam === "client") {
-      assert.equal(asked, null, `${row.op} says the copied client asks it, and carry.ts names a route`)
+      assert.equal(asked, null, `${row.op} says the copied client asks it, and names a route`)
       continue
     }
-    assert.ok(asked, `${row.op}: carry.ts names no route for a ${row.console_seam} word`)
+    assert.ok(asked, `${row.op}: no route for a ${row.console_seam} word`)
     const parsed = writeRoute(asked.method, asked.path)
     if (row.console_seam === "writer") {
       assert.ok(parsed, `${row.op}: writeRoute does not parse ${asked.method} ${asked.path}`)
