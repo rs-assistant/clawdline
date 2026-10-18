@@ -266,7 +266,7 @@ export interface CloudReadClient {
    */
   agent?(identity: CloudIdentity, agent: string): Promise<unknown>
   shell?(identity: CloudIdentity, shell: string): Promise<unknown>
-  /** The copied client's session reader, used for cursor pages without changing the pinned copy. */
+  /** The copied client's session reader, used for cursor pages without changing the client. */
   _read?(identity: CloudIdentity, word: string, body: Record<string, unknown>, answer: string): Promise<unknown>
   /**
    * The application server key, as the machine's `push-key` read answers it.
@@ -284,14 +284,13 @@ export interface CloudReadClient {
    *
    * The copied client has a method per word of the Swift console's vocabulary
    * and none for a word that console never had — the whole work system and
-   * this daemon's Project catalog are such words
-   * — and the copy is held to its source byte for byte
-   * (`tools/check-legacy-css.sh`), so a method cannot be added to it here.
-   * This is the generic underneath all of them (`_machineRequest`), and the
-   * reads carried through it get exactly what the named methods get: the
-   * machine's own capability gate before anything is sealed, the
-   * `unknown_command` a machine that lacks the word answers, and the
-   * `machineLacks` memory that stops the page asking it twice.
+   * this daemon's Project catalog are such words.
+   * Rather than a method per word added to it, this is the generic underneath
+   * all of them (`_machineRequest`), and the reads carried through it get
+   * exactly what the named methods get: the machine's own capability gate
+   * before anything is sealed, the `unknown_command` a machine that lacks the
+   * word answers, and the `machineLacks` memory that stops the page asking it
+   * twice.
    *
    * It is called for every word this file carries, including the four the
    * copied client does name, because those four pick their own machine —

@@ -1,7 +1,7 @@
 // The Documents page's way into its copied modules.
 //
 // `js/view/documents.js`, `js/view/document-render.js`, `js/net/document-links.js`
-// and `js/net/cloud-crypto.js` are the Swift app's, byte for byte. They are
+// and `js/net/cloud-crypto.js` began as the Swift app's. They are
 // bound here as that app's `main.js` binds them: one table of the page's
 // elements by id, and an environment whose answers are the ones the original's
 // local transport gives (`net/live.js`).

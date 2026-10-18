@@ -1,6 +1,5 @@
-// The archived Cloud client is pinned byte for byte. This subclass accepts the
-// new content-free ss/ channel without changing that archive or weakening its
-// validation for any existing channel.
+// This subclass accepts the new content-free ss/ channel without changing the
+// copied Cloud client or weakening its validation for any existing channel.
 import { CatalogCloudClient } from "./refusal-client.js"
 import { SESSION_INVENTORY_ID, SESSION_INVENTORY_LIMIT, channelSegment, decodedChannelSegment } from "../legacy/js/net/client.js"
 import { base64Bytes, bytesBase64, envelopeSigningBytes, importMasterSecret, openEnvelope, sealEnvelope, validateEnvelope } from "../legacy/js/net/cloud-crypto.js"

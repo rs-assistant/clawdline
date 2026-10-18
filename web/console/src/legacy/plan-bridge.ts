@@ -1,7 +1,7 @@
 // The Plan page's way into its copied module.
 //
-// `js/view/plan.js` and its billing client are the Swift app's byte-for-byte
-// copies. This bridge reads the additional Cloud promo fields without changing
+// `js/view/plan.js` and its billing client began as the Swift app's. This
+// bridge reads the additional Cloud promo fields without changing
 // either copied module. It is
 // bound here as that app's `main.js` binds it for the two environments:
 //

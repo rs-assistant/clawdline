@@ -1,10 +1,10 @@
 // The composer's pictures: `js/input/shots.js`, ported.
 //
-// The copy beside this file is the Swift app's module byte for byte, kept under
-// the guard as the text this one follows. It cannot be imported: it binds its
-// listeners through `core/dom.js`, which looks every id up once at import —
-// before React has drawn `#shots`, `#attach` or `#pick` — and it redraws the
-// composer by calling the page's own `renderComposer`. So the list, its bounds,
+// The Swift app's module was copied beside this file as the text this one
+// follows, and deleted on 2026-10-18 because nothing imported it. It could not
+// be imported: it bound its listeners through `core/dom.js`, which looks every
+// id up once at import — before React has drawn `#shots`, `#attach` or `#pick`
+// — and it redrew the composer by calling the page's own `renderComposer`. So the list, its bounds,
 // the shrinking and the markup are here, function for function, and
 // `session/Composer.tsx` binds the listeners the original binds at the bottom
 // of that file.

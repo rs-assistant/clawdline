@@ -1,6 +1,6 @@
 // The Devices page's way into its copied module.
 //
-// `js/view/devices.js` is the Swift app's, byte for byte. It is bound here as
+// `js/view/devices.js` began as the Swift app's. It is bound here as
 // that app's `main.js` binds it: one table of the page's elements by id, and an
 // environment whose answers are the ones the page's transport gives.
 //
@@ -347,7 +347,7 @@ function childWith(node: Drawn, className: string): Drawn | null {
  * cards it changed.
  *
  * It runs after the copied module has drawn — `pages/devices.tsx` watches the
- * list — because `js/view/devices.js` is byte for byte and rebuilds its cards
+ * list — because `js/view/devices.js` rebuilds its cards
  * whenever what they say changes. So it is idempotent: a card that already
  * carries the button is left alone. The machine's id is the one the copied
  * card itself carries, in the title of the short id under its name.

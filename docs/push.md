@@ -277,7 +277,7 @@ Web Push**，手機只訂閱一次，帳號上每台機器都叫得到它，不�
 ### console 這一半
 
 `web/console/src/cloud/cloud-push.ts`，由 `CloudGate.tsx` 在選定機器時裝上；`push/push.ts` 看得到它
-就走 Cloud 路徑，看不到（本機 console）就跟以前一模一樣。`legacy/js/net/cloud-client.js` 是
+就走 Cloud 路徑，看不到（本機 console）就跟以前一模一樣。`legacy/js/net/cloud-client.js` 當時是
 `MANIFEST.json` 釘住的拷貝，沒有動。
 
 - **開**：`GET {api}/v1/push/key`（`credentials: "include"`）→ 瀏覽器目前的訂閱如果是用別把金鑰

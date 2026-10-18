@@ -1,7 +1,7 @@
 // The list's order, fed from the copied modules' state.
 //
-// `derive.js` `ordered()`, `freezeOrder()` and `thawOrder()` are replaced here
-// rather than edited, because that file is a byte-for-byte copy. The rule
+// `derive.js` `ordered()`, `freezeOrder()` and `thawOrder()` were replaced here
+// rather than edited while that file was a byte-for-byte copy. The rule
 // itself — the original's, with the most recently moved session first inside
 // each state — is `session/order.ts`, and when a session last moved comes with
 // the row (`activity`) rather than from a clock this browser keeps. This file

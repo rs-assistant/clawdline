@@ -1,6 +1,6 @@
 // The transcript's pictures.
 //
-// `js/view/transcript-images.js` is the Swift app's module byte for byte and is
+// `js/view/transcript-images.js` began as the Swift app's module and is
 // imported as it is: it takes its nodes as arguments and imports nothing, so
 // the tile states, the reconciliation across redraws and the lightbox's zoom
 // are the original's own code. What `view/transcript.js` does around it —

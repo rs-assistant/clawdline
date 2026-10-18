@@ -11,8 +11,8 @@
 // a missing decision, it is a decision nothing enforces.
 //
 // So this file enforces it. It parses the console's own TypeScript — not the
-// copied Swift modules under `legacy/js/`, which are byte for byte theirs
-// (`tools/check-legacy-css.sh`) and can only be corrected at their call sites —
+// modules under `legacy/js/`, which began as the Swift app's (`legacy/README.md`)
+// and are outside this scan —
 // and reports three ways a named refusal stops being named:
 //
 //   `fixed_catch_all`  a chain that branches on `.code`/`.reason` and ends in a
