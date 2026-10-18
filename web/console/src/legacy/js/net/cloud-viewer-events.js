@@ -120,8 +120,32 @@ function freshState(now) {
         v: 1, next_n: 1, cursor: 1, counting_since_ms: now, rows: [], rate_limited_total: 0,
         counts: { rate_limited: 0, overflow: 0, storage_errors: 0, refused: 0, unflushed: 0 },
         rate: {}, outbox: null, sends: [], blocked: null, target: null, acknowledged: null,
-        refusals: 0, deliveries: []
+        refusals: 0, deliveries: [], unflushed_spans: []
     };
+}
+
+/**
+ * Where the unflushed numbers are. A killed page's lost rows are one run of numbers, after every
+ * row it had written and before every row the next page records; each span is one such run, by
+ * its last number and how many. Spans with no kept row between them are one gap and are joined,
+ * so there are at most as many as gaps between rows. A batch never ends inside a gap (it ends
+ * just before a kept row), so a span is either wholly below its end or wholly above it.
+ */
+function joinSpans(state) {
+    var spans = state.unflushed_spans;
+    var joined = [];
+    var row = 0;
+    spans.forEach(function (span) {
+        var last = joined[joined.length - 1];
+        while (row < state.rows.length && state.rows[row].n <= (last ? last.to : -Infinity)) row += 1;
+        if (last && !(row < state.rows.length && state.rows[row].n <= span.to)) {
+            last.to = Math.max(last.to, span.to);
+            last.count += span.count;
+        } else {
+            joined.push({ to: span.to, count: span.count });
+        }
+    });
+    state.unflushed_spans = joined;
 }
 
 function usableState(value) {
@@ -135,6 +159,10 @@ function usableState(value) {
     if (!Number.isSafeInteger(value.rate_limited_total)) value.rate_limited_total = 0;
     if (!Number.isSafeInteger(value.refusals)) value.refusals = 0;
     if (!Array.isArray(value.deliveries)) value.deliveries = [];
+    // A state written before spans were kept has none; its unflushed count is placed as it was then.
+    value.unflushed_spans = Array.isArray(value.unflushed_spans) ? value.unflushed_spans.filter(function (span) {
+        return span && Number.isSafeInteger(span.to) && Number.isSafeInteger(span.count) && span.count > 0;
+    }) : [];
     return true;
 }
 
@@ -497,6 +525,8 @@ export class ViewerEventLog {
         if (!state || !journal || typeof journal !== "object") return state;
         if (Number.isSafeInteger(journal.n) && journal.n > state.next_n) {
             state.counts.unflushed += journal.n - state.next_n;
+            state.unflushed_spans.push({ to: journal.n - 1, count: journal.n - state.next_n });
+            joinSpans(state);
             state.next_n = journal.n;
         }
         if (Number.isSafeInteger(journal.rl) && journal.rl > state.rate_limited_total) {
@@ -535,6 +565,7 @@ export class ViewerEventLog {
             state.rows.splice(Math.floor(this.limits.rows / 2), 1);
             state.counts.overflow += 1;
         }
+        joinSpans(state);
         ["rate_limited", "overflow", "storage_errors"].forEach(function (count) {
             state.counts[count] += memory.counts[count];
         });
@@ -713,6 +744,7 @@ export class ViewerEventLog {
         if (state.rows.length > this.limits.rows) {
             state.rows.splice(Math.floor(this.limits.rows / 2), 1);
             state.counts.overflow += 1;
+            if (state.unflushed_spans.length > 1) joinSpans(state);
         }
         this._journal(state);
         this._save(state);
@@ -774,12 +806,22 @@ export class ViewerEventLog {
         var nTo = state.next_n - 1;
         var overflow = state.counts.overflow;
         var unflushed = state.counts.unflushed;
+        var spans = [];
         if (take < state.rows.length) {
             nTo = state.rows[take].n - 1;
-            // Unflushed numbers precede every row this page recorded since; the rest of the gap
-            // was cut from the middle by the row bound.
+            // The unflushed numbers below the end are the spans there (`joinSpans`); the rest of
+            // the gap was cut from the middle by the row bound. Unflushed numbers no span places,
+            // from a state written before spans, are counted first, as they were then.
             var missing = Math.max(0, nTo - state.cursor + 1 - take);
-            unflushed = Math.min(state.counts.unflushed, missing);
+            var placed = 0;
+            var below = 0;
+            state.unflushed_spans.forEach(function (span) {
+                placed += span.count;
+                if (span.to <= nTo) below += span.count;
+                else spans.push(span);
+            });
+            unflushed = Math.min(state.counts.unflushed, missing,
+                below + Math.max(0, state.counts.unflushed - placed));
             overflow = Math.min(state.counts.overflow, missing - unflushed);
         }
         var batch = {
@@ -826,6 +868,7 @@ export class ViewerEventLog {
             rows: batch.rows.length, created_at_ms: now, attempts: 0, last_attempt_ms: null,
             last_failure: null, machine: boundedText(meta.machine, 128), why: boundedText(meta.why, 32) };
         state.rows = state.rows.slice(take);
+        state.unflushed_spans = spans;
         state.cursor = nTo + 1;
         state.counts = { rate_limited: 0, overflow: state.counts.overflow - overflow, storage_errors: 0,
             refused: 0, unflushed: state.counts.unflushed - unflushed };
