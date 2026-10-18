@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { base64Bytes } from "../legacy/js/net/cloud-crypto.js"
 // @ts-expect-error -- Node's strip-types runner loads the TypeScript source.
-import { DIRECT_CHUNK_MS, DIRECT_CHUNK_UNITS, DIRECT_LABEL, DIRECT_MESSAGE_BYTES, DIRECT_NEGOTIATE_MS, DIRECT_STUN, DirectLink, DirectReassembler, directMessages, sealDirectOffer } from "./terminal-direct.ts"
+import { DIRECT_CHUNK_MS, DIRECT_CHUNK_UNITS, DIRECT_LABEL, DIRECT_MESSAGE_BYTES, DIRECT_NEGOTIATE_MS, DIRECT_STUN, DirectLink, DirectReassembler, directAttemptRecorder, directAttemptStage, directCandidateCounts, directMessages, directSelectedPair, sealDirectOffer } from "./terminal-direct.ts"
 import type { DirectChannelLike, DirectPeerLike } from "./terminal-direct.js"
 import type { TerminalEnvelope } from "./terminal-transport.js"
 
@@ -171,4 +171,138 @@ test("the offer is sealed under the connection key with its connection as additi
   assert.equal(new TextDecoder().decode(await open("clawdline-direct-offer-v1/conn")), "v=0 offer")
   await assert.rejects(open("clawdline-direct-offer-v1/other"))
   await assert.rejects(sealDirectOffer(key, "conn", "a".repeat(16 * 1024 + 1)), /terminal_direct_sdp_too_large/)
+})
+
+// A real-shaped offer and answer: private host, mDNS, public srflx IPv4 and IPv6, a TCP line, and
+// the credentials every SDP carries. None of it may reach a trace.
+const traceOffer = [
+  "v=0", "o=- 4611731400430051336 2 IN IP4 127.0.0.1", "s=-",
+  "a=fingerprint:sha-256 4A:AD:B9:B1:3F:82:18:3B:54:02:12:DF:3E:5D:49:6B",
+  "m=application 9 UDP/DTLS/SCTP webrtc-datachannel", "c=IN IP4 0.0.0.0",
+  "a=ice-ufrag:Qx7v", "a=ice-pwd:k2b0Jz5PqWrYcVdXtLmNnFhG",
+  "a=candidate:1 1 udp 2122260223 192.168.1.23 51234 typ host generation 0",
+  "a=candidate:2 1 udp 2122260223 3f9c1a2e-7d4b-4c8e-9f0a-1b2c3d4e5f60.local 51235 typ host generation 0",
+  "a=candidate:3 1 udp 1686052607 203.0.113.77 61001 typ srflx raddr 192.168.1.23 rport 51234 generation 0",
+  "a=candidate:4 1 udp 1686052351 2001:db8:85a3::8a2e:370:7334 61002 typ srflx raddr :: rport 0 generation 0",
+  "a=candidate:5 1 tcp 1518280447 198.51.100.9 9 typ host tcptype active generation 0",
+].join("\r\n") + "\r\n"
+const traceAnswer = "v=0\r\na=ice-ufrag:Mm9q\r\na=ice-pwd:Z8yXwVuTsRqPoNmLkJiHgFeD\r\n" +
+  "a=candidate:1 1 udp 1694498815 198.51.100.40 62000 typ srflx raddr 0.0.0.0 rport 0\r\n"
+const traceSecrets = ["192.168.1.23", "203.0.113.77", "2001:db8", "198.51.100", "3f9c1a2e", ".local", "51234", "51235",
+  "61001", "61002", "62000", "Qx7v", "k2b0Jz5PqWrYcVdXtLmNnFhG", "Mm9q", "Z8yXwVuTsRqPoNmLkJiHgFeD", "4A:AD:B9",
+  "fingerprint", "ice-ufrag", "ice-pwd", "a=candidate", "v=0", "IN IP4"]
+
+class TracedPeer extends FakePeer {
+  iceConnectionState = "new"
+  oniceconnectionstatechange: ((event?: unknown) => void) | null = null
+  stats: Array<Record<string, unknown>> = []
+  async createOffer(): Promise<{ type: string; sdp?: string }> { return { type: "offer", sdp: traceOffer } }
+  ice(state: string): void { this.iceConnectionState = state; this.oniceconnectionstatechange?.() }
+  async getStats() { if (this.closed) throw new Error("closed"); return new Map(this.stats.map((entry) => [entry.id, entry])) }
+}
+
+test("candidate counts read only a candidate's type and the family of its address", () => {
+  const counts = directCandidateCounts(traceOffer)
+  assert.deepEqual(counts, { "host/ipv4": 2, "host/mdns": 1, "srflx/ipv4": 1, "srflx/ipv6": 1 })
+  const text = JSON.stringify(counts)
+  for (const secret of traceSecrets) assert.ok(!text.includes(secret), `counts carry ${secret}`)
+})
+
+test("an attempt that opens reports one summary with its pair and no address, port or SDP", async () => {
+  let peer!: TracedPeer
+  const reports: Array<Record<string, unknown>> = []
+  const link = new DirectLink((config) => (peer = new TracedPeer(config)), () => undefined, () => undefined,
+    { attempt: "AAAAAAAAAAAAAAAAAAAAAA", kind: "terminal", report: (data) => reports.push(data) })
+  peer.stats = [
+    { id: "T1", type: "transport", selectedCandidatePairId: "P1" },
+    { id: "P1", type: "candidate-pair", localCandidateId: "L1", remoteCandidateId: "R1", state: "succeeded", nominated: true },
+    { id: "L1", type: "local-candidate", candidateType: "srflx", address: "203.0.113.77", port: 61001, protocol: "udp" },
+    { id: "R1", type: "remote-candidate", candidateType: "srflx", address: "198.51.100.40", port: 62000, protocol: "udp" },
+  ]
+  await link.offer()
+  peer.ice("checking")
+  peer.connectionState = "connecting"; peer.onconnectionstatechange?.()
+  peer.ice("connected")
+  await link.answer(traceAnswer)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  link.close("terminal_direct_released")
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.equal(reports.length, 1)
+  const report = reports[0]
+  assert.equal(report.attempt, "AAAAAAAAAAAAAAAAAAAAAA")
+  assert.equal(report.kind, "terminal")
+  assert.equal(report.stage, "open")
+  assert.equal(report.answer, "received")
+  assert.equal(report.offer_cands, "host/ipv4:2,host/mdns:1,srflx/ipv4:1,srflx/ipv6:1")
+  assert.equal(report.answer_cands, "srflx/ipv4:1")
+  assert.equal(report.gather, "complete")
+  assert.equal(report.browser_srflx, true)
+  assert.equal(report.pair, "srflx/ipv4>srflx/ipv4")
+  assert.match(String(report.ice), /^checking@\d+ms,connected@\d+ms$/)
+  assert.match(String(report.pc), /^connecting@\d+ms$/)
+  const text = JSON.stringify(report)
+  for (const secret of traceSecrets) assert.ok(!text.includes(secret), `the summary carries ${secret}: ${text}`)
+})
+
+test("an attempt that never opens reports where it stopped", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] })
+  let peer!: TracedPeer
+  const reports: Array<Record<string, unknown>> = []
+  const link = new DirectLink((config) => { peer = new TracedPeer(config); peer.autoOpen = false; return peer },
+    () => undefined, () => undefined, { attempt: "BBBBBBBBBBBBBBBBBBBBBB", kind: "carrier", report: (data) => reports.push(data) })
+  const answered = link.answer(traceAnswer)
+  peer.ice("checking")
+  await Promise.resolve()
+  t.mock.timers.tick(DIRECT_NEGOTIATE_MS)
+  await assert.rejects(answered, /terminal_direct_ice_failed/)
+  t.mock.timers.reset()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.equal(reports.length, 1)
+  assert.equal(reports[0].stage, "timed_out")
+  assert.equal(reports[0].code, "terminal_direct_ice_failed")
+  assert.equal(reports[0].pair, null)
+})
+
+test("an attempt closed before any answer is no_answer, and a link without a trace reports nothing", async () => {
+  const reports: Array<Record<string, unknown>> = []
+  const traced = new DirectLink((config) => new TracedPeer(config), () => undefined, () => undefined,
+    { attempt: "CCCCCCCCCCCCCCCCCCCCCC", kind: "carrier", report: (data) => reports.push(data) })
+  await traced.offer()
+  traced.close("carrier_failed")
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.deepEqual(reports.map((report) => [report.stage, report.code, report.answer]), [["no_answer", "carrier_failed", "none"]])
+  new DirectLink((config) => new TracedPeer(config), () => undefined, () => undefined).close()
+  assert.equal(reports.length, 1)
+})
+
+test("the stage names each way an attempt ends, in the machine's order", () => {
+  const cases: Array<[string, Parameters<typeof directAttemptStage>[0], string]> = [
+    ["open", { opened: true, answered: true, remote: 1, ice: ["checking", "connected"], timedOut: false }, "open"],
+    ["no answer", { opened: false, answered: false, remote: 0, ice: [], timedOut: false }, "no_answer"],
+    ["connected without a channel", { opened: false, answered: true, remote: 1, ice: ["checking", "connected"], timedOut: true }, "connected_no_channel"],
+    ["connected through a peer-reflexive pair", { opened: false, answered: true, remote: 0, ice: ["completed"], timedOut: true }, "connected_no_channel"],
+    ["nothing to check against", { opened: false, answered: true, remote: 0, ice: ["checking", "failed"], timedOut: true }, "no_remote_candidates"],
+    ["checks failed", { opened: false, answered: true, remote: 2, ice: ["checking", "failed"], timedOut: false }, "checks_failed"],
+    ["timed out while checking", { opened: false, answered: true, remote: 2, ice: ["checking"], timedOut: true }, "timed_out"],
+    ["closed for another reason", { opened: false, answered: true, remote: 2, ice: ["checking"], timedOut: false }, "closed_early"],
+  ]
+  for (const [name, facts, want] of cases) assert.equal(directAttemptStage(facts), want, name)
+})
+
+test("the selected pair falls back to a nominated succeeded pair and reads families only", () => {
+  assert.equal(directSelectedPair([
+    { id: "P1", type: "candidate-pair", localCandidateId: "L", remoteCandidateId: "R", state: "in-progress" },
+    { id: "P2", type: "candidate-pair", localCandidateId: "L", remoteCandidateId: "R6", state: "succeeded", nominated: true },
+    { id: "L", type: "local-candidate", candidateType: "host", address: "fd00::1" },
+    { id: "R6", type: "remote-candidate", candidateType: "prflx", ip: "2001:db8::9" },
+  ]), "host/ipv6>prflx/ipv6")
+  assert.equal(directSelectedPair([{ id: "P1", type: "candidate-pair", state: "failed" }]), null)
+})
+
+test("the recorder writes one cloud.direct.attempt row naming its machine, keyed by kind and stage", () => {
+  const rows: Array<[string, Record<string, unknown>, string | undefined]> = []
+  const record = directAttemptRecorder({ viewerEvents: { record: (event: string, data: Record<string, unknown>, key?: string) => rows.push([event, data, key]) } }, "machine_test")
+  record!({ kind: "terminal", stage: "timed_out", attempt: "A" })
+  assert.deepEqual(rows, [["cloud.direct.attempt", { kind: "terminal", stage: "timed_out", attempt: "A", machine: "machine_test" }, "cloud.direct.attempt|terminal|timed_out"]])
+  assert.equal(directAttemptRecorder({}, "machine_test"), null)
 })
