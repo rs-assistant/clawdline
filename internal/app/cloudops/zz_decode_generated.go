@@ -205,11 +205,7 @@ func genDecodeAgent(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/agents/"
-	path += segment(genText(b["agent"]))
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/agents/" + segment(genText(b["agent"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"before": genValue{from: "before"}, "limit": genValue{from: "limit"}})
 	return p, req, true
@@ -238,10 +234,7 @@ func genDecodeAnswer(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/key"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/key"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"expect": genValue{from: "expect"}, "key": genValue{from: "answer"}, "typed": genValue{from: "typed"}})
 	return p, req, true
@@ -267,10 +260,7 @@ func genDecodeArchiveSession(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/archive"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/archive"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"expected_closeability_version": genValue{from: "expected_closeability_version", omitEmpty: true}, "force": genValue{from: "force", fallback: false}})
 	return p, req, true
@@ -287,8 +277,7 @@ func genDecodeArchivedSessions(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/archived"
+	path := "/v1/sessions/archived"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -310,8 +299,7 @@ func genDecodeBoard(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/board"
+	path := "/v1/board"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"item": genValue{from: "item", omitEmpty: true}, "project": genValue{from: "project", omitEmpty: true}})
 	return p, req, true
@@ -331,8 +319,7 @@ func genDecodeBoardCommand(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/board"
+	path := "/v1/board"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("command")
@@ -350,8 +337,7 @@ func genDecodeCapacity(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/capacity"
+	path := "/v1/capacity"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -367,8 +353,7 @@ func genDecodeCoordinationLeases(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/orchestrator/leases"
+	path := "/v1/orchestrator/leases"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -384,8 +369,7 @@ func genDecodeCoordinationPauses(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/orchestrator/pauses"
+	path := "/v1/orchestrator/pauses"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -401,8 +385,7 @@ func genDecodeCoordinationWaits(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/orchestrator/waits"
+	path := "/v1/orchestrator/waits"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -418,8 +401,7 @@ func genDecodeDefaultModels(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/settings/default-models"
+	path := "/v1/settings/default-models"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -438,8 +420,7 @@ func genDecodeDefaultModelsUpdate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/settings/default-models"
+	path := "/v1/settings/default-models"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("changes")
@@ -495,8 +476,7 @@ func genDecodeDismissRestorable(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/restorable/dismiss"
+	path := "/v1/sessions/restorable/dismiss"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"conversations": genValue{from: "conversations"}})
 	return p, req, true
@@ -520,10 +500,7 @@ func genDecodeDocuments(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/documents"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/documents"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -545,10 +522,7 @@ func genDecodeEnd(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/close"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/close"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"expected_closeability_version": genValue{from: "expected_closeability_version", omitEmpty: true}, "force": genValue{from: "accept_loss"}})
 	return p, req, true
@@ -572,10 +546,7 @@ func genDecodeFocus(b body) (plan, LocalRequest, bool) {
 	if v, named := b["execution_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/focus"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/focus"
 	req := LocalRequest{Method: "POST", Path: path}
 	return p, req, true
 }
@@ -594,8 +565,7 @@ func genDecodeForgetArchived(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/archived/forget"
+	path := "/v1/sessions/archived/forget"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"conversation": genValue{from: "conversation"}})
 	return p, req, true
@@ -619,10 +589,7 @@ func genDecodeGit(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/git"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/git"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -652,10 +619,7 @@ func genDecodeGitDiff(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/git/diff"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/git/diff"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"path": genValue{from: "path"}})
 	return p, req, true
@@ -682,9 +646,7 @@ func genDecodeImage(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/artifacts/images/"
-	path += segment(genText(b["id"]))
+	path := "/v1/artifacts/images/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"session": genValue{from: "session"}})
 	return p, req, true
@@ -711,10 +673,7 @@ func genDecodeInfo(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/info"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/info"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"parts": genValue{from: "parts", only: "summary"}})
 	return p, req, true
@@ -734,8 +693,7 @@ func genDecodeIntents(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/intents"
+	path := "/v1/intents"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"text": genValue{from: "text"}})
 	return p, req, true
@@ -752,10 +710,7 @@ func genDecodeInterrupt(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/interrupt"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/interrupt"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = []byte("{}")
 	return p, req, true
@@ -784,10 +739,7 @@ func genDecodeKey(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/key"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/key"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"expect": genValue{from: "expect"}, "key": genValue{from: "key"}, "typed": genValue{from: "typed"}})
 	return p, req, true
@@ -804,8 +756,7 @@ func genDecodeMachineUsage(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/machine/usage"
+	path := "/v1/machine/usage"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -821,8 +772,7 @@ func genDecodeNotificationRules(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/notification-rules"
+	path := "/v1/notification-rules"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -841,8 +791,7 @@ func genDecodeNotificationRulesUpdate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/notification-rules"
+	path := "/v1/notification-rules"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("changes")
@@ -860,8 +809,7 @@ func genDecodeNotificationSettings(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/settings/notifications"
+	path := "/v1/settings/notifications"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -880,8 +828,7 @@ func genDecodeNotificationSettingsUpdate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/settings/notifications"
+	path := "/v1/settings/notifications"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("changes")
@@ -908,8 +855,7 @@ func genDecodePairAgentStart(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/cloud/pairing/agent"
+	path := "/v1/cloud/pairing/agent"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = map[string]string{}
 	if v, sent := b.genSource(genValue{from: "request"}); sent {
@@ -933,9 +879,7 @@ func genDecodePairAgentStatus(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/cloud/pairing/agent/"
-	path += segment(genText(b["task_id"]))
+	path := "/v1/cloud/pairing/agent/" + segment(genText(b["task_id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -957,10 +901,7 @@ func genDecodePastSessions(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/places/"
-	path += segment(genText(b["place"]))
-	path += "/sessions"
+	path := "/v1/places/" + segment(genText(b["place"])) + "/sessions"
 	if t := genText(b["assistant"]); t != "" {
 		path += "/" + segment(t)
 	}
@@ -982,8 +923,7 @@ func genDecodePeerControl(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/cloud/peer/control"
+	path := "/v1/cloud/peer/control"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genObject("control")
 	return p, req, true
@@ -1003,9 +943,7 @@ func genDecodePeerOutbox(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/cloud/peer/outbox/"
-	path += segment(genText(b["target_request"]))
+	path := "/v1/cloud/peer/outbox/" + segment(genText(b["target_request"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1021,8 +959,7 @@ func genDecodePersonas(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/personas"
+	path := "/v1/personas"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1038,8 +975,7 @@ func genDecodePlaces(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/places"
+	path := "/v1/places"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1058,8 +994,7 @@ func genDecodeProjectAdd(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/places"
+	path := "/v1/places"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genFields(map[string]genValue{"paths": genValue{from: "path", list: true}})
@@ -1080,8 +1015,7 @@ func genDecodeProjectEntry(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/project-sync/entry"
+	path := "/v1/project-sync/entry"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"repo": genValue{from: "repo"}})
 	return p, req, true
@@ -1101,10 +1035,7 @@ func genDecodeProjectFileList(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects/"
-	path += segment(genText(b["project"]))
-	path += "/files"
+	path := "/v1/projects/" + segment(genText(b["project"])) + "/files"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1126,11 +1057,7 @@ func genDecodeProjectFileRead(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects/"
-	path += segment(genText(b["project"]))
-	path += "/files/"
-	path += segment(genText(b["file"]))
+	path := "/v1/projects/" + segment(genText(b["project"])) + "/files/" + segment(genText(b["file"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1155,11 +1082,7 @@ func genDecodeProjectFileSave(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects/"
-	path += segment(genText(b["project"]))
-	path += "/files/"
-	path += segment(genText(b["file"]))
+	path := "/v1/projects/" + segment(genText(b["project"])) + "/files/" + segment(genText(b["file"]))
 	req := LocalRequest{Method: "PUT", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -1181,8 +1104,7 @@ func genDecodeProjectFolders(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/project-folders"
+	path := "/v1/project-folders"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"path": genValue{from: "path", fallback: ""}})
 	return p, req, true
@@ -1202,8 +1124,7 @@ func genDecodeProjectHide(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/places"
+	path := "/v1/places"
 	req := LocalRequest{Method: "DELETE", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genFields(map[string]genValue{"paths": genValue{from: "path", list: true}})
@@ -1221,8 +1142,7 @@ func genDecodeProjectManifest(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/project-sync/manifest"
+	path := "/v1/project-sync/manifest"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1238,8 +1158,7 @@ func genDecodeProjectMirror(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/project-sync/mirror"
+	path := "/v1/project-sync/mirror"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1258,8 +1177,7 @@ func genDecodeProjectMirrorApply(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/project-sync/mirror"
+	path := "/v1/project-sync/mirror"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -1280,8 +1198,7 @@ func genDecodeProjectMirrorDetach(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/project-sync/mirror"
+	path := "/v1/project-sync/mirror"
 	req := LocalRequest{Method: "DELETE", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"repo": genValue{from: "repo"}})
 	req.Header = asDevice()
@@ -1305,10 +1222,7 @@ func genDecodeProjectTreeList(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects/"
-	path += segment(genText(b["project"]))
-	path += "/tree"
+	path := "/v1/projects/" + segment(genText(b["project"])) + "/tree"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"directory": genValue{from: "directory"}})
 	return p, req, true
@@ -1331,10 +1245,7 @@ func genDecodeProjectTreeRead(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects/"
-	path += segment(genText(b["project"]))
-	path += "/tree/file"
+	path := "/v1/projects/" + segment(genText(b["project"])) + "/tree/file"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"path": genValue{from: "path"}})
 	return p, req, true
@@ -1357,10 +1268,7 @@ func genDecodeProjectUnifyApply(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects/"
-	path += segment(genText(b["project"]))
-	path += "/unify"
+	path := "/v1/projects/" + segment(genText(b["project"])) + "/unify"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -1381,10 +1289,7 @@ func genDecodeProjectUnifyPlan(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects/"
-	path += segment(genText(b["project"]))
-	path += "/unify"
+	path := "/v1/projects/" + segment(genText(b["project"])) + "/unify"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1403,10 +1308,7 @@ func genDecodeProjectWorktreeLifecycle(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects/"
-	path += segment(genText(b["project"]))
-	path += "/worktrees"
+	path := "/v1/projects/" + segment(genText(b["project"])) + "/worktrees"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1425,10 +1327,7 @@ func genDecodeProjectWorktreeLifecycleRefresh(b body) (plan, LocalRequest, bool)
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects/"
-	path += segment(genText(b["project"]))
-	path += "/worktrees/refresh"
+	path := "/v1/projects/" + segment(genText(b["project"])) + "/worktrees/refresh"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = []byte("{}")
 	return p, req, true
@@ -1451,11 +1350,7 @@ func genDecodeProjectWorktreeRemove(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects/"
-	path += segment(genText(b["project"]))
-	path += "/worktrees/"
-	path += segment(genText(b["worktree"]))
+	path := "/v1/projects/" + segment(genText(b["project"])) + "/worktrees/" + segment(genText(b["worktree"]))
 	req := LocalRequest{Method: "DELETE", Path: path}
 	return p, req, true
 }
@@ -1471,8 +1366,7 @@ func genDecodeProjects(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/projects"
+	path := "/v1/projects"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1488,8 +1382,7 @@ func genDecodePushKey(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/push/key"
+	path := "/v1/push/key"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1511,8 +1404,7 @@ func genDecodePushTest(b body) (plan, LocalRequest, bool) {
 	if v, named := b["target"]; named {
 		p.target = genText(v)
 	}
-	path := ""
-	path += "/v1/push/test"
+	path := "/v1/push/test"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genFields(map[string]genValue{"session_id": genValue{from: "target", omitEmpty: true}})
@@ -1533,8 +1425,7 @@ func genDecodePushUnsubscribe(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/push/unsubscribe"
+	path := "/v1/push/unsubscribe"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genFields(map[string]genValue{"id": genValue{from: "id"}})
@@ -1552,8 +1443,7 @@ func genDecodeRestorableSessions(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/restorable"
+	path := "/v1/sessions/restorable"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1572,8 +1462,7 @@ func genDecodeRestoreArchived(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/archived/restore"
+	path := "/v1/sessions/archived/restore"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"conversations": genValue{from: "conversations"}})
 	return p, req, true
@@ -1593,8 +1482,7 @@ func genDecodeRestoreSessions(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/restorable/restore"
+	path := "/v1/sessions/restorable/restore"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"conversations": genValue{from: "conversations"}})
 	return p, req, true
@@ -1614,9 +1502,7 @@ func genDecodeSchedule(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/orchestrator/schedules/"
-	path += segment(genText(b["id"]))
+	path := "/v1/orchestrator/schedules/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1635,8 +1521,7 @@ func genDecodeScheduleCreate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/orchestrator/schedules"
+	path := "/v1/orchestrator/schedules"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("schedule")
@@ -1657,9 +1542,7 @@ func genDecodeScheduleDelete(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/orchestrator/schedules/"
-	path += segment(genText(b["id"]))
+	path := "/v1/orchestrator/schedules/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "DELETE", Path: path}
 	req.Header = asDevice()
 	return p, req, true
@@ -1683,10 +1566,7 @@ func genDecodeScheduleRun(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/orchestrator/schedules/"
-	path += segment(genText(b["id"]))
-	path += "/run"
+	path := "/v1/orchestrator/schedules/" + segment(genText(b["id"])) + "/run"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genFields(map[string]genValue{"force": genValue{from: "force"}})
@@ -1710,9 +1590,7 @@ func genDecodeScheduleUpdate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/orchestrator/schedules/"
-	path += segment(genText(b["id"]))
+	path := "/v1/orchestrator/schedules/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "PATCH", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("schedule")
@@ -1730,8 +1608,7 @@ func genDecodeSchedules(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/orchestrator/schedules"
+	path := "/v1/orchestrator/schedules"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1754,10 +1631,7 @@ func genDecodeScreen(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/screen"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/screen"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1780,10 +1654,7 @@ func genDecodeSend(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/send"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/send"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"images": genValue{from: "images"}, "text": genValue{from: "text"}})
 	return p, req, true
@@ -1829,8 +1700,7 @@ func genDecodeSessionSnippets(b body) (plan, LocalRequest, bool) {
 	if v, named := b["row"]; named {
 		p.target = genText(v)
 	}
-	path := ""
-	path += "/v1/snippets"
+	path := "/v1/snippets"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"session": genValue{from: "row"}})
 	return p, req, true
@@ -1851,8 +1721,7 @@ func genDecodeSessionsList(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/sessions"
+	path := "/v1/sessions"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"fresh": genValue{from: "fresh", ifTrue: "1"}, "parts": genValue{constant: "list"}})
 	return p, req, true
@@ -1940,11 +1809,7 @@ func genDecodeShell(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/shells/"
-	path += segment(genText(b["shell"]))
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/shells/" + segment(genText(b["shell"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"bytes": genValue{from: "bytes"}})
 	return p, req, true
@@ -1968,10 +1833,7 @@ func genDecodeSkills(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/skills"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/skills"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -1994,10 +1856,7 @@ func genDecodeSmartTitle(b body) (plan, LocalRequest, bool) {
 	if v, named := b["execution_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/smart-title"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/smart-title"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = []byte("{}")
 	return p, req, true
@@ -2017,8 +1876,7 @@ func genDecodeSnippetCreate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/snippets"
+	path := "/v1/snippets"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("snippet")
@@ -2039,9 +1897,7 @@ func genDecodeSnippetDelete(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/snippets/"
-	path += segment(genText(b["id"]))
+	path := "/v1/snippets/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "DELETE", Path: path}
 	req.Header = asDevice()
 	return p, req, true
@@ -2061,8 +1917,7 @@ func genDecodeSnippetOrder(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/snippets/order"
+	path := "/v1/snippets/order"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("ordering")
@@ -2086,9 +1941,7 @@ func genDecodeSnippetUpdate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/snippets/"
-	path += segment(genText(b["id"]))
+	path := "/v1/snippets/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "PATCH", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("snippet")
@@ -2106,8 +1959,7 @@ func genDecodeSnippets(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/snippets"
+	path := "/v1/snippets"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -2123,8 +1975,7 @@ func genDecodeSquadEventHead(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/events/head"
+	path := "/v1/squad/events/head"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Header = asDevice()
 	return p, req, true
@@ -2147,8 +1998,7 @@ func genDecodeSquadEvents(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/events"
+	path := "/v1/squad/events"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"after": genValue{from: "after"}, "limit": genValue{from: "limit"}})
 	req.Header = asDevice()
@@ -2166,8 +2016,7 @@ func genDecodeSquadSessionBindings(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/session-bindings"
+	path := "/v1/squad/session-bindings"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Header = asDevice()
 	return p, req, true
@@ -2187,9 +2036,7 @@ func genDecodeSquadSessionSnapshot(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/session-snapshots/"
-	path += segment(genText(b["conversation"]))
+	path := "/v1/squad/session-snapshots/" + segment(genText(b["conversation"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Header = asDevice()
 	return p, req, true
@@ -2206,8 +2053,7 @@ func genDecodeSquadCatalog(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/catalog"
+	path := "/v1/squad/catalog"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Header = asDevice()
 	return p, req, true
@@ -2227,8 +2073,7 @@ func genDecodeSquadCatalogUpdate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/catalog"
+	path := "/v1/squad/catalog"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("changes")
@@ -2253,9 +2098,7 @@ func genDecodeSquadDefinition(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/definitions/"
-	path += segment(genText(b["definition_id"]))
+	path := "/v1/squad/definitions/" + segment(genText(b["definition_id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"version": genValue{from: "version"}})
 	req.Header = asDevice()
@@ -2276,8 +2119,7 @@ func genDecodeSquadMotionUpdate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/motion"
+	path := "/v1/squad/motion"
 	req := LocalRequest{Method: "PUT", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("changes")
@@ -2298,8 +2140,7 @@ func genDecodeSquadPackagesAdopt(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad-packages/adopt"
+	path := "/v1/squad-packages/adopt"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("package")
@@ -2320,8 +2161,7 @@ func genDecodeSquadPackagesExport(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad-packages/export"
+	path := "/v1/squad-packages/export"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("package")
@@ -2342,8 +2182,7 @@ func genDecodeSquadPackagesExportPrivate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad-packages/export"
+	path := "/v1/squad-packages/export"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("package")
@@ -2364,8 +2203,7 @@ func genDecodeSquadPackagesPreview(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad-packages/preview"
+	path := "/v1/squad-packages/preview"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("package")
@@ -2386,8 +2224,7 @@ func genDecodeSquadRoleDraft(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/role-draft"
+	path := "/v1/squad/role-draft"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("changes")
@@ -2405,8 +2242,7 @@ func genDecodeSquadScopes(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/scopes"
+	path := "/v1/squad/scopes"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Header = asDevice()
 	return p, req, true
@@ -2431,8 +2267,7 @@ func genDecodeSquadSettings(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/settings"
+	path := "/v1/squad/settings"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"place_id": genValue{from: "place_id"}, "scope_id": genValue{from: "scope_id"}})
 	req.Header = asDevice()
@@ -2453,8 +2288,7 @@ func genDecodeSquadSettingsUpdate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/settings"
+	path := "/v1/squad/settings"
 	req := LocalRequest{Method: "PUT", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("changes")
@@ -2487,8 +2321,7 @@ func genDecodeSquadSkillSources(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/squad/skill-sources"
+	path := "/v1/squad/skill-sources"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"folder": genValue{from: "folder", omitEmpty: true}, "id": genValue{from: "id", omitEmpty: true}, "place_id": genValue{from: "place_id", omitEmpty: true}, "provider": genValue{from: "provider", omitEmpty: true}})
 	req.Header = asDevice()
@@ -2516,10 +2349,7 @@ func genDecodeTitle(b body) (plan, LocalRequest, bool) {
 	if v, named := b["execution_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/sessions/"
-	path += segment(genText(b["session"]))
-	path += "/title"
+	path := "/v1/sessions/" + segment(genText(b["session"])) + "/title"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"title": genValue{from: "text"}})
 	return p, req, true
@@ -2561,8 +2391,7 @@ func genDecodeTranscript(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
-	path := ""
-	path += "/v1/transcript"
+	path := "/v1/transcript"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"before": genValue{from: "before"}, "expected_generation": genValue{from: "expected_generation"}, "limit": genValue{from: "limit"}, "session": genValue{from: "session"}})
 	return p, req, true
@@ -2579,8 +2408,7 @@ func genDecodeUpdate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/update"
+	path := "/v1/update"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -2596,8 +2424,7 @@ func genDecodeUpdateApply(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/update/apply"
+	path := "/v1/update/apply"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = []byte("{}")
@@ -2615,8 +2442,7 @@ func genDecodeUpdateFresh(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/update/fresh"
+	path := "/v1/update/fresh"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -2636,8 +2462,7 @@ func genDecodeUsageCompareCompaction(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/usage/compare-compaction"
+	path := "/v1/usage/compare-compaction"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"since": genValue{from: "since"}})
 	return p, req, true
@@ -2658,8 +2483,7 @@ func genDecodeUsageCompareHandoff(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/usage/compare-handoff"
+	path := "/v1/usage/compare-handoff"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"since": genValue{from: "since"}})
 	return p, req, true
@@ -2679,9 +2503,7 @@ func genDecodeUsageItem(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/usage/items/"
-	path += segment(genText(b["id"]))
+	path := "/v1/usage/items/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -2700,9 +2522,7 @@ func genDecodeUsageSession(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/usage/sessions/"
-	path += segment(genText(b["id"]))
+	path := "/v1/usage/sessions/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -2721,9 +2541,7 @@ func genDecodeUsageTask(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/usage/tasks/"
-	path += segment(genText(b["id"]))
+	path := "/v1/usage/tasks/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -2748,8 +2566,7 @@ func genDecodeUsageWorkSamples(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/usage/work-samples"
+	path := "/v1/usage/work-samples"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"since": genValue{from: "since"}, "until": genValue{from: "until"}})
 	return p, req, true
@@ -2770,8 +2587,7 @@ func genDecodeUsageWorkUnits(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/usage/work-units"
+	path := "/v1/usage/work-units"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"since": genValue{from: "since"}})
 	return p, req, true
@@ -2794,10 +2610,7 @@ func genDecodeVerificationClose(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/verifications/"
-	path += segment(genText(b["id"]))
-	path += "/close"
+	path := "/v1/verifications/" + segment(genText(b["id"])) + "/close"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("verification")
@@ -2818,8 +2631,7 @@ func genDecodeVerificationCreate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/verifications"
+	path := "/v1/verifications"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("verification")
@@ -2846,11 +2658,7 @@ func genDecodeVerificationCriterion(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/verifications/"
-	path += segment(genText(b["id"]))
-	path += "/criteria/"
-	path += segment(genText(b["index"]))
+	path := "/v1/verifications/" + segment(genText(b["id"])) + "/criteria/" + segment(genText(b["index"]))
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("verification")
@@ -2874,9 +2682,7 @@ func genDecodeVerificationDelete(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/verifications/"
-	path += segment(genText(b["id"]))
+	path := "/v1/verifications/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "DELETE", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"force": genValue{from: "force", ifTrue: "1"}})
 	req.Header = asDevice()
@@ -2897,9 +2703,7 @@ func genDecodeVerificationGet(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/verifications/"
-	path += segment(genText(b["id"]))
+	path := "/v1/verifications/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -2915,8 +2719,7 @@ func genDecodeVerificationList(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/verifications"
+	path := "/v1/verifications"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -2938,10 +2741,7 @@ func genDecodeVerificationNote(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/verifications/"
-	path += segment(genText(b["id"]))
-	path += "/notes"
+	path := "/v1/verifications/" + segment(genText(b["id"])) + "/notes"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("verification")
@@ -2965,8 +2765,7 @@ func genDecodeVoice(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/voice"
+	path := "/v1/voice"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"audio": genValue{from: "audio"}, "rate": genValue{from: "rate"}})
 	return p, req, true
@@ -2983,8 +2782,7 @@ func genDecodeWorkGateSettings(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/settings/work-gates"
+	path := "/v1/settings/work-gates"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -3003,8 +2801,7 @@ func genDecodeWorkGateSettingsUpdate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/settings/work-gates"
+	path := "/v1/settings/work-gates"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("changes")
@@ -3025,9 +2822,7 @@ func genDecodeWorkDecision(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/decisions/"
-	path += segment(genText(b["id"]))
+	path := "/v1/work/decisions/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -3049,9 +2844,7 @@ func genDecodeWorkDecisionAnswer(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/decisions/"
-	path += segment(genText(b["id"]))
+	path := "/v1/work/decisions/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genFields(map[string]genValue{"answer": genValue{from: "answer"}})
@@ -3069,8 +2862,7 @@ func genDecodeWorkDecisions(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/decisions"
+	path := "/v1/work/decisions"
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -3089,8 +2881,7 @@ func genDecodeWorkDigests(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/digests"
+	path := "/v1/work/digests"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"kind": genValue{from: "kind", omitEmpty: true}})
 	return p, req, true
@@ -3110,8 +2901,7 @@ func genDecodeWorkProposals(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/proposals"
+	path := "/v1/work/proposals"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"project": genValue{from: "project", omitEmpty: true}})
 	return p, req, true
@@ -3134,10 +2924,7 @@ func genDecodeWorkV2Assign(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/assign"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/assign"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3161,10 +2948,7 @@ func genDecodeWorkV2Cancel(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/cancel"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/cancel"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3188,10 +2972,7 @@ func genDecodeWorkV2Complete(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/complete"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/complete"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3215,10 +2996,7 @@ func genDecodeWorkV2Convert(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/convert"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/convert"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3239,8 +3017,7 @@ func genDecodeWorkV2Create(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items"
+	path := "/v1/work/v2/items"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3264,9 +3041,7 @@ func genDecodeWorkV2Edit(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
+	path := "/v1/work/v2/items/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "PATCH", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3290,10 +3065,7 @@ func genDecodeWorkV2GateDecision(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/gate-decision"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/gate-decision"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3314,10 +3086,7 @@ func genDecodeWorkV2GateExport(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/gate-export"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/gate-export"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Header = asDevice()
 	return p, req, true
@@ -3340,10 +3109,7 @@ func genDecodeWorkV2GatePurge(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/gate-purge"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/gate-purge"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3376,13 +3142,7 @@ func genDecodeWorkV2HumanInterventionAction(b body) (plan, LocalRequest, bool) {
 	if v, named := b["terminal"]; named {
 		p.target = genText(v)
 	}
-	path := ""
-	path += "/v1/work/v2/human-interventions/"
-	path += segment(genText(b["terminal"]))
-	path += "/"
-	path += segment(genText(b["id"]))
-	path += "/"
-	path += segment(genText(b["action"]))
+	path := "/v1/work/v2/human-interventions/" + segment(genText(b["terminal"])) + "/" + segment(genText(b["id"])) + "/" + segment(genText(b["action"]))
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3406,9 +3166,7 @@ func genDecodeWorkV2HumanInterventions(b body) (plan, LocalRequest, bool) {
 	if v, named := b["terminal"]; named {
 		p.target = genText(v)
 	}
-	path := ""
-	path += "/v1/work/v2/human-interventions/"
-	path += segment(genText(b["terminal"]))
+	path := "/v1/work/v2/human-interventions/" + segment(genText(b["terminal"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -3431,9 +3189,7 @@ func genDecodeWorkV2Image(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/images/"
-	path += segment(genText(b["id"]))
+	path := "/v1/work/v2/images/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"size": genValue{from: "size"}})
 	return p, req, true
@@ -3456,10 +3212,7 @@ func genDecodeWorkV2ImageCreate(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/images"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/images"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3486,11 +3239,7 @@ func genDecodeWorkV2ImageDelete(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/images/"
-	path += segment(genText(b["image"]))
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/images/" + segment(genText(b["image"]))
 	req := LocalRequest{Method: "DELETE", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3511,9 +3260,7 @@ func genDecodeWorkV2Item(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
+	path := "/v1/work/v2/items/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	return p, req, true
 }
@@ -3536,8 +3283,7 @@ func genDecodeWorkV2Items(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items"
+	path := "/v1/work/v2/items"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"cursor": genValue{from: "cursor", omitEmpty: true}, "project": genValue{from: "project", omitEmpty: true}})
 	return p, req, true
@@ -3560,10 +3306,7 @@ func genDecodeWorkV2PersonaSuggestion(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/persona-suggestion"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/persona-suggestion"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3590,11 +3333,7 @@ func genDecodeWorkV2ProposalResolve(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/proposals/"
-	path += segment(genText(b["id"]))
-	path += "/"
-	path += segment(genText(b["decision"]))
+	path := "/v1/work/v2/proposals/" + segment(genText(b["id"])) + "/" + segment(genText(b["decision"]))
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3615,8 +3354,7 @@ func genDecodeWorkV2Proposals(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/proposals"
+	path := "/v1/work/v2/proposals"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"state": genValue{from: "state", omitEmpty: true}})
 	return p, req, true
@@ -3639,10 +3377,7 @@ func genDecodeWorkV2Remind(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/remind"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/remind"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3673,8 +3408,7 @@ func genDecodeWorkV2Search(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items"
+	path := "/v1/work/v2/items"
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"cursor": genValue{from: "cursor", omitEmpty: true}, "project": genValue{from: "project", omitEmpty: true}, "q": genValue{from: "query", omitEmpty: true}, "status": genValue{from: "status", omitEmpty: true}})
 	return p, req, true
@@ -3697,10 +3431,7 @@ func genDecodeWorkV2Seen(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
-	path := ""
-	path += "/v1/work/v2/items/"
-	path += segment(genText(b["id"]))
-	path += "/seen"
+	path := "/v1/work/v2/items/" + segment(genText(b["id"])) + "/seen"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3728,9 +3459,7 @@ func genDecodeWorkV2SessionTodos(b body) (plan, LocalRequest, bool) {
 	if v, named := b["terminal"]; named {
 		p.target = genText(v)
 	}
-	path := ""
-	path += "/v1/work/v2/session-todos/"
-	path += segment(genText(b["terminal"]))
+	path := "/v1/work/v2/session-todos/" + segment(genText(b["terminal"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"summary": genValue{from: "summary", ifTrue: "1"}})
 	return p, req, true
@@ -3762,13 +3491,7 @@ func genDecodeWorkV2TodoAction(b body) (plan, LocalRequest, bool) {
 	if v, named := b["terminal"]; named {
 		p.target = genText(v)
 	}
-	path := ""
-	path += "/v1/work/v2/session-todos/"
-	path += segment(genText(b["terminal"]))
-	path += "/"
-	path += segment(genText(b["id"]))
-	path += "/"
-	path += segment(genText(b["action"]))
+	path := "/v1/work/v2/session-todos/" + segment(genText(b["terminal"])) + "/" + segment(genText(b["id"])) + "/" + segment(genText(b["action"]))
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3795,9 +3518,7 @@ func genDecodeWorkV2TodoCreate(b body) (plan, LocalRequest, bool) {
 	if v, named := b["terminal"]; named {
 		p.target = genText(v)
 	}
-	path := ""
-	path += "/v1/work/v2/session-todos/"
-	path += segment(genText(b["terminal"]))
+	path := "/v1/work/v2/session-todos/" + segment(genText(b["terminal"]))
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")
@@ -3827,12 +3548,7 @@ func genDecodeWorkV2TodoImageCreate(b body) (plan, LocalRequest, bool) {
 	if v, named := b["terminal"]; named {
 		p.target = genText(v)
 	}
-	path := ""
-	path += "/v1/work/v2/session-todos/"
-	path += segment(genText(b["terminal"]))
-	path += "/"
-	path += segment(genText(b["id"]))
-	path += "/images"
+	path := "/v1/work/v2/session-todos/" + segment(genText(b["terminal"])) + "/" + segment(genText(b["id"])) + "/images"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Header = asDevice()
 	req.Body = b.genObject("item")

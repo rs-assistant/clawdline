@@ -189,36 +189,54 @@ func goTemplate(template string) string {
 	return strings.Join(parts, " + ")
 }
 
-// goPath is the statements that build `path` from a route template.
+// goPath is the statements that build `path` from a route template: one
+// expression, broken only where a segment is optional.
 func goPath(template string) (string, error) {
 	var b strings.Builder
-	b.WriteString("path := \"\"\n")
+	terms := []string{}
+	declared := false
+	flush := func() {
+		if len(terms) == 0 {
+			return
+		}
+		op := "+="
+		if !declared {
+			op, declared = ":=", true
+		}
+		fmt.Fprintf(&b, "path %s %s\n", op, strings.Join(terms, " + "))
+		terms = nil
+	}
 	rest := template
 	for {
 		at := placeholder.FindStringSubmatchIndex(rest)
 		if at == nil {
 			if rest != "" {
-				fmt.Fprintf(&b, "path += %q\n", rest)
+				terms = append(terms, strconv.Quote(rest))
 			}
+			flush()
 			return b.String(), nil
 		}
 		if at[0] > 0 {
-			fmt.Fprintf(&b, "path += %q\n", rest[:at[0]])
+			terms = append(terms, strconv.Quote(rest[:at[0]]))
 		}
 		slash := at[3] > at[2]
 		field := rest[at[4]:at[5]]
 		mark := rest[at[6]:at[7]]
 		switch {
 		case slash && mark == "?":
+			flush()
+			if !declared {
+				return "", fmt.Errorf("path %s: an optional segment cannot come first", template)
+			}
 			fmt.Fprintf(&b, "if t := genText(b[%q]); t != \"\" {\npath += \"/\" + segment(t)\n}\n", field)
 		case slash:
 			return "", fmt.Errorf("path %s: a {/field} segment must be optional", template)
 		case mark == "*":
-			fmt.Fprintf(&b, "path += escapedDocumentPath(genText(b[%q]))\n", field)
+			terms = append(terms, fmt.Sprintf("escapedDocumentPath(genText(b[%q]))", field))
 		case mark == "?":
 			return "", fmt.Errorf("path %s: an optional segment carries its slash", template)
 		default:
-			fmt.Fprintf(&b, "path += segment(genText(b[%q]))\n", field)
+			terms = append(terms, fmt.Sprintf("segment(genText(b[%q]))", field))
 		}
 		rest = rest[at[1]:]
 	}
