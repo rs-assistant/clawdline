@@ -76,6 +76,11 @@ function promoHref(campaign: string | null): string {
   return adminPath("promotions") + (campaign ? "?campaign=" + encodeURIComponent(campaign) : "")
 }
 
+function publicCampaignPage(code: string, locale: string): string {
+  const path = locale === "zh-TW" ? "/zh-TW/redeem/" : "/redeem/"
+  return `https://clawdline.com${path}#code=${encodeURIComponent(code)}`
+}
+
 export function PromoManagement({ overview, apiOrigin, say, locale, search, go, onChanged, onLostAccess }: {
   overview: Overview
   apiOrigin: string
@@ -528,6 +533,7 @@ function CampaignDetail({ id, row, full, apiOrigin, say, locale, n, go, notice, 
   const issuable = fresh ? canIssue(fresh, now) : full ? canIssue(full, now) : row ? row.phase !== "revoked" && row.phase !== "expired" : false
   const revocable = (fresh?.state ?? full?.state) === "active" || (!fresh && !full && row !== null && row.phase !== "revoked")
   const limit = fresh?.redemption_limit ?? full?.redemption_limit ?? row?.redemption_limit ?? null
+  const publicCodes = codes.kind === "ready" ? codes.page.rows.flatMap((code) => code.public_code ? [code.public_code] : []) : []
 
   return (
     <div className="adm-page adm-detail">
@@ -563,6 +569,16 @@ function CampaignDetail({ id, row, full, apiOrigin, say, locale, n, go, notice, 
         ) : (
           <p className="adm-fine">{say("campaignNotListed")}</p>
         )}
+        {publicCodes.length ? (
+          <div className="adm-campaign-pages">
+            <span>{say("campaignPublicPages")}</span>
+            {publicCodes.map((code) => (
+              <a key={code} href={publicCampaignPage(code, locale)} target="_blank" rel="noopener noreferrer" className="adm-crumb">
+                {say("campaignViewPage", { code })}<span aria-hidden="true"> ↗</span>
+              </a>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       {notice ? <Banner tone="ok" text={notice} onDismiss={clearNotice} say={say} /> : null}
