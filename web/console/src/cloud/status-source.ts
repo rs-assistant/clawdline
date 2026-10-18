@@ -143,11 +143,19 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
       const ownerConversation = record(status.epic_parent)?.owner_session_id
       const parentSessionID = typeof ownerConversation === "string" ? byConversation.get(ownerConversation) : null
       const before = known.get(String(row!.id) + "\u0000" + String(row!.execution_generation))
+      const menu = record(status.menu)
+      const options = menu?.options
+      const replyProven = status.state === "waiting" && Array.isArray(options) && options.length > 0 &&
+        (status.screen_reading === "read" && !menu?.source ||
+          status.screen_reading === "unavailable" && menu?.source === "transcript")
       return { destination: { machineID, sessionID: String(row!.id),
         executionGeneration: String(row!.execution_generation) }, state: String(status.state),
       parentSessionID: parentSessionID && parentSessionID !== row!.id ? parentSessionID : before?.parentSessionID,
       machineScope: status.machine_scope === true || before?.machineScope === true,
       coordinatorBound: status.coordinator_bound === true || before?.coordinatorBound === true,
+      needsAttention: status.work_person_needed === true ||
+        typeof status.attention_count === "number" && status.attention_count > 0,
+      waitingForReply: replyProven ? true as const : undefined,
       freshness: "current" as const, observedAt: nowMs, snapshotGeneration }
     }) } }
 }

@@ -232,6 +232,40 @@ test("a cold status gap uses one complete pinned machine list for rows and title
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 })
 
+test("a pinned list fallback keeps attention and reply filters aligned with its visible status", async () => {
+  const { client } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
+  let now = Date.now()
+  client.now = () => now
+  let attention = 1
+  let replyQuestion = true
+  const list = client.listPresentationsForMachine
+  client.listPresentationsForMachine = async (machine) => {
+    const reply = await list(machine)
+    return { ...reply, at: Math.floor(now / 1000), sessions: reply.sessions.map((row) => ({ ...row,
+      status: { ...row.status, state: attention ? "waiting" : "idle",
+        work_state: attention ? "waiting_you" : "ready", attention_count: attention,
+        ...(replyQuestion ? { screen_reading: "read", menu: { options: [{ n: 1, label: "Continue" }] } } : {}) } })) }
+  }
+  const source = statusSource(() => client as never)
+  const first = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(first.rows?.[0]?.needsAttention, true)
+  assert.equal(first.rows?.[0]?.waitingForReply, true)
+  assert.equal((await source.readMachinePresentations?.(machineID, new AbortController().signal))?.[0]?.status?.attention_count, 1)
+
+  replyQuestion = false
+  now += STATUS_GAP_RETRY_MS
+  const noteOnly = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(noteOnly.rows?.[0]?.needsAttention, true)
+  assert.equal(noteOnly.rows?.[0]?.waitingForReply, undefined)
+
+  attention = 0
+  now += STATUS_GAP_RETRY_MS
+  const cleared = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(cleared.rows?.[0]?.needsAttention, false)
+  assert.equal(cleared.rows?.[0]?.waitingForReply, undefined)
+})
+
 test("a cold pinned list retains an Epic child's visible parent", async () => {
   const { client } = clientFixture()
   client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
