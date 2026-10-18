@@ -139,3 +139,28 @@ export function holderKey(c: { held: boolean; holder?: { same_client: boolean; s
   if (!c.held || !c.holder) return "nobody"
   return c.holder.same_client ? "you" : c.holder.same_device ? "tab" : "device:" + c.holder.name
 }
+
+/**
+ * The hosted page's key panel: each control combination is a key of its own, with what it does
+ * said under it. ^D is marked apart: on an empty shell line it ends the shell, and with it the terminal.
+ */
+export const COMBO_KEYS: { name: string; value: string; hint: NextWord; danger?: boolean }[] = [
+  { name: "^C", value: "\x03", hint: "terminalKeyHintInterrupt" },
+  { name: "^Z", value: "\x1a", hint: "terminalKeyHintSuspend" },
+  { name: "^L", value: "\x0c", hint: "terminalKeyHintClear" },
+  { name: "^R", value: "\x12", hint: "terminalKeyHintSearch" },
+  { name: "^A", value: "\x01", hint: "terminalKeyHintLineStart" },
+  { name: "^E", value: "\x05", hint: "terminalKeyHintLineEnd" },
+  { name: "^U", value: "\x15", hint: "terminalKeyHintDeleteLine" },
+  { name: "^D", value: "\x04", hint: "terminalKeyHintEndShell", danger: true },
+]
+/** Keys without a hint: arrows go through `sendKey`, which picks the program's cursor mode. */
+export const PANEL_KEYS: [string, string, NextWord | null][] = [
+  ["Esc", "\x1b", null], ["Tab", "\t", null], ["⇧Tab", "\x1b[Z", "terminalKeyBackTab"], ["Enter", "\r", null],
+  ["←", "D", "terminalKeyLeft"], ["↑", "A", "terminalKeyUp"], ["↓", "B", "terminalKeyDown"], ["→", "C", "terminalKeyRight"],
+]
+/** The row over the text box: the keys a phone reaches for most. */
+export const QUICK_KEYS: [string, string, NextWord | null][] = [
+  ["^C", "\x03", "terminalKeyHintInterrupt"], ["Esc", "\x1b", null], ["Tab", "\t", null],
+  ["↑", "A", "terminalKeyUp"], ["↓", "B", "terminalKeyDown"],
+]

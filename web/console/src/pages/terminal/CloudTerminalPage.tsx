@@ -13,10 +13,11 @@ import { TAB } from "./tab.js"
 import { closeTerminalPane, openTerminalPage } from "./navigate.js"
 import { firstSize } from "./TerminalProjectList.js"
 import { TerminalBackButton } from "./TerminalBackButton.js"
-import { KEY_ROW, bindTerminalKeyboard, isRegionKey, readClipboardPaste, withCtrl } from "./keys.js"
+import { COMBO_KEYS, PANEL_KEYS, QUICK_KEYS, bindTerminalKeyboard, isRegionKey, readClipboardPaste, withCtrl } from "./keys.js"
 import { PasteField } from "./PasteField.js"
 import { holderWords, terminalRefusalWords, terminalShortID } from "./words.js"
-import { acquireVisibleTerminal, beginCloudTerminal, cloudTerminalBody, keyRefusalControl, keyRefusalNotice, reconnectCloudTerminal, shownKeyRefusal, type KeyRefusalNotice } from "./cloud-view.js"
+import { acquireVisibleTerminal, beginCloudTerminal, cloudTerminalBody, cloudTerminalPhase, composerSend, defaultInputMode, keyRefusalControl, keyRefusalNotice,
+  reconnectCloudTerminal, shownKeyRefusal, type CloudTerminalPhase, type KeyRefusalNotice } from "./cloud-view.js"
 import { beginTerminalClose, observeTerminalEnded, observeTerminalRunning, settleTerminalClose, terminalCloseState, watchTerminalClose } from "../../cloud/terminal-close-state.js"
 import { centerCursorLine, followCursorLine } from "./cursor-line.js"
 import { CLOUD_TERMINAL_LIST_RETRY_DELAYS_MS, terminalListErrorKind } from "../../session/cloud-terminal-all.js"
@@ -74,6 +75,8 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
   const [keyRefused, setKeyRefused] = useState<(KeyRefusalNotice & { why: string; control: string }) | null>(null)
   const keyFailed = (e: unknown) => {
     const code = (e as { code?: string })?.code ?? "terminal_send_failed"
+    // A key the machine refused because the terminal is gone ends the page, not just the key.
+    if (code === "terminal_closed") { setError(code); return }
     const why = reason(e)
     const control = session?.snapshot.control ?? null
     setKeyRefused({ ...keyRefusalNotice(code, control, session?.snapshot.state ?? ""), why: why === code ? terminalRefusalWords(code) : why,
@@ -96,7 +99,16 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
   const [nativePaste, setNativePaste] = useState(false)
   const pasteBusy = useRef(false)
   const ctrlArmed = useRef(false)
-  const [confirm, setConfirm] = useState<"takeover" | "reacquire" | null>(null)
+  /** Where typed text goes: the text box (a phone's default) or straight into the screen. */
+  const [inputMode, setInputMode] = useState<"direct" | "composer">(() => defaultInputMode(typeof window === "undefined" ? undefined : window.matchMedia?.bind(window)))
+  const inputModeRef = useRef(inputMode)
+  const [keysOpen, setKeysOpen] = useState(false)
+  const [composerText, setComposerText] = useState("")
+  const [sending, setSending] = useState(false)
+  const composer = useRef<HTMLInputElement>(null)
+  const [endedAt, setEndedAt] = useState<Date | null>(null)
+  const [diagnosticsText, setDiagnosticsText] = useState<string | null>(null)
+  const [dockNote, setDockNote] = useState("")
   const [closeConfirm, setCloseConfirm] = useState(false)
   const closeDialog = useRef<HTMLDialogElement>(null)
   const closeOpener = useRef<HTMLButtonElement>(null)
@@ -135,7 +147,7 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
     const observation = new TerminalObservation()
     let release: (() => void) | null = null
     let stop: (() => void) | null = null
-    setSnapshot(empty); setLoading(true); setFirstFramePending(!!id); setFrameTimedOut(false); setError(""); setNeedsReview(false); setMeta(null); setKeyRefused(null)
+    setSnapshot(empty); setLoading(true); setFirstFramePending(!!id); setFrameTimedOut(false); setError(""); setNeedsReview(false); setMeta(null); setKeyRefused(null); setEndedAt(null)
     if (attempt === 0) setRetryWait(null)
     void (async () => {
       try {
@@ -200,6 +212,7 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
         term.loadAddon(addon)
         term.open(screen.current)
         term.textarea?.setAttribute("aria-label", nextWord("terminalScreenFor", { project: label }))
+        if (inputModeRef.current === "composer") term.textarea?.setAttribute("inputmode", "none")
         term.onData((data) => {
           const { out } = withCtrl(ctrlArmed.current, data)
           if (ctrlArmed.current) { ctrlArmed.current = false; setCtrl(false) }
@@ -243,6 +256,15 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
   // session refuses raises the notice beside the screen. A disabled screen swallowed keys unsaid.
   useEffect(() => { if (snapshot.canType) setKeyRefused(null) }, [snapshot.canType])
   useEffect(() => { if (terminal.current) terminal.current.options.screenReaderMode = reader }, [reader])
+  // With the text box in use, a tap on the screen raises no on-screen keyboard; a hardware keyboard
+  // still types into the screen. Typing directly gives the screen its keyboard back (vim, less).
+  useEffect(() => {
+    inputModeRef.current = inputMode
+    const area = terminal.current?.textarea
+    if (!area) return
+    if (inputMode === "composer") area.setAttribute("inputmode", "none")
+    else area.removeAttribute("inputmode")
+  }, [inputMode])
   useEffect(() => {
     const box = screen.current?.parentElement
     if (!box || !session || !snapshot.canType || typeof ResizeObserver === "undefined") return
@@ -333,14 +355,14 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
     if (value === "ctrl") {
       ctrlArmed.current = !ctrlArmed.current
       setCtrl(ctrlArmed.current)
-      terminal.current?.focus()
+      if (inputModeRef.current === "direct") terminal.current?.focus()
       return
     }
     const bytes = /^[ABCD]$/.test(value) ? (snapshot.frame?.modes.app_cursor ? "\x1bO" : "\x1b[") + value : value
     const { out } = withCtrl(ctrlArmed.current, bytes)
     ctrlArmed.current = false; setCtrl(false)
     void session?.input(new TextEncoder().encode(out)).then(keySent, keyFailed)
-    terminal.current?.focus()
+    if (inputModeRef.current === "direct") terminal.current?.focus()
     showInputLine()
   }
   const pasteFromClipboard = async () => {
@@ -360,10 +382,46 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
     (snapshot.control.holder?.name || snapshot.control.holder?.same_device)
       ? holderWords(snapshot.control.holder)
       : nextWord("terminalControlOtherDevice")
-  // Shown only while control is as it was when the key was refused; its way back is offered once:
-  // the header's own button for that action steps aside, and an open confirmation replaces both.
-  const refusal = shownKeyRefusal(keyRefused, snapshot.control)
-  const refusalOffers = confirm ? null : refusal?.action ?? null
+  const phase: CloudTerminalPhase = cloudTerminalPhase({ state: snapshot.state, error, status: meta?.status ?? "",
+    closeStatus: closeRecord?.status ?? "", retrying: !!retryWait && !error, frameTimedOut, needsReview,
+    canType: snapshot.canType, hasFrame: !!snapshot.frame, control: snapshot.control })
+  useEffect(() => { if (phase === "ended" && !endedAt) setEndedAt(new Date()) }, [phase, endedAt])
+  // Shown only while control is as it was when the key was refused.
+  const refusal = phase === "ended" ? null : shownKeyRefusal(keyRefused, snapshot.control)
+  const focusInput = () => { if (inputModeRef.current === "direct") terminal.current?.focus(); else composer.current?.focus() }
+  // One press takes input, from nobody, from this tab's forgotten lease, or from another device:
+  // every device here is the same person's, so taking over asks nothing more (2026-10-18).
+  const takeInput = () => void run("acquire", async () => {
+    await session!.acquire(snapshot.control?.held && !snapshot.control.holder?.same_client ? "takeover" : "acquire")
+    setNeedsReview(false); setKeyRefused(null); focusInput()
+  })
+  const retryNow = () => { if (retryWait) setAttachRetry({ key: attachKey, attempt: retryWait.attempt }); else reconnect() }
+  const copyDiagnostics = () => {
+    const text = `carrier=${snapshot.carrier}\n${observed.current?.text() ?? ""}`
+    void navigator.clipboard.writeText(text).then(() => { setDiagnosticsText(null); setDockNote(nextWord("terminalDiagnosticsCopied")) },
+      // refusal-ok: a clipboard write is refused by the browser's permission, which carries no machine code to name.
+      () => { setDiagnosticsText(text); setDockNote(nextWord("terminalDiagnosticsCopyFailed")) })
+  }
+  const sendComposer = async () => {
+    if (!session || sending) return
+    const { paste, enter } = composerSend(composerText)
+    setSending(true)
+    try {
+      if (paste !== null) { await session.paste(paste); setComposerText("") }
+      await session.input(enter)
+      keySent(); showInputLine()
+    } catch (failure) { keyFailed(failure) }
+    finally { setSending(false) }
+  }
+  // Ctrl armed from the key panel applies to the next character typed in the box: it goes to the
+  // terminal as its control form and never into the text.
+  const changeComposer = (next: string) => {
+    if (ctrlArmed.current && next.length === composerText.length + 1 && next.startsWith(composerText)) {
+      sendKey(next.slice(-1))
+      return
+    }
+    setComposerText(next)
+  }
   const body = cloudTerminalBody(host, channelProject, id)
   if (body === "offline" || !host) return <p className="terminal-note" role="status">{nextWord("terminalCloudLineReconnecting")}</p>
   if (body === "no_project") return <p className="terminal-note" role="alert">{nextWord("terminalNoProject")}</p>
@@ -376,7 +434,22 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
       <TerminalDiagnostics observation={observed} /></div>}
   </section>
 
-  return <div className="terminal-view cloud-terminal-view" data-holding={snapshot.canType ? "" : undefined} data-stale={snapshot.state === "stale" || snapshot.state === "offline" ? "" : undefined}
+  const time = endedAt ? endedAt.toLocaleTimeString(document.documentElement.lang || undefined, { hour: "2-digit", minute: "2-digit" }) : ""
+  const phaseWords = phase === "typing" ? nextWord("terminalPhaseTyping") : phase === "watching" ? nextWord("terminalPhaseWatching") :
+    phase === "other_holder" ? nextWord("terminalPhaseOtherHolder", { holder }) : phase === "needs_review" ? nextWord("terminalPhaseNeedsReview") :
+    phase === "reconnecting" ? (retryWait ? nextWord("terminalPhaseReconnectingCount", { attempt: retryWait.attempt, max: CLOUD_TERMINAL_LIST_RETRY_DELAYS_MS.length }) : nextWord("terminalPhaseReconnecting")) :
+    phase === "offline" ? nextWord("terminalPhaseOffline") : phase === "ended" ? nextWord("terminalPhaseEnded", { time }) :
+    phase === "error" ? nextWord("terminalPhaseError") : phase === "denied" ? nextWord("terminalPhaseDenied") : nextWord("terminalPhaseLoading")
+  const tone = phase === "typing" ? "ok" : phase === "watching" || phase === "loading" ? "idle" :
+    phase === "offline" || phase === "error" || phase === "denied" ? "bad" : "warn"
+  const typing = phase === "typing" && history === null
+  const keyButton = ([name, value, spoken]: [string, string, Parameters<typeof nextWord>[0] | null]) =>
+    <button key={name} className="cloud-chip" type="button" aria-label={spoken ? nextWord(spoken) : undefined}
+      onPointerDown={(event) => event.preventDefault()} onClick={() => sendKey(value)}>{name}</button>
+  const diagnosticsLink = <button className="cloud-link" type="button" onClick={copyDiagnostics}>{nextWord("terminalDiagnosticsCopy")}</button>
+
+  return <div className="terminal-view cloud-terminal-view" data-holding={snapshot.canType ? "" : undefined}
+    data-stale={phase === "reconnecting" || phase === "offline" ? "" : undefined} data-ended={phase === "ended" ? "" : undefined}
     onKeyDown={(event) => { if (isRegionKey(event.nativeEvent)) {
       event.preventDefault()
       if (history) {
@@ -385,99 +458,125 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
       } else terminal.current?.focus()
     } }}>
     <header className="terminal-head">
-      <div className="terminal-head-row"><TerminalBackButton buttonRef={back} onClick={goBack} />
-        <strong className="terminal-context" title={label}>{label}</strong>
-        {snapshot.carrier === "direct" && <span className="terminal-note terminal-carrier" title={nextWord("terminalCarrierDirectHelp")}
-          aria-label={nextWord("terminalCarrierDirectHelp")}>{nextWord("terminalCarrierDirect")}</span>}
+      <div className="terminal-head-row"><TerminalBackButton buttonRef={back} onClick={goBack} compact />
+        <div className="cloud-title">
+          <strong className="terminal-context" title={label}>{label}</strong>
+          <span className="cloud-phase" data-tone={tone} role="status" aria-live="polite">{phaseWords}</span>
+        </div>
         <details className="terminal-action-more" ref={actionMenu}><summary aria-label={nextWord("terminalMoreActions")} title={nextWord("terminalMoreActions")}>⋯</summary>
         <button className="terminal-menu-backdrop" type="button" aria-label={nextWord("terminalDismissMenu")}
           onClick={() => actionMenu.current?.removeAttribute("open")} />
         <div className="terminal-more-actions">
-          <button className="board-button" type="button" disabled={!!busy} onClick={() => { actionMenu.current?.removeAttribute("open"); void run("history", async () => setHistory(history ? null : await session!.history())) }}>{history ? nextWord("terminalHistoryBack") : nextWord("terminalHistory")}</button>
+          <button className="board-button" type="button" disabled={!!busy || phase === "ended"} onClick={() => { actionMenu.current?.removeAttribute("open"); void run("history", async () => setHistory(history ? null : await session!.history())) }}>{history ? nextWord("terminalHistoryBack") : nextWord("terminalHistory")}</button>
           <button className="board-button terminal-reader" type="button" aria-pressed={reader} onClick={() => { actionMenu.current?.removeAttribute("open"); setReader((value) => !value) }}><span>{nextWord("terminalReaderMode")}</span><small>{nextWord("terminalReaderModeHelp")}</small></button>
+          <button className="board-button" type="button" onClick={() => { actionMenu.current?.removeAttribute("open"); copyDiagnostics() }}>{nextWord("terminalDiagnosticsCopy")}</button>
           <button className="board-button terminal-danger" type="button" ref={closeOpener}
             disabled={!snapshot.canType || !!busy || closeRecord?.status === "pending" || closeRecord?.status === "unknown" || closeRecord?.status === "ok" || closeRecord?.status === "ended"}
             onClick={() => { actionMenu.current?.removeAttribute("open"); setCloseConfirm(true) }}>{nextWord("terminalTerminateHost")}</button>
         </div></details></div>
-      <p className="terminal-status-line" role="status" aria-live="polite">{retryWait && !error ? nextWord("terminalCloudRetrying", {
-        code: retryWait.code, attempt: retryWait.attempt, max: CLOUD_TERMINAL_LIST_RETRY_DELAYS_MS.length }) : loading && !snapshot.frame ? "" :
-        error ? accessError ? nextWord("terminalCloudNotAuthorized", { code: error }) : nextWord("terminalCloudError", { code: error }) : snapshot.state === "offline" ? nextWord("terminalCloudOffline") :
-          snapshot.state === "stale" ? nextWord("terminalCloudStaleHelp") : snapshot.state === "unknown" ? nextWord("terminalCloudUnknown") :
-          snapshot.state === "revoked" ? nextWord("terminalCloudAccessRevoked") :
-            frameTimedOut ? nextWord("terminalCloudStaleHelp") : needsReview ? nextWord("terminalCloudUnknown") :
-            snapshot.canType ? "" : snapshot.typeAhead ? nextWord("terminalCloudTypeAhead") :
-            snapshot.frame && !snapshot.hasLease ? nextWord("terminalKeyboardPaused") : ""}</p>
-      <div className="terminal-actions" role="group" aria-label={nextWord("terminalControlLabel")}>
-        {!snapshot.control?.holder?.same_client && !loading && refusalOffers !== "acquire" && refusalOffers !== "takeover" && <button className="board-button" type="button" disabled={!!busy || accessError || snapshot.state === "revoked"}
-          onClick={() => snapshot.control?.held ? setConfirm("takeover") : void run("acquire", () => session!.acquire("acquire"))}>
-          {snapshot.control?.held ? nextWord("terminalTakeover") : nextWord("terminalAcquire")}</button>}
-        {!accessError && !loading && refusalOffers !== "reacquire" && (snapshot.state === "unknown" || (snapshot.control?.holder?.same_client && !snapshot.hasLease)) && <button className="board-button" type="button" disabled={!!busy}
-          onClick={() => setConfirm("reacquire")}>{nextWord("terminalCloudReacquire")}</button>}
-        {(snapshot.state === "stale" || snapshot.state === "offline") && refusalOffers !== "reconnect" && <button className="board-button" type="button" disabled={!!busy}
-          onClick={reconnect}>{nextWord("terminalCloudReconnect")}</button>}
-      </div>
       <dialog ref={closeDialog} className="terminal-close-confirm" onCancel={() => { setCloseConfirm(false); closeOpener.current?.focus() }}
         aria-label={nextWord("terminalTerminateHost")}>
         <p>{nextWord("terminalTerminateAsk", { project: label, machine, id: terminalShortID(id) })}</p>
         <button className="board-button" type="button" ref={closeCancel} onClick={() => { setCloseConfirm(false); closeOpener.current?.focus() }}>{nextWord("terminalCancel")}</button>
         <button className="board-button terminal-danger" type="button" onClick={submitClose}>{nextWord("terminalTerminateHost")}</button>
       </dialog>
-      {closeRecord && <div className="terminal-close-result">
+      {closeRecord && closeRecord.status !== "ok" && closeRecord.status !== "ended" && <div className="terminal-close-result">
         <p ref={closeMessage} tabIndex={-1} role={closeRecord.status === "refused" ? "alert" : "status"}>
           {nextWord(closeRecord.status === "pending" ? "terminalTerminatePending" :
-            closeRecord.status === "unknown" ? "terminalTerminateUnknown" :
-              closeRecord.status === "ended" ? "terminalTerminateEnded" :
-                closeRecord.status === "ok" ? "terminalTerminateSucceeded" : "terminalCloudError",
+            closeRecord.status === "unknown" ? "terminalTerminateUnknown" : "terminalCloudError",
             { code: terminalRefusalWords(closeRecord.error) })}
         </p>
         {closeRecord.status === "unknown" && <button className="board-button" type="button" disabled={!!busy} onClick={queryClose}>{nextWord("terminalTerminateQuery")}</button>}
       </div>}
-      {confirm && <div className="terminal-ask" role="group" aria-label={nextWord("terminalTakeover")}>
-        <p>{confirm === "reacquire" ? nextWord("terminalCloudReacquireAsk") : nextWord("terminalTakeoverAsk", { holder })}</p>
-        <button className="board-button terminal-danger" type="button" disabled={!!busy} onClick={() => void run(confirm, async () => {
-          await session!.acquire(confirm === "reacquire" ? "acquire" : "takeover")
-          setNeedsReview(false)
-          setConfirm(null)
-          setKeyRefused(null)
-          terminal.current?.focus()
-        })}>{nextWord(confirm === "reacquire" ? "terminalCloudReacquire" : "terminalTakeoverConfirm")}</button>
-        <button className="board-button" type="button" onClick={() => setConfirm(null)}>{nextWord("terminalCancel")}</button>
-      </div>}
-      {(frameTimedOut || (error && !accessError && snapshot.state !== "stale" && snapshot.state !== "offline")) && <button className="board-button" type="button" disabled={!!busy} onClick={reconnect}>{nextWord("terminalCloudReconnect")}</button>}
-      {meta && meta.status !== "running" && <p role="alert">{nextWord("terminalExited")}</p>}
-      {(error || frameTimedOut || snapshot.state === "unknown" || snapshot.state === "revoked") && <TerminalDiagnostics observation={observed} />}
     </header>
     {history && <section className="terminal-history" aria-label={nextWord("terminalHistoryTitle")}><h2>{nextWord("terminalHistoryTitle")}</h2>
       {history.truncated && <p className="terminal-note" role="status">{nextWord("terminalCloudHistoryTruncated", { lines: history.omitted_lines })}</p>}
       <div className="terminal-history-output" ref={historyFocus} tabIndex={0}>{history.lines.map((line, index) =>
-        <div className="terminal-history-line" key={index}>{line || "\u00a0"}</div>)}</div></section>}
+        <div className="terminal-history-line" key={index}>{line || " "}</div>)}</div></section>}
     <div className="terminal-scroll" ref={scroller} hidden={history !== null}>{refusal && <div className="terminal-key-refused" role="alert">
       <p>{refusal.kind === "no_control" ? nextWord("terminalKeysNotSentNoControl") :
         refusal.kind === "other_holder" ? nextWord("terminalKeysNotSentOtherHolder", { holder }) :
           refusal.kind === "unknown" ? nextWord("terminalKeysNotSentUnknown") : nextWord("terminalKeysNotSent", { why: refusal.why })}</p>
-      {refusalOffers && <button className="board-button" type="button" disabled={!!busy || accessError || snapshot.state === "revoked"} onClick={() => {
-        const action = refusalOffers
-        if (action === "acquire") void run("acquire", async () => { await session!.acquire("acquire"); setKeyRefused(null); terminal.current?.focus() })
-        else if (action === "reconnect") reconnect()
-        else setConfirm(action)
-      }}>{nextWord(refusalOffers === "acquire" ? "terminalAcquire" : refusalOffers === "takeover" ? "terminalTakeover" :
-        refusalOffers === "reacquire" ? "terminalCloudReacquire" : "terminalCloudReconnect")}</button>}
-    </div>}{firstFramePending && !error && <p className="terminal-loading terminal-wait" role="status" aria-live="polite"><span className="terminal-wait-indicator" aria-hidden="true" />{nextWord("terminalCloudSyncing")}</p>}<div className="terminal-host" ref={screen} /></div>
-    <button className="terminal-keyboard board-button" type="button" disabled={!snapshot.canType || history !== null}
-      title={!snapshot.canType ? nextWord("terminalKeyboardPaused") : undefined}
-      onClick={() => { terminal.current?.focus(); showInputLine() }}>{nextWord(snapshot.canType ? "terminalShowKeyboard" : "terminalKeyboardPaused")}</button>
-    <div className="terminal-keys" role="group" aria-label={nextWord("terminalKeys")} hidden={history !== null}>
-      <button className="terminal-key terminal-paste" type="button" disabled={!snapshot.canType || pasting || history !== null}
-        aria-busy={pasting} onClick={() => void pasteFromClipboard()}>{nextWord("terminalPasteButton")}</button>
-      {KEY_ROW.map(([name, value, spoken]) =>
-        <button key={name} className="terminal-key" type="button" disabled={!snapshot.canType} aria-label={spoken ? nextWord(spoken) : undefined}
-          aria-pressed={value === "ctrl" ? ctrl : undefined} onPointerDown={(event) => event.preventDefault()} onClick={() => sendKey(value)}>{name}</button>)}
+      {refusal.action && <button className="board-button" type="button" disabled={!!busy || accessError || snapshot.state === "revoked"}
+        onClick={() => refusal.action === "reconnect" ? reconnect() : takeInput()}>{nextWord(refusal.action === "acquire" ? "terminalAcquire" :
+          refusal.action === "takeover" ? "terminalTypeHere" : refusal.action === "reacquire" ? "terminalNeedsReviewContinue" : "terminalCloudReconnect")}</button>}
+    </div>}{firstFramePending && !error && phase !== "ended" && <p className="terminal-loading terminal-wait" role="status" aria-live="polite"><span className="terminal-wait-indicator" aria-hidden="true" />{nextWord("terminalCloudSyncing")}</p>}<div className="terminal-host" ref={screen} /></div>
+    <div className="cloud-dock" hidden={history !== null}>
+      {phase === "ended" && <section className="cloud-ended" aria-labelledby="cloud-ended-title">
+        <h2 id="cloud-ended-title">{nextWord("terminalEndedTitle")}</h2>
+        <p>{nextWord("terminalEndedHelp")}</p>
+        <button className="cloud-primary" type="button" disabled={!!busy || !session} onClick={openNew}>{nextWord("terminalEndedOpenNew", { project: label })}</button>
+        <button className="cloud-secondary" type="button" onClick={goBack}>{nextWord("terminalEndedBack")}</button>
+        {diagnosticsLink}
+      </section>}
+      {(phase === "other_holder" || phase === "watching") && <div className="cloud-action">
+        <p>{phase === "other_holder" ? nextWord("terminalOtherHolderHelp", { holder }) : nextWord("terminalWatchingHelp")}</p>
+        <button className="cloud-primary" type="button" disabled={!!busy} onClick={takeInput}>{nextWord("terminalTypeHere")}</button>
+      </div>}
+      {phase === "needs_review" && <div className="cloud-action">
+        <p>{nextWord("terminalNeedsReviewHelp")}</p>
+        <button className="cloud-primary" type="button" disabled={!!busy} onClick={takeInput}>{nextWord("terminalNeedsReviewContinue")}</button>
+      </div>}
+      {phase === "reconnecting" && <div className="cloud-action">
+        <p>{nextWord("terminalReconnectingHelp")}</p>
+        <button className="cloud-secondary" type="button" disabled={!!busy} onClick={retryNow}>{nextWord("terminalRetryNow")}</button>
+      </div>}
+      {phase === "offline" && <div className="cloud-action">
+        <p>{nextWord("terminalOfflineHelp")}</p>
+        <button className="cloud-primary" type="button" disabled={!!busy} onClick={reconnect}>{nextWord("terminalCloudReconnect")}</button>
+      </div>}
+      {phase === "error" && <div className="cloud-action">
+        <p role="alert">{frameTimedOut && !error ? nextWord("terminalCloudStaleHelp") : nextWord("terminalErrorHelp", { why: terminalRefusalWords(error) })}</p>
+        <button className="cloud-primary" type="button" disabled={!!busy} onClick={reconnect}>{nextWord("terminalCloudReconnect")}</button>
+        {diagnosticsLink}
+      </div>}
+      {phase === "denied" && <div className="cloud-action">
+        <p role="alert">{snapshot.state === "revoked" ? nextWord("terminalCloudAccessRevoked") : nextWord("terminalCloudNotAuthorized", { code: error })}</p>
+        {diagnosticsLink}
+      </div>}
+      {typing && keysOpen && <section className="cloud-keypanel" aria-label={nextWord("terminalMoreKeys")}>
+        <div className="cloud-keypanel-head"><strong>{nextWord("terminalMoreKeys")}</strong>
+          <button className="cloud-link" type="button" onClick={() => setKeysOpen(false)}>{nextWord("terminalKeysDone")}</button></div>
+        <div className="cloud-keygrid">{COMBO_KEYS.map((key) =>
+          <button key={key.name} className="cloud-key" data-danger={key.danger ? "" : undefined} type="button"
+            onPointerDown={(event) => event.preventDefault()} onClick={() => sendKey(key.value)}>{key.name}<small>{nextWord(key.hint)}</small></button>)}
+          {PANEL_KEYS.map(([name, value, spoken]) => <button key={name} className="cloud-key" type="button" aria-label={spoken ? nextWord(spoken) : undefined}
+            onPointerDown={(event) => event.preventDefault()} onClick={() => sendKey(value)}>{name}</button>)}
+          <button className="cloud-key" type="button" aria-pressed={ctrl} aria-label={nextWord("terminalKeyCtrl")}
+            onPointerDown={(event) => event.preventDefault()} onClick={() => sendKey("ctrl")}>{nextWord("terminalKeyCtrlThen")}</button>
+        </div>
+      </section>}
+      {typing && <div className="cloud-quick" role="group" aria-label={nextWord("terminalKeys")}>
+        <button className="cloud-chip cloud-chip-mode" type="button" aria-pressed={inputMode === "direct"}
+          onClick={() => { const next = inputMode === "direct" ? "composer" : "direct"; setInputMode(next); requestAnimationFrame(() =>
+            next === "direct" ? terminal.current?.focus() : composer.current?.focus()) }}>{nextWord("terminalDirectTyping")}</button>
+        {QUICK_KEYS.map(keyButton)}
+        <button className="cloud-chip" type="button" disabled={pasting} aria-busy={pasting} onClick={() => void pasteFromClipboard()}>{nextWord("terminalPasteButton")}</button>
+      </div>}
+      {typing && <div className="cloud-composer">
+        <button className="cloud-round" type="button" aria-label={nextWord("terminalMoreKeys")} aria-expanded={keysOpen} onClick={() => setKeysOpen((open) => !open)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" /></svg></button>
+        {inputMode === "composer" ? <>
+          <form className="cloud-composer-form" onSubmit={(event) => { event.preventDefault(); void sendComposer() }}>
+            <label className="terminal-sr" htmlFor="cloud-composer-input">{nextWord("terminalComposerLabel")}</label>
+            <input id="cloud-composer-input" ref={composer} value={composerText} onChange={(event) => changeComposer(event.target.value)}
+              placeholder={nextWord("terminalComposerPlaceholder")} enterKeyHint="send" autoCapitalize="off" autoComplete="off" autoCorrect="off" spellCheck={false} />
+            <button className="cloud-round cloud-send" type="submit" disabled={sending} aria-busy={sending} aria-label={nextWord("terminalComposerSend")}>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6" /></svg></button>
+          </form>
+        </> : <>
+          <button className="cloud-direct" type="button" onClick={() => { terminal.current?.focus(); showInputLine() }}>{nextWord("terminalDirectTypingHelp")}</button>
+          <button className="cloud-chip" type="button" onClick={() => { setInputMode("composer"); requestAnimationFrame(() => composer.current?.focus()) }}>{nextWord("terminalUseComposer")}</button>
+        </>}
+      </div>}
+      {dockNote && <p className="terminal-note" role="status">{dockNote}</p>}
+      {diagnosticsText !== null && <pre className="terminal-diagnostics-text">{diagnosticsText}</pre>}
+      {pasteMessage && <p className="terminal-note" role="status">{pasteMessage}</p>}
+      {nativePaste && history === null && <PasteField available={snapshot.canType} close={() => setNativePaste(false)} send={async text => {
+        if (!session?.snapshot.canType || history !== null) { setPasteMessage(nextWord("terminalPasteUnavailable")); return false }
+        try { await session.paste(text); keySent(); return true }
+        catch (failure) { keyFailed(failure); return false }
+      }} />}
     </div>
-    {pasteMessage && <p className="terminal-note" role="status">{pasteMessage}</p>}
-    {nativePaste && history === null && <PasteField available={snapshot.canType} close={() => setNativePaste(false)} send={async text => {
-      if (!session?.snapshot.canType || history !== null) { setPasteMessage(nextWord("terminalPasteUnavailable")); return false }
-      try { await session.paste(text); keySent(); return true }
-      catch (failure) { keyFailed(failure); return false }
-    }} />}
   </div>
 }
