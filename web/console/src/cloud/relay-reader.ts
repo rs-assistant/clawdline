@@ -1476,10 +1476,17 @@ export class RelayReader {
       // relay eviction. The connection's recovery asks once; ask again here.
       const previousGeneration = this.statusSnapshotGeneration()
       const response = await this.machineRead(signal, "GET", "/v1/sessions", "sessions.snapshot", {})
-      const stated = await response.json().catch(() => null) as { sessions?: unknown; complete?: unknown } | null
+      const stated = await response.json().catch(() => null) as
+        { sessions?: unknown; complete?: unknown; snapshot_generation?: unknown } | null
       if (this.options.classicStatus && signal && stated?.complete === true &&
         Array.isArray(stated.sessions) && stated.sessions.every((id) => typeof id === "string")) {
-        return this.waitForStatedSessions(new Set(stated.sessions as string[]), signal, previousGeneration)
+        // A machine that names the pass it stated is confirmed by a marker
+        // naming that pass, even the one already held: the pass id hashes the
+        // set, so an unchanged set never produces a new one. An older machine
+        // names none, and only a pass newer than the held one can confirm it.
+        const confirmed = typeof stated.snapshot_generation === "string" && /^[0-9a-f]{32}$/u.test(stated.snapshot_generation)
+          ? { pass: stated.snapshot_generation } : { after: previousGeneration }
+        return this.waitForStatedSessions(new Set(stated.sessions as string[]), signal, confirmed)
       }
       return this.snapshot()
     }
@@ -1500,7 +1507,8 @@ export class RelayReader {
   }
 
   /** A snapshot command can answer before its ss/ envelopes reach this browser. */
-  private waitForStatedSessions(ids: Set<string>, signal: AbortSignal, previousGeneration: string | null): Promise<SessionsSnapshot> {
+  private waitForStatedSessions(ids: Set<string>, signal: AbortSignal,
+    confirmed: { pass: string } | { after: string | null }): Promise<SessionsSnapshot> {
     return new Promise((resolve, reject) => {
       let finished = false
       let checking = false
@@ -1531,7 +1539,8 @@ export class RelayReader {
             again = false
             const reading = await this.snapshotReading(true)
             if (reading.snapshot.scan.complete &&
-              (previousGeneration === null || this.statusSnapshotGeneration() !== previousGeneration) &&
+              ("pass" in confirmed ? this.statusSnapshotGeneration() === confirmed.pass
+                : confirmed.after === null || this.statusSnapshotGeneration() !== confirmed.after) &&
               reading.snapshot.sessions.length === ids.size &&
               reading.snapshot.sessions.every((row) => ids.has(row.id))) {
               finish(reading.snapshot)
