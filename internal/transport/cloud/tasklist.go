@@ -97,7 +97,9 @@ package cloud
 //     second writer on the same store file owes this process no signal at all,
 //     so the list cannot be left to a signal that may never come. It is the
 //     descriptor's own heartbeat, so the pass that re-reads is the pass that
-//     re-states.
+//     re-states. What a viewer indents a child under does not wait for it:
+//     each pass resolves a task's root against the rows it lists, from the
+//     record's durable `root.sessionId` (resolveTaskRoots).
 //
 // The rows a viewer can reach also change when the session inventory changes
 // with no task written — a finished task is drawn only while its child's row
@@ -279,8 +281,10 @@ func (p *Publisher) noteListed(ids []string, authoritative bool) {
 // refreshTasks projects the task list for this pass, reading this machine's
 // own list only when something could have moved it (the header's *Cadence*).
 // A failed read keeps the last projection and stays due, so the next pass asks
-// again rather than waiting out the floor.
-func (p *Publisher) refreshTasks(ctx context.Context) {
+// again rather than waiting out the floor. rows is this pass's reading of the
+// sessions, or nil when the pass did not read them; each task's root is
+// resolved against it (resolveTaskRoots).
+func (p *Publisher) refreshTasks(ctx context.Context, rows []map[string]any) {
 	p.taskPasses.Add(1)
 	// Asked on every pass and not only when a read is otherwise due, because
 	// taking the fact clears it: a write that happened while a read was
@@ -289,13 +293,116 @@ func (p *Publisher) refreshTasks(ctx context.Context) {
 		p.taskRowsStale = true
 	}
 	if p.taskReadDue() {
-		if rows, ok := p.readTasks(ctx); ok {
-			p.taskRows, p.taskReadAt, p.taskRowsStale = rows, p.now(), false
+		if read, ok := p.readTasks(ctx); ok {
+			p.taskRows, p.taskReadAt, p.taskRowsStale = read, p.now(), false
 			// New rows: the kept projection is of other ones.
 			p.taskListed = nil
 		}
 	}
+	if rows != nil {
+		p.resolveTaskRoots(sessionRowsByID(rows))
+	}
 	p.projectKeptTasks()
+}
+
+// sessionRowsByID is one reading's rows by their wire id.
+func sessionRowsByID(sessions []map[string]any) map[string]map[string]any {
+	rows := make(map[string]map[string]any, len(sessions))
+	for _, row := range sessions {
+		if id, _ := row["id"].(string); id != "" {
+			rows[id] = row
+		}
+	}
+	return rows
+}
+
+// Why a task's root was not found among the listed rows. Each is a sentence
+// for daemon.log; none of them carries a conversation id or a title.
+const (
+	rootCauseOffScreen  = "the root's tab was not on screen when the task list was read, and no listed row holds its conversation"
+	rootCauseNotListed  = "the root's tab %s is not a listed row, and no listed row holds its conversation"
+	rootCauseAmbiguous  = "more than one listed row holds the root's conversation"
+	rootCauseNoSession  = ""
+	rootCauseIsTheChild = "the root's tab is the child's own"
+)
+
+// conversationOwners maps each conversation a listed row names to that row,
+// or to "" when more than one row names it: an ambiguous conversation places
+// nothing.
+func conversationOwners(rows map[string]map[string]any) map[string]string {
+	owners := make(map[string]string)
+	for id, row := range rows {
+		if conversation, _ := row["sessionId"].(string); conversation != "" {
+			if _, exists := owners[conversation]; exists {
+				owners[conversation] = ""
+			} else {
+				owners[conversation] = id
+			}
+		}
+	}
+	return owners
+}
+
+// taskRootIn is the listed row a task's root is in, or "" with the cause.
+//
+// The route's `root.terminalId` is the machine's screen as it stood when the
+// list was read, and the list is read on a write and on a 240-second floor
+// (the header's *Cadence*): between two reads it can name a tab that was off
+// screen then and is listed now, or name nothing. The record's own
+// `root.sessionId` is durable, so it is matched against the rows listed now,
+// as the local Session list does (web/console/src/session/order.ts
+// `visualParents`). A cause of rootCauseNoSession is a task with no session
+// root at all — a scheduled run — which is not a missing parent.
+func taskRootIn(task map[string]any, rows map[string]map[string]any, owners map[string]string) (string, string) {
+	root, _ := task["root"].(map[string]any)
+	terminal, _ := root["terminalId"].(string)
+	conversation, _ := root["sessionId"].(string)
+	if terminal != "" && rows[terminal] != nil {
+		return terminal, ""
+	}
+	if conversation == "" && terminal == "" {
+		return "", rootCauseNoSession
+	}
+	owner, named := owners[conversation]
+	switch {
+	case conversation != "" && owner != "":
+		return owner, ""
+	case conversation != "" && named:
+		return "", rootCauseAmbiguous
+	case terminal != "":
+		return "", fmt.Sprintf(rootCauseNotListed, terminal)
+	default:
+		return "", rootCauseOffScreen
+	}
+}
+
+// resolveTaskRoots finds each kept task's root among this pass's rows, and
+// keeps the last one found while that tab is still listed.
+//
+// The keeping is for the pass where neither the read nor the rows can say: the
+// root's tab was off screen at the read and its row has no conversation this
+// pass. That root has not moved, and a child drawn flat for a pass and nested
+// the next is the flicker this is for. A tab that is no longer listed is
+// forgotten, so a closed root never keeps a child indented.
+func (p *Publisher) resolveTaskRoots(rows map[string]map[string]any) {
+	owners := conversationOwners(rows)
+	roots := make(map[string]string, len(p.taskRows))
+	for _, task := range p.taskRows {
+		id, _ := task["id"].(string)
+		if id == "" {
+			continue
+		}
+		owner, _ := taskRootIn(task, rows, owners)
+		if owner == "" {
+			if kept := p.taskRoots[id]; kept != "" && rows[kept] != nil {
+				owner = kept
+			}
+		}
+		if owner != "" {
+			roots[id] = owner
+		}
+	}
+	p.taskRoots = roots
 }
 
 // taskReadDue is whether this pass reads this machine's own task list.
@@ -337,7 +444,7 @@ func (p *Publisher) projectKeptTasks() {
 	if p.taskRows == nil {
 		return
 	}
-	if p.taskListed != nil && sameListed(p.taskListed, p.listed) {
+	if p.taskListed != nil && sameListed(p.taskListed, p.listed) && sameRoots(p.taskRootsProjected, p.taskRoots) {
 		return
 	}
 	projected, omitted := projectTasks(p.taskRows, p.listed)
@@ -350,11 +457,40 @@ func (p *Publisher) projectKeptTasks() {
 		}
 		p.omitted = omitted
 	}
+	// The root a viewer indents a child under is the one resolved against
+	// the rows it holds, not the screen as it stood at the read.
+	for _, row := range projected {
+		id, _ := row["id"].(string)
+		owner := p.taskRoots[id]
+		if owner == "" {
+			continue
+		}
+		root, _ := row["root"].(map[string]any)
+		if root == nil {
+			root = map[string]any{}
+			row["root"] = root
+		}
+		root["terminalId"] = owner
+	}
 	p.tasks = projected
 	p.taskListed = make(map[string]bool, len(p.listed))
 	for id := range p.listed {
 		p.taskListed[id] = true
 	}
+	p.taskRootsProjected = p.taskRoots
+}
+
+// sameRoots is whether two resolutions place every task alike.
+func sameRoots(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for id, owner := range a {
+		if b[id] != owner {
+			return false
+		}
+	}
+	return true
 }
 
 // sameListed is whether two readings name the same sessions.

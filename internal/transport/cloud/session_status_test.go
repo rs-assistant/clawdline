@@ -393,6 +393,11 @@ func TestStatusCarriesMachineRoleWithoutItsPrivateLabel(t *testing.T) {
 	}
 }
 
+func parentOf(rows map[string]map[string]any, tasks []map[string]any) string {
+	parents, _ := statusParents(rows, tasks, nil)
+	return parents["child"]
+}
+
 func TestStatusResolvesTaskRootFromConversationWhenScreenLinkIsMissing(t *testing.T) {
 	rows := map[string]map[string]any{
 		"root":  {"sessionId": "root-conversation"},
@@ -402,15 +407,15 @@ func TestStatusResolvesTaskRootFromConversationWhenScreenLinkIsMissing(t *testin
 		"child": map[string]any{"terminalId": "child"},
 		"root":  map[string]any{"sessionId": "root-conversation", "terminalId": ""},
 	}}
-	if got := statusParents(rows, tasks)["child"]; got != "root" {
+	if got := parentOf(rows, tasks); got != "root" {
 		t.Fatalf("task root with a missing screen link: got %q, want root", got)
 	}
 	tasks[0]["root"].(map[string]any)["terminalId"] = "old-root-tab"
-	if got := statusParents(rows, tasks)["child"]; got != "root" {
+	if got := parentOf(rows, tasks); got != "root" {
 		t.Fatalf("task root with a stale screen link: got %q, want root", got)
 	}
 	rows["other"] = map[string]any{"sessionId": "root-conversation"}
-	if got := statusParents(rows, tasks)["child"]; got != "" {
+	if got := parentOf(rows, tasks); got != "" {
 		t.Fatalf("ambiguous conversation invented a parent: %q", got)
 	}
 }

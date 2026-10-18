@@ -563,6 +563,17 @@ Cloud caller 就是發布者本身，沒有別人。
 理由。`/v1/diagnostics` 的 capacity 列 `cloud.task_list_reread_seconds` 帶上次讀取的秒數，備註是
 「n 次讀 / m 輪」。
 
+**兩次讀之間 child 的 root 不跟著讀取當下的畫面走（2026-10-18）。** 上面那 240 秒對 `root.terminalId`
+有個代價：讀的那一刻如果 root 的分頁不在畫面上（例如那個來源正在刷新、列被標成 unverified），整個窗
+口裡描述的 `tasks` 都沒有 root，ss/ 的 `parent_session_id` 也只能靠 root 那列當輪剛好有
+`sessionId` 才補得回來——手機上同一個 child 就一下縮排、一下變成頂層。現在每一輪在投影前，用紀錄裡
+持久的 `root.sessionId` 對「這一輪列出的 session」重新找 root（唯一一列才算），找到的值同時寫進描述
+的 `root.terminalId` 與 ss/ 的 `parent_session_id`；兩邊都找不到時沿用上一次找到、而且那個分頁仍在
+清單裡的 root；分頁不在了就忘掉，關掉的 root 不會讓 child 繼續縮排。這不增加任何讀取，wire 形狀也沒
+變。仍然找不到 root 的 child 會在 daemon log 留一行 `cloud: child %64 has no listed parent: <原因>`，
+原因變了才再寫一次，重新找到時寫 `cloud: child %64 is listed under %8 again`
+（`internal/transport/cloud/tasklist_root_test.go`）。
+
 #### 8.2.2 頁面等這台機器的字再讀（`FEATURE_WAIT_MS`，2026-10-10）
 
 描述裡的 `commands` 是頁面判斷「這台機器會不會這個字」的依據（copied client 的

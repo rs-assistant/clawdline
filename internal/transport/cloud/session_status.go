@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"sort"
 	"strings"
 
 	"github.com/sainteye/clawdline/internal/app/cloudops"
@@ -192,14 +193,17 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 	// words to a read_sessions-only viewer.
 	displays := make([]map[string]any, 0, len(ids))
 	steadyDisplays := make([]map[string]any, 0, len(ids))
-	// The public task projection omits root.sessionId. When a screen scan
-	// cannot resolve root.terminalId, the original task record still names
-	// the owning conversation and can resolve it against this session list.
+	// The descriptor's task projection omits root.sessionId, so the rows
+	// read from the route are used when there are any: their record still
+	// names the owning conversation, which resolves a root the screen scan
+	// at read time could not (taskRootIn). A root resolved on an earlier
+	// pass and still listed is kept for the pass where neither can say.
 	tasks := p.taskRows
 	if tasks == nil {
 		tasks = p.tasks
 	}
-	parents := statusParents(rows, tasks)
+	parents, causes := statusParents(rows, tasks, p.taskRoots)
+	p.noteChildParents(rows, parents, causes)
 	for _, id := range ids {
 		row := rows[id]
 		status := ProjectSessionStatus(p.MachineID, id, row, true, at)
@@ -339,30 +343,43 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 // statusParents projects only terminal ancestry. The signed orch task list
 // already resolves dispatch roots; Epic roots use the same unique conversation
 // match as the local Session list. No task title or conversation text enters ss/.
-func statusParents(rows map[string]map[string]any, tasks []map[string]any) map[string]string {
+//
+// kept is each task's root as resolveTaskRoots last placed it, by task id,
+// used when this reading cannot place it itself. It also answers, for each
+// listed child no task could place, why the first task naming it could not; a
+// task with no session root (a scheduled run) is not a missing parent.
+func statusParents(rows map[string]map[string]any, tasks []map[string]any, kept map[string]string) (map[string]string, map[string]string) {
 	parents := make(map[string]string)
-	conversations := make(map[string]string)
-	for id, row := range rows {
-		if conversation, _ := row["sessionId"].(string); conversation != "" {
-			if _, exists := conversations[conversation]; exists {
-				conversations[conversation] = ""
-			} else {
-				conversations[conversation] = id
-			}
-		}
-	}
+	causes := make(map[string]string)
+	conversations := conversationOwners(rows)
 	for _, task := range tasks {
 		child, _ := task["child"].(map[string]any)
-		root, _ := task["root"].(map[string]any)
 		kid, _ := child["terminalId"].(string)
-		owner, _ := root["terminalId"].(string)
-		if rows[owner] == nil {
-			conversation, _ := root["sessionId"].(string)
-			owner = conversations[conversation]
+		if kid == "" || rows[kid] == nil || rows[kid]["machine_scope"] == true {
+			continue
 		}
-		if kid != "" && owner != "" && kid != owner && rows[kid] != nil && rows[owner] != nil && rows[kid]["machine_scope"] != true {
+		owner, cause := taskRootIn(task, rows, conversations)
+		if owner == "" {
+			id, _ := task["id"].(string)
+			if held := kept[id]; held != "" && rows[held] != nil {
+				owner = held
+			}
+		}
+		if owner == kid {
+			owner, cause = "", rootCauseIsTheChild
+		}
+		// A later task naming the same child places it over an earlier one,
+		// as the local Session list's own walk does.
+		if owner != "" {
 			parents[kid] = owner
+			continue
 		}
+		if _, noted := causes[kid]; !noted && cause != rootCauseNoSession {
+			causes[kid] = cause
+		}
+	}
+	for kid := range parents {
+		delete(causes, kid)
 	}
 	for id, row := range rows {
 		if parents[id] != "" || row["machine_scope"] == true || row["coordinator"] != nil {
@@ -374,5 +391,36 @@ func statusParents(rows map[string]map[string]any, tasks []map[string]any) map[s
 			parents[id] = owner
 		}
 	}
-	return parents
+	return parents, causes
+}
+
+// noteChildParents logs a dispatched child a viewer will draw without its
+// root, once per change of cause, and once more when it is placed again — so
+// the next child drawn flat on a phone can be read off daemon.log.
+func (p *Publisher) noteChildParents(rows map[string]map[string]any, parents, causes map[string]string) {
+	if p.childCauses == nil {
+		p.childCauses = map[string]string{}
+	}
+	for kid := range p.childCauses {
+		switch {
+		case parents[kid] != "" && rows[kid] != nil:
+			p.logf("cloud: child %s is listed under %s again", kid, parents[kid])
+			delete(p.childCauses, kid)
+		case causes[kid] == "":
+			// Gone from the list, or no longer a child a task places.
+			delete(p.childCauses, kid)
+		}
+	}
+	ids := make([]string, 0, len(causes))
+	for kid := range causes {
+		ids = append(ids, kid)
+	}
+	sort.Strings(ids)
+	for _, kid := range ids {
+		if p.childCauses[kid] == causes[kid] {
+			continue
+		}
+		p.childCauses[kid] = causes[kid]
+		p.logf("cloud: child %s has no listed parent: %s", kid, causes[kid])
+	}
 }

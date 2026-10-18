@@ -193,6 +193,16 @@ type Publisher struct {
 	// taskListed is the set the kept rows were last projected over, so a pass
 	// whose listed sessions are unchanged does not reproject them either.
 	taskListed map[string]bool
+	// taskRoots is each task's root tab as last resolved against a listed
+	// row (resolveTaskRoots), by task id, and taskRootsProjected the roots
+	// the kept projection carries. Both name only tasks in taskRows, so they
+	// are bounded by the task list's own read.
+	taskRoots          map[string]string
+	taskRootsProjected map[string]string
+	// childCauses is why each listed child's parent could not be resolved, as
+	// last logged, by child terminal: the log says it when it changes rather
+	// than every pass. It names only listed rows, so InventoryLimit bounds it.
+	childCauses map[string]string
 	// What the task list's reads have cost, for the capacity register's
 	// `cloud.task_list_reread_seconds` row: when the route was last asked
 	// (Unix seconds; zero is never), how many times it has been asked and how
@@ -776,7 +786,7 @@ func (p *Publisher) tick(ctx context.Context) {
 		return
 	}
 	p.unsent = 0
-	p.refreshTasks(ctx)
+	p.refreshTasks(ctx, nil)
 	p.publishDescriptor(ctx)
 }
 
@@ -836,7 +846,11 @@ func (p *Publisher) pass(ctx context.Context) ([]string, sessionReading, bool) {
 		// past its bound, in which case the viewer keeps every row it had.
 		p.noteListed(inventory, len(inventory) <= InventoryLimit)
 	}
-	p.refreshTasks(ctx)
+	var rows []map[string]any
+	if ok {
+		rows = reading.sessions
+	}
+	p.refreshTasks(ctx, rows)
 	p.publishDescriptor(ctx)
 	if ok {
 		p.publishSessions(ctx, reading, inventory)
