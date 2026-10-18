@@ -245,7 +245,21 @@ with** — its `orch/<machine>` snapshot opened through the browser's pairing fo
 bound from a legacy pin — that is **a Mac** (its descriptor names no other platform) and **takes the
 command** (it published `cloud_status.v >= 1`). It is never "the only machine": a Linux executor on the
 same account, paired or not, is excluded by platform and by capability, and does not stop delivery.
-The batch is sealed with that Mac's pairing, like every other command. Wire format:
+The batch is sealed with that Mac's pairing, like every other command.
+
+**A row goes to the machine it is about.** With more than one such machine on the account, the
+oldest waiting row decides where a batch goes: the machine its `machine` field names (a direct
+attempt's machine, the machine a read failed on; a missing Whisper's `target_machine`) when that
+machine takes the command, else the machine the page is showing, else the account-wide choice
+above. The batch takes the rows behind it bound for the same machine and stops at the first row
+bound elsewhere, which starts the next batch; such a batch ends just before that row and counts the
+rows the bound dropped below it, so the completeness arithmetic below holds for each batch. A
+sealed batch is resent only to the machine it was sealed for while that machine still takes the
+command. Until 2026-10-18 an account with two Macs sent every batch to the one whose id sorts
+first. The page keeps its last 16 delivery outcomes in the log's stored state (`deliveries`):
+the state, the machine, the route (`row_machine`, `page_machine`, `account`, `remembered`,
+`sealed` or `rerouted`), why a batch was deferred, the code a blocked or refused one carried,
+the batch id and its rows, with a repeat counted on the newest entry rather than added. Wire format:
 [`cloud-error-transparency.md` §11.9](cloud-error-transparency.md#119-cloud-指令-diagnosticsevents).
 
 **Each line states its own completeness.** `device` is the envelope's authenticated sender; then

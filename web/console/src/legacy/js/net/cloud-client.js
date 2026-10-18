@@ -2557,6 +2557,61 @@ export class CloudClient {
             "no paired Mac has published an authenticated snapshot to this browser yet");
     }
 
+    /** Every paired machine that takes viewer events now: `{ machine, sender, capable: true }`. */
+    _viewerEventCandidates() {
+        var candidates = [];
+        this.viewerVerified.forEach(function (seen, machine) {
+            if (this._machineImplements(machine, VIEWER_EVENTS_COMMAND, { learned: false }) === "yes") {
+                candidates.push({ machine: machine, sender: seen.sender, capable: true });
+            }
+        }, this);
+        candidates.sort(function (a, b) { return a.machine < b.machine ? -1 : a.machine > b.machine ? 1 : 0; });
+        return candidates;
+    }
+
+    /**
+     * The machine a row is about: the one its `machine` field names (a missing Whisper's row names
+     * the machine asked as `target_machine`), or null for a page-level row. A receive failure's
+     * `target_machine` is where delivery would have gone, not what the row is about.
+     */
+    _viewerEventAbout(row) {
+        var data = row && row.data;
+        var machine = data && (row.event === "cloud.voice.whisper_missing" ? data.target_machine : data.machine);
+        return typeof machine === "string" && machine ? machine : null;
+    }
+
+    /** The machine this page is showing, which takes the rows about no machine in particular. */
+    _viewerEventPageMachine() {
+        return typeof this.classicSessionMachine === "string" && this.classicSessionMachine
+            ? this.classicSessionMachine : null;
+    }
+
+    /**
+     * Where a row about `about` goes, and why (`route`): the machine it is about when that machine
+     * takes viewer events (`row_machine`) — a direct attempt to the machine of that attempt, a read
+     * failure to the machine read; else the machine the page is showing (`page_machine`); else the
+     * account's one target (`_viewerEventTarget`: `account`, or `remembered` from an earlier page).
+     * An account with two Macs used to send every row to whichever one sorted first. Throws what
+     * `_viewerEventTarget` throws when nothing can take the row.
+     */
+    _viewerEventRoute(about, candidates, remember) {
+        var named = function (machine) {
+            return machine ? candidates.find(function (candidate) { return candidate.machine === machine; }) : null;
+        };
+        var found = named(about);
+        var route = "row_machine";
+        if (!found) {
+            found = named(this._viewerEventPageMachine());
+            route = "page_machine";
+        }
+        if (found) {
+            if (remember) this.viewerEvents.rememberTarget(found);
+            return Object.assign({ route: route }, found);
+        }
+        var target = this._viewerEventTarget(remember);
+        return Object.assign({ route: target.remembered ? "remembered" : "account" }, target);
+    }
+
     _macBuild(machine) {
         var snapshot = this.orchestratorSnapshots.get(machine);
         var app = snapshot && snapshot.app;
@@ -2712,6 +2767,7 @@ export class CloudClient {
             this.viewerEventTimer = this.viewerEventTimers.setTimeout(function () {
                 self.viewerEventTimer = null;
                 self._deliverViewerEvents().then(function (outcome) {
+                    // Also in the log's own state, with every earlier outcome (`noteDelivery`).
                     self.lastViewerDelivery = outcome;
                     // With Web Locks another tab's log says nothing until this one is its writer, and
                     // becoming it notifies; without them the lease is polled.
@@ -2725,9 +2781,18 @@ export class CloudClient {
     }
 
     /**
-     * Send the waiting batch to the paired Mac as `diagnostics.events` and remove it only on a
-     * receipt that names it. Resolves with what happened — `delivered`, `empty`, `deferred`,
-     * `blocked` or `failed` — and never rejects: the rows are the record, and they stay.
+     * Send the waiting batch to the machine its rows are about as `diagnostics.events` and remove
+     * it only on a receipt that names it. Resolves with what happened — `delivered`, `empty`,
+     * `deferred`, `blocked` or `failed` — and never rejects: the rows are the record, and they stay.
+     * Every outcome but `empty` names the machine and route it was for when one was chosen, and is
+     * kept in the log's state (`noteDelivery`), so a page can say where its batches went and why one
+     * did not go.
+     *
+     * **One machine per batch.** The oldest waiting row decides where the batch goes
+     * (`_viewerEventRoute`), and the batch takes the rows behind it that go to the same machine; the
+     * first row bound elsewhere starts the next batch. A sealed batch keeps the machine it was sealed
+     * for while that machine still takes viewer events, so a resend reaches the Mac that recognises
+     * its `batch_id`.
      *
      * Accepted, delivered and acknowledged stay three facts: the relay's `ack` is the trail's
      * `relayed` step; the Mac's receipt, written after it appended the line, is `observed`; and
@@ -2739,20 +2804,39 @@ export class CloudClient {
         return Promise.resolve().then(function () {
             if (!log.pending()) return { state: "empty" };
             if (!self.ready) return { state: "deferred", why: "not_ready" };
+            var sealed = log.sealedBatch();
+            var rows = sealed ? [] : log.rows();
+            var candidates = self._viewerEventCandidates();
             var target;
-            try { target = self._viewerEventTarget(true); }
+            try {
+                target = self._viewerEventRoute(sealed ? sealed.machine : rows.length ? self._viewerEventAbout(rows[0]) : null,
+                    candidates, true);
+            }
             catch (failure) { return { state: "deferred", why: failure.code, failure: failure }; }
+            if (sealed) target.route = sealed.machine === target.machine ? "sealed" : "rerouted";
+            var route = { machine: target.machine, route: target.route };
             if (!target.capable) {
-                return { state: "deferred", why: "cloud_feature_unavailable", machine: target.machine };
+                return Object.assign({ state: "deferred", why: "cloud_feature_unavailable" }, route);
             }
             var macBuild = self._macBuild(target.machine);
             var blocked = log.blockedFor(target.machine, macBuild, self.webBuild || null);
-            if (blocked) return { state: "blocked", code: blocked.code, machine: target.machine };
+            if (blocked) return Object.assign({ state: "blocked", code: blocked.code }, route);
             var at = log.nextSendAt();
-            if (at > log.now()) return { state: "deferred", why: "spacing", at: at };
-            if (!log.claimLease(self.tabID)) return { state: "deferred", why: "other_tab" };
-            var outbox = log.takeBatch({ device: self.deviceID, tab: self.tabID, webBuild: self.webBuild });
+            if (at > log.now()) return Object.assign({ state: "deferred", why: "spacing", at: at }, route);
+            if (!log.claimLease(self.tabID)) return Object.assign({ state: "deferred", why: "other_tab" }, route);
+            var take = 0;
+            while (take < rows.length) {
+                var next;
+                try { next = self._viewerEventRoute(self._viewerEventAbout(rows[take]), candidates, false); }
+                catch (e) { next = null; }
+                if (take > 0 && (!next || next.machine !== target.machine)) break;
+                take += 1;
+            }
+            var outbox = log.takeBatch({ device: self.deviceID, tab: self.tabID, webBuild: self.webBuild,
+                rows: take, machine: target.machine, why: target.route });
             if (!outbox) return { state: "empty" };
+            route.batch_id = outbox.batch_id;
+            route.rows = outbox.rows;
             var batch = JSON.parse(outbox.body);
             log.noteAttempt();
             return self._machineRequestAs(outbox.request, target.machine, VIEWER_EVENTS_COMMAND,
@@ -2760,10 +2844,10 @@ export class CloudClient {
                 if (!receipt || receipt.batch_id !== outbox.batch_id || receipt.rows !== outbox.rows) {
                     var wrong = cloudError("bad_payload", "the Mac's receipt does not name this batch");
                     log.noteFailure(wrong);
-                    return { state: "failed", failure: wrong, machine: target.machine };
+                    return Object.assign({ state: "failed", failure: wrong }, route);
                 }
                 log.acknowledge(outbox.batch_id, receipt);
-                return { state: "delivered", receipt: receipt, machine: target.machine };
+                return Object.assign({ state: "delivered", receipt: receipt }, route);
             }, function (error) {
                 var failure = asCloudFailure(error);
                 log.noteFailure(failure);
@@ -2773,13 +2857,16 @@ export class CloudClient {
                     var disposition = log.block({ machine: target.machine, code: failure.code,
                         layer: failure.layer, status: failure.status, message: failure.message,
                         macBuild: macBuild, webBuild: self.webBuild || null });
-                    return { state: disposition === "drop" ? "refused" : "blocked", code: failure.code,
-                        failure: failure, machine: target.machine };
+                    return Object.assign({ state: disposition === "drop" ? "refused" : "blocked", code: failure.code,
+                        failure: failure }, route);
                 }
-                return { state: "failed", failure: failure, machine: target.machine };
+                return Object.assign({ state: "failed", failure: failure }, route);
             });
         }).catch(function (error) {
             return { state: "failed", failure: asCloudFailure(error) };
+        }).then(function (outcome) {
+            try { log.noteDelivery(outcome); } catch (e) { /* the record cannot change the outcome */ }
+            return outcome;
         });
     }
 
