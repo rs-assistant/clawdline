@@ -98,6 +98,10 @@ func (s *Server) workV2Agent(w http.ResponseWriter, r *http.Request, parts []str
 		s.agentClaimItem(w, r, parts[1])
 		return
 	}
+	if len(parts) == 3 && parts[0] == "items" && workID(parts[1]) && parts[2] == "cancel" && r.Method == http.MethodPost {
+		s.agentCancelItem(w, r, parts[1])
+		return
+	}
 	if len(parts) == 3 && parts[0] == "items" && workID(parts[1]) && parts[2] == "session-name" && r.Method == http.MethodPost {
 		s.agentNameItemSession(w, r, parts[1])
 		return
@@ -721,6 +725,57 @@ func (s *Server) relaySession(ctx context.Context, runID, sessionID, noRun, noth
 		return nil, session.Session{}, err
 	}
 	return run, sess, nil
+}
+
+// agentCancelItem relays a person's request to remove one Board item. Cancel
+// preserves the item's audit trail and releases its assignment in one write.
+func (s *Server) agentCancelItem(w http.ResponseWriter, r *http.Request, id string) {
+	var body struct {
+		ExpectedVersion int64  `json:"expected_version"`
+		SessionID       string `json:"session_id"`
+		Reason          string `json:"reason"`
+		Via             struct {
+			Run string `json:"run"`
+		} `json:"via"`
+	}
+	raw, ok := readWorkV2Body(w, r, &body)
+	if !ok {
+		return
+	}
+	k, ok := s.beginWorkV2Write(w, r, body.SessionID, raw)
+	if !ok {
+		return
+	}
+	refuse := s.relayRefuser(w, r, k)
+	run, sess, err := s.relaySession(r.Context(), body.Via.Run, body.SessionID,
+		"A Session cancels a Board item only on a person's message sent through Clawdline that asks for it; name its run as {\"via\":{\"run\":\"…\"}}.",
+		"nothing was cancelled")
+	if err != nil {
+		refuse(err)
+		return
+	}
+	if err := work.RelayTo(*run, sess.ConversationID, time.Time{}); err != nil {
+		refuse(err)
+		return
+	}
+	if body.ExpectedVersion < 1 {
+		refuse(&app.WorkError{Status: http.StatusBadRequest, Code: "version_required",
+			Message: "Read the item and name its current expected_version before cancelling it."})
+		return
+	}
+	itemOf := s.workV2ItemProjector(r.Context())
+	var answer []byte
+	_, err = s.workV2().Cancel(r.Context(), id, body.ExpectedVersion, run.Actor(), body.Reason,
+		func(v app.WorkV2View) (store.ReceiptKey, store.ReceiptAnswer, bool) {
+			answer = workV2Answer(itemOf(v))
+			return k, store.ReceiptAnswer{Status: http.StatusOK, Body: answer}, true
+		})
+	if err != nil {
+		refuse(err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_, _ = w.Write(answer)
 }
 
 // agentClaimItem is POST /v1/work/v2/agent/items/<id>/claim: a Session taking

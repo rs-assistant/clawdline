@@ -1138,6 +1138,18 @@ echo "Clean up the release notes before the next release." | \
 
 絕對不要主動建立看板項目，也不要一次建好幾個來規劃推測性的工作。
 
+**取消使用者要求移除的看板項目。** 使用者透過 Clawdline 傳來的訊息必須明確指出項目，並要求移除或取消。
+先讀取項目並確認 ID；不要把計畫變更或無關訊息當成取消授權。使用
+`clawdline item cancel <item id> --reason "使用者要求移除的原因"`。
+
+`item cancel` 預設讀取此對話最新的 run 和項目目前的版本；也可用 `--run` 或
+`--expected-version` 明確指定。它附上 Idempotency-Key，呼叫
+`POST /v1/work/v2/agent/items/<id>/cancel`，body 為
+`{"session_id", "via":{"run"}, "expected_version", "reason"}`。項目會離開進行中的看板和
+Session 清單，但取消紀錄與原因仍保留在稽核紀錄中。沒有 run、run 已過期、run 屬於其他 Session、
+版本過期、項目已結束，或沒有原因時，什麼都不改。使用者也能直接在看板取消項目。
+絕對不要自行決定取消。
+
 **認領使用者指給你的看板項目。** 使用者透過 Clawdline 傳來的訊息要你接下看板上某個已經存在的項目——
 「把 release notes 那個項目接走」「認領 <item id>」——就認領它，一條指令：
 

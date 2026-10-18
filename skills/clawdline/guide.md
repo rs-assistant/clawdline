@@ -1305,6 +1305,20 @@ echo "Clean up the release notes before the next release." | \
 
 Never create a Board item on your own initiative, and never several to plan speculative work.
 
+**Cancel a Board item the person asked you to remove.** The person's message sent through
+Clawdline must identify the item and explicitly ask to remove or cancel it. Read the item first
+and use its id; do not infer cancellation from a changed plan or from an unrelated message.
+
+Use `clawdline item cancel <item id> --reason "What the person asked to remove"`.
+
+`item cancel` reads this conversation's latest run and the item's current version unless `--run`
+or `--expected-version` names them. It sends `POST /v1/work/v2/agent/items/<id>/cancel` with
+`{"session_id", "via":{"run"}, "expected_version", "reason"}` under an Idempotency-Key.
+The item leaves the active Board and its Session projection; its cancelled record and reason
+remain in the audit trail. A missing or expired run, a run sent to another Session, a stale
+version, a terminal item, or an empty reason changes nothing. The person can also cancel an
+item directly in the Board. Never cancel on your own initiative.
+
 **Claim a Board item the person pointed you at.** When the person's message through Clawdline tells
 you to take a specific item already on the Board — *"take the release-notes item"*, *"claim
 <item id>"* — claim it; that is one command:

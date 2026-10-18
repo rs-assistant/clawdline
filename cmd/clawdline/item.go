@@ -50,13 +50,13 @@ func (l *stringList) Set(v string) error { *l = append(*l, v); return nil }
 
 // itemFlags is what `item add` was told.
 type itemFlags struct {
-	project, kind, title, description, acceptance, deploy, run string
-	expectedVersion                                            int64
-	docID, output                                              string
-	steps                                                      []string
-	phase                                                      phaseEvidence
-	doc                                                        docFlags
-	assign                                                     assignFlags
+	project, kind, title, description, acceptance, deploy, run, reason string
+	expectedVersion                                                    int64
+	docID, output                                                      string
+	steps                                                              []string
+	phase                                                              phaseEvidence
+	doc                                                                docFlags
+	assign                                                             assignFlags
 }
 
 // assignFlags is who `item add`, `item child` or `item assign` hands the item
@@ -151,6 +151,7 @@ func itemCommand(args []string) {
 	stepsFile := fs.String("steps-file", "", cliCopy("item", "flag.steps_file", "a file holding the steps, one per non-empty line"))
 	deploy := fs.String("deploy", "", cliCopy("item", "flag.deploy", "required, not_required or agent_decides (default agent_decides)"))
 	run := fs.String("run", "", cliCopy("item", "flag.run", "the run of the person's message (default: this conversation's latest run)"))
+	reason := fs.String("reason", "", cliCopy("item", "flag.reason", "why the person asked to remove this Board item"))
 	expectedVersion := fs.Int64("expected-version", 0, cliCopy("item", "flag.expected_version", "the item's version the write expects; refused as version_conflict when it moved on (required for acceptance-revise)"))
 	docID := fs.String("doc", "", cliCopy("item", "flag.doc", "for show: print only this document's body, raw"))
 	output := fs.String("output", "", cliCopy("item", "flag.output", "for image: save the full reference image to this new file"))
@@ -234,6 +235,13 @@ func itemCommand(args []string) {
 		rest = positional
 		f.run = *run
 		f.kind = *kind
+	case "cancel":
+		if len(positional) != 1 {
+			fmt.Fprintf(os.Stderr, cliCopy("item", "argument.cancel", "clawdline item cancel: takes one item id, got %d arguments\n"), len(positional))
+			itemUsage()
+		}
+		rest = positional
+		f.run, f.reason, f.expectedVersion = *run, *reason, *expectedVersion
 	case "name":
 		if len(positional) != 2 {
 			fmt.Fprintln(os.Stderr, cliCopy("item", "argument.name", "clawdline item name: takes an item id and the Session's task name"))
@@ -363,6 +371,7 @@ func itemUsage() {
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.add_assign", "                          [--assign-self | --assign-terminal <terminal id> | --assign-new [--assistant a] [--model m] [--persona id]]"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.add_options", "                          [--deploy policy] [--run id] [--conversation id] [--key k] [--port n]"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.claim", "       clawdline item claim [--kind feature|issue|epic|refactor] [--run id] [--conversation id] [--key k] [--port n] <item id>"))
+	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.cancel", "       clawdline item cancel --reason <text> [--run id] [--expected-version n] [--conversation id] [--key k] [--port n] <item id>"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.name", "       clawdline item name [--conversation id] [--port n] <item id> <Session task name>"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.child", "       clawdline item child --kind <feature|issue> --title <t> [--step <text>]… [--steps-file f] [--acceptance-file f]"))
 	fmt.Fprintln(os.Stderr, cliCopy("item", "usage.child_description", "                          [--description-file f | stdin] [--deploy policy]"))
@@ -706,6 +715,28 @@ func sessionItem(stdout, stderr io.Writer, b *broker, op string, f itemFlags, ar
 			body["kind"] = f.kind
 		}
 		path = "/v1/work/v2/agent/items/" + url.PathEscape(itemID) + "/claim"
+	case "cancel":
+		itemID := strings.TrimSpace(args[0])
+		if strings.TrimSpace(f.reason) == "" {
+			fmt.Fprintf(stderr, cliCopy("item", "error.cancel_reason", "clawdline %s: --reason is required. Nothing was cancelled.\n"), name)
+			return 2
+		}
+		run, code := wordRun(stdout, stderr, b, name, f.run, conversation,
+			cliCopy("item", "error.no_run_cancel", "Nothing was cancelled. Only a person's message sent through Clawdline may request cancellation."))
+		if code != 0 {
+			return code
+		}
+		version := f.expectedVersion
+		if version == 0 {
+			it, code := readItem(stdout, stderr, b, name, itemID)
+			if code != 0 {
+				return code
+			}
+			version = it.Version
+		}
+		body = map[string]any{"session_id": conversation, "via": map[string]string{"run": run},
+			"reason": f.reason, "expected_version": version}
+		path = "/v1/work/v2/agent/items/" + url.PathEscape(itemID) + "/cancel"
 	case "step-done":
 		itemID, stepID := strings.TrimSpace(args[0]), strings.TrimSpace(args[1])
 		body = map[string]any{"session_id": conversation}
@@ -1065,7 +1096,7 @@ func docWrote(stdout io.Writer, it itemWire, d docFlags, before int64) {
 // about: `item show` reads them.
 func itemWrote(stdout io.Writer, op string, args []string, it itemWire) {
 	what := map[string]string{"add": cliCopy("item", "receipt.item", "the item"), "child": cliCopy("item", "receipt.child", "the child item"), "assign": cliCopy("item", "receipt.assignment", "the assignment"),
-		"claim": cliCopy("item", "receipt.claim", "the claim"), "finish": cliCopy("item", "receipt.finish", "the finish"), "doc": cliCopy("item", "receipt.document", "the document"),
+		"claim": cliCopy("item", "receipt.claim", "the claim"), "cancel": cliCopy("item", "receipt.cancel", "the cancellation"), "finish": cliCopy("item", "receipt.finish", "the finish"), "doc": cliCopy("item", "receipt.document", "the document"),
 		"acceptance": cliCopy("item", "receipt.acceptance", "the acceptance criteria"), "acceptance-revise": cliCopy("item", "receipt.acceptance_revision", "the acceptance revision")}[op]
 	if op == "step-done" && len(args) > 1 {
 		what = cliCopy("item", "receipt.step_prefix", "step ") + strings.TrimSpace(args[1]) + cliCopy("item", "receipt.step_suffix", " done")
