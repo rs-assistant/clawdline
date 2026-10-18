@@ -228,6 +228,31 @@ func TestAPlanTurnedIntoWorkSeedsNoStepsFromItsAnalysis(t *testing.T) {
 		}
 	})
 
+	t.Run("converted, then opened in a new Session", func(t *testing.T) {
+		w := newWorkV2Test(t)
+		plan := newPlan(t, w)
+		converted, err := w.ConvertKind(ctx, plan.Item.ID, ConvertKindV2{
+			ExpectedVersion: plan.Item.Version, Kind: work.KindFeature, Actor: "local"}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Assign(ctx, plan.Item.ID, AssignWorkV2{ExpectedVersion: converted.Item.Version,
+			Mode: "new_session", AssignmentID: "assignment-a", Actor: "local"}, true, nil); err != nil {
+			t.Fatal(err)
+		}
+		active, err := w.FinishAssignment(ctx, plan.Item.ID, FinishAssignmentV2{AssignmentID: "assignment-a",
+			SessionID: "session-a", TerminalID: "terminal-a", RootAssignment: "root-a", Actor: "local"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(active.Steps) != 0 {
+			t.Fatalf("activation seeded %d steps: %+v", len(active.Steps), active.Steps)
+		}
+		if steps := stored(t, w, plan.Item.ID); len(steps) != 0 {
+			t.Fatalf("activation stored %d steps: %+v", len(steps), steps)
+		}
+	})
+
 	t.Run("a feature that was never a Plan still seeds", func(t *testing.T) {
 		w := newWorkV2Test(t)
 		feature, err := w.Create(ctx, NewWorkV2{ProjectID: "p", ProjectPath: "/p", Kind: work.KindFeature,
