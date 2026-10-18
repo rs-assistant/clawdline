@@ -9,6 +9,25 @@ never seen Clawdline can follow them:
    screenshot attached.
 3. The Board item for the checkout shows the stage it is in and the Session doing it.
 
+The blog's posts use five more, from two other invented stories in the same file:
+
+4. `todo-screenshot` — a Session refactoring a trip planner's storage gets a bug the person reports
+   from the phone: the add-to-do dialog with the words typed and a screenshot attached, the problem
+   circled in red in the picture itself. A saved to-do shows its picture only as a filename, so
+   the dialog is where the circle can be seen; its thumbnail is 44 points wide, which is why the
+   invented screenshot is a tight square crop.
+5. `session-message` — a message from the Session running the sync tests, as the conversation
+   draws a `clawdline.message`: it found a connection problem, opened a Board item and asks this
+   Session to take it.
+6. `ask-person` — the Session waiting on its terminal's own menu: take that item now, after the
+   current work, or not at all.
+7. `squad-list` — the Session list with a coordinating Session in the architect role and three
+   child Sessions nested under it by their dispatched tasks, each showing its built-in role.
+8. `review-notice` — the coordinator's conversation when the code review child finishes: the
+   completion notice, then the coordinator's own reply with the review's verdict. The notice
+   carries no verdict of its own; the verdict is in the child's result, which the coordinator
+   reads and reports.
+
 The story lives in `STORIES` in `web/console/src/session/site-shots.ts`, written separately in
 English and Taiwan Traditional Chinese, so neither language's pictures read as a translation. It
 used to be the e2e fixtures' own sample content ("Bravo is still working", `/tmp/fixture`, a
@@ -23,7 +42,9 @@ tools/site-shots.sh <website checkout>/marketing/marketing-claude/public/feature
 
 The script builds the console through `tools/heavy.sh`, then runs
 `web/console/src/session/site-shots.e2e.ts` once per language. Each run writes
-`<scene>-en.png` or `<scene>-zh-Hant.png`: a 390 × 844 phone at 2×, so 780 × 1688 pixels. Without
+`<scene>-en.png` or `<scene>-zh-Hant.png` for each of the eight scenes: a 390 × 844 phone at 2×,
+so 780 × 1688 pixels. The roles in `squad-list` are the built-in catalog's names, read from
+`internal/domain/persona/catalog`, with icons copied from `internal/domain/persona/icons.go`. Without
 `SITE_SHOTS` those tests skip.
 
 ## The callouts
@@ -36,6 +57,6 @@ website repository) names each number under the picture and in its lightbox, in 
 
 ## Before publishing
 
-Look at all six pictures. A fold caught mid-animation, a callout around nothing, a name cut short
+Look at all sixteen pictures. A fold caught mid-animation, a callout around nothing, a name cut short
 in the header, or a label in the wrong language is a capture to fix here, not a picture to
 publish.
