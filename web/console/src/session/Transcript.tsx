@@ -61,6 +61,7 @@ import { joinTranscript } from "./history.js"
 import { recordSendDiagnostic } from "../cloud/install.js"
 import "./jump.css"
 import "./history.css"
+import { AsyncQuestion } from "./AsyncQuestion.js"
 
 /*
  * The transcript pane, drawn as `view/transcript.js` draws it.
@@ -534,6 +535,7 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
       return next
     })
   const view: View = {
+    sessionID: agentId ? undefined : id,
     who,
     expanded,
     toggle,
@@ -955,6 +957,7 @@ function cutNote(page: TranscriptPage | null | undefined): ReactElement | null {
 }
 
 interface View {
+  sessionID?: string
   who: Record<string, string>
   expanded: Record<string, boolean>
   toggle: Toggle
@@ -1219,6 +1222,12 @@ function parseAsk(text: string): Question[] | null {
 
 /** `askHTML`: a question, drawn in full and never folded. */
 function askHTML(v: View, e: Entry, at: number) {
+  if (e.tool === "request_user_input_async" && v.sessionID) return (
+    <div className="entry ask" data-role="ask" key={"ask:" + at}>
+      {whoHTML(v, "assistant", e.at)}
+      <AsyncQuestion key={e.text + String(e.at)} sessionID={v.sessionID} questions={askOf(e) ?? []} />
+    </div>
+  )
   const T = L.strings
   const esc = L.escapeHTML
   const body = (askOf(e) || [])
