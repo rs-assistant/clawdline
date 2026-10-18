@@ -159,7 +159,7 @@ export const PANEL_KEYS: [string, string, NextWord | null][] = [
   ["Esc", "\x1b", null], ["Tab", "\t", null], ["⇧Tab", "\x1b[Z", "terminalKeyBackTab"], ["Enter", "\r", null],
   ["←", "D", "terminalKeyLeft"], ["↑", "A", "terminalKeyUp"], ["↓", "B", "terminalKeyDown"], ["→", "C", "terminalKeyRight"],
 ]
-/** The row over the text box: the keys a phone reaches for most. */
+/** The row under the screen: the keys a phone reaches for most. */
 export const QUICK_KEYS: [string, string, NextWord | null][] = [
   ["^C", "\x03", "terminalKeyHintInterrupt"], ["Esc", "\x1b", null], ["Tab", "\t", null],
   ["↑", "A", "terminalKeyUp"], ["↓", "B", "terminalKeyDown"],

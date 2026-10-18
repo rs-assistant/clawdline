@@ -16,7 +16,7 @@ import { TerminalBackButton } from "./TerminalBackButton.js"
 import { COMBO_KEYS, PANEL_KEYS, QUICK_KEYS, bindTerminalKeyboard, isRegionKey, readClipboardPaste, withCtrl } from "./keys.js"
 import { PasteField } from "./PasteField.js"
 import { holderWords, terminalRefusalWords, terminalShortID } from "./words.js"
-import { acquireVisibleTerminal, beginCloudTerminal, cloudTerminalBody, cloudTerminalPhase, composerSend, defaultInputMode, keyRefusalControl, keyRefusalNotice,
+import { acquireVisibleTerminal, beginCloudTerminal, cloudTerminalBody, cloudTerminalPhase, keyRefusalControl, keyRefusalNotice,
   reconnectCloudTerminal, shownKeyRefusal, type CloudTerminalPhase, type KeyRefusalNotice } from "./cloud-view.js"
 import { beginTerminalClose, observeTerminalEnded, observeTerminalRunning, settleTerminalClose, terminalCloseState, watchTerminalClose } from "../../cloud/terminal-close-state.js"
 import { centerCursorLine, followCursorLine } from "./cursor-line.js"
@@ -99,13 +99,7 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
   const [nativePaste, setNativePaste] = useState(false)
   const pasteBusy = useRef(false)
   const ctrlArmed = useRef(false)
-  /** Where typed text goes: the text box (a phone's default) or straight into the screen. */
-  const [inputMode, setInputMode] = useState<"direct" | "composer">(() => defaultInputMode(typeof window === "undefined" ? undefined : window.matchMedia?.bind(window)))
-  const inputModeRef = useRef(inputMode)
   const [keysOpen, setKeysOpen] = useState(false)
-  const [composerText, setComposerText] = useState("")
-  const [sending, setSending] = useState(false)
-  const composer = useRef<HTMLInputElement>(null)
   const [endedAt, setEndedAt] = useState<Date | null>(null)
   const [diagnosticsText, setDiagnosticsText] = useState<string | null>(null)
   const [dockNote, setDockNote] = useState("")
@@ -212,7 +206,6 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
         term.loadAddon(addon)
         term.open(screen.current)
         term.textarea?.setAttribute("aria-label", nextWord("terminalScreenFor", { project: label }))
-        if (inputModeRef.current === "composer") term.textarea?.setAttribute("inputmode", "none")
         term.onData((data) => {
           const { out } = withCtrl(ctrlArmed.current, data)
           if (ctrlArmed.current) { ctrlArmed.current = false; setCtrl(false) }
@@ -256,15 +249,6 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
   // session refuses raises the notice beside the screen. A disabled screen swallowed keys unsaid.
   useEffect(() => { if (snapshot.canType) setKeyRefused(null) }, [snapshot.canType])
   useEffect(() => { if (terminal.current) terminal.current.options.screenReaderMode = reader }, [reader])
-  // With the text box in use, a tap on the screen raises no on-screen keyboard; a hardware keyboard
-  // still types into the screen. Typing directly gives the screen its keyboard back (vim, less).
-  useEffect(() => {
-    inputModeRef.current = inputMode
-    const area = terminal.current?.textarea
-    if (!area) return
-    if (inputMode === "composer") area.setAttribute("inputmode", "none")
-    else area.removeAttribute("inputmode")
-  }, [inputMode])
   useEffect(() => {
     const box = screen.current?.parentElement
     if (!box || !session || !snapshot.canType || typeof ResizeObserver === "undefined") return
@@ -355,14 +339,14 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
     if (value === "ctrl") {
       ctrlArmed.current = !ctrlArmed.current
       setCtrl(ctrlArmed.current)
-      if (inputModeRef.current === "direct") terminal.current?.focus()
+      terminal.current?.focus()
       return
     }
     const bytes = /^[ABCD]$/.test(value) ? (snapshot.frame?.modes.app_cursor ? "\x1bO" : "\x1b[") + value : value
     const { out } = withCtrl(ctrlArmed.current, bytes)
     ctrlArmed.current = false; setCtrl(false)
     void session?.input(new TextEncoder().encode(out)).then(keySent, keyFailed)
-    if (inputModeRef.current === "direct") terminal.current?.focus()
+    terminal.current?.focus()
     showInputLine()
   }
   const pasteFromClipboard = async () => {
@@ -388,7 +372,7 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
   useEffect(() => { if (phase === "ended" && !endedAt) setEndedAt(new Date()) }, [phase, endedAt])
   // Shown only while control is as it was when the key was refused.
   const refusal = phase === "ended" ? null : shownKeyRefusal(keyRefused, snapshot.control)
-  const focusInput = () => { if (inputModeRef.current === "direct") terminal.current?.focus(); else composer.current?.focus() }
+  const focusInput = () => terminal.current?.focus()
   // One press takes input, from nobody, from this tab's forgotten lease, or from another device:
   // every device here is the same person's, so taking over asks nothing more (2026-10-18).
   const takeInput = () => void run("acquire", async () => {
@@ -401,26 +385,6 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
     void navigator.clipboard.writeText(text).then(() => { setDiagnosticsText(null); setDockNote(nextWord("terminalDiagnosticsCopied")) },
       // refusal-ok: a clipboard write is refused by the browser's permission, which carries no machine code to name.
       () => { setDiagnosticsText(text); setDockNote(nextWord("terminalDiagnosticsCopyFailed")) })
-  }
-  const sendComposer = async () => {
-    if (!session || sending) return
-    const { paste, enter } = composerSend(composerText)
-    setSending(true)
-    try {
-      if (paste !== null) { await session.paste(paste); setComposerText("") }
-      await session.input(enter)
-      keySent(); showInputLine()
-    } catch (failure) { keyFailed(failure) }
-    finally { setSending(false) }
-  }
-  // Ctrl armed from the key panel applies to the next character typed in the box: it goes to the
-  // terminal as its control form and never into the text.
-  const changeComposer = (next: string) => {
-    if (ctrlArmed.current && next.length === composerText.length + 1 && next.startsWith(composerText)) {
-      sendKey(next.slice(-1))
-      return
-    }
-    setComposerText(next)
   }
   const body = cloudTerminalBody(host, channelProject, id)
   if (body === "offline" || !host) return <p className="terminal-note" role="status">{nextWord("terminalCloudLineReconnecting")}</p>
@@ -546,28 +510,15 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
             onPointerDown={(event) => event.preventDefault()} onClick={() => sendKey("ctrl")}>{nextWord("terminalKeyCtrlThen")}</button>
         </div>
       </section>}
-      {typing && <div className="cloud-quick" role="group" aria-label={nextWord("terminalKeys")}>
-        <button className="cloud-chip cloud-chip-mode" type="button" aria-pressed={inputMode === "direct"}
-          onClick={() => { const next = inputMode === "direct" ? "composer" : "direct"; setInputMode(next); requestAnimationFrame(() =>
-            next === "direct" ? terminal.current?.focus() : composer.current?.focus()) }}>{nextWord("terminalDirectTyping")}</button>
-        {QUICK_KEYS.map(keyButton)}
-        <button className="cloud-chip" type="button" disabled={pasting} aria-busy={pasting} onClick={() => void pasteFromClipboard()}>{nextWord("terminalPasteButton")}</button>
-      </div>}
-      {typing && <div className="cloud-composer">
+      {typing && <div className="cloud-keyrow">
         <button className="cloud-round" type="button" aria-label={nextWord("terminalMoreKeys")} aria-expanded={keysOpen} onClick={() => setKeysOpen((open) => !open)}>
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" /></svg></button>
-        {inputMode === "composer" ? <>
-          <form className="cloud-composer-form" onSubmit={(event) => { event.preventDefault(); void sendComposer() }}>
-            <label className="terminal-sr" htmlFor="cloud-composer-input">{nextWord("terminalComposerLabel")}</label>
-            <input id="cloud-composer-input" ref={composer} value={composerText} onChange={(event) => changeComposer(event.target.value)}
-              placeholder={nextWord("terminalComposerPlaceholder")} enterKeyHint="send" autoCapitalize="off" autoComplete="off" autoCorrect="off" spellCheck={false} />
-            <button className="cloud-round cloud-send" type="submit" disabled={sending} aria-busy={sending} aria-label={nextWord("terminalComposerSend")}>
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6" /></svg></button>
-          </form>
-        </> : <>
-          <button className="cloud-direct" type="button" onClick={() => { terminal.current?.focus(); showInputLine() }}>{nextWord("terminalDirectTypingHelp")}</button>
-          <button className="cloud-chip" type="button" onClick={() => { setInputMode("composer"); requestAnimationFrame(() => composer.current?.focus()) }}>{nextWord("terminalUseComposer")}</button>
-        </>}
+        <div className="cloud-quick" role="group" aria-label={nextWord("terminalKeys")}>
+          {QUICK_KEYS.map(keyButton)}
+          <button className="cloud-chip" type="button" disabled={pasting} aria-busy={pasting} onClick={() => void pasteFromClipboard()}>{nextWord("terminalPasteButton")}</button>
+        </div>
+        <button className="cloud-round" type="button" aria-label={nextWord("terminalShowKeyboard")} onClick={() => { terminal.current?.focus(); showInputLine() }}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M7 10h1M11 10h1M15 10h1M8 14h8" /></svg></button>
       </div>}
       {dockNote && <p className="terminal-note" role="status">{dockNote}</p>}
       {diagnosticsText !== null && <pre className="terminal-diagnostics-text">{diagnosticsText}</pre>}

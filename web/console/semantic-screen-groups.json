@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6103,
+  "englishContentKeys": 6097,
   "riskKeys": 2910,
-  "nonRiskCount": 3193,
+  "nonRiskCount": 3187,
   "groups": [
     {
       "name": "bar / other",
@@ -2457,7 +2457,7 @@
     },
     {
       "name": "next / terminal",
-      "count": 131,
+      "count": 125,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2489,9 +2489,6 @@
         "next.terminalCloudStale",
         "next.terminalCloudStaleHelp",
         "next.terminalCloudState",
-        "next.terminalComposerLabel",
-        "next.terminalComposerPlaceholder",
-        "next.terminalComposerSend",
         "next.terminalConnecting",
         "next.terminalControlLabel",
         "next.terminalControlNobody",
@@ -2503,8 +2500,6 @@
         "next.terminalDiagnostics",
         "next.terminalDiagnosticsCopied",
         "next.terminalDiagnosticsCopy",
-        "next.terminalDirectTyping",
-        "next.terminalDirectTypingHelp",
         "next.terminalDismissMenu",
         "next.terminalEndedBack",
         "next.terminalEndedTitle",
@@ -2590,7 +2585,6 @@
         "next.terminalTerminateSucceeded",
         "next.terminalTypeHere",
         "next.terminalUnavailableOld",
-        "next.terminalUseComposer",
         "next.terminalViewOnly",
         "next.terminalWatchingHelp"
       ]

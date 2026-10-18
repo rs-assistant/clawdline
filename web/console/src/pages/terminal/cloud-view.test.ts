@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 // @ts-expect-error -- `.ts` paths let Node's strip-types runner execute this test.
-import { acquireVisibleTerminal, beginCloudTerminal, cloudTerminalBody, cloudTerminalPhase, composerSend, defaultInputMode, keyRefusalControl, keyRefusalNotice, reconnectCloudTerminal, shownKeyRefusal, type CloudTerminalStarter } from "./cloud-view.ts"
+import { acquireVisibleTerminal, beginCloudTerminal, cloudTerminalBody, cloudTerminalPhase, keyRefusalControl, keyRefusalNotice, reconnectCloudTerminal, shownKeyRefusal, type CloudTerminalStarter } from "./cloud-view.ts"
 
 // `cloud/terminal-session.ts` uses constructor parameter properties, which
 // Node's strip-types runner refuses, so the start path is driven through a fake
@@ -136,16 +136,4 @@ test("each other situation has its own phase, in the order the page must say the
   assert.equal(cloudTerminalPhase({ ...live, canType: false, hasFrame: false, control: null }), "loading")
   assert.equal(cloudTerminalPhase({ ...live, canType: false, control: { held: true, epoch: 2, holder: { same_client: false, name: "iPad" } } } as typeof live), "other_holder")
   assert.equal(cloudTerminalPhase({ ...live, canType: false, control: { held: false, epoch: 2 } } as typeof live), "watching")
-})
-
-test("Send types the text as a paste and then Enter; an empty box sends Enter alone", () => {
-  assert.deepEqual(composerSend("git status"), { paste: "git status", enter: new Uint8Array([0x0d]) })
-  assert.deepEqual(composerSend(""), { paste: null, enter: new Uint8Array([0x0d]) })
-})
-
-test("a real pointer types directly, a phone uses the text box, and a browser that cannot tell uses the box", () => {
-  assert.equal(defaultInputMode(() => ({ matches: true })), "direct")
-  assert.equal(defaultInputMode(() => ({ matches: false })), "composer")
-  assert.equal(defaultInputMode(undefined), "composer")
-  assert.equal(defaultInputMode(() => { throw new Error("no matchMedia") }), "composer")
 })

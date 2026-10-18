@@ -237,8 +237,8 @@
 
 .signed-in .device-facts [data-tone="warn"] { color: var(--ink); border-color: var(--warn); }
 
-/* The hosted terminal (CloudTerminalPage.tsx): one status line in the header, one action under
-   the screen, and a text box that types only when sent. Scoped so the local page is unchanged. */
+/* The hosted terminal (CloudTerminalPage.tsx): one status line in the header, and one action under
+   the screen. Scoped so the local page is unchanged. */
 .cloud-terminal-view .terminal-head-row { flex-wrap: nowrap; gap: 6px; }
 .cloud-terminal-view .terminal-back { width: 44px; padding: 0; flex: none; }
 .cloud-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
@@ -272,25 +272,16 @@
     flex: none; min-height: 44px; min-width: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 22px;
     background: var(--card); color: var(--ink); font: 13px var(--mono); touch-action: manipulation; cursor: pointer;
 }
-.cloud-chip-mode { font-family: var(--ui); }
 .cloud-chip[aria-pressed="true"] { background: var(--accent-in); border-color: var(--accent); }
 .cloud-chip:focus-visible, .cloud-key:focus-visible, .cloud-round:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
-.cloud-composer { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.cloud-composer-form { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; margin: 0; }
-.cloud-composer-form input {
-    flex: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 16px; border: 1px solid var(--line); border-radius: 22px;
-    background: var(--card); color: var(--ink); font: 16px var(--ui);
-}
-.cloud-composer-form input:focus { outline: none; border-color: var(--accent-ed); }
+.cloud-keyrow { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cloud-keyrow .cloud-quick { flex: 1; }
 .cloud-round {
     display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; border: 1px solid var(--line); border-radius: 22px;
     background: var(--card); color: var(--ink); cursor: pointer;
 }
 .cloud-round[aria-expanded="true"] { border-color: var(--accent); }
 .cloud-round svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.cloud-send { border: 0; background: var(--ink); color: var(--term-bg, #101114); }
-.cloud-direct { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border: 1px dashed var(--line); border-radius: 22px;
-    background: transparent; color: var(--dim); font: 13px var(--ui); text-align: left; cursor: pointer; }
 .cloud-keypanel { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
 .cloud-keypanel-head { display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
 .cloud-keygrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }

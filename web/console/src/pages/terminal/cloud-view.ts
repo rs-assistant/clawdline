@@ -137,17 +137,3 @@ export function cloudTerminalPhase(v: CloudTerminalPhaseInput): CloudTerminalPha
   if (v.control?.held && !v.control.holder?.same_client) return "other_holder"
   return "watching"
 }
-
-/**
- * What one press of the text box's Send types: the text as a paste, so a program that asked for
- * bracketed paste receives it as one, then Enter. An empty box sends Enter alone.
- */
-export function composerSend(text: string): { paste: string | null; enter: Uint8Array } {
-  return { paste: text === "" ? null : text, enter: new Uint8Array([0x0d]) }
-}
-
-/** How a fresh page takes keys: a device with a real pointer and keyboard types directly, a phone uses the text box. */
-export function defaultInputMode(match: ((query: string) => { matches: boolean }) | undefined): "direct" | "composer" {
-  try { return match?.("(hover: hover) and (pointer: fine)").matches ? "direct" : "composer" }
-  catch { return "composer" }
-}
