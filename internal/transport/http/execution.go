@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	"github.com/sainteye/clawdline/internal/domain/session"
@@ -31,7 +31,7 @@ func (s *Server) executionMachine() string {
 	return ""
 }
 
-func executionFingerprint(item session.Session, live swiftstore.Live) string {
+func executionFingerprint(item session.Session, live ownrecords.Live) string {
 	if item.PID <= 0 || live.ProcessStart.IsZero() || !item.IsAssistant() {
 		return ""
 	}
@@ -51,7 +51,7 @@ func currentExecution(item session.Session, inv session.Inventory) bool {
 // observeExecutions uses only current, kernel-pinned rows. The previous
 // generation is withheld from the response whenever a source is unverified.
 func (s *Server) observeExecutions(ctx context.Context, inv session.Inventory,
-	items []session.Session, lives []swiftstore.Live) map[string]string {
+	items []session.Session, lives []ownrecords.Live) map[string]string {
 	if s.store == nil || s.executionMachine() == "" {
 		return nil
 	}
@@ -116,9 +116,9 @@ func (s *Server) admitExecution(ctx context.Context, machine, id, expected strin
 	defer cancel()
 	inv = read(readCtx)
 	var found *session.Session
-	var live swiftstore.Live
+	var live ownrecords.Live
 	items := make([]session.Session, 0, len(inv.Sessions))
-	lives := make([]swiftstore.Live, 0, len(inv.Sessions))
+	lives := make([]ownrecords.Live, 0, len(inv.Sessions))
 	for _, item := range inv.Sessions {
 		if !item.IsAssistant() {
 			continue

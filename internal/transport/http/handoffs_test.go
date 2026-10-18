@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/taskdir"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
@@ -133,7 +133,7 @@ func TestRootAssignmentReadProjectsIndependentCleanupGates(t *testing.T) {
 }
 
 func TestPersonCloseRecordsOnlyTheBoundRootExecutor(t *testing.T) {
-	start := swiftstore.ProcessStart(os.Getpid())
+	start := ownrecords.ProcessStart(os.Getpid())
 	if start.IsZero() {
 		t.Skip("this platform has no process-start reader for exact Root binding")
 	}

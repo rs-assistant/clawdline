@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/limits"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
@@ -196,7 +196,7 @@ type sessionRowWire struct {
 	Menu *menuWire `json:"menu,omitempty"`
 	// waiting is the work projection's live tasks behind a broker-decided
 	// waiting_session, turned into `waiting_for` once labels are known.
-	waiting []*swiftstore.Task
+	waiting []*ownrecords.Task
 }
 
 // sessionsSnapshotWire is contract.SessionsSnapshot with those rows.
@@ -264,7 +264,7 @@ func (s *Server) sessionsPayloadRead(ctx context.Context, inv session.Inventory,
 	}
 	// The record set the projections read: this daemon's own, laid in below.
 	// The retired Swift app's store is no longer read (docs/cutover.md §7).
-	swift := swiftstore.Snapshot{}
+	swift := ownrecords.Snapshot{}
 	// And of this daemon's own machine role (W5): when it holds one, the
 	// crown is drawn from it and from nothing else — one role, one source.
 	// An unreadable role draws no crown.
@@ -282,7 +282,7 @@ func (s *Server) sessionsPayloadRead(ctx context.Context, inv session.Inventory,
 			items = append(items, item)
 		}
 	}
-	lives := make([]swiftstore.Live, len(items))
+	lives := make([]ownrecords.Live, len(items))
 	for i, item := range items {
 		lives[i] = liveOf(item)
 	}
@@ -706,13 +706,13 @@ func recordsContext(ctx context.Context) (context.Context, context.CancelFunc) {
 // compared with. The start time is asked of the kernel here, once per row per
 // reading: it is one sysctl, and a cached one would be the one fact that could
 // be wrong about a process that replaced another in the same second.
-func liveOf(item session.Session) swiftstore.Live {
-	return swiftstore.Live{
+func liveOf(item session.Session) ownrecords.Live {
+	return ownrecords.Live{
 		TerminalID:     item.ID,
 		TTY:            item.TTY,
 		Assistant:      string(item.Assistant),
 		PID:            int64(item.PID),
-		ProcessStart:   swiftstore.ProcessStart(item.PID),
+		ProcessStart:   ownrecords.ProcessStart(item.PID),
 		ConversationID: item.ConversationID,
 	}
 }
@@ -747,7 +747,7 @@ func identityMatchCounts(items []session.Session) map[string]int {
 // thread rung. A project is the last human name before the terminal
 // coordinate: `Codex · project` distinguishes two conversations, while
 // `Codex · ttys020` distinguishes only two terminal devices.
-func rowLabel(item session.Session, titles swiftstore.Titles, project string) string {
+func rowLabel(item session.Session, titles ownrecords.Titles, project string) string {
 	rungs := item.Rungs
 	rungs.Manual = titles.Manual
 	rungs.Orchestrator = titles.Orchestrator
@@ -774,11 +774,11 @@ func rowLabel(item session.Session, titles swiftstore.Titles, project string) st
 
 type rowInput struct {
 	item                session.Session
-	live                swiftstore.Live
+	live                ownrecords.Live
 	label               string
 	labelOf             func(string) string
 	matches             int
-	swift               swiftstore.Snapshot
+	swift               ownrecords.Snapshot
 	owed                []task.Obligation
 	owedErr             error
 	ownErr              error // this daemon's own records not all read (ownrecords.go)
@@ -917,7 +917,7 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		// This daemon's own peer waits are an input the Swift store does not
 		// hold; they rank where the Swift app's coordination waits do.
 		if work.State != "waiting_you" && ownWaitingOnPeer(item, in.owed) {
-			work = swiftstore.Work{State: "waiting_session", Provenance: "broker", Owed: work.Owed}
+			work = ownrecords.Work{State: "waiting_session", Provenance: "broker", Owed: work.Owed}
 		}
 		row.WorkState = contract.WorkState(work.State)
 		row.WorkProvenance = contract.WorkProvenance(work.Provenance)
@@ -989,7 +989,7 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		})
 	}
 
-	row.Closeability = in.swift.Closeability(swiftstore.CloseInput{
+	row.Closeability = in.swift.Closeability(ownrecords.CloseInput{
 		Live:          in.live,
 		TerminalState: state,
 		Bound: in.live.Assistant != "" && in.live.PID != 0 &&

@@ -6,13 +6,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
 func TestPinnedSessionAdmissionRequiresFreshProcessAndMatchingMachine(t *testing.T) {
-	if swiftstore.ProcessStart(os.Getpid()).IsZero() {
+	if ownrecords.ProcessStart(os.Getpid()).IsZero() {
 		t.Skip("this platform has no kernel process-start reader")
 	}
 	p := &pane{s: session.Session{ID: "%19", Backend: session.BackendTmux,
@@ -25,7 +25,7 @@ func TestPinnedSessionAdmissionRequiresFreshProcessAndMatchingMachine(t *testing
 	if len(items) != 1 {
 		t.Fatalf("assistant reading: %+v", inv)
 	}
-	got := s.observeExecutions(ctx, inv, items, []swiftstore.Live{liveOf(items[0])})
+	got := s.observeExecutions(ctx, inv, items, []ownrecords.Live{liveOf(items[0])})
 	gen := got["%19"]
 	if gen == "" {
 		t.Fatalf("no generation from current process: %+v", got)
@@ -50,7 +50,7 @@ func TestPinnedSessionAdmissionRequiresFreshProcessAndMatchingMachine(t *testing
 }
 
 func TestPinnedSmartTitleRefusesAReusedExecutionAfterNaming(t *testing.T) {
-	if swiftstore.ProcessStart(os.Getpid()).IsZero() {
+	if ownrecords.ProcessStart(os.Getpid()).IsZero() {
 		t.Skip("this platform has no kernel process-start reader")
 	}
 	p := &pane{s: session.Session{ID: "%19", Backend: session.BackendTmux,
@@ -69,7 +69,7 @@ func TestPinnedSmartTitleRefusesAReusedExecutionAfterNaming(t *testing.T) {
 	if len(items) != 1 {
 		t.Fatalf("assistant reading: %+v", inv)
 	}
-	generation := s.observeExecutions(ctx, inv, items, []swiftstore.Live{liveOf(items[0])})[p.s.ID]
+	generation := s.observeExecutions(ctx, inv, items, []ownrecords.Live{liveOf(items[0])})[p.s.ID]
 	if generation == "" {
 		t.Fatal("no generation for the selected execution")
 	}

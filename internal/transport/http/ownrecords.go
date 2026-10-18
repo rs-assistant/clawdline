@@ -6,15 +6,15 @@ import (
 	"errors"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
 )
 
 // This daemon's own records, converted to the shape the session list's
-// projections read (swiftstore/own.go), so that the crown, the task chips,
+// projections read (ownrecords/own.go), so that the crown, the task chips,
 // the waits, the delivery ticks and the titles come from this daemon's store
 // first and the Swift app's is only history beside it (cutover B1).
 //
@@ -35,11 +35,11 @@ const ownStartTolerance = 5 * time.Second
 // It is evidence missing, never an empty list (DG-7).
 var errOwnRecords = errors.New("this daemon's own records could not all be read")
 
-func secondsOf(t time.Time) swiftstore.Seconds {
-	return swiftstore.Seconds(float64(t.UnixNano()) / 1e9)
+func secondsOf(t time.Time) ownrecords.Seconds {
+	return ownrecords.Seconds(float64(t.UnixNano()) / 1e9)
 }
 
-func secondsPtrOf(t time.Time) *swiftstore.Seconds {
+func secondsPtrOf(t time.Time) *ownrecords.Seconds {
 	if t.IsZero() {
 		return nil
 	}
@@ -57,18 +57,18 @@ func stringPtr(v string) *string {
 // ownOverlay reads the records and converts them against the sessions on
 // screen. err is set when any source failed; what the others said is still
 // returned, so the caller can list it under "unknown" (DG-7).
-func (s *Server) ownOverlay(ctx context.Context, lives []swiftstore.Live) (swiftstore.Own, error) {
+func (s *Server) ownOverlay(ctx context.Context, lives []ownrecords.Live) (ownrecords.Own, error) {
 	records, unreadable, err := s.broker.Records(ctx)
 	return s.ownOverlayOf(ctx, lives, records, unreadable, err)
 }
 
 // ownOverlayOf is ownOverlay over tasks already read: the whole ledger, or
 // the part of it the sessions in lives can be told by (Broker.SessionTasks).
-func (s *Server) ownOverlayOf(ctx context.Context, lives []swiftstore.Live, records []orchestrator.Record,
-	unreadable []orchestrator.Unreadable, readErr error) (swiftstore.Own, error) {
-	var own swiftstore.Own
+func (s *Server) ownOverlayOf(ctx context.Context, lives []ownrecords.Live, records []orchestrator.Record,
+	unreadable []orchestrator.Unreadable, readErr error) (ownrecords.Own, error) {
+	var own ownrecords.Own
 	var failed bool
-	byTerminal := make(map[string]swiftstore.Live, len(lives))
+	byTerminal := make(map[string]ownrecords.Live, len(lives))
 	for _, l := range lives {
 		byTerminal[l.TerminalID] = l
 	}
@@ -116,7 +116,7 @@ func (s *Server) ownOverlayOf(ctx context.Context, lives []swiftstore.Live, reco
 // when exactly one terminal holds it. This daemon's coordination plane names
 // sessions by conversation (W5); the session list's rows are terminals, and a
 // conversation two terminals claim names neither of them.
-func conversationTerminals(lives []swiftstore.Live) map[string]string {
+func conversationTerminals(lives []ownrecords.Live) map[string]string {
 	count := map[string]int{}
 	out := map[string]string{}
 	for _, l := range lives {
@@ -153,10 +153,10 @@ func conversationTerminals(lives []swiftstore.Live) map[string]string {
 // it: a finished task told only by its root is not read for the list. Carry
 // the notice here and SessionTasks must read such tasks too
 // (TestTheSessionListIsTheOneTheWholeHistoryGave fails until it does).
-func ownTasks(records []orchestrator.Record, byTerminal map[string]swiftstore.Live) []swiftstore.Task {
-	out := make([]swiftstore.Task, 0, len(records))
+func ownTasks(records []orchestrator.Record, byTerminal map[string]ownrecords.Live) []ownrecords.Task {
+	out := make([]ownrecords.Task, 0, len(records))
 	for _, r := range records {
-		t := swiftstore.Task{
+		t := ownrecords.Task{
 			ID:         r.ID,
 			State:      string(r.State),
 			Kind:       r.Kind,
@@ -206,13 +206,13 @@ func ownTasks(records []orchestrator.Record, byTerminal map[string]swiftstore.Li
 				if l.State == orchestrator.LandingIncorporated {
 					origin = "other_task_landing"
 				}
-				t.Landing = &swiftstore.Landing{
+				t.Landing = &ownrecords.Landing{
 					State: string(l.State), Commit: stringPtr(l.Commit), VerifiedCommit: stringPtr(l.Commit),
 					VerifiedTargetCommit: stringPtr(l.TargetCommit), Target: stringPtr(l.Target),
 					VerificationOrigin: &origin, LandedAt: secondsPtrOf(l.At),
 				}
 			case orchestrator.LandingAbandoned, orchestrator.LandingNothingToLand:
-				t.Landing = &swiftstore.Landing{State: string(l.State), Target: stringPtr(l.Target),
+				t.Landing = &ownrecords.Landing{State: string(l.State), Target: stringPtr(l.Target),
 					LandedAt: secondsPtrOf(l.At)}
 			}
 		}
@@ -239,7 +239,7 @@ func ownTasks(records []orchestrator.Record, byTerminal map[string]swiftstore.Li
 // 2026-10-07, so every child process looked older than its own tab and every
 // finished child read as "status unknown". A process from before the task
 // existed is still somebody else's.
-func ownChild(r orchestrator.Record, l swiftstore.Live) bool {
+func ownChild(r orchestrator.Record, l ownrecords.Live) bool {
 	if l.Assistant == "" || l.Assistant != r.Assistant || l.PID == 0 || l.ProcessStart.IsZero() ||
 		l.ConversationID == "" {
 		return false
@@ -260,22 +260,22 @@ func ownChild(r orchestrator.Record, l swiftstore.Live) bool {
 // ownWaits converts the open waits. Their sessions are conversations; each is
 // named by its terminal when exactly one on screen holds it, and otherwise by
 // the conversation, which no row's id can be mistaken for.
-func ownWaits(waits []store.WaitRow, terminalOf map[string]string) []swiftstore.CoordinationWait {
+func ownWaits(waits []store.WaitRow, terminalOf map[string]string) []ownrecords.CoordinationWait {
 	name := func(conversation string) string {
 		if t, ok := terminalOf[conversation]; ok {
 			return t
 		}
 		return conversation
 	}
-	out := make([]swiftstore.CoordinationWait, 0, len(waits))
+	out := make([]ownrecords.CoordinationWait, 0, len(waits))
 	for _, w := range waits {
-		cw := swiftstore.CoordinationWait{
+		cw := ownrecords.CoordinationWait{
 			ID: w.ID, Repository: w.Repository, Paths: append([]string(nil), w.Paths...),
 			OwnerSessionID: name(w.Owner), ReleaseCondition: w.ReleaseCondition,
 			Created: secondsOf(w.CreatedAt),
 		}
 		for _, waiter := range w.Waiters {
-			row := swiftstore.CoordinationWaiter{
+			row := ownrecords.CoordinationWaiter{
 				SessionID: name(waiter.Waiter), Reason: waiter.Reason, Created: secondsOf(waiter.CreatedAt),
 				RequestDeliveredAt: secondsPtrOf(waiter.RequestDeliveredAt),
 			}
@@ -301,7 +301,7 @@ func ownWaits(waits []store.WaitRow, terminalOf map[string]string) []swiftstore.
 // with a conversation — and wrote down which. So a receipt speaks for the
 // session now in that terminal when it is the same conversation of the same
 // assistant: the evidence the broker itself required when it accepted it.
-func (s *Server) ownDeliveries(ctx context.Context, lives []swiftstore.Live) ([]swiftstore.SessionDelivery, error) {
+func (s *Server) ownDeliveries(ctx context.Context, lives []ownrecords.Live) ([]ownrecords.SessionDelivery, error) {
 	terminals := make([]string, 0, len(lives))
 	for _, l := range lives {
 		terminals = append(terminals, l.TerminalID)
@@ -310,7 +310,7 @@ func (s *Server) ownDeliveries(ctx context.Context, lives []swiftstore.Live) ([]
 	if err != nil {
 		return nil, err
 	}
-	out := []swiftstore.SessionDelivery{}
+	out := []ownrecords.SessionDelivery{}
 	for _, l := range lives {
 		e, ok := events[l.TerminalID]
 		if !ok {
@@ -329,11 +329,11 @@ func (s *Server) ownDeliveries(ctx context.Context, lives []swiftstore.Live) ([]
 		}
 		assistant, pid, conv := l.Assistant, l.PID, l.ConversationID
 		start := secondsOf(l.ProcessStart)
-		out = append(out, swiftstore.SessionDelivery{
-			Identity: swiftstore.Identity{TerminalID: l.TerminalID, TTY: l.TTY, Assistant: &assistant,
+		out = append(out, ownrecords.SessionDelivery{
+			Identity: ownrecords.Identity{TerminalID: l.TerminalID, TTY: l.TTY, Assistant: &assistant,
 				PID: &pid, ProcessStart: &start, ConversationID: &conv},
 			Summary:    p.Summary,
-			ReportedAt: swiftstore.Seconds(p.At),
+			ReportedAt: ownrecords.Seconds(p.At),
 		})
 	}
 	return out, nil
@@ -341,15 +341,15 @@ func (s *Server) ownDeliveries(ctx context.Context, lives []swiftstore.Live) ([]
 
 // ownHandoffs converts the handoffs, and the label each names the session it
 // opened with — by the terminal the broker opened for it.
-func ownHandoffs(handoffs []orchestrator.Handoff, byTerminal map[string]swiftstore.Live) ([]swiftstore.Handoff, []swiftstore.HandoffLabel) {
-	out := make([]swiftstore.Handoff, 0, len(handoffs))
-	labels := []swiftstore.HandoffLabel{}
+func ownHandoffs(handoffs []orchestrator.Handoff, byTerminal map[string]ownrecords.Live) ([]ownrecords.Handoff, []ownrecords.HandoffLabel) {
+	out := make([]ownrecords.Handoff, 0, len(handoffs))
+	labels := []ownrecords.HandoffLabel{}
 	for _, h := range handoffs {
-		out = append(out, swiftstore.Handoff{ID: h.ID, State: h.State, FromSession: stringPtr(h.FromSession),
-			Created: swiftstore.Seconds(h.CreatedAt)})
+		out = append(out, ownrecords.Handoff{ID: h.ID, State: h.State, FromSession: stringPtr(h.FromSession),
+			Created: ownrecords.Seconds(h.CreatedAt)})
 		if h.Opened != nil && h.Opened.TerminalID != "" && h.Title != "" {
 			if identity := ownOpenedIdentity(h.Opened.TerminalID, h.Assistant, h.Opened.OpenedAt, h.DeliveredAt, byTerminal); identity != nil {
-				labels = append(labels, swiftstore.HandoffLabel{HandoffID: h.ID, Label: h.Title, Identity: *identity})
+				labels = append(labels, ownrecords.HandoffLabel{HandoffID: h.ID, Label: h.Title, Identity: *identity})
 			}
 		}
 	}
@@ -358,10 +358,10 @@ func ownHandoffs(handoffs []orchestrator.Handoff, byTerminal map[string]swiftsto
 
 // ownAssignments converts the Feature Roots that have a terminal: the one the
 // broker opened for the executor.
-func ownAssignments(assignments []orchestrator.RootAssignment, byTerminal map[string]swiftstore.Live) []swiftstore.RootAssignment {
-	out := make([]swiftstore.RootAssignment, 0, len(assignments))
+func ownAssignments(assignments []orchestrator.RootAssignment, byTerminal map[string]ownrecords.Live) []ownrecords.RootAssignment {
+	out := make([]ownrecords.RootAssignment, 0, len(assignments))
 	for _, a := range assignments {
-		ra := swiftstore.RootAssignment{ID: a.ID, Label: a.Label, AgentNamed: a.AgentNamed, State: a.State}
+		ra := ownrecords.RootAssignment{ID: a.ID, Label: a.Label, AgentNamed: a.AgentNamed, State: a.State}
 		if a.Executor != nil && a.Executor.TerminalID != "" {
 			ra.Identity = ownOpenedIdentity(a.Executor.TerminalID, a.Assistant, a.Executor.OpenedAt, a.BriefedAt, byTerminal)
 		}
@@ -376,7 +376,7 @@ func ownAssignments(assignments []orchestrator.RootAssignment, byTerminal map[st
 // Existing launch records have no process identity, so use their closed launch
 // interval with the same clock tolerance as ownChild. Missing evidence keeps
 // the conversation's own title rather than lending it an unrelated task name.
-func ownOpenedIdentity(terminal, assistant string, opened, briefed int64, byTerminal map[string]swiftstore.Live) *swiftstore.RootAssignmentIdentity {
+func ownOpenedIdentity(terminal, assistant string, opened, briefed int64, byTerminal map[string]ownrecords.Live) *ownrecords.RootAssignmentIdentity {
 	live, ok := byTerminal[terminal]
 	if !ok || opened <= 0 || briefed < opened || live.Assistant != assistant || assistant == "" ||
 		live.PID == 0 || live.ProcessStart.IsZero() {
@@ -387,7 +387,7 @@ func ownOpenedIdentity(terminal, assistant string, opened, briefed int64, byTerm
 		return nil
 	}
 	start := secondsOf(live.ProcessStart)
-	return &swiftstore.RootAssignmentIdentity{TerminalID: terminal, Assistant: assistant,
+	return &ownrecords.RootAssignmentIdentity{TerminalID: terminal, Assistant: assistant,
 		PID: &live.PID, ProcessStart: &start, ConversationID: stringPtr(live.ConversationID)}
 }
 
@@ -399,14 +399,14 @@ func ownOpenedIdentity(terminal, assistant string, opened, briefed int64, byTerm
 // as the Swift app labels one. Without these a child this daemon dispatched
 // stood alone in the list as soon as the Swift store was not there to place it
 // (cutover B1).
-func ownTaskLinks(row *contract.TaskRow, t orchestrator.Record, screen []swiftstore.OnScreen) {
+func ownTaskLinks(row *contract.TaskRow, t orchestrator.Record, screen []ownrecords.OnScreen) {
 	if t.ChildTerminalID != "" || t.ChildBackend != "" {
 		row.Child = &contract.TaskChild{TerminalID: t.ChildTerminalID, Backend: t.ChildBackend}
 	}
 	switch {
 	case t.Root != nil:
 		row.Root = &contract.TaskRoot{SessionID: t.Root.SessionID, Assistant: t.Root.Assistant, Label: t.Root.Label,
-			TerminalID: swiftstore.ScreenTerminal(screen, t.Root.Assistant, t.Root.SessionID)}
+			TerminalID: ownrecords.ScreenTerminal(screen, t.Root.Assistant, t.Root.SessionID)}
 	case t.ScheduleTitle != "":
 		row.Root = &contract.TaskRoot{Label: t.ScheduleTitle}
 	}

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 )
 
@@ -20,10 +20,10 @@ func TestAnOwnTaskIsTiedOnlyToItsOwnProcess(t *testing.T) {
 		ChildConversationID: "c",
 		CreatedAt:           time.Unix(990, 0), SpawnedAt: time.Unix(1000, 0), FinishedAt: time.Unix(2000, 0),
 		Landing: &orchestrator.Landing{State: orchestrator.LandingPending}}
-	live := swiftstore.Live{TerminalID: "%3", TTY: "ttys003", Assistant: "claude", PID: 9,
+	live := ownrecords.Live{TerminalID: "%3", TTY: "ttys003", Assistant: "claude", PID: 9,
 		ProcessStart: time.Unix(1001, 0), ConversationID: "c"}
 
-	got := ownTasks([]orchestrator.Record{r}, map[string]swiftstore.Live{"%3": live})[0]
+	got := ownTasks([]orchestrator.Record{r}, map[string]ownrecords.Live{"%3": live})[0]
 	if !got.TranscriptProven || got.ChildPID == nil || *got.ChildPID != 9 || *got.ChildSession != "c" {
 		t.Fatalf("the task's own child was not tied to it: %+v", got)
 	}
@@ -34,15 +34,15 @@ func TestAnOwnTaskIsTiedOnlyToItsOwnProcess(t *testing.T) {
 		t.Fatal("a finished task reads as one without a result")
 	}
 
-	for name, change := range map[string]func(*swiftstore.Live){
-		"a process started after the task ended": func(l *swiftstore.Live) { l.ProcessStart = time.Unix(3000, 0) },
-		"a process older than the tab":           func(l *swiftstore.Live) { l.ProcessStart = time.Unix(500, 0) },
-		"another assistant":                      func(l *swiftstore.Live) { l.Assistant = "codex" },
-		"an unbound conversation":                func(l *swiftstore.Live) { l.ConversationID = "" },
+	for name, change := range map[string]func(*ownrecords.Live){
+		"a process started after the task ended": func(l *ownrecords.Live) { l.ProcessStart = time.Unix(3000, 0) },
+		"a process older than the tab":           func(l *ownrecords.Live) { l.ProcessStart = time.Unix(500, 0) },
+		"another assistant":                      func(l *ownrecords.Live) { l.Assistant = "codex" },
+		"an unbound conversation":                func(l *ownrecords.Live) { l.ConversationID = "" },
 	} {
 		l := live
 		change(&l)
-		got := ownTasks([]orchestrator.Record{r}, map[string]swiftstore.Live{"%3": l})[0]
+		got := ownTasks([]orchestrator.Record{r}, map[string]ownrecords.Live{"%3": l})[0]
 		if got.TranscriptProven || got.ChildPID != nil {
 			t.Errorf("%s was taken for the task's child", name)
 		}
@@ -52,10 +52,10 @@ func TestAnOwnTaskIsTiedOnlyToItsOwnProcess(t *testing.T) {
 func TestAFinishedTaskNeedsItsRecordedConversationToNameAChild(t *testing.T) {
 	r := orchestrator.Record{ID: "t1", Assistant: "codex", State: orchestrator.StateSuccess,
 		ChildTerminalID: "%1", CreatedAt: time.Unix(990, 0), FinishedAt: time.Unix(2000, 0)}
-	live := swiftstore.Live{TerminalID: "%1", Assistant: "codex", PID: 9,
+	live := ownrecords.Live{TerminalID: "%1", Assistant: "codex", PID: 9,
 		ProcessStart: time.Unix(1000, 0), ConversationID: "new-conversation"}
-	read := func() swiftstore.Task {
-		return ownTasks([]orchestrator.Record{r}, map[string]swiftstore.Live{"%1": live})[0]
+	read := func() ownrecords.Task {
+		return ownTasks([]orchestrator.Record{r}, map[string]ownrecords.Live{"%1": live})[0]
 	}
 	if got := read(); got.ChildSession != nil || got.TranscriptProven {
 		t.Fatalf("finished task without a recorded conversation borrowed the current one: %+v", got)
@@ -79,17 +79,17 @@ func TestAChildStartedBeforeItsTabFinishedOpeningIsStillTheTasksChild(t *testing
 		ChildConversationID: "c2",
 		CreatedAt:           time.Unix(1000, 0), SpawnedAt: time.Unix(1021, 0), FinishedAt: time.Unix(1055, 0),
 		Landing: &orchestrator.Landing{State: orchestrator.LandingPending}}
-	live := swiftstore.Live{TerminalID: "%42", TTY: "ttys009", Assistant: "codex", PID: 4242,
+	live := ownrecords.Live{TerminalID: "%42", TTY: "ttys009", Assistant: "codex", PID: 4242,
 		ProcessStart: time.Unix(1002, 0), ConversationID: "c2"}
 
-	got := ownTasks([]orchestrator.Record{r}, map[string]swiftstore.Live{"%42": live})[0]
+	got := ownTasks([]orchestrator.Record{r}, map[string]ownrecords.Live{"%42": live})[0]
 	if !got.TranscriptProven || got.ChildPID == nil || *got.ChildPID != 4242 {
 		t.Fatalf("a child that started while its tab was opening was not tied to its task: %+v", got)
 	}
 
 	older := live
 	older.ProcessStart = time.Unix(900, 0)
-	if got := ownTasks([]orchestrator.Record{r}, map[string]swiftstore.Live{"%42": older})[0]; got.TranscriptProven {
+	if got := ownTasks([]orchestrator.Record{r}, map[string]ownrecords.Live{"%42": older})[0]; got.TranscriptProven {
 		t.Fatal("a process from before the task existed was taken for its child")
 	}
 }
@@ -98,7 +98,7 @@ func TestAChildStartedBeforeItsTabFinishedOpeningIsStillTheTasksChild(t *testing
 // A conversation exactly one terminal holds is named by it, and one two
 // terminals claim names neither.
 func TestOwnWaitsAreNamedByTheirTerminal(t *testing.T) {
-	lives := []swiftstore.Live{
+	lives := []ownrecords.Live{
 		{TerminalID: "%1", ConversationID: "owner"},
 		{TerminalID: "%2", ConversationID: "waiter"},
 		{TerminalID: "%3", ConversationID: "twice"},
@@ -142,23 +142,23 @@ func TestReusedTmuxPaneDoesNotInheritOpenedSessionLabels(t *testing.T) {
 		{"unread start", 0, "codex", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			live := swiftstore.Live{TerminalID: "%0", Assistant: tc.assistant, PID: 9, ConversationID: "conversation"}
+			live := ownrecords.Live{TerminalID: "%0", Assistant: tc.assistant, PID: 9, ConversationID: "conversation"}
 			if tc.start != 0 {
 				live.ProcessStart = time.Unix(tc.start, 0)
 			}
-			lives := []swiftstore.Live{live}
-			byTerminal := map[string]swiftstore.Live{"%0": live}
+			lives := []ownrecords.Live{live}
+			byTerminal := map[string]ownrecords.Live{"%0": live}
 			roots := ownAssignments([]orchestrator.RootAssignment{assignment}, byTerminal)
 			_, labels := ownHandoffs([]orchestrator.Handoff{handoff}, byTerminal)
-			for name, snapshot := range map[string]swiftstore.Snapshot{
-				"root": (swiftstore.Snapshot{}).With(swiftstore.Own{RootAssignments: roots}), "handoff": (swiftstore.Snapshot{}).With(swiftstore.Own{HandoffLabels: labels}),
+			for name, snapshot := range map[string]ownrecords.Snapshot{
+				"root": (ownrecords.Snapshot{}).With(ownrecords.Own{RootAssignments: roots}), "handoff": (ownrecords.Snapshot{}).With(ownrecords.Own{HandoffLabels: labels}),
 			} {
 				title := snapshot.TitleOf(live, "", lives).Orchestrator
 				if (title != "") != tc.want {
 					t.Errorf("%s title=%q, want label=%v", name, title, tc.want)
 				}
 			}
-			if ((swiftstore.Snapshot{}).With(swiftstore.Own{RootAssignments: roots})).RootAssignment(live) != nil && !tc.want {
+			if ((ownrecords.Snapshot{}).With(ownrecords.Own{RootAssignments: roots})).RootAssignment(live) != nil && !tc.want {
 				t.Fatal("replacement inherited root ownership")
 			}
 		})

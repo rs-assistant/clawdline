@@ -14,8 +14,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/domain/work"
 )
 
@@ -737,7 +737,7 @@ func trimCallbackLog(files callbackFiles) {
 // leaderStart is when pid started, in Unix seconds, or 0 when the kernel would
 // not say. Two readings of one process agree; a reused pid does not.
 func leaderStart(pid int) int64 {
-	at := swiftstore.ProcessStart(pid)
+	at := ownrecords.ProcessStart(pid)
 	if at.IsZero() {
 		return 0
 	}

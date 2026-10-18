@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/app/ports"
 	"github.com/sainteye/clawdline/internal/domain/session"
@@ -40,7 +40,7 @@ const slowListing = 400 * time.Millisecond
 // the shared reading in front of it, and the pane's current generation.
 func slowPinnedServer(t *testing.T) (*Server, *slowPane, string) {
 	t.Helper()
-	if swiftstore.ProcessStart(os.Getpid()).IsZero() {
+	if ownrecords.ProcessStart(os.Getpid()).IsZero() {
 		t.Skip("this platform has no kernel process-start reader")
 	}
 	p := &pane{s: session.Session{ID: "%19", Backend: session.BackendTmux,
@@ -59,7 +59,7 @@ func slowPinnedServer(t *testing.T) (*Server, *slowPane, string) {
 	if len(items) != 1 {
 		t.Fatalf("assistant reading: %+v", inv)
 	}
-	gen := s.observeExecutions(ctx, inv, items, []swiftstore.Live{liveOf(items[0])})["%19"]
+	gen := s.observeExecutions(ctx, inv, items, []ownrecords.Live{liveOf(items[0])})["%19"]
 	if gen == "" {
 		t.Fatal("no generation for the pane")
 	}

@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/contract"
 )
 
@@ -68,7 +68,7 @@ func runCoordinatedOperation(stdout, stderr io.Writer, b *broker, opts coordinat
 	req := contract.LeaseRequest{RequestID: id, Resource: contract.LeaseResource(opts.resource),
 		Checkout: opts.checkout, Holder: conversation, Reason: opts.reason,
 		SessionID: conversation, PID: int64(os.Getpid()), Phase: "waiting"}
-	if start := swiftstore.ProcessStart(os.Getpid()); !start.IsZero() {
+	if start := ownrecords.ProcessStart(os.Getpid()); !start.IsZero() {
 		req.ProcessStart = start.Unix()
 	}
 	owner := contract.LeaseOwnerRequest{RequestID: id, Resource: req.Resource, Checkout: opts.checkout}

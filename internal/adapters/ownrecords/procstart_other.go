@@ -1,6 +1,6 @@
 //go:build !darwin && !linux
 
-package swiftstore
+package ownrecords
 
 import "time"
 

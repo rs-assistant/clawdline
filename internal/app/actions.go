@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/artifacts"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/app/lane"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
@@ -698,7 +698,7 @@ func (a Actions) ClosePinned(ctx context.Context, id string, force bool, pid int
 	}
 	if pid != 0 {
 		if session.SourceForID(id) != "ps" || started.IsZero() || s.PID != pid ||
-			!swiftstore.ProcessStart(pid).Equal(started) {
+			!ownrecords.ProcessStart(pid).Equal(started) {
 			return s, Refusal{Code: "close_not_proven", Detail: "the process changed since this close was confirmed"}
 		}
 		s.ExpectedStart = started

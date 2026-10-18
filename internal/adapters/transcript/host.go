@@ -85,7 +85,7 @@ func (h *Host) codexIndexes() (map[string]string, map[string]codexLiveIdentity) 
 // The two rungs above the conversation's own title are records this daemon
 // keeps: a name somebody typed in Clawdline, and the title of the task
 // Clawdline opened the tab for. They are not read here; the session list fills
-// them from its own records (projected by internal/adapters/swiftstore) and
+// them from its own records (projected by internal/adapters/ownrecords) and
 // chooses again from Rungs. A weak `aiTitle` is still never set aside, because telling
 // weak from strong needs the conversation's first message, which is not read.
 func (h *Host) ForSession(ctx context.Context, s session.Session) (ports.Identity, bool) {

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
@@ -95,10 +95,10 @@ func TestProjectNamesANewSessionBeforeItsTerminalCoordinate(t *testing.T) {
 		Assistant: session.AssistantCodex,
 		Rungs:     session.LabelRungs{Coordinate: "Codex · ttys020"},
 	}
-	if got := rowLabel(item, swiftstore.Titles{}, "my-app"); got != "Codex · my-app" {
+	if got := rowLabel(item, ownrecords.Titles{}, "my-app"); got != "Codex · my-app" {
 		t.Fatalf("label = %q", got)
 	}
-	if got := rowLabel(item, swiftstore.Titles{Manual: "Release helper"}, "my-app"); got != "Release helper" {
+	if got := rowLabel(item, ownrecords.Titles{Manual: "Release helper"}, "my-app"); got != "Release helper" {
 		t.Fatalf("manual label was replaced by %q", got)
 	}
 }

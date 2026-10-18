@@ -212,7 +212,7 @@ React 端要另外寫的只有 `useFleet.ts`——九行 `useSyncExternalStore`�
 `orchestrator.json`、`coordinator.json`、`config.json`、舊看板、家規 local 檔一個都不再開，皇冠、task chip、
 協調等待與交付勾只畫本專案自己的紀錄。
 
-讀的東西（全部在 `internal/adapters/swiftstore`）：
+讀的東西（全部在 `internal/adapters/swiftstore`，2026-10-18 改名為 `internal/adapters/ownrecords`）：
 - `~/.config/clawdline/orchestrator.json`、`coordinator.json`：上面那些事實。
 - `~/.config/clawdline/config.json`：只解 `session_titles`，以及方案額度要的 `status_dir`、`codex_home`、
   `assistant_quota_low_threshold` 三個鍵（`QuotaConfig`）。
@@ -222,6 +222,8 @@ React 端要另外寫的只有 `useFleet.ts`——九行 `useSyncExternalStore`�
   原始標記文字。做法（`images.go`）：`O_RDONLY` 開 `<id>.json` 與 `<id>.png`，比對 byteCount，過期或 `deletedAt`
   就回「過期」。**舊 app 讀到過期記錄時會順手寫墓碑，本讀取器不寫**——過期是答案，不是要改的狀態。
   自己存的圖在自己的 `CLAWDLINE_NEXT_DIR/session-images`，先查自己的、查不到才問舊的。
+  **2026-10-18 拿掉了**：`images.go` 與 `CLAWDLINE_SESSION_IMAGE_DIR` 都刪了，舊快取從 2026-09-19 舊 app 停掉後
+  就沒再寫過；現在只查自己的 store，舊 app 的圖片 id 一律答「未知」。
 - **看板** `~/Library/Application Support/Clawdline/project-board.json`（`CLAWDLINE_BOARD_STORE` 可改；2026-09-18）：
   舊 app 的 776 張卡，`/v1/board` 唯讀顯示（`internal/adapters/board/source.go` 的 `Legacy`）。`O_RDONLY` 讀整份、
   依 size＋mtime 快取，讀壞或版本不認得就沿用上一次好的讀數並把 `readState.status` 標成 `stale`，沒有就回 `error`，
@@ -241,7 +243,7 @@ React 端要另外寫的只有 `useFleet.ts`——九行 `useSyncExternalStore`�
 - **讀不到是「未知」，不是「空」。** 舊 app 隨時在改寫這些檔；半截的 JSON 要沿用上一次成功的讀數，
   並依 mtime 快取（`orchestrator.json` 有 6 MB）。
 - **這是過渡。** 等本專案自己擁有派工與交付紀錄時，這條讀取要能整條拿掉；所以它是一個獨立的
-  adapter（`internal/adapters/swiftstore`），不是散在各處的路徑。
+  adapter（當時的 `internal/adapters/swiftstore`），不是散在各處的路徑。
 
 ---
 
