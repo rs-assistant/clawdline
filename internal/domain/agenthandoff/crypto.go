@@ -2,19 +2,14 @@ package agenthandoff
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/ecdh"
 	"crypto/ed25519"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"io"
 
-	"github.com/sainteye/clawdline/internal/domain/cloud"
 	"golang.org/x/crypto/hkdf"
 )
 
@@ -38,18 +33,6 @@ type Envelope struct {
 	Nonce      string  `json:"nonce"`
 	KeyID      string  `json:"key_id"`
 	Signature  string  `json:"signature"`
-}
-
-func canonicalRequest(request Request) ([]byte, error) {
-	encoded, err := json.Marshal(request)
-	if err != nil {
-		return nil, err
-	}
-	parsed, err := cloud.Parse(encoded)
-	if err != nil {
-		return nil, err
-	}
-	return cloud.CanonicalBytes(parsed), nil
 }
 
 // PairKey derives the exact pair key and key ID from a pinned transcript.
@@ -97,20 +80,12 @@ func PairKey(pair PairKeys, localPrivate *ecdh.PrivateKey, sourceSide bool) ([]b
 // SignatureInput is the peer rail's Ed25519 input, separate from the older
 // Cloud envelope signature format.
 func SignatureInput(envelope Envelope) ([]byte, error) {
-	request, err := canonicalRequest(envelope.Request)
-	if err != nil || envelope.Nonce == "" || envelope.KeyID == "" || envelope.Ciphertext == "" {
-		return nil, ErrPeerEnvelope
-	}
-	input := make([]byte, 0, len(request)+len(envelope.Nonce)+len(envelope.KeyID)+len(envelope.Ciphertext)+32)
-	input = append(input, "clawdline-peer-v1\n"...)
-	input = append(input, request...)
-	input = append(input, '\n')
-	input = append(input, envelope.Nonce...)
-	input = append(input, '\n')
-	input = append(input, envelope.KeyID...)
-	input = append(input, '\n')
-	input = append(input, envelope.Ciphertext...)
-	return input, nil
+	return requestFrame.signatureInput(envelope.Request, envelope.frame())
+}
+
+func (envelope Envelope) frame() sealedFrame {
+	return sealedFrame{Ciphertext: envelope.Ciphertext, Nonce: envelope.Nonce,
+		KeyID: envelope.KeyID, Signature: envelope.Signature}
 }
 
 // Open verifies the pinned peer signature, derived key ID and GCM tag before
@@ -121,44 +96,7 @@ func Open(envelope Envelope, pair PairKeys, localPrivate *ecdh.PrivateKey, pinne
 		envelope.Request.Target.MachineID != pair.TargetMachineID {
 		return nil, ErrPeerEnvelope
 	}
-	input, err := SignatureInput(envelope)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	sig, err := decodeCanonical(envelope.Signature, ed25519.SignatureSize)
-	if err != nil || !ed25519.Verify(pinnedSigner, input, sig) {
-		return nil, ErrPeerEnvelope
-	}
-	key, expectedID, err := PairKey(pair, localPrivate, false)
-	if err != nil || envelope.KeyID != expectedID {
-		return nil, ErrPeerEnvelope
-	}
-	nonce, err := decodeCanonical(envelope.Nonce, 12)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	ciphertext, err := decodeCanonical(envelope.Ciphertext, -1)
-	if err != nil || len(ciphertext) < 16 {
-		return nil, ErrPeerEnvelope
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	request, err := canonicalRequest(envelope.Request)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	aad := make([]byte, 0, len(request)+len(envelope.KeyID)+32)
-	aad = append(aad, "clawdline-peer-aad-v1\n"...)
-	aad = append(aad, request...)
-	aad = append(aad, '\n')
-	aad = append(aad, envelope.KeyID...)
-	plain, err := aead.Open(nil, nonce, ciphertext, aad)
+	plain, err := requestFrame.open(envelope.Request, envelope.frame(), pair, localPrivate, false, pinnedSigner)
 	if err != nil || len(plain) == 0 {
 		return nil, ErrPeerEnvelope
 	}
@@ -183,39 +121,12 @@ func Seal(request Request, body []byte, pair PairKeys, localPrivate *ecdh.Privat
 	if request.BodyDigest != hex.EncodeToString(sum[:]) {
 		return Envelope{}, ErrPeerEnvelope
 	}
-	key, keyID, err := PairKey(pair, localPrivate, true)
+	frame, err := requestFrame.seal(request, body, pair, localPrivate, true, signer)
 	if err != nil {
 		return Envelope{}, ErrPeerEnvelope
 	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return Envelope{}, ErrPeerEnvelope
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return Envelope{}, ErrPeerEnvelope
-	}
-	nonce := make([]byte, aead.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return Envelope{}, ErrPeerEnvelope
-	}
-	canonical, err := canonicalRequest(request)
-	if err != nil {
-		return Envelope{}, ErrPeerEnvelope
-	}
-	aad := make([]byte, 0, len(canonical)+len(keyID)+32)
-	aad = append(aad, "clawdline-peer-aad-v1\n"...)
-	aad = append(aad, canonical...)
-	aad = append(aad, '\n')
-	aad = append(aad, keyID...)
-	envelope := Envelope{Request: request, Nonce: base64.StdEncoding.EncodeToString(nonce),
-		KeyID: keyID, Ciphertext: base64.StdEncoding.EncodeToString(aead.Seal(nil, nonce, body, aad))}
-	input, err := SignatureInput(envelope)
-	if err != nil {
-		return Envelope{}, ErrPeerEnvelope
-	}
-	envelope.Signature = base64.StdEncoding.EncodeToString(ed25519.Sign(signer, input))
-	return envelope, nil
+	return Envelope{Request: request, Ciphertext: frame.Ciphertext, Nonce: frame.Nonce,
+		KeyID: frame.KeyID, Signature: frame.Signature}, nil
 }
 
 func decodeCanonical(raw string, length int) ([]byte, error) {
