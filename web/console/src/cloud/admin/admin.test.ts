@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/forget.test.ts.
 import { completeDays, loadOverview, parseOverview, trend } from "./api.ts"
 // @ts-expect-error -- a `.ts` path, for node.
-import { adminLocale, adminWords } from "./words.ts"
+import { ADMIN_ROUTES, adminLocale, adminPath, adminRoute, adminWords, type AdminWord } from "./words.ts"
 
 function body(over: Record<string, unknown> = {}) {
   const counters = { dispatches: 12, connect_minutes: 340, bytes_in: 1_200_000, bytes_out: 5_000 }
@@ -98,4 +98,34 @@ test("Traditional Chinese preferences read Taiwan copy; every other language rea
   assert.equal(adminLocale(["fr-FR"]), "en")
   assert.equal(adminLocale(["en-GB", "zh-TW"]), "en")
   assert.equal(adminWords("zh-TW")("campaignsCapped", { shown: 50, total: 51 }), "共 51 個活動，只顯示最新的 50 個。")
+})
+
+test("each page has its own address, and an address names one page or none", () => {
+  assert.deepEqual(ADMIN_ROUTES.map(adminPath), ["/admin", "/admin/accounts", "/admin/promotions", "/admin/usage"])
+  for (const route of ADMIN_ROUTES) assert.equal(adminRoute(adminPath(route)), route)
+  assert.equal(adminRoute("/admin/"), "overview")
+  assert.equal(adminRoute("/admin/promotions/"), "promotions")
+  assert.equal(adminRoute("/admin/overview"), null)
+  assert.equal(adminRoute("/admin/nope"), null)
+  assert.equal(adminRoute("/administrator"), null)
+  assert.equal(adminRoute("/"), null)
+})
+
+// The tables are typed against each other; what types cannot see is a key the
+// pages compose from a route or a phase, and a placeholder one language lost.
+test("both languages have every composed sentence, with the same placeholders", () => {
+  const en = adminWords("en")
+  const zh = adminWords("zh-TW")
+  const marks = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(",")
+  // Every page, phase and refusal the pages draw by a composed key resolves in both.
+  const composed: AdminWord[] = [
+    ...ADMIN_ROUTES.flatMap((r: string) => [`nav_${r}`, `hint_${r}`, `lead_${r}`] as AdminWord[]),
+    ...["open", "not_started", "expired", "revoked", "limit_reached", "no_codes", "unknown"].map((p) => `phase_${p}` as AdminWord),
+  ]
+  for (const key of composed) {
+    assert.ok(en(key).length > 0, key)
+    assert.ok(zh(key).length > 0, key)
+    assert.equal(marks(zh(key)), marks(en(key)), key)
+  }
+  assert.equal(zh("pageRange", { from: 51, to: 100, total: 230 }), "第 51–100 筆，共 230 筆")
 })

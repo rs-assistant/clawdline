@@ -1,73 +1,301 @@
 import { useId } from "react"
-import { campaignFill, trend, type CampaignRow, type Comparison, type DailyCount, type Overview, type UsagePeriod } from "./api.js"
-import type { Say } from "./words.js"
+import { trend, type CampaignRow, type Comparison, type DailyCount, type Overview, type UsagePeriod } from "./api.js"
+import { adminPath, type AdminRoute, type Say } from "./words.js"
 
 /*
- * The overview, drawn. Three sections in the order an operator asks: are
- * people arriving, are the campaigns working, what is the service carrying.
+ * The operations pages that read the overview: the overview itself, accounts
+ * and usage. Each route draws one subject; the overview answers "is anything
+ * different today" and points at the page that holds the detail.
+ *
  * Every figure the API could not vouch for is shown as the word for unknown,
  * every chart has its numbers in words beside it and a table behind it, and
- * no change is told by colour alone.
+ * no change is told by colour alone. A sentence of insight is built only from
+ * the aggregates the API returned; nothing here estimates what it did not say.
  */
 
-export function AdminDashboard({ overview, say, locale, stale }: {
+/** Follows an in-page link without reloading; a modified press is left to the browser. */
+export type Go = (href: string) => void
+
+export function RouteLink({ href, go, className, current, children }: { href: string; go: Go; className?: string; current?: boolean; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      className={className}
+      aria-current={current ? "page" : undefined}
+      onClick={(event) => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+        event.preventDefault()
+        go(href)
+      }}
+    >
+      {children}
+    </a>
+  )
+}
+
+interface PageProps {
   overview: Overview
   say: Say
   locale: string
-  stale: { code: string } | null
-}) {
+  go: Go
+}
+
+/* ---- overview --------------------------------------------------------- */
+
+export function OverviewPage({ overview, say, locale, go }: PageProps) {
   const n = new Intl.NumberFormat(locale)
   const { accounts, promotions, usage } = overview
+  const yesterday = accounts.daily.length ? accounts.daily[accounts.daily.length - 1] : null
   return (
-    <div className="adm-dash">
-      {stale ? (
-        <p className="adm-stale" role="status">
-          {say("staleNote", { code: stale.code, time: new Intl.DateTimeFormat(locale, { timeZone: "UTC", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(overview.generated_at)) })}
-        </p>
-      ) : null}
+    <div className="adm-page">
+      <div className="adm-tiles adm-tiles-4">
+        <Tile label={say("accountsTotal")} value={n.format(accounts.total)} lead />
+        <Tile label={say("accountsYesterday")} value={yesterday ? n.format(yesterday.count) : say("usageUnknown")}>
+          <p className="adm-tile-note">{yesterday ? longDay(yesterday.day, locale) : say("chartEmpty")}</p>
+        </Tile>
+        <TrendTile label={say("accountsNew7")} value={accounts.new_7d} say={say} n={n} />
+        <Tile label={say("usageActiveNow")} value={usage.current.active_accounts === null ? say("usageUnknown") : n.format(usage.current.active_accounts)}>
+          <p className="adm-tile-note">
+            {usage.current.coverage === "partial" ? say("usagePartial") : say("usageThroughToday")}
+          </p>
+        </Tile>
+      </div>
 
-      <section className="adm-section" aria-labelledby="adm-accounts">
-        <h2 id="adm-accounts" className="adm-h2">{say("sectionAccounts")}</h2>
-        <div className="adm-tiles">
-          <Tile label={say("accountsTotal")} value={n.format(accounts.total)} lead />
-          <TrendTile label={say("accountsNew7")} value={accounts.new_7d} say={say} n={n} />
-          <TrendTile label={say("accountsNew30")} value={accounts.new_30d} say={say} n={n} />
-        </div>
-        <p className="adm-fine">{say("comparisonNote")}</p>
-        <DailyChart title={say("chartAccounts")} days={accounts.daily} say={say} locale={locale} />
+      <section className="adm-panel adm-insights" aria-labelledby="adm-insights">
+        <h2 id="adm-insights" className="adm-h3">{say("insightsTitle")}</h2>
+        <ul className="adm-insight-list">
+          {insights(overview, say, locale).map((item) => (
+            <li key={item.key} className="adm-insight">
+              <span className={"adm-insight-mark adm-insight-" + item.tone} aria-hidden="true" />
+              <p>{item.text}</p>
+              <RouteLink href={adminPath(item.route)} go={go} className="adm-insight-link">
+                {say(item.linkKey)}<span aria-hidden="true"> →</span>
+              </RouteLink>
+            </li>
+          ))}
+        </ul>
+        <p className="adm-fine">{say("insightsBasis")}</p>
       </section>
 
-      <section className="adm-section" aria-labelledby="adm-promotions">
-        <h2 id="adm-promotions" className="adm-h2">{say("sectionPromotions")}</h2>
-        <div className="adm-tiles adm-tiles-4">
-          <Tile label={say("redemptionsTotal")} value={n.format(promotions.redemptions_total)} lead />
-          <Tile label={say("redeemersTotal")} value={n.format(promotions.redeemers_total)} />
-          <TrendTile label={say("redeemed7")} value={promotions.redeemed_7d} say={say} n={n} />
-          <TrendTile label={say("redeemed30")} value={promotions.redeemed_30d} say={say} n={n} />
-        </div>
-        <p className="adm-fine">{say("comparisonNote")}</p>
-        <p className="adm-fine">
-          {say("promoInventory", { campaigns: n.format(promotions.campaigns_total), codes: n.format(promotions.codes_total) })}
-        </p>
-        <DailyChart title={say("chartRedemptions")} days={promotions.daily} say={say} locale={locale} />
-        <Campaigns rows={promotions.campaigns.rows} total={promotions.campaigns.total} say={say} n={n} />
-      </section>
+      <DailyChart title={say("chartAccounts")} days={accounts.daily} say={say} locale={locale} />
 
-      <section className="adm-section" aria-labelledby="adm-usage">
-        <h2 id="adm-usage" className="adm-h2">{say("sectionUsage")}</h2>
-        <div className="adm-usage">
-          <UsageCard heading={say("usageCurrent")} period={usage.current} say={say} locale={locale} n={n} current asOf={overview.generated_at} />
-          <UsageCard heading={say("usagePrevious")} period={usage.previous} say={say} locale={locale} n={n} asOf={overview.generated_at} />
-        </div>
-        <p className="adm-fine">{say("usageNoGrowth")}</p>
-      </section>
-
-      <p className="adm-fine adm-foot">{say("windowNote")}</p>
+      <div className="adm-dest" role="list">
+        <Destination route="accounts" go={go} say={say} title={say("nav_accounts")} body={say("destAccounts", { total: n.format(accounts.total), new30: n.format(accounts.new_30d.current) })} />
+        <Destination route="promotions" go={go} say={say} title={say("nav_promotions")} body={say("destPromotions", { redeemed: n.format(promotions.redeemed_30d.current), campaigns: n.format(promotions.campaigns_total) })} />
+        <Destination route="usage" go={go} say={say} title={say("nav_usage")} body={
+          usage.current.counters.dispatches === null
+            ? say("destUsageUnknown")
+            : say("destUsage", { dispatches: n.format(usage.current.counters.dispatches) })
+        } />
+      </div>
     </div>
   )
 }
 
-function Tile({ label, value, lead, children }: { label: string; value: string; lead?: boolean; children?: React.ReactNode }) {
+function Destination({ route, go, say, title, body }: { route: AdminRoute; go: Go; say: Say; title: string; body: string }) {
+  return (
+    <div role="listitem" className="adm-dest-item">
+      <RouteLink href={adminPath(route)} go={go} className="adm-dest-card">
+        <span className="adm-dest-title">{title}</span>
+        <span className="adm-dest-body">{body}</span>
+        <span className="adm-dest-go">{say("open")}<span aria-hidden="true"> →</span></span>
+      </RouteLink>
+    </div>
+  )
+}
+
+type Insight = { key: string; text: string; tone: "up" | "down" | "flat" | "note"; route: AdminRoute; linkKey: "seeAccounts" | "seePromotions" | "seeUsage" }
+
+function changeSentence(c: Comparison, say: Say, n: Intl.NumberFormat, keys: { up: Parameters<Say>[0]; down: Parameters<Say>[0]; flat: Parameters<Say>[0] }): { text: string; tone: Insight["tone"] } {
+  const t = trend(c)
+  const values = { current: n.format(c.current), previous: n.format(c.previous) }
+  if (t.kind === "flat") return { text: say(keys.flat, values), tone: "flat" }
+  const pct = t.percent === null ? "" : say("insightPercent", { percent: n.format(t.percent) })
+  return { text: say(t.kind === "up" ? keys.up : keys.down, { ...values, delta: n.format(t.delta), pct }), tone: t.kind }
+}
+
+/** What an operator should notice, in sentences, from nothing but the returned aggregates. */
+export function insights(overview: Overview, say: Say, locale: string): Insight[] {
+  const n = new Intl.NumberFormat(locale)
+  const { accounts, promotions, usage } = overview
+  const out: Insight[] = []
+  const a7 = changeSentence(accounts.new_7d, say, n, { up: "insightAccountsUp", down: "insightAccountsDown", flat: "insightAccountsFlat" })
+  out.push({ key: "accounts7", ...a7, route: "accounts", linkKey: "seeAccounts" })
+  if (accounts.daily.length) {
+    const peak = accounts.daily.reduce((best, d) => (d.count > best.count ? d : best), accounts.daily[0])
+    out.push(peak.count > 0
+      ? { key: "peak", text: say("insightPeak", { day: longDay(peak.day, locale), count: n.format(peak.count), days: accounts.daily.length }), tone: "note", route: "accounts", linkKey: "seeAccounts" }
+      : { key: "peak", text: say("insightNoSignups", { days: accounts.daily.length }), tone: "note", route: "accounts", linkKey: "seeAccounts" })
+  }
+  const r30 = changeSentence(promotions.redeemed_30d, say, n, { up: "insightRedeemedUp", down: "insightRedeemedDown", flat: "insightRedeemedFlat" })
+  out.push({ key: "redeemed30", ...r30, route: "promotions", linkKey: "seePromotions" })
+  const rows = promotions.campaigns.rows
+  if (rows.length) {
+    const open = rows.filter((r) => r.status === "redeemable").length
+    const blocked = rows.filter((r) => r.status === "campaign_exhausted" || r.status === "no_available_code").length
+    const capped = promotions.campaigns.total > rows.length
+    const scope = capped ? say("insightScopeLatest", { shown: n.format(rows.length) }) : say("insightScopeAll")
+    out.push({
+      key: "campaigns",
+      text: blocked > 0
+        ? say("insightCampaignsBlocked", { scope, open: n.format(open), blocked: n.format(blocked) })
+        : say("insightCampaignsOpen", { scope, open: n.format(open) }),
+      tone: blocked > 0 ? "down" : "note",
+      route: "promotions",
+      linkKey: "seePromotions",
+    })
+  } else {
+    out.push({ key: "campaigns", text: say("insightNoCampaigns"), tone: "note", route: "promotions", linkKey: "seePromotions" })
+  }
+  const cur = usage.current
+  const prev = usage.previous
+  if (cur.active_accounts !== null && prev.active_accounts !== null) {
+    out.push({
+      key: "usage",
+      text: say(cur.coverage === "partial" ? "insightUsagePartial" : "insightUsage", { now: n.format(cur.active_accounts), last: n.format(prev.active_accounts) }),
+      tone: "note",
+      route: "usage",
+      linkKey: "seeUsage",
+    })
+  } else {
+    out.push({ key: "usage", text: say("insightUsageUnknown"), tone: "note", route: "usage", linkKey: "seeUsage" })
+  }
+  return out
+}
+
+/* ---- accounts --------------------------------------------------------- */
+
+export function AccountsPage({ overview, say, locale }: PageProps) {
+  const n = new Intl.NumberFormat(locale)
+  const one = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 })
+  const { accounts } = overview
+  const days = accounts.daily
+  const yesterday = days.length ? days[days.length - 1] : null
+  const sum = days.reduce((s, d) => s + d.count, 0)
+  const peak = days.length ? days.reduce((best, d) => (d.count > best.count ? d : best), days[0]) : null
+  const quiet = days.filter((d) => d.count === 0).length
+  return (
+    <div className="adm-page">
+      <div className="adm-tiles adm-tiles-4">
+        <Tile label={say("accountsTotal")} value={n.format(accounts.total)} lead />
+        <Tile label={say("accountsYesterday")} value={yesterday ? n.format(yesterday.count) : say("usageUnknown")}>
+          <p className="adm-tile-note">{yesterday ? longDay(yesterday.day, locale) : say("chartEmpty")}</p>
+        </Tile>
+        <TrendTile label={say("accountsNew7")} value={accounts.new_7d} say={say} n={n} />
+        <TrendTile label={say("accountsNew30")} value={accounts.new_30d} say={say} n={n} />
+      </div>
+      <p className="adm-fine">{say("comparisonNote")}</p>
+
+      <DailyChart title={say("chartAccounts")} days={days} say={say} locale={locale} tall />
+
+      {days.length ? (
+        <section className="adm-stats" aria-labelledby="adm-acc-stats">
+          <h2 id="adm-acc-stats" className="adm-h2">{say("accountsPattern")}</h2>
+          <div className="adm-tiles adm-tiles-3">
+            <Stat label={say("statDailyAverage")} value={one.format(sum / days.length)} note={say("statOverDays", { days: days.length })} />
+            <Stat label={say("statBusiest")} value={peak ? n.format(peak.count) : "—"} note={peak ? longDay(peak.day, locale) : ""} />
+            <Stat label={say("statQuietDays")} value={n.format(quiet)} note={say("statQuietNote", { days: days.length })} />
+          </div>
+        </section>
+      ) : null}
+      <p className="adm-fine adm-foot">{say("accountsPrivacy")} {say("windowNote")}</p>
+    </div>
+  )
+}
+
+/* ---- usage ------------------------------------------------------------ */
+
+export function UsagePage({ overview, say, locale }: PageProps) {
+  const n = new Intl.NumberFormat(locale)
+  const { usage } = overview
+  const metrics: { label: string; pick: (p: UsagePeriod) => number | null; format: (v: number) => string }[] = [
+    { label: say("usageActive"), pick: (p) => p.active_accounts, format: (v) => n.format(v) },
+    { label: say("usageDispatches"), pick: (p) => p.counters.dispatches, format: (v) => n.format(v) },
+    { label: say("usageMinutes"), pick: (p) => p.counters.connect_minutes, format: (v) => n.format(v) },
+    { label: say("usageIn"), pick: (p) => p.counters.bytes_in, format: (v) => bytes(v, locale) },
+    { label: say("usageOut"), pick: (p) => p.counters.bytes_out, format: (v) => bytes(v, locale) },
+  ]
+  return (
+    <div className="adm-page">
+      <div className="adm-usage">
+        <UsageCard heading={say("usageCurrent")} period={usage.current} say={say} locale={locale} n={n} current asOf={overview.generated_at} />
+        <UsageCard heading={say("usagePrevious")} period={usage.previous} say={say} locale={locale} n={n} asOf={overview.generated_at} />
+      </div>
+
+      <section className="adm-panel adm-compare" aria-labelledby="adm-usage-side">
+        <h2 id="adm-usage-side" className="adm-h3">{say("usageSideBySide")}</h2>
+        <p className="adm-fine">{say("usageNoGrowth")}</p>
+        <div className="adm-table-wrap">
+          <table className="adm-table adm-table-compare">
+            <thead>
+              <tr>
+                <th scope="col">{say("usageMetric")}</th>
+                <th scope="col">{say("usagePreviousShort", { month: monthName(usage.previous.period, locale) })}</th>
+                <th scope="col">{say("usageCurrentShort", { month: monthName(usage.current.period, locale) })}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {metrics.map((m) => {
+                const before = m.pick(usage.previous)
+                const now = m.pick(usage.current)
+                const max = Math.max(1, before ?? 0, now ?? 0)
+                return (
+                  <tr key={m.label}>
+                    <th scope="row">{m.label}</th>
+                    <td><Measured value={before} max={max} format={m.format} say={say} /></td>
+                    <td><Measured value={now} max={max} format={m.format} say={say} current /></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="adm-stats" aria-labelledby="adm-usage-per">
+        <h2 id="adm-usage-per" className="adm-h2">{say("usagePerAccount")}</h2>
+        <div className="adm-tiles adm-tiles-3">
+          {([
+            ["usageMinutesPer", (p: UsagePeriod) => p.counters.connect_minutes, (v: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(v)],
+            ["usageDispatchesPer", (p: UsagePeriod) => p.counters.dispatches, (v: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(v)],
+            ["usageDataPer", (p: UsagePeriod) => (p.counters.bytes_in === null || p.counters.bytes_out === null ? null : p.counters.bytes_in + p.counters.bytes_out), (v: number) => bytes(v, locale)],
+          ] as const).map(([key, pick, format]) => {
+            const per = (p: UsagePeriod) => {
+              const v = pick(p)
+              return v === null || !p.active_accounts ? null : v / p.active_accounts
+            }
+            const last = per(usage.previous)
+            const now = per(usage.current)
+            return (
+              <Stat key={key} label={say(key)}
+                value={last === null ? say("usageUnknown") : format(last)}
+                note={say("usagePerNote", { month: monthName(usage.previous.period, locale), now: now === null ? say("usageUnknown") : format(now) })} />
+            )
+          })}
+        </div>
+        <p className="adm-fine">{say("usagePerBasis")}</p>
+      </section>
+    </div>
+  )
+}
+
+function Measured({ value, max, format, say, current = false }: { value: number | null; max: number; format: (v: number) => string; say: Say; current?: boolean }) {
+  if (value === null) {
+    return <span className="adm-unknown" title={say("usageUnknownLabel")}><span aria-hidden="true">— </span>{say("usageUnknown")}</span>
+  }
+  return (
+    <span className="adm-measured">
+      <span className="adm-measured-num">{format(value)}</span>
+      <span className={current ? "adm-meter adm-meter-now" : "adm-meter"} aria-hidden="true">
+        <span style={{ width: `${Math.round((value / max) * 100)}%` }} />
+      </span>
+    </span>
+  )
+}
+
+/* ---- shared pieces ---------------------------------------------------- */
+
+export function Tile({ label, value, lead, children }: { label: string; value: string; lead?: boolean; children?: React.ReactNode }) {
   return (
     <div className={lead ? "adm-tile adm-tile-lead" : "adm-tile"}>
       <p className="adm-tile-label">{label}</p>
@@ -77,7 +305,17 @@ function Tile({ label, value, lead, children }: { label: string; value: string; 
   )
 }
 
-function TrendTile({ label, value, say, n }: { label: string; value: Comparison; say: Say; n: Intl.NumberFormat }) {
+function Stat({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div className="adm-tile adm-tile-stat">
+      <p className="adm-tile-label">{label}</p>
+      <p className="adm-tile-value">{value}</p>
+      {note ? <p className="adm-tile-note">{note}</p> : null}
+    </div>
+  )
+}
+
+export function TrendTile({ label, value, say, n }: { label: string; value: Comparison; say: Say; n: Intl.NumberFormat }) {
   const t = trend(value)
   const previous = n.format(value.previous)
   let chip: string
@@ -109,7 +347,11 @@ function shortDay(day: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { timeZone: "UTC", month: "numeric", day: "numeric" }).format(new Date(day + "T00:00:00Z"))
 }
 
-function DailyChart({ title, days, say, locale }: { title: string; days: DailyCount[]; say: Say; locale: string }) {
+function longDay(day: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" }).format(new Date(day + "T00:00:00Z"))
+}
+
+export function DailyChart({ title, days, say, locale, tall = false }: { title: string; days: DailyCount[]; say: Say; locale: string; tall?: boolean }) {
   const id = useId()
   const n = new Intl.NumberFormat(locale)
   if (days.length === 0) {
@@ -138,18 +380,22 @@ function DailyChart({ title, days, say, locale }: { title: string; days: DailyCo
         <span id={id + "t"} className="adm-chart-title">{title}</span>
         <span className="adm-chart-range">{say("chartRange", { from, to })}</span>
       </figcaption>
-      <svg className="adm-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`${title}. ${summary}`}>
-        <line x1="0" x2={W} y1={H - 0.5} y2={H - 0.5} className="adm-axis" />
-        {days.map((d, i) => {
-          const h = d.count === 0 ? 0 : Math.max(2, (d.count / max) * (H - 6))
-          return (
-            <rect key={d.day} x={i * slot + (slot - bar) / 2} y={H - 1 - h} width={bar} height={h} rx="1"
-              className={d === peak && d.count > 0 ? "adm-bar adm-bar-peak" : "adm-bar"}>
-              <title>{`${shortDay(d.day, locale)}: ${n.format(d.count)}`}</title>
-            </rect>
-          )
-        })}
-      </svg>
+      <div className="adm-chart-body">
+        <span className="adm-chart-max" aria-hidden="true">{n.format(peak.count)}</span>
+        <svg className={tall ? "adm-svg adm-svg-tall" : "adm-svg"} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`${title}. ${summary}`}>
+          <line x1="0" x2={W} y1={H - 0.5} y2={H - 0.5} className="adm-axis" />
+          <line x1="0" x2={W} y1={5.5} y2={5.5} className="adm-axis adm-axis-top" />
+          {days.map((d, i) => {
+            const h = d.count === 0 ? 0 : Math.max(2, (d.count / max) * (H - 6))
+            return (
+              <rect key={d.day} x={i * slot + (slot - bar) / 2} y={H - 1 - h} width={bar} height={h} rx="1"
+                className={d === peak && d.count > 0 ? "adm-bar adm-bar-peak" : "adm-bar"}>
+                <title>{`${shortDay(d.day, locale)}: ${n.format(d.count)}`}</title>
+              </rect>
+            )
+          })}
+        </svg>
+      </div>
       <div className="adm-chart-scale" aria-hidden="true">
         <span>{from}</span>
         <span>{to}</span>
@@ -172,84 +418,18 @@ function DailyChart({ title, days, say, locale }: { title: string; days: DailyCo
   )
 }
 
-function campaignWindow(row: CampaignRow, say: Say): string {
-  const utc = (value: string) => new Date(value).toISOString().replace("T", " ").replace(/\.000Z$/, "Z")
-  const from = row.not_before ? utc(row.not_before) : null
-  const to = row.expires_at ? utc(row.expires_at) : null
+/** An instant as the page writes it everywhere: `YYYY-MM-DD HH:MM UTC`. */
+export function utcMinute(iso: string): string {
+  return new Date(iso).toISOString().slice(0, 16).replace("T", " ") + " UTC"
+}
+
+export function campaignWindow(row: Pick<CampaignRow, "not_before" | "expires_at">, say: Say): string {
+  const from = row.not_before ? utcMinute(row.not_before) : null
+  const to = row.expires_at ? utcMinute(row.expires_at) : null
   if (from && to) return say("windowRange", { from, to })
   if (from) return say("windowFrom", { date: from })
   if (to) return say("windowUntil", { date: to })
   return say("windowAlways")
-}
-
-const STATUS_TONE: Record<CampaignRow["status"], string> = {
-  redeemable: "ok",
-  not_started: "calm",
-  expired: "dim",
-  revoked: "bad",
-  campaign_exhausted: "warn",
-  no_available_code: "warn",
-  unknown: "dim",
-}
-
-function Campaigns({ rows, total, say, n }: { rows: CampaignRow[]; total: number; say: Say; n: Intl.NumberFormat }) {
-  return (
-    <div className="adm-panel adm-campaigns">
-      <h3 className="adm-h3">{say("campaignsTitle")}</h3>
-      <p className="adm-fine">{say("campaignEligibilityNote")}</p>
-      {total > rows.length ? (
-        <p className="adm-fine adm-capped">{say("campaignsCapped", { shown: n.format(rows.length), total: n.format(total) })}</p>
-      ) : null}
-      {rows.length === 0 ? (
-        <p className="adm-fine">{say("campaignsNone")}</p>
-      ) : (
-        <div className="adm-table-wrap">
-          <table className="adm-table adm-table-campaigns">
-            <thead>
-              <tr>
-                <th scope="col">{say("campaignName")}</th>
-                <th scope="col">{say("campaignStatus")}</th>
-                <th scope="col">{say("campaignWindow")}</th>
-                <th scope="col">{say("campaignRedeemed")}</th>
-                <th scope="col" className="num">{say("campaignCodes")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const fill = campaignFill(row)
-                return (
-                  <tr key={row.id}>
-                    <th scope="row" data-label={say("campaignName")}>
-                      <span className={row.name ? "adm-cname" : "adm-cname adm-unnamed"}>{row.name || say("campaignUnnamed")}</span>
-                    </th>
-                    <td data-label={say("campaignStatus")}>
-                      <span className={"adm-status adm-status-" + STATUS_TONE[row.status]}>
-                        <span className="adm-dot" aria-hidden="true" />{say(`status_${row.status}`)}
-                      </span>
-                    </td>
-                    <td data-label={say("campaignWindow")} className="adm-when">{campaignWindow(row, say)}</td>
-                    <td data-label={say("campaignRedeemed")}>
-                      <span className="adm-fillnum">
-                        {row.redemption_limit === null
-                          ? say("campaignNoLimit", { n: n.format(row.redeemed_count) })
-                          : say("campaignOf", { n: n.format(row.redeemed_count), limit: n.format(row.redemption_limit) })}
-                      </span>
-                      {fill !== null ? (
-                        <span className="adm-meter" aria-hidden="true"><span style={{ width: `${Math.round(fill * 100)}%` }} /></span>
-                      ) : null}
-                    </td>
-                    <td data-label={say("campaignCodes")} className="num">
-                      {say("campaignCodesValue", { available: n.format(row.available_codes), issued: n.format(row.issued_codes) })}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
 }
 
 function bytes(value: number, locale: string): string {
@@ -278,10 +458,10 @@ function UsageCard({ heading, period, say, locale, n, current = false, asOf }: {
   return (
     <div className="adm-panel adm-usage-card">
       <div className="adm-usage-head">
-        <h3 className="adm-h3">{heading}<span className="adm-month">{monthName(period.period, locale)}</span></h3>
+        <h2 className="adm-h3">{heading}<span className="adm-month">{monthName(period.period, locale)}</span></h2>
         {period.coverage === "partial" ? <span className="adm-status adm-status-warn"><span className="adm-dot" aria-hidden="true" />{say("usagePartial")}</span> : null}
       </div>
-      <p className="adm-fine">{current ? say("usageInProgress", { time: new Date(asOf).toISOString().replace("T", " ").replace(/\.000Z$/, "Z") }) : say("usageEnded")}</p>
+      <p className="adm-fine">{current ? say("usageInProgress", { time: utcMinute(asOf) }) : say("usageEnded")}</p>
       {period.coverage === "partial" ? <p className="adm-fine">{say("usagePartialNote")}</p> : null}
       <dl className="adm-dl">
         {rows.map(([label, value, format]) => (
