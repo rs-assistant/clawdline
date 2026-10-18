@@ -59,7 +59,9 @@ export interface CampaignPage {
 
 export interface PromoCodeRow {
   id: string
+  public_code: string | null
   issued_at: string
+  revoked_at: string | null
   redemption_limit: number
   redeemed_count: number
 }
@@ -163,7 +165,9 @@ export function parseCodePage(raw: unknown): CodePage {
       const r = bag(row, `rows[${i}]`)
       return {
         id: text(r.id, `rows[${i}].id`),
+        public_code: optionalText(r.public_code),
         issued_at: instant(r.issued_at, `rows[${i}].issued_at`),
+        revoked_at: r.revoked_at == null ? null : instant(r.revoked_at, `rows[${i}].revoked_at`),
         redemption_limit: count(r.redemption_limit, `rows[${i}].redemption_limit`),
         redeemed_count: count(r.redeemed_count, `rows[${i}].redeemed_count`),
       }
@@ -416,8 +420,8 @@ export function createCampaign(fetcher: Fetch, apiOrigin: string, input: Campaig
   })
 }
 
-export function issueCode(fetcher: Fetch, apiOrigin: string, campaignId: string, redemptionLimit: number, key: string): Promise<Read<IssueAnswer>> {
-  return call(fetcher, `${apiOrigin}/su/v1/promo/campaigns/${encodeURIComponent(campaignId)}/codes`, writing(key, { redemption_limit: redemptionLimit }), created, (raw) => {
+export function issueCode(fetcher: Fetch, apiOrigin: string, campaignId: string, redemptionLimit: number, key: string, publicCode?: string): Promise<Read<IssueAnswer>> {
+  return call(fetcher, `${apiOrigin}/su/v1/promo/campaigns/${encodeURIComponent(campaignId)}/codes`, writing(key, { redemption_limit: redemptionLimit, ...(publicCode ? { public_code: publicCode } : {}) }), created, (raw) => {
     const b = bag(raw, "body")
     const replay = b.replay === true
     const code = b.code === null || b.code === undefined ? null : text(b.code, "code")
@@ -432,6 +436,13 @@ export function revokeCampaign(fetcher: Fetch, apiOrigin: string, campaignId: st
   return call(fetcher, `${apiOrigin}/su/v1/promo/campaigns/${encodeURIComponent(campaignId)}/revoke`, writing(key, {}), is200, (raw) => {
     const b = bag(raw, "body")
     return { campaign: parseCampaign(b.campaign), replay: b.replay === true }
+  })
+}
+
+export function revokeCode(fetcher: Fetch, apiOrigin: string, campaignId: string, codeId: string, key: string): Promise<Read<{ codeId: string; revokedAt: string; replay: boolean }>> {
+  return call(fetcher, `${apiOrigin}/su/v1/promo/campaigns/${encodeURIComponent(campaignId)}/codes/${encodeURIComponent(codeId)}/revoke`, writing(key, {}), is200, (raw) => {
+    const b = bag(raw, "body")
+    return { codeId: text(b.code_id, "code_id"), revokedAt: instant(b.revoked_at, "revoked_at"), replay: b.replay === true }
   })
 }
 

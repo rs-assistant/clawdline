@@ -4,7 +4,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import {
   campaignPhase, canIssue, checkCampaignDraft, checkCodeLimit, createCampaign, issueCode, listedFromOverview,
-  loadCampaigns, loadCodes, pageWindow, parseCampaign, parseCampaignPage, revokeCampaign,
+  loadCampaigns, loadCodes, pageWindow, parseCampaign, parseCampaignPage, revokeCampaign, revokeCode,
   // @ts-expect-error -- a `.ts` path, for node; see cloud/forget.test.ts.
 } from "./promo-api.ts"
 
@@ -48,11 +48,13 @@ test("the list and the code reads ask for 50 at an offset, with the session cook
   assert.equal(seen[0].init.cache, "no-store")
   const codes = await loadCodes(fake(200, {
     campaign: { id: "pc/1", name: "x", state: "revoked", not_before: "2026-10-01T00:00:00Z", expires_at: "2026-11-01T00:00:00Z", redemption_limit: 5, redeemed_count: 5 },
-    total: 1, offset: 0, rows: [{ id: "pk_1", issued_at: "2026-10-02T00:00:00Z", redemption_limit: 5, redeemed_count: 5 }],
+    total: 1, offset: 0, rows: [{ id: "pk_1", issued_at: "2026-10-02T00:00:00Z", revoked_at: "2026-10-03T00:00:00Z", redemption_limit: 5, redeemed_count: 5 }],
   }, seen), API, "pc/1", 0)
   assert.equal(seen[1].url, API + "/su/v1/promo/campaigns/pc%2F1/codes?offset=0&limit=50")
   assert.equal(codes.kind, "ready")
   assert.equal(codes.value.rows[0].redeemed_count, 5)
+  assert.equal(codes.value.rows[0].public_code, null)
+  assert.equal(codes.value.rows[0].revoked_at, "2026-10-03T00:00:00Z")
   assert.equal(codes.value.campaign.state, "revoked")
 })
 
@@ -80,9 +82,17 @@ test("every write is a POST with its Idempotency-Key and the body the server che
   assert.equal(seen[1].url, API + "/su/v1/promo/campaigns/pc_1/codes")
   assert.deepEqual(JSON.parse(seen[1].init.body as string), { redemption_limit: 2 })
 
+  await issueCode(fake(201, { code: "HACKER-NEWS", replay: false, receipt: { code_id: "pk_2" } }, seen), API, "pc_1", 10, "k-public", "HACKER-NEWS")
+  assert.deepEqual(JSON.parse(seen[2].init.body as string), { redemption_limit: 10, public_code: "HACKER-NEWS" })
+
+  const stopped = await revokeCode(fake(200, { code_id: "pk/1", revoked_at: "2026-10-03T00:00:00Z", replay: false }, seen), API, "pc/1", "pk/1", "k-stop")
+  assert.equal(stopped.kind, "ready")
+  assert.equal(seen[3].url, API + "/su/v1/promo/campaigns/pc%2F1/codes/pk%2F1/revoke")
+  assert.equal((seen[3].init.headers as Record<string, string>)["Idempotency-Key"], "k-stop")
+
   const revoked = await revokeCampaign(fake(200, { campaign: raw({ state: "revoked" }), replay: false }, seen), API, "pc_1", "k3")
-  assert.equal(seen[2].url, API + "/su/v1/promo/campaigns/pc_1/revoke")
-  assert.deepEqual(JSON.parse(seen[2].init.body as string), {})
+  assert.equal(seen[4].url, API + "/su/v1/promo/campaigns/pc_1/revoke")
+  assert.deepEqual(JSON.parse(seen[4].init.body as string), {})
   assert.equal(revoked.kind === "ready" && revoked.value.campaign.state, "revoked")
 })
 

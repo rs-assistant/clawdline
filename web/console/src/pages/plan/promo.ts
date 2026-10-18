@@ -3,7 +3,8 @@ import { failureSentence } from "../../legacy/js/core/failure-text.js"
 
 const CODE_KEY = "clawdline.promo.code"
 const INTENT_KEY = "clawdline.promo.intent"
-const CODE = /^clp_[A-Za-z0-9_-]{20,100}$/
+const PRIVATE_CODE = /^clp_[A-Za-z0-9_-]{20,100}$/
+const PUBLIC_CODE = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$/
 
 export function capturePromoLink(scope: Pick<Window, "location" | "history" | "sessionStorage">): void {
   const params = new URLSearchParams(scope.location.hash.slice(1))
@@ -11,7 +12,10 @@ export function capturePromoLink(scope: Pick<Window, "location" | "history" | "s
   if (!code) return
   params.delete("promo")
   scope.history.replaceState(scope.history.state, "", scope.location.pathname + scope.location.search + "#" + params.toString())
-  if (CODE.test(code)) scope.sessionStorage.setItem(CODE_KEY, code)
+  const normalized = code.startsWith("clp_") ? code : code.toUpperCase()
+  if (PRIVATE_CODE.test(code) || normalized.length >= 6 && normalized.length <= 48 && PUBLIC_CODE.test(normalized)) {
+    scope.sessionStorage.setItem(CODE_KEY, normalized)
+  }
 }
 
 export function pendingPromoCode(storage: Storage): string {

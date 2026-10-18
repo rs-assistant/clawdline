@@ -3,7 +3,7 @@ import type { Overview } from "./api.js"
 import { campaignWindow, DailyChart, RouteLink, Tile, TrendTile, utcMinute, type Go } from "./AdminDashboard.js"
 import {
   canIssue, checkCampaignDraft, checkCodeLimit, createCampaign, fill, issueCode, listedFromCampaign, listedFromOverview,
-  loadCampaigns, loadCodes, newIdempotencyKey, pageWindow, revokeCampaign, NAME_MAX,
+  loadCampaigns, loadCodes, newIdempotencyKey, pageWindow, revokeCampaign, revokeCode, NAME_MAX,
   type CampaignDraft, type CampaignPhase, type CodePage, type DraftProblem, type Failure, type ListedCampaign, type PromoCampaign, type Read,
 } from "./promo-api.js"
 import { adminPath, type AdminWord, type Say } from "./words.js"
@@ -54,6 +54,8 @@ function failureText(code: string, say: Say): string {
     extend_not_supported: "errPolicy",
     campaign_unavailable: "errCampaignUnavailable",
     bad_redemption_limit: "errCodeLimit",
+    bad_public_code: "errPublicCode",
+    public_code_taken: "errPublicCodeTaken",
     idempotency_conflict: "errIdempotency",
     unknown_campaign: "errUnknownCampaign",
     admin_pre_auth_rate_limited: "errRateLimited",
@@ -495,6 +497,7 @@ function CampaignDetail({ id, row, full, apiOrigin, say, locale, n, go, notice, 
 }) {
   const [codes, setCodes] = useState<CodesState>({ kind: "loading", offset: 0 })
   const [revoking, setRevoking] = useState(false)
+  const [revokingCode, setRevokingCode] = useState<{ id: string; label: string } | null>(null)
   const heading = useRef<HTMLHeadingElement>(null)
   const generation = useRef(0)
 
@@ -571,7 +574,11 @@ function CampaignDetail({ id, row, full, apiOrigin, say, locale, n, go, notice, 
         <p className="adm-fine adm-panel adm-panel-quiet">{say(facts.phase === "revoked" ? "issueRevoked" : "issueClosed")}</p>
       ) : null}
 
-      <CodeList codes={codes} say={say} n={n} onPage={(offset) => void readCodes(offset, true)} onRetry={() => void readCodes(codes.kind === "failed" ? codes.offset : 0, false)} />
+      <CodeList codes={codes} say={say} n={n} onPage={(offset) => void readCodes(offset, true)} onRetry={() => void readCodes(codes.kind === "failed" ? codes.offset : 0, false)} onRevoke={(code) => setRevokingCode(code)} />
+
+      {revokingCode ? <RevokeCodeDialog campaignId={id} code={revokingCode} apiOrigin={apiOrigin} say={say}
+        onClose={() => setRevokingCode(null)} onRevoked={() => { setRevokingCode(null); void readCodes(codes.kind === "ready" ? codes.page.offset : 0, true); onIssued() }}
+        onLostAccess={onLostAccess} /> : null}
 
       {revoking ? (
         <RevokeDialog campaignId={id} name={name} apiOrigin={apiOrigin} say={say}
@@ -594,8 +601,9 @@ function IssueCode({ campaignId, campaignLimit, apiOrigin, say, n, onIssued, onL
 }) {
   const id = useId()
   const [raw, setRaw] = useState("1")
+  const [publicCode, setPublicCode] = useState("")
   const [state, setState] = useState<Mutation>({ kind: "idle" })
-  const [problem, setProblem] = useState<"limit_not_whole" | "limit_too_large" | null>(null)
+  const [problem, setProblem] = useState<"limit_not_whole" | "limit_too_large" | "public_code" | null>(null)
   // The plaintext, here and nowhere else, until it is dismissed.
   const [revealed, setRevealed] = useState<{ code: string; codeId: string | null } | null>(null)
   const [replayed, setReplayed] = useState(false)
@@ -610,9 +618,15 @@ function IssueCode({ campaignId, campaignLimit, apiOrigin, say, n, onIssued, onL
       document.getElementById(id + "limit")?.focus()
       return
     }
+    const named = publicCode.trim().toUpperCase()
+    if (named && (named.length < 6 || named.length > 48 || !/^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$/.test(named))) {
+      setProblem("public_code")
+      document.getElementById(id + "public")?.focus()
+      return
+    }
     setProblem(null)
     setState({ kind: "busy" })
-    const result = await issueCode(send, apiOrigin, campaignId, limit, intent.take())
+    const result = await issueCode(send, apiOrigin, campaignId, limit, intent.take(), named || undefined)
     if (result.kind === "ready") {
       intent.reset()
       setState({ kind: "idle" })
@@ -635,20 +649,28 @@ function IssueCode({ campaignId, campaignLimit, apiOrigin, say, n, onIssued, onL
       <h2 id={id + "h"} className="adm-h3">{say("issueTitle")}</h2>
       <p className="adm-fine">{say("issueLead")}</p>
       {revealed ? (
-        <OneTimeCode code={revealed.code} codeId={revealed.codeId} say={say} onDone={() => setRevealed(null)} />
+        <OneTimeCode code={revealed.code} codeId={revealed.codeId} publicCode={!!publicCode.trim()} say={say} onDone={() => setRevealed(null)} />
       ) : (
         <form className="adm-issue-form" onSubmit={submit} noValidate aria-busy={busy}>
-          <div className={problem ? "adm-field adm-field-bad" : "adm-field"}>
+          <div className={problem && problem !== "public_code" ? "adm-field adm-field-bad" : "adm-field"}>
             <label htmlFor={id + "limit"}>{say("issueLimit")}</label>
             <input id={id + "limit"} type="number" inputMode="numeric" min={1} max={campaignLimit} step={1} value={raw}
               onChange={(e) => { intent.reset(); setRaw(e.target.value); setProblem(null); if (state.kind === "error") setState({ kind: "idle" }) }}
-              aria-invalid={problem ? true : undefined} aria-describedby={id + "hint" + (problem ? " " + id + "err" : "")} disabled={busy} />
+              aria-invalid={problem && problem !== "public_code" ? true : undefined} aria-describedby={id + "hint" + (problem && problem !== "public_code" ? " " + id + "err" : "")} disabled={busy} />
             <p id={id + "hint"} className="adm-field-hint">{say("issueLimitHint", { max: n.format(campaignLimit) })}</p>
-            {problem ? (
+            {problem && problem !== "public_code" ? (
               <p id={id + "err"} className="adm-field-error"><span aria-hidden="true">! </span>
                 {say(problem === "limit_too_large" ? "problemCodeLimitLarge" : "problemLimitWhole", { max: n.format(campaignLimit) })}
               </p>
             ) : null}
+          </div>
+          <div className={problem === "public_code" ? "adm-field adm-field-bad" : "adm-field"}>
+            <label htmlFor={id + "public"}>{say("issuePublicCode")}</label>
+            <input id={id + "public"} type="text" value={publicCode} maxLength={48} autoComplete="off" spellCheck={false}
+              placeholder="HACKER-NEWS" onChange={(e) => { intent.reset(); setPublicCode(e.target.value.toUpperCase()); setProblem(null); if (state.kind === "error") setState({ kind: "idle" }) }}
+              aria-invalid={problem === "public_code" ? true : undefined} aria-describedby={id + "publichint" + (problem === "public_code" ? " " + id + "publicerr" : "")} disabled={busy} />
+            <p id={id + "publichint"} className="adm-field-hint">{say("issuePublicCodeHint")}</p>
+            {problem === "public_code" ? <p id={id + "publicerr"} className="adm-field-error">{say("problemPublicCode")}</p> : null}
           </div>
           <button type="submit" className="adm-btn adm-btn-go" disabled={busy} aria-busy={busy}>
             {busy ? say("issueBusy") : state.kind === "error" ? say("issueRetry") : say("issueSubmit")}
@@ -661,7 +683,7 @@ function IssueCode({ campaignId, campaignLimit, apiOrigin, say, n, onIssued, onL
   )
 }
 
-function OneTimeCode({ code, codeId, say, onDone }: { code: string; codeId: string | null; say: Say; onDone: () => void }) {
+function OneTimeCode({ code, codeId, publicCode, say, onDone }: { code: string; codeId: string | null; publicCode: boolean; say: Say; onDone: () => void }) {
   const id = useId()
   const field = useRef<HTMLInputElement>(null)
   const [copied, setCopied] = useState<"no" | "yes" | "failed">("no")
@@ -673,6 +695,7 @@ function OneTimeCode({ code, codeId, say, onDone }: { code: string; codeId: stri
   }, [])
 
   useEffect(() => {
+    if (publicCode) return
     const release = guardCodeNavigation(() => window.confirm(say("revealLeaveWarning")))
     const beforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault()
@@ -683,7 +706,7 @@ function OneTimeCode({ code, codeId, say, onDone }: { code: string; codeId: stri
       release()
       window.removeEventListener("beforeunload", beforeUnload)
     }
-  }, [say])
+  }, [say, publicCode])
 
   const copy = async () => {
     try {
@@ -699,7 +722,7 @@ function OneTimeCode({ code, codeId, say, onDone }: { code: string; codeId: stri
   return (
     <div className="adm-reveal" role="group" aria-labelledby={id + "h"}>
       <h3 id={id + "h"} className="adm-reveal-title">{say("revealTitle")}</h3>
-      <p className="adm-reveal-warn"><span aria-hidden="true">⚠ </span>{say("revealWarning")}</p>
+      <p className="adm-reveal-warn">{publicCode ? say("revealPublicNote") : <><span aria-hidden="true">⚠ </span>{say("revealWarning")}</>}</p>
       <div className="adm-reveal-row">
         <label htmlFor={id + "c"} className="adm-visually-hidden">{say("revealLabel")}</label>
         <input ref={field} id={id + "c"} className="adm-reveal-code" type="text" readOnly value={code} spellCheck={false} autoComplete="off"
@@ -713,18 +736,18 @@ function OneTimeCode({ code, codeId, say, onDone }: { code: string; codeId: stri
       </p>
       {codeId ? <p className="adm-fine">{say("revealId", { id: codeId })}</p> : null}
       <div className="adm-form-actions">
-        {confirming || copied === "yes" ? (
-          <button type="button" className="adm-btn" onClick={onDone}>{say("revealDone")}</button>
+        {publicCode || confirming || copied === "yes" ? (
+          <button type="button" className="adm-btn" onClick={onDone}>{say(publicCode ? "revealPublicDone" : "revealDone")}</button>
         ) : (
           <button type="button" className="adm-btn adm-btn-quiet" onClick={() => setConfirming(true)}>{say("revealClose")}</button>
         )}
-        {confirming && copied !== "yes" ? <p className="adm-fine adm-reveal-confirm" role="alert">{say("revealCloseWarning")}</p> : null}
+        {!publicCode && confirming && copied !== "yes" ? <p className="adm-fine adm-reveal-confirm" role="alert">{say("revealCloseWarning")}</p> : null}
       </div>
     </div>
   )
 }
 
-function CodeList({ codes, say, n, onPage, onRetry }: { codes: CodesState; say: Say; n: Intl.NumberFormat; onPage: (offset: number) => void; onRetry: () => void }) {
+function CodeList({ codes, say, n, onPage, onRetry, onRevoke }: { codes: CodesState; say: Say; n: Intl.NumberFormat; onPage: (offset: number) => void; onRetry: () => void; onRevoke: (code: { id: string; label: string }) => void }) {
   return (
     <section className="adm-panel adm-codes" aria-labelledby="adm-codes-h" aria-busy={codes.kind === "loading" || (codes.kind === "ready" && codes.refreshing)}>
       <h2 id="adm-codes-h" className="adm-h3">{say("codesTitle")}</h2>
@@ -753,6 +776,7 @@ function CodeList({ codes, say, n, onPage, onRetry }: { codes: CodesState; say: 
                   <th scope="col">{say("codeIssued")}</th>
                   <th scope="col">{say("codeUsed")}</th>
                   <th scope="col">{say("codeState")}</th>
+                  <th scope="col">{say("codeAction")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -761,18 +785,22 @@ function CodeList({ codes, say, n, onPage, onRetry }: { codes: CodesState; say: 
                   const spent = row.redeemed_count >= row.redemption_limit
                   return (
                     <tr key={row.id}>
-                      <th scope="row" data-label={say("codeId")}><code className="adm-codeid">{row.id}</code></th>
+                      <th scope="row" data-label={say("codeId")}>
+                        {row.public_code ? <><code className="adm-codeid">{row.public_code}</code><br /></> : null}
+                        <code className="adm-codeid">{row.id}</code>
+                      </th>
                       <td data-label={say("codeIssued")} className="adm-when">{utcMinute(row.issued_at)}</td>
                       <td data-label={say("codeUsed")}>
                         <span className="adm-fillnum">{say("campaignOf", { n: n.format(row.redeemed_count), limit: n.format(row.redemption_limit) })}</span>
                         {share !== null ? <span className="adm-meter" aria-hidden="true"><span style={{ width: `${Math.round(share * 100)}%` }} /></span> : null}
                       </td>
                       <td data-label={say("codeState")}>
-                        <span className={"adm-status adm-status-" + (spent ? "warn" : row.redeemed_count > 0 ? "ok" : "calm")}>
+                        <span className={"adm-status adm-status-" + (row.revoked_at ? "bad" : spent ? "warn" : row.redeemed_count > 0 ? "ok" : "calm")}>
                           <span className="adm-dot" aria-hidden="true" />
-                          {say(spent ? "codeSpent" : row.redeemed_count > 0 ? "codeInUse" : "codeUnused")}
+                          {say(row.revoked_at ? "codeRevoked" : spent ? "codeSpent" : row.redeemed_count > 0 ? "codeInUse" : "codeUnused")}
                         </span>
                       </td>
+                      <td data-label={say("codeAction")}>{!row.revoked_at ? <button type="button" className="adm-btn adm-btn-quiet adm-btn-small" onClick={() => onRevoke({ id: row.id, label: row.public_code ?? row.id })}>{say("codeRevokeOpen")}</button> : null}</td>
                     </tr>
                   )
                 })}
@@ -784,6 +812,47 @@ function CodeList({ codes, say, n, onPage, onRetry }: { codes: CodesState; say: 
       )}
     </section>
   )
+}
+
+function RevokeCodeDialog({ campaignId, code, apiOrigin, say, onClose, onRevoked, onLostAccess }: {
+  campaignId: string; code: { id: string; label: string }; apiOrigin: string; say: Say;
+  onClose: () => void; onRevoked: () => void; onLostAccess: () => void
+}) {
+  const id = useId()
+  const dialog = useRef<HTMLDialogElement>(null)
+  const cancel = useRef<HTMLButtonElement>(null)
+  const [state, setState] = useState<Mutation>({ kind: "idle" })
+  const intent = useIntentKey()
+  const busy = state.kind === "busy"
+  useEffect(() => {
+    const d = dialog.current
+    if (!d) return
+    const opener = document.activeElement as HTMLElement | null
+    d.showModal()
+    cancel.current?.focus()
+    return () => opener?.focus?.()
+  }, [])
+  const confirm = async () => {
+    if (busy) return
+    setState({ kind: "busy" })
+    const result = await revokeCode(send, apiOrigin, campaignId, code.id, intent.take())
+    if (result.kind === "ready") { dialog.current?.close(); onRevoked(); return }
+    if (result.kind === "no_access") onLostAccess()
+    setState({ kind: "error", code: result.kind === "no_access" ? "no_access" : result.code })
+  }
+  return <dialog ref={dialog} className="adm-dialog" aria-labelledby={id + "h"} aria-describedby={id + "b"}
+    onCancel={(e) => { if (busy) e.preventDefault() }} onClose={onClose}
+    onClick={(e) => { if (e.target === dialog.current && !busy) dialog.current?.close() }}>
+    <div className="adm-dialog-body">
+      <h2 id={id + "h"} className="adm-h3">{say("codeRevokeTitle", { code: code.label })}</h2>
+      <p id={id + "b"}>{say("codeRevokeBody")}</p>
+      {state.kind === "error" ? <Banner tone="bad" text={say("codeRevokeFailed", { reason: failureText(state.code, say) })} say={say} /> : null}
+      <div className="adm-form-actions adm-dialog-actions">
+        <button ref={cancel} type="button" className="adm-btn" onClick={() => dialog.current?.close()} disabled={busy}>{say("cancel")}</button>
+        <button type="button" className="adm-btn adm-btn-danger" onClick={() => void confirm()} disabled={busy} aria-busy={busy}>{say(busy ? "codeRevokeBusy" : "codeRevokeConfirm")}</button>
+      </div>
+    </div>
+  </dialog>
 }
 
 function RevokeDialog({ campaignId, name, apiOrigin, say, onClose, onRevoked, onLostAccess }: {

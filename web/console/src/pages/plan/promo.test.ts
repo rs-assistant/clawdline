@@ -30,6 +30,18 @@ test("a promo fragment is removed before login and retained only in this tab", (
   assert.equal(pendingPromoCode(held), code)
 })
 
+test("a named public event code survives the login redirect in canonical form", () => {
+  const held = storage()
+  let replaced = ""
+  capturePromoLink({
+    location: { hash: "#page=plan&promo=hacker-news", pathname: "/", search: "" },
+    history: { state: null, replaceState(_state: unknown, _title: string, url: string) { replaced = url } },
+    sessionStorage: held,
+  } as unknown as Window)
+  assert.equal(replaced, "/#page=plan")
+  assert.equal(pendingPromoCode(held), "HACKER-NEWS")
+})
+
 test("retries use one intent and only a server grant establishes success", async () => {
   const held = storage()
   savePromoCode(held, code)
