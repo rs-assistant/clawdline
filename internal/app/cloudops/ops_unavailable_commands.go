@@ -1,8 +1,6 @@
 package cloudops
 
-import (
-	"encoding/json"
-)
+import ()
 
 func init() {
 	register(
@@ -29,41 +27,8 @@ func init() {
 					name: "action:" + request}, true
 			}},
 
-		op{name: "diagnostics.report", readLevel: true,
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "report") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				// A `report` that is not an object still reaches the store,
-				// which names it `report_not_json`, so anything JSON is taken
-				// here and judged there.
-				raw, err := json.Marshal(b["report"])
-				if err != nil {
-					return plan{}, false
-				}
-				p.document = raw
-				return p, true
-			}},
+		op{name: "diagnostics.report", readLevel: true},
 
-		op{name: "diagnostics.events", readLevel: true,
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "batch") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				batch, ok := b.object("batch", ViewerEventsBatchBytesLimit)
-				if !ok {
-					return plan{}, false
-				}
-				p.document = batch
-				return p, true
-			}},
+		op{name: "diagnostics.events", readLevel: true},
 	)
 }

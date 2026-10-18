@@ -42,13 +42,7 @@ func sessionDigest(parsed body) string {
 }
 
 func init() {
-	register(op{name: "session-receipt", read: true, decode: func(b body) (plan, bool) {
-		if !b.has("type", "session", "request", "target_request", "execution_generation", "action") {
-			return plan{}, false
-		}
-		p, ok := actionPlan(b, true)
-		return p, ok && p.request != ""
-	}})
+	register(op{name: "session-receipt", read: true})
 }
 
 // sessionCommand admits the exact destination and request before the local

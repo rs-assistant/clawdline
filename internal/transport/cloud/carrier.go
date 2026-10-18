@@ -94,7 +94,7 @@ func (l *Link) handleCarrierOffer(ctx context.Context, svc *terminals.Service, p
 		return
 	}
 	go func() {
-		answer, err := l.answerDirectOffer(viewer, "", true, body.SDP)
+		answer, err := l.answerDirectOffer(viewer, "", true, req.Connection, body.SDP)
 		if err != nil {
 			l.releaseDirectReservation(viewer)
 			refuse(err)
@@ -113,7 +113,9 @@ func (l *Link) handleCarrierOffer(ctx context.Context, svc *terminals.Service, p
 			map[string]any{"carrier": req.Connection, "sdp_sealed": sealed, "direct_receipts": true},
 			200, "") != nil {
 			l.closeDirectPeerOf(viewer, "the carrier answer could not be sent")
+			return
 		}
+		l.directAnswerSent(viewer)
 	}()
 }
 

@@ -745,6 +745,8 @@ See the [dated read-refusal record](records/cloud-wire-implementation-2026-09.md
 
 Hosted 頁面讀取失敗時，如果失敗發生在送出之前或回答離開機器之後，機器的 log 原本什麼都看不到。現在 relay-reader 把每次 Session 讀取失敗記成一列 `cloud.read.failed`（`word`、`stage`＝`viewer_refused`／`timeout`／`relay_refused`／`answered`、`code`、`cond`、`status`、`layer`、`ms`、`connection`、`marker_age_s`、`row_age_s`、`offline_hold_ms`、`machine`、`session`；沒有標題、文字或內容），由頁面既有的 viewer event 投遞（`legacy/js/net/cloud-client.js` `_deliverViewerEvents`）以 `diagnostics.events` 送到有宣告這個字的那台機器。Go daemon 現在回答它（`internal/app/cloudops/viewer_events.go`）：每列寫成一行 `cloud: viewer reported: event=… age_s=… <欄位依名稱排序> sender=… batch=<前 8 字> n=…`，每批再一行 `cloud: viewer events delivered: …`，同一批重送只回收據不重寫。上限登錄在 `internal/domain/capacity`（`cloud.viewer_events_*`）。
 
+直連嘗試也走同一條投遞：每次 `direct_offer`／`carrier_offer` 結束時，瀏覽器記一列 `cloud.direct.attempt`，機器自己寫一行 `cloud direct attempt:`，兩邊用同一個 `attempt`（瀏覽器為這次 offer 取的 connection id）對得起來；欄位是候選的類型與位址家族計數、ICE 狀態時間線、選中配對的類型與家族，以及停在哪個階段，不記位址、埠、SDP 或 ICE 憑證。完整欄位與階段定義在 [Cloud terminal wire](cloud-terminal-wire.md)「Direct attempt trace」。
+
 相容：這是新增的指令字。舊 daemon 不在描述的 `commands` 裡宣告它，頁面就不送，列留在瀏覽器自己的保存與上限內，不會重試到天荒地老；新 daemon 對今天已上線的頁面只是多一個沒人呼叫的字。
 
 The first-read timing events `cloud.detail.first_read` and `cloud.transcript.first_read` include the opaque Session ID alongside the machine, outcome and stage durations. An abandoned first detail read reports `outcome=aborted`. A slow or refused machine read logs its Session ID too. This joins the phone's opening attempt to the exact machine response without logging a title or conversation text; a timing event for another Session is not evidence about the one on screen.
@@ -802,6 +804,28 @@ relay 的 `delivered` 只證明 fan-out 送出去了，不證明機器執行或�
 ### 10.3 Operations
 
 See the [dated operation record](records/cloud-operations-2026-09.md).
+
+Every word is one row of `internal/domain/cloudvocab/vocabulary.json`. A row's
+`decode` states its decoder as data: each body field's type, limits and named
+checks, where the answer goes, and the local request the fields become (path
+template, query, headers, body, with each value's source and default). The
+table's `wrappers` state what the bridge does around a decoder — the
+`execution_generation` it strips from a session-receipt word, the `machine_id`
+it strips from a content read — and `idempotency` the key every local request
+that is not a GET carries. `go run ./tools/contract-gen` generates a Go decoder
+for every row not marked `hand` (`internal/app/cloudops/zz_decode_generated.go`),
+and production serves those words with them; eight words keep a hand-written
+decoder, each with its reason in the row. A value the answer side reads after
+the local request is built (a picture's id, an info read's parts, a menu
+answer's key and question) is carried `into` the plan by the row. What the
+hand-written decoders answered, before they were removed, is a golden of
+142,267 bodies (`internal/app/cloudops/testdata/cloud_decoders.golden.jsonl.gz`)
+that `TestGeneratedDecodersKeepTheGolden` holds every served decoder to;
+`CLAWDLINE_DECODER_GOLDEN=record` rewrites it for a table change that is meant
+to change what a word accepts, and the decompressed diff is the review. A limit
+the table copies from a Go constant names it under `copies`, and
+`TestCopiedLimitsAreTheirConstants` holds the two equal. The wrapper rules are
+held to the bridge by `TestTheTableStatesTheBridgesWrapperRules`.
 
 For a live Session's `send`, `answer`/`key`, `interrupt`, `end`, or
 `archive-session`, the Go machine now requires `request` (the caller's stable

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react"
 import type { Icon } from "@clawdline/contract"
 import { nextWord } from "../../next-strings.js"
+import { showModalWithoutChoice } from "../../modal-focus.js"
 import { failureSentence } from "../../refusals/refusal-text.js"
 import type { SquadAPI } from "./api.js"
 
@@ -57,7 +58,7 @@ export function PersonaCreator({ api, canWrite, catalogVersion, onSaved }: {
   }
 
   return <>
-    <button ref={opener} type="button" disabled={!canWrite} onClick={() => { setError(""); dialog.current?.showModal() }}>{nextWord("roleCreateOpen")}</button>
+    <button ref={opener} type="button" disabled={!canWrite} onClick={() => { setError(""); showModalWithoutChoice(dialog.current) }}>{nextWord("roleCreateOpen")}</button>
     <dialog ref={dialog} className="squad-dialog squad-role-create" aria-labelledby="squad-role-create-title" onClose={() => opener.current?.focus()} onCancel={(event) => { if (busy) event.preventDefault() }}>
       <div className="squad-dialog-head"><h2 id="squad-role-create-title">{nextWord("roleCreateTitle")}</h2><button type="button" aria-label={nextWord("roleCreateClose")} disabled={!!busy} onClick={close}>×</button></div>
       <p>{nextWord("roleCreateIntro")}</p>

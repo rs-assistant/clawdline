@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import type { IntentDraft } from "@clawdline/contract"
 import { client } from "../client.js"
+import { focusModalContainer } from "../modal-focus.js"
 import * as L from "../legacy/bridge.js"
 import { planIntent, setCommandSpinner } from "../legacy/command-bridge.js"
 import * as V from "../legacy/voice-bridge.js"
@@ -347,6 +348,7 @@ function open(): void {
   el("command").hidden = false
   sayTop(T().webCommandSay)
   paint()
+  focusModalContainer(el("command-sheet"))
 }
 
 /**
@@ -385,7 +387,6 @@ async function reviewProjectSetup(place: string, instructions: string): Promise<
     sayTop(T().webCommandDraft)
     sayStatus("")
     paint()
-    el<HTMLTextAreaElement>("command-instructions").focus({ preventScroll: true })
   } catch (error) {
     if (mine !== run) return
     phase = "idle"
@@ -407,7 +408,6 @@ function heard(text: string): void {
   if (phase !== "idle") reset()
   el<HTMLTextAreaElement>("command-text").value = text
   paint()
-  el<HTMLTextAreaElement>("command-text").focus({ preventScroll: true })
 }
 
 function voiceChanged(state: V.VoiceState): void {

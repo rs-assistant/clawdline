@@ -31,6 +31,36 @@ func TestATableThatContradictsItselfIsRefused(t *testing.T) {
 		"another version": func(raw []byte) []byte {
 			return bytes.Replace(raw, []byte(`"version": 1`), []byte(`"version": 2`), 1)
 		},
+		"a check nobody knows": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"checks": ["generation"]`), []byte(`"checks": ["generations"]`), 1)
+		},
+		"a special nobody knows": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"special": ["content_read"]`), []byte(`"special": ["content_reads"]`), 1)
+		},
+		"a refusal special that is free text": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"refused:cloud_dispatch_unpinned"`), []byte(`"refused: no wire shape"`), 1)
+		},
+		"a rule for a field no shape names": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"decode": {"reply": "machine", "route": {"path": "/v1/sessions/archived"}}`),
+				[]byte(`"decode": {"reply": "machine", "fields": {"ghost": {"type": "string"}}, "route": {"path": "/v1/sessions/archived"}}`), 1)
+		},
+		"a row with no decode": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"decode": {"reply": "machine", "route": {"path": "/v1/sessions/archived"}}`),
+				[]byte(`"decode": null`), 1)
+		},
+		"a hand row that states a decode too": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"decode": {"hand": "its body is open`), []byte(`"decode": {"reply": "machine", "hand": "its body is open`), 1)
+		},
+		"a route path naming a field no shape names": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"route": {"path": "/v1/sessions/archived"}`), []byte(`"route": {"path": "/v1/sessions/{ghost}"}`), 1)
+		},
+		"a string rule on an integer": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"limit": {"type": "integer", "min": 1, "max": 1000}`),
+				[]byte(`"limit": {"type": "integer", "min": 1, "max": 1000, "max_bytes": 4}`), 1)
+		},
+		"a wrapper check nobody knows": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"strip_check": "generation"`), []byte(`"strip_check": "generations"`), 1)
+		},
 	} {
 		edited := edit(vocabularyJSON)
 		if bytes.Equal(edited, vocabularyJSON) {

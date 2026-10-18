@@ -1,5 +1,7 @@
 {
   "version": 1,
+  "wrappers": [{"special": "session_receipt", "strip": "execution_generation", "strip_check": "generation", "strip_refusal": "execution_generation_required", "require": "request", "require_refusal": "idempotency_key_required"}, {"special": "content_read", "channel": "r", "strip": "machine_id", "strip_refusal": "wrong_machine"}],
+  "idempotency": {"header": "Idempotency-Key", "from": "request", "fallback": "cloud:{sender}:{sequence}", "except": "GET"},
   "operations": [
     {
       "op": "agent",
@@ -16,7 +18,8 @@
         {"body": ["agent", "before", "limit", "session"], "path": "/v1/sessions/{session}/agents/{agent}", "query": ["before", "limit"]},
         {"body": ["agent", "expected_generation", "limit", "session"], "path": "/v1/sessions/{session}/agents/{agent}", "query": ["limit"]},
         {"body": ["agent", "before", "expected_generation", "limit", "session"], "path": "/v1/sessions/{session}/agents/{agent}", "query": ["before", "limit"]}
-      ]
+      ],
+      "decode": {"reply": "session", "name": "agent:{agent}", "name_suffix": {"field": "before", "text": ".before.{before}"}, "fields": {"agent": {"type": "string", "non_empty": true}, "limit": {"type": "integer", "min": 1, "max": 1000}, "before": {"type": "integer", "min": 1}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/agents/{agent}", "query": {"limit": {"from": "limit"}, "before": {"from": "before"}}}}
     },
     {
       "op": "answer",
@@ -33,7 +36,8 @@
         {"body": ["answer", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["key"]},
         {"body": ["answer", "expect", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["expect", "key"]},
         {"body": ["answer", "request", "session", "typed"], "path": "/v1/sessions/{session}/key", "local_body": ["key", "typed"]}
-      ]
+      ],
+      "decode": {"reply": "session_action", "fields": {"answer": {"type": "string", "into": "key"}, "expect": {"type": "string", "checks": ["fingerprint"], "into": "expect"}, "typed": {"type": "string", "into": "typed"}}, "route": {"path": "/v1/sessions/{session}/key", "body": {"fields": {"key": {"from": "answer"}, "expect": {"from": "expect"}, "typed": {"from": "typed"}}}}}
     },
     {
       "op": "archive-session",
@@ -50,7 +54,8 @@
         {"body": ["expected_closeability_version", "request", "session"], "path": "/v1/sessions/{session}/archive", "local_body": ["expected_closeability_version", "force"]},
         {"body": ["force", "request", "session"], "path": "/v1/sessions/{session}/archive", "local_body": ["force"]},
         {"body": ["expected_closeability_version", "force", "request", "session"], "path": "/v1/sessions/{session}/archive", "local_body": ["expected_closeability_version", "force"]}
-      ]
+      ],
+      "decode": {"reply": "session_action", "fields": {"force": {"type": "bool"}, "expected_closeability_version": {"type": "string"}}, "route": {"path": "/v1/sessions/{session}/archive", "body": {"fields": {"force": {"from": "force", "default": false}, "expected_closeability_version": {"from": "expected_closeability_version", "omit_empty": true}}}}}
     },
     {
       "op": "archived-sessions",
@@ -63,7 +68,8 @@
       "example": {"request": "req-archived", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/sessions/archived"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/sessions/archived"}}
     },
     {
       "op": "board",
@@ -77,7 +83,8 @@
       "example": {"item": "", "project": "clawdline-go", "request": "req-board", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["item", "project", "request", "session"], "path": "/v1/board", "query": ["project"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"project": {"type": "string", "max_bytes": 200}, "item": {"type": "string", "max_bytes": 200}}, "route": {"path": "/v1/board", "query": {"project": {"from": "project", "omit_empty": true}, "item": {"from": "item", "omit_empty": true}}}}
     },
     {
       "op": "board-command",
@@ -90,7 +97,8 @@
       "example": {"command": {"enabled": true, "expectedRevision": 4, "operation": "set_ai_consent", "policy": "board-reading-v1", "provider": "codex", "requestId": "board-setting-1"}, "request": "board-setting-1", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["command", "request", "session"], "path": "/v1/board", "local_body": ["enabled", "expectedRevision", "operation", "policy", "provider", "requestId"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"command": {"type": "object", "max_bytes": 65536, "required": ["requestId"], "properties": {"requestId": {"type": "string", "checks": ["request_name"], "same_as": "request"}}, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/board", "body": {"object": "command"}}}
     },
     {
       "op": "capacity",
@@ -103,7 +111,8 @@
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/capacity"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/capacity"}}
     },
     {
       "op": "coordination.leases",
@@ -116,7 +125,8 @@
       "example": {"request": "req-leases", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/orchestrator/leases"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/orchestrator/leases"}}
     },
     {
       "op": "coordination.pauses",
@@ -129,7 +139,8 @@
       "example": {"request": "req-pauses", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/orchestrator/pauses"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/orchestrator/pauses"}}
     },
     {
       "op": "coordination.waits",
@@ -142,7 +153,8 @@
       "example": {"request": "req-waits", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/orchestrator/waits"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/orchestrator/waits"}}
     },
     {
       "op": "default-models",
@@ -155,7 +167,8 @@
       "example": {"request": "req-read", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/settings/default-models"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/settings/default-models"}}
     },
     {
       "op": "default-models-update",
@@ -168,7 +181,8 @@
       "example": {"changes": {"claude_default_model": "claude-sonnet-4-5"}, "request": "req-write", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/settings/default-models", "local_body": ["claude_default_model"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "max_keys": 3, "properties": {"codex_default_model": {"type": "string", "nullable": true}, "claude_default_model": {"type": "string", "nullable": true}, "codex_default_effort": {"type": "string", "nullable": true}}, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/settings/default-models", "body": {"object": "changes"}}}
     },
     {
       "op": "diagnostics.events",
@@ -181,7 +195,8 @@
       "example": {"batch": {"rows": []}, "request": "req-events", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["batch", "request", "session"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"batch": {"type": "object", "max_bytes": 262144, "into": "document", "copies": {"max_bytes": "ViewerEventsBatchBytesLimit"}}}}
     },
     {
       "op": "diagnostics.report",
@@ -192,7 +207,8 @@
       "example": {"report": {"page": "session"}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["report", "request", "session"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"report": {"type": "any"}}}
     },
     {
       "op": "dismiss-restorable",
@@ -206,7 +222,8 @@
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/sessions/restorable/dismiss", "local_body": []},
         {"body": ["conversations", "request", "session"], "path": "/v1/sessions/restorable/dismiss", "local_body": ["conversations"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"conversations": {"type": "list", "items": {"type": "string", "checks": ["session_name"]}}}, "route": {"path": "/v1/sessions/restorable/dismiss", "body": {"fields": {"conversations": {"from": "conversations"}}}}}
     },
     {
       "op": "dispatch",
@@ -224,7 +241,8 @@
         {"body": ["request", "task"]},
         {"body": ["session", "task"]},
         {"body": ["request", "session", "task"]}
-      ]
+      ],
+      "decode": {"hand": "its body is open: every field is accepted, and a body naming no request still decodes"}
     },
     {
       "op": "document",
@@ -239,7 +257,8 @@
       "shapes": [
         {"body": ["path", "request", "scope", "session", "task"], "path": "/v1/sessions/{session}/documents/{scope}/{task}/{path}"},
         {"body": ["expected_generation", "path", "request", "scope", "session", "task"], "path": "/v1/sessions/{session}/documents/{scope}/{task}/{path}"}
-      ]
+      ],
+      "decode": {"hand": "the scope decides whether a task segment exists, and the session must equal the plan's own reply session"}
     },
     {
       "op": "documents",
@@ -254,7 +273,8 @@
       "shapes": [
         {"body": ["session"], "path": "/v1/sessions/{session}/documents"},
         {"body": ["expected_generation", "session"], "path": "/v1/sessions/{session}/documents"}
-      ]
+      ],
+      "decode": {"reply": "session", "name": "documents", "fields": {"expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/documents"}}
     },
     {
       "op": "end",
@@ -268,7 +288,8 @@
       "example": {"accept_loss": false, "expected_closeability_version": "", "request": "req-end", "session": "%19"},
       "shapes": [
         {"body": ["accept_loss", "expected_closeability_version", "request", "session"], "path": "/v1/sessions/{session}/close", "local_body": ["force"]}
-      ]
+      ],
+      "decode": {"reply": "session_action", "fields": {"accept_loss": {"type": "bool"}, "expected_closeability_version": {"type": "string"}}, "route": {"path": "/v1/sessions/{session}/close", "body": {"fields": {"force": {"from": "accept_loss"}, "expected_closeability_version": {"from": "expected_closeability_version", "omit_empty": true}}}}}
     },
     {
       "op": "focus",
@@ -282,7 +303,8 @@
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/sessions/{session}/focus"},
         {"body": ["execution_generation", "request", "session"], "path": "/v1/sessions/{session}/focus"}
-      ]
+      ],
+      "decode": {"reply": "session_action", "fields": {"execution_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/focus"}}
     },
     {
       "op": "forget-archived",
@@ -295,7 +317,8 @@
       "example": {"conversation": "018f2f7a", "request": "req-forget-archive", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["conversation", "request", "session"], "path": "/v1/sessions/archived/forget", "local_body": ["conversation"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"conversation": {"type": "string", "non_empty": true}}, "route": {"path": "/v1/sessions/archived/forget", "body": {"fields": {"conversation": {"from": "conversation"}}}}}
     },
     {
       "op": "git",
@@ -310,7 +333,8 @@
       "shapes": [
         {"body": ["session"], "path": "/v1/sessions/{session}/git"},
         {"body": ["expected_generation", "session"], "path": "/v1/sessions/{session}/git"}
-      ]
+      ],
+      "decode": {"reply": "session", "name": "git", "fields": {"expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/git"}}
     },
     {
       "op": "git-diff",
@@ -325,7 +349,8 @@
       "shapes": [
         {"body": ["path", "request", "session"], "path": "/v1/sessions/{session}/git/diff", "query": ["path"]},
         {"body": ["expected_generation", "path", "request", "session"], "path": "/v1/sessions/{session}/git/diff", "query": ["path"]}
-      ]
+      ],
+      "decode": {"reply": "session_request", "fields": {"path": {"type": "string", "non_empty": true, "checks": ["printable"]}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/git/diff", "query": {"path": {"from": "path"}}}}
     },
     {
       "op": "image",
@@ -340,7 +365,8 @@
       "shapes": [
         {"body": ["id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]},
         {"body": ["expected_generation", "id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]}
-      ]
+      ],
+      "decode": {"reply": "session", "name": "image.{id}", "fields": {"id": {"type": "string", "non_empty": true, "into": "id"}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/artifacts/images/{id}", "query": {"session": {"from": "session"}}}}
     },
     {
       "op": "info",
@@ -355,7 +381,8 @@
       "shapes": [
         {"body": ["parts", "session"], "path": "/v1/sessions/{session}/info", "query": ["parts"]},
         {"body": ["expected_generation", "parts", "session"], "path": "/v1/sessions/{session}/info", "query": ["parts"]}
-      ]
+      ],
+      "decode": {"reply": "session", "name": "info.{parts}", "fields": {"parts": {"type": "string", "enum": ["full", "summary"], "into": "parts"}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/info", "query": {"parts": {"from": "parts", "only": "summary"}}}}
     },
     {
       "op": "intents",
@@ -368,7 +395,8 @@
       "example": {"request": "req-intents", "session": "__clawdline_machine__", "text": "start the review"},
       "shapes": [
         {"body": ["request", "session", "text"], "path": "/v1/intents", "local_body": ["text"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"text": {"type": "string", "max_bytes": 4096, "copies": {"max_bytes": "intentTextLimit"}}}, "route": {"path": "/v1/intents", "body": {"fields": {"text": {"from": "text"}}}}}
     },
     {
       "op": "interrupt",
@@ -382,7 +410,8 @@
       "example": {"request": "req-interrupt", "session": "%19"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/sessions/{session}/interrupt", "local_body": []}
-      ]
+      ],
+      "decode": {"reply": "session_action", "route": {"path": "/v1/sessions/{session}/interrupt", "body": {"empty": true}}}
     },
     {
       "op": "key",
@@ -397,7 +426,8 @@
         {"body": ["key", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["key"]},
         {"body": ["expect", "key", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["expect", "key"]},
         {"body": ["key", "request", "session", "typed"], "path": "/v1/sessions/{session}/key", "local_body": ["key", "typed"]}
-      ]
+      ],
+      "decode": {"reply": "session_action", "fields": {"key": {"type": "string", "into": "key"}, "expect": {"type": "string", "checks": ["fingerprint"], "into": "expect"}, "typed": {"type": "string", "into": "typed"}}, "route": {"path": "/v1/sessions/{session}/key", "body": {"fields": {"key": {"from": "key"}, "expect": {"from": "expect"}, "typed": {"from": "typed"}}}}}
     },
     {
       "op": "machine-usage",
@@ -410,7 +440,8 @@
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/machine/usage"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/machine/usage"}}
     },
     {
       "op": "notification-rules",
@@ -423,7 +454,8 @@
       "example": {"request": "req-read", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/notification-rules"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/notification-rules"}}
     },
     {
       "op": "notification-rules-update",
@@ -436,7 +468,8 @@
       "example": {"changes": {"action": "delete", "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "request": "req-write", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/notification-rules", "local_body": ["action", "id"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/notification-rules", "body": {"object": "changes"}}}
     },
     {
       "op": "notification-settings",
@@ -449,7 +482,8 @@
       "example": {"request": "req-notifications", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/settings/notifications"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/settings/notifications"}}
     },
     {
       "op": "notification-settings-update",
@@ -462,7 +496,8 @@
       "example": {"changes": {"push_on_waiting": false}, "request": "req-notifications-write", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/settings/notifications", "local_body": ["push_on_waiting"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "properties": {"push_on_waiting": {"type": "bool", "nullable": true}, "orchestrator_agent_notify": {"type": "bool", "nullable": true}, "push_on_board_decision": {"type": "bool", "nullable": true}, "push_on_board_done": {"type": "bool", "nullable": true}, "push_on_schedule_failure": {"type": "bool", "nullable": true}, "push_on_capacity": {"type": "bool", "nullable": true}, "push_on_dead_letter": {"type": "bool", "nullable": true}, "push_on_app_release_success": {"type": "bool", "nullable": true}, "push_on_cloud_release_success": {"type": "bool", "nullable": true}, "push_on_release_failure": {"type": "bool", "nullable": true}}, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/settings/notifications", "body": {"object": "changes"}}}
     },
     {
       "op": "pair-agent-start",
@@ -475,7 +510,8 @@
       "example": {"machine_id": "mac_target", "machine_name": "Target", "offer": "opaque", "request": "req-pair-agent-start", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["machine_id", "machine_name", "offer", "request", "session"], "path": "/v1/cloud/pairing/agent", "local_body": ["machine_id", "machine_name", "offer"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"offer": {"type": "string", "non_empty": true, "max_bytes": 4096}, "machine_id": {"type": "string", "non_empty": true, "max_bytes": 204}, "machine_name": {"type": "string", "max_bytes": 256}}, "route": {"path": "/v1/cloud/pairing/agent", "headers": {"Idempotency-Key": {"from": "request"}}, "body": {"fields": {"offer": {"from": "offer"}, "machine_id": {"from": "machine_id"}, "machine_name": {"from": "machine_name"}}}}}
     },
     {
       "op": "pair-agent-status",
@@ -488,7 +524,8 @@
       "example": {"request": "req-pair-status", "session": "__clawdline_machine__", "task_id": "7a000000-0000-4000-8000-000000000001"},
       "shapes": [
         {"body": ["request", "session", "task_id"], "path": "/v1/cloud/pairing/agent/{task_id}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"task_id": {"type": "string", "non_empty": true, "length": 36}}, "route": {"path": "/v1/cloud/pairing/agent/{task_id}"}}
     },
     {
       "op": "past-sessions",
@@ -501,7 +538,8 @@
       "example": {"assistant": "codex", "place": "/Users/sean/code/clawdline-go", "request": "req-past", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["assistant", "place", "request", "session"], "path": "/v1/places/{place}/sessions/{assistant}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"place": {"type": "string", "non_empty": true}, "assistant": {"type": "string"}}, "route": {"path": "/v1/places/{place}/sessions{/assistant?}"}}
     },
     {
       "op": "peer-control",
@@ -514,7 +552,8 @@
       "example": {"control": {"action": "status"}, "request": "req-peer-control", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["control", "request", "session"], "path": "/v1/cloud/peer/control", "local_body": ["action"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"control": {"type": "object", "max_bytes": 16384, "min_keys": 1, "max_keys": 14, "required": ["action"], "properties": {"action": {"type": "string", "non_empty": true}}}}, "route": {"path": "/v1/cloud/peer/control", "body": {"object": "control"}}}
     },
     {
       "op": "peer-inbox",
@@ -528,7 +567,8 @@
       "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "request": "inbox-1", "session": "%19"},
       "shapes": [
         {"body": ["expected_generation", "request", "session"], "path": "/v1/cloud/peer/inbox", "query": ["execution_generation", "machine_id", "session_id"]}
-      ]
+      ],
+      "decode": {"hand": "the machine id in its query is the bridge's own, set after decoding, not a body field"}
     },
     {
       "op": "peer-outbox",
@@ -541,7 +581,8 @@
       "example": {"request": "req-peer-outbox", "session": "__clawdline_machine__", "target_request": "req-peer-send"},
       "shapes": [
         {"body": ["request", "session", "target_request"], "path": "/v1/cloud/peer/outbox/{target_request}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"target_request": {"type": "string", "non_empty": true, "max_bytes": 128}}, "route": {"path": "/v1/cloud/peer/outbox/{target_request}"}}
     },
     {
       "op": "peer-send",
@@ -554,7 +595,8 @@
       "example": {"body": "fixture", "header": {"body_digest": "0000000000000000000000000000000000000000000000000000000000000000", "grant_id": "grant-1", "kind": "message", "request_id": "req-peer-send", "source": {"execution_generation": "11111111111111111111111111111111", "machine_id": "mac-01", "session_id": "source"}, "target": {"execution_generation": "22222222222222222222222222222222", "machine_id": "mac-02", "session_id": "target"}}, "request": "req-peer-send", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["body", "header", "request", "session"], "path": "/v1/cloud/peer/send", "local_body": ["body", "request"]}
-      ]
+      ],
+      "decode": {"hand": "its header is read into agenthandoff.Request and sent re-encoded, so the local body is that type's spelling"}
     },
     {
       "op": "personas",
@@ -567,7 +609,8 @@
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/personas"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/personas"}}
     },
     {
       "op": "places",
@@ -580,7 +623,8 @@
       "example": {"request": "req-places", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/places"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/places"}}
     },
     {
       "op": "project-add",
@@ -593,7 +637,8 @@
       "example": {"path": "/projects/example", "request": "req-add", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["path", "request", "session"], "path": "/v1/places", "local_body": ["paths"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"path": {"type": "string", "non_empty": true, "max_bytes": 4096, "checks": ["printable", "absolute_path"]}}, "route": {"path": "/v1/places", "body": {"fields": {"paths": {"from": "path", "list": true}}}}}
     },
     {
       "op": "project-entry",
@@ -606,7 +651,8 @@
       "example": {"repo": "github.com/o/n", "request": "req-entry", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["repo", "request", "session"], "path": "/v1/project-sync/entry", "query": ["repo"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"repo": {"type": "string", "non_empty": true, "max_bytes": 512}}, "route": {"path": "/v1/project-sync/entry", "query": {"repo": {"from": "repo"}}}}
     },
     {
       "op": "project-file-list",
@@ -619,7 +665,8 @@
       "example": {"project": "p1", "request": "req-file-list", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["project", "request", "session"], "path": "/v1/projects/{project}/files"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}}, "route": {"path": "/v1/projects/{project}/files"}}
     },
     {
       "op": "project-file-read",
@@ -632,7 +679,8 @@
       "example": {"file": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "project": "p1", "request": "read-1", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["file", "project", "request", "session"], "path": "/v1/projects/{project}/files/{file}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}, "file": {"type": "string", "length": 32, "checks": ["lower_hex"]}}, "route": {"path": "/v1/projects/{project}/files/{file}"}}
     },
     {
       "op": "project-file-save",
@@ -645,7 +693,8 @@
       "example": {"file": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "item": {"content": "updated", "expected_version": "v1"}, "project": "p1", "request": "req-file-save", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["file", "item", "project", "request", "session"], "path": "/v1/projects/{project}/files/{file}", "local_body": ["content", "expected_version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}, "file": {"type": "string", "length": 32, "checks": ["lower_hex"]}, "item": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "projectfiles.MaxWriteBytes"}}}, "route": {"path": "/v1/projects/{project}/files/{file}", "body": {"object": "item"}}}
     },
     {
       "op": "project-folders",
@@ -659,7 +708,8 @@
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/project-folders", "query": ["path"]},
         {"body": ["path", "request", "session"], "path": "/v1/project-folders", "query": ["path"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"path": {"type": "string", "max_bytes": 4096}}, "route": {"path": "/v1/project-folders", "query": {"path": {"from": "path", "default": ""}}}}
     },
     {
       "op": "project-hide",
@@ -672,7 +722,8 @@
       "example": {"path": "/projects/example", "request": "req-hide", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["path", "request", "session"], "path": "/v1/places", "local_body": ["paths"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"path": {"type": "string", "non_empty": true, "max_bytes": 4096, "checks": ["printable", "absolute_path"]}}, "route": {"path": "/v1/places", "body": {"fields": {"paths": {"from": "path", "list": true}}}}}
     },
     {
       "op": "project-manifest",
@@ -685,7 +736,8 @@
       "example": {"request": "req-manifest", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/project-sync/manifest"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/project-sync/manifest"}}
     },
     {
       "op": "project-mirror",
@@ -698,7 +750,8 @@
       "example": {"request": "req-mirror", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/project-sync/mirror"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/project-sync/mirror"}}
     },
     {
       "op": "project-mirror-apply",
@@ -711,7 +764,8 @@
       "example": {"item": {}, "request": "req-apply", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["item", "request", "session"], "path": "/v1/project-sync/mirror", "local_body": []}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"item": {"type": "object", "max_bytes": 4194304, "copies": {"max_bytes": "projectSyncCloudBodyLimit"}}}, "route": {"path": "/v1/project-sync/mirror", "body": {"object": "item"}}}
     },
     {
       "op": "project-mirror-detach",
@@ -724,7 +778,8 @@
       "example": {"repo": "github.com/o/n", "request": "req-detach", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["repo", "request", "session"], "path": "/v1/project-sync/mirror", "query": ["repo"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"repo": {"type": "string", "non_empty": true, "max_bytes": 512}}, "route": {"path": "/v1/project-sync/mirror", "query": {"repo": {"from": "repo"}}}}
     },
     {
       "op": "project-tree-list",
@@ -737,7 +792,8 @@
       "example": {"directory": "src/nested", "project": "p1", "request": "req-tree-list", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["directory", "project", "request", "session"], "path": "/v1/projects/{project}/tree", "query": ["directory"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}, "directory": {"type": "string", "checks": ["tree_directory"]}}, "route": {"path": "/v1/projects/{project}/tree", "query": {"directory": {"from": "directory"}}}}
     },
     {
       "op": "project-tree-read",
@@ -750,7 +806,8 @@
       "example": {"path": "src/page.ts", "project": "p1", "request": "tree-1", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["path", "project", "request", "session"], "path": "/v1/projects/{project}/tree/file", "query": ["path"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}, "path": {"type": "string", "non_empty": true, "checks": ["tree_file"]}}, "route": {"path": "/v1/projects/{project}/tree/file", "query": {"path": {"from": "path"}}}}
     },
     {
       "op": "project-unify-apply",
@@ -764,7 +821,8 @@
       "example": {"item": {"version": "v1"}, "project": "p1", "request": "apply-1", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["item", "project", "request", "session"], "path": "/v1/projects/{project}/unify", "local_body": ["version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}, "item": {"type": "object", "max_bytes": 4096}}, "route": {"path": "/v1/projects/{project}/unify", "body": {"object": "item"}}}
     },
     {
       "op": "project-unify-plan",
@@ -777,7 +835,8 @@
       "example": {"project": "p1", "request": "plan-1", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["project", "request", "session"], "path": "/v1/projects/{project}/unify"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}}, "route": {"path": "/v1/projects/{project}/unify"}}
     },
     {
       "op": "project-worktree-lifecycle",
@@ -790,7 +849,8 @@
       "example": {"project": "/Users/sean/code/clawdline-go", "request": "req-lifecycle", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["project", "request", "session"], "path": "/v1/projects/{project}/worktrees"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}}, "route": {"path": "/v1/projects/{project}/worktrees"}}
     },
     {
       "op": "project-worktree-lifecycle-refresh",
@@ -803,7 +863,8 @@
       "example": {"project": "/workspace/example", "request": "req-lifecycle-refresh", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["project", "request", "session"], "path": "/v1/projects/{project}/worktrees/refresh", "local_body": []}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}}, "route": {"path": "/v1/projects/{project}/worktrees/refresh", "body": {"empty": true}}}
     },
     {
       "op": "project-worktree-remove",
@@ -816,7 +877,8 @@
       "example": {"project": "project-abc", "request": "req-worktree-remove", "session": "__clawdline_machine__", "worktree": "wt-0123456789abcdef01234567"},
       "shapes": [
         {"body": ["project", "request", "session", "worktree"], "path": "/v1/projects/{project}/worktrees/{worktree}"}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"project": {"type": "string", "non_empty": true, "max_bytes": 200}, "worktree": {"type": "string", "length": 27, "prefix": "wt-"}}, "route": {"path": "/v1/projects/{project}/worktrees/{worktree}"}}
     },
     {
       "op": "projects",
@@ -829,7 +891,8 @@
       "example": {"request": "req-projects", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/projects"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/projects"}}
     },
     {
       "op": "push-key",
@@ -842,7 +905,8 @@
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/push/key"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/push/key"}}
     },
     {
       "op": "push-subscribe",
@@ -857,7 +921,8 @@
       "shapes": [
         {"body": ["request", "session", "subscription"], "path": "/v1/push/subscribe", "local_body": ["endpoint", "keys"]},
         {"body": ["cloud_subscription_id", "request", "session", "subscription"], "path": "/v1/push/subscribe", "local_body": ["cloud_subscription_id", "endpoint", "keys"]}
-      ]
+      ],
+      "decode": {"hand": "an optional cloud_subscription_id is merged into the subscription object, refusing a clash"}
     },
     {
       "op": "push-test",
@@ -871,7 +936,8 @@
       "example": {"request": "req", "session": "__clawdline_machine__", "target": ""},
       "shapes": [
         {"body": ["request", "session", "target"], "path": "/v1/push/test", "local_body": []}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"target": {"type": "string", "into": "target"}}, "route": {"path": "/v1/push/test", "body": {"fields": {"session_id": {"from": "target", "omit_empty": true}}}}}
     },
     {
       "op": "push-unsubscribe",
@@ -885,7 +951,8 @@
       "example": {"id": "9f1c0b3a4d5e6f708192a3b4c5d6e7f8", "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/push/unsubscribe", "local_body": ["id"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true}}, "route": {"path": "/v1/push/unsubscribe", "body": {"fields": {"id": {"from": "id"}}}}}
     },
     {
       "op": "restorable-sessions",
@@ -898,7 +965,8 @@
       "example": {"request": "req-offer", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/sessions/restorable"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/sessions/restorable"}}
     },
     {
       "op": "restore-archived",
@@ -911,7 +979,8 @@
       "example": {"conversations": ["018f2f7a"], "request": "req-unarchive", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["conversations", "request", "session"], "path": "/v1/sessions/archived/restore", "local_body": ["conversations"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"conversations": {"type": "list", "items": {"type": "string", "checks": ["session_name"]}, "min_items": 1}}, "route": {"path": "/v1/sessions/archived/restore", "body": {"fields": {"conversations": {"from": "conversations"}}}}}
     },
     {
       "op": "restore-sessions",
@@ -924,7 +993,8 @@
       "example": {"conversations": ["018f2f7a"], "request": "req-restore", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["conversations", "request", "session"], "path": "/v1/sessions/restorable/restore", "local_body": ["conversations"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"conversations": {"type": "list", "items": {"type": "string", "checks": ["session_name"]}, "min_items": 1}}, "route": {"path": "/v1/sessions/restorable/restore", "body": {"fields": {"conversations": {"from": "conversations"}}}}}
     },
     {
       "op": "resume",
@@ -938,7 +1008,8 @@
       "shapes": [
         {"body": ["assistant", "past", "place", "request", "session"], "path": "/v1/places/{place}/resume/{assistant}/{past}", "local_body": []},
         {"body": ["assistant", "past", "persona", "place", "request", "session"], "path": "/v1/places/{place}/resume/{assistant}/{past}/as/{persona}", "local_body": []}
-      ]
+      ],
+      "decode": {"hand": "the path spells a default assistant only when a persona needs one, and orders its segments by what was named"}
     },
     {
       "op": "schedule",
@@ -951,7 +1022,8 @@
       "example": {"id": "5c000000-0000-4000-8000-000000000002", "request": "req-schedule", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/orchestrator/schedules/{id}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "non_empty": true}}, "route": {"path": "/v1/orchestrator/schedules/{id}"}}
     },
     {
       "op": "schedule-create",
@@ -964,7 +1036,8 @@
       "example": {"request": "req-schedule-create", "schedule": {"title": "morning"}, "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "schedule", "session"], "path": "/v1/orchestrator/schedules", "local_body": ["title"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"schedule": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "scheduleMaximumBytes"}}}, "route": {"path": "/v1/orchestrator/schedules", "body": {"object": "schedule"}}}
     },
     {
       "op": "schedule-delete",
@@ -977,7 +1050,8 @@
       "example": {"id": "5c000000-0000-4000-8000-000000000002", "request": "req-schedule-delete", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/orchestrator/schedules/{id}"}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true}}, "route": {"path": "/v1/orchestrator/schedules/{id}"}}
     },
     {
       "op": "schedule-run",
@@ -991,7 +1065,8 @@
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/orchestrator/schedules/{id}/run", "local_body": []},
         {"body": ["force", "id", "request", "session"], "path": "/v1/orchestrator/schedules/{id}/run", "local_body": ["force"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true}, "force": {"type": "bool", "equals": true}}, "route": {"path": "/v1/orchestrator/schedules/{id}/run", "body": {"fields": {"force": {"from": "force"}}}}}
     },
     {
       "op": "schedule-update",
@@ -1004,7 +1079,8 @@
       "example": {"id": "5c000000-0000-4000-8000-000000000002", "request": "req-schedule-update", "schedule": {"title": "morning"}, "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "schedule", "session"], "path": "/v1/orchestrator/schedules/{id}", "local_body": ["title"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true}, "schedule": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "scheduleMaximumBytes"}}}, "route": {"path": "/v1/orchestrator/schedules/{id}", "body": {"object": "schedule"}}}
     },
     {
       "op": "schedule-webhook-bind-v1",
@@ -1018,7 +1094,8 @@
       "shapes": [
         {"body": ["hook_id", "replace_hook_id", "request_id", "schedule_id"], "path": "/v1/orchestrator/schedule-webhooks/bind", "local_body": ["hook_id", "replace_hook_id", "request_id", "schedule_id"]},
         {"body": ["hook_id", "hook_revision", "replace_hook_id", "request_id", "schedule_id"], "path": "/v1/orchestrator/schedule-webhooks/bind", "local_body": ["hook_id", "hook_revision", "replace_hook_id", "request_id", "schedule_id"]}
-      ]
+      ],
+      "decode": {"hand": "its request_id is the answer's request and a UUID, with no session field, and replace_hook_id is sent as null"}
     },
     {
       "op": "schedules",
@@ -1031,7 +1108,8 @@
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/orchestrator/schedules"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/orchestrator/schedules"}}
     },
     {
       "op": "screen",
@@ -1046,7 +1124,8 @@
       "shapes": [
         {"body": ["session"], "path": "/v1/sessions/{session}/screen"},
         {"body": ["expected_generation", "session"], "path": "/v1/sessions/{session}/screen"}
-      ]
+      ],
+      "decode": {"reply": "session", "name": "screen", "fields": {"expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/screen"}}
     },
     {
       "op": "send",
@@ -1061,7 +1140,8 @@
       "shapes": [
         {"body": ["images", "session", "text"], "path": "/v1/sessions/{session}/send", "local_body": ["images", "text"]},
         {"body": ["images", "request", "session", "text"], "path": "/v1/sessions/{session}/send", "local_body": ["images", "text"]}
-      ]
+      ],
+      "decode": {"reply": "session_action", "fields": {"text": {"type": "string"}, "images": {"type": "list", "items": {"type": "string"}}}, "route": {"path": "/v1/sessions/{session}/send", "body": {"fields": {"text": {"from": "text"}, "images": {"from": "images"}}}}}
     },
     {
       "op": "session-receipt",
@@ -1074,7 +1154,8 @@
       "example": {"action": "send", "execution_generation": "0123456789abcdef0123456789abcdef", "request": "req-receipt", "session": "%19", "target_request": "req-send"},
       "shapes": [
         {"body": ["action", "execution_generation", "request", "session", "target_request"]}
-      ]
+      ],
+      "decode": {"reply": "session_action", "fields": {"target_request": {"type": "any"}, "execution_generation": {"type": "any"}, "action": {"type": "any"}}}
     },
     {
       "op": "session-snippets",
@@ -1087,7 +1168,8 @@
       "example": {"request": "req-session-snippets", "row": "session-one", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "row", "session"], "path": "/v1/snippets", "query": ["session"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"row": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target", "copies": {"max_bytes": "SessionRowIDBytesLimit"}}}, "route": {"path": "/v1/snippets", "query": {"session": {"from": "row"}}}}
     },
     {
       "op": "sessions.list",
@@ -1102,7 +1184,8 @@
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/sessions", "query": ["parts"]},
         {"body": ["fresh", "request", "session"], "path": "/v1/sessions", "query": ["fresh", "parts"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"fresh": {"type": "bool", "equals": true}}, "route": {"path": "/v1/sessions", "query": {"parts": {"const": "list"}, "fresh": {"from": "fresh", "if_true": "1"}}}}
     },
     {
       "op": "sessions.row",
@@ -1115,7 +1198,8 @@
       "example": {"request": "req-1", "row": "%19", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "row", "session"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"row": {"type": "string", "non_empty": true, "max_bytes": 256, "copies": {"max_bytes": "SessionRowIDBytesLimit"}}}}
     },
     {
       "op": "sessions.snapshot",
@@ -1131,7 +1215,8 @@
         {"body": ["initial", "request", "session"]},
         {"body": ["orchestrator", "request", "session"]},
         {"body": ["initial", "orchestrator", "request", "session"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"orchestrator": {"type": "bool", "equals": true}, "initial": {"type": "bool"}}}
     },
     {
       "op": "sessions.snapshot.initial",
@@ -1145,7 +1230,8 @@
       "shapes": [
         {"body": ["request", "session"]},
         {"body": ["orchestrator", "request", "session"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"orchestrator": {"type": "bool", "equals": true}}}
     },
     {
       "op": "shell",
@@ -1160,7 +1246,8 @@
       "shapes": [
         {"body": ["bytes", "session", "shell"], "path": "/v1/sessions/{session}/shells/{shell}", "query": ["bytes"]},
         {"body": ["bytes", "expected_generation", "session", "shell"], "path": "/v1/sessions/{session}/shells/{shell}", "query": ["bytes"]}
-      ]
+      ],
+      "decode": {"reply": "session", "name": "shell:{shell}", "fields": {"shell": {"type": "string", "non_empty": true}, "bytes": {"type": "integer", "min": 1024, "max": 1048576}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/shells/{shell}", "query": {"bytes": {"from": "bytes"}}}}
     },
     {
       "op": "skills",
@@ -1175,7 +1262,8 @@
       "shapes": [
         {"body": ["session"], "path": "/v1/sessions/{session}/skills"},
         {"body": ["expected_generation", "session"], "path": "/v1/sessions/{session}/skills"}
-      ]
+      ],
+      "decode": {"reply": "session", "name": "skills", "fields": {"expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/skills"}}
     },
     {
       "op": "smart-title",
@@ -1189,7 +1277,8 @@
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/sessions/{session}/smart-title", "local_body": []},
         {"body": ["execution_generation", "request", "session"], "path": "/v1/sessions/{session}/smart-title", "local_body": []}
-      ]
+      ],
+      "decode": {"reply": "session_action", "fields": {"execution_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/smart-title", "body": {"empty": true}}}
     },
     {
       "op": "snippet-create",
@@ -1202,7 +1291,8 @@
       "example": {"request": "req-snippet-create", "session": "__clawdline_machine__", "snippet": {"body": "a body", "scope": "global", "title": "a title"}},
       "shapes": [
         {"body": ["request", "session", "snippet"], "path": "/v1/snippets", "local_body": ["body", "scope", "title"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"snippet": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "snippetMaximumBytes"}}}, "route": {"path": "/v1/snippets", "body": {"object": "snippet"}}}
     },
     {
       "op": "snippet-delete",
@@ -1215,7 +1305,8 @@
       "example": {"id": "3b000000-0000-4000-8000-000000000004", "request": "req-snippet-delete", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/snippets/{id}"}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true}}, "route": {"path": "/v1/snippets/{id}"}}
     },
     {
       "op": "snippet-order",
@@ -1228,7 +1319,8 @@
       "example": {"ordering": {"order": ["3b000000-0000-4000-8000-000000000004"], "scope": "global"}, "request": "req-snippet-order", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["ordering", "request", "session"], "path": "/v1/snippets/order", "local_body": ["order", "scope"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"ordering": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "snippetMaximumBytes"}}}, "route": {"path": "/v1/snippets/order", "body": {"object": "ordering"}}}
     },
     {
       "op": "snippet-update",
@@ -1241,7 +1333,8 @@
       "example": {"id": "3b000000-0000-4000-8000-000000000004", "request": "req-snippet-update", "session": "__clawdline_machine__", "snippet": {"body": "a body", "scope": "global", "title": "a title"}},
       "shapes": [
         {"body": ["id", "request", "session", "snippet"], "path": "/v1/snippets/{id}", "local_body": ["body", "scope", "title"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true}, "snippet": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "snippetMaximumBytes"}}}, "route": {"path": "/v1/snippets/{id}", "body": {"object": "snippet"}}}
     },
     {
       "op": "snippets",
@@ -1255,7 +1348,8 @@
       "example": {"request": "req-snippets", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/snippets"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/snippets"}}
     },
     {
       "op": "squad-event-head",
@@ -1268,7 +1362,8 @@
       "example": {"request": "req-event-head", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/squad/events/head"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/squad/events/head"}}
     },
     {
       "op": "squad-events",
@@ -1281,7 +1376,8 @@
       "example": {"after": 7, "limit": 50, "request": "req-events", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["after", "limit", "request", "session"], "path": "/v1/squad/events", "query": ["after", "limit"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"after": {"type": "integer", "min": 0}, "limit": {"type": "integer", "min": 1, "max": 100, "copies": {"max": "store.MaxSquadEventPageRows"}}}, "route": {"path": "/v1/squad/events", "query": {"after": {"from": "after"}, "limit": {"from": "limit"}}}}
     },
     {
       "op": "squad-session-bindings",
@@ -1294,7 +1390,8 @@
       "example": {"request": "req-bindings", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/squad/session-bindings"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/squad/session-bindings"}}
     },
     {
       "op": "squad-session-snapshot",
@@ -1307,7 +1404,8 @@
       "example": {"conversation": "conversation-a", "request": "req-role-snapshot", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["conversation", "request", "session"], "path": "/v1/squad/session-snapshots/{conversation}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"conversation": {"type": "string", "non_empty": true, "checks": ["printable"]}}, "route": {"path": "/v1/squad/session-snapshots/{conversation}"}}
     },
     {
       "op": "squad.catalog",
@@ -1320,7 +1418,8 @@
       "example": {"request": "req-squad-catalog", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/squad/catalog"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/squad/catalog"}}
     },
     {
       "op": "squad.catalog.update",
@@ -1333,7 +1432,8 @@
       "example": {"changes": {"expected_version": 0}, "request": "req-squad-catalog-write", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/squad/catalog", "local_body": ["expected_version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "squad.MaxSquadRequestBytes"}}}, "route": {"path": "/v1/squad/catalog", "body": {"object": "changes"}}}
     },
     {
       "op": "squad.definition",
@@ -1343,10 +1443,12 @@
       "console_route": "GET /v1/squad/definitions/{id}[?version=]",
       "console_seam": "reader",
       "local": {"method": "GET", "device": true},
-      "example": {"definition_id": "backend", "request": "req-squad-definition", "session": "__clawdline_machine__"},
+      "example": {"definition_id": "backend", "request": "req-squad-definition", "session": "__clawdline_machine__", "version": "v2"},
       "shapes": [
-        {"body": ["definition_id", "request", "session"], "path": "/v1/squad/definitions/{definition_id}"}
-      ]
+        {"body": ["definition_id", "request", "session"], "path": "/v1/squad/definitions/{definition_id}"},
+        {"body": ["definition_id", "request", "session", "version"], "path": "/v1/squad/definitions/{definition_id}", "query": ["version"]}
+      ],
+      "decode": {"reply": "machine", "fields": {"definition_id": {"type": "string", "non_empty": true, "max_bytes": 256, "checks": ["printable"]}, "version": {"type": "string", "non_empty": true, "max_bytes": 256, "checks": ["printable"]}}, "route": {"path": "/v1/squad/definitions/{definition_id}", "query": {"version": {"from": "version"}}}}
     },
     {
       "op": "squad.motion.update",
@@ -1359,7 +1461,8 @@
       "example": {"changes": {"expected_version": 0}, "request": "req-squad-motion-write", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/squad/motion", "local_body": ["expected_version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "squad.MaxSquadRequestBytes"}}}, "route": {"path": "/v1/squad/motion", "body": {"object": "changes"}}}
     },
     {
       "op": "squad.packages.adopt",
@@ -1372,7 +1475,8 @@
       "example": {"package": {}, "request": "req-package-adopt", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["package", "request", "session"], "path": "/v1/squad-packages/adopt", "local_body": []}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"package": {"type": "object", "max_bytes": 1048576, "copies": {"max_bytes": "squadpack.MaxRequestBytes"}}}, "route": {"path": "/v1/squad-packages/adopt", "body": {"object": "package"}}}
     },
     {
       "op": "squad.packages.export",
@@ -1385,7 +1489,8 @@
       "example": {"package": {"confirm_private": false, "private_scopes": []}, "request": "req-package-export", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["package", "request", "session"], "path": "/v1/squad-packages/export", "local_body": ["confirm_private", "private_scopes"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"package": {"type": "object", "max_bytes": 1048576, "closed": true, "required": ["confirm_private", "private_scopes"], "properties": {"confirm_private": {"type": "bool", "equals": false}, "private_scopes": {"type": "list", "items": {"type": "any"}, "max_items": 0}}, "copies": {"max_bytes": "squadpack.MaxRequestBytes"}}}, "route": {"path": "/v1/squad-packages/export", "body": {"object": "package"}}}
     },
     {
       "op": "squad.packages.export.private",
@@ -1399,7 +1504,8 @@
       "example": {"package": {"confirm_private": true, "private_scopes": ["global"]}, "request": "req-package-export-private", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["package", "request", "session"], "path": "/v1/squad-packages/export", "local_body": ["confirm_private", "private_scopes"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"package": {"type": "object", "max_bytes": 1048576, "closed": true, "required": ["confirm_private", "private_scopes"], "properties": {"confirm_private": {"type": "bool", "equals": true}, "private_scopes": {"type": "list", "items": {"type": "string", "non_empty": true}, "min_items": 1}}, "copies": {"max_bytes": "squadpack.MaxRequestBytes"}}}, "route": {"path": "/v1/squad-packages/export", "body": {"object": "package"}}}
     },
     {
       "op": "squad.packages.preview",
@@ -1412,7 +1518,8 @@
       "example": {"package": {}, "request": "req-package-preview", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["package", "request", "session"], "path": "/v1/squad-packages/preview", "local_body": []}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"package": {"type": "object", "max_bytes": 1048576, "copies": {"max_bytes": "squadpack.MaxRequestBytes"}}}, "route": {"path": "/v1/squad-packages/preview", "body": {"object": "package"}}}
     },
     {
       "op": "squad.role-draft",
@@ -1425,7 +1532,8 @@
       "example": {"changes": {"description": "Review release notes"}, "request": "req-squad-role-draft", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/squad/role-draft", "local_body": ["description"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "squad.MaxSquadRequestBytes"}}}, "route": {"path": "/v1/squad/role-draft", "body": {"object": "changes"}}}
     },
     {
       "op": "squad.scopes",
@@ -1438,7 +1546,8 @@
       "example": {"request": "req-squad-scopes", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/squad/scopes"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/squad/scopes"}}
     },
     {
       "op": "squad.settings",
@@ -1448,11 +1557,13 @@
       "console_route": "GET /v1/squad/settings[?place_id=|scope_id=]",
       "console_seam": "reader",
       "local": {"method": "GET", "device": true},
-      "example": {"place_id": "place-a", "request": "req-squad-settings", "session": "__clawdline_machine__"},
+      "example": {"place_id": "place-a", "request": "req-squad-settings", "scope_id": "scope-a", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/squad/settings"},
-        {"body": ["place_id", "request", "session"], "path": "/v1/squad/settings", "query": ["place_id"]}
-      ]
+        {"body": ["place_id", "request", "session"], "path": "/v1/squad/settings", "query": ["place_id"]},
+        {"body": ["request", "scope_id", "session"], "path": "/v1/squad/settings", "query": ["scope_id"]}
+      ],
+      "decode": {"reply": "machine", "fields": {"place_id": {"type": "string", "non_empty": true, "max_bytes": 256, "checks": ["printable"]}, "scope_id": {"type": "string", "non_empty": true, "max_bytes": 256, "checks": ["printable"]}}, "route": {"path": "/v1/squad/settings", "query": {"place_id": {"from": "place_id"}, "scope_id": {"from": "scope_id"}}}}
     },
     {
       "op": "squad.settings.update",
@@ -1465,7 +1576,8 @@
       "example": {"changes": {"expected_version": 0}, "request": "req-squad-settings-write", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/squad/settings", "local_body": ["expected_version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 262144, "copies": {"max_bytes": "squad.MaxSquadRequestBytes"}}}, "route": {"path": "/v1/squad/settings", "body": {"object": "changes"}}}
     },
     {
       "op": "squad.skill-sources",
@@ -1481,7 +1593,8 @@
         {"body": ["place_id", "provider", "request", "session"], "path": "/v1/squad/skill-sources", "query": ["place_id", "provider"]},
         {"body": ["folder", "id", "provider", "request", "session"], "path": "/v1/squad/skill-sources", "query": ["folder", "id", "provider"]},
         {"body": ["folder", "id", "place_id", "provider", "request", "session"], "path": "/v1/squad/skill-sources", "query": ["folder", "id", "place_id", "provider"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"provider": {"type": "string", "enum": ["project", "claude-code", "codex"]}, "place_id": {"type": "string", "non_empty": true, "max_bytes": 256, "checks": ["printable"]}, "id": {"type": "string", "length": 64, "checks": ["printable"]}, "folder": {"type": "string", "enum": ["true", "false"]}}, "route": {"path": "/v1/squad/skill-sources", "query": {"provider": {"from": "provider", "omit_empty": true}, "place_id": {"from": "place_id", "omit_empty": true}, "id": {"from": "id", "omit_empty": true}, "folder": {"from": "folder", "omit_empty": true}}}}
     },
     {
       "op": "start",
@@ -1495,7 +1608,8 @@
       "shapes": [
         {"body": ["assistant", "model", "place", "request", "session"], "path": "/v1/places/{place}/start/{assistant}", "local_body": []},
         {"body": ["assistant", "model", "persona", "place", "request", "session"], "path": "/v1/places/{place}/start/{assistant}/as/{persona}", "local_body": []}
-      ]
+      ],
+      "decode": {"hand": "the path spells a default assistant only when a later segment needs one, and orders its segments by what was named"}
     },
     {
       "op": "title",
@@ -1509,7 +1623,8 @@
       "shapes": [
         {"body": ["request", "session", "text"], "path": "/v1/sessions/{session}/title", "local_body": ["title"]},
         {"body": ["execution_generation", "request", "session", "text"], "path": "/v1/sessions/{session}/title", "local_body": ["title"]}
-      ]
+      ],
+      "decode": {"reply": "session_action", "fields": {"text": {"type": "string"}, "execution_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/title", "body": {"fields": {"title": {"from": "text"}}}}}
     },
     {
       "op": "transcript",
@@ -1530,7 +1645,8 @@
         {"body": ["before", "limit", "priority", "session"], "path": "/v1/transcript", "query": ["before", "limit", "session"]},
         {"body": ["expected_generation", "limit", "priority", "session"], "path": "/v1/transcript", "query": ["expected_generation", "limit", "session"]},
         {"body": ["before", "expected_generation", "limit", "priority", "session"], "path": "/v1/transcript", "query": ["before", "expected_generation", "limit", "session"]}
-      ]
+      ],
+      "decode": {"reply": "session", "name": "transcript", "name_suffix": {"field": "before", "text": ".before.{before}"}, "fields": {"limit": {"type": "integer", "min": 1, "max": 1000}, "before": {"type": "integer", "min": 1}, "priority": {"type": "string", "enum": ["foreground", "background"]}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/transcript", "query": {"session": {"from": "session"}, "limit": {"from": "limit"}, "before": {"from": "before"}, "expected_generation": {"from": "expected_generation"}}}}
     },
     {
       "op": "update",
@@ -1543,7 +1659,8 @@
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/update"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/update"}}
     },
     {
       "op": "update-apply",
@@ -1556,7 +1673,8 @@
       "example": {"request": "req-apply", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/update/apply", "local_body": []}
-      ]
+      ],
+      "decode": {"reply": "action", "route": {"path": "/v1/update/apply", "body": {"empty": true}}}
     },
     {
       "op": "update-fresh",
@@ -1569,7 +1687,8 @@
       "example": {"request": "req-update-fresh", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/update/fresh"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/update/fresh"}}
     },
     {
       "op": "usage.compare-compaction",
@@ -1583,7 +1702,8 @@
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/usage/compare-compaction"},
         {"body": ["request", "session", "since"], "path": "/v1/usage/compare-compaction", "query": ["since"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"since": {"type": "string", "checks": ["compare_since"]}}, "route": {"path": "/v1/usage/compare-compaction", "query": {"since": {"from": "since"}}}}
     },
     {
       "op": "usage.compare-handoff",
@@ -1597,7 +1717,8 @@
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/usage/compare-handoff"},
         {"body": ["request", "session", "since"], "path": "/v1/usage/compare-handoff", "query": ["since"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"since": {"type": "string", "checks": ["compare_since"]}}, "route": {"path": "/v1/usage/compare-handoff", "query": {"since": {"from": "since"}}}}
     },
     {
       "op": "usage.item",
@@ -1610,7 +1731,8 @@
       "example": {"id": "w1", "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/usage/items/{id}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "checks": ["usage_id"]}}, "route": {"path": "/v1/usage/items/{id}"}}
     },
     {
       "op": "usage.session",
@@ -1623,7 +1745,8 @@
       "example": {"id": "w1", "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/usage/sessions/{id}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "checks": ["usage_id"]}}, "route": {"path": "/v1/usage/sessions/{id}"}}
     },
     {
       "op": "usage.task",
@@ -1636,7 +1759,8 @@
       "example": {"id": "w1", "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/usage/tasks/{id}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "checks": ["usage_id"]}}, "route": {"path": "/v1/usage/tasks/{id}"}}
     },
     {
       "op": "usage.work-samples",
@@ -1652,7 +1776,8 @@
         {"body": ["request", "session", "since"], "path": "/v1/usage/work-samples", "query": ["since"]},
         {"body": ["request", "session", "until"], "path": "/v1/usage/work-samples", "query": ["until"]},
         {"body": ["request", "session", "since", "until"], "path": "/v1/usage/work-samples", "query": ["since", "until"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"since": {"type": "string", "checks": ["compare_since"]}, "until": {"type": "string", "checks": ["work_until"]}}, "route": {"path": "/v1/usage/work-samples", "query": {"since": {"from": "since"}, "until": {"from": "until"}}}}
     },
     {
       "op": "usage.work-units",
@@ -1666,7 +1791,8 @@
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/usage/work-units"},
         {"body": ["request", "session", "since"], "path": "/v1/usage/work-units", "query": ["since"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"since": {"type": "string", "checks": ["compare_since"]}}, "route": {"path": "/v1/usage/work-units", "query": {"since": {"from": "since"}}}}
     },
     {
       "op": "verification.close",
@@ -1679,7 +1805,8 @@
       "example": {"id": "7e000000-0000-4000-8000-000000000006", "request": "req-verify-close", "session": "__clawdline_machine__", "verification": {"reason": "it held", "status": "accepted"}},
       "shapes": [
         {"body": ["id", "request", "session", "verification"], "path": "/v1/verifications/{id}/close", "local_body": ["reason", "status"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["verification_id"]}, "verification": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "verificationCloudBodyLimit"}}}, "route": {"path": "/v1/verifications/{id}/close", "body": {"object": "verification"}}}
     },
     {
       "op": "verification.create",
@@ -1692,7 +1819,8 @@
       "example": {"request": "req-verify-add", "session": "__clawdline_machine__", "verification": {"criteria": ["it holds"], "due_at": 1790000000, "title": "a check"}},
       "shapes": [
         {"body": ["request", "session", "verification"], "path": "/v1/verifications", "local_body": ["criteria", "due_at", "title"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"verification": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "verificationCloudBodyLimit"}}}, "route": {"path": "/v1/verifications", "body": {"object": "verification"}}}
     },
     {
       "op": "verification.criterion",
@@ -1705,7 +1833,8 @@
       "example": {"id": "7e000000-0000-4000-8000-000000000006", "index": 2, "request": "req-verify-mark", "session": "__clawdline_machine__", "verification": {"state": "passed"}},
       "shapes": [
         {"body": ["id", "index", "request", "session", "verification"], "path": "/v1/verifications/{id}/criteria/{index}", "local_body": ["state"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["verification_id"]}, "index": {"type": "integer", "min": 0, "max": 11, "copies": {"max": "verificationCriteriaMaximum-1"}}, "verification": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "verificationCloudBodyLimit"}}}, "route": {"path": "/v1/verifications/{id}/criteria/{index}", "body": {"object": "verification"}}}
     },
     {
       "op": "verification.delete",
@@ -1718,7 +1847,8 @@
       "example": {"force": false, "id": "7e000000-0000-4000-8000-000000000006", "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["force", "id", "request", "session"], "path": "/v1/verifications/{id}"}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["verification_id"]}, "force": {"type": "bool"}}, "route": {"path": "/v1/verifications/{id}", "query": {"force": {"from": "force", "if_true": "1"}}}}
     },
     {
       "op": "verification.get",
@@ -1731,7 +1861,8 @@
       "example": {"id": "7e000000-0000-4000-8000-000000000006", "request": "req-verify-get", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/verifications/{id}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "checks": ["verification_id"]}}, "route": {"path": "/v1/verifications/{id}"}}
     },
     {
       "op": "verification.list",
@@ -1744,7 +1875,8 @@
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/verifications"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/verifications"}}
     },
     {
       "op": "verification.note",
@@ -1757,7 +1889,8 @@
       "example": {"id": "7e000000-0000-4000-8000-000000000006", "request": "req-verify-note", "session": "__clawdline_machine__", "verification": {"text": "looked"}},
       "shapes": [
         {"body": ["id", "request", "session", "verification"], "path": "/v1/verifications/{id}/notes", "local_body": ["text"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["verification_id"]}, "verification": {"type": "object", "max_bytes": 65536, "copies": {"max_bytes": "verificationCloudBodyLimit"}}}, "route": {"path": "/v1/verifications/{id}/notes", "body": {"object": "verification"}}}
     },
     {
       "op": "voice",
@@ -1770,7 +1903,8 @@
       "example": {"audio": "AAAA", "rate": 16000, "request": "req-voice", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["audio", "rate", "request", "session"], "path": "/v1/voice", "local_body": ["audio", "rate"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"audio": {"type": "string", "non_empty": true}, "rate": {"type": "integer", "min": 16000, "max": 16000, "copies": {"min": "voiceRate", "max": "voiceRate"}}}, "route": {"path": "/v1/voice", "body": {"fields": {"audio": {"from": "audio"}, "rate": {"from": "rate"}}}}}
     },
     {
       "op": "work-gate-settings",
@@ -1783,7 +1917,8 @@
       "example": {"request": "req-read", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/settings/work-gates"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/settings/work-gates"}}
     },
     {
       "op": "work-gate-settings-update",
@@ -1796,7 +1931,8 @@
       "example": {"changes": {"planning_gate": false, "verify_gate": true}, "request": "req-write", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["changes", "request", "session"], "path": "/v1/settings/work-gates", "local_body": ["planning_gate", "verify_gate"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"changes": {"type": "object", "max_bytes": 65536, "closed": true, "max_keys": 2, "properties": {"planning_gate": {"type": "bool", "nullable": true}, "verify_gate": {"type": "bool", "nullable": true}}, "copies": {"max_bytes": "defaultModelsCloudBodyLimit"}}}, "route": {"path": "/v1/settings/work-gates", "body": {"object": "changes"}}}
     },
     {
       "op": "work.decision",
@@ -1809,7 +1945,8 @@
       "example": {"id": "10000000-0000-4000-8000-000000000001", "request": "req-work-decision", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/work/decisions/{id}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "checks": ["task_id"]}}, "route": {"path": "/v1/work/decisions/{id}"}}
     },
     {
       "op": "work.decision-answer",
@@ -1822,7 +1959,8 @@
       "example": {"answer": "Proceed", "id": "10000000-0000-4000-8000-000000000001", "request": "press-1", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["answer", "id", "request", "session"], "path": "/v1/work/decisions/{id}", "local_body": ["answer"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "checks": ["task_id"]}, "answer": {"type": "string", "max_bytes": 4096, "checks": ["not_blank", "printable"]}}, "route": {"path": "/v1/work/decisions/{id}", "body": {"fields": {"answer": {"from": "answer"}}}}}
     },
     {
       "op": "work.decisions",
@@ -1835,7 +1973,8 @@
       "example": {"request": "req-work-decisions", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["request", "session"], "path": "/v1/work/decisions"}
-      ]
+      ],
+      "decode": {"reply": "machine", "route": {"path": "/v1/work/decisions"}}
     },
     {
       "op": "work.digests",
@@ -1848,7 +1987,8 @@
       "example": {"kind": "daily", "request": "req-work-digests", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["kind", "request", "session"], "path": "/v1/work/digests", "query": ["kind"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"kind": {"type": "string", "max_bytes": 32}}, "route": {"path": "/v1/work/digests", "query": {"kind": {"from": "kind", "omit_empty": true}}}}
     },
     {
       "op": "work.proposals",
@@ -1861,7 +2001,8 @@
       "example": {"project": "", "request": "req-work-proposals", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["project", "request", "session"], "path": "/v1/work/proposals"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"project": {"type": "string", "max_bytes": 200}}, "route": {"path": "/v1/work/proposals", "query": {"project": {"from": "project", "omit_empty": true}}}}
     },
     {
       "op": "work.v2.assign",
@@ -1874,7 +2015,8 @@
       "example": {"id": "w1", "item": {"mode": "existing", "terminal": "%19"}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/assign", "local_body": ["mode", "terminal"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/assign", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.cancel",
@@ -1887,7 +2029,8 @@
       "example": {"id": "w1", "item": {"expected_version": 3, "reason": "Deleted"}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/cancel", "local_body": ["expected_version", "reason"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/cancel", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.complete",
@@ -1900,7 +2043,8 @@
       "example": {"id": "w1", "item": {"expected_version": 4}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/complete", "local_body": ["expected_version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/complete", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.convert",
@@ -1913,7 +2057,8 @@
       "example": {"id": "w1", "item": {"expected_version": 2, "kind": "plan"}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/convert", "local_body": ["expected_version", "kind"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/convert", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.create",
@@ -1926,7 +2071,8 @@
       "example": {"item": {"kind": "feature", "project_id": "p1", "title": "A"}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["item", "request", "session"], "path": "/v1/work/v2/items", "local_body": ["kind", "project_id", "title"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.edit",
@@ -1939,7 +2085,8 @@
       "example": {"id": "w1", "item": {"expected_version": 2, "title": "Edited"}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}", "local_body": ["expected_version", "title"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.gate-decision",
@@ -1952,7 +2099,8 @@
       "example": {"id": "w1", "item": {"action": "direction", "direction": "Repair", "expected_version": 5, "reason": "Explain"}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/gate-decision", "local_body": ["action", "direction", "expected_version", "reason"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/gate-decision", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.gate-export",
@@ -1965,7 +2113,8 @@
       "example": {"id": "w1", "request": "req-gate-export", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/work/v2/items/{id}/gate-export"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}}, "route": {"path": "/v1/work/v2/items/{id}/gate-export"}}
     },
     {
       "op": "work.v2.gate-purge",
@@ -1978,7 +2127,8 @@
       "example": {"id": "w1", "item": {"expected_version": 5, "sha256": "abc"}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/gate-purge", "local_body": ["expected_version", "sha256"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/gate-purge", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.human-intervention-action",
@@ -1991,7 +2141,8 @@
       "example": {"action": "handoff", "id": "10000000-0000-4000-8000-000000000003", "item": {"value": "SAFE_FIXTURE"}, "request": "req-secret-handoff", "session": "__clawdline_machine__", "terminal": "conversation:10000000-0000-4000-8000-000000000002"},
       "shapes": [
         {"body": ["action", "id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/human-interventions/{terminal}/{id}/{action}", "local_body": ["value"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "action": {"type": "string", "enum": ["read", "resolve", "reopen", "handoff"]}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/human-interventions/{terminal}/{id}/{action}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.human-interventions",
@@ -2004,7 +2155,8 @@
       "example": {"request": "req-human-interventions", "session": "__clawdline_machine__", "terminal": "conversation:10000000-0000-4000-8000-000000000002"},
       "shapes": [
         {"body": ["request", "session", "terminal"], "path": "/v1/work/v2/human-interventions/{terminal}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}}, "route": {"path": "/v1/work/v2/human-interventions/{terminal}"}}
     },
     {
       "op": "work.v2.image",
@@ -2019,7 +2171,8 @@
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/work/v2/images/{id}"},
         {"body": ["id", "request", "session", "size"], "path": "/v1/work/v2/images/{id}", "query": ["size"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "id"}, "size": {"type": "string", "enum": ["thumb"]}}, "route": {"path": "/v1/work/v2/images/{id}", "query": {"size": {"from": "size"}}}}
     },
     {
       "op": "work.v2.image-create",
@@ -2032,7 +2185,8 @@
       "example": {"id": "w1", "item": {"data_url": "data:image/png;base64,cG5n", "expected_version": 1}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/images", "local_body": ["data_url", "expected_version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 18874368, "copies": {"max_bytes": "workV2CloudImageBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/images", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.image-delete",
@@ -2045,7 +2199,8 @@
       "example": {"id": "w1", "image": "img1", "item": {"expected_version": 2}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "image", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/images/{image}", "local_body": ["expected_version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "image": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/images/{image}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.item",
@@ -2058,7 +2213,8 @@
       "example": {"id": "w1", "request": "req-work-v2-item", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "request", "session"], "path": "/v1/work/v2/items/{id}"}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}}, "route": {"path": "/v1/work/v2/items/{id}"}}
     },
     {
       "op": "work.v2.items",
@@ -2072,7 +2228,8 @@
       "shapes": [
         {"body": ["project", "request", "session"], "path": "/v1/work/v2/items", "query": ["project"]},
         {"body": ["cursor", "project", "request", "session"], "path": "/v1/work/v2/items", "query": ["cursor", "project"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"project": {"type": "string", "max_bytes": 256}, "cursor": {"type": "string", "max_bytes": 1024}}, "route": {"path": "/v1/work/v2/items", "query": {"project": {"from": "project", "omit_empty": true}, "cursor": {"from": "cursor", "omit_empty": true}}}}
     },
     {
       "op": "work.v2.persona-suggestion",
@@ -2085,7 +2242,8 @@
       "example": {"id": "w1", "item": {"expected_version": 1}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/persona-suggestion", "local_body": ["expected_version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/persona-suggestion", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.proposal-resolve",
@@ -2098,7 +2256,8 @@
       "example": {"decision": "accept", "id": "pr1", "item": {}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["decision", "id", "item", "request", "session"], "path": "/v1/work/v2/proposals/{id}/{decision}", "local_body": []}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "decision": {"type": "string", "enum": ["accept", "reject"]}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/proposals/{id}/{decision}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.proposals",
@@ -2111,7 +2270,8 @@
       "example": {"request": "req-work-v2-proposals", "session": "__clawdline_machine__", "state": "pending"},
       "shapes": [
         {"body": ["request", "session", "state"], "path": "/v1/work/v2/proposals", "query": ["state"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"state": {"type": "string", "max_bytes": 32}}, "route": {"path": "/v1/work/v2/proposals", "query": {"state": {"from": "state", "omit_empty": true}}}}
     },
     {
       "op": "work.v2.remind",
@@ -2124,7 +2284,8 @@
       "example": {"id": "w1", "item": {"expected_version": 2}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/remind", "local_body": ["expected_version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/remind", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.search",
@@ -2138,7 +2299,8 @@
       "shapes": [
         {"body": ["project", "query", "request", "session", "status"], "path": "/v1/work/v2/items", "query": ["project", "q", "status"]},
         {"body": ["cursor", "project", "query", "request", "session", "status"], "path": "/v1/work/v2/items", "query": ["cursor", "project", "q", "status"]}
-      ]
+      ],
+      "decode": {"reply": "machine", "fields": {"project": {"type": "string", "max_bytes": 256}, "status": {"type": "string", "enum": ["open", "done", "all"]}, "query": {"type": "string", "max_bytes": 1024}, "cursor": {"type": "string", "max_bytes": 1024}}, "route": {"path": "/v1/work/v2/items", "query": {"project": {"from": "project", "omit_empty": true}, "status": {"from": "status", "omit_empty": true}, "q": {"from": "query", "omit_empty": true}, "cursor": {"from": "cursor", "omit_empty": true}}}}
     },
     {
       "op": "work.v2.seen",
@@ -2151,7 +2313,8 @@
       "example": {"id": "w1", "item": {"phase": "done"}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["id", "item", "request", "session"], "path": "/v1/work/v2/items/{id}/seen", "local_body": ["phase"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/items/{id}/seen", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.session-todos",
@@ -2161,10 +2324,12 @@
       "console_route": "GET /v1/work/v2/session-todos/{terminal}",
       "console_seam": "reader",
       "local": {"method": "GET"},
-      "example": {"request": "req-work-v2-todos", "session": "__clawdline_machine__", "terminal": "%19"},
+      "example": {"request": "req-work-v2-todos", "session": "__clawdline_machine__", "summary": true, "terminal": "%19"},
       "shapes": [
-        {"body": ["request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}"}
-      ]
+        {"body": ["request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}"},
+        {"body": ["request", "session", "summary", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}", "query": ["summary"]}
+      ],
+      "decode": {"reply": "machine", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "summary": {"type": "bool"}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}", "query": {"summary": {"from": "summary", "if_true": "1"}}}}
     },
     {
       "op": "work.v2.todo-action",
@@ -2177,7 +2342,8 @@
       "example": {"action": "reopen", "id": "td1", "item": {}, "request": "req-work-v2-todo-reopen", "session": "__clawdline_machine__", "terminal": "%19"},
       "shapes": [
         {"body": ["action", "id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}/{id}/{action}", "local_body": []}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "action": {"type": "string", "enum": ["send", "complete", "reopen", "delete", "edit"]}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}/{id}/{action}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.todo-create",
@@ -2190,7 +2356,8 @@
       "example": {"item": {"text": "Ship it"}, "request": "req", "session": "__clawdline_machine__", "terminal": "%19"},
       "shapes": [
         {"body": ["item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}", "local_body": ["text"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "item": {"type": "object", "max_bytes": 98304, "copies": {"max_bytes": "workV2CloudBodyLimit"}}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}", "body": {"object": "item"}}}
     },
     {
       "op": "work.v2.todo-image-create",
@@ -2203,7 +2370,8 @@
       "example": {"id": "td1", "item": {"data_url": "data:image/png;base64,cG5n", "expected_version": 1}, "request": "req", "session": "__clawdline_machine__", "terminal": "%19"},
       "shapes": [
         {"body": ["id", "item", "request", "session", "terminal"], "path": "/v1/work/v2/session-todos/{terminal}/{id}/images", "local_body": ["data_url", "expected_version"]}
-      ]
+      ],
+      "decode": {"reply": "action", "fields": {"terminal": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "target"}, "id": {"type": "string", "non_empty": true, "max_bytes": 256}, "item": {"type": "object", "max_bytes": 18874368, "copies": {"max_bytes": "workV2CloudImageBodyLimit"}}}, "route": {"path": "/v1/work/v2/session-todos/{terminal}/{id}/images", "body": {"object": "item"}}}
     }
   ]
 }
