@@ -4,139 +4,26 @@ func init() {
 	register(
 		// MARK: commands with a local capability
 
-		op{name: "send",
-			decode: func(b body) (plan, bool) {
-				if !b.hasOneOf([]string{"type", "session", "text", "images"},
-					[]string{"type", "session", "request", "text", "images"}) {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, true)
-				if !ok {
-					return plan{}, false
-				}
-				text, textOK := b.str("text")
-				raw, imagesOK := b["images"].([]any)
-				if !textOK || !imagesOK {
-					return plan{}, false
-				}
-				images := make([]string, 0, len(raw))
-				for _, item := range raw {
-					url, ok := item.(string)
-					if !ok {
-						return plan{}, false
-					}
-					images = append(images, url)
-				}
-				p.text, p.images = text, images
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/sessions/" + segment(p.target) + "/send",
-					Body: jsonBody(map[string]any{"text": p.text, "images": p.images})}
-			}},
+		op{name: "send"},
 
-		op{name: "answer", decode: decodeAnswer("answer"), route: routeAnswer, guard: answerNamesItsQuestion},
+		op{name: "answer", guard: answerNamesItsQuestion},
 		// The Swift bridge takes `answer` and `key` as one case, and the
 		// hosted console still sends either depending on how old the tab is.
-		op{name: "key", decode: decodeAnswer("key"), route: routeAnswer, guard: answerNamesItsQuestion},
+		op{name: "key", guard: answerNamesItsQuestion},
 
-		op{name: "end",
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "accept_loss",
-					"expected_closeability_version") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, true)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				acceptLoss, acceptOK := b.boolean("accept_loss")
-				closeability, closeOK := b.str("expected_closeability_version")
-				if !acceptOK || !closeOK {
-					return plan{}, false
-				}
-				p.acceptLoss, p.closeability = acceptLoss, closeability
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				// This daemon spells it `close`; the route compares the optional
-				// version against its current Session reading.
-				out := map[string]any{"force": p.acceptLoss}
-				if p.closeability != "" {
-					out["expected_closeability_version"] = p.closeability
-				}
-				return LocalRequest{Method: "POST",
-					Path: "/v1/sessions/" + segment(p.target) + "/close", Body: jsonBody(out)}
-			}},
+		op{name: "end"},
 
-		op{name: "focus",
-			decode: func(b body) (plan, bool) {
-				if !b.hasOneOf([]string{"type", "session", "request"},
-					[]string{"type", "session", "request", "execution_generation"}) {
-					return plan{}, false
-				}
-				p, ok := pinnedActionPlan(b)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/sessions/" + segment(p.target) + "/focus"}
-			}},
+		op{name: "focus"},
 
 		// Stopping the turn a session is working on: the one Escape its own
 		// working line asks for. Not a Swift word — that app had no stop — and
 		// not `key`, whose allowlist is a menu's answers and which this bridge
 		// refuses unless the answer names its question; a stop has no question.
-		op{name: "interrupt",
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, true)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/sessions/" + segment(p.target) + "/interrupt", Body: []byte("{}")}
-			}},
+		op{name: "interrupt"},
 
-		op{name: "smart-title",
-			decode: func(b body) (plan, bool) {
-				if !b.hasOneOf([]string{"type", "session", "request"},
-					[]string{"type", "session", "request", "execution_generation"}) {
-					return plan{}, false
-				}
-				p, ok := pinnedActionPlan(b)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/sessions/" + segment(p.target) + "/smart-title", Body: []byte("{}")}
-			}},
+		op{name: "smart-title"},
 
-		op{name: "title",
-			decode: func(b body) (plan, bool) {
-				if !b.hasOneOf([]string{"type", "session", "request", "text"},
-					[]string{"type", "session", "request", "text", "execution_generation"}) {
-					return plan{}, false
-				}
-				p, ok := pinnedActionPlan(b)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				p.text, ok = b.str("text")
-				return p, ok
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/sessions/" + segment(p.target) + "/title",
-					Body: jsonBody(map[string]any{"title": p.text})}
-			}},
+		op{name: "title"},
 
 		op{name: "start",
 			decode: func(b body) (plan, bool) {
@@ -224,67 +111,11 @@ func init() {
 		// their Idempotency-Key, as `resume` does, because a restore is one
 		// resume per conversation and a retried envelope must not open a
 		// second tab.
-		op{name: "restorable-sessions", read: true,
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request") {
-					return plan{}, false
-				}
-				return machinePlan(b)
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "GET", Path: "/v1/sessions/restorable"}
-			}},
+		op{name: "restorable-sessions", read: true},
 
-		op{name: "restore-sessions",
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "conversations") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				ids, ok := conversationList(b["conversations"])
-				if !ok || len(ids) == 0 {
-					return plan{}, false
-				}
-				p.conversations = ids
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/sessions/restorable/restore",
-					Body: jsonBody(map[string]any{"conversations": p.conversations})}
-			}},
+		op{name: "restore-sessions"},
 
-		op{name: "dismiss-restorable",
-			decode: func(b body) (plan, bool) {
-				if !b.hasOneOf([]string{"type", "session", "request"},
-					[]string{"type", "session", "request", "conversations"}) {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				raw, named := b["conversations"]
-				if !named {
-					p.allConversations = true
-					return p, true
-				}
-				ids, ok := conversationList(raw)
-				if !ok {
-					return plan{}, false
-				}
-				p.conversations = ids
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				if p.allConversations {
-					return LocalRequest{Method: "POST", Path: "/v1/sessions/restorable/dismiss", Body: []byte("{}")}
-				}
-				return LocalRequest{Method: "POST", Path: "/v1/sessions/restorable/dismiss",
-					Body: jsonBody(map[string]any{"conversations": p.conversations})}
-			}},
+		op{name: "dismiss-restorable"},
 
 		// The Sessions a person archived (docs/session-archive.md). The
 		// archive names the session it closes, so its answer rides that
@@ -292,175 +123,25 @@ func init() {
 		// `accept_loss`. The list is a machine read, and the restore a
 		// machine command that carries the viewer's request as its
 		// Idempotency-Key, as `restore-sessions` does.
-		op{name: "archive-session",
-			decode: func(b body) (plan, bool) {
-				if !b.hasOneOf([]string{"type", "session", "request"},
-					[]string{"type", "session", "request", "force"},
-					[]string{"type", "session", "request", "expected_closeability_version"},
-					[]string{"type", "session", "request", "force", "expected_closeability_version"}) {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, true)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				if _, named := b["force"]; named {
-					force, forceOK := b.boolean("force")
-					if !forceOK {
-						return plan{}, false
-					}
-					p.acceptLoss = force
-				}
-				if _, named := b["expected_closeability_version"]; named {
-					version, ok := b.str("expected_closeability_version")
-					if !ok {
-						return plan{}, false
-					}
-					p.closeability = version
-				}
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				out := map[string]any{"force": p.acceptLoss}
-				if p.closeability != "" {
-					out["expected_closeability_version"] = p.closeability
-				}
-				return LocalRequest{Method: "POST", Path: "/v1/sessions/" + segment(p.target) + "/archive",
-					Body: jsonBody(out)}
-			}},
+		op{name: "archive-session"},
 
-		op{name: "archived-sessions", read: true,
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request") {
-					return plan{}, false
-				}
-				return machinePlan(b)
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "GET", Path: "/v1/sessions/archived"}
-			}},
+		op{name: "archived-sessions", read: true},
 
-		op{name: "restore-archived",
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "conversations") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				ids, ok := conversationList(b["conversations"])
-				if !ok || len(ids) == 0 {
-					return plan{}, false
-				}
-				p.conversations = ids
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/sessions/archived/restore",
-					Body: jsonBody(map[string]any{"conversations": p.conversations})}
-			}},
+		op{name: "restore-archived"},
 
-		op{name: "forget-archived",
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "conversation") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				id, ok := b.nonEmpty("conversation")
-				if !ok {
-					return plan{}, false
-				}
-				p.conversations = []string{id}
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/sessions/archived/forget",
-					Body: jsonBody(map[string]any{"conversation": p.conversations[0]})}
-			}},
+		op{name: "forget-archived"},
 
-		op{name: "voice",
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "audio", "rate") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				audio, audioOK := b.nonEmpty("audio")
-				rate, rateOK := b.integer("rate")
-				// Checked rather than resampled, as the route checks it: a body
-				// that names 48000 has not made a small mistake.
-				if !audioOK || !rateOK || rate != voiceRate {
-					return plan{}, false
-				}
-				p.audio, p.rate = audio, rate
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/voice",
-					Body: jsonBody(map[string]any{"audio": p.audio, "rate": p.rate})}
-			}},
+		op{name: "voice"},
 
-		op{name: "intents",
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "text") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				text, ok := b.str("text")
-				if !ok || len([]byte(text)) > intentTextLimit {
-					return plan{}, false
-				}
-				p.text = text
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/intents",
-					Body: jsonBody(map[string]any{"text": p.text})}
-			}},
+		op{name: "intents"},
 
-		op{name: "schedule-create",
-			decode: decodeScheduleWrite(false),
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/orchestrator/schedules",
-					Body: p.document, Header: asDevice()}
-			}},
+		op{name: "schedule-create"},
 
-		op{name: "schedule-update",
-			decode: decodeScheduleWrite(true),
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "PATCH",
-					Path: "/v1/orchestrator/schedules/" + segment(p.id),
-					Body: p.document, Header: asDevice()}
-			}},
+		op{name: "schedule-update"},
 
-		op{name: "schedule-delete",
-			decode: decodeNamedSchedule,
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "DELETE",
-					Path: "/v1/orchestrator/schedules/" + segment(p.id), Header: asDevice()}
-			}},
+		op{name: "schedule-delete"},
 
-		op{name: "schedule-run",
-			decode: decodeScheduleRun,
-			route: func(p plan) LocalRequest {
-				body := []byte("{}")
-				if p.force {
-					body = []byte(`{"force":true}`)
-				}
-				return LocalRequest{Method: "POST",
-					Path:   "/v1/orchestrator/schedules/" + segment(p.id) + "/run",
-					Body:   body,
-					Header: asDevice()}
-			}},
+		op{name: "schedule-run"},
 
 		// The old hosted console's two-phase webhook creation flow. Cloud creates
 		// the capability under the browser session, then this encrypted command
@@ -488,64 +169,16 @@ func init() {
 		// `local` — so a person's press from their phone and a script's write
 		// on this machine would share one receipt namespace. It opens nothing:
 		// the route needs a device that may send, which it needed anyway.
-		op{name: "snippet-create",
-			decode: decodeSnippetWrite(false),
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/snippets",
-					Body: p.document, Header: asDevice()}
-			}},
+		op{name: "snippet-create"},
 
-		op{name: "snippet-update",
-			decode: decodeSnippetWrite(true),
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "PATCH", Path: "/v1/snippets/" + segment(p.id),
-					Body: p.document, Header: asDevice()}
-			}},
+		op{name: "snippet-update"},
 
-		op{name: "snippet-delete",
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "id") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				id, ok := b.nonEmpty("id")
-				if !ok {
-					return plan{}, false
-				}
-				p.id = id
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "DELETE", Path: "/v1/snippets/" + segment(p.id),
-					Header: asDevice()}
-			}},
+		op{name: "snippet-delete"},
 
 		// One group's complete order. `ordering` is the producer's name for
 		// the body the local route reads under no name at all, which is the
 		// one place these two spellings differ.
-		op{name: "snippet-order",
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "ordering") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				document, ok := b.object("ordering", snippetMaximumBytes)
-				if !ok {
-					return plan{}, false
-				}
-				p.document = document
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/snippets/order",
-					Body: p.document, Header: asDevice()}
-			}},
+		op{name: "snippet-order"},
 
 		// The three words that change something about notifications, all
 		// read-level: the Swift bridge lists exactly these three beside the
@@ -619,56 +252,8 @@ func init() {
 					Body: p.document, Header: asDevice()}
 			}},
 
-		op{name: "push-unsubscribe", readLevel: true,
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "id") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				id, ok := b.nonEmpty("id")
-				if !ok {
-					return plan{}, false
-				}
-				p.id = id
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				return LocalRequest{Method: "POST", Path: "/v1/push/unsubscribe",
-					Body:   jsonBody(map[string]any{"id": p.id}),
-					Header: asDevice()}
-			}},
+		op{name: "push-unsubscribe", readLevel: true},
 
-		op{name: "push-test", readLevel: true,
-			decode: func(b body) (plan, bool) {
-				if !b.has("type", "session", "request", "target") {
-					return plan{}, false
-				}
-				p, ok := actionPlan(b, false)
-				if !ok || p.request == "" {
-					return plan{}, false
-				}
-				// An empty target is a test with nothing to tap back to,
-				// which goes to the list: the key is required, its value may
-				// be "". The route's field for it is `session_id`, and the
-				// body leaves it out entirely rather than sending an empty
-				// one, as the Swift bridge does.
-				target, ok := b.str("target")
-				if !ok {
-					return plan{}, false
-				}
-				p.target = target
-				return p, true
-			},
-			route: func(p plan) LocalRequest {
-				sent := map[string]any{}
-				if p.target != "" {
-					sent["session_id"] = p.target
-				}
-				return LocalRequest{Method: "POST", Path: "/v1/push/test",
-					Body: jsonBody(sent), Header: asDevice()}
-			}},
+		op{name: "push-test", readLevel: true},
 	)
 }

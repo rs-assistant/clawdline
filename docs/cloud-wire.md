@@ -803,6 +803,28 @@ relay 的 `delivered` 只證明 fan-out 送出去了，不證明機器執行或�
 
 See the [dated operation record](records/cloud-operations-2026-09.md).
 
+Every word is one row of `internal/domain/cloudvocab/vocabulary.json`. A row's
+`decode` states its decoder as data: each body field's type, limits and named
+checks, where the answer goes, and the local request the fields become (path
+template, query, headers, body, with each value's source and default). The
+table's `wrappers` state what the bridge does around a decoder — the
+`execution_generation` it strips from a session-receipt word, the `machine_id`
+it strips from a content read — and `idempotency` the key every local request
+that is not a GET carries. `go run ./tools/contract-gen` generates a Go decoder
+for every row not marked `hand` (`internal/app/cloudops/zz_decode_generated.go`),
+and production serves those words with them; eight words keep a hand-written
+decoder, each with its reason in the row. A value the answer side reads after
+the local request is built (a picture's id, an info read's parts, a menu
+answer's key and question) is carried `into` the plan by the row. What the
+hand-written decoders answered, before they were removed, is a golden of
+142,267 bodies (`internal/app/cloudops/testdata/cloud_decoders.golden.jsonl.gz`)
+that `TestGeneratedDecodersKeepTheGolden` holds every served decoder to;
+`CLAWDLINE_DECODER_GOLDEN=record` rewrites it for a table change that is meant
+to change what a word accepts, and the decompressed diff is the review. A limit
+the table copies from a Go constant names it under `copies`, and
+`TestCopiedLimitsAreTheirConstants` holds the two equal. The wrapper rules are
+held to the bridge by `TestTheTableStatesTheBridgesWrapperRules`.
+
 For a live Session's `send`, `answer`/`key`, `interrupt`, `end`, or
 `archive-session`, the Go machine now requires `request` (the caller's stable
 Idempotency-Key) and `execution_generation` (the authoritative 32-digit
