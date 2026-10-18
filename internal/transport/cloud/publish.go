@@ -846,9 +846,12 @@ func (p *Publisher) pass(ctx context.Context) ([]string, sessionReading, bool) {
 		// past its bound, in which case the viewer keeps every row it had.
 		p.noteListed(inventory, len(inventory) <= InventoryLimit)
 	}
-	var rows []map[string]any
-	if ok {
-		rows = reading.sessions
+	// Roots are resolved against a whole reading only: a partial one did not
+	// reach every row the viewer keeps, so a root it does not list has not
+	// closed (resolveTaskRoots).
+	var rows map[string]map[string]any
+	if ok && reading.whole() {
+		rows = sessionRowsByID(reading.sessions)
 	}
 	p.refreshTasks(ctx, rows)
 	p.publishDescriptor(ctx)

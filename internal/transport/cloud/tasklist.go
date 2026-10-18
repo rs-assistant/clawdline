@@ -193,11 +193,11 @@ func (p *Publisher) readTasks(ctx context.Context) ([]map[string]any, bool) {
 // to the fields it reads, in the route's order (unfinished first, then
 // finished, each newest first), bounded. It answers how many relevant records
 // the bounds left out.
-func projectTasks(rows []map[string]any, listed map[string]bool) ([]map[string]any, int) {
+func projectTasks(rows []map[string]any, listed map[string]bool, roots map[string]string) ([]map[string]any, int) {
 	out := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
 		if cloudTaskRelevant(row, listed) {
-			out = append(out, cloudTaskProjection(row))
+			out = append(out, withResolvedRoot(cloudTaskProjection(row), roots))
 		}
 	}
 	relevant := len(out)
@@ -218,6 +218,26 @@ func projectTasks(rows []map[string]any, listed map[string]bool) ([]map[string]a
 		}
 	}
 	return out, relevant - len(out)
+}
+
+// withResolvedRoot puts the root resolveTaskRoots placed the record's task
+// under into its projection, before the byte bound measures it: the root a
+// viewer indents a child under is the one resolved against the rows it holds,
+// not the screen as it stood at the read. The projection's maps are its own,
+// so the kept record is not written.
+func withResolvedRoot(projected map[string]any, roots map[string]string) map[string]any {
+	id, _ := projected["id"].(string)
+	owner := roots[id]
+	if owner == "" {
+		return projected
+	}
+	root, _ := projected["root"].(map[string]any)
+	if root == nil {
+		root = map[string]any{}
+		projected["root"] = root
+	}
+	root["terminalId"] = owner
+	return projected
 }
 
 // cloudTaskRelevant is `RemoteServer.cloudTaskRelevant`: kept while unfinished
@@ -281,10 +301,11 @@ func (p *Publisher) noteListed(ids []string, authoritative bool) {
 // refreshTasks projects the task list for this pass, reading this machine's
 // own list only when something could have moved it (the header's *Cadence*).
 // A failed read keeps the last projection and stays due, so the next pass asks
-// again rather than waiting out the floor. rows is this pass's reading of the
-// sessions, or nil when the pass did not read them; each task's root is
-// resolved against it (resolveTaskRoots).
-func (p *Publisher) refreshTasks(ctx context.Context, rows []map[string]any) {
+// again rather than waiting out the floor. rows is this pass's whole reading
+// of the sessions by id, or nil when the pass has none — it did not read them,
+// or read only some sources; each task's root is resolved against a whole one
+// (resolveTaskRoots).
+func (p *Publisher) refreshTasks(ctx context.Context, rows map[string]map[string]any) {
 	p.taskPasses.Add(1)
 	// Asked on every pass and not only when a read is otherwise due, because
 	// taking the fact clears it: a write that happened while a read was
@@ -300,7 +321,7 @@ func (p *Publisher) refreshTasks(ctx context.Context, rows []map[string]any) {
 		}
 	}
 	if rows != nil {
-		p.resolveTaskRoots(sessionRowsByID(rows))
+		p.resolveTaskRoots(rows)
 	}
 	p.projectKeptTasks()
 }
@@ -377,13 +398,14 @@ func taskRootIn(task map[string]any, rows map[string]map[string]any, owners map[
 }
 
 // resolveTaskRoots finds each kept task's root among this pass's rows, and
-// keeps the last one found while that tab is still listed.
+// keeps the last one found while that tab is still listed (carriedRootIn).
 //
 // The keeping is for the pass where neither the read nor the rows can say: the
 // root's tab was off screen at the read and its row has no conversation this
 // pass. That root has not moved, and a child drawn flat for a pass and nested
 // the next is the flicker this is for. A tab that is no longer listed is
-// forgotten, so a closed root never keeps a child indented.
+// forgotten, so a closed root never keeps a child indented. rows must be a
+// whole reading: a partial one says nothing of a row it did not reach.
 func (p *Publisher) resolveTaskRoots(rows map[string]map[string]any) {
 	owners := conversationOwners(rows)
 	roots := make(map[string]string, len(p.taskRows))
@@ -394,15 +416,32 @@ func (p *Publisher) resolveTaskRoots(rows map[string]map[string]any) {
 		}
 		owner, _ := taskRootIn(task, rows, owners)
 		if owner == "" {
-			if kept := p.taskRoots[id]; kept != "" && rows[kept] != nil {
-				owner = kept
-			}
+			owner = carriedRootIn(task, p.taskRoots, rows)
 		}
 		if owner != "" {
 			roots[id] = owner
 		}
 	}
 	p.taskRoots = roots
+}
+
+// carriedRootIn is the root kept for a task from an earlier pass, while that
+// tab is still a listed row and the row names no conversation other than the
+// task's own `root.sessionId`. A carried root is a terminal id, and tmux hands
+// a closed tab's id to the next pane it opens: a row that now holds another
+// conversation is another Session, and the child is not kept under it.
+func carriedRootIn(task map[string]any, kept map[string]string, rows map[string]map[string]any) string {
+	id, _ := task["id"].(string)
+	held := kept[id]
+	if held == "" || rows[held] == nil {
+		return ""
+	}
+	root, _ := task["root"].(map[string]any)
+	want, _ := root["sessionId"].(string)
+	if listed, _ := rows[held]["sessionId"].(string); listed != "" && listed != want {
+		return ""
+	}
+	return held
 }
 
 // taskReadDue is whether this pass reads this machine's own task list.
@@ -447,7 +486,7 @@ func (p *Publisher) projectKeptTasks() {
 	if p.taskListed != nil && sameListed(p.taskListed, p.listed) && sameRoots(p.taskRootsProjected, p.taskRoots) {
 		return
 	}
-	projected, omitted := projectTasks(p.taskRows, p.listed)
+	projected, omitted := projectTasks(p.taskRows, p.listed, p.taskRoots)
 	if omitted != p.omitted {
 		if omitted > 0 {
 			p.logf("cloud: the orch snapshot carries %d task records and leaves out the %d oldest, past %d records or %d bytes",
@@ -456,21 +495,6 @@ func (p *Publisher) projectKeptTasks() {
 			p.logf("cloud: the orch snapshot carries every task record a viewer can reach again (%d)", len(projected))
 		}
 		p.omitted = omitted
-	}
-	// The root a viewer indents a child under is the one resolved against
-	// the rows it holds, not the screen as it stood at the read.
-	for _, row := range projected {
-		id, _ := row["id"].(string)
-		owner := p.taskRoots[id]
-		if owner == "" {
-			continue
-		}
-		root, _ := row["root"].(map[string]any)
-		if root == nil {
-			root = map[string]any{}
-			row["root"] = root
-		}
-		root["terminalId"] = owner
 	}
 	p.tasks = projected
 	p.taskListed = make(map[string]bool, len(p.listed))

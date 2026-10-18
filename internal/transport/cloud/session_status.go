@@ -197,7 +197,8 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 	// read from the route are used when there are any: their record still
 	// names the owning conversation, which resolves a root the screen scan
 	// at read time could not (taskRootIn). A root resolved on an earlier
-	// pass and still listed is kept for the pass where neither can say.
+	// pass and still listed, under the task's own conversation, is kept for
+	// the pass where neither can say (carriedRootIn).
 	tasks := p.taskRows
 	if tasks == nil {
 		tasks = p.tasks
@@ -360,10 +361,7 @@ func statusParents(rows map[string]map[string]any, tasks []map[string]any, kept 
 		}
 		owner, cause := taskRootIn(task, rows, conversations)
 		if owner == "" {
-			id, _ := task["id"].(string)
-			if held := kept[id]; held != "" && rows[held] != nil {
-				owner = held
-			}
+			owner = carriedRootIn(task, kept, rows)
 		}
 		if owner == kid {
 			owner, cause = "", rootCauseIsTheChild

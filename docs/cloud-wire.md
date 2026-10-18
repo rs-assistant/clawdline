@@ -569,8 +569,11 @@ Cloud caller 就是發布者本身，沒有別人。
 `sessionId` 才補得回來——手機上同一個 child 就一下縮排、一下變成頂層。現在每一輪在投影前，用紀錄裡
 持久的 `root.sessionId` 對「這一輪列出的 session」重新找 root（唯一一列才算），找到的值同時寫進描述
 的 `root.terminalId` 與 ss/ 的 `parent_session_id`；兩邊都找不到時沿用上一次找到、而且那個分頁仍在
-清單裡的 root；分頁不在了就忘掉，關掉的 root 不會讓 child 繼續縮排。這不增加任何讀取，wire 形狀也沒
-變。仍然找不到 root 的 child 會在 daemon log 留一行 `cloud: child %64 has no listed parent: <原因>`，
+清單裡的 root；分頁不在了就忘掉，關掉的 root 不會讓 child 繼續縮排。沿用的 root 只是一個終端 id，
+tmux 會把關掉的分頁 id 交給下一個 pane，所以那一列若帶著別的 `sessionId`（另一段對話），就不再沿用。
+重新找 root 只看完整的掃描（`whole`）：只讀到部分來源的那一輪沒看到 root，不代表它關了（viewer 也還
+留著那一列），沿用的 root 不會因此被忘掉。這不增加任何讀取，wire 形狀也沒變；描述的位元組上限量的是
+已經寫進 root 的那筆。仍然找不到 root 的 child 會在 daemon log 留一行 `cloud: child %64 has no listed parent: <原因>`，
 原因變了才再寫一次，重新找到時寫 `cloud: child %64 is listed under %8 again`
 （`internal/transport/cloud/tasklist_root_test.go`）。
 
