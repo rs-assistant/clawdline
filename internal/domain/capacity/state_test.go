@@ -274,7 +274,7 @@ func TestNoticesAreAtMostOneADayPerRow(t *testing.T) {
 // Unknown is not ok and not zero: the state says unknown, the reason is kept,
 // and a row that comes back is measured from ok, not from what it was.
 func TestAnUnmeasuredRowIsUnknown(t *testing.T) {
-	e := Register()[1] // store.db
+	e := entryNamed(t, StoreDB)
 	res := Resolved{Entry: e, Limit: 100}
 	tr := NewTracker()
 	st, events := tr.Observe(res, Unmeasured("stat: permission denied"), t0)
@@ -316,7 +316,7 @@ func TestExhaustedIsEvidenceAndAuditOnly(t *testing.T) {
 // Two weeks before a projected row is full it is warn, whatever its ratio;
 // with under an hour of samples there is no projection at all.
 func TestAProjectionWarnsTwoWeeksAhead(t *testing.T) {
-	e := Register()[1] // store.db projects
+	e := entryNamed(t, StoreDB) // projects
 	res := Resolved{Entry: e, Limit: 1_000_000}
 	tr := NewTracker()
 	st, _ := tr.Observe(res, Reading{Known: true, Used: 0}, t0)
@@ -333,7 +333,7 @@ func TestAProjectionWarnsTwoWeeksAhead(t *testing.T) {
 		t.Fatalf("projected %s ahead", d)
 	}
 	// A row that does not project is never warned by one.
-	q := Register()[3] // cloud.relay_queue
+	q := entryNamed(t, SessionExecutions)
 	qt := NewTracker()
 	qt.Observe(Resolved{Entry: q, Limit: 64}, Reading{Known: true, Used: 0}, t0)
 	st, _ = qt.Observe(Resolved{Entry: q, Limit: 64}, Reading{Known: true, Used: 10}, t0.Add(2*time.Hour))
@@ -345,7 +345,7 @@ func TestAProjectionWarnsTwoWeeksAhead(t *testing.T) {
 // A counter is reported by how much it moved, once, and a counter that went
 // backwards is a new baseline rather than negative work.
 func TestCountersAreReportedOnceABatch(t *testing.T) {
-	e := Register()[2] // board.receipts
+	e := entryNamed(t, StoreEvents)
 	res := Resolved{Entry: e, Limit: 10}
 	tr := NewTracker()
 	_, ev := tr.Observe(res, Reading{Known: true, Used: 10, Counters: Counters{Evicted: 7}}, t0)
