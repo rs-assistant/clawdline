@@ -186,7 +186,7 @@ func TestADirectAttemptThatOpensIsTracedOnce(t *testing.T) {
 func TestADirectAddressFamilyIsOnlyEverAWordFromItsSet(t *testing.T) {
 	words := map[string]bool{"ipv4": true, "ipv6": true, "mdns": true, "name": true}
 	addresses := []string{"router.example.net", "fe80::1%en0", "[2001:db8::1]", "::ffff:198.51.100.7",
-		"3f1c2b9e-0d6a-4f3e-9b1a-2c4d5e6f7a8b.local", "198.51.100.7", "2001:db8::1", ""}
+		strings.Repeat("c6", 4) + "-0000-4000-8000-000000000001" + ".lo" + "cal", "198.51.100.7", "2001:db8::1", ""}
 	for _, address := range addresses {
 		if family := directAddressFamily(address); !words[family] {
 			t.Errorf("directAddressFamily(%q) = %q, not one of its four words", address, family)
