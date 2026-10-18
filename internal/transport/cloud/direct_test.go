@@ -195,7 +195,7 @@ func TestFixedDirectPortPublishesOnlyTheConfiguredPublicCandidate(t *testing.T) 
 	if err := f.l.directOfferAdmitted("viewer"); err != nil {
 		t.Fatal(err)
 	}
-	answer, err := f.l.answerDirectOffer("viewer", testConnection, false, offer)
+	answer, err := f.l.answerDirectOffer("viewer", testConnection, false, testConnection, offer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestFixedDirectPortPublishesOnlyTheConfiguredPublicCandidate(t *testing.T) 
 	if err := f.l.directOfferAdmitted("second-viewer"); err != nil {
 		t.Fatal(err)
 	}
-	secondAnswer, err := f.l.answerDirectOffer("second-viewer", testConnection, false, secondOffer)
+	secondAnswer, err := f.l.answerDirectOffer("second-viewer", testConnection, false, testConnection, secondOffer)
 	if err != nil {
 		t.Fatal(err)
 	}
