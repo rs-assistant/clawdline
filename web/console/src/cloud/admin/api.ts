@@ -77,7 +77,7 @@ export interface Overview {
     daily: DailyCount[]
     campaigns: { total: number; shown: number; rows: CampaignRow[] }
   }
-  usage: { current: UsagePeriod; previous: UsagePeriod }
+  usage: { current: UsagePeriod; previous: UsagePeriod; active_daily: DailyCount[] | null }
 }
 
 /** The answer was not the contract; `where` names the first field that was wrong. */
@@ -211,7 +211,10 @@ export function parseOverview(raw: unknown): Overview {
         rows: rows.map((row, i) => campaign(row, `promotions.campaigns.rows[${i}]`)),
       },
     },
-    usage: { current: usage(u.current, "usage.current"), previous: usage(u.previous, "usage.previous") },
+    usage: {
+      current: usage(u.current, "usage.current"), previous: usage(u.previous, "usage.previous"),
+      active_daily: u.active_daily == null ? null : completeDays(daily(u.active_daily, "usage.active_daily"), generatedAt),
+    },
   }
 }
 

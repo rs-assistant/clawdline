@@ -43,6 +43,7 @@ test("a v1 overview is read field for field, and a null counter stays unknown, n
   assert.equal(o.usage.current.counters.dispatches, null)
   assert.equal(o.usage.current.coverage, "partial")
   assert.equal(o.usage.previous.counters.dispatches, 12)
+  assert.equal(o.usage.active_daily, null)
   assert.equal(o.promotions.campaigns.total, 51)
   assert.equal(o.promotions.campaigns.shown, 1)
 })
@@ -59,6 +60,16 @@ test("illustrative periods agree with their daily charts and campaign totals", (
   assert.equal(o.promotions.redemptions_total, o.promotions.campaigns.rows.reduce((total, row) => total + row.redeemed_count, 0))
   assert.equal(o.usage.current.period, "2026-10")
   assert.equal(o.usage.previous.period, "2026-09")
+  assert.equal(o.usage.active_daily?.length, 30)
+  assert.equal(o.usage.active_daily?.at(-1)?.day, "2026-10-17")
+})
+
+test("daily activity accepts the additive API field and excludes an unfinished UTC day", () => {
+  const source = body({ usage: { ...body().usage, active_daily: [
+    { day: "2026-10-17", count: 4 }, { day: "2026-10-18", count: 99 },
+  ] } })
+  const o = parseOverview(source)
+  assert.deepEqual(o.usage.active_daily, [{ day: "2026-10-17", count: 4 }])
 })
 
 test("an answer that is not the contract is refused with the field that was wrong", () => {
