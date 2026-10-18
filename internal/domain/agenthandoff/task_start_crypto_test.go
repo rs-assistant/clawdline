@@ -17,7 +17,7 @@ func TestTaskStartEnvelopeBindsMachineProjectAndBody(t *testing.T) {
 		t.Fatal(err)
 	}
 	start, body := validTaskStart()
-	canonical, err := canonicalTaskStart(start)
+	canonical, err := canonicalHeader(start)
 	if err != nil {
 		t.Fatal(err)
 	}

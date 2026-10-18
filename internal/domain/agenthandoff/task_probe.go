@@ -31,7 +31,7 @@ func taskProbeInput(probe TaskProbe) ([]byte, error) {
 	if err != nil || len(nonce) != 24 {
 		return nil, ErrPeerEnvelope
 	}
-	header, err := canonicalTaskStart(probe.Start)
+	header, err := canonicalHeader(probe.Start)
 	if err != nil {
 		return nil, ErrPeerEnvelope
 	}
