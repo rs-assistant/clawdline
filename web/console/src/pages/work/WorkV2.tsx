@@ -1,4 +1,5 @@
 import { catalogFormat } from "../../catalog.js"
+import { focusModalContainer } from "../../modal-focus.js"
 import { catalogWord, catalogWordLanguage } from "../../catalog.js"
 import { catalogLabel, closingMark, fullWidthPunctuation, quotedTitle } from "../../punctuation.js"
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react"
@@ -965,7 +966,7 @@ function WorkCard({ item, sessions, decisions, decisionAnswers, busy, failure, c
       {reassignable && <p className="work-reassign-note">{catalogWord("inline", "58f4894c12b1")}</p>}
       <section className="work-assignment-route" aria-labelledby={`work-assign-existing-${item.id}`}>
         <h4 id={`work-assign-existing-${item.id}`}>{catalogWord("inline", "c8232bd59817")}</h4>
-        <SessionAssignmentPicker sessions={eligible} value={terminal} onChange={setTerminal} autoFocus={focusAssignment || (epic && reassigning)} />
+        <SessionAssignmentPicker sessions={eligible} value={terminal} onChange={setTerminal} autoFocus={!focusAssignment && epic && reassigning} />
         {terminal && <button className="chip on work-assignment-action" type="button" disabled={!!busy} aria-busy={busy === item.id && assigningRoute === "existing"}
           onClick={() => assign("existing", () => assignWorkV2(item, terminal))}>
           {busy === item.id && assigningRoute === "existing" && <span className="work-assignment-spinner" aria-hidden="true" />}
@@ -1296,9 +1297,8 @@ function CreatedWorkModal({ item, created = true, back, sessions, decisions, dec
   onClose: () => void
 }) {
   const modal = useRef<HTMLDivElement>(null)
-  const initialFocus = useRef<HTMLButtonElement>(null)
   useModalDismiss(false, onClose)
-  useModalFocus(modal, initialFocus, back)
+  useModalFocus(modal, back)
   // Opened from a Session too, so it lives beside the app root, never inside
   // the fixed Session pane: a phone then keeps one scroll surface.
   return createPortal(<div ref={modal} tabIndex={-1} className={created ? "session-todo-modal work-created-modal" : "session-todo-modal work-created-modal work-item-detail-modal"}
@@ -1307,7 +1307,7 @@ function CreatedWorkModal({ item, created = true, back, sessions, decisions, dec
     <div className={created ? "work-created-panel" : "work-created-panel work-item-detail-panel"}>
       <div className="work-modal-head"><div><p className="board-eyebrow">{created ? catalogWord("ui", "workItemCreated") : catalogWord("ui", "boardItem")}</p>
         <h2 id={`work-created-title-${item.id}`}>{created ? catalogWord("literal", "935ee1ab45ca") : catalogWord("literal", "79a3cb6e5cdb")}</h2></div>
-        <button ref={initialFocus} className="work-modal-close" type="button" aria-label={catalogWord("inline", "c7fdddf79eaa")} onClick={onClose}><WorkIcon name="close" /></button></div>
+        <button className="work-modal-close" type="button" aria-label={catalogWord("inline", "c7fdddf79eaa")} onClick={onClose}><WorkIcon name="close" /></button></div>
       {failure && <p className="work-note" role="alert">{failure}</p>}
       <WorkCard item={item} sessions={sessions} decisions={decisions} decisionAnswers={decisionAnswers} busy={busy} failure={failure} clearFailure={clearFailure} run={run} answerWorkDecision={answerWorkDecision}
         detailLoading={detailLoading} detailError={detailError} retryDetail={retryDetail} focusAssignment={created} reportsExpanded={!created} foldDescription={!created} />
@@ -1338,15 +1338,17 @@ function EditWorkModal({ item, busy, failure, onClose, onSave }: {
   onSave: (title: string, description: string) => void
 }) {
   const [title, setTitle] = useState(item.title)
+  const dialog = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => focusModalContainer(dialog.current), [])
   const [description, setDescription] = useState(item.description)
   const ready = !!title.trim() && !!description.trim()
   useModalDismiss(busy, onClose)
-  return <div className="session-todo-modal work-edit-modal" role="dialog" aria-modal="true" aria-labelledby={`work-edit-title-${item.id}`}
+  return <div className="session-todo-modal work-edit-modal" ref={dialog} role="dialog" aria-modal="true" aria-labelledby={`work-edit-title-${item.id}`}
     onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <form onSubmit={(event) => { event.preventDefault(); if (ready) onSave(title.trim(), description.trim()) }}>
       <div className="work-modal-head"><div><p className="board-eyebrow">{catalogWord("inline", "308278979452")}</p><h2 id={`work-edit-title-${item.id}`}>{catalogWord("inline", "9293ae04361c")}</h2></div>
         <button className="work-modal-close" type="button" aria-label={catalogWord("inline", "c7fdddf79eaa")} disabled={busy} onClick={onClose}><WorkIcon name="close" /></button></div>
-      <label>{catalogWord("inline", "6fe38ed1ee10")}<input className="work-input" value={title} maxLength={240} autoFocus onChange={(event) => setTitle(event.target.value)} /></label>
+      <label>{catalogWord("inline", "6fe38ed1ee10")}<input className="work-input" value={title} maxLength={240} onChange={(event) => setTitle(event.target.value)} /></label>
       <VoiceTextarea label={catalogWord("literal", "8561515b8b34")} value={description} maxLength={65536} onValue={setDescription} />
       {failure && <p className="work-note" role="alert">{failure}</p>}
       <div className="work-actions"><button className="chip on" type="submit" disabled={busy || !ready}>{busy ? catalogWord("literal", "21aa64dd7446") : catalogWord("literal", "9a8097d8f563")}</button>
@@ -1395,7 +1397,7 @@ interface ModalReturn {
 }
 
 /** Keep the keyboard in the modal and put it back on the summary that opened it. */
-function useModalFocus(container: RefObject<HTMLDivElement | null>, initialFocus: RefObject<HTMLElement | null>, shared?: ModalReturn) {
+function useModalFocus(container: RefObject<HTMLDivElement | null>, shared?: ModalReturn) {
   // StrictMode runs an effect's setup/cleanup/setup sequence once in
   // development. Keep the opener across that rehearsal and cancel its false
   // restoration when the second setup starts. A dialog replaced by the next
@@ -1406,7 +1408,7 @@ function useModalFocus(container: RefObject<HTMLDivElement | null>, initialFocus
   if (!back.opener && document.activeElement instanceof HTMLElement) back.opener = document.activeElement
   useEffect(() => {
     if (back.timer !== null) { window.clearTimeout(back.timer); back.timer = null }
-    initialFocus.current?.focus({ preventScroll: true })
+    focusModalContainer(container.current)
     const keepFocus = (event: KeyboardEvent) => {
       if (event.key !== "Tab" || !container.current) return
       const controls = [...container.current.querySelectorAll<HTMLElement>(
@@ -1436,7 +1438,7 @@ function useModalFocus(container: RefObject<HTMLDivElement | null>, initialFocus
         if (opener?.isConnected) opener.focus({ preventScroll: true })
       }, 0)
     }
-  }, [container, initialFocus, back])
+  }, [container, back])
 }
 
 function WorkReferenceImage({ item, image, busy, run }: {

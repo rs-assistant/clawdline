@@ -1,6 +1,7 @@
 import { localizedLiteralMap } from "../../catalog.js"
 import { catalogFormat } from "../../catalog.js"
 import { catalogWord } from "../../catalog.js"
+import { showModalWithoutChoice } from "../../modal-focus.js"
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react"
 import { createPortal } from "react-dom"
 import type { Icon } from "@clawdline/contract"
@@ -142,8 +143,7 @@ export function ProjectSetup({ shown, ref }: { shown: boolean; ref?: Ref<Project
       setView("settings")
       setUnifyRequest({ place: "", count: 0 })
       void load()
-      dialog.current?.showModal()
-      dialog.current?.focus({ preventScroll: true })
+      showModalWithoutChoice(dialog.current)
     },
   }), [load])
 
@@ -188,8 +188,7 @@ export function ProjectSetup({ shown, ref }: { shown: boolean; ref?: Ref<Project
       ref={trigger}
       aria-haspopup="dialog"
       onClick={() => {
-        dialog.current?.showModal()
-        dialog.current?.focus({ preventScroll: true })
+        showModalWithoutChoice(dialog.current)
       }}
     >{catalogWord("inline", "4ad26221870f")}</button>
   </section>

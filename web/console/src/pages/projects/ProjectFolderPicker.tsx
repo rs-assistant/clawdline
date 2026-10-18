@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { catalogWord } from "../../catalog.js"
+import { showModalWithoutChoice } from "../../modal-focus.js"
 import { failureSentence } from "../../legacy/bridge.js"
 import { addProjectPlace, readProjectFolders, type ProjectFolderPage } from "../work/api.js"
 import "./project-folder-picker.css"
@@ -37,7 +38,7 @@ export function ProjectFolderPicker({ open, machine, onClose, onAdded }: {
     const node = dialog.current
     if (!node) return
     if (open) {
-      if (!node.open) node.showModal()
+      showModalWithoutChoice(node)
       setPage(null); setTyped(""); setError("")
       void browse()
     } else {

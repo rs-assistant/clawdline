@@ -1,5 +1,6 @@
 import { catalogFormat } from "../catalog.js"
 import { catalogWord } from "../catalog.js"
+import { focusModalContainer } from "../modal-focus.js"
 import type { MachineUsage, SessionRow } from "@clawdline/contract"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { RefusalError } from "@clawdline/core"
@@ -58,6 +59,7 @@ export function MachineDashboard({ sessions, onClose, onClawdfather }: {
   const [memHistory, setMemHistory] = useState<number[]>([])
   const slotsRef = useRef<Map<string, number>>(new Map())
   const closeRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let alive = true
@@ -90,7 +92,7 @@ export function MachineDashboard({ sessions, onClose, onClawdfather }: {
   }, [])
 
   useEffect(() => {
-    closeRef.current?.focus()
+    focusModalContainer(dialogRef.current)
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation()
@@ -124,6 +126,7 @@ export function MachineDashboard({ sessions, onClose, onClawdfather }: {
     <div className="overlay machine-overlay" onClick={onClose}>
       <div
         className="sheet machine-sheet"
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="machine-title"

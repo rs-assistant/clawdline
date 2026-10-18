@@ -125,7 +125,7 @@ test("the Board detail modal owns focus while open and returns it to its summary
   assert.match(source, /function useModalFocus/)
   // The opener lives in a ModalReturn that successive detail dialogs share.
   assert.match(source, /const opener = back\.opener[\s\S]*if \(opener\?\.isConnected\) opener\.focus\(\{ preventScroll: true \}\)/)
-  assert.match(source, /initialFocus\.current\?\.focus/)
+  assert.match(source, /focusModalContainer\(container\.current\)/)
   assert.match(app, /\[role="dialog"\]\[aria-modal="true"\]/)
 })
 
@@ -348,10 +348,8 @@ test("an assigned card can be moved to another or a new Session", () => {
   assert.match(source, /assignmentCandidates\(sessions, item\)/)
 })
 
-test("opening Epic reassignment brings the picker into view", () => {
-  // An Epic can be much taller than the viewport: its gate and children sit
-  // between the toolbar button and the newly mounted assignment picker.
-  assert.match(source, /autoFocus=\{focusAssignment \|\| \(epic && reassigning\)\}/)
+test("opening Epic reassignment brings the picker into view outside a modal", () => {
+  assert.match(source, /autoFocus=\{!focusAssignment && epic && reassigning\}/)
 })
 
 test("an Epic keeps its frame and label without spanning both desktop columns", () => {
@@ -465,7 +463,7 @@ test("family links open the other item by id, in both directions", () => {
 
 test("opening another item from the detail dialog is a fresh dialog that returns focus to the first opener", () => {
   assert.match(source, /<CreatedWorkModal item=\{openedItem\} created=\{false\} key=\{openedItem\.id\} back=\{detailReturn\.current\}/)
-  assert.match(source, /useModalFocus\(modal, initialFocus, back\)/)
+  assert.match(source, /useModalFocus\(modal, back\)/)
 })
 
 test("parents the family list lacks are read one by one, bounded, before the Board draws", () => {
