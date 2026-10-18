@@ -571,6 +571,8 @@ const words = {
     cloudSwitch: "Other machines",
     cloudAllMachines: "All machines",
     cloudStartWhere: "Start it on which machine?",
+    cloudStartWhereHelp: "Choose the machine that will run the new Session.",
+    cloudSwitchWhereHelp: "Choose the machine for this action.",
     cloudStartOn: "Starting on {machine}",
     cloudSingleSessions: "Sessions on this machine",
     cloudAllSearch: "Search Sessions or machines",
@@ -678,14 +680,14 @@ const words = {
       "Clawdline Cloud's answer about removing {machine} could not be read ({code}), so it is not known whether it was removed. Reload this page before asking again.",
     // Renaming a machine. It is an account write like forgetting one and it is
     // asked the same way, but it is not destructive, so what it says after is
-    // about where the new name has and has not arrived yet.
+    // about where the new account label is used.
     cloudRename: "Rename",
     cloudRenameOne: "Rename {machine}",
     cloudRenameTitle: "Rename {machine}?",
     cloudRenameAsk:
       "This changes what {machine} is called on this account, for every browser signed in to it. It changes nothing on the machine itself.",
     cloudRenameLater:
-      "This list is what the machines themselves last said about themselves, so it goes on showing the old name until this one reports in again.",
+      "This page uses the new name immediately. Other browsers see it after they refresh.",
     cloudRenameField: "New name",
     cloudRenaming: "Renaming {machine}…",
     cloudRenamed: "{machine} is called {name} on this account now.",
@@ -1965,6 +1967,8 @@ const words = {
     cloudSwitch: "換一台機器",
     cloudAllMachines: "所有機器",
     cloudStartWhere: "要開在哪一台機器？",
+    cloudStartWhereHelp: "選擇要執行新 Session 的機器。",
+    cloudSwitchWhereHelp: "選擇要執行這項操作的機器。",
     cloudStartOn: "要開在 {machine}",
     cloudSingleSessions: "這台機器的 Session",
     cloudAllSearch: "搜尋 Session 或機器",
@@ -2071,7 +2075,7 @@ const words = {
     cloudRenameOne: "把 {machine} 改名",
     cloudRenameTitle: "要把 {machine} 改名嗎？",
     cloudRenameAsk: "這會改掉 {machine} 在這個帳號上的名字，每一個登入這個帳號的瀏覽器都會看到新的。機器本身不會有任何改變。",
-    cloudRenameLater: "這份清單是各台機器自己上次說的，所以在這一台重新回報之前，它還是會顯示舊的名字。",
+    cloudRenameLater: "這一頁會立即顯示新名稱；其他瀏覽器重新整理後也會看到。",
     cloudRenameField: "新的名字",
     cloudRenaming: "正在把 {machine} 改名…",
     cloudRenamed: "{machine} 在這個帳號上現在叫做 {name}。",

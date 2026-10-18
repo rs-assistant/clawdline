@@ -37,6 +37,7 @@ import { machinePresentation } from "../legacy/js/session/selection.js"
 import { forgetPersonas } from "../personas.js"
 import { accountMachineForConfirmation, accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, withAccountRegistrations, type AccountName } from "./unpaired-rows.js"
 import { machineSeenWord } from "./machine-seen.js"
+import { MachinePlatformIcon } from "./MachinePlatformIcon.js"
 import { PairingRun, dropInvitation, watchInvitations, type PairStart, type PairState } from "./pair.js"
 import {
   browserPendingPairings,
@@ -811,9 +812,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
    * it against the machine's own name.
    *
    * Nothing is retried and nothing is assumed: `rename.ts` answers which of
-   * "refused", "no such machine" and "could not be read" it was, and this only
-   * decides where that is said. It is not destructive, so unlike forgetting it
-   * leaves the list and this tab's chosen machine exactly as they were.
+   * "refused", "no such machine" and "could not be read" it was. A confirmed
+   * rename updates the account labels in this tab immediately; the machine's
+   * retained descriptor may still carry the old hostname.
    */
   const rename = useCallback(
     async (machine: CloudMachine, name: string) => {
@@ -823,6 +824,19 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       const outcome = await renameMachine(transport.config.apiOrigin, machine.id, name)
       setRenaming(false)
       setRenamed({ machine: machine.name || machine.label || machine.id, outcome })
+      if (outcome.kind === "renamed") {
+        // An earlier roster read must not overwrite the successful PATCH with
+        // its pre-rename name when the two requests finish out of order.
+        rosterRequest.current += 1
+        const account = { name: outcome.name, platform: registeredRef.current.get(machine.id)?.platform ?? "" }
+        registeredRef.current = new Map(registeredRef.current).set(machine.id, account)
+        namesRef.current = new Map(namesRef.current).set(machine.id, account)
+        setRegistered(registeredRef.current)
+        setNames(namesRef.current)
+        setRosterPending(false)
+        setRosterFailed(false)
+        setAccountRosterStatus("ready")
+      }
       // A name this page would not send, or a bound the account would refuse,
       // never left the browser: the question stays open with what was typed.
       if (outcome.kind === "blank" || outcome.kind === "too_long") return
@@ -966,13 +980,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   useEffect(() => {
     setMachinePairing((id) => {
       const known = machinesRef.current?.find((m) => m.id === id)
-      const named = known ? withAccountNames([known], namesRef.current, described, present)[0] : null
+      const named = known ? withAccountNames([known], namesRef.current, present)[0] : null
       openPairing({ id, name: named ? named.name || named.label || id : id })
     })
     setMachineForgetting((id) => {
       const named = accountMachineForConfirmation(
         id, machinesRef.current, registeredRef.current, namesRef.current,
-        described, present, gone.current)
+        present, gone.current)
       if (!named) return
       setTold(null)
       forgetReturn.current = "console"
@@ -995,11 +1009,6 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       setScreen({ at: "console" })
     }
   }, [])
-
-  /** Whether this browser has read `machine`'s own snapshot, and so has its own word for its name. */
-  function described(machine: string): boolean {
-    return !!client.current?.machineDescriptor?.(machine)
-  }
 
   const onUpdate = useCallback(
     (update: CloudUpdate) => {
@@ -1033,7 +1042,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             // no session count where it could not read the sessions to count them.
             const named = withAccountNames(
               withAccountRegistrations(answer.machines, registeredRef.current, present),
-              namesRef.current, described, present)
+              namesRef.current, present)
             return {
               machines: devicesPageRows(named, gone.current),
               syncing: answer.syncing,
@@ -1215,7 +1224,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     () => {
       if (machineList.phase === "refused") return machineList
       const relay = machineList.phase === "ready" ? machineList.machines : []
-      const visible = withAccountNames(withAccountRegistrations(relay, registered, present), names, described, present)
+      const visible = withAccountNames(withAccountRegistrations(relay, registered, present), names, present)
         .filter((machine) => !forgotten.includes(machine.id))
         .map((machine) => {
           const operation = client.current?.machineDescriptor?.(machine.id)?.machine?.operation_allowed
@@ -1224,8 +1233,6 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       return visible.length ? { phase: "ready", machines: visible }
         : machineList.phase === "ready" ? { phase: "empty_authoritative" } : machineList
     },
-    // `described` reads the client, which changes only with a new line and
-    // then with a new list.
     [machineList, names, registered, forgotten],
   )
   const quickMachines = shown.phase === "ready" ? shown.machines.filter((machine) => machine.selectable) : []
@@ -1634,7 +1641,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           nameOf: (id: string) => {
             const known = machines?.find((m) => m.id === id)
             if (known) {
-              const named = withAccountNames([known], names, described, present)[0]
+              const named = withAccountNames([known], names, present)[0]
               return named.name || named.label || id
             }
             // A browser that held no key had no list to find it in; the
@@ -2271,7 +2278,10 @@ function GateCard(props: {
                         disabled={!m.selectable}
                         onClick={() => onChoose(m)}
                       >
-                        <span className="cloud-machine-name">{name}</span>
+                        <span className="cloud-machine-heading">
+                          <MachinePlatformIcon platform={platformWord(identity.platform)} />
+                          <span className="cloud-machine-name">{name}</span>
+                        </span>
                         <span className="cloud-machine-identity">
                           {platformWord(identity.platform)}
                           {" · "}
@@ -2330,6 +2340,7 @@ function GateCard(props: {
                           onClick={() => onName(m)}
                         >
                           <span aria-hidden="true">✎</span>
+                          <span>{nextWord("cloudRename")}</span>
                         </button>
                         <button
                           className="cloud-forget"

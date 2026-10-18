@@ -142,6 +142,11 @@ be read, the page asks for a retry instead of opening from possibly stale relay 
 opening decision is made before the machine picker is painted, so an automatic fleet or addressed
 Session open does not flash the management list first.
 
+When a fleet action needs one machine, its dialog shows each machine's name, platform and a
+server or personal computer silhouette. Machine management keeps Rename as a named control beside
+Pair and Forget. A confirmed rename changes the account label used by the picker, switcher and
+fleet immediately; it does not rename the operating system host.
+
 A cold browser load has two bounded paths. The signed `ss/` inventory marker names the complete
 Session set for each machine. If its marker or a row is missing, a complete, fresh, authorized
 `sessions.list` answer supplies the set and its titles in one read; an unanswered list falls back

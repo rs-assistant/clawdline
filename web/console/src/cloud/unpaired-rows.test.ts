@@ -104,8 +104,9 @@ test("the Devices revoke confirmation can resolve a registration absent from rel
   }
   const resolve = (id: string, forgotten: string[] = []) =>
     accountMachineForConfirmation(id, [witnessed], roster.registered, roster.names,
-      (machine: string) => machine === "mac_1", present, forgotten)
-  assert.equal(resolve("mac_1"), witnessed, "an observed machine keeps its own facts")
+      present, forgotten)
+  assert.deepEqual(resolve("mac_1"), { ...witnessed, name: "Studio", label: "Desk · Studio" },
+    "an observed machine uses the account name without losing its observed facts")
   assert.deepEqual(resolve("mac_c0ffee42"), {
     id: "mac_c0ffee42", name: "build-box", label: "Linux · build-box", kind: "linux",
     observedAt: null, freshness: "unknown", pairing: "unknown",
@@ -116,7 +117,7 @@ test("the Devices revoke confirmation can resolve a registration absent from rel
   assert.equal(resolve("mac_other"), null, "a guessed id cannot open confirmation")
 })
 
-test("a machine this browser cannot name is called what the account calls it; one it can name keeps its own", () => {
+test("an account rename wins over an older machine descriptor", () => {
   const rows = [
     { id: "mac_1", name: "Studio (published)", label: "Desk · Studio (published)", kind: "desk" },
     { id: "mac_c0ffee42", name: "Machine · c0ffee42", label: "Machine · c0ffee42", kind: "unknown" },
@@ -126,10 +127,10 @@ test("a machine this browser cannot name is called what the account calls it; on
     ["mac_1", { name: "Studio", platform: "darwin" }],
     ["mac_c0ffee42", { name: "build-box", platform: "linux" }],
   ])
-  const shown = withAccountNames(rows, names, (id: string) => id === "mac_1", present)
+  const shown = withAccountNames(rows, names, present)
   assert.deepEqual(
     shown.map((row: { label: string }) => row.label),
-    ["Desk · Studio (published)", "Linux · build-box", "Machine · unlisted"],
+    ["Desk · Studio", "Linux · build-box", "Machine · unlisted"],
   )
   assert.equal(shown[1].kind, "linux")
 })
