@@ -252,43 +252,6 @@ func TestTheOpenLimitRefusesAndLetsNothingGo(t *testing.T) {
 	}
 }
 
-// DG-1: a sweep that stops is said out loud. Stalled is false while passes
-// come, and true once none has finished for three ticks — the answer
-// /v1/health turns red on.
-func TestAStoppedSweepIsStalled(t *testing.T) {
-	w, _, clock := newBoard(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { w.Run(ctx, time.Hour); close(done) }()
-	for {
-		if p, _, _ := w.Pulse(); p.Passes > 0 {
-			break
-		}
-		select {
-		case <-time.After(5 * time.Millisecond):
-		case <-done:
-			t.Fatal("the sweep ended before its first pass")
-		}
-	}
-	if w.Stalled() {
-		t.Fatal("stalled right after a pass")
-	}
-	clock.at = clock.at.Add(3*time.Hour - time.Second)
-	if w.Stalled() {
-		t.Fatal("stalled inside three ticks")
-	}
-	// Control: past three ticks with no pass, it is stalled.
-	clock.at = clock.at.Add(2 * time.Second)
-	if !w.Stalled() {
-		t.Fatal("three ticks without a pass and not stalled")
-	}
-	cancel()
-	<-done
-	if w.Stalled() {
-		t.Fatal("a sweep that was stopped on purpose reads as stalled")
-	}
-}
-
 // BD-17 against the real store: work a person says was done, whose delivery
 // named no item, closes as done — the row says `done_elsewhere`, the move
 // says who said so and why, and `dropped` keeps meaning what it says.

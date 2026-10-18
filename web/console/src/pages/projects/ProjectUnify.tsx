@@ -1,5 +1,6 @@
 import { catalogFormat } from "../../catalog.js"
 import { catalogWord } from "../../catalog.js"
+import { showModalWithoutChoice } from "../../modal-focus.js"
 import { catalogLabel, openingMark, wordGap } from "../../punctuation.js"
 import { useEffect, useRef, useState } from "react"
 import type { ProjectUnifyAction, ProjectUnifyPlan } from "@clawdline/contract"
@@ -154,8 +155,7 @@ export function ProjectUnify({ place, openRequest = 0 }: { place: ProjectPlace; 
 
   const open = () => {
     setNotice(""); setError(""); setStopped(null)
-    dialog.current?.showModal()
-    heading.current?.focus({ preventScroll: true })
+    showModalWithoutChoice(dialog.current)
   }
 
   useEffect(() => { if (openRequest > 0) pendingOpen.current = true }, [openRequest])

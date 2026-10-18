@@ -33,6 +33,10 @@ type Layout struct {
 	Releases string
 	Current  string
 	Staging  string
+	// ServiceBin is a real, stable path for the macOS LaunchAgent. It is a
+	// hard link to the selected release, never a symlink through current: TCC
+	// records an unbundled executable by its resolved path.
+	ServiceBin string
 	// BinLink is the `clawdline` on PATH.
 	BinLink string
 }
@@ -40,11 +44,12 @@ type Layout struct {
 // NewLayout is the layout under root, with the PATH link in binDir.
 func NewLayout(root, binDir string) Layout {
 	return Layout{
-		Root:     root,
-		Releases: filepath.Join(root, "releases"),
-		Current:  filepath.Join(root, "current"),
-		Staging:  filepath.Join(root, "staging"),
-		BinLink:  filepath.Join(binDir, "clawdline"),
+		Root:       root,
+		Releases:   filepath.Join(root, "releases"),
+		Current:    filepath.Join(root, "current"),
+		Staging:    filepath.Join(root, "staging"),
+		ServiceBin: filepath.Join(root, "service", "clawdline"),
+		BinLink:    filepath.Join(binDir, "clawdline"),
 	}
 }
 
@@ -122,6 +127,9 @@ func (l Layout) CurrentRelease() (string, Kind) {
 // release or source deploy when it runs from this layout's releases (directly
 // or through `current`), a source checkout otherwise.
 func (l Layout) KindOf(exe string) Kind {
+	if name, kind := l.ServiceRelease(exe); name != "" {
+		return kind
+	}
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		exe = resolved
 	}
@@ -138,6 +146,77 @@ func (l Layout) KindOf(exe string) Kind {
 		return k
 	}
 	return KindSourceCheckout
+}
+
+// ServiceRelease identifies the release whose binary is hard-linked at the
+// stable service path. The inode comparison keeps rollback truthful even when
+// current has switched but the supervisor has not installed the next link.
+func (l Layout) ServiceRelease(exe string) (string, Kind) {
+	if filepath.Clean(exe) != filepath.Clean(l.ServiceBin) {
+		return "", KindNone
+	}
+	service, err := os.Stat(l.ServiceBin)
+	if err != nil {
+		return "", KindNone
+	}
+	current, _ := l.CurrentRelease()
+	if current != "" {
+		if candidate, err := os.Stat(filepath.Join(l.ReleaseDir(current), "clawdline")); err == nil && os.SameFile(service, candidate) {
+			return current, kindOfRelease(current)
+		}
+	}
+	entries, err := os.ReadDir(l.Releases)
+	if err != nil {
+		return "", KindNone
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == current || kindOfRelease(name) == KindNone {
+			continue
+		}
+		if candidate, err := os.Stat(filepath.Join(l.ReleaseDir(name), "clawdline")); err == nil && os.SameFile(service, candidate) {
+			return name, kindOfRelease(name)
+		}
+	}
+	return "", KindNone
+}
+
+// InstallServiceBinary atomically selects the macOS daemon at a fixed real
+// path. The release remains untouched and available for rollback. Hard links
+// require the service and releases to be on the same filesystem, which they
+// are under one installation root.
+func (l Layout) InstallServiceBinary(name string) error {
+	if kindOfRelease(name) == KindNone {
+		return fmt.Errorf("%q is not a release or commit name", name)
+	}
+	if err := os.MkdirAll(filepath.Dir(l.ServiceBin), 0o755); err != nil {
+		return err
+	}
+	// The daemon discovers its console beside its executable. The stable
+	// service path needs the current release's dist/ there as well, including
+	// when an older updater switches to this release before it restarts.
+	console := filepath.Join(filepath.Dir(l.ServiceBin), "dist")
+	const consoleTarget = "../current/dist"
+	if err := os.Symlink(consoleTarget, console); err != nil && !errors.Is(err, os.ErrExist) {
+		return err
+	}
+	target, err := os.Readlink(console)
+	if err != nil {
+		return fmt.Errorf("service console path %s: %w", console, err)
+	}
+	if target != consoleTarget {
+		return fmt.Errorf("service console path %s links to %q, want %q", console, target, consoleTarget)
+	}
+	tmp := l.ServiceBin + ".new"
+	_ = os.Remove(tmp)
+	if err := os.Link(filepath.Join(l.ReleaseDir(name), "clawdline"), tmp); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, l.ServiceBin); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // SwitchCurrent points `current` at releases/<name> in one rename, so a

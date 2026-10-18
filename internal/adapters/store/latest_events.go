@@ -11,9 +11,10 @@ import (
 // (`session.delivered`, keyed by terminal) from this daemon's store rather than
 // from the Swift app's (cutover B1).
 //
-// The index is what keeps it one seek per subject. The events table only
-// grows, and the list is built every time a page asks; without the index each
-// build would scan every event ever recorded.
+// The index is what keeps it one seek per subject. The list is built every
+// time a page asks; without the index each build would scan every event the
+// table holds. The newest row per subject of each kind read here is kept until
+// its subject has been silent for EventKeptAgeLimit (events_retention.go).
 const latestEventsSchema = `
 CREATE INDEX IF NOT EXISTS events_kind_subject ON events(kind, subject, seq);
 `

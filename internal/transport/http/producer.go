@@ -242,9 +242,6 @@ func (p *listProducer) taskList() (contract.TaskList, error) {
 // after a press from a page (cloud.Publisher.Fresh), when the shared product
 // may still be the screen from before the press.
 func (s *Server) CloudSessionsFresh(context.Context) ([]byte, bool) {
-	if !s.ownsSessions() {
-		return nil, false
-	}
 	value, err := s.lists().sessions.since(time.Now())
 	if err != nil {
 		return nil, false
@@ -267,9 +264,6 @@ func (s *Server) CloudSessionLook(id string) {
 // product every stream reads, encoded as `GET /v1/sessions` answers it, so the
 // publisher no longer builds one of its own through the route.
 func (s *Server) CloudSessions(context.Context) ([]byte, bool) {
-	if !s.ownsSessions() {
-		return nil, false
-	}
 	body, err := json.Marshal(s.lists().snapshot())
 	if err != nil {
 		return nil, false

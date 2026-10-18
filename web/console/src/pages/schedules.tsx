@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react"
 import * as L from "../legacy/bridge.js"
 import { nextWord, type NextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import { toast } from "../overlays/index.js"
 import { readAnswer, readFailure, readReady, type ReadState } from "../read-state.js"
 import { invalidScheduleErrorHTML } from "../schedule-errors.js"
@@ -58,6 +59,7 @@ import {
   rememberScheduleOwners,
   scheduleFleet,
   scheduleOwner,
+  silentMachineWord,
   type ScheduleMachine,
 } from "../cloud/schedule-machines.js"
 import {
@@ -279,7 +281,7 @@ function renderSchedules(
             (group.unanswered ? ' data-state="' + (group.unanswered === "loading" ? "loading" : "unanswered") + '"' : "") +
             ">" +
             esc(group.unanswered === "loading" ? machineWords(group.machine) + " · " + nextWord("schedulesLoading") :
-              group.unanswered ? silentMachine(group.machine) : machineWords(group.machine)) +
+              group.unanswered ? silentMachine(group.machine, group.unanswered) : machineWords(group.machine)) +
             "</li>" +
             group.rows.map(row).join(""),
         )
@@ -310,13 +312,12 @@ function seenClock(at: number): string {
   return when.toLocaleString(lang() || undefined, options)
 }
 
-/** A machine that did not answer: offline since a time when one is known, otherwise offline or unreadable. */
-function silentMachine(machine: ScheduleMachine): string {
+/** A machine that did not answer, in the words `silentMachineWord` chooses. */
+function silentMachine(machine: ScheduleMachine, code: string | null): string {
   const name = machineWords(machine)
-  if (!machine.online && machine.seenAt) {
-    return nextWord("scheduleMachineOffline", { machine: name, time: seenClock(machine.seenAt) })
-  }
-  return nextWord("scheduleMachineUnread", { machine: name })
+  const word = silentMachineWord(machine, code)
+  return nextWord(word, word === "scheduleMachineOffline"
+    ? { machine: name, time: seenClock(machine.seenAt ?? 0) } : { machine: name })
 }
 
 /* ---- net/schedules.js: the one-minute lane -------------------------------- */
@@ -514,6 +515,10 @@ const Schedules = (() => {
         if (requestedMachines !== machineKey()) return
         answers.set(machine.id, (data.schedules ?? []).filter((row) => row.machine === machine.id))
         at = Math.max(at, data.at ?? 0)
+        // An answer is proof the machine is reachable now; without this, a Mac
+        // that was offline when the page opened and came back would still be
+        // called offline the next time a read times out.
+        noteScheduleMachineAnswered(machine.id)
       } catch (error) {
         failures.set(machine.id, { machine: machine.id,
           code: typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
@@ -775,7 +780,7 @@ const Schedule = (() => {
       chip.type = "button"
       chip.className = "chip" + (m.id === machine ? " on" : "")
       chip.textContent = machineWords(m)
-      if (!m.online) chip.title = silentMachine(m)
+      if (!m.online) chip.title = silentMachine(m, null)
       chip.setAttribute("aria-pressed", m.id === machine ? "true" : "false")
       chip.onclick = () => chooseMachine(m.id)
       row.appendChild(chip)
@@ -1190,7 +1195,7 @@ const Schedule = (() => {
     if (!el("schedule-form").hidden) return
     reset()
     el("schedule-form").hidden = false
-    el("schedule-title").focus({ preventScroll: true })
+    focusModalContainer(el("schedule-form"))
     ensurePlaces().then(() => {
       defaultAssistant(null)
       drawWith()
@@ -1215,7 +1220,7 @@ const Schedule = (() => {
     drawDays()
     drawPlaces()
     said(draft.question || hint())
-    el("schedule-title").focus({ preventScroll: true })
+    focusModalContainer(el("schedule-form"))
     ensurePlaces().then(() => {
       defaultAssistant(draft.assistant)
       chosenModel = chosenAssistant === "claude" && MODELS.includes(draft.model || "") ? draft.model || "" : ""
@@ -1324,7 +1329,7 @@ const Schedule = (() => {
     el("schedule-delete-confirm-go").textContent = T().webScheduleDelete
     el("schedule-delete-confirm").hidden = false
     paintDeleteConfirm()
-    el("schedule-delete-confirm-go").focus({ preventScroll: true })
+    focusModalContainer(el("schedule-delete-confirm"))
   }
 
   function closeDeleteConfirm(restore: boolean): void {
@@ -2163,7 +2168,7 @@ const ScheduleHistory = (() => {
     el("schedule-history-said").textContent = ""
     el("schedule-history").hidden = false
     draw()
-    el("schedule-history-close").focus({ preventScroll: true })
+    focusModalContainer(el("schedule-history"))
     const mine = ++ticket
     const detail = scheduleApi.schedule(id, scheduleOwner(id))
     const availablePlaces = scheduleApi.places(scheduleOwner(id)).catch(() => ({ places: [] }) as SchedulePlaces)
@@ -2322,7 +2327,7 @@ const ScheduleHistory = (() => {
         runningNow = false
         if (error && error.code === "write_disabled") write = false
         // `scheduleRunMessage` is the Swift app's (`js/input/schedule-run.js`,
-        // copied byte for byte and so not correctable there): it names five
+        // copied from it): it names five
         // codes and answers every other one with "無法啟動這個排程。" That was
         // the sentence a `machine_offline` or a `rate_limited` press got. The
         // five keep their words — they are better than the catalog's — and the

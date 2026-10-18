@@ -28,7 +28,7 @@ import type { StreamHandle, StreamHandlers, StreamTransport } from "@clawdline/c
 import type { CloudWriteClient, WriteHost, WriteRoute } from "./relay-writer.js"
 import type { MachineListPresentation, MachineSessionProjection, SessionDestination, SessionListPresentation } from "./all-machine-sessions.js"
 import { authenticatedRefusalKey } from "./refusal-client.js"
-import { channelSegment } from "../legacy/js/net/client.js"
+import { SESSION_INVENTORY_ID, channelSegment } from "../legacy/js/net/client.js"
 
 /** One machine and one of its sessions, as the relay's channels name them. */
 export interface CloudIdentity {
@@ -266,7 +266,7 @@ export interface CloudReadClient {
    */
   agent?(identity: CloudIdentity, agent: string): Promise<unknown>
   shell?(identity: CloudIdentity, shell: string): Promise<unknown>
-  /** The copied client's session reader, used for cursor pages without changing the pinned copy. */
+  /** The copied client's session reader, used for cursor pages without changing the client. */
   _read?(identity: CloudIdentity, word: string, body: Record<string, unknown>, answer: string): Promise<unknown>
   /**
    * The application server key, as the machine's `push-key` read answers it.
@@ -284,14 +284,13 @@ export interface CloudReadClient {
    *
    * The copied client has a method per word of the Swift console's vocabulary
    * and none for a word that console never had — the whole work system and
-   * this daemon's Project catalog are such words
-   * — and the copy is held to its source byte for byte
-   * (`tools/check-legacy-css.sh`), so a method cannot be added to it here.
-   * This is the generic underneath all of them (`_machineRequest`), and the
-   * reads carried through it get exactly what the named methods get: the
-   * machine's own capability gate before anything is sealed, the
-   * `unknown_command` a machine that lacks the word answers, and the
-   * `machineLacks` memory that stops the page asking it twice.
+   * this daemon's Project catalog are such words.
+   * Rather than a method per word added to it, this is the generic underneath
+   * all of them (`_machineRequest`), and the reads carried through it get
+   * exactly what the named methods get: the machine's own capability gate
+   * before anything is sealed, the `unknown_command` a machine that lacks the
+   * word answers, and the `machineLacks` memory that stops the page asking it
+   * twice.
    *
    * It is called for every word this file carries, including the four the
    * copied client does name, because those four pick their own machine —
@@ -583,7 +582,8 @@ export interface RelayReaderOptions {
   onAnswer?: (row: SeamRow) => void
   /**
    * What this bundle carries, and what it says about what it does not
-   * (`carry.ts`, handed in by `CloudGate`).
+   * (`carry.ts`, whose word lists `carry-generated.ts` generates from the
+   * vocabulary table, handed in by `CloudGate`).
    *
    * It is handed in rather than imported because nothing in this file is
    * imported at run time — that is what lets `node --test` load it as it is —
@@ -734,6 +734,24 @@ export class RelayReader {
   }
 
   /**
+   * The Board's Session list read failed (`SessionListReader`, pages/work).
+   * Its word, this machine, the failure's code and how long it took go to the
+   * machine's log as `cloud: viewer reported:`, so the next failure on a
+   * phone is read there and not from a screenshot.
+   */
+  reportSessionListFailure(failure: { code: string; elapsedMs: number }): boolean {
+    try {
+      const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } } | null)?.viewerEvents
+      if (typeof log?.record !== "function") return false
+      log.record("work.sessions.read_failed", {
+        word: "sessions.snapshot", machine: this.machine, code: failure.code, elapsed_ms: Math.round(failure.elapsedMs),
+        connection: !this.client ? "none" : this.client.ready === false ? "not_ready" : "ready",
+      }, ["work.sessions.read_failed", this.machine, failure.code].join("|"))
+      return true
+    } catch { return false }
+  }
+
+  /**
    * What `relay-writer.ts` is given of this seam: the machine, the client, the
    * log, and `wrote`, which is how a write reaches the reads after it.
    */
@@ -798,9 +816,9 @@ export class RelayReader {
   /**
    * What this bundle and this machine disagree about, right now, on the page.
    *
-   * The build-time half of this is a Go test that reads `carry.ts`
-   * (internal/app/cloudops/carry_test.go), and it can only compare this bundle
-   * with the checkout it was built from. A hosted console is an *older* bundle
+   * The build-time half of this is the generated `carry-generated.ts`, held
+   * to the vocabulary table by `go run ./tools/contract-gen -check`, and it can
+   * only compare this bundle with the checkout it was built from. A hosted console is an *older* bundle
    * reading a machine that has been updated since, which no test in either repo can
    * see. The machine says what it can do in its own descriptor —
    * `cloudops.Implemented()`, carried as `machine.commands` — so the same
@@ -1087,7 +1105,18 @@ export class RelayReader {
           // person with a Mac and a Linux machine sees both machines'
           // schedules without switching the whole console.
           const query = this.only(url, path, "machine")
-          const client = this.connected()
+          // A paused or renewing line waits for its successor, as one
+          // schedule's read does (`machineRead`). This list threw
+          // `NotConnected` instead, which `jsonFetch` spells `offline`: a
+          // phone that came back to the page before its line did drew every
+          // machine on the account as offline or unreadable, the online Mac
+          // included, and asked again only a minute later.
+          const client = await this.connectedFor(init?.signal)
+          if (!client) {
+            if (init?.signal?.aborted) throw new NotConnected()
+            return this.refuse(method, path, 503, "cloud_reconnecting",
+              "This page's Cloud connection is renewing or reconnecting; the machine was not asked.")
+          }
           if (typeof client.schedules !== "function") {
             return this.refuse(method, path, 501, "cloud_not_carried",
               "This console cannot read this machine's schedules.")
@@ -1263,26 +1292,9 @@ export class RelayReader {
           return json(200, key)
         }
         case "/v1/board": {
-          // One path, two words, told apart exactly as the page tells them
-          // apart: a read that names an audience is the paged card list and
-          // everything else is the envelope (`legacy/board-bridge.ts`).
-          const q = this.only(url, path, "project", "item", "audience", "cursor", "limit")
-          if (q.audience === undefined) {
-            return await this.machineRead(init?.signal, method, path, "board", {
-              project: q.project ?? "", item: q.item ?? "",
-            })
-          }
-          return await this.machineRead(init?.signal, method, path, "board.items", {
-            project: q.project ?? "", audience: q.audience,
-            // Absent is not zero and not the maximum: this route reads a
-            // missing `cursor` as 0 and a missing `limit` as its own default
-            // (`clampInt`, internal/transport/http/board.go), and the page
-            // leaves both off for the first page of a Project it has just
-            // opened. The word carries two integers and no absence, so the
-            // route's own numbers are what is sent — anything else would page
-            // a phone differently from the browser on the machine.
-            cursor: whole(q.cursor, 0),
-            limit: whole(q.limit, BOARD_PAGE_DEFAULT),
+          const q = this.only(url, path, "project", "item")
+          return await this.machineRead(init?.signal, method, path, "board", {
+            project: q.project ?? "", item: q.item ?? "",
           })
         }
         case "/v1/work/proposals": {
@@ -1464,10 +1476,17 @@ export class RelayReader {
       // relay eviction. The connection's recovery asks once; ask again here.
       const previousGeneration = this.statusSnapshotGeneration()
       const response = await this.machineRead(signal, "GET", "/v1/sessions", "sessions.snapshot", {})
-      const stated = await response.json().catch(() => null) as { sessions?: unknown; complete?: unknown } | null
+      const stated = await response.json().catch(() => null) as
+        { sessions?: unknown; complete?: unknown; snapshot_generation?: unknown } | null
       if (this.options.classicStatus && signal && stated?.complete === true &&
         Array.isArray(stated.sessions) && stated.sessions.every((id) => typeof id === "string")) {
-        return this.waitForStatedSessions(new Set(stated.sessions as string[]), signal, previousGeneration)
+        // A machine that names the pass it stated is confirmed by a marker
+        // naming that pass, even the one already held: the pass id hashes the
+        // set, so an unchanged set never produces a new one. An older machine
+        // names none, and only a pass newer than the held one can confirm it.
+        const confirmed = typeof stated.snapshot_generation === "string" && /^[0-9a-f]{32}$/u.test(stated.snapshot_generation)
+          ? { pass: stated.snapshot_generation } : { after: previousGeneration }
+        return this.waitForStatedSessions(new Set(stated.sessions as string[]), signal, confirmed)
       }
       return this.snapshot()
     }
@@ -1482,13 +1501,14 @@ export class RelayReader {
   }
 
   private statusSnapshotGeneration(): string | null {
-    const marker = this.client?.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+    const marker = this.client?.statusSnapshots?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as
       { payload?: { snapshot_generation?: unknown } } | undefined
     return typeof marker?.payload?.snapshot_generation === "string" ? marker.payload.snapshot_generation : null
   }
 
   /** A snapshot command can answer before its ss/ envelopes reach this browser. */
-  private waitForStatedSessions(ids: Set<string>, signal: AbortSignal, previousGeneration: string | null): Promise<SessionsSnapshot> {
+  private waitForStatedSessions(ids: Set<string>, signal: AbortSignal,
+    confirmed: { pass: string } | { after: string | null }): Promise<SessionsSnapshot> {
     return new Promise((resolve, reject) => {
       let finished = false
       let checking = false
@@ -1519,7 +1539,8 @@ export class RelayReader {
             again = false
             const reading = await this.snapshotReading(true)
             if (reading.snapshot.scan.complete &&
-              (previousGeneration === null || this.statusSnapshotGeneration() !== previousGeneration) &&
+              ("pass" in confirmed ? this.statusSnapshotGeneration() === confirmed.pass
+                : confirmed.after === null || this.statusSnapshotGeneration() !== confirmed.after) &&
               reading.snapshot.sessions.length === ids.size &&
               reading.snapshot.sessions.every((row) => ids.has(row.id))) {
               finish(reading.snapshot)
@@ -1650,7 +1671,7 @@ export class RelayReader {
         machine: this.machine, execution_generation: row.destination.executionGeneration,
         parent_session_id: row.parentSessionID,
         machine_scope: row.machineScope === true, coordinator_bound: row.coordinatorBound === true,
-        label: presentation?.title ?? row.destination.sessionID, cwd: presentation?.cwd,
+        label: presentation?.title ?? row.destination.sessionID, cwd: presentation?.cwd, project_key: presentation?.projectKey,
         icon: presentation?.icon, assistant: row.assistant ?? presentation?.assistant, backend: row.backend, state: row.state,
         source: { freshness: row.freshness === "current" ? "current" : "unverified",
           observed_at: row.observedAt / 1000 } }
@@ -1710,7 +1731,7 @@ export class RelayReader {
     closed: string[]
     claims(): { inventory?: { at: number; sessions: string[] }; closed?: string[] }
   } {
-    const marker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+    const marker = client.statusSnapshots?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as
       | { payload?: { at?: unknown; complete?: unknown; inventory?: { version?: unknown; sessions?: unknown } } } | undefined
     const meta = marker?.payload
     const ids = meta?.inventory?.sessions
@@ -1755,7 +1776,7 @@ export class RelayReader {
     this.sayDrift()
     const recovering = (all.scan.recovering ?? []).includes(this.machine)
     const failed = (all.scan.failures ?? []).some((f) => f.machine === this.machine)
-    const statusMarker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+    const statusMarker = client.statusSnapshots?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as
       | { payload?: { at?: unknown; complete?: unknown; snapshot_generation?: unknown;
         inventory?: { version?: unknown; sessions?: unknown } } } | undefined
     const statusIDs = statusMarker?.payload?.complete === true && statusMarker.payload.inventory?.version === 1 &&
@@ -1846,7 +1867,7 @@ export class RelayReader {
           machine: this.machine, execution_generation: target.executionGeneration, label: presentation.title,
           parent_session_id: signedRow && typeof data?.parent_session_id === "string"
             ? data.parent_session_id : presentation.projection?.parentSessionID,
-          cwd: presentation.cwd, icon: presentation.icon,
+          cwd: presentation.cwd, project_key: presentation.projectKey, icon: presentation.icon,
           assistant: signedRow ? data?.assistant ?? presentation.assistant : presentation.projection?.assistant ?? presentation.assistant,
           backend: signedRow ? data?.backend : presentation.projection?.backend,
           state: signedRow ? data?.state : presentation.status?.state ?? "unknown",
@@ -1877,7 +1898,7 @@ export class RelayReader {
         machineRows.push({ ...displayStatus, id: target.sessionID, session: target.sessionID,
           machine: this.machine, execution_generation: target.executionGeneration,
           parent_session_id: typeof data.parent_session_id === "string" ? data.parent_session_id : undefined,
-          label: presentation.title, cwd: presentation.cwd, icon: presentation.icon,
+          label: presentation.title, cwd: presentation.cwd, project_key: presentation.projectKey, icon: presentation.icon,
           assistant: data.assistant, backend: data.backend, state: data.state, source: data.source })
       }
     }
@@ -2327,7 +2348,7 @@ export class RelayReader {
       signal?.addEventListener("abort", done)
       off = client.events((event) => {
         if (event.type === "session_status" && event.identity?.machine === this.machine &&
-          event.identity?.session === "__clawdline_inventory_v1__") done()
+          event.identity?.session === SESSION_INVENTORY_ID) done()
       }) as (() => void) | null
     })
     if (signal?.aborted) throw new AbandonedRead(word)
@@ -2397,7 +2418,7 @@ export class RelayReader {
     if (signal?.aborted) return false
     const client = this.connected()
     if (typeof client.recoverStatusRow !== "function") return false
-    const marker = client.statusSnapshots?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+    const marker = client.statusSnapshots?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as
       | { payload?: { snapshot_generation?: unknown } } | undefined
     const pass = marker?.payload?.snapshot_generation
     if (typeof pass !== "string" || !/^[0-9a-f]{32}$/u.test(pass)) return false
@@ -2406,7 +2427,7 @@ export class RelayReader {
 
   private pinnedSession(session: string): { machineID: string; sessionID: string; executionGeneration: string } {
     const held = this.connected().statusSnapshots
-    const marker = held?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as
+    const marker = held?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as
       | { payload?: { complete?: unknown; inventory?: { sessions?: unknown }; snapshot_generation?: unknown; at?: unknown } } | undefined
     const row = held?.get(JSON.stringify([this.machine, session])) as
       | { payload?: { snapshot_generation?: unknown; execution_generation?: unknown; projected_at?: unknown;
@@ -2769,7 +2790,7 @@ export class RelayReader {
         : "answered"
       const client = this.client
       const held = client?.statusSnapshots
-      const marker = held?.get(JSON.stringify([this.machine, "__clawdline_inventory_v1__"])) as { payload?: { at?: unknown } } | undefined
+      const marker = held?.get(JSON.stringify([this.machine, SESSION_INVENTORY_ID])) as { payload?: { at?: unknown } } | undefined
       const row = read.session ? held?.get(JSON.stringify([this.machine, read.session])) as { payload?: { projected_at?: unknown } } | undefined : undefined
       const nowS = this.now() / 1000
       const age = (at: unknown) => typeof at === "number" && Number.isFinite(at) ? Math.round(nowS - at) : null
@@ -2848,21 +2869,6 @@ class NotConnected extends Error {
   }
 }
 
-/**
- * The page size `/v1/board` uses when a read names no `limit`
- * (`boardstore.DefaultPageLimit`, internal/adapters/board/board.go). It is
- * here because the Cloud word carries two integers and no absence, so the
- * seam has to say what the route would have said. The two are checked against
- * each other by `TestTheBoardsCloudPageSizeIsTheRoutesOwn`.
- */
-const BOARD_PAGE_DEFAULT = 30
-
-/** A whole number from a query field, or `fallback` when it names none. */
-function whole(value: string | undefined, fallback: number): number {
-  const n = Number(value)
-  return value !== undefined && Number.isSafeInteger(n) && n >= 0 ? n : fallback
-}
-
 /** The two ids in `/v1/sessions/{session}/shells/{shell}`, decoded after splitting. */
 function sessionShell(path: string): { session: string; shell: string } | null {
   const parts = path.split("/")
@@ -2905,6 +2911,8 @@ function readFailureWord(input: RequestInfo | URL, init?: RequestInit): { word: 
       return { word: url.searchParams.has("before") ? "transcript_page" : "transcript", session: url.searchParams.get("session") }
     }
     if (path === "/v1/sessions") return { word: "session_list", session: null }
+    if (path === "/v1/orchestrator/schedules") return { word: "schedules", session: null,
+      machine: url.searchParams.get("machine") || undefined }
     if (path === "/v1/personas") return { word: "personas", session: null,
       machine: url.searchParams.get("machine") || undefined }
     const todos = workV2SessionTodosTerminal(path)

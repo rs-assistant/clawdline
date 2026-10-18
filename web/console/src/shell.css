@@ -86,3 +86,5 @@ html.booting body {
   cursor: pointer;
   text-decoration: underline;
 }
+/* A modal receives initial focus for keyboard access; its controls show a ring only after navigation. */
+[data-modal-initial-focus]:focus { outline: none; }

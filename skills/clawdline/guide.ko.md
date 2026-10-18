@@ -138,7 +138,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":{"code":"…","message":"…","request_id":"…", …extras}}` — 게이트와 브로커의 응답입니다. `retry_after` 같은 추가 필드는 `error` 안에 있습니다.
 - `{"error":"<code>","detail":"…"}` — 없는 경로, 잘못된 메서드, 일부 읽기의 응답입니다.
 
-이 데몬이 소유하지 않는 경로는 경로 이름을 포함한 `501 not_implemented`로 거부됩니다. 일반적인 컴퓨터에서는 이것이 최종 응답입니다. 누군가 `CLAWDLINE_NEXT_UPSTREAM_PORT`를 설정해 다른 데몬을 뒤에 둔 경우에만 전달됩니다. 그 데몬이 응답하지 않으면 응답하지 않은 주소와 함께 `502 upstream_unreachable`가 나옵니다. 두 응답 모두 이 데몬이 해당 기능을 제공한다는 뜻은 아닙니다. 2026-09-19 이전에는 기본 전달 대상이 포트 7717의 Swift 앱이었으므로 당시 기록에는 소유하지 않는 경로가 그 앱에 닿는다고 쓰였을 수 있지만, 지금은 그렇지 않습니다.
+이 데몬이 소유하지 않는 경로는 경로 이름을 포함한 `501 not_implemented`로 거부됩니다. 다른 데몬으로 전달되지 않습니다.
 
 ### 프로젝트의 Clawdline 표시 설정
 
@@ -423,7 +423,7 @@ POST /v1/orchestrator/tasks/<id>/landing
 
 `clawdline landings`(`GET /v1/orchestrator/landings`)는 이 컴퓨터에서 대기 중인 모든 반영과 각 `ownership.status`를 보여줍니다. `unknown`은 "주인이 없음"이 아니라 근거를 읽지 못했다는 뜻입니다. `503 landings_incomplete`는 일부 행을 읽지 못했다는 뜻이며, 불완전한 짧은 목록으로 대신 응답하지 않습니다.
 
-`clawdline landings --work-id <item id>`(`GET /v1/orchestrator/landings?work_id=<item id>`)는 이와 달리 보드 항목 하나에 **기록된 모든** 반영을 보여줍니다: `{"work_id", "landings": [...], "at"}`. 각 행에는 `id`와 `source`가 있습니다. `task`는 연결된 child의 `landed`나 `incorporated` 기록이며 ID는 작업 ID입니다. `root`는 `item phase deploying --commit`이 쓴 기록입니다. `phase_event`는 예전 데몬이 항목 이력에 남긴 사본입니다. 연결된 작업 기록을 읽지 못하면 누락하지 않고 `state: "unknown"`인 행으로 표시합니다. 항목 읽기에도 같은 `landings` 행이 있습니다. 없는 항목은 `404 work_not_found`입니다.
+`clawdline landings --work-id <item id>`(`GET /v1/orchestrator/landings?work_id=<item id>`)는 이와 달리 보드 항목 하나에 **기록된 모든** 반영을 보여줍니다: `{"work_id", "landings": [...], "at"}`. 각 행에는 `id`와 `source`가 있습니다. `task`는 연결된 child의 `landed`나 `incorporated` 기록이며 ID는 작업 ID입니다. `root`는 `item phase deploying --commit`이 쓴 기록이거나, 예전 데몬이 항목 이력에 남겨 저장소가 별도 행으로 만든 사본입니다. 연결된 작업 기록을 읽지 못하면 누락하지 않고 `state: "unknown"`인 행으로 표시합니다. 항목 읽기에도 같은 `landings` 행이 있습니다. 없는 항목은 `404 work_not_found`입니다.
 
 **두 root가 같은 체크아웃에 반영할 때는** 먼저 반영 임대를 받습니다(§11).
 

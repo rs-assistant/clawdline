@@ -40,8 +40,10 @@ import (
 //     a push's event is written with the push's outbox effect in one
 //     transaction (D08), so a restart reads the decision back rather than
 //     deciding again. A stop whose end nobody saw (the daemon was down,
-//     or the reading could not see that terminal) stays spent: a person
-//     pushed twice is worse than one who finds it on the list (DG-7).
+//     or the reading could not see that terminal) stays spent for as long
+//     as the events journal keeps its row (store.EventKeptAgeLimit, 30
+//     days): a person pushed twice is worse than one who finds it on the
+//     list (DG-7). Past that, a restart re-pushes a Session still waiting.
 //
 // Only a reading ends a stop. `unknown` is not "not waiting", and a row
 // missing from a reading that could not see its terminal is not a row gone.

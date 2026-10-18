@@ -1,5 +1,11 @@
 #!/bin/bash
-# Check the byte-for-byte copies against the hashes pinned when they were copied.
+# Check the byte-for-byte stylesheet copies against the hashes pinned when they
+# were copied.
+#
+# Only the CSS is a copy. The JavaScript beside it, and the strings catalog, are
+# this console's own code since the retired app stopped (web/console/src/legacy/
+# README.md), so the manifest no longer pins them and this check refuses a
+# manifest that does.
 #
 # The retired application's source tree is optional evidence. When present, its
 # current hashes are compared with the same pins and any later source movement is
@@ -54,16 +60,12 @@ try:
 except (OSError, json.JSONDecodeError) as error:
     raise SystemExit(f"cannot read pinned manifest: {error}")
 
+for owned in ("js", "strings"):
+    if owned in manifest:
+        raise SystemExit(f"pinned manifest pins {owned}, which is owned code, not a copy")
+
 groups = (
     ("css", lambda name: (f"{destination}/{name}", f"app/css/{name}")),
-    ("js", lambda name: (f"{destination}/{name}", f"app/{name}")),
-    (
-        "strings",
-        lambda name: (
-            f"web/console/{name}",
-            f"strings/{name.rsplit('/', 1)[-1]}",
-        ),
-    ),
 )
 for group, paths in groups:
     pins = manifest.get(group)

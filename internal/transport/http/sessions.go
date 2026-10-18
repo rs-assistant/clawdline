@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/limits"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
@@ -24,25 +24,6 @@ import (
 	"github.com/sainteye/clawdline/internal/domain/session"
 	"github.com/sainteye/clawdline/internal/domain/task"
 )
-
-// ownsSessions reports whether this daemon answers /v1/sessions itself.
-//
-// With nobody behind it — the ordinary case since the Swift app was stopped on
-// 2026-09-19 — the answer is yes and there is nothing to decide: handing the
-// route to an upstream that does not exist is how `/v1/sessions` came to answer
-// `502 upstream_unreachable` on a machine where the session list is the whole
-// product.
-//
-// With an upstream configured, the switch means what it always meant. Taking a
-// route over is the one change that can break the console for a person who is
-// working, so while there is something behind this daemon it stays a switch
-// that can be turned back within a second rather than a property of the build.
-func (s *Server) ownsSessions() bool {
-	if !s.proxying() {
-		return true
-	}
-	return os.Getenv("CLAWDLINE_NEXT_OWN_SESSIONS") == "1"
-}
 
 // epoch identifies this process. A client that reconnects to a restarted daemon
 // must be able to tell that the generation counter started over rather than
@@ -53,10 +34,6 @@ var generation atomic.Int64
 
 // sessions answers the route the console actually reads.
 func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
-	if !s.ownsSessions() {
-		s.forwardUpstream(w, r)
-		return
-	}
 	w.Header().Set("Content-Type", "application/json")
 	// The product every stream reads, when it is not older than one tick
 	// (producer.go): a page's first read, the Cloud fleet's and the streams'
@@ -131,13 +108,14 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 			ID                  string         `json:"id"`
 			Title               string         `json:"title"`
 			CWD                 string         `json:"cwd,omitempty"`
+			ProjectKey          string         `json:"project_key,omitempty"`
 			Icon                *contract.Icon `json:"icon,omitempty"`
 			ExecutionGeneration string         `json:"execution_generation,omitempty"`
 			Status              status         `json:"status"`
 		}
 		rows := make([]presentation, 0, len(snapshot.Sessions))
 		for _, row := range snapshot.Sessions {
-			rows = append(rows, presentation{ID: row.ID, Title: row.Label, CWD: row.CWD,
+			rows = append(rows, presentation{ID: row.ID, Title: row.Label, CWD: row.CWD, ProjectKey: row.ProjectKey,
 				Icon: row.Icon, ExecutionGeneration: row.ExecutionGeneration,
 				Status: status{SessionID: row.SessionID, EpicParent: row.EpicParent, Persona: row.Persona, State: row.State, WorkState: row.WorkState, WorkNote: row.WorkNote,
 					WorkProvenance: row.WorkProvenance, WorkMovedBy: row.WorkMovedBy,
@@ -219,7 +197,7 @@ type sessionRowWire struct {
 	Menu *menuWire `json:"menu,omitempty"`
 	// waiting is the work projection's live tasks behind a broker-decided
 	// waiting_session, turned into `waiting_for` once labels are known.
-	waiting []*swiftstore.Task
+	waiting []*ownrecords.Task
 }
 
 // sessionsSnapshotWire is contract.SessionsSnapshot with those rows.
@@ -241,20 +219,53 @@ func (s *Server) sessionsPayload(ctx context.Context) sessionsSnapshotWire {
 // (orchestrator.go): one reading, so a row and the source completeness read
 // with it are of the same moment.
 func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory) sessionsSnapshotWire {
+	return s.sessionsPayloadRead(ctx, inv, s.sessionTasks)
+}
+
+// sessionLedgerRead reads the broker's tasks one build of the list projects
+// from, for the sessions in a reading.
+type sessionLedgerRead func(ctx context.Context, sessions []session.Session) ([]orchestrator.Record, []orchestrator.Unreadable, error)
+
+// sessionTasks is the part of the ledger the sessions can be told by
+// (Broker.SessionTasks): the list is rebuilt every two seconds, and the whole
+// history it used to read three times a build is thousands of finished tasks
+// no row projects.
+func (s *Server) sessionTasks(ctx context.Context, sessions []session.Session) ([]orchestrator.Record, []orchestrator.Unreadable, error) {
+	if s.broker == nil {
+		return nil, nil, nil
+	}
+	terminals := make([]string, 0, len(sessions))
+	for _, item := range sessions {
+		terminals = append(terminals, item.ID)
+	}
+	return s.broker.SessionTasks(ctx, terminals)
+}
+
+// sessionsPayloadRead is sessionsPayloadFrom with the tasks read by read.
+func (s *Server) sessionsPayloadRead(ctx context.Context, inv session.Inventory, read sessionLedgerRead) sessionsSnapshotWire {
 	// This daemon's own records get a clock of their own, and not what the
 	// terminal scan left of the request's (recordsContext).
 	records, releaseRecords := recordsContext(ctx)
 	defer releaseRecords()
+
+	// One reading of the broker's tasks for the whole build: what is owed,
+	// the callbacks each root runs and the tasks the rows project are all
+	// cut from it, so no two of them describe different moments.
+	tasks, unreadableTasks, tasksErr := read(records, inv.Sessions)
 
 	// One reading of what is owed, for the whole list, against this same
 	// reading of the sessions. Asking per row would ask the same question
 	// eight times and let two rows disagree about the same moment. An
 	// unreadable broker makes the projection incomplete, not wrong in one
 	// place: it is carried as missing evidence rather than as zero.
-	owed, owedErr := s.owed(records, inv.Sessions)
+	var owed []task.Obligation
+	owedErr := tasksErr
+	if tasksErr == nil && s.broker != nil {
+		owed, owedErr = s.broker.OwedOf(tasks, unreadableTasks, inv.Sessions)
+	}
 	// The record set the projections read: this daemon's own, laid in below.
 	// The retired Swift app's store is no longer read (docs/cutover.md §7).
-	swift := swiftstore.Snapshot{}
+	swift := ownrecords.Snapshot{}
 	// And of this daemon's own machine role (W5): when it holds one, the
 	// crown is drawn from it and from nothing else — one role, one source.
 	// An unreadable role draws no crown.
@@ -272,7 +283,7 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 			items = append(items, item)
 		}
 	}
-	lives := make([]swiftstore.Live, len(items))
+	lives := make([]ownrecords.Live, len(items))
 	for i, item := range items {
 		lives[i] = liveOf(item)
 	}
@@ -288,7 +299,10 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 		}
 	}
 	heavySession, heavyWork, heavyPlaces := s.runningHeavyCallback(records)
-	callbacks, callbacksKnown := s.callbackShells(records, heavyPlaces)
+	callbacks, callbacksKnown := map[string][]contract.SessionShell{}, true
+	if s.broker != nil {
+		callbacks, callbacksKnown = callbackShells(tasks, unreadableTasks, tasksErr, heavyPlaces)
+	}
 	// One database read for the entire fleet. An error leaves the count
 	// unknown on every row, rather than turning it into zero.
 	attentionCounts, attentionErr := s.store.OpenHumanInterventionCounts(records)
@@ -332,7 +346,7 @@ func (s *Server) sessionsPayloadFrom(ctx context.Context, inv session.Inventory)
 	// in the Swift store's shape, so the one set of rules reads both
 	// (ownrecords.go). A source of ours that could not be read is evidence
 	// missing for every row, as an unreadable Swift store is.
-	own, ownErr := s.ownOverlay(records, lives)
+	own, ownErr := s.ownOverlayOf(records, lives, tasks, unreadableTasks, tasksErr)
 	swift = swift.With(own)
 	// A delivery is historical. A later message typed by the person starts new
 	// work, even when the terminal has already gone idle again. Read the run
@@ -593,13 +607,8 @@ func sourceComplete(inv session.Inventory, backend session.Backend) bool {
 
 // A tty-named assistant came only from ps, even if its provisional backend
 // is iTerm2. Its evidence must follow ps; an unrelated Apple Event failure
-// cannot make the process reading stale.
-func rowSource(item session.Session) string {
-	if session.SourceForID(item.ID) == "ps" {
-		return "ps"
-	}
-	return session.SourceFor(item.Backend)
-}
+// cannot make the process reading stale (session.OwningSource).
+func rowSource(item session.Session) string { return session.OwningSource(item) }
 
 func sourceCompleteRow(inv session.Inventory, item session.Session) bool {
 	proves, _ := inv.ProvesAbsence(rowSource(item))
@@ -698,13 +707,13 @@ func recordsContext(ctx context.Context) (context.Context, context.CancelFunc) {
 // compared with. The start time is asked of the kernel here, once per row per
 // reading: it is one sysctl, and a cached one would be the one fact that could
 // be wrong about a process that replaced another in the same second.
-func liveOf(item session.Session) swiftstore.Live {
-	return swiftstore.Live{
+func liveOf(item session.Session) ownrecords.Live {
+	return ownrecords.Live{
 		TerminalID:     item.ID,
 		TTY:            item.TTY,
 		Assistant:      string(item.Assistant),
 		PID:            int64(item.PID),
-		ProcessStart:   swiftstore.ProcessStart(item.PID),
+		ProcessStart:   ownrecords.ProcessStart(item.PID),
 		ConversationID: item.ConversationID,
 	}
 }
@@ -739,7 +748,7 @@ func identityMatchCounts(items []session.Session) map[string]int {
 // thread rung. A project is the last human name before the terminal
 // coordinate: `Codex · project` distinguishes two conversations, while
 // `Codex · ttys020` distinguishes only two terminal devices.
-func rowLabel(item session.Session, titles swiftstore.Titles, project string) string {
+func rowLabel(item session.Session, titles ownrecords.Titles, project string) string {
 	rungs := item.Rungs
 	rungs.Manual = titles.Manual
 	rungs.Orchestrator = titles.Orchestrator
@@ -766,11 +775,11 @@ func rowLabel(item session.Session, titles swiftstore.Titles, project string) st
 
 type rowInput struct {
 	item                session.Session
-	live                swiftstore.Live
+	live                ownrecords.Live
 	label               string
 	labelOf             func(string) string
 	matches             int
-	swift               swiftstore.Snapshot
+	swift               ownrecords.Snapshot
 	owed                []task.Obligation
 	owedErr             error
 	ownErr              error // this daemon's own records not all read (ownrecords.go)
@@ -892,6 +901,11 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		Persona:      item.Persona,
 		MachineScope: projects.IsMachineWorkspace(s.cfg.Dir, item.CWD),
 	}
+	// The Project this row would be accepted into, by the claim's own rule:
+	// a subdirectory or a linked worktree of a repository is that repository.
+	if key, ok := s.projectKeys.key(item.CWD); ok {
+		row.ProjectKey = key
+	}
 	out := sessionRowWire{Menu: wireMenu(item), processPID: item.PID, processStart: in.live.ProcessStart}
 	// Only a waiting row says whether its screen was read: it is what tells
 	// the card a terminal that is not answering from a dialog nothing
@@ -909,7 +923,7 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		// This daemon's own peer waits are an input the Swift store does not
 		// hold; they rank where the Swift app's coordination waits do.
 		if work.State != "waiting_you" && ownWaitingOnPeer(item, in.owed) {
-			work = swiftstore.Work{State: "waiting_session", Provenance: "broker", Owed: work.Owed}
+			work = ownrecords.Work{State: "waiting_session", Provenance: "broker", Owed: work.Owed}
 		}
 		row.WorkState = contract.WorkState(work.State)
 		row.WorkProvenance = contract.WorkProvenance(work.Provenance)
@@ -981,7 +995,7 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		})
 	}
 
-	row.Closeability = in.swift.Closeability(swiftstore.CloseInput{
+	row.Closeability = in.swift.Closeability(ownrecords.CloseInput{
 		Live:          in.live,
 		TerminalState: state,
 		Bound: in.live.Assistant != "" && in.live.PID != 0 &&

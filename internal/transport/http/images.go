@@ -11,19 +11,16 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/artifacts"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 )
 
-// pictures is everything this daemon keeps of pictures, and the Swift app's
-// store it may read.
+// pictures is everything this daemon keeps of pictures.
 type pictures struct {
 	store      *artifacts.Store
 	drops      *artifacts.Drops
 	pasteboard artifacts.Pasteboard
-	swift      *swiftstore.SessionImages
 }
 
 func newPictures(stateDir string) pictures {
@@ -39,7 +36,6 @@ func newPictures(stateDir string) pictures {
 		store:      store,
 		drops:      drops,
 		pasteboard: artifacts.NewPasteboard(),
-		swift:      swiftstore.OpenImages(swiftstore.ImageDir()),
 	}
 }
 
@@ -56,10 +52,6 @@ const sendBodyLimit = 20 << 20
 // imageRoute is GET /v1/artifacts/images/{id}: same-origin bytes for a
 // reference a transcript already published. The URL carries an opaque id and
 // nothing else; no path or file name crosses this route.
-//
-// This daemon's own store answers first. An id it has never held is asked of
-// the Swift app's store, read-only, because transcripts written while that app
-// was running point there.
 func (s *Server) imageRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed", "an image is read with GET")
@@ -87,16 +79,6 @@ func (s *Server) imageRoute(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	found := s.pictures.store.Lookup(id, now)
 	data, state, mediaType := found.Data, found.State, found.Artifact.MediaType
-	if state == artifacts.Missing {
-		_, bytes, swiftState := s.pictures.swift.Lookup(id, now)
-		switch swiftState {
-		case swiftstore.ImageLive:
-			// The Swift app's store holds PNGs only (swiftstore.SessionImages).
-			data, state, mediaType = bytes, artifacts.Live, artifacts.MediaTypePNG
-		case swiftstore.ImageExpired:
-			state = artifacts.Expired
-		}
-	}
 	switch state {
 	case artifacts.Live:
 		if r.Header.Get("X-Clawdline-Target-Machine") != "" || r.Header.Get("X-Clawdline-Execution-Generation") != "" {
@@ -175,7 +157,7 @@ func (s *Server) imagesRoute(w http.ResponseWriter, r *http.Request) {
 			writeRefusal(w, http.StatusNotFound, "session_not_found", "No Session on this machine has that terminal id.")
 			return
 		}
-		record := recordPath(item)
+		record := s.recordPath(item)
 		offset, ok := recordEnd(record)
 		if !ok {
 			writeRefusal(w, http.StatusConflict, "session_has_no_record",
@@ -242,9 +224,9 @@ func writePictureRefusal(w http.ResponseWriter, err error) {
 
 // wireArtifacts is what one entry's pictures are now.
 //
-// A marker's id is resolved from the stores — this daemon's, then the Swift
-// app's — and only from there; the cheap door, metadata and existence, never
-// the bytes. An id neither store has is `unknown` and one that ran out is
+// A marker's id is resolved from this daemon's store and only from there; the
+// cheap door, metadata and existence, never the bytes. An id the store does
+// not have is `unknown` and one that ran out is
 // `expired`, each as a reference that describes no bytes. A session message's
 // pictures are served as its envelope described them, as the Swift app serves
 // them; their bytes are asked for by id like any other.
@@ -278,13 +260,6 @@ func (p pictures) resolve(id string, now time.Time) contract.ImageArtifact {
 		case artifacts.Expired:
 			return absent(contract.ImageAbsenceExpired)
 		}
-	}
-	switch rec, state := p.swift.Liveness(id, now); state {
-	case swiftstore.ImageLive:
-		return contract.ImageArtifact{ID: rec.ID, MediaType: rec.MediaType, ByteCount: int64(rec.ByteCount),
-			Width: int64(rec.Width), Height: int64(rec.Height), ExpiresAt: rec.ExpiresAt}
-	case swiftstore.ImageExpired:
-		return absent(contract.ImageAbsenceExpired)
 	}
 	return absent(contract.ImageAbsenceUnknown)
 }

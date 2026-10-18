@@ -775,7 +775,7 @@ func TestTheVocabularyAndTheImplementedListAgreeWithTheCatalog(t *testing.T) {
 		"past-sessions", "schedules", "coordination.leases", "coordination.waits", "coordination.pauses", "schedule", "schedule-create", "schedule-update", "schedule-delete",
 		"schedule-run", "schedule-webhook-bind-v1", "snippets", "session-snippets", "snippet-create", "snippet-update", "snippet-delete",
 		"snippet-order", "push-key", "push-subscribe", "push-unsubscribe", "push-test", "diagnostics.events",
-		"board", "board-command", "board.items", "projects", "project-file-list", "project-file-read", "project-file-save", "project-tree-list", "project-tree-read", "project-unify-plan", "project-unify-apply", "project-worktree-lifecycle",
+		"board", "board-command", "projects", "project-file-list", "project-file-read", "project-file-save", "project-tree-list", "project-tree-read", "project-unify-plan", "project-unify-apply", "project-worktree-lifecycle",
 		"project-worktree-lifecycle-refresh", "project-worktree-remove", "capacity", "default-models", "default-models-update", "notification-rules", "notification-rules-update", "work-gate-settings", "work-gate-settings-update", "notification-settings", "notification-settings-update", "machine-usage", "update", "update-apply", "personas",
 		"work.proposals", "work.decisions", "work.decision", "work.digests",
 		"work.v2.item", "work.v2.items", "work.v2.search", "work.v2.proposals", "work.v2.session-todos", "work.v2.image", "work.v2.create",
@@ -1101,52 +1101,6 @@ func TestEveryDivergenceIsAboutAWordThisDaemonActuallyAnswers(t *testing.T) {
 		if found[word] == "" {
 			t.Fatalf("%s answers differently from the hosted contract and says nothing about it", word)
 		}
-	}
-}
-
-// TestChannelSegmentIsEncodeURIComponent. A tmux pane is `%19`, and the same
-// function names both a relay channel's segment and a local route's path
-// segment, exactly as the Swift bridge uses it.
-func TestChannelSegmentIsEncodeURIComponent(t *testing.T) {
-	cases := map[string]string{
-		"%19":                     "%2519",
-		"/Users/sean/code":        "%2FUsers%2Fsean%2Fcode",
-		"mac-01":                  "mac-01",
-		"a b":                     "a%20b",
-		"~_.!*'()-":               "~_.!*'()-",
-		MachineReplySession:       "__clawdline_machine__",
-		"session|with|separators": "session%7Cwith%7Cseparators",
-	}
-	for in, want := range cases {
-		if got := ChannelSegment(in); got != want {
-			t.Fatalf("%q encoded to %q, wanted %q", in, got, want)
-		}
-	}
-}
-
-// TestBoardItemsRoutesTheWholeQuery holds the one rule board.items has that
-// board does not: the Swift app sends all four parameters, always, and the two
-// words share one path. A route that dropped a zero cursor would read page one
-// as "no cursor" — the same answer today, a different one the day a default
-// changes.
-func TestBoardItemsRoutesTheWholeQuery(t *testing.T) {
-	o := catalog["board.items"]
-	if o.route == nil {
-		t.Fatal("board.items has no route")
-	}
-	got := o.route(plan{project: "project-b542053a6fe9f75722f3a24a", audience: "human", offset: 0, limit: 30})
-	want := map[string]string{"project": "project-b542053a6fe9f75722f3a24a", "audience": "human",
-		"cursor": "0", "limit": "30"}
-	if got.Method != "GET" || got.Path != "/v1/board" {
-		t.Fatalf("route = %s %s, want GET /v1/board", got.Method, got.Path)
-	}
-	for k, v := range want {
-		if got.Query[k] != v {
-			t.Fatalf("query[%s] = %q, want %q (whole query %v)", k, got.Query[k], v, got.Query)
-		}
-	}
-	if len(got.Query) != len(want) {
-		t.Fatalf("query carries %v, want exactly %v", got.Query, want)
 	}
 }
 
@@ -1958,5 +1912,21 @@ func TestNotificationRulesCrossOnlyTheirMachineRoute(t *testing.T) {
 	if write.Status != 200 || got.Method != "POST" || got.Path != "/v1/notification-rules" ||
 		got.Header[actorHeader] != actorDevice || got.Header["Idempotency-Key"] != "req-write" {
 		t.Fatalf("write: %+v %+v", write, got)
+	}
+}
+
+// The pass id a re-statement's status marker named rides beside the ids, so a
+// page refreshing an unchanged set can tell its held marker is the confirmed
+// one. An empty id (no marker this pass) leaves the older answer unchanged.
+func TestSessionsSnapshotNamesThePassItsMarkerCarried(t *testing.T) {
+	pass := strings.Repeat("a", 32)
+	bridge := Bridge{MachineID: "mac-01", SessionsFor: func(context.Context, string, bool) (SessionsStated, *Refusal) {
+		return SessionsStated{IDs: []string{"%19"}, Complete: true, Generation: pass}, nil
+	}}
+	answer := bridge.Handle(context.Background(), request(t, ClassCtl,
+		map[string]any{"type": "sessions.snapshot", "session": MachineReplySession, "request": "req-1"}))
+	got, _ := json.Marshal(answerOf(t, answer)["body"])
+	if string(got) != `{"complete":true,"sessions":["%19"],"snapshot_generation":"`+pass+`"}` {
+		t.Fatalf("the answer said %s", got)
 	}
 }

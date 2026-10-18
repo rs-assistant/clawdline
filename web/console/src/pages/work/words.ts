@@ -235,6 +235,10 @@ const words = {
     usageBaseOther: "Other",
     reviewRequiredLabel: "Needs independent review",
     reviewRequiredHint: "When checked, a plan must be written and reviewed by an independent child before work starts.",
+    assignSessionsLoading: "Reading the Session list…",
+    assignSessionsFailed: "The Session list could not be read: {error}",
+    assignSessionsRetry: "Read again",
+    assignSessionsIncomplete: "The Session list is not complete yet, so a Session in this Project may be missing from it.",
   },
   "zh-Hant": {
     nav: "看板",
@@ -448,6 +452,10 @@ const words = {
     usageBaseOther: "其他",
     reviewRequiredLabel: "需要獨立審查",
     reviewRequiredHint: "勾選後，開工前要先寫計畫並由獨立 child 審查。",
+    assignSessionsLoading: "正在讀取 Session 清單…",
+    assignSessionsFailed: "讀不到 Session 清單：{error}",
+    assignSessionsRetry: "重新讀取",
+    assignSessionsIncomplete: "Session 清單還沒讀完整，這個 Project 的 Session 可能還不在裡面。",
   },
 } as const
 

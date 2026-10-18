@@ -114,7 +114,7 @@ claims `internal/app/orchestrator`、`internal/adapters/store`、`taskdir`、`su
 | `schedules/*.json` | 6 檔 | 舊 app | 只讀 `schedule_id` 與 `title`（給用量頁） | 新 daemon | **要人工搬**：5 個啟用中的營運排程 |
 | `snippets/*.json` | 5 檔 | 舊 app | 未讀 | 新 daemon | 小、可手動重建 |
 | `usage.sqlite3` | 6.4 MB＋3 MB WAL | 舊 app | 不再讀（讀取器已在 `0957d7448` 刪除；之前是唯讀副本） | 新 daemon 要有自己的帳本 | 舊檔＝歷史；退役後新 daemon 若沒有自己的帳本，用量頁會退回 transcript 計算（已實作） |
-| `~/Library/Caches/com.tsunamiworks.clawdline/session-images/` | 86 項 | 舊 app | 唯讀（對話裡的 `<clawdline-image id>` 標記沒有第二份來源） | 新 daemon（自己的 `CLAWDLINE_NEXT_DIR/session-images`，已實作，先查自己再問舊的） | 舊圖留著，否則舊對話裡的圖變成一行文字 |
+| `~/Library/Caches/com.tsunamiworks.clawdline/session-images/` | 86 項 | 舊 app | **不再讀**（2026-10-18 起；之前唯讀，對話裡的 `<clawdline-image id>` 標記沒有第二份來源） | 新 daemon（自己的 `CLAWDLINE_NEXT_DIR/session-images`，已實作） | 舊圖留著，否則舊對話裡的圖變成一行文字 |
 | `durable-reports/` | 44 KB | 舊 app | 未讀 | 新 daemon | 升級過的報告，量少 |
 | `~/Library/Application Support/Clawdline/worktrees/` | **434 MB**（6 repo） | 舊 app（`ProjectWorktreeLifecycle`） | 未管理 | 新 daemon | **退役前要決定誰清**。今天沒人清＝硬碟慢慢長大 |
 | `remote-audit.jsonl` | 6.4 MB | 舊 app | 新版有自己的（448 bytes） | 各自 | 不合併 |
@@ -123,6 +123,12 @@ claims `internal/app/orchestrator`、`internal/adapters/store`、`taskdir`、`su
 **一條規則**：`~/.config/clawdline` 與 `~/.config/clawdline-next` 不共用任何一個檔案。
 今天新版對前者只有 `O_RDONLY`，退役後應該連讀都不要——這條讀取是一個獨立 adapter
 （`internal/adapters/swiftstore`），設計上就是要能整條拿掉。
+
+**`~/.config/clawdline/secrets/` is live.** Clawdline does not read it, but other programs and
+scheduled jobs on the machine do. No cleanup may delete or move it, and the old directory must
+never be moved or deleted as a whole: on 2026-10-17 a cleanup moved all of `~/.config/clawdline`
+to the Trash, and those programs failed until `secrets/` was restored. Clean the old directory
+file by file, and only files proved to be the retired app's.
 
 **B1 之後（2026-09-19）**：新版**先用自己的 store**（broker 的 task、waits、`session.delivered`、handoff、
 Feature Root、coordinator 表，以及自己從 transcript 算的用量），舊 store 只當「歷史補充」；
@@ -139,6 +145,8 @@ Feature Root、coordinator 表，以及自己從 transcript 算的用量），�
 `off` 時的答案：task 列表 `store: disabled`、`/v1/board/tracks` 的 `sources.board/history.status: disabled`、
 `/v1/board` 與 `/v1/projects` 的 catalog 是空的。`swiftstore` 套件留下來的是投影規則（`project.go`，現在只讀
 這個 daemon 自己的紀錄，經 `Snapshot.With`）、`ProcessStart`，與 B3 的舊圖片讀取。
+**2026-10-18**：B3 的舊圖片讀取也刪了（`images.go`、`CLAWDLINE_SESSION_IMAGE_DIR`），套件改名為
+`internal/adapters/ownrecords`；舊 app 的圖片 id 現在答「未知」。
 **一處刻意不照 `off`**：Projects 頁的 worktree 生命週期。`off` 時 task 紀錄永遠不算權威，所有 worktree 都不能
 清；現在以自己的紀錄為權威——舊 app 的 worktree 在這裡沒有紀錄，生命週期把它的擁有者判成 unknown
 （`managed_path_without_task_record`）。unknown 不會讓任何東西被自動清掉；使用者在 Projects 頁明確按下 Delete 時，仍然會刪除那個 checkout。
@@ -459,7 +467,7 @@ Feature Root、coordinator 表，以及自己從 transcript 算的用量），�
 | **4** | **遠端與手機**：tunnel 或 Cloud 擇一當手機的 origin、push 四條路由＋送出器、`/sw.js` 與圖示、PWA 重裝；**broker 交接面**（handoffs、root-assignments、graphs、storage／maintenance）；URL scheme；hook 的結論；worktree 回收 | C1–C6、E4、E5、B4 | **這一波的手機部分退不回去**（origin 換了）。先在一台手機上試，確認再換第二台 |
 | **5** | **B1／B2 拆掉對舊 store 的依賴**＋看板、時間軸、驗證帳本、常用句、durable reports | B1、B2、F1 全部 | 把 `swiftstore` 打開即可暫時退回 |
 | **6** | **退役日**：停舊 app、從 `~/.claude/settings.json` 移除舊 hook、取消舊 app 的登入時啟動、把舊 Mac 從 Cloud 帳號撤掉（如果決定撤）、資料改標「歷史」 | 上面全部打勾 | 舊 app 重開即可——只要**沒有刪掉** `~/.config/clawdline` |
-| **7** | 清理：刪 `.build`、回收 worktree、決定要不要保留 `~/.config/clawdline` | — | — |
+| **7** | 清理：刪 `.build`、回收 worktree、決定要不要保留 `~/.config/clawdline`（only file by file: its `secrets/` is read by other programs and stays, see §3） | — | — |
 
 ### 8.3 先切哪一半？
 

@@ -37,27 +37,7 @@ func init() {
 	}, route: func(p plan) LocalRequest {
 		return LocalRequest{Method: "POST", Path: "/v1/cloud/peer/send", Body: p.document}
 	}})
-	register(op{name: "peer-control", decode: func(b body) (plan, bool) {
-		if !b.has("type", "session", "request", "control") {
-			return plan{}, false
-		}
-		p, ok := actionPlan(b, false)
-		if !ok || p.request == "" {
-			return plan{}, false
-		}
-		control, ok := b["control"].(map[string]any)
-		if !ok || len(control) == 0 || len(control) > 14 {
-			return plan{}, false
-		}
-		action, _ := control["action"].(string)
-		if action == "" {
-			return plan{}, false
-		}
-		p.document = jsonBody(control)
-		return p, len(p.document) <= 16<<10
-	}, route: func(p plan) LocalRequest {
-		return LocalRequest{Method: "POST", Path: "/v1/cloud/peer/control", Body: p.document}
-	}})
+	register(op{name: "peer-control"})
 	register(op{name: "peer-inbox", read: true, decode: func(b body) (plan, bool) {
 		if !b.has("type", "session", "request", "expected_generation") &&
 			!b.has("type", "session", "request", "expected_generation", "before") {
@@ -87,18 +67,5 @@ func init() {
 		}
 		return LocalRequest{Method: "GET", Path: "/v1/cloud/peer/inbox", Query: query}
 	}})
-	register(op{name: "peer-outbox", read: true, decode: func(b body) (plan, bool) {
-		if !b.has("type", "session", "request", "target_request") {
-			return plan{}, false
-		}
-		p, ok := machinePlan(b)
-		id, idOK := b.nonEmpty("target_request")
-		if !ok || !idOK || len(id) > 128 {
-			return plan{}, false
-		}
-		p.id = id
-		return p, true
-	}, route: func(p plan) LocalRequest {
-		return LocalRequest{Method: "GET", Path: "/v1/cloud/peer/outbox/" + segment(p.id)}
-	}})
+	register(op{name: "peer-outbox", read: true})
 }

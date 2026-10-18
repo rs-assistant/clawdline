@@ -34,8 +34,8 @@ Swift app 已於 2026-09-19 退役：它被停掉、取消了登入時啟動，p
 4. **換了一扇門。** Port 7727（或 `CLAWDLINE_NEXT_PORT`），狀態放在 `~/.config/clawdline-next`
    （或 `CLAWDLINE_NEXT_DIR`）。絕對不要讀 `~/.config/clawdline`：那裡的 token 不是這個 daemon 的，
    會被 `401 unauthorized` 拒絕。
-5. **Swift app 有、這個 daemon 沒有的東西：** durable report 升級（回
-   `501 durable_report_promotion_unsupported`）、coordinator succession（回
+5. **Swift app 有、這個 daemon 沒有的東西：** durable report 升級（沒有這條路由：回
+   `501 not_implemented`）、coordinator succession（回
    `501 succession_unavailable`），以及 brief 欄位 `serialize`、
    `attach_session`（兩個都會被點名拒絕，code 是 `bad_task`）。`reasoning_effort` 有支援：
    `high` 或 `xhigh`，而且只在 `codex` 的 task 上。
@@ -305,11 +305,8 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
   `retry_after` 這類額外欄位放在 `error` 裡面。
 - `{"error":"<code>","detail":"…"}`——找不到路由、HTTP method 錯誤，以及部分讀取用這種。
 
-不歸這個 daemon 管的路由會回 `501 not_implemented`，而且拒絕訊息會說出那條路由的名字——
-一般機器上就是這個答案。只有在有人刻意用 `CLAWDLINE_NEXT_UPSTREAM_PORT` 在它後面擺了另一個
-daemon 時才會轉送出去，轉不到則回 `502 upstream_unreachable`，並說出打不通的位址。兩種都不是
-這個 daemon 給的答案。2026-09-19 之前轉送是預設開著、且指向 7717 的 Swift app，所以當時寫的筆記
-會說沒接管的路由會跑到那個 app——現在不會。
+不歸這個 daemon 管的路由會回 `501 not_implemented`，而且拒絕訊息會說出那條路由的名字；
+不會轉送給其他 daemon。
 
 ### 設定 Project 在 Clawdline 裡的顯示
 
@@ -817,8 +814,8 @@ POST /v1/orchestrator/tasks/<id>/landing
 
 `clawdline landings --work-id <item id>`（`GET /v1/orchestrator/landings?work_id=<item id>`）則是一個
 看板項目所有**已記錄**的 landing：`{"work_id", "landings": [...], "at"}`，每一列帶 `id` 和 `source`——
-`task`（綁定 child 的 landed 或 incorporated 記錄，id 就是 task id）、`root`（`item phase deploying
---commit` 寫下的記錄）或 `phase_event`（舊版 daemon 留在項目歷史裡的副本）。讀不到記錄的綁定 task 會是一列
+`task`（綁定 child 的 landed 或 incorporated 記錄，id 就是 task id）或 `root`（`item phase deploying
+--commit` 寫下的記錄，或舊版 daemon 留在項目歷史裡、已由 store 補成一列的副本）。讀不到記錄的綁定 task 會是一列
 `state: "unknown"`，不會被省略。項目讀取帶的 `landings` 就是同樣這些列。項目不存在時回
 `404 work_not_found`。
 
@@ -1141,6 +1138,18 @@ echo "Clean up the release notes before the next release." | \
 
 絕對不要主動建立看板項目，也不要一次建好幾個來規劃推測性的工作。
 
+**取消使用者要求移除的看板項目。** 使用者透過 Clawdline 傳來的訊息必須明確指出項目，並要求移除或取消。
+先讀取項目並確認 ID；不要把計畫變更或無關訊息當成取消授權。使用
+`clawdline item cancel <item id> --reason "使用者要求移除的原因"`。
+
+`item cancel` 預設讀取此對話最新的 run 和項目目前的版本；也可用 `--run` 或
+`--expected-version` 明確指定。它附上 Idempotency-Key，呼叫
+`POST /v1/work/v2/agent/items/<id>/cancel`，body 為
+`{"session_id", "via":{"run"}, "expected_version", "reason"}`。項目會離開進行中的看板和
+Session 清單，但取消紀錄與原因仍保留在稽核紀錄中。沒有 run、run 已過期、run 屬於其他 Session、
+版本過期、項目已結束，或沒有原因時，什麼都不改。使用者也能直接在看板取消項目。
+絕對不要自行決定取消。
+
 **認領使用者指給你的看板項目。** 使用者透過 Clawdline 傳來的訊息要你接下看板上某個已經存在的項目——
 「把 release notes 那個項目接走」「認領 <item id>」——就認領它，一條指令：
 
@@ -1154,7 +1163,8 @@ clawdline item claim <item id>
   而且只會把項目指派給**你，也就是那則訊息送達的 Session**——裡面沒有任何欄位能指名別的 Session 或
   terminal。
 - 之後這個項目看起來就跟使用者從看板把它指派給你一模一樣：你是 owner，phase 變成 `assigned`，原本沒有
-  steps 的話會從 description 的清單補上。不會有任何字打進你的 terminal。照任何已指派項目的做法做（見下文）。
+  steps 的話會從 description 的清單補上——用 `--kind` 認領的 Plan 例外：它的 description 是分析，
+  不會補上任何 step，請你自己用 `clawdline item step-add` 加。不會有任何字打進你的 terminal。照任何已指派項目的做法做（見下文）。
 - 使用者會看到卡片上寫著「Session 依你 HH:MM 的訊息認領」，並引用他的原話。
 - 拒絕，每一種都什麼都不寫：`run_unknown`、`run_expired`、`run_other_session`、`session_not_found`、
   `child_session`（同 `item add`）；`work_not_found`；`project_mismatch`（項目在你沒在工作的 Project）；
@@ -1423,7 +1433,7 @@ POST /v1/work/v2/agent/items/<id>/finish    (Idempotency-Key required)
   `implementing` 之前）。
 
 已指派的項目可能帶有 `steps`。成功指派時，description 裡兩個以上的頂層 Markdown 列點可以自動成為
-steps，用 `clawdline item add` 建立的項目則帶著它的 `--step`；每一列都是父項目清單上的一個 step，不是另一張看板項目。確認完成一列後，用
+steps（曾經是 Plan 的項目不會），用 `clawdline item add` 建立的項目則帶著它的 `--step`；每一列都是父項目清單上的一個 step，不是另一張看板項目。確認完成一列後，用
 `clawdline item step-done <item id> <step id>` 勾掉；它送出
 `POST /v1/work/v2/agent/items/<item-id>/steps/<step-id>/complete` 與 `{"session_id"}`。Agent 路由上的
 `expected_version` 可省略：省略時寫入作用在當下的版本；有帶（`--expected-version`）就會比對，過期的版本回 `version_conflict`。

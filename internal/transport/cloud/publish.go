@@ -46,12 +46,11 @@ import (
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
-// The inventory marker's literal session id and the bound on how many ids it
-// may carry, `CloudAppBridge.swift:1373-1374`. A page holds this same literal
-// (`cloud-client.js`), so it is spelled here exactly once.
+// The inventory marker's session id and id bound, named here as well because
+// this package already spells them so. They are domaincloud's, not copies.
 const (
-	InventorySessionID = "__clawdline_inventory_v1__"
-	InventoryLimit     = 512
+	InventorySessionID = domaincloud.InventorySessionID
+	InventoryLimit     = domaincloud.InventoryLimit
 )
 
 // SnapshotInterval is how often the publisher looks. The Swift bridge publishes
@@ -64,13 +63,13 @@ const SnapshotInterval = 5 * time.Second
 // FeatureWords is `CloudAppBridge.swift:1436`'s `cloudFeatures`: the words a
 // newer machine answers that an older one does not. A page sends such a word only
 // to a machine that listed it.
-var FeatureWords = []string{"sessions.snapshot", "sessions.snapshot.initial", "sessions.row", "board.items"}
+var FeatureWords = []string{"sessions.snapshot", "sessions.snapshot.initial", "sessions.row"}
 
 // Features is the subset of those this daemon can actually answer.
 //
 // It is **computed, not copied**, which is what keeps it true as the catalog
-// moves: `sessions.snapshot` is answered by this publisher (Snapshot) and
-// `board.items` is routed, so today this list is both. Advertising a word this daemon
+// moves: `sessions.snapshot` is answered by this publisher (Snapshot), so
+// today this list is all of them. Advertising a word this daemon
 // refuses would buy a refusal per tap rather than a feature — and worse than a
 // refusal, because a page that has been told a machine implements a word and
 // is then refused records it as a fault rather than as an absence.
@@ -174,6 +173,12 @@ type Publisher struct {
 	// be skipped against whatever the relay still retains under it. It is the
 	// inventory's own set and so bounded by InventoryLimit.
 	statusRows map[string]bool
+	// statusPass is the pass id the ss/ marker of the current pass stated, or
+	// empty when this pass stated none (a partial reading, a refused row). A
+	// re-statement answers with it, so a viewer whose held marker already
+	// names that id knows its list is confirmed without waiting for a pass id
+	// that only a changed set would produce (statusGeneration).
+	statusPass string
 
 	// listed is the sessions a viewer holds rows for, which decides whether a
 	// finished task is still reachable (tasklist.go).
@@ -194,6 +199,16 @@ type Publisher struct {
 	// taskListed is the set the kept rows were last projected over, so a pass
 	// whose listed sessions are unchanged does not reproject them either.
 	taskListed map[string]bool
+	// taskRoots is each task's root tab as last resolved against a listed
+	// row (resolveTaskRoots), by task id, and taskRootsProjected the roots
+	// the kept projection carries. Both name only tasks in taskRows, so they
+	// are bounded by the task list's own read.
+	taskRoots          map[string]string
+	taskRootsProjected map[string]string
+	// childCauses is why each listed child's parent could not be resolved, as
+	// last logged, by child terminal: the log says it when it changes rather
+	// than every pass. It names only listed rows, so InventoryLimit bounds it.
+	childCauses map[string]string
 	// What the task list's reads have cost, for the capacity register's
 	// `cloud.task_list_reread_seconds` row: when the route was last asked
 	// (Unix seconds; zero is never), how many times it has been asked and how
@@ -222,6 +237,24 @@ type Publisher struct {
 	// restate is set when a device that is not in the audience has been heard
 	// from, and cleared by the pass that re-states everything for it.
 	restate bool
+	// viewerAt is the newest evidence that a viewer is connected: a viewer
+	// heard from (Seen) or a status publication the relay fanned out to at
+	// least one socket (Acked). emptyAt is the newest status publication the
+	// relay fanned out to nobody. A pass made while emptyAt is the newer of
+	// the two builds no Session list and sends no row (Watched); both are
+	// zero on a new socket, which counts as watched until the first pass's
+	// receipts say otherwise.
+	viewerAt, emptyAt time.Time
+	// unwatched is what the last pass decided, so the log says it once per
+	// change rather than every pass. The publisher goroutine's.
+	unwatched bool
+	// probedAt is the last full pass made while unwatched. A fan-out of zero
+	// can be the relay's mistake — it answers zero while its revocation
+	// authority is not durable, with a phone still connected — so an
+	// unwatched machine still makes a full pass every UnwatchedProbe: a
+	// connected viewer's rows are then at most that stale, not a heartbeat's,
+	// and its delivered acks reopen the gate. The publisher goroutine's.
+	probedAt time.Time
 
 	// inventoried is the last inventory this publisher stated, by id, with
 	// enough of each row to decide later which source would have seen it
@@ -304,6 +337,10 @@ type inventoriedRow struct {
 // viewer's staleness threshold is 300.
 const Heartbeat = 240 * time.Second
 
+// UnwatchedProbe is how often a machine that believes nobody watches still
+// makes a full pass (Publisher.probedAt).
+const UnwatchedProbe = 30 * time.Second
+
 // freshnessOnlySessionRowFields are the row paths that move with every reading
 // of this machine whether or not the row's content moved
 // (`CloudAppBridge.swift:1418-1422`). They are removed before a row is
@@ -362,6 +399,7 @@ func (p *Publisher) Run(ctx context.Context) error {
 	// everything anyway, and the audience starts empty rather than carrying a
 	// belief about who holds what across a line that went down.
 	p.forgetAudience()
+	p.unwatched = false
 	ticker := time.NewTicker(every)
 	defer ticker.Stop()
 	// The first pass states everything anyway, so it answers anybody who
@@ -380,7 +418,7 @@ func (p *Publisher) Run(ctx context.Context) error {
 				p.restatePass(ctx)
 				continue
 			}
-			p.pass(ctx)
+			p.tick(ctx)
 		case <-settle:
 			p.pressedAt = p.now()
 			stopSettling()
@@ -511,7 +549,8 @@ func (p *Publisher) restatePass(ctx context.Context) {
 	p.steady = map[string][32]byte{}
 	p.unsent = 0
 	inventory, reading, ok := p.pass(ctx)
-	result := snapshotResult{stated: cloudops.SessionsStated{IDs: inventory, Complete: ok && reading.whole()}}
+	result := snapshotResult{stated: cloudops.SessionsStated{IDs: inventory, Complete: ok && reading.whole(),
+		Generation: p.statusPass}}
 	if ok && p.unsent > 0 {
 		// A row that did not leave would be named and never arrive; the page
 		// retries a busy answer once, five seconds on.
@@ -723,8 +762,67 @@ func (p *Publisher) windowLeft() time.Duration {
 	return every - p.now().Sub(stated)
 }
 
-// Pass publishes one round, for a caller that drives the clock itself.
-func (p *Publisher) Pass(ctx context.Context) { _, _, _ = p.pass(ctx) }
+// Pass publishes one round, for a caller that drives the clock itself. It is
+// the round Run's ticker makes.
+func (p *Publisher) Pass(ctx context.Context) { p.tick(ctx) }
+
+// tick is one round of Run's clock. While nobody watches (Watched) it states
+// only the descriptor: its heartbeat is what a viewer arriving later needs
+// first, and the rows that viewer needs come from the `sessions.snapshot`
+// it asks on connecting (`relay-reader.ts`), which restatePass answers with
+// a list built then. Measured on 2026-10-17: 409 publications
+// in ten minutes, every one fanned out to nobody, and with no local console
+// open each pass built the whole list (about 90 ms of CPU) to send them.
+func (p *Publisher) tick(ctx context.Context) {
+	if p.Watched() {
+		if p.unwatched {
+			p.unwatched = false
+			p.logf("cloud: a viewer is connected; Session rows are published again")
+		}
+		_, _, _ = p.pass(ctx)
+		return
+	}
+	if !p.unwatched {
+		p.unwatched = true
+		p.probedAt = p.now()
+		p.logf("cloud: no viewer is connected; Session rows wait until one is, and the descriptor keeps its heartbeat")
+	}
+	if p.now().Sub(p.probedAt) >= UnwatchedProbe {
+		p.probedAt = p.now()
+		_, _, _ = p.pass(ctx)
+		return
+	}
+	p.unsent = 0
+	p.refreshTasks(ctx, nil)
+	p.publishDescriptor(ctx)
+}
+
+// Watched answers whether a viewer may be connected: nothing since this
+// socket came up says otherwise, or the newest evidence of a viewer is no
+// older than the newest status publication that reached nobody.
+func (p *Publisher) Watched() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.restate || p.emptyAt.IsZero() || !p.emptyAt.After(p.viewerAt)
+}
+
+// Acked is the relay's receipt for one publication on ch, with how many
+// sockets it was fanned out to. Only the status channels count: ss/ and
+// orch/ reach every viewer socket that reads Sessions without a
+// subscription, so a fan-out of zero there is nobody connected, where on s/
+// it is only nobody subscribed. Called on the transport's read loop.
+func (p *Publisher) Acked(ch string, fanout int) {
+	if !strings.HasPrefix(ch, "ss/") && !strings.HasPrefix(ch, "orch/") {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if fanout > 0 {
+		p.viewerAt = p.now()
+	} else {
+		p.emptyAt = p.now()
+	}
+}
 
 // The sessions are read before the descriptor goes out and published after it:
 // which finished tasks the descriptor's task list carries depends on which
@@ -734,6 +832,7 @@ func (p *Publisher) Pass(ctx context.Context) { _, _, _ = p.pass(ctx) }
 // this machine's own list could not be read and nothing about Sessions went out.
 func (p *Publisher) pass(ctx context.Context) ([]string, sessionReading, bool) {
 	p.unsent = 0
+	p.statusPass = ""
 	if p.takeRestate() {
 		// A viewer this machine has not stated its channels to is out there.
 		// What it holds is not this machine's to guess, so the skip's memory
@@ -755,7 +854,14 @@ func (p *Publisher) pass(ctx context.Context) ([]string, sessionReading, bool) {
 		// past its bound, in which case the viewer keeps every row it had.
 		p.noteListed(inventory, len(inventory) <= InventoryLimit)
 	}
-	p.refreshTasks(ctx)
+	// Roots are resolved against a whole reading only: a partial one did not
+	// reach every row the viewer keeps, so a root it does not list has not
+	// closed (resolveTaskRoots).
+	var rows map[string]map[string]any
+	if ok && reading.whole() {
+		rows = sessionRowsByID(reading.sessions)
+	}
+	p.refreshTasks(ctx, rows)
 	p.publishDescriptor(ctx)
 	if ok {
 		p.publishSessions(ctx, reading, inventory)
@@ -935,21 +1041,17 @@ func (p *Publisher) readProduct(ctx context.Context) ([]byte, bool) {
 }
 
 // owningSource names the source that would have seen this row again, which is
-// the only source whose silence means anything about it.
+// the only source whose silence means anything about it (session.OwningSource,
+// read off the row's wire id, backend and tty).
 //
-// The three are told apart the way the reading itself makes them: a tmux pane
-// id is spelled `%<n>` and nothing else is; an iTerm2 row carries that
-// backend and a GUID of its own; and a row whose id *is* its tty is the
-// degraded one the process table produced when the terminal could not be
-// asked, so the process table is what owns it.
+// A row no single source speaks for (a pty this daemon opened) is put to the
+// process table here, which lists every assistant's terminal, rather than to
+// the whole reading: inventoryIDs has already handled a whole reading.
 func owningSource(id string, row inventoriedRow) string {
-	if strings.HasPrefix(id, "%") {
-		return "tmux"
+	if source := session.OwningSource(session.Session{ID: id, Backend: session.Backend(row.backend), TTY: row.tty}); source != "" {
+		return source
 	}
-	if row.backend == "iterm" && id != row.tty {
-		return "iterm"
-	}
-	return "ps"
+	return session.ProcessSource
 }
 
 // publishSessions puts this machine's sessions in the viewer's list. The ids
@@ -1353,6 +1455,7 @@ func (p *Publisher) Seen(device string) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.viewerAt = p.now()
 	if p.audience[device] {
 		return
 	}
@@ -1380,6 +1483,7 @@ func (p *Publisher) forgetAudience() {
 	defer p.mu.Unlock()
 	p.audience = map[string]bool{}
 	p.restate = false
+	p.viewerAt, p.emptyAt = time.Time{}, time.Time{}
 }
 
 func (p *Publisher) now() time.Time {

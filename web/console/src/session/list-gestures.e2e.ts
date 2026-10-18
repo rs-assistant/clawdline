@@ -463,6 +463,19 @@ function daemon(): Server {
       })
       return
     }
+    if (path === "/v1/snippets/" + workflowID && req.method === "PATCH") {
+      let body = ""
+      req.on("data", (part) => { body += part })
+      req.on("end", () => {
+        workflowRecords = workflowRecords.map((row) => row.id === workflowID ? { ...row, ...JSON.parse(body) } : row)
+        json(res, 200, workflowRecords.find((row) => row.id === workflowID))
+      })
+      return
+    }
+    if (path === "/v1/snippets/" + workflowID && req.method === "DELETE") {
+      workflowRecords = workflowRecords.filter((row) => row.id !== workflowID)
+      return json(res, 200, { ok: true, deleted: workflowID })
+    }
     if (path === "/v1/work/v2/session-todos/" + encodeURIComponent(SAFE) && req.method === "POST") {
       let body = ""
       req.on("data", (part) => { body += part })
@@ -2171,6 +2184,74 @@ test("a phone creates a global Workflow and offers it in a Session", () =>
     assert.equal(workflowRecords.find((record) => record.title === 'Session checklist')?.project, '/tmp/fixture')
   }))
 
+test("a phone can edit and delete a Workflow from its launch review", () =>
+  inTab(async (tab) => {
+    workflowRecords = [{ id: workflowID, title: "Daily check", body: "Check status.", scope: "workflow",
+      project: "/tmp/fixture", position: 100, created_at: 1, updated_at: 1 }]
+    await tab.go("/#session=" + encodeURIComponent(SAFE))
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => {
+        const button = document.querySelector('#detail-snippets')
+        return button && !button.disabled ? resolve(true)
+        : Date.now() > deadline ? reject(new Error('Session did not open')) : setTimeout(look, 25)
+      }
+      look()
+    })`)
+    await tab.press("#detail-snippets")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => document.querySelector('#workflow-tab') ? resolve(true)
+        : Date.now() > deadline ? reject(new Error('Workflow tab did not open')) : setTimeout(look, 25)
+      look()
+    })`)
+    await tab.press("#workflow-tab")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => document.querySelector('.workflow-picker-row') ? resolve(true)
+        : Date.now() > deadline ? reject(new Error('Workflow did not load')) : setTimeout(look, 25)
+      look()
+    })`)
+    await tab.press(".workflow-picker-row")
+    await tab.shot("workflow-review-actions-phone")
+    assert.deepEqual(await tab.run(`[...document.querySelectorAll('.workflow-detail-actions button')].map((button) => ({
+      name: button.getAttribute('aria-label'), icon: button.querySelector('.work-icon') !== null,
+      text: button.textContent.trim()
+    }))`), [
+      { name: "編輯", icon: true, text: "" }, { name: "刪除", icon: true, text: "" },
+    ])
+    await tab.press(".workflow-detail-actions button:first-child")
+    await tab.shot("workflow-editor-voice-phone")
+    assert.equal(await tab.run(`document.querySelector('#workflow-quick-name')?.value`), "Daily check")
+    assert.equal(await tab.run(`document.querySelector('#workflow-quick-message')?.value`), "Check status.")
+    assert.equal(await tab.run(`document.querySelector('.workflow-quick-message .work-voice-box .work-voice-mic')?.getAttribute('aria-label')`), "用說的寫一則訊息")
+    assert.equal(await tab.run(`document.querySelector('.workflow-quick-message .work-voice-row')?.hidden`), true)
+    assert.equal(await tab.run(`document.querySelector('#workflow-quick-editor .block .row') === null`), true)
+    await tab.run(`(() => {
+      const field = document.querySelector('#workflow-quick-message')
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(field, 'Check every status.')
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+    })()`)
+    await tab.press("#workflow-quick-editor .confirm-go")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => !document.querySelector('#workflow-quick-editor') ? resolve(true)
+        : Date.now() > deadline ? reject(new Error('Workflow editor stayed open')) : setTimeout(look, 25)
+      look()
+    })`)
+    assert.equal(workflowRecords[0]?.body, "Check every status.")
+    assert.match(await tab.run(`document.querySelector('.workflow-launch p')?.textContent`), /Check every status/)
+    await tab.run(`window.confirm = () => true`)
+    await tab.press(".workflow-detail-actions .workflow-delete")
+    await tab.run(`new Promise((resolve, reject) => {
+      const deadline = Date.now() + 8000
+      const look = () => !document.querySelector('.workflow-detail-actions') ? resolve(true)
+        : Date.now() > deadline ? reject(new Error('Workflow review stayed open')) : setTimeout(look, 25)
+      look()
+    })`)
+    assert.equal(workflowRecords.length, 0)
+  }))
+
 test("the Global Workflow list survives unavailable Project files and an empty Project inventory", () =>
   inTab(async (tab) => {
     workflowFilesUnavailable = true
@@ -2994,6 +3075,28 @@ test("rows travel to a changed sorted position instead of snapping there", () =>
   }))
 
 // ---- the swipe
+
+test("a closed short row reserves horizontal swipes before the finger lands", () =>
+  inTab(async (tab) => {
+    readingScenario = "unstarted-codex"
+    try {
+      await tab.go("/")
+      await tab.until("the short row arrives", (s) => s.order.join() === SAFE)
+      const row = await tab.run(`(() => {
+        const el = document.querySelector('#rows > li.row[data-id="${SAFE}"]')
+        return el && {
+          actions: el.querySelectorAll(".swipe-archive, .swipe-end").length,
+          state: el.dataset.swipe ?? "",
+          touchAction: getComputedStyle(el).touchAction,
+        }
+      })()`)
+      assert.deepEqual(row, { actions: 1, state: "", touchAction: "pan-y" })
+      const open = await swipeOpen(tab, SAFE)
+      assert.equal(open.swipeX, "-126px")
+    } finally {
+      readingScenario = "normal"
+    }
+  }))
 
 /** A left swipe on one row, finished. */
 async function swipeOpen(tab: Tab, id: string): Promise<Seen> {

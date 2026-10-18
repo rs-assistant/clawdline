@@ -981,8 +981,6 @@ async function deviceTab(device: { token: string }, phone = false): Promise<Tab>
   return tab
 }
 
-const grantOf = async (id: string) => (await api("/v1/auth/devices")).devices.find((d: { id: string }) => d.id === id)?.terminal === true
-
 test("a paired browser can open a terminal without a separate grant", { skip }, async () => {
   const device = await pairedDevice()
   const made = await api("/v1/terminals", { method: "POST", body: JSON.stringify({ project_id: project, cols: 80, rows: 24 }) })
@@ -1020,7 +1018,6 @@ test("device cards show terminal access for every pairing without a separate swi
   assert.match(await tab.run(`document.querySelector(${JSON.stringify(card(first.id) + " .device-facts span")}).textContent`), /可開 shell/)
   assert.match(await tab.run(`document.querySelector(${JSON.stringify(card(second.id) + " .device-facts span")}).textContent`), /可開 shell/)
   assert.equal(await tab.run(`document.querySelectorAll(".terminal-grant").length`), 0)
-  assert.equal(await grantOf(first.id), false, "a paired device was not separately granted")
   await tab.shot("20-devices-default-terminal")
   await api(`/v1/auth/devices/${first.id}/revoke`, { method: "POST", body: "{}" }).catch(() => {})
   await api(`/v1/auth/devices/${second.id}/revoke`, { method: "POST", body: "{}" }).catch(() => {})

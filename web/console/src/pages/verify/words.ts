@@ -3,7 +3,7 @@
  *
  * The Swift app never had this page, so its catalog has no words for it. They
  * live here beside the page, as the board's do, and the
- * copied `public/strings/zh-Hant.json` stays byte for byte. Where the catalog
+ * copied `public/strings/zh-Hant.json` is not extended. Where the catalog
  * already has the word — "載入中" — the page reads the catalog, not this.
  *
  * Holes are `{name}`, as the catalog's are.

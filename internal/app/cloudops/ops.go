@@ -3,9 +3,6 @@ package cloudops
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/sainteye/clawdline/internal/adapters/projectfiles"
-	"github.com/sainteye/clawdline/internal/domain/session"
-	"github.com/sainteye/clawdline/internal/domain/squad"
 	"regexp"
 	"sort"
 	"strings"
@@ -83,11 +80,6 @@ func (b body) integer(key string) (int64, bool) {
 	}
 	v, err := n.Int64()
 	return v, err == nil
-}
-
-func (b body) boolean(key string) (bool, bool) {
-	v, ok := b[key].(bool)
-	return v, ok
 }
 
 // object keeps a sub-document as the bytes it will travel as, because the
@@ -216,33 +208,26 @@ type plan struct {
 	// check. Empty is the older unpinned read shape.
 	executionGeneration string
 
-	id, scope, task, path             string
-	place, past, assistant, model     string
-	parts, priority, text, key, audio string
+	// The rest are what a hand-written decoder hands its route (start,
+	// resume, dispatch, document, the peer words, push-subscribe, the
+	// webhook binder), and the few values a generated decoder carries
+	// `into` the plan for the answer side: a picture's id, an info read's
+	// parts, a menu answer's key, its question and whether it names typed
+	// words, a viewer event batch.
+	id, scope, task, path         string
+	place, past, assistant, model string
+	parts, key                    string
 	// expect is a menu answer's question, session.MenuFingerprint's hex.
 	expect string
 	// persona is the catalog id a start or a resume names, or "" for none.
 	persona string
-	// typed is the end of the words an `enter` submits, and namesTyped whether
-	// the body named them at all: a send of pictures alone names "".
-	typed                          string
-	namesTyped                     bool
-	project, item, audience, entry string
-	status, query                  string
-	// until is the work samples' end, a Unix time; query holds their since.
-	until                         string
-	environment, category, cursor string
-	// kind is a digest's daily-or-weekly, named rather than folded into `id`.
-	kind   string
-	images []string
-	// conversations is a restore's or a dismissal's list; allConversations
-	// is a dismissal that named none, which means every one on offer.
-	conversations                                  []string
-	allConversations                               bool
-	upcoming, acceptLoss, force, fresh             bool
-	closeability                                   string
-	rate, limit, byteWindow, offset, after, before int64
-	document                                       []byte
+	// namesTyped is whether a menu answer named the words an `enter` submits
+	// (`typed`) at all; the words themselves travel in the local request.
+	namesTyped bool
+	document   []byte
+	// local is the request a generated decoder built, which the op's route
+	// hands on (routeLocal).
+	local LocalRequest
 }
 
 // op is one word of the vocabulary.
@@ -290,168 +275,21 @@ type op struct {
 	divergence string
 }
 
-// someOf is the query a route is given: the pairs whose value is not empty.
-//
-// It is not tidiness. The routes under `/v1/work/` refuse a query field that
-// is present and empty by name (`workQuery`, "Unknown or repeated query field
-// project.")
-// and an empty one as a bad one. So "the viewer did not say" has to reach
-// these routes as silence, which is what a browser on this machine's own
-// network already sends (`URLSearchParams` is only given what was chosen).
-func someOf(pairs map[string]string) map[string]string {
-	out := map[string]string{}
-	for key, value := range pairs {
-		if value != "" {
-			out[key] = value
-		}
-	}
-	return out
-}
-
-// decodeProject is the body of the Project worktree lifecycle read: one
-// bounded, non-empty Project. It is spelled into the path, where an empty
-// segment is a different route, so malformed input is refused here before the
-// local router is reached.
-func decodeProject(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "project") {
-		return plan{}, false
-	}
-	p, ok := machinePlan(b)
-	if !ok {
-		return plan{}, false
-	}
-	project, ok := b.nonEmpty("project")
-	if !ok || len(project) > 200 {
-		return plan{}, false
-	}
-	p.project = project
-	return p, true
-}
-
-// decodeProjectRefresh is the command-shaped sibling of decodeProject. A
-// refresh changes the machine's cached observation, so it uses an action reply
-// and is subject to the remote-write gate.
-func decodeProjectRefresh(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "project") {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	if !ok {
-		return plan{}, false
-	}
-	project, ok := b.nonEmpty("project")
-	if !ok || len(project) > 200 {
-		return plan{}, false
-	}
-	p.project = project
-	return p, true
-}
-
-func projectFileID(b body) (string, bool) {
-	id, ok := b.nonEmpty("file")
-	if !ok || len(id) != 32 {
-		return "", false
-	}
-	for _, c := range id {
-		if c < '0' || c > '9' && c < 'a' || c > 'f' {
-			return "", false
-		}
-	}
-	return id, true
-}
-
-func decodeProjectFileList(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "project") {
-		return plan{}, false
-	}
-	p, ok := machinePlan(b)
-	project, projectOK := b.nonEmpty("project")
-	if !ok || !projectOK || len(project) > 200 {
-		return plan{}, false
-	}
-	p.project = project
-	return p, true
-}
-
-func decodeProjectFileRead(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "project", "file") {
-		return plan{}, false
-	}
-	p, ok := machinePlan(b)
-	project, projectOK := b.nonEmpty("project")
-	file, fileOK := projectFileID(b)
-	if !ok || !projectOK || len(project) > 200 || !fileOK {
-		return plan{}, false
-	}
-	p.project, p.id = project, file
-	return p, true
-}
-
-func decodeProjectTreeList(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "project", "directory") {
-		return plan{}, false
-	}
-	p, ok := machinePlan(b)
-	project, projectOK := b.nonEmpty("project")
-	directory, pathOK := b.str("directory")
-	_, valid := projectfiles.TreePath(directory, false)
-	if !ok || !projectOK || len(project) > 200 || !pathOK || valid != nil {
-		return plan{}, false
-	}
-	p.project, p.path = project, directory
-	return p, true
-}
-
-func decodeProjectTreeRead(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "project", "path") {
-		return plan{}, false
-	}
-	p, ok := machinePlan(b)
-	project, projectOK := b.nonEmpty("project")
-	path, pathOK := b.nonEmpty("path")
-	_, valid := projectfiles.TreePath(path, true)
-	if !ok || !projectOK || len(project) > 200 || !pathOK || valid != nil {
-		return plan{}, false
-	}
-	p.project, p.path = project, path
-	return p, true
-}
-
-func decodeProjectFileSave(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "project", "file", "item") {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	project, projectOK := b.nonEmpty("project")
-	file, fileOK := projectFileID(b)
-	document, documentOK := b.object("item", projectfiles.MaxWriteBytes)
-	if !ok || p.request == "" || !projectOK || len(project) > 200 || !fileOK || !documentOK {
-		return plan{}, false
-	}
-	p.project, p.id, p.document = project, file, document
-	return p, true
-}
-
-// decodeProjectUnifyApply carries only the plan version the person read; the
-// machine recomputes the plan and refuses plan_changed when disk moved on.
-func decodeProjectUnifyApply(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "project", "item") {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	project, projectOK := b.nonEmpty("project")
-	document, documentOK := b.object("item", 4<<10)
-	if !ok || p.request == "" || !projectOK || len(project) > 200 || !documentOK {
-		return plan{}, false
-	}
-	p.project, p.document = project, document
-	return p, true
-}
-
 var catalog = map[string]op{}
 
+// register adds words to the catalog. A word the vocabulary table states the
+// decoder of is given that generated decoder and its route here, and must
+// not bring its own: one word, one decoder.
 func register(ops ...op) {
 	for _, o := range ops {
+		if _, generated := generatedDecoders[o.name]; generated {
+			if o.decode != nil || o.route != nil {
+				panic("cloudops: " + o.name + " has a generated decoder and registers its own")
+			}
+			o = withGeneratedDecoder(o)
+		} else if o.decode == nil {
+			panic("cloudops: " + o.name + " has no decoder")
+		}
 		catalog[o.name] = o
 	}
 }
@@ -536,57 +374,6 @@ func machinePlan(b body) (plan, bool) {
 	return plan{session: id, request: request, name: "read:" + request}, true
 }
 
-func squadCloudScopePlan(b body) (plan, bool) {
-	if !b.hasOneOf(
-		[]string{"type", "session", "request"},
-		[]string{"type", "session", "request", "place_id"},
-		[]string{"type", "session", "request", "scope_id"}) {
-		return plan{}, false
-	}
-	p, ok := machinePlan(b)
-	if !ok {
-		return plan{}, false
-	}
-	if v, exists := b["place_id"]; exists {
-		p.place, ok = v.(string)
-		if !ok || p.place == "" || len(p.place) > 256 || !printable(p.place) {
-			return plan{}, false
-		}
-	}
-	if v, exists := b["scope_id"]; exists {
-		p.scope, ok = v.(string)
-		if !ok || p.scope == "" || len(p.scope) > 256 || !printable(p.scope) {
-			return plan{}, false
-		}
-	}
-	return p, true
-}
-
-func squadCloudQuery(p plan) map[string]string {
-	out := map[string]string{}
-	if p.place != "" {
-		out["place_id"] = p.place
-	}
-	if p.scope != "" {
-		out["scope_id"] = p.scope
-	}
-	return out
-}
-
-func squadCloudWritePlan(field string) func(body) (plan, bool) {
-	return func(b body) (plan, bool) {
-		if !b.has("type", "session", "request", field) {
-			return plan{}, false
-		}
-		p, ok := actionPlan(b, false)
-		if !ok || p.request == "" {
-			return plan{}, false
-		}
-		p.document, ok = b.object(field, squad.MaxSquadRequestBytes)
-		return p, ok
-	}
-}
-
 // personaName is a start's or a resume's optional `persona`: absent is none,
 // and present it is a non-empty, bounded, printable name, held to the same
 // shape as a session name before it becomes a path segment. Whether the catalog
@@ -598,25 +385,6 @@ func personaName(b body) (string, bool) {
 		return "", true
 	}
 	return sessionName(value)
-}
-
-// conversationList is a list of conversation ids: each one a printable,
-// bounded name. How many one request may carry is the route's to refuse
-// (sessions.restore_batch), not this bridge's.
-func conversationList(value any) ([]string, bool) {
-	raw, ok := value.([]any)
-	if !ok {
-		return nil, false
-	}
-	out := make([]string, 0, len(raw))
-	for _, item := range raw {
-		id, ok := sessionName(item)
-		if !ok {
-			return nil, false
-		}
-		out = append(out, id)
-	}
-	return out, true
 }
 
 // actionPlan is a command's answer channel: `action:<request>`, on the
@@ -651,23 +419,6 @@ func actionPlan(b body, sessionScoped bool) (plan, bool) {
 	}
 	p.request = request
 	p.name = "action:" + request
-	return p, true
-}
-
-// pinnedActionPlan keeps legacy focus and smart naming requests unchanged,
-// while allowing a fleet viewer to bind them to the selected execution.
-func pinnedActionPlan(b body) (plan, bool) {
-	p, ok := actionPlan(b, true)
-	if !ok {
-		return plan{}, false
-	}
-	if raw, named := b["execution_generation"]; named {
-		generation, valid := executionGeneration(raw)
-		if !valid {
-			return plan{}, false
-		}
-		p.executionGeneration = generation
-	}
 	return p, true
 }
 
@@ -844,270 +595,6 @@ const (
 // to by the router (the idempotency key), so two routes must not share a map.
 func asDevice() map[string]string { return map[string]string{actorHeader: actorDevice} }
 
-func decodeWorkV2Document(field string) func(body) (plan, bool) {
-	return func(b body) (plan, bool) {
-		if !b.has("type", "session", "request", field) {
-			return plan{}, false
-		}
-		p, ok := actionPlan(b, false)
-		document, documentOK := b.object(field, workV2CloudBodyLimit)
-		if !ok || p.request == "" || !documentOK {
-			return plan{}, false
-		}
-		p.document = document
-		return p, true
-	}
-}
-
-func decodeWorkV2NamedDocument(idField, documentField string) func(body) (plan, bool) {
-	return func(b body) (plan, bool) {
-		if !b.has("type", "session", "request", idField, documentField) {
-			return plan{}, false
-		}
-		p, ok := actionPlan(b, false)
-		id, idOK := b.nonEmpty(idField)
-		document, documentOK := b.object(documentField, workV2CloudBodyLimit)
-		if !ok || p.request == "" || !idOK || len(id) > 256 || !documentOK {
-			return plan{}, false
-		}
-		p.id, p.document = id, document
-		return p, true
-	}
-}
-
-func decodeWorkV2NamedImageDocument(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "id", "item") {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	id, idOK := b.nonEmpty("id")
-	document, documentOK := b.object("item", workV2CloudImageBodyLimit)
-	if !ok || p.request == "" || !idOK || len(id) > 256 || !documentOK {
-		return plan{}, false
-	}
-	p.id, p.document = id, document
-	return p, true
-}
-
-func decodeWorkV2ImageDelete(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "id", "image", "item") {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	id, idOK := b.nonEmpty("id")
-	image, imageOK := b.nonEmpty("image")
-	document, documentOK := b.object("item", workV2CloudBodyLimit)
-	if !ok || p.request == "" || !idOK || len(id) > 256 || !imageOK || len(image) > 256 || !documentOK {
-		return plan{}, false
-	}
-	p.id, p.item, p.document = id, image, document
-	return p, true
-}
-
-func decodeWorkV2Action(field string, allowed ...string) func(body) (plan, bool) {
-	return func(b body) (plan, bool) {
-		if !b.has("type", "session", "request", "id", field, "item") {
-			return plan{}, false
-		}
-		p, ok := actionPlan(b, false)
-		id, idOK := b.nonEmpty("id")
-		action, actionOK := b.nonEmpty(field)
-		document, documentOK := b.object("item", workV2CloudBodyLimit)
-		if !ok || p.request == "" || !idOK || len(id) > 256 || !actionOK || !documentOK {
-			return plan{}, false
-		}
-		known := false
-		for _, candidate := range allowed {
-			known = known || action == candidate
-		}
-		if !known {
-			return plan{}, false
-		}
-		p.id, p.kind, p.document = id, action, document
-		return p, true
-	}
-}
-
-func decodeWorkV2TerminalDocument(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "terminal", "item") {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	terminal, terminalOK := b.nonEmpty("terminal")
-	document, documentOK := b.object("item", workV2CloudBodyLimit)
-	if !ok || p.request == "" || !terminalOK || len(terminal) > 256 || !documentOK {
-		return plan{}, false
-	}
-	p.target, p.document = terminal, document
-	return p, true
-}
-
-func decodeWorkV2TodoImageDocument(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "terminal", "id", "item") {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	terminal, terminalOK := b.nonEmpty("terminal")
-	id, idOK := b.nonEmpty("id")
-	document, documentOK := b.object("item", workV2CloudImageBodyLimit)
-	if !ok || p.request == "" || !terminalOK || len(terminal) > 256 || !idOK || len(id) > 256 || !documentOK {
-		return plan{}, false
-	}
-	p.target, p.id, p.document = terminal, id, document
-	return p, true
-}
-
-func decodeWorkV2TodoAction(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "terminal", "id", "action", "item") {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	terminal, terminalOK := b.nonEmpty("terminal")
-	id, idOK := b.nonEmpty("id")
-	action, actionOK := b.nonEmpty("action")
-	document, documentOK := b.object("item", workV2CloudBodyLimit)
-	if !ok || p.request == "" || !terminalOK || len(terminal) > 256 || !idOK || len(id) > 256 ||
-		!actionOK || !documentOK || (action != "send" && action != "complete" && action != "reopen" && action != "delete" && action != "edit") {
-		return plan{}, false
-	}
-	p.target, p.id, p.kind, p.document = terminal, id, action, document
-	return p, true
-}
-
-func decodeWorkV2HumanInterventionAction(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "terminal", "id", "action", "item") {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	conversation, conversationOK := b.nonEmpty("terminal")
-	id, idOK := b.nonEmpty("id")
-	action, actionOK := b.nonEmpty("action")
-	document, documentOK := b.object("item", workV2CloudBodyLimit)
-	if !ok || p.request == "" || !conversationOK || len(conversation) > 256 || !idOK || len(id) > 256 ||
-		!actionOK || !documentOK || (action != "read" && action != "resolve" && action != "reopen" && action != "handoff") {
-		return plan{}, false
-	}
-	p.target, p.id, p.kind, p.document = conversation, id, action, document
-	return p, true
-}
-
-// decodeScheduleWrite is `schedule-create` and `schedule-update`, which differ
-// by one key: the id of the schedule being saved.
-func decodeScheduleWrite(named bool) func(b body) (plan, bool) {
-	want := []string{"type", "session", "request", "schedule"}
-	if named {
-		want = []string{"type", "session", "request", "id", "schedule"}
-	}
-	return func(b body) (plan, bool) {
-		if !b.has(want...) {
-			return plan{}, false
-		}
-		p, ok := actionPlan(b, false)
-		if !ok || p.request == "" {
-			return plan{}, false
-		}
-		if named {
-			id, ok := b.nonEmpty("id")
-			if !ok {
-				return plan{}, false
-			}
-			p.id = id
-		}
-		// The object is carried as the bytes it will travel as. What counts as
-		// a schedule is the route's question, and it answers it with its own
-		// sentence naming the field that is wrong — which is the sentence the
-		// form already shows over this machine's own network.
-		document, ok := b.object("schedule", scheduleMaximumBytes)
-		if !ok {
-			return plan{}, false
-		}
-		p.document = document
-		return p, true
-	}
-}
-
-// decodeSnippetWrite is `snippet-create` and `snippet-update`, which differ by
-// one key: the id of the snippet being saved.
-func decodeSnippetWrite(named bool) func(b body) (plan, bool) {
-	want := []string{"type", "session", "request", "snippet"}
-	if named {
-		want = []string{"type", "session", "request", "id", "snippet"}
-	}
-	return func(b body) (plan, bool) {
-		if !b.has(want...) {
-			return plan{}, false
-		}
-		p, ok := actionPlan(b, false)
-		if !ok || p.request == "" {
-			return plan{}, false
-		}
-		if named {
-			id, ok := b.nonEmpty("id")
-			if !ok {
-				return plan{}, false
-			}
-			p.id = id
-		}
-		// The object travels as the bytes it arrived as. What counts as a
-		// snippet is `internal/domain/snippet`'s question, answered once there
-		// and never here — the sentence a person reads about a title that is
-		// too long is the one the sheet already shows over this machine's own
-		// network.
-		document, ok := b.object("snippet", snippetMaximumBytes)
-		if !ok {
-			return plan{}, false
-		}
-		p.document = document
-		return p, true
-	}
-}
-
-// decodeNamedSchedule is `schedule-delete`: one id, and nothing else to get
-// wrong.
-func decodeNamedSchedule(b body) (plan, bool) {
-	if !b.has("type", "session", "request", "id") {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	if !ok || p.request == "" {
-		return plan{}, false
-	}
-	id, ok := b.nonEmpty("id")
-	if !ok {
-		return plan{}, false
-	}
-	p.id = id
-	return p, true
-}
-
-// decodeScheduleRun accepts the ordinary press and the one explicit retry
-// shape that may override schedule_active. False is not another spelling of
-// the retry: omitting force is the ordinary protected run.
-func decodeScheduleRun(b body) (plan, bool) {
-	if !b.hasOneOf(
-		[]string{"type", "session", "request", "id"},
-		[]string{"type", "session", "request", "id", "force"},
-	) {
-		return plan{}, false
-	}
-	p, ok := actionPlan(b, false)
-	if !ok || p.request == "" {
-		return plan{}, false
-	}
-	id, ok := b.nonEmpty("id")
-	if !ok {
-		return plan{}, false
-	}
-	p.id = id
-	if _, present := b["force"]; present {
-		p.force, ok = b.boolean("force")
-		if !ok || !p.force {
-			return plan{}, false
-		}
-	}
-	return p, true
-}
-
 func scheduleWebhookHookID(value string) bool {
 	if len(value) != 30 || !strings.HasPrefix(value, "swh_") {
 		return false
@@ -1161,47 +648,6 @@ func decodeScheduleWebhookBind(b body) (plan, bool) {
 		request: requestID, document: document}, true
 }
 
-// decodeAnswer is the one case behind two words. The field's name follows the
-// word, which is the only difference between them.
-func decodeAnswer(word string) func(b body) (plan, bool) {
-	field := "answer"
-	if word == "key" {
-		field = "key"
-	}
-	return func(b body) (plan, bool) {
-		if !b.hasOneOf([]string{"type", "session", field},
-			[]string{"type", "session", field, "request"},
-			[]string{"type", "session", field, "request", "expect"},
-			[]string{"type", "session", field, "request", "typed"}) {
-			return plan{}, false
-		}
-		p, ok := actionPlan(b, true)
-		if !ok {
-			return plan{}, false
-		}
-		key, ok := b.str(field)
-		if !ok {
-			return plan{}, false
-		}
-		p.key = key
-		if _, named := b["expect"]; named {
-			expect, ok := b.str("expect")
-			if !ok || !session.ValidFingerprint(expect) {
-				return plan{}, false
-			}
-			p.expect = expect
-		}
-		if _, named := b["typed"]; named {
-			typed, ok := b.str("typed")
-			if !ok {
-				return plan{}, false
-			}
-			p.typed, p.namesTyped = typed, true
-		}
-		return p, true
-	}
-}
-
 // answerNamesItsQuestion refuses a menu answer that does not say which
 // question it was chosen for (F1).
 //
@@ -1228,52 +674,12 @@ func answerNamesItsQuestion(p plan) *Refusal {
 		Message: "This machine answers a menu over Clawdline Cloud only when the answer names the question it was chosen for. Reload the page and answer again.", fixedCopy: true}
 }
 
-// routeAnswer is the menu-answer route, which is not `send`.
-//
-// The Swift app's own comment records why: answering a menu with `/send` sends
-// the wrong option — "Tea" arrived as "Water" — so an answer is one raw key
-// outside any bracketed paste, and the route allows a closed set of them. The
-// question it names travels with it, and the route types nothing at any other.
-func routeAnswer(p plan) LocalRequest {
-	body := map[string]any{"key": p.key}
-	if p.expect != "" {
-		body["expect"] = p.expect
-	}
-	if p.namesTyped {
-		body["typed"] = p.typed
-	}
-	return LocalRequest{Method: "POST", Path: "/v1/sessions/" + segment(p.target) + "/key",
-		Body: jsonBody(body)}
-}
-
 // usageID is `usageID` in internal/transport/http/usage.go, spelled a second
 // time because this package cannot import a transport: letters, digits and
 // `-`, `_`, `.`, starting with a letter or digit, at most 200, and never `..`.
 // A looser copy would ask the route something it refuses as `bad_request`; a
 // stricter one would refuse on a phone an id the machine's own page reads.
 var usageID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$`)
-
-// usageRead is one of the token ledger's three reads: `{type, session,
-// request, id}` on the machine's reply channel, asked as
-// GET /v1/usage/<kind>/<id>.
-func usageRead(word, kind string) op {
-	return op{name: word, read: true,
-		decode: func(b body) (plan, bool) {
-			if !b.has("type", "session", "request", "id") {
-				return plan{}, false
-			}
-			p, ok := machinePlan(b)
-			id, idOK := b.str("id")
-			if !ok || !idOK || !usageID.MatchString(id) || strings.Contains(id, "..") {
-				return plan{}, false
-			}
-			p.id = id
-			return p, true
-		},
-		route: func(p plan) LocalRequest {
-			return LocalRequest{Method: "GET", Path: "/v1/usage/" + kind + "/" + segment(p.id)}
-		}}
-}
 
 // compareSince is the spelling of `since` the comparison route reads
 // (app.ParseCompareSince): `<n>d`, `<n>h` or a Unix time in seconds, spelled
@@ -1297,34 +703,3 @@ const verificationCriteriaMaximum = 12
 // verificationCloudBodyLimit is the largest sub-document a verification word
 // carries: a note of 8000 characters, each up to four bytes, escaped.
 const verificationCloudBodyLimit = 64 << 10
-
-// decodeVerificationWrite is a verification command's body: the record's id
-// when it names one, and the `verification` document the route reads.
-func decodeVerificationWrite(named bool) func(b body) (plan, bool) {
-	want := []string{"type", "session", "request", "verification"}
-	if named {
-		want = []string{"type", "session", "request", "id", "verification"}
-	}
-	return func(b body) (plan, bool) {
-		if !b.has(want...) {
-			return plan{}, false
-		}
-		p, ok := actionPlan(b, false)
-		if !ok || p.request == "" {
-			return plan{}, false
-		}
-		if named {
-			id, ok := b.str("id")
-			if !ok || !verificationID.MatchString(id) {
-				return plan{}, false
-			}
-			p.id = id
-		}
-		document, ok := b.object("verification", verificationCloudBodyLimit)
-		if !ok {
-			return plan{}, false
-		}
-		p.document = document
-		return p, true
-	}
-}

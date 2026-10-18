@@ -11,9 +11,9 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/git"
 	"github.com/sainteye/clawdline/internal/adapters/limits"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/adapters/taskdir"
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
@@ -241,7 +241,7 @@ func newBroker(s *Server) *orchestrator.Broker {
 		// unreadable is the setting's default, on.
 		NotifyEnabled: s.agentNotifyEnabled,
 		PushEnabled:   s.notificationEnabled,
-		ProcessStart:  swiftstore.ProcessStart,
+		ProcessStart:  ownrecords.ProcessStart,
 		LeaseLine:     int(CapacityLimit(capacity.LeasesQueue)),
 		OpenWaits:     int(CapacityLimit(capacity.WaitsOpen)),
 		Port:          s.cfg.Port,
@@ -400,9 +400,7 @@ func (s *Server) StartBroker(ctx context.Context) {
 	}
 	// A Board assignment whose Root was settled while no daemon listened.
 	go s.settleAwaitedAssignments(ctx)
-	go s.broker.Run(ctx, tick, func(p orchestrator.Pulse) {
-		s.beat.Store(&p)
-	})
+	go s.broker.Run(ctx, tick, nil)
 	// A Session's own close waiting for its turn to end, on the same beat;
 	// a pass with nothing waiting reads nothing.
 	go s.runScheduledCloses(ctx, tick)

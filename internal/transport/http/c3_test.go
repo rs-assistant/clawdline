@@ -104,7 +104,7 @@ func TestAPictureStoredIsMeasuredAtOnce(t *testing.T) {
 // A picture let go to make room answers with the same code as one whose day
 // was up, and a sentence that says which.
 func TestAnEvictedPictureSaysItWasLetGo(t *testing.T) {
-	s, own, _ := picturesFixture(t)
+	s, own := picturesFixture(t)
 	s.pictures.store.Policy.MaxCount = 1
 	var buf bytes.Buffer
 	_ = png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 2, 2)))

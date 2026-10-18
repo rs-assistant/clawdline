@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"net/http"
 	"sort"
 	"strings"
@@ -31,20 +30,22 @@ func callbackShell(record orchestrator.Record, places map[string]heavySlotPlace)
 	return row
 }
 
-func (s *Server) callbackShells(ctx context.Context, places map[string]heavySlotPlace) (map[string][]contract.SessionShell, bool) {
+// callbackShells is each root's live callbacks, newest first, from tasks
+// already read: every live task must be among them.
+func callbackShells(records []orchestrator.Record, bad []orchestrator.Unreadable, err error,
+	places map[string]heavySlotPlace) (map[string][]contract.SessionShell, bool) {
 	out := map[string][]contract.SessionShell{}
-	if s.broker == nil {
-		return out, true
-	}
-	records, bad, err := s.broker.Records(ctx)
 	if err != nil || len(bad) > 0 {
 		return nil, false
 	}
-	sort.SliceStable(records, func(i, j int) bool { return records[i].CreatedAt.After(records[j].CreatedAt) })
+	live := []orchestrator.Record{}
 	for _, r := range records {
-		if r.Kind != orchestrator.TaskKindCallback || r.Callback == nil || r.Root == nil || r.State.Terminal() {
-			continue
+		if r.Kind == orchestrator.TaskKindCallback && r.Callback != nil && r.Root != nil && !r.State.Terminal() {
+			live = append(live, r)
 		}
+	}
+	sort.SliceStable(live, func(i, j int) bool { return live[i].CreatedAt.After(live[j].CreatedAt) })
+	for _, r := range live {
 		out[r.Root.SessionID] = append(out[r.Root.SessionID], callbackShell(r, places))
 	}
 	return out, true

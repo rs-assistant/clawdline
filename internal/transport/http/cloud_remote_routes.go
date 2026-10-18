@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/cloudkeys"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/peerstore"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/domain/agenthandoff"
 	"github.com/sainteye/clawdline/internal/domain/session"
@@ -45,7 +45,7 @@ func (s *Server) currentRemoteSession(ctx context.Context, id string) (agenthand
 	}
 	inv := s.freshReading(ctx)
 	items := make([]session.Session, 0, len(inv.Sessions))
-	lives := make([]swiftstore.Live, 0, len(inv.Sessions))
+	lives := make([]ownrecords.Live, 0, len(inv.Sessions))
 	var found session.Session
 	count := 0
 	for _, item := range inv.Sessions {

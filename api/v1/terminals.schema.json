@@ -263,33 +263,12 @@
         "applied_through": { "description": "With `input_gap`: resend from the number after this one.", "type": "integer" }
       }
     },
-    "TerminalGrantRequest": {
-      "description": "Legacy POST /v1/auth/devices/{id}/terminal. This machine's own token only, and never through Clawdline Cloud. The record remains readable for older clients, but terminal access now follows pairing and send permission; this grant does not change access.",
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["grant"],
-      "properties": {
-        "grant": { "type": "boolean" }
-      }
-    },
-    "TerminalGrant": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["device_id", "granted"],
-      "properties": {
-        "device_id": { "type": "string" },
-        "granted": { "type": "boolean" },
-        "granted_at": { "description": "Unix seconds. Absent when not granted.", "type": "integer" }
-      }
-    },
     "TerminalDiagnostics": {
       "description": "What /v1/diagnostics says about terminals.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["grants_ok", "leases", "streams"],
+      "required": ["leases", "streams"],
       "properties": {
-        "grants_ok": { "description": "The legacy terminal grants file could be read. It no longer controls terminal access.", "type": "boolean" },
-        "grants_error": { "description": "Why the grants file could not be read.", "type": "string" },
         "leases": { "description": "Control leases held now.", "type": "integer" },
         "streams": { "description": "Terminal streams open now, of at most 16.", "type": "integer" },
         "osascript": { "$ref": "#/$defs/OsascriptDiagnostics" }

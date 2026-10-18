@@ -109,7 +109,8 @@ one of them published the key and the other did not, because its own settings fi
 switch off. With the switch on it opened a carrier in 927 ms.
 
 The machine's local Settings → Remote page and `clawdline cloud direct on|off` now expose that
-switch. Changing it replaces the active Cloud line, retiring open direct peers; the viewer can
+switch, and beside it the same-network option (`cloud_direct_local_network`, off by default; see
+Decisions). Changing it replaces the active Cloud line, retiring open direct peers; the viewer can
 continue over the relay. For an EC2 private NIC with a public IPv4 mapping, setting both
 `cloud_direct_udp_port` and `cloud_direct_public_ip` makes Pion share one UDP listener and publish
 that external IPv4 at that port as a host candidate. The daemon then omits its STUN servers so it
@@ -173,5 +174,33 @@ removed on 2026-10-06: a hidden page now keeps its Cloud connection exactly as a
   any viewer without a direct pair. The local console is the fast path on the same Mac. This also
   retires the earlier residual risk that a viewer could make the machine probe private addresses
   of its choosing.
+- **Same network is the person's choice, off by default** (2026-10-18). With the trace in place,
+  one Mac's log held 41 direct attempts: 39 opened, every one on `srflx/ipv4 > srflx/ipv4`, and 2
+  timed out with ICE stuck at checking and only public IPv4 candidates on both sides. The phone's
+  `.local` host candidates were dropped (`offer_dropped=name:host/mdns:2`) and the Mac's own
+  private host candidates left out of its answer (`answer_dropped=private:host/ipv4:2,…`), so a
+  phone on the same Wi-Fi could only reach the Mac by hairpinning through the router. The machine
+  setting `cloud_direct_local_network` (absent is off; Settings → Remote, shown only while direct
+  connections are on, or `clawdline cloud direct local on|off`) widens the filters by exactly one
+  thing: **RFC 1918 IPv4 host candidates**. The machine keeps its own in its answer and accepts the
+  viewer's. Link-local, loopback, multicast and unique-local IPv6 stay dropped — nothing measured
+  needs them — and so do private server-reflexive candidates. `.local` names stay dropped too:
+  resolving one is a multicast query, pion would need its mDNS mode turned on for it, and a phone's
+  browser hides its private address behind such a name anyway. What carries the same-network pair
+  is the machine's answer: the phone sends checks to the machine's private address, and the machine
+  learns the phone's private address from those checks as a peer-reflexive candidate (expected
+  from ICE; not yet measured with a phone). The first check sent to the local network is what
+  makes macOS show its Local Network prompt naming Clawdline, once; turning the setting on is the
+  person inviting it. If the permission is denied, those checks fail and the pair is made over the
+  public addresses as before, or the relay carries the connection. Off, both filters answer byte for
+  byte what they answered before the setting existed (`TestSameNetworkCandidatesFollowTheSetting`).
+  Changing it replaces the Cloud line like the direct switch does, so open peers close and the next
+  offer is filtered by the new choice.
+  The residual risk when it is on: a viewer the person has paired can now name private IPv4 hosts
+  in its offer, and this machine sends ICE connectivity checks to them. That is bounded by the same
+  admission as every offer — it must decrypt under that viewer's key, at most 32 candidates per
+  offer, 6 offers a minute per viewer, 8 peers per machine (`direct.go`) — so a paired viewer can
+  make this machine probe at most a few hundred LAN addresses a minute with STUN binding requests.
+  Off, it cannot name any.
 - **No relay change.** Keeping receipts and registrations on the relay and probing it from the
   machine gives the relay's gate the same reach without a new relay message or deploy.

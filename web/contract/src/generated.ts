@@ -3069,7 +3069,6 @@ export interface Diagnostics {
   scheduler: SchedulerPulse
   served_by: string
   terminals?: TerminalDiagnostics
-  upstream: number
   usage?: UsageDiagnostics
 }
 
@@ -4173,12 +4172,6 @@ export interface PairedDevice {
    */
   last_seen?: number
   name: string
-
-  /**
-   * Legacy terminal grant record for older clients. Access now follows pairing;
-   * this field does not grant or revoke terminal access.
-   */
-  terminal?: boolean
 }
 
 /**
@@ -5357,16 +5350,15 @@ export interface RecordedLanding {
  * Where a recorded landing of a Board item comes from. `task`: a bound broker
  * task's landed or incorporated record; its id is the task id. `root`: a broker
  * root landing row, written when the owning Session proved a commit with `item
- * phase deploying --commit --target --remote` and no child task carried it.
- * `phase_event`: a landing copy an older daemon wrote into the item's phase event
- * before root landings had rows of their own; read, never rewritten.
+ * phase deploying --commit --target --remote` and no child task carried it. A
+ * landing copy an older daemon wrote into the item's phase event is given a root
+ * row when the store opens.
  */
 export type RecordedLandingSource =
     "task"
   | "root"
-  | "phase_event"
 
-export const RecordedLandingSourceValues: readonly RecordedLandingSource[] = ["task", "root", "phase_event"] as const
+export const RecordedLandingSourceValues: readonly RecordedLandingSource[] = ["task", "root"] as const
 
 /**
  * Every refusal on this daemon has this shape. A caller reads `error` as the code
@@ -5382,7 +5374,6 @@ export interface Refusal {
   detail_key?: string
   error: string
   route?: string
-  upstream?: string
 }
 
 /**
@@ -6207,43 +6198,6 @@ export interface ScreenEvent {
 }
 
 /**
- * The machine state this feature creates, published so that somebody can see it.
- * `tmux list-panes -a -F '#{pane_id} #{pane_pipe}'` answers the same question in
- * one command; this answers it and says which of those pipes this daemon can
- * account for, which tmux cannot, because `#{pane_pipe}` is a boolean with no owner
- * in it. A pane that is piped and not on this daemon's list is therefore
- * `unattributed` rather than a leak, and nothing here takes somebody else's pipe
- * off.
- */
-export interface ScreenInventory {
-  attached: string[]
-  leaseSeconds: number
-  piped: string[]
-  screens: ScreenWatch[]
-  unattributed: string[]
-  windowMs: number
-}
-
-/**
- * One row of what this daemon is watching.
- */
-export interface ScreenWatch {
-  backend: Backend
-  captures: number
-  channel: ScreenChannel
-  expiresIn: number
-  id: string
-  readable: boolean
-
-  /**
-   * Whether this daemon has a pipe on that pane right now.
-   */
-  signalled: boolean
-  signals: number
-  watching: boolean
-}
-
-/**
  * Text, pictures, or both; a send that is neither is refused. Each picture is a
  * base64 `data:` URL, at most six, inside the 20 MB body limit. Pictures that
  * cannot be decoded are left out, and a send none of whose pictures can be is
@@ -6917,6 +6871,15 @@ export interface SessionRow {
    * process reading.
    */
   persona?: string
+
+  /**
+   * The Project this Session would be accepted into, decided from `cwd` by the same
+   * rule an assignment's claim applies: the nearest repository, with a linked
+   * worktree followed to the repository it belongs to and symlinks resolved. A
+   * Board item's `project.path` is compared with it. Absent when `cwd` is absent or
+   * not absolute.
+   */
+  project_key?: string
   root_assignment?: RootAssignmentRecord
   screen_reading?: SessionScreenReading
 
@@ -8659,17 +8622,6 @@ export const TerminalCursorShapeValues: readonly TerminalCursorShape[] = ["defau
  */
 export interface TerminalDiagnostics {
   /**
-   * Why the grants file could not be read.
-   */
-  grants_error?: string
-
-  /**
-   * The legacy terminal grants file could be read. It no longer controls terminal
-   * access.
-   */
-  grants_ok: boolean
-
-  /**
    * Control leases held now.
    */
   leases: number
@@ -8716,26 +8668,6 @@ export interface TerminalFrame {
    * The screen's height. The text is `lines`.
    */
   rows: number
-}
-
-export interface TerminalGrant {
-  device_id: string
-  granted: boolean
-
-  /**
-   * Unix seconds. Absent when not granted.
-   */
-  granted_at?: number
-}
-
-/**
- * Legacy POST /v1/auth/devices/{id}/terminal. This machine's own token only, and
- * never through Clawdline Cloud. The record remains readable for older clients, but
- * terminal access now follows pairing and send permission; this grant does not
- * change access.
- */
-export interface TerminalGrantRequest {
-  grant: boolean
 }
 
 /**

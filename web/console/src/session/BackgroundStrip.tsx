@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState } from "react"
 import type { SessionRow, SessionShell } from "@clawdline/contract"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import { backgroundCounts, backgroundLine, backgroundLive, showsBackground, type BackgroundWords } from "./background.js"
 import { WorkTree } from "./WorkTree.js"
 import "./background.css"
@@ -26,12 +27,12 @@ export function BackgroundStrip({ row, selected, onAgent, onShell }: {
   const [open, setOpen] = useState(false)
   useEffect(() => setOpen(false), [row.id])
   const counts = backgroundCounts(row)
-  const shows = showsBackground(counts) || row.background_reading === "unavailable" || !!row.background_omitted
+  const shows = showsBackground(counts) || !!row.background_omitted
   useEffect(() => {
     if (!shows) setOpen(false)
   }, [shows])
   useLayoutEffect(() => {
-    if (open) document.getElementById("bg-sheet-close")?.focus({ preventScroll: true })
+    if (open) focusModalContainer(document.getElementById("bg-sheet"))
   }, [open])
   if (!shows) return null
 

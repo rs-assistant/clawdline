@@ -21,6 +21,7 @@
 | `cache.session_execution_memo` | 4096 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cache.session_inventory` | 120 | `seconds` | `expire` | `diagnostics` | — |
 | `cache.session_links` | 64 | `rows` | `evict_oldest` | `diagnostics, notice` | — |
+| `cache.session_project_keys` | 256 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cache.session_skills` | 64 | `rows` | `evict_oldest` | `diagnostics, notice` | — |
 | `cache.source_answer` | 30 | `seconds` | `expire` | `diagnostics` | — |
 | `cache.terminal_screens` | 64 | `rows` | `evict_oldest` | `diagnostics, notice` | — |
@@ -184,6 +185,7 @@
 | `projectsync.project_files` | 64 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `proposals.open` | 500 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `push.subscriptions` | 128 | `rows` | `refuse` | `diagnostics, notice, health` | — |
+| `release.app_relist_seconds` | 60 | `seconds` | `expire` | `diagnostics` | — |
 | `release.app_swap_poll_seconds` | 2 | `seconds` | `evict_oldest` | `diagnostics` | — |
 | `release.apply_follow_seconds` | 1500 | `seconds` | `refuse` | `diagnostics` | — |
 | `release.archive_entries` | 20000 | `rows` | `refuse` | `diagnostics` | — |
@@ -278,11 +280,14 @@
 | `squadpackage.request_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `sse.screen_pending` | 64 | `rows` | `disconnect` | `diagnostics, notice` | — |
 | `store.db` | 1073741824 | `bytes` | `none` | `diagnostics, notice, health` | limits §7.1: C1 only measures this row. Its class refuses new writes at the limit (limits §4.4 step 5, 507 storage_exhausted); nothing refuses yet, and ok:false on /v1/health is the only effect of full. |
+| `store.done_effect_retention_seconds` | 604800 | `seconds` | `evict_oldest` | `diagnostics` | — |
+| `store.events` | 150000 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `store.read_connections` | 4 | `rows` | `refuse` | `diagnostics` | — |
+| `store.receipt_tombstone_retention_seconds` | 604800 | `seconds` | `expire` | `diagnostics` | — |
 | `store.receipts` | 4096 | `rows` | `refuse` | `diagnostics, notice` | — |
+| `store.retention_prune_batch_rows` | 500 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `terminal.body_bytes` | 6295552 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `terminal.count` | 8 | `rows` | `refuse` | `diagnostics, sender` | — |
-| `terminal.grants_bytes` | 262144 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `terminal.history_lines` | 2000 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `terminal.input_bytes` | 4096 | `bytes` | `refuse` | `diagnostics, sender` | — |
 | `terminal.lane` | 16 | `rows` | `refuse` | `diagnostics, sender` | — |

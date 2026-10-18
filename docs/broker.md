@@ -113,9 +113,9 @@ what is recorded, and a refusal for want of a landing ends with what the look fo
 to live only as a copy inside the item's `item.phase_changed` payload — 233 of 238 entries into deploying, as the Board
 review (R3) counted them — a second truth beside the broker's records (D01). It is now one broker row, written in the same SQLite
 transaction as the phase change, keyed by item, repository, commit and target (the same four are the same row), and the
-event carries only its `landing_id`. Older events keep their `landing` copy and are read as `phase_event` rows; nothing
-is rewritten. `GET /v1/orchestrator/landings?work_id=<item>` and the item read list the same rows — bound tasks'
-`landed`/`incorporated` records, root rows and legacy copies — from one function (`internal/app/work_v2_landings.go`).
+event carries only its `landing_id`. Older events keep their `landing` copy; when the store opens, each copy is given the
+root row it would have been (same four keys, same id; `migrateLegacyLandings`), and no event is rewritten. Two copies that share those four keys but name different tips become one row, the first written; on the machine this was measured on that folded 238 visible copies into 236. A binary older than this change, opening the same file after a rollback, reads both the row and the copy and lists such a landing twice. `GET /v1/orchestrator/landings?work_id=<item>` and the item read list the same rows — bound tasks'
+`landed`/`incorporated` records and root rows — from one function (`internal/app/work_v2_landings.go`).
 One item keeps 64 root rows (`work.root_landings_per_item`); the next is refused `landings_full`.
 
 The target is the record's (D19). A pending landing opens without one, and the broker does **not** fill it with `HEAD`.
@@ -152,7 +152,7 @@ tree equality 能回答的問題：語意整合本來就會讓兩棵樹不同。
 3. 逐一走過 projection：inventory 是否 settled、session 待辦與 board 是否關閉、graph、timeline、舊 task projection，以及 reclaim
    是否真的有足夠證據刪東西。這些讀者不一定該把新字當 `landed`；要各自說明。
 4. 改 `api/v1/orchestrator.schema.json`，執行 `go run ./tools/contract-gen` 同時產生 Go 與 TypeScript contract；不要手改 generated file。
-5. 在非 legacy 的 console 加人能看懂的字。`web/console/src/legacy/js/**` 與 copied string catalog 是 byte-for-byte 資產，不在這條路上改。
+5. 在非 legacy 的 console 加人能看懂的字。`web/console/src/legacy/js/**` 雖然已是 console 自己的程式碼（`web/console/src/legacy/README.md`），新字仍放在非 legacy 的 console 與它自己的字串目錄，不加進 `public/strings/zh-Hant.json`。
 6. 測試要一正一反地釘住每一個 proof gate、wire evidence、derived closing 行為與 replay；最後跑 `contract-gen -check` 和 web checks。
 
 錯誤碼與文字照舊版，包括信封：`{"error":{"code","message","request_id", …extra}}`，**extra 放在 `error` 裡面**。
@@ -448,8 +448,7 @@ hosted console serves `<sha>` or later and then runs the CloudGate check
 ```bash
 go build -o /tmp/x/clawdline ./cmd/clawdline
 mkdir -p /tmp/x/dir && echo '{"terminal":"tmux"}' > /tmp/x/dir/config.json
-CLAWDLINE_NEXT_PORT=7794 CLAWDLINE_NEXT_DIR=/tmp/x/dir CLAWDLINE_NEXT_STANDALONE=1 \
-  CLAWDLINE_NEXT_OWN_SESSIONS=1 /tmp/x/clawdline serve
+CLAWDLINE_NEXT_PORT=7794 CLAWDLINE_NEXT_DIR=/tmp/x/dir /tmp/x/clawdline serve
 OT=$(cat /tmp/x/dir/orchestrator-token)
 # 1. whoami → 自己的 conversation id；2. inventory → generation 與 task_root
 # 3. 把 task.json 寫到 <task_root>/<id>/，再 POST /v1/orchestrator/tasks {task_id, secret, inventory_generation}

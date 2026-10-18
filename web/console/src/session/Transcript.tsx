@@ -1243,13 +1243,16 @@ function askHTML(v: View, e: Entry, at: number) {
       return head + asked + (options ? '<ol class="askopts">' + options + "</ol>" : "")
     })
     .join("")
+  const answerHint = e.tool === "request_user_input_async"
+    ? '<div class="askany">' + esc(catalogWord("next", "codexAsyncAnswerHint")) + "</div>"
+    : ""
   return (
     <div className="entry ask" data-role="ask" key={"ask:" + at}>
       {whoHTML(v, "assistant", e.at)}
       <div
         className="body"
         dangerouslySetInnerHTML={{
-          __html: '<div class="askbox"><div class="asktag">' + esc(T.webAskLabel) + "</div>" + body + "</div>",
+          __html: '<div class="askbox"><div class="asktag">' + esc(T.webAskLabel) + "</div>" + body + answerHint + "</div>",
         }}
       />
     </div>

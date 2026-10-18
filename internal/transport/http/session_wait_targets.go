@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
@@ -28,7 +28,7 @@ func waitTargetsReading() capacity.Reading {
 // very tasks the work projection counted. A dispatched child is named by its
 // Session; a heavy callback by the command it runs and its place at the
 // compile slot; anything else by its own title.
-func (s *Server) waitTargets(ctx context.Context, tasks []*swiftstore.Task, labels map[string]string,
+func (s *Server) waitTargets(ctx context.Context, tasks []*ownrecords.Task, labels map[string]string,
 	places map[string]heavySlotPlace) ([]contract.SessionWaitTarget, int64) {
 	if n := int64(len(tasks)); n > waitTargetsSeen.Load() {
 		waitTargetsSeen.Store(n)

@@ -57,22 +57,19 @@ func cloudViewerCommand(args []string) {
 			fmt.Fprintln(os.Stderr, "clawdline:", err)
 			os.Exit(1)
 		}
-		identity, found, err := cloud.NewViewerIdentityStore(parts.keys.Dir()).Load()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "clawdline cloud viewer: identity_unreadable: %v\n", err)
-			os.Exit(1)
-		}
-		if !found {
+		identity, key, err := cloud.LoadViewerAuthorization(parts.keys, parts.settings.APIBase)
+		switch {
+		case errors.Is(err, cloud.ErrViewerIdentityAbsent):
 			fmt.Fprintln(os.Stdout, cliCopy("viewer", "status_none", "viewer authorization is absent; run `clawdline cloud viewer login`"))
 			return
-		}
-		key, keyFound, err := parts.keys.ViewerKey()
-		if err != nil || !keyFound {
-			fmt.Fprintln(os.Stderr, cliCopy("viewer", "key_missing", "viewer_key_missing: the viewer signing key is missing or unreadable"))
+		case errors.Is(err, cloud.ErrViewerIdentityUnreadable):
+			fmt.Fprintf(os.Stderr, "clawdline cloud viewer: identity_unreadable: %v\n", err)
 			os.Exit(1)
-		}
-		if identity.APIBase != parts.settings.APIBase {
+		case errors.Is(err, cloud.ErrViewerEnvironmentMismatch):
 			fmt.Fprintln(os.Stderr, cliCopy("viewer", "environment_mismatch", "viewer_environment_mismatch: this identity belongs to another Cloud API"))
+			os.Exit(1)
+		case err != nil:
+			fmt.Fprintln(os.Stderr, cliCopy("viewer", "key_missing", "viewer_key_missing: the viewer signing key is missing or unreadable"))
 			os.Exit(1)
 		}
 		fmt.Fprintf(os.Stdout, cliCopy("viewer", "status_ready", "viewer device %s on account %s; key %s; use `viewer machines` to inspect pairing\n"), identity.DeviceID, identity.AccountID, key.Fingerprint())

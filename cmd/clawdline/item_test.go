@@ -25,6 +25,43 @@ const createdItem = `{"ok":true,"item":{"id":"item-1","title":"Ship it","kind":"
  "gate_snapshot_cycle":1,"planning_gate":true,"verify_gate":false,"steps":[
  {"id":"s1","title":"draft","done":false},{"id":"s2","title":"check","done":false},{"id":"s3","title":"publish","done":false}]}}`
 
+func TestItemCancelReadsTheRunAndVersionThenRelaysTheReason(t *testing.T) {
+	s, b := newStandIn(t, func(r *http.Request) (int, string) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/run"):
+			return 200, `{"ok":true,"run":{"id":"` + itemRun + `"}}`
+		case r.Method == http.MethodGet:
+			return 200, createdItem
+		default:
+			return 200, strings.Replace(createdItem, `"phase":"assigned"`, `"phase":"cancelled"`, 1)
+		}
+	})
+	var out, errs bytes.Buffer
+	if code := sessionItem(&out, &errs, b, "cancel", itemFlags{reason: "The person withdrew it."},
+		[]string{"item-1"}, thinConversation, "cancel-key", envOf(nil)); code != 0 {
+		t.Fatalf("cancel exit %d: %s", code, errs.String())
+	}
+	seen := s.requests()
+	if len(seen) != 3 || seen[0].Method != http.MethodGet || seen[1].Method != http.MethodGet ||
+		seen[2].Method != http.MethodPost || seen[2].EscapedPath != "/v1/work/v2/agent/items/item-1/cancel" ||
+		seen[2].Key != "cancel-key" {
+		t.Fatalf("requests: %+v", seen)
+	}
+	var body struct {
+		SessionID       string            `json:"session_id"`
+		Via             map[string]string `json:"via"`
+		ExpectedVersion int64             `json:"expected_version"`
+		Reason          string            `json:"reason"`
+	}
+	if err := json.Unmarshal(seen[2].Body, &body); err != nil || body.SessionID != thinConversation ||
+		body.Via["run"] != itemRun || body.ExpectedVersion != 2 || body.Reason != "The person withdrew it." {
+		t.Fatalf("cancel body: %s, %v", seen[2].Body, err)
+	}
+	if !strings.Contains(out.String(), "the cancellation") || !strings.Contains(out.String(), "cancelled") {
+		t.Fatalf("receipt: %s", out.String())
+	}
+}
+
 func TestItemNameSendsTheCurrentConversationAndReportsTheSavedName(t *testing.T) {
 	s, b := newStandIn(t, func(r *http.Request) (int, string) {
 		return 200, `{"ok":true,"stored_title":"Repair Session naming","display_title":"Person's title"}`

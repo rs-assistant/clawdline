@@ -62,7 +62,7 @@ var liveness = regexp.MustCompile(`(?i)\bowns\b|\bis running\b|\bare running\b|\
 // app's bytes.
 var deliberate = map[string]string{
 	"tools/check-legacy-css.sh": "byte-for-byte comparison against the old app's own Resources/web; the point is that it reads that repository",
-	"web/console/src/legacy/":   "byte-for-byte copies of the old app's files, registered in MANIFEST.json with where and when each was taken",
+	"web/console/src/legacy/":   "the old app's stylesheets, pinned byte for byte in MANIFEST.json, and the JavaScript that began as its console",
 	"tools/package-macos.sh":    "bundle identity: it has to name the id the old app registered in order not to claim it",
 
 	// Conditional, not assumed: each of these asks the machine whether

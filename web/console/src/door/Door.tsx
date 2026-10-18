@@ -13,13 +13,12 @@ import { passwordFailureSentence } from "./failure.js"
  * browser*. A pairing code shown on this machine and typed in here — in that
  * direction and never the other — or the password, when one has been set.
  *
- * `legacy/js/door/door.js` is the Swift app's door, byte for byte, and it is
- * the text this file follows line by line — not imported. It cannot be: it
- * imports the whole page (`view/list.js`) and binds its listeners through
- * `core/dom.js`, which looks every id up once at import, before React has drawn
- * any of them. The copy is kept under the guard so a change to the original
- * turns `tools/check-legacy-css.sh` red and this file is read again. The
- * stylesheet is `legacy/door.css`, also the original's, which is why the markup
+ * The Swift app's door, `js/door/door.js`, was the text this file follows line
+ * by line — not imported. It could not be: it imported the whole page
+ * (`view/list.js`) and bound its listeners through `core/dom.js`, which looks
+ * every id up once at import, before React has drawn any of them. Nothing
+ * imported the copy, so it was deleted on 2026-10-18 (`docs/remote.md`). The
+ * stylesheet is `legacy/door.css`, the original's and still pinned, which is why the markup
  * below is `index.html`'s door (lines 1338–1404 there) with the same ids,
  * classes and attributes, and its words are the ones `view/static.js` paints
  * into it.

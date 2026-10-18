@@ -1,6 +1,6 @@
 # 此 build 的 Agent 路由索引
 
-由已註冊的路由與 `api/v1/agent-routes.json` 產生；API 等級：18。請先讀 `clawdline guide`，再讀表格指定的部分。路由出現在此只表示可以探索，**不授權呼叫，也不代表操作完成**。每個前綴下的具體動作、輸入、權限、拒絕與收據，必須由該部分及本 build 的 schema 明示；若未載明該動作，Agent 就不得呼叫。缺少能力或版本、身分不符、結果未知時停止，不改走另一台機器或舊介面。
+由已註冊的路由與 `api/v1/agent-routes.json` 產生；API 等級：21。請先讀 `clawdline guide`，再讀表格指定的部分。路由出現在此只表示可以探索，**不授權呼叫，也不代表操作完成**。每個前綴下的具體動作、輸入、權限、拒絕與收據，必須由該部分及本 build 的 schema 明示；若未載明該動作，Agent 就不得呼叫。缺少能力或版本、身分不符、結果未知時停止，不改走另一台機器或舊介面。
 
 | 方法 | 已註冊路由 | 起始 API 等級 | Agent 指南 | 使用者目標 |
 | --- | --- | ---: | --- | --- |
@@ -14,6 +14,7 @@
 | `*` | `/v1/cloud/commands` | 9 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/devices/revoke` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/direct` | 15 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
+| `*` | `/v1/cloud/direct/local-network` | 21 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/enabled` | 9 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/keys/rotate` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/login` | 9 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
@@ -31,8 +32,6 @@
 | `*` | `/v1/cloud/viewer/machines` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/viewer/receipts` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/viewer/sessions` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
-| `*` | `/v1/cloud/viewer/skills` | 5 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
-| `*` | `/v1/cloud/viewer/status` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/devstacks` | 1 | `clawdline guide project` | `docs/user/projects.md` |
 | `*` | `/v1/diagnostics` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/events` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
@@ -51,7 +50,6 @@
 | `*` | `/v1/orchestrator/decisions` | 1 | `clawdline guide board` | `docs/user/board.md` |
 | `*` | `/v1/orchestrator/decisions/` | 1 | `clawdline guide board` | `docs/user/board.md` |
 | `*` | `/v1/orchestrator/detached-tasks` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
-| `*` | `/v1/orchestrator/durable-reports/promotions` | 1 | `clawdline guide report` | `docs/user/sessions.md` |
 | `*` | `/v1/orchestrator/graphs` | 1 | `clawdline guide coordination` | `docs/user/clawdfather-and-dispatch.md` |
 | `*` | `/v1/orchestrator/handoffs` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
 | `*` | `/v1/orchestrator/handoffs/` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
@@ -69,9 +67,7 @@
 | `*` | `/v1/orchestrator/reclaim` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
 | `*` | `/v1/orchestrator/root-assignments` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
 | `*` | `/v1/orchestrator/root-assignments/` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
-| `*` | `/v1/orchestrator/runs/` | 1 | `clawdline guide running` | `docs/user/clawdfather-and-dispatch.md` |
 | `*` | `/v1/orchestrator/schedule-exports` | 1 | `clawdline guide schedule` | `docs/user/schedules.md` |
-| `*` | `/v1/orchestrator/schedule-imports` | 1 | `clawdline guide schedule` | `docs/user/schedules.md` |
 | `*` | `/v1/orchestrator/schedule-webhooks/bind` | 1 | `clawdline guide schedule` | `docs/user/schedules.md` |
 | `*` | `/v1/orchestrator/schedules` | 1 | `clawdline guide schedule` | `docs/user/schedules.md` |
 | `*` | `/v1/orchestrator/schedules/` | 1 | `clawdline guide schedule` | `docs/user/schedules.md` |
@@ -95,7 +91,6 @@
 | `*` | `/v1/remote/machines` | 13 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/remote/tasks` | 13 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/remote/tasks/` | 13 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
-| `*` | `/v1/screens` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/sessions` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/sessions/` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/settings` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |

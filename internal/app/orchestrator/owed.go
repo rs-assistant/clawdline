@@ -45,6 +45,13 @@ func (b *Broker) Owed(ctx context.Context, sessions []session.Session) ([]task.O
 	if err != nil {
 		return nil, err
 	}
+	return b.OwedOf(records, unreadable, sessions)
+}
+
+// OwedOf is Owed over records already read, for a reader that read them for
+// more than this: every task with a pending landing must be among them, and
+// unreadable is every row the read could not decode.
+func (b *Broker) OwedOf(records []Record, unreadable []Unreadable, sessions []session.Session) ([]task.Obligation, error) {
 	if len(unreadable) > 0 {
 		return nil, ErrOwedIncomplete{Unreadable: len(unreadable)}
 	}

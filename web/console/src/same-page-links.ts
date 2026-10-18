@@ -29,7 +29,7 @@
  *   for the other window, and a renderer that already handled the press keeps
  *   it.
  *
- * `legacy/js/view/markdown.js` is a byte-for-byte copy and is not changed;
+ * `legacy/js/view/markdown.js` is not changed for this;
  * this listens above it, in the capture phase, because the sheets that carry
  * links stop their clicks from bubbling.
  */

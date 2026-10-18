@@ -33,7 +33,8 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
 
 這份清單是 Go 版剛起步時的記錄，不是今天的狀態。今天這台機器回應哪些字，看 `cloudops.Implemented()`
 與 `docs/cloud-wire.md` 的操作表；hosted console 會問哪些，看 `web/console/src/cloud/carry.ts` 的
-`CARRIED`（Go 測試 `TestTheConsoleCarryTableMatchesThisMachinesVocabulary` 讓兩邊對得上）。例如
+`CARRIED`（由 `tools/contract-gen` 從 `internal/domain/cloudvocab/vocabulary.json` 產生到
+`carry-generated.ts`，`TestTheVocabularyTableIsTheBridgesCatalog` 讓那張表與機器對得上）。例如
 `screen`：機器這邊早就接上，hosted console 則到 2026-09-26 才開始問，在那之前手機上的「即時畫面」
 只會叫人回機器上看。
 
@@ -81,8 +82,8 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
 
 ### 配對頁
 
-- `web/console/src/legacy/js/door/door.js` 是舊版原檔的逐位元組拷貝，登記在 `MANIFEST.json`，
-  `tools/check-legacy-css.sh` 會比對；`door.css` 早就在。React 的 `web/console/src/door/Door.tsx`
+- `web/console/src/legacy/js/door/door.js` 當時是舊版原檔的逐位元組拷貝，登記在 `MANIFEST.json`；
+  2026-10-18 因為兩個 bundle 都沒有收它而刪除，`door.css` 仍是釘住的拷貝。React 的 `web/console/src/door/Door.tsx`
   不 import 它（它 import 整個舊頁面、在 import 時查 id），而是逐行照它寫，產出 `index.html` 那段門口相同的
   id、class、屬性，字是 `view/static.js` 貼進去的那些 `webDoor*` 鍵。
 - **什麼時候出現**照舊版 `net/live.js` 的 `check`：開頁先讀公開的 `/v1/health`（不走快取），只有明確的
@@ -125,7 +126,7 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
 `/v1/terminals*` 是這台機器自己的 tmux server 上的一般 shell（契約：`api/v1/terminals.schema.json`，
 上限：`docs/limits.md` N59、N60）。放行的順序：
 
-- **Generic Cloud requests still reject terminal and grant HTTP routes** with
+- **Generic Cloud requests still reject terminal HTTP routes** with
   `terminal_cloud_not_supported`. The machine answers those requests with its own token
   (`internal/transport/cloud/local.go`), so `Router.Do` marks them `viaCloud` and those routes
   reject them. Hosted terminal traffic instead uses dedicated signed, end-to-end encrypted
@@ -133,7 +134,7 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
   into terminal authority. See `docs/cloud-terminal-wire.md`.
 - **本機自己的 token** 直接可以。
 - **已配對裝置預設可傳送**：本機配對裝置須仍在裝置清單（`Holds`）；Cloud viewer 須登入且本機 pin 的公鑰與 roster 相符。已撤銷、未配對或公鑰不符者皆被拒絕；該機器的 Cloud 命令開關仍可停止遠端操作。不再要求獨立的 `terminal_control` 或本機終端 grant；看畫面仍須符合資格，打字另需控制租約。
-- **舊 grant 檔僅供相容**：`terminal-grants.json` 及本機 `POST /v1/auth/devices/{id}/terminal` 仍可供舊客戶端讀寫，但其值不再決定終端存取權。診斷會報告檔案是否可讀，不應把它解讀為終端可用狀態。
+- **舊 grant 檔已移除**：`terminal-grants.json` 與本機 `POST /v1/auth/devices/{id}/terminal` 已刪除（後者現在回 `404`）；裝置清單不再有 `terminal` 欄位，診斷也不再報告 `grants_ok`。
 - **撤銷立即生效**：裝置或配對 pin 被撤銷時，服務重新檢查租約與串流；失去資格的租約作廢，串流送出 `terminal_access_revoked` 後關閉。每個效果和畫面也重新檢查。
 - **一次一個控制者**：租約 30 秒、每 10 秒續約；別人持有時 `acquire` 回 `terminal_controlled` 並說明是誰；
   `takeover` 換 epoch，原持有者的串流收到 `control`，下一次輸入回 `lease_superseded`。輸入在 terminal

@@ -1,18 +1,10 @@
 package agenthandoff
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/ecdh"
 	"crypto/ed25519"
-	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
-	"io"
-
-	"github.com/sainteye/clawdline/internal/domain/cloud"
 )
 
 const (
@@ -70,31 +62,6 @@ func ValidateTaskEventHeader(event TaskEvent) error {
 	return nil
 }
 
-func canonicalTaskEvent(event TaskEvent) ([]byte, error) {
-	encoded, err := json.Marshal(event)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	parsed, err := cloud.Parse(encoded)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	return cloud.CanonicalBytes(parsed), nil
-}
-
-func taskEventSignatureInput(envelope TaskEventEnvelope) ([]byte, error) {
-	header, err := canonicalTaskEvent(envelope.Event)
-	if err != nil || envelope.Nonce == "" || envelope.KeyID == "" || envelope.Ciphertext == "" {
-		return nil, ErrPeerEnvelope
-	}
-	return []byte("clawdline-peer-task-event-v1\n" + string(header) + "\n" +
-		envelope.Nonce + "\n" + envelope.KeyID + "\n" + envelope.Ciphertext), nil
-}
-
-func taskEventAAD(header []byte, keyID string) []byte {
-	return []byte("clawdline-peer-task-event-aad-v1\n" + string(header) + "\n" + keyID)
-}
-
 // SealTaskEvent accepts either direction on the same directed pair. The
 // sender's local private key decides which half of the pinned pair is local.
 func SealTaskEvent(event TaskEvent, body []byte, pair PairKeys, private *ecdh.PrivateKey,
@@ -104,35 +71,12 @@ func SealTaskEvent(event TaskEvent, body []byte, pair PairKeys, private *ecdh.Pr
 		event.Start.TargetMachineID != pair.TargetMachineID {
 		return TaskEventEnvelope{}, ErrPeerEnvelope
 	}
-	key, keyID, err := PairKey(pair, private, event.Sender.MachineID == pair.SourceMachineID)
+	frame, err := taskEventFrame.seal(event, body, pair, private, event.Sender.MachineID == pair.SourceMachineID, signer)
 	if err != nil {
 		return TaskEventEnvelope{}, ErrPeerEnvelope
 	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return TaskEventEnvelope{}, ErrPeerEnvelope
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return TaskEventEnvelope{}, ErrPeerEnvelope
-	}
-	nonce := make([]byte, aead.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return TaskEventEnvelope{}, ErrPeerEnvelope
-	}
-	header, err := canonicalTaskEvent(event)
-	if err != nil {
-		return TaskEventEnvelope{}, ErrPeerEnvelope
-	}
-	envelope := TaskEventEnvelope{Event: event, KeyID: keyID,
-		Nonce:      base64.StdEncoding.EncodeToString(nonce),
-		Ciphertext: base64.StdEncoding.EncodeToString(aead.Seal(nil, nonce, body, taskEventAAD(header, keyID)))}
-	input, err := taskEventSignatureInput(envelope)
-	if err != nil {
-		return TaskEventEnvelope{}, ErrPeerEnvelope
-	}
-	envelope.Signature = base64.StdEncoding.EncodeToString(ed25519.Sign(signer, input))
-	return envelope, nil
+	return TaskEventEnvelope{Event: event, Ciphertext: frame.Ciphertext, Nonce: frame.Nonce,
+		KeyID: frame.KeyID, Signature: frame.Signature}, nil
 }
 
 func OpenTaskEvent(envelope TaskEventEnvelope, pair PairKeys, private *ecdh.PrivateKey,
@@ -142,41 +86,14 @@ func OpenTaskEvent(envelope TaskEventEnvelope, pair PairKeys, private *ecdh.Priv
 		event.Start.Source.MachineID != pair.SourceMachineID || event.Start.TargetMachineID != pair.TargetMachineID {
 		return nil, ErrPeerEnvelope
 	}
-	input, err := taskEventSignatureInput(envelope)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	sig, err := decodeCanonical(envelope.Signature, ed25519.SignatureSize)
-	if err != nil || !ed25519.Verify(signer, input, sig) {
-		return nil, ErrPeerEnvelope
-	}
-	key, keyID, err := PairKey(pair, private, event.Recipient.MachineID == pair.SourceMachineID)
-	if err != nil || envelope.KeyID != keyID {
-		return nil, ErrPeerEnvelope
-	}
-	nonce, err := decodeCanonical(envelope.Nonce, 12)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	ciphertext, err := decodeCanonical(envelope.Ciphertext, -1)
-	if err != nil || len(ciphertext) < 16 {
-		return nil, ErrPeerEnvelope
-	}
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	aead, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	header, err := canonicalTaskEvent(event)
-	if err != nil {
-		return nil, ErrPeerEnvelope
-	}
-	body, err := aead.Open(nil, nonce, ciphertext, taskEventAAD(header, keyID))
+	body, err := taskEventFrame.open(envelope.Event, envelope.frame(), pair, private, event.Recipient.MachineID == pair.SourceMachineID, signer)
 	if err != nil || ValidateTaskEvent(event, body) != nil {
 		return nil, ErrPeerEnvelope
 	}
 	return body, nil
+}
+
+func (envelope TaskEventEnvelope) frame() sealedFrame {
+	return sealedFrame{Ciphertext: envelope.Ciphertext, Nonce: envelope.Nonce,
+		KeyID: envelope.KeyID, Signature: envelope.Signature}
 }

@@ -1,4 +1,5 @@
 import { catalogWord } from "../catalog.js"
+import { focusModalContainer } from "../modal-focus.js"
 import {
   useEffect,
   useMemo,
@@ -122,6 +123,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   // the same reason.
   const [query, setQuery] = useState("")
   const closeButton = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const { data, pending } = useSheetTranscript(row.id)
   const entries = useMemo(() => (data ? data.entries : []), [data])
@@ -130,7 +132,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   // Focus enters the sheet, so its Escape closes it, but not the field: a
   // phone would open its keyboard over the list the person came to read.
   useEffect(() => {
-    closeButton.current?.focus({ preventScroll: true })
+    focusModalContainer(dialogRef.current)
   }, [])
 
   // `draw()` puts the list back at its top; it is a new list each time the
@@ -174,6 +176,7 @@ function Sheet({ row, onClose }: { row: SessionRow; onClose: () => void }) {
   return (
     <div
       className="sheet user-messages-sheet"
+      ref={dialogRef}
       id="user-messages-sheet"
       role="dialog"
       aria-modal="true"

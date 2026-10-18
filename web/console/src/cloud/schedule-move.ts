@@ -367,8 +367,8 @@ export function refusedAsStaleRevision(error: unknown): boolean {
 
 /**
  * Cloud's move of a hook, as the request the copied webhook client sends: the
- * body has exactly these two keys (the Cloud's PROTOCOL.md). The copy of that
- * client is pinned byte for byte, so the route is described here and sent
+ * body has exactly these two keys (the Cloud's PROTOCOL.md). That client has
+ * no method for it, so the route is described here and sent
  * through its `send`, which adds the session cookie and an `Idempotency-Key`.
  */
 export function hookMoveRequest(hookID: string, machine: string, revision: number) {

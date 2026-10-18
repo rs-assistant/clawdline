@@ -318,7 +318,7 @@ func TestWorkGateSettingsWriteNeedsLocalOrSendAuthority(t *testing.T) {
 // rest is behind this machine's own token.
 func TestHealthAndDiagnostics(t *testing.T) {
 	f, _ := newGateFixture(t)
-	s := &Server{cfg: config.Config{Dir: "/secret/state/dir", Port: 7757, UpstreamPort: 7717}}
+	s := &Server{cfg: config.Config{Dir: "/secret/state/dir", Port: 7757}}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/health", s.health)
 	mux.HandleFunc("/v1/diagnostics", s.diagnostics)

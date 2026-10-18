@@ -27,10 +27,6 @@ func focusPath(r *http.Request) (string, bool) {
 // gone out, deliberately: the tail is up to four round trips, two of them Apple
 // Events, and somebody is waiting on this request.
 func (s *Server) sessionFocusRoute(w http.ResponseWriter, r *http.Request, id string) {
-	if !s.ownsSessions() {
-		s.forwardUpstream(w, r)
-		return
-	}
 	// The same sentence and envelope every other session action uses, since the
 	// page reads both.
 	if !maySend(r) {

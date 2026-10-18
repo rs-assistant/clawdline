@@ -31,11 +31,9 @@ import (
 //	DELETE /v1/orchestrator/schedules/:id        take one away
 //	POST   /v1/orchestrator/schedules/:id/run    run one now
 //
-// and three this daemon adds for moving schedules in and out, all behind this
-// machine's orchestrator token:
+// and two this daemon adds, both behind this machine's orchestrator token:
 //
 //	POST   /v1/orchestrator/schedule-webhooks/bind   the Cloud bind command's local half
-//	POST   /v1/orchestrator/schedule-imports         files from the Swift app, byte for byte
 //	GET    /v1/orchestrator/schedule-exports         every stored file, byte for byte
 //
 // Writes have two doors, as there: a device that may send, with an
@@ -85,14 +83,6 @@ func (s *Server) scheduleBook() *app.ScheduleBook {
 				return on
 			}
 			return true
-		},
-		ImportsEnabled: func() bool {
-			v, err := nextconfig.Open(dir).Read()
-			if err != nil {
-				return false
-			}
-			on, ok := v.Bool("schedule_imports_enabled")
-			return ok && on
 		},
 		Audit: s.audit,
 		Notify: func(ctx context.Context, title, body, tag string) {
@@ -408,45 +398,6 @@ func (s *Server) scheduleWebhookBindRoute(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = w.Write(answer)
-}
-
-// scheduleImportRoute stores schedule files handed over whole: `{"files":
-// {"<schedule-id>.json": "<the file's bytes>"}}`. The bytes are kept exactly,
-// so an export afterwards can be compared with the source file by hash.
-func (s *Server) scheduleImportRoute(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeAuthRefusal(w, http.StatusMethodNotAllowed, "bad_request", "No such route")
-		return
-	}
-	if !machineAuthed(r) {
-		writeAuthRefusal(w, http.StatusForbidden, "forbidden", "That needs the orchestrator token.")
-		return
-	}
-	var body struct {
-		Files map[string]string `json:"files"`
-	}
-	raw, err := io.ReadAll(http.MaxBytesReader(nil, r.Body, scheduleImportBodyLimit))
-	if err != nil || json.Unmarshal(raw, &body) != nil || len(body.Files) == 0 {
-		writeAuthRefusal(w, http.StatusBadRequest, "bad_request", `Send {"files": {"<schedule-id>.json": "<file contents>"}}.`)
-		return
-	}
-	names := make([]string, 0, len(body.Files))
-	for name := range body.Files {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	files := make([]app.ImportFile, 0, len(names))
-	for _, name := range names {
-		files = append(files, app.ImportFile{Name: name, Body: []byte(body.Files[name])})
-	}
-	book := s.scheduleBook()
-	results, refusal := book.Import(context.WithoutCancel(r.Context()), files)
-	if refusal != nil {
-		writeScheduleReply(w, *refusal)
-		return
-	}
-	rows, _ := book.List(r.Context())
-	writeJSON(w, map[string]any{"ok": true, "results": results, "schedules": rows, "at": time.Now().Unix()})
 }
 
 // scheduleExportRoute is every stored schedule file, byte for byte.

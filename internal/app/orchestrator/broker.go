@@ -239,11 +239,10 @@ type Broker struct {
 	// cannot both count the same last artifact slot. Durability and respawn
 	// concurrency are enforced separately on disk and in SQLite.
 	gateMu sync.Mutex
-	// decoded is every record this broker has decoded, by id and version, so
-	// a list that is asked for every two seconds decodes only the rows that
-	// changed since it last looked (G33). It is replaced wholesale by each
-	// whole-table read, so it never holds a row the table no longer has.
-	decoded decodedRecords
+	// snapshot is every task head this broker has read with its decoded
+	// record, so a list that is asked for every two seconds reads only the
+	// rows that changed since it last looked (G33, ledger.go).
+	snapshot ledgerSnapshot
 	// EffectFault is a failure-injection seam, called with the name of each
 	// point an effect passes — "committed" is after the intent is durable and
 	// before the effect is attempted. Nil in production; set only from
@@ -452,41 +451,27 @@ const StateUnreadable State = "unreadable"
 // ledger reads every task this broker holds, each joined to its completion
 // envelope, and names every row it could not decode.
 //
-// It reads every row's head — no record, nothing decoded — and fetches and
-// decodes only the rows whose version it has not decoded before (G33). The
-// long prose is never read here: a list shows titles, not instructions.
+// It is the whole history, and it is for the readers that need it. It costs
+// what the snapshot's sync costs, plus every envelope and a Record for every
+// row; the task list's first page reads TaskWindow instead. The long prose is
+// never read here: a list shows titles, not instructions.
 func (b *Broker) ledger(ctx context.Context) ([]Record, []Unreadable, error) {
-	heads, err := b.Store.BrokerTaskHeads(ctx)
-	if err != nil {
+	l := &b.snapshot
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.sync(ctx, b.Store); err != nil {
 		return nil, nil, storeError(err)
 	}
 	notices, err := b.Store.BrokerNotices(ctx)
 	if err != nil {
 		return nil, nil, storeError(err)
 	}
-	decoded, stale := b.decoded.lookup(heads)
-	if len(stale) > 0 {
-		fetched, err := b.Store.BrokerTaskRecords(ctx, stale)
-		if err != nil {
-			return nil, nil, storeError(err)
-		}
-		for id, row := range fetched {
-			r, err := Decode(row.Record)
-			decoded[id] = decodedRecord{version: row.Version, record: r, err: err, row: row}
-		}
-	}
-	b.decoded.replace(decoded)
-	out := make([]Record, 0, len(heads))
+	out := make([]Record, 0, len(l.order))
 	bad := []Unreadable{}
-	for _, h := range heads {
-		d, ok := decoded[h.ID]
-		if !ok {
-			// Gone between the two reads: it is not in this answer, and the
-			// next read will say so either way.
-			continue
-		}
+	for _, id := range l.order {
+		d := l.rows[id]
 		if d.err != nil {
-			bad = append(bad, unreadableRow(d.row, d.err))
+			bad = append(bad, unreadableRow(*d.row, d.err))
 			continue
 		}
 		r := d.record
@@ -494,6 +479,114 @@ func (b *Broker) ledger(ctx context.Context) ([]Record, []Unreadable, error) {
 			r.Notice = noticeOf(n)
 		}
 		out = append(out, r)
+	}
+	return out, bad, nil
+}
+
+// TaskWindow is what the task list's page shows of the ledger: every task
+// not yet finished, every row that could not be decoded, and the newest
+// finished tasks — not the whole history.
+type TaskWindow struct {
+	// Live is every readable task whose state is not terminal, newest first.
+	Live []Record
+	// Finished is the newest finished tasks, newest first, at most as many
+	// as were asked for.
+	Finished []Record
+	// FinishedTotal is how many finished tasks the broker holds.
+	FinishedTotal int
+	Unreadable    []Unreadable
+}
+
+// TaskWindow reads the window the task list's page is cut from, with the
+// newest finished tasks up to finished of them. Every Record in it is the one
+// Records would have answered for that task, envelope included; what it does
+// not do is build one for each of the thousands of tasks that finished
+// before them, or read their envelopes.
+func (b *Broker) TaskWindow(ctx context.Context, finished int) (TaskWindow, error) {
+	l := &b.snapshot
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.sync(ctx, b.Store); err != nil {
+		return TaskWindow{}, storeError(err)
+	}
+	out := TaskWindow{Live: []Record{}, Finished: []Record{}, Unreadable: []Unreadable{}}
+	ids := []string{}
+	for _, id := range l.order {
+		d := l.rows[id]
+		switch {
+		case d.err != nil:
+			out.Unreadable = append(out.Unreadable, unreadableRow(*d.row, d.err))
+		case !d.record.State.Terminal():
+			out.Live = append(out.Live, d.record)
+			ids = append(ids, id)
+		default:
+			out.FinishedTotal++
+			if len(out.Finished) < finished {
+				out.Finished = append(out.Finished, d.record)
+				ids = append(ids, id)
+			}
+		}
+	}
+	notices, err := b.Store.BrokerNoticesFor(ctx, ids)
+	if err != nil {
+		return TaskWindow{}, storeError(err)
+	}
+	for _, rows := range [][]Record{out.Live, out.Finished} {
+		for i := range rows {
+			if n, ok := notices[rows[i].ID]; ok {
+				rows[i].Notice = noticeOf(n)
+			}
+		}
+	}
+	return out, nil
+}
+
+// SessionTasks reads what the Session list's rows can be told by, and no
+// more of the history: every task not yet finished, every task whose landing
+// is still pending, every task whose child terminal is one of terminals, and
+// every row that could not be decoded — in Records' order, each the Record
+// Records would have answered.
+//
+// A finished task reaches a row only through its child terminal: the root a
+// task names holds that Session open only while the task runs or while its
+// landing is pending (Owed), and every other fact a row shows of a finished
+// task is read through the terminal its child was in. What it does not do is
+// build a Record and read the notice of every other task that ever finished.
+func (b *Broker) SessionTasks(ctx context.Context, terminals []string) ([]Record, []Unreadable, error) {
+	onScreen := make(map[string]bool, len(terminals))
+	for _, id := range terminals {
+		onScreen[id] = true
+	}
+	l := &b.snapshot
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := l.sync(ctx, b.Store); err != nil {
+		return nil, nil, storeError(err)
+	}
+	out := []Record{}
+	bad := []Unreadable{}
+	ids := []string{}
+	for _, id := range l.order {
+		d := l.rows[id]
+		if d.err != nil {
+			bad = append(bad, unreadableRow(*d.row, d.err))
+			continue
+		}
+		r := d.record
+		if r.State.Terminal() && (r.Landing == nil || r.Landing.State != LandingPending) && !onScreen[r.ChildTerminalID] {
+			continue
+		}
+		out = append(out, r)
+		ids = append(ids, id)
+	}
+	notices, err := b.Store.BrokerNoticesFor(ctx, ids)
+	if err != nil {
+		return nil, nil, storeError(err)
+	}
+	for i := range out {
+		if n, ok := notices[out[i].ID]; ok {
+			out[i].Notice = noticeOf(n)
+		}
 	}
 	return out, bad, nil
 }

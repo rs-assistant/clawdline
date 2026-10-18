@@ -361,3 +361,105 @@ func TestARowTheRelayRefusedIsNotAnsweredAsStated(t *testing.T) {
 		t.Fatalf("the refused row was not tried again on the next pass: %v", out.channels())
 	}
 }
+
+// A refresh of an unchanged set states the pass id the viewer already holds.
+// The id hashes the set (statusGeneration), so no new id is coming; the answer
+// names it, which is what lets the page answer its refresh at once instead of
+// waiting for a pass that never comes.
+func TestARestatementOfAnUnchangedSetNamesThePassItsMarkerCarries(t *testing.T) {
+	out := &collector{}
+	router := &fixedRouter{body: scanBody(t, true, map[string]bool{"ps": true, "tmux": true, "iterm": true},
+		scanRow{id: "%19", tty: "ttys001", backend: "tmux"})}
+	publisher := newPublisher(router, out)
+	publisher.Every = 20 * time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { _ = publisher.Run(ctx); close(done) }()
+	marker := "ss/mac-01/" + InventorySessionID
+	waitFor(t, "the first status marker", func() bool {
+		for _, name := range out.channels() {
+			if name == marker {
+				return true
+			}
+		}
+		return false
+	})
+	held, _ := out.payload(t, marker)["snapshot_generation"].(string)
+	time.Sleep(3 * publisher.Every)
+	out.reset()
+
+	stated, refusal := publisher.Snapshot(ctx)
+	if refusal != nil {
+		t.Fatalf("refused: %+v", *refusal)
+	}
+	restated, _ := out.payload(t, marker)["snapshot_generation"].(string)
+	if held == "" || stated.Generation != held || restated != held {
+		t.Fatalf("the viewer holds pass %q; the restated marker says %q and the answer names %q",
+			held, restated, stated.Generation)
+	}
+
+	cancel()
+	<-done
+}
+
+// restated runs one re-statement synchronously and answers what the page is told.
+func restated(t *testing.T, publisher *Publisher) snapshotResult {
+	t.Helper()
+	publisher.mu.Lock()
+	answer := make(chan snapshotResult, 1)
+	publisher.asks = []chan snapshotResult{answer}
+	publisher.mu.Unlock()
+	publisher.restatePass(context.Background())
+	return <-answer
+}
+
+// The pass id a re-statement names is a promise that the viewer holds a marker
+// with it. Each case is a pass that stated no ss/ marker, after a pass that did,
+// so a stale id or a marker published behind a missing row shows up in the answer.
+func TestARestatementNamesNoPassItsMarkerDidNotState(t *testing.T) {
+	marker := "ss/mac-01/" + InventorySessionID
+	row := "ss/mac-01/%2519"
+	partial := scanBody(t, false, map[string]bool{"ps": true, "tmux": true, "iterm": false},
+		scanRow{id: "%19", tty: "ttys001", backend: "tmux"})
+	for _, tc := range []struct {
+		name  string
+		fail  string // the channel the relay refuses on the second pass
+		body  string // the second pass's reading
+		quiet bool   // the marker must not go out on the second pass
+	}{
+		// A marker behind a row that did not leave names a Session the viewer never gets.
+		{name: "a status row was refused", fail: row, body: completeScan, quiet: true},
+		{name: "the status marker was refused", fail: marker, body: completeScan},
+		// A partial reading states no ss/ set, so the previous pass's id is not this pass's.
+		{name: "the reading was partial", body: partial, quiet: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := &collector{}
+			router := &fixedRouter{body: completeScan}
+			publisher := newPublisher(router, out)
+			refuse := ""
+			publisher.Publish = func(ctx context.Context, o Outbound) error {
+				if o.Channel == refuse {
+					return errors.New("spool full")
+				}
+				return out.publish(ctx, o)
+			}
+			first := restated(t, publisher)
+			if first.refusal != nil || first.stated.Generation == "" {
+				t.Fatalf("the first pass answered %+v, %+v", first.stated, first.refusal)
+			}
+			out.reset()
+			refuse = tc.fail
+			router.set(tc.body)
+			second := restated(t, publisher)
+			if second.refusal == nil && second.stated.Generation != "" {
+				t.Fatalf("a pass that stated no marker named pass %q (the first pass named %q)",
+					second.stated.Generation, first.stated.Generation)
+			}
+			if tc.quiet && holds(out.channels(), marker) {
+				t.Fatalf("the marker went out on a pass that stated no whole set: %v", out.channels())
+			}
+		})
+	}
+}

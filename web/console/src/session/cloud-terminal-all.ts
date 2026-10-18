@@ -110,3 +110,40 @@ export async function withTerminalListRetries<T extends { errors: readonly Cloud
     if (!live()) return result
   }
 }
+
+/** The bare code of a failure whose message may carry the machine's own words after a colon. */
+export function noticeCode(message: string): string {
+  return message.split(":")[0].trim()
+}
+
+const OFFLINE_CODES = new Set(["machine_offline", "machine_stale"])
+
+/** One card the list shows above its rows: what happened, in which machine, and the one way forward. */
+export interface TerminalListNotice {
+  key: string
+  kind: "offline" | "denied" | "checking" | "unverified" | "failed" | "projects"
+  machine: string
+  code: string
+}
+
+/**
+ * The list's failures as cards, one per cause. A machine that is offline fails the Project list
+ * and the terminal read alike; on 2026-10-18 that showed as two paragraphs with two codes and two
+ * Try again buttons, which read as a broken page. It is now one "offline" card.
+ */
+export function terminalListNotices(projectError: string, errors: readonly CloudTerminalError[],
+  machine: string, retrying: boolean): TerminalListNotice[] {
+  const notices: TerminalListNotice[] = errors.map((error) => {
+    const kind = OFFLINE_CODES.has(error.code) ? "offline" : terminalListErrorKind(error.code) === "denied" ? "denied" :
+      terminalListErrorKind(error.code) === "retryable" ? (retrying ? "checking" : "unverified") : "failed"
+    return { key: `machine:${error.machine}`, kind, machine: error.machine, code: error.code }
+  })
+  if (projectError) {
+    const code = noticeCode(projectError)
+    if (OFFLINE_CODES.has(code)) {
+      if (!notices.some((notice) => notice.kind === "offline"))
+        notices.unshift({ key: "projects", kind: "offline", machine, code })
+    } else notices.unshift({ key: "projects", kind: "projects", machine, code })
+  }
+  return notices
+}

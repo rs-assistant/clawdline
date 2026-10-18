@@ -11,16 +11,20 @@ function page() {
     textContent: "", hidden: false, disabled: false, dataset: {} as Record<string, string>,
     setAttribute() {}, addEventListener() {}, querySelectorAll() { return [] },
   }]))
-  return { doc: { getElementById: (id: string) => nodes.get(id) ?? null } as unknown as Document, nodes }
+  return { doc: { documentElement: { lang: "en" }, getElementById: (id: string) => nodes.get(id) ?? null } as unknown as Document, nodes }
 }
 
 test("the hosted Plan page reads the signed-in account while the local page makes no billing call", async () => {
   const original = globalThis.fetch
+  let promo = false
   const calls: { url: string; credentials: RequestCredentials | undefined }[] = []
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     calls.push({ url, credentials: init?.credentials })
-    if (url.endsWith("/v1/entitlements")) return new Response(JSON.stringify({
+    if (url.endsWith("/v1/entitlements")) return new Response(JSON.stringify(promo ? {
+      entitlements: { tier: "pro", max_machines: 5 }, plan_source: "promo",
+      promo_expires_at: "2027-01-18T12:00:00.000Z", purchasable_tiers: ["pro"],
+    } : {
       entitlements: { tier: "free", max_machines: 1 }, purchasable_tiers: ["pro"],
     }), { status: 200 })
     return new Response("{}", { status: 404 })
@@ -32,6 +36,11 @@ test("the hosted Plan page reads the signed-in account while the local page make
     assert.equal(hostedPlan.state(), "free")
     assert.equal(hosted.nodes.get("plan-upgrade")?.hidden, false)
     assert.ok(calls.some((call) => call.url === "https://api.example.test/v1/entitlements" && call.credentials === "include"))
+    promo = true
+    await hostedPlan.enter()
+    assert.equal(hostedPlan.state(), "paid")
+    assert.equal(hosted.nodes.get("plan-portal")?.hidden, true)
+    assert.match(hosted.nodes.get("plan-say")?.textContent ?? "", /2027-01-18/)
     await hostedPlan.enter({ returning: true })
     assert.equal(hostedPlan.state(), "waiting")
     hostedPlan.leave()

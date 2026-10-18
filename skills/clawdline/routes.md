@@ -1,6 +1,6 @@
 # Agent routes in this build
 
-Generated from the registered routes and `api/v1/agent-routes.json`; API level: 18. Read `clawdline guide` first, then the part named below. A route here is discoverability, **not authorization or proof of completion**. For an action under a prefix, its input, permission, refusals, and receipt must be stated by that part and this build's schema. If the part does not specify that action, treat the route as unavailable to an Agent. Stop on a missing capability or version, mismatched identity, or unknown outcome; do not switch machines or use an older interface.
+Generated from the registered routes and `api/v1/agent-routes.json`; API level: 21. Read `clawdline guide` first, then the part named below. A route here is discoverability, **not authorization or proof of completion**. For an action under a prefix, its input, permission, refusals, and receipt must be stated by that part and this build's schema. If the part does not specify that action, treat the route as unavailable to an Agent. Stop on a missing capability or version, mismatched identity, or unknown outcome; do not switch machines or use an older interface.
 
 | Method | Registered route | Since API level | Agent guide | Human goal |
 | --- | --- | ---: | --- | --- |
@@ -14,6 +14,7 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | `*` | `/v1/cloud/commands` | 9 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/devices/revoke` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/direct` | 15 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
+| `*` | `/v1/cloud/direct/local-network` | 21 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/enabled` | 9 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/keys/rotate` | 1 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/login` | 9 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
@@ -31,8 +32,6 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | `*` | `/v1/cloud/viewer/machines` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/viewer/receipts` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/cloud/viewer/sessions` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
-| `*` | `/v1/cloud/viewer/skills` | 5 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
-| `*` | `/v1/cloud/viewer/status` | 4 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/devstacks` | 1 | `clawdline guide project` | `docs/user/projects.md` |
 | `*` | `/v1/diagnostics` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/events` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
@@ -51,7 +50,6 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | `*` | `/v1/orchestrator/decisions` | 1 | `clawdline guide board` | `docs/user/board.md` |
 | `*` | `/v1/orchestrator/decisions/` | 1 | `clawdline guide board` | `docs/user/board.md` |
 | `*` | `/v1/orchestrator/detached-tasks` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
-| `*` | `/v1/orchestrator/durable-reports/promotions` | 1 | `clawdline guide report` | `docs/user/sessions.md` |
 | `*` | `/v1/orchestrator/graphs` | 1 | `clawdline guide coordination` | `docs/user/clawdfather-and-dispatch.md` |
 | `*` | `/v1/orchestrator/handoffs` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
 | `*` | `/v1/orchestrator/handoffs/` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
@@ -69,9 +67,7 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | `*` | `/v1/orchestrator/reclaim` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
 | `*` | `/v1/orchestrator/root-assignments` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
 | `*` | `/v1/orchestrator/root-assignments/` | 1 | `clawdline guide landing` | `docs/user/clawdfather-and-dispatch.md` |
-| `*` | `/v1/orchestrator/runs/` | 1 | `clawdline guide running` | `docs/user/clawdfather-and-dispatch.md` |
 | `*` | `/v1/orchestrator/schedule-exports` | 1 | `clawdline guide schedule` | `docs/user/schedules.md` |
-| `*` | `/v1/orchestrator/schedule-imports` | 1 | `clawdline guide schedule` | `docs/user/schedules.md` |
 | `*` | `/v1/orchestrator/schedule-webhooks/bind` | 1 | `clawdline guide schedule` | `docs/user/schedules.md` |
 | `*` | `/v1/orchestrator/schedules` | 1 | `clawdline guide schedule` | `docs/user/schedules.md` |
 | `*` | `/v1/orchestrator/schedules/` | 1 | `clawdline guide schedule` | `docs/user/schedules.md` |
@@ -95,7 +91,6 @@ Generated from the registered routes and `api/v1/agent-routes.json`; API level: 
 | `*` | `/v1/remote/machines` | 13 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/remote/tasks` | 13 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
 | `*` | `/v1/remote/tasks/` | 13 | `clawdline guide cloud` | `docs/user/cloud-first-look.md` |
-| `*` | `/v1/screens` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/sessions` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/sessions/` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |
 | `*` | `/v1/settings` | 1 | `clawdline guide connect` | `docs/user/first-session.md` |

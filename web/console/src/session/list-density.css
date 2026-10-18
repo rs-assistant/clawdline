@@ -14,6 +14,14 @@
   overflow: hidden;
 }
 
+/* The browser decides who owns a touch from the styles in force when the
+ * finger lands. A swipe row must allow vertical scrolling before touchstart;
+ * adding data-swipe during that event is too late on WebKit, especially when
+ * a short row gives the finger little room before the browser cancels it. */
+@media (max-width: 899px) {
+  .row[data-swipe-width] { touch-action: pan-y; }
+}
+
 .row > .title,
 .row > .meta,
 .row > .state {
@@ -191,6 +199,16 @@
  * row is active and where it belongs.
  */
 @media (max-width: 480px) {
+  /* Keep both states on the original line. Their fixed glyphs and spinner
+   * need their own width even when the adjacent words are ellipsised. */
+  .row .state:has(> .session-callback-active):has(> .coordination-wait) > .session-callback-active {
+    min-width: 38px;
+  }
+
+  .row .state:has(> .session-callback-active):has(> .coordination-wait) > .coordination-wait {
+    min-width: 18px;
+  }
+
   .row .state:has(> .session-callback-active) > .persona-state {
     max-width: 14px;
     overflow: hidden;

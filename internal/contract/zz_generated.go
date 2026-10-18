@@ -2631,7 +2631,6 @@ type Diagnostics struct {
 	Scheduler SchedulerPulse       `json:"scheduler"`
 	ServedBy  string               `json:"served_by"`
 	Terminals *TerminalDiagnostics `json:"terminals,omitempty"`
-	Upstream  int64                `json:"upstream"`
 	Usage     *UsageDiagnostics    `json:"usage,omitempty"`
 }
 
@@ -3566,10 +3565,6 @@ type PairedDevice struct {
 	// absent when never.
 	LastSeen int64  `json:"last_seen,omitempty"`
 	Name     string `json:"name"`
-
-	// Legacy terminal grant record for older clients. Access now follows pairing; this
-	// field does not grant or revoke terminal access.
-	Terminal bool `json:"terminal,omitempty"`
 }
 
 // One `pairing` event on GET /v1/auth/pairings, the server-sent stream only
@@ -4570,19 +4565,18 @@ type RecordedLanding struct {
 // Where a recorded landing of a Board item comes from. `task`: a bound broker
 // task's landed or incorporated record; its id is the task id. `root`: a broker
 // root landing row, written when the owning Session proved a commit with `item
-// phase deploying --commit --target --remote` and no child task carried it.
-// `phase_event`: a landing copy an older daemon wrote into the item's phase
-// event before root landings had rows of their own; read, never rewritten.
+// phase deploying --commit --target --remote` and no child task carried it. A
+// landing copy an older daemon wrote into the item's phase event is given a
+// root row when the store opens.
 type RecordedLandingSource string
 
 const (
-	RecordedLandingSourceTask       RecordedLandingSource = "task"
-	RecordedLandingSourceRoot       RecordedLandingSource = "root"
-	RecordedLandingSourcePhaseEvent RecordedLandingSource = "phase_event"
+	RecordedLandingSourceTask RecordedLandingSource = "task"
+	RecordedLandingSourceRoot RecordedLandingSource = "root"
 )
 
 // RecordedLandingSourceValues is every value the contract allows, in contract order.
-var RecordedLandingSourceValues = []RecordedLandingSource{RecordedLandingSourceTask, RecordedLandingSourceRoot, RecordedLandingSourcePhaseEvent}
+var RecordedLandingSourceValues = []RecordedLandingSource{RecordedLandingSourceTask, RecordedLandingSourceRoot}
 
 // Every refusal on this daemon has this shape. A caller reads `error` as the
 // code and never parses `detail`.
@@ -4594,7 +4588,6 @@ type Refusal struct {
 	DetailKey string `json:"detail_key,omitempty"`
 	Error     string `json:"error"`
 	Route     string `json:"route,omitempty"`
-	Upstream  string `json:"upstream,omitempty"`
 }
 
 // Why nothing can be offered. `boot_unknown`: this machine cannot read its boot
@@ -5260,37 +5253,6 @@ type ScreenEvent struct {
 	Revision string `json:"revision"`
 }
 
-// The machine state this feature creates, published so that somebody can see
-// it. `tmux list-panes -a -F '#{pane_id} #{pane_pipe}'` answers the same
-// question in one command; this answers it and says which of those pipes this
-// daemon can account for, which tmux cannot, because `#{pane_pipe}` is a
-// boolean with no owner in it. A pane that is piped and not on this daemon's
-// list is therefore `unattributed` rather than a leak, and nothing here takes
-// somebody else's pipe off.
-type ScreenInventory struct {
-	Attached     []string      `json:"attached"`
-	LeaseSeconds int64         `json:"leaseSeconds"`
-	Piped        []string      `json:"piped"`
-	Screens      []ScreenWatch `json:"screens"`
-	Unattributed []string      `json:"unattributed"`
-	WindowMs     int64         `json:"windowMs"`
-}
-
-// One row of what this daemon is watching.
-type ScreenWatch struct {
-	Backend   Backend       `json:"backend"`
-	Captures  int64         `json:"captures"`
-	Channel   ScreenChannel `json:"channel"`
-	ExpiresIn int64         `json:"expiresIn"`
-	ID        string        `json:"id"`
-	Readable  bool          `json:"readable"`
-
-	// Whether this daemon has a pipe on that pane right now.
-	Signalled bool  `json:"signalled"`
-	Signals   int64 `json:"signals"`
-	Watching  bool  `json:"watching"`
-}
-
 // Text, pictures, or both; a send that is neither is refused. Each picture is a
 // base64 `data:` URL, at most six, inside the 20 MB body limit. Pictures that
 // cannot be decoded are left out, and a send none of whose pictures can be is
@@ -5817,7 +5779,14 @@ type SessionRow struct {
 	// The built-in persona (GET /v1/personas) this session was launched as, read back
 	// from its process command line; absent for none, and absent on a row with no
 	// process reading.
-	Persona        string                `json:"persona,omitempty"`
+	Persona string `json:"persona,omitempty"`
+
+	// The Project this Session would be accepted into, decided from `cwd` by the same
+	// rule an assignment's claim applies: the nearest repository, with a linked
+	// worktree followed to the repository it belongs to and symlinks resolved. A Board
+	// item's `project.path` is compared with it. Absent when `cwd` is absent or not
+	// absolute.
+	ProjectKey     string                `json:"project_key,omitempty"`
 	RootAssignment *RootAssignmentRecord `json:"root_assignment,omitempty"`
 	ScreenReading  SessionScreenReading  `json:"screen_reading,omitempty"`
 
@@ -7167,13 +7136,6 @@ var TerminalCursorShapeValues = []TerminalCursorShape{TerminalCursorShapeDefault
 
 // What /v1/diagnostics says about terminals.
 type TerminalDiagnostics struct {
-	// Why the grants file could not be read.
-	GrantsError string `json:"grants_error,omitempty"`
-
-	// The legacy terminal grants file could be read. It no longer controls terminal
-	// access.
-	GrantsOK bool `json:"grants_ok"`
-
 	// Control leases held now.
 	Leases    int64                 `json:"leases"`
 	Osascript *OsascriptDiagnostics `json:"osascript,omitempty"`
@@ -7205,22 +7167,6 @@ type TerminalFrame struct {
 
 	// The screen's height. The text is `lines`.
 	Rows int64 `json:"rows"`
-}
-
-type TerminalGrant struct {
-	DeviceID string `json:"device_id"`
-	Granted  bool   `json:"granted"`
-
-	// Unix seconds. Absent when not granted.
-	GrantedAt int64 `json:"granted_at,omitempty"`
-}
-
-// Legacy POST /v1/auth/devices/{id}/terminal. This machine's own token only,
-// and never through Clawdline Cloud. The record remains readable for older
-// clients, but terminal access now follows pairing and send permission; this
-// grant does not change access.
-type TerminalGrantRequest struct {
-	Grant bool `json:"grant"`
 }
 
 // GET /v1/terminals/{id}/history?lines=N: up to N lines that scrolled off the

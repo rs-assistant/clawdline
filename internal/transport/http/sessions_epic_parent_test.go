@@ -3,8 +3,8 @@ package http
 import (
 	"testing"
 
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/adapters/store"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
@@ -14,9 +14,9 @@ func TestSessionRowCarriesEpicPresentationParentOnlyForAnIndependentRoot(t *test
 		ConversationID: "conversation-child", State: session.StateIdle}
 	live := liveOf(item)
 	conversation := item.ConversationID
-	snapshot := swiftstore.Snapshot{Orchestrator: swiftstore.Orchestrator{RootAssignments: []swiftstore.RootAssignment{{
+	snapshot := ownrecords.Snapshot{Orchestrator: ownrecords.Orchestrator{RootAssignments: []ownrecords.RootAssignment{{
 		ID: "root-child", Label: "Feature", State: "briefed",
-		Identity: &swiftstore.RootAssignmentIdentity{TerminalID: item.ID, Assistant: "codex", ConversationID: &conversation},
+		Identity: &ownrecords.RootAssignmentIdentity{TerminalID: item.ID, Assistant: "codex", ConversationID: &conversation},
 	}}}}
 	parent := store.EpicRootParent{OwnerSession: "original-owner", EpicID: "epic-a"}
 	got := s.sessionRow(rowInput{item: item, live: live, swift: snapshot, epicParent: parent}).EpicParent

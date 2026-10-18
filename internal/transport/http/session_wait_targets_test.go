@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 )
 
 func TestAWaitTargetSaysWhatTheWorkIsNotWhatItWillSayWhenDone(t *testing.T) {
 	strp := func(s string) *string { return &s }
-	tasks := []*swiftstore.Task{
+	tasks := []*ownrecords.Task{
 		{ID: "heavy-running", Title: "Queued heavy command finished", CallbackIntent: orchestrator.CallbackIntentHeavy},
 		{ID: "heavy-queued", Title: "Queued heavy command finished", CallbackIntent: orchestrator.CallbackIntentHeavy},
 		{ID: "wait", Title: "CI finished", CallbackIntent: orchestrator.CallbackIntentWait},
@@ -43,9 +43,9 @@ func TestAWaitTargetSaysWhatTheWorkIsNotWhatItWillSayWhenDone(t *testing.T) {
 }
 
 func TestAWaitTargetListKeepsItsBoundAndCountsTheRest(t *testing.T) {
-	var tasks []*swiftstore.Task
+	var tasks []*ownrecords.Task
 	for i := 0; i < MaximumWaitTargets+3; i++ {
-		tasks = append(tasks, &swiftstore.Task{ID: fmt.Sprint("t", i), Title: "child"})
+		tasks = append(tasks, &ownrecords.Task{ID: fmt.Sprint("t", i), Title: "child"})
 	}
 	got, omitted := (&Server{}).waitTargets(context.Background(), tasks, nil, nil)
 	if len(got) != MaximumWaitTargets || omitted != 3 || got[0].TaskID != "t0" {

@@ -43,7 +43,7 @@ const (
 const ReadBudget = 8 << 20
 
 // AskTool is the tool Claude Code stops on when it wants a decision rather
-// than a file, and AskMarker is what that call's text starts with. A question
+// than a file, and AskMarker is what a question call's text starts with. A question
 // is the one call whose arguments are the content, so it carries them — as
 // JSON after a marker no transcript contains and no keyboard produces — and a
 // renderer that has not been taught about it can tell data from a summary.
@@ -1101,11 +1101,9 @@ func tagAttribute(name, tag string) string {
 func parseCodex(r io.ReaderAt, size int64, limit int) ([]Entry, int64) {
 	var newestFirst []Entry
 	unread := eachLineFromEnd(r, size, func(line []byte) bool {
-		// Only three row shapes can yield anything, and each spells its marker
+		// Only these row shapes can yield anything, and each spells its marker
 		// literally. Skipping the rest unparsed is most of what a rollout is.
-		if !bytes.Contains(line, []byte("item_completed")) &&
-			!bytes.Contains(line, []byte("task_complete")) &&
-			!bytes.Contains(line, []byte("tools.update_plan(")) {
+		if !codexInterestingLine(line) {
 			return true
 		}
 		rowEntries := codexEntries(line)
@@ -1115,6 +1113,15 @@ func parseCodex(r io.ReaderAt, size int64, limit int) ([]Entry, int64) {
 		return len(newestFirst) < limit
 	})
 	return oldestFirst(newestFirst, limit), unread
+}
+
+func codexInterestingLine(line []byte) bool {
+	return bytes.Contains(line, []byte("item_completed")) ||
+		bytes.Contains(line, []byte("task_complete")) ||
+		bytes.Contains(line, []byte("turn_aborted")) ||
+		(bytes.Contains(line, []byte("custom_tool_call_output")) && bytes.Contains(line, []byte("Rejected("))) ||
+		bytes.Contains(line, []byte("tools.update_plan(")) ||
+		bytes.Contains(line, []byte("request_user_input_async"))
 }
 
 // codexEntries is the Swift app's `Codex.entries(inRow:)`: finished
@@ -1146,6 +1153,29 @@ func codexEntries(line []byte) []Entry {
 		}
 		return nil
 	}
+	if rowType == "event_msg" && payloadType == "turn_aborted" {
+		if reason, _ := payload.str("reason"); reason == "interrupted" {
+			return []Entry{{Kind: KindError, Text: "Conversation interrupted", At: at}}
+		}
+		return nil
+	}
+	if rowType == "response_item" && payloadType == "custom_tool_call_output" {
+		if reason := codexToolDenial(payload["output"]); reason != "" {
+			return []Entry{{Kind: KindError, Text: reason, At: at}}
+		}
+		return nil
+	}
+	if rowType == "response_item" && payloadType == "function_call" {
+		name, _ := payload.str("name")
+		if name == "request_user_input_async" {
+			if args, ok := payload.str("arguments"); ok {
+				if question, ok := codexAsyncQuestion(args); ok {
+					return []Entry{{Kind: KindTool, Text: question, Tool: name, At: at}}
+				}
+			}
+		}
+		return nil
+	}
 	if rowType != "response_item" || payloadType != "custom_tool_call" {
 		return nil
 	}
@@ -1159,6 +1189,75 @@ func codexEntries(line []byte) []Entry {
 		return nil
 	}
 	return []Entry{{Kind: KindTool, Text: "Updated Plan", Tool: "plan", At: at, Plan: steps}}
+}
+
+// Codex does not write its terminal's "Request denied" line as an event.
+// The rejected tool's output does contain the approval review's reason. Keep
+// only that reason, not the tool wrapper or an arbitrary command's output.
+func codexToolDenial(raw json.RawMessage) string {
+	parts, ok := rawObjects(raw)
+	if !ok {
+		return ""
+	}
+	for _, part := range parts {
+		message, ok := part.str("text")
+		if !ok || !strings.Contains(message, "Script error:\nexec_command failed: CreateProcess") ||
+			!strings.Contains(message, "Rejected(") {
+			continue
+		}
+		start := strings.Index(message, "Reason: ")
+		if start < 0 {
+			continue
+		}
+		reason := message[start+len("Reason: "):]
+		if end := strings.Index(reason, `\\n`); end >= 0 {
+			reason = reason[:end]
+		}
+		return strings.TrimSpace(reason)
+	}
+	return ""
+}
+
+// Codex's async question is recorded as a function call. The result only
+// acknowledges that Codex queued it; the transcript card makes no claim that
+// it was shown or answered.
+func codexAsyncQuestion(args string) (string, bool) {
+	input, ok := decodeObject([]byte(args))
+	if !ok {
+		return "", false
+	}
+	asked, ok := input.objects("questions")
+	if !ok {
+		return "", false
+	}
+	type option struct {
+		L string `json:"l"`
+	}
+	type question struct {
+		Q string   `json:"q"`
+		O []option `json:"o"`
+	}
+	items := []question{}
+	for _, q := range asked {
+		item := question{Q: q.clean("title"), O: []option{}}
+		options, _ := rawArray(q["options"])
+		for _, raw := range options {
+			if label, ok := rawString(raw); ok && strings.TrimSpace(label) != "" {
+				item.O = append(item.O, option{L: strings.TrimSpace(label)})
+			}
+		}
+		if item.Q != "" {
+			items = append(items, item)
+		}
+	}
+	if len(items) == 0 {
+		return "", false
+	}
+	encoded, ok := encodeJSON(items)
+	if !ok {
+		return "", false
+	}
+	return AskMarker + encoded, true
 }
 
 func codexItemEntries(item object, at int64) []Entry {

@@ -1,5 +1,6 @@
 import { RefusalError, TransportError, isRefusal } from "@clawdline/core"
 import { fetchWithDeadline } from "./fetch-deadline.js"
+import { readSessionListWith } from "./session-assignment.js"
 import type { PersonaSuggestionReply, SessionsSnapshot, UsageItem, UsageSession, WorkGateCompactRead, WorkGateDetailRead, WorkGateDecisionAction } from "@clawdline/contract"
 import type { CreatedVia } from "./words.js"
 
@@ -60,10 +61,10 @@ export interface ProjectPlacePage {
   places: ProjectPlace[]
 }
 
-async function call<T>(path: string, init: RequestInit = {}, timeoutMs = 15_000): Promise<T> {
+async function call<T>(path: string, init: RequestInit = {}, timeoutMs = 15_000, answerMs = 0): Promise<T> {
   let res: Response
   try {
-    res = await fetchWithDeadline(path, { credentials: "same-origin", ...init }, timeoutMs)
+    res = await fetchWithDeadline(path, { credentials: "same-origin", ...init }, timeoutMs, answerMs)
   } catch (cause) {
     throw new TransportError(`${init.method ?? "GET"} ${path} did not complete`, cause)
   }
@@ -499,7 +500,7 @@ export const submitSecretHandoffV2 = (conversationID: string, noteID: string, va
     `/v1/work/v2/human-interventions/${encodeURIComponent(`conversation:${conversationID}`)}/${noteID}/handoff`,
     { value },
   )
-export const readSessionsForWorkV2 = () => call<SessionsSnapshot>("/v1/sessions")
+export const readSessionsForWorkV2 = () => readSessionListWith<SessionsSnapshot>(call)
 /** The token ledger's bill of a Board item, and of one session (docs/token-ledger.md). */
 export const readItemUsage = (itemID: string) => call<UsageItem>(`/v1/usage/items/${encodeURIComponent(itemID)}`)
 export const readSessionUsage = (conversation: string) =>

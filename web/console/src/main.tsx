@@ -2,6 +2,7 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { DoorGate } from "./door/Door.js"
 import { keepSamePageLinksHere } from "./same-page-links.js"
+import { capturePromoLink } from "./pages/plan/promo.js"
 
 // The original stylesheet, all of it, in the order index.html links it. These
 // are byte-for-byte copies (see legacy/README.md). The first cut copied only the
@@ -47,6 +48,7 @@ import { restoreFontScale } from "./font-scale.js"
 // The body remains hidden behind `html.booting` until its words arrive, so a
 // remembered size is in place before the first visible layout.
 restoreFontScale()
+capturePromoLink(window)
 
 const host = document.getElementById("root")
 if (!host) throw new Error("no #root in the document")
@@ -71,7 +73,19 @@ keepSamePageLinksHere(window)
 // The gate is loaded only when declared, so the daemon's console does not
 // carry the relay client.
 const declared = import.meta.env.VITE_HOSTED_CONSOLE as string | undefined
-if (declared) {
+// `/admin` and every address under it on the hosted build are Cloud's
+// operations pages, which stand apart from the machine gate so an operator
+// with no machine or relay still reaches them (cloud/admin/AdminGate.tsx). The
+// page itself decides which of its pages an address names, so a deep link and
+// Back and Forward all land on it (`adminRoute` in cloud/admin/words.ts).
+const operations = location.pathname === "/admin" || location.pathname.startsWith("/admin/")
+if (declared && operations) {
+  void import("./cloud/admin/AdminGate.js").then(({ AdminGate }) =>
+    // Session establishment registers a revocable viewer device. React's
+    // development-only StrictMode effect replay must not register it twice.
+    createRoot(host).render(<AdminGate declared={declared} />),
+  )
+} else if (declared) {
   void import("./cloud/CloudGate.js").then(({ CloudGate }) =>
     createRoot(host).render(
       <StrictMode>

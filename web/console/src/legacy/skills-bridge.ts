@@ -3,7 +3,7 @@
 // `composer.js` is not copied: it binds every listener through `core/dom.js`,
 // which looks each id up once at import, before React has drawn the composer.
 // Its one pure neighbour is: `js/input/skill-picker-state.js`, beside this
-// file byte for byte and imported as it is. The rest — which text opens the
+// file and imported as it is. The rest — which text opens the
 // menu, how a skill ranks against what was typed, the nine rows — is here,
 // function for function, and both boxes that offer the menu use it: the
 // console's composer (`session/Composer.tsx`) and the input bar

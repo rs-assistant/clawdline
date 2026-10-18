@@ -30,8 +30,8 @@ trap 'rm -rf -- "$stage"' EXIT HUP INT TERM
 umask 077
 
 # A session opened by the daemon inherits its production switches. They are
-# inputs to a running service, not to its test/build process: standalone mode,
-# for example, deliberately disables the forwarding exercised by tests.
+# inputs to a running service, not to its test/build process: its port and state
+# directory, for example, would point the tests at the person's daemon.
 while IFS='=' read -r name _; do
   case "$name" in
     CLAWDLINE_NEXT_*) unset "$name" ;;

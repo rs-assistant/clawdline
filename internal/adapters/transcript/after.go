@@ -28,9 +28,7 @@ func ReadClaudeAfter(path string, limit int, after int64) (Page, error) {
 // ReadCodexAfter is ReadClaudeAfter for a Codex record.
 func ReadCodexAfter(path string, limit int, after int64) (Page, error) {
 	return readAfter(path, limit, after, func(line []byte) []Entry {
-		if !bytes.Contains(line, []byte("item_completed")) &&
-			!bytes.Contains(line, []byte("task_complete")) &&
-			!bytes.Contains(line, []byte("tools.update_plan(")) {
+		if !codexInterestingLine(line) {
 			return nil
 		}
 		return codexEntries(line)

@@ -19,8 +19,8 @@
  * conversation record last grew — so every device sorts the same list the same
  * way and a browser opened for the first time is not starting over.
  *
- * Restated rather than wrapped, because the copied function has no seam for a
- * comparator and `derive.js` stays byte for byte (`tools/check-legacy-css.sh`).
+ * Restated rather than wrapped, because the copied function had no seam for a
+ * comparator while `derive.js` was a byte-for-byte copy.
  * Every function here takes what it reads as arguments and nothing is imported
  * at run time, so `node --test` loads this file as it is. The seam that feeds
  * it the copied modules' state is `legacy/order-bridge.ts`.

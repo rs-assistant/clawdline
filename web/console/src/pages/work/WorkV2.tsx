@@ -1,4 +1,5 @@
 import { catalogFormat } from "../../catalog.js"
+import { focusModalContainer } from "../../modal-focus.js"
 import { catalogWord, catalogWordLanguage } from "../../catalog.js"
 import { catalogLabel, closingMark, fullWidthPunctuation, quotedTitle } from "../../punctuation.js"
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react"
@@ -6,6 +7,7 @@ import { createPortal } from "react-dom"
 import type { Assistant, SessionRow } from "@clawdline/contract"
 import { RefusalError, asMachineNeedsUpdate, type MachineNeedsUpdate } from "@clawdline/core"
 import { NeedsUpdate } from "../../machine/NeedsUpdate.js"
+import { recordSessionListFailure } from "../../cloud/install.js"
 import * as L from "../../legacy/bridge.js"
 import { isPicture, prepareReferencePicture } from "../../legacy/shots-bridge.js"
 import { sessionFragment } from "../../session/address.js"
@@ -71,7 +73,9 @@ import {
   type SessionWorkV2,
 } from "./api.js"
 import {
-  assignmentCandidates,
+  assignmentChoiceRows,
+  assignmentChoices,
+  assignmentChoicesWords,
   assistantName,
   awaitsAcceptance,
   NEW_SESSION_ASSISTANTS,
@@ -80,6 +84,9 @@ import {
   sessionActivityName,
   sessionWorkCounts,
   sessionWorkLabel,
+  type AssignmentChoices,
+  SessionListReader,
+  type SessionListReading,
 } from "./session-assignment.js"
 import { workV2CreateDecision, type WorkV2CreateDecision } from "./create-decision.js"
 import { claimedViaLine, createdViaLine, epicOwnerLine, originLine, workOrigin, workWord } from "./words.js"
@@ -102,6 +109,17 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
   const [items, setItems] = useState<WorkV2Item[]>([])
   const [places, setPlaces] = useState<ProjectPlace[]>([])
   const [sessions, setSessions] = useState<SessionRow[]>([])
+  const [failure, setFailure] = useState("")
+  // The Board load and the picker's retry read the Session list through one
+  // reader, which keeps the newest answer on screen (session-assignment.ts).
+  const [sessionReader] = useState(() => new SessionListReader({
+    read: readSessionsForWorkV2,
+    publish: (state) => { setSessions(state.sessions); setSessionList(state.reading) },
+    words: failureWords,
+    recovered: (notice) => setFailure((current) => current === notice ? "" : current),
+    failed: recordSessionListFailure,
+  }))
+  const [sessionList, setSessionList] = useState<SessionListReading>(() => sessionReader.state.reading)
   const [proposals, setProposals] = useState<WorkV2Proposal[]>([])
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [project, setProject] = useState("")
@@ -123,7 +141,6 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState("")
   const [busy, setBusy] = useState("")
-  const [failure, setFailure] = useState("")
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
   const loadGeneration = useRef(0)
   const answeredDecisionIDs = useRef(new Set<string>())
@@ -149,7 +166,7 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
       // Sessions can be the slowest inventory read. Start the independent
       // reads now; the Board waits only for the Project catalog it needs to
       // resolve the URL, never for those reads before it starts its own.
-      const supportRead = Promise.allSettled([readSessionsForWorkV2(), readWorkV2Proposals(), readDecisions()])
+      const supportRead = Promise.allSettled([sessionReader.refresh(), readWorkV2Proposals(), readDecisions()])
       const projects = await readProjectPlaces()
       const selectedProject = workProjectID(routeProject, projects.places)
       const work = await readWorkV2(selectedProject || undefined, status, search)
@@ -167,11 +184,14 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
       // slow Session, proposal, decision, or Epic-family request.
       void supportRead.then(([live, suggestions, questions]) => {
         if (generation !== loadGeneration.current) return
-        if (live.status === "fulfilled") setSessions(live.value.sessions)
         if (suggestions.status === "fulfilled") setProposals(suggestions.value.rows)
         if (questions.status === "fulfilled") setDecisions(questions.value.rows.filter((row) => !answeredDecisionIDs.current.has(row.id)))
-        const failed = [live, suggestions, questions].find((result) => result.status === "rejected")
-        if (failed?.status === "rejected") setFailure(failureWords(failed.reason))
+        // The Session list applied its own answer; its failure is named here
+        // only when that answer is the one on screen.
+        const sessionFailure = live.status === "fulfilled" && live.value.applied ? live.value.error : undefined
+        const failed = [suggestions, questions].find((result) => result.status === "rejected")
+        if (sessionFailure) setFailure(sessionFailure)
+        else if (failed?.status === "rejected") setFailure(failureWords(failed.reason))
       })
       void readEpicFamily(selectedProject, status, search, work).then((relatives) => {
         if (generation === loadGeneration.current) setFamily(relatives)
@@ -189,7 +209,7 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
     } finally {
       if (generation === loadGeneration.current) setRefreshing(false)
     }
-  }, [routeProject, status, search])
+  }, [routeProject, status, search, sessionReader])
   const loadMore = useCallback(async () => {
     if (!nextCursor || paging) return
     const generation = loadGeneration.current
@@ -469,10 +489,10 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
     }} />}
     {createdItem && <CreatedWorkModal item={createdItem} sessions={sessions} decisions={decisionsForWorkItem(decisions, createdItem.id)} decisionAnswers={decisionAnswers} busy={busy} failure={failure}
       detailLoading={false} detailError="" retryDetail={() => void readWorkV2Item(createdItem.id).then((answer) => setCreatedItem([...answeredDecisionIDs.current].reduce(withoutAnsweredWait, answer.item))).catch((error: unknown) => setFailure(failureWords(error)))}
-      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} onClose={() => setCreatedItem(null)} />}
+      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} sessionList={sessionList} retrySessions={sessionReader.retry} onClose={() => setCreatedItem(null)} />}
     {openedItem && <CreatedWorkModal item={openedItem} created={false} key={openedItem.id} back={detailReturn.current} sessions={sessions} decisions={decisionsForWorkItem(decisions, openedItem.id)} decisionAnswers={decisionAnswers} busy={busy} failure={failure}
       detailLoading={detailLoading} detailError={detailError} retryDetail={() => refreshDetail(openedItem.id)}
-      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} onClose={() => setOpenedItem(null)} />}
+      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} sessionList={sessionList} retrySessions={sessionReader.retry} onClose={() => setOpenedItem(null)} />}
   </EpicFamilyContext.Provider>
 }
 
@@ -772,9 +792,11 @@ function CompactWorkCard({ item, sessions, nowSeconds, decisions, onOpen }: {
   </article>
 }
 
-function WorkCard({ item, sessions, decisions, decisionAnswers, busy, failure, clearFailure, run, answerWorkDecision, detailLoading, detailError, retryDetail, focusAssignment = false, reportsExpanded = false, foldDescription = false }: {
+function WorkCard({ item, sessions, sessionList, retrySessions, decisions, decisionAnswers, busy, failure, clearFailure, run, answerWorkDecision, detailLoading, detailError, retryDetail, focusAssignment = false, reportsExpanded = false, foldDescription = false }: {
   item: WorkV2Item
   sessions: SessionRow[]
+  sessionList: SessionListReading
+  retrySessions: () => void
   decisions: Decision[]
   decisionAnswers: Record<string, DecisionAnswerStatus>
   busy: string
@@ -860,7 +882,7 @@ function WorkCard({ item, sessions, decisions, decisionAnswers, busy, failure, c
     })
   }
   const imagePicker = useRef<HTMLInputElement>(null)
-  const eligible = useMemo(() => assignmentCandidates(sessions, item), [sessions, item.project.path, item.owner_session])
+  const choices = useMemo(() => assignmentChoices(sessionList, sessions, item), [sessionList, sessions, item.project.path, item.owner_session])
   const owner = item.owner_session ? sessions.find((session) => session.sessionId === item.owner_session) : undefined
   const assignable = item.area !== "planning" && !item.closed_at && !item.owner_session
   const reassignable = item.area !== "planning" && !item.closed_at && !!item.owner_session
@@ -965,7 +987,7 @@ function WorkCard({ item, sessions, decisions, decisionAnswers, busy, failure, c
       {reassignable && <p className="work-reassign-note">{catalogWord("inline", "58f4894c12b1")}</p>}
       <section className="work-assignment-route" aria-labelledby={`work-assign-existing-${item.id}`}>
         <h4 id={`work-assign-existing-${item.id}`}>{catalogWord("inline", "c8232bd59817")}</h4>
-        <SessionAssignmentPicker sessions={eligible} value={terminal} onChange={setTerminal} autoFocus={focusAssignment || (epic && reassigning)} />
+        <SessionAssignmentPicker choices={choices} onRetry={retrySessions} value={terminal} onChange={setTerminal} autoFocus={!focusAssignment && epic && reassigning} />
         {terminal && <button className="chip on work-assignment-action" type="button" disabled={!!busy} aria-busy={busy === item.id && assigningRoute === "existing"}
           onClick={() => assign("existing", () => assignWorkV2(item, terminal))}>
           {busy === item.id && assigningRoute === "existing" && <span className="work-assignment-spinner" aria-hidden="true" />}
@@ -1151,13 +1173,16 @@ interface SessionWorkReading {
   update?: MachineNeedsUpdate | null
 }
 
-function SessionAssignmentPicker({ sessions, value, onChange, autoFocus = false }: {
-  sessions: SessionRow[]
+function SessionAssignmentPicker({ choices, onRetry, value, onChange, autoFocus = false }: {
+  choices: AssignmentChoices
+  onRetry: () => void
   value: string
   onChange: (id: string) => void
   autoFocus?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const sessions = useMemo(() => assignmentChoiceRows(choices), [choices])
+  const said = assignmentChoicesWords(choices)
   const personas = usePersonas()
   const [readings, setReadings] = useState<Record<string, SessionWorkReading>>({})
   const root = useRef<HTMLDivElement>(null)
@@ -1218,7 +1243,12 @@ function SessionAssignmentPicker({ sessions, value, onChange, autoFocus = false 
     {open && <div className="work-session-menu" role="listbox" aria-label={catalogWord("inline", "498ac2845b60")}>
       {sessions.map((session) => <SessionChoice key={session.id} session={session} reading={readings[session.id]}
         selected={session.id === value} onChoose={() => choose(session.id)} />)}
-      {!sessions.length && <p className="work-project-empty">{catalogWord("inline", "7b9c3fe68d48")}</p>}
+      {/* Only a complete answer says the Project has none; loading, failed and
+          incomplete lists say so instead (session-assignment.ts). */}
+      {said && <p className={"work-project-empty" + (choices.phase === "loading" ? " work-session-loading" : "")}
+        role={choices.phase === "failed" ? "alert" : "status"} aria-busy={choices.phase === "loading" || undefined}>
+        {choices.phase === "loading" && <span className="work-assignment-spinner" aria-hidden="true" />}{said}</p>}
+      {choices.phase === "failed" && <button className="chip work-session-retry" type="button" onClick={onRetry}>{workWord("assignSessionsRetry")}</button>}
     </div>}
     </div>
     {selected && <SessionAssignmentDetail session={selected} reading={selectedReading} />}
@@ -1277,12 +1307,14 @@ function SessionWorkList({ title, empty, rows }: {
   </li>)}</ul> : <small>{empty}</small>}</div>
 }
 
-function CreatedWorkModal({ item, created = true, back, sessions, decisions, decisionAnswers, busy, failure, clearFailure, run, answerWorkDecision, detailLoading, detailError, retryDetail, onClose }: {
+function CreatedWorkModal({ item, created = true, back, sessions, sessionList, retrySessions, decisions, decisionAnswers, busy, failure, clearFailure, run, answerWorkDecision, detailLoading, detailError, retryDetail, onClose }: {
   item: WorkV2Item
   created?: boolean
   /** Shared by successive dialogs opened from one another, so focus returns to the first opener. */
   back?: ModalReturn
   sessions: SessionRow[]
+  sessionList: SessionListReading
+  retrySessions: () => void
   decisions: Decision[]
   decisionAnswers: Record<string, DecisionAnswerStatus>
   busy: string
@@ -1296,9 +1328,8 @@ function CreatedWorkModal({ item, created = true, back, sessions, decisions, dec
   onClose: () => void
 }) {
   const modal = useRef<HTMLDivElement>(null)
-  const initialFocus = useRef<HTMLButtonElement>(null)
   useModalDismiss(false, onClose)
-  useModalFocus(modal, initialFocus, back)
+  useModalFocus(modal, back)
   // Opened from a Session too, so it lives beside the app root, never inside
   // the fixed Session pane: a phone then keeps one scroll surface.
   return createPortal(<div ref={modal} tabIndex={-1} className={created ? "session-todo-modal work-created-modal" : "session-todo-modal work-created-modal work-item-detail-modal"}
@@ -1307,10 +1338,10 @@ function CreatedWorkModal({ item, created = true, back, sessions, decisions, dec
     <div className={created ? "work-created-panel" : "work-created-panel work-item-detail-panel"}>
       <div className="work-modal-head"><div><p className="board-eyebrow">{created ? catalogWord("ui", "workItemCreated") : catalogWord("ui", "boardItem")}</p>
         <h2 id={`work-created-title-${item.id}`}>{created ? catalogWord("literal", "935ee1ab45ca") : catalogWord("literal", "79a3cb6e5cdb")}</h2></div>
-        <button ref={initialFocus} className="work-modal-close" type="button" aria-label={catalogWord("inline", "c7fdddf79eaa")} onClick={onClose}><WorkIcon name="close" /></button></div>
+        <button className="work-modal-close" type="button" aria-label={catalogWord("inline", "c7fdddf79eaa")} onClick={onClose}><WorkIcon name="close" /></button></div>
       {failure && <p className="work-note" role="alert">{failure}</p>}
       <WorkCard item={item} sessions={sessions} decisions={decisions} decisionAnswers={decisionAnswers} busy={busy} failure={failure} clearFailure={clearFailure} run={run} answerWorkDecision={answerWorkDecision}
-        detailLoading={detailLoading} detailError={detailError} retryDetail={retryDetail} focusAssignment={created} reportsExpanded={!created} foldDescription={!created} />
+        sessionList={sessionList} retrySessions={retrySessions} detailLoading={detailLoading} detailError={detailError} retryDetail={retryDetail} focusAssignment={created} reportsExpanded={!created} foldDescription={!created} />
     </div>
   </div>, document.body)
 }
@@ -1338,15 +1369,17 @@ function EditWorkModal({ item, busy, failure, onClose, onSave }: {
   onSave: (title: string, description: string) => void
 }) {
   const [title, setTitle] = useState(item.title)
+  const dialog = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => focusModalContainer(dialog.current), [])
   const [description, setDescription] = useState(item.description)
   const ready = !!title.trim() && !!description.trim()
   useModalDismiss(busy, onClose)
-  return <div className="session-todo-modal work-edit-modal" role="dialog" aria-modal="true" aria-labelledby={`work-edit-title-${item.id}`}
+  return <div className="session-todo-modal work-edit-modal" ref={dialog} role="dialog" aria-modal="true" aria-labelledby={`work-edit-title-${item.id}`}
     onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
     <form onSubmit={(event) => { event.preventDefault(); if (ready) onSave(title.trim(), description.trim()) }}>
       <div className="work-modal-head"><div><p className="board-eyebrow">{catalogWord("inline", "308278979452")}</p><h2 id={`work-edit-title-${item.id}`}>{catalogWord("inline", "9293ae04361c")}</h2></div>
         <button className="work-modal-close" type="button" aria-label={catalogWord("inline", "c7fdddf79eaa")} disabled={busy} onClick={onClose}><WorkIcon name="close" /></button></div>
-      <label>{catalogWord("inline", "6fe38ed1ee10")}<input className="work-input" value={title} maxLength={240} autoFocus onChange={(event) => setTitle(event.target.value)} /></label>
+      <label>{catalogWord("inline", "6fe38ed1ee10")}<input className="work-input" value={title} maxLength={240} onChange={(event) => setTitle(event.target.value)} /></label>
       <VoiceTextarea label={catalogWord("literal", "8561515b8b34")} value={description} maxLength={65536} onValue={setDescription} />
       {failure && <p className="work-note" role="alert">{failure}</p>}
       <div className="work-actions"><button className="chip on" type="submit" disabled={busy || !ready}>{busy ? catalogWord("literal", "21aa64dd7446") : catalogWord("literal", "9a8097d8f563")}</button>
@@ -1395,7 +1428,7 @@ interface ModalReturn {
 }
 
 /** Keep the keyboard in the modal and put it back on the summary that opened it. */
-function useModalFocus(container: RefObject<HTMLDivElement | null>, initialFocus: RefObject<HTMLElement | null>, shared?: ModalReturn) {
+function useModalFocus(container: RefObject<HTMLDivElement | null>, shared?: ModalReturn) {
   // StrictMode runs an effect's setup/cleanup/setup sequence once in
   // development. Keep the opener across that rehearsal and cancel its false
   // restoration when the second setup starts. A dialog replaced by the next
@@ -1406,7 +1439,7 @@ function useModalFocus(container: RefObject<HTMLDivElement | null>, initialFocus
   if (!back.opener && document.activeElement instanceof HTMLElement) back.opener = document.activeElement
   useEffect(() => {
     if (back.timer !== null) { window.clearTimeout(back.timer); back.timer = null }
-    initialFocus.current?.focus({ preventScroll: true })
+    focusModalContainer(container.current)
     const keepFocus = (event: KeyboardEvent) => {
       if (event.key !== "Tab" || !container.current) return
       const controls = [...container.current.querySelectorAll<HTMLElement>(
@@ -1436,7 +1469,7 @@ function useModalFocus(container: RefObject<HTMLDivElement | null>, initialFocus
         if (opener?.isConnected) opener.focus({ preventScroll: true })
       }, 0)
     }
-  }, [container, initialFocus, back])
+  }, [container, back])
 }
 
 function WorkReferenceImage({ item, image, busy, run }: {

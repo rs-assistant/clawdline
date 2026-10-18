@@ -204,6 +204,5 @@ export function setOptimisticSpinners(list) { optimisticSpinners = list; }
 export function setBandSpin(canvas) { bandSpin = canvas; }
 export function setStartSpin(canvas) { startSpin = canvas; }
 export function setConfirmSpin(canvas) { confirmSpin = canvas; }
-export function setLiveSpin(canvas) { liveSpin = canvas; }
 export function setVoiceSpin(canvas) { voiceSpin = canvas; }
 export function setCommandSpin(canvas) { commandSpin = canvas; }

@@ -284,7 +284,10 @@ func readMenu(screen string, assistant Assistant, tailLines int, gate bool) (Men
 		if len(tail) > 0 {
 			lower = tail[0].offset
 		}
-		menu.Question = questionAbove(lines, firstOptionLine, lower)
+		// A picker cut off at the top has no frame left to close its question;
+		// the key line has stood in for it, and the screen's edge does too.
+		edge := dialogStart == 0 && pickerKeyLine(tailText)
+		menu.Question = questionAbove(lines, firstOptionLine, lower, edge)
 		menu.Steps = StepsAbove(lines, firstOptionLine)
 	}
 	menu.Selected = firstSelected(options)
@@ -486,7 +489,7 @@ func plainMenu(tail []tailLine, lines []string, gate bool) (Menu, bool) {
 		})
 	}
 	return Menu{
-		Question: questionAbove(lines, tail[rows[0]].offset, tail[0].offset),
+		Question: questionAbove(lines, tail[rows[0]].offset, tail[0].offset, false),
 		Options:  options,
 		Selected: firstSelected(options),
 		Numbered: false,
@@ -803,8 +806,10 @@ func detailUnder(optionIndex int, lines []string, submitLine int) string {
 
 // questionAbove is the prose immediately above a menu's first row. One blank is
 // padding and two are an edge; only prose closed off by a frame, a header or a
-// caret is the question.
-func questionAbove(lines []string, optionLine, lowerBound int) string {
+// caret is the question — or by the top of the screen, when `edge` says the
+// picker's frame is off it. Prose on the screen's first line, with no blank
+// row over it, may have lost its beginning, and is said with an ellipsis.
+func questionAbove(lines []string, optionLine, lowerBound int, edge bool) string {
 	if optionLine <= lowerBound {
 		return ""
 	}
@@ -812,6 +817,7 @@ func questionAbove(lines []string, optionLine, lowerBound int) string {
 	blanks := 0
 	reach := 12
 	closed := false
+	cut := false
 	for index := optionLine - 1; index >= lowerBound && reach > 0; {
 		raw := lines[index]
 		text := dialogText(raw)
@@ -830,13 +836,22 @@ func questionAbove(lines []string, optionLine, lowerBound int) string {
 		}
 		blanks = 0
 		parts = append([]string{text}, parts...)
+		if index == lowerBound && edge {
+			// A blank row above it is the padding under the lost tab bar.
+			closed, cut = true, index == 0 || dialogText(lines[index-1]) != ""
+			break
+		}
 		index--
 		reach--
 	}
 	if !closed {
 		return ""
 	}
-	return trimSpacesAndNewlines(strings.Join(parts, " "))
+	question := trimSpacesAndNewlines(strings.Join(parts, " "))
+	if cut && question != "" {
+		question = "… " + question
+	}
+	return question
 }
 
 // dialogText is a line inside a dialog wall, without its padding or far edge.

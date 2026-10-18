@@ -40,8 +40,6 @@
   "main_tunnel_json_what_the_cloudflared_tunnel": "  tunnel [--json]           查看 cloudflared 通道状态；设置中的 remote_tunnel 可启用通道",
   "main_type_session_id_text_type_straight": "  type <session-id> <text>      直接在终端输入，不留下记录（用于测试后端）",
   "main_update_json_apply_force_whether_this": "  update [--json] [--apply [--force]]   查看此机器是否落后于云端最新版本；退出码：0 已是最新、10 落后、3 未知",
-  "main_upstream_d": "上游      %d\n",
-  "main_upstream_none_an_unowned_route_answers": "上游      无（无所有者的路由返回 501 not_implemented；%s 会请求一个上游）\n",
   "main_usage_clawdline_lang_tag_command_arguments": "用法：clawdline --lang <tag> <command> [arguments]",
   "main_usage_clawdline_s_session_id_text": "用法：clawdline %s <session-id> [text]\n",
   "main_usage_clawdline_serve_doctor_guide_skill": "用法：clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|tunnel|cloud|board|project|task|webhook|update|version>",

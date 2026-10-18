@@ -240,12 +240,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":"<code>","detail":"…"}` – nicht gefundene Routen, falsche Methoden und manche Lesezugriffe.
 
 Eine Route, die diesem Daemon nicht gehört, wird mit `501 not_implemented` abgelehnt, und die Ablehnung
-nennt die Route. Das ist die Antwort auf jedem gewöhnlichen Rechner. Weitergeleitet wird nur, wenn
-jemand absichtlich mit `CLAWDLINE_NEXT_UPSTREAM_PORT` einen anderen Daemon hinter diesen gesetzt hat, und
-dann nennt ein `502
-upstream_unreachable` die Adresse, die nicht geantwortet hat. Keines von beiden ist eine Antwort dieses
-Daemons. Vor dem 2026-09-19 war die Weiterleitung standardmäßig an und ging an die Swift-App auf 7717;
-eine damals geschriebene Notiz sagt deshalb, eine fremde Route erreiche jene App. Das tut sie nicht.
+nennt die Route. An einen anderen Daemon wird nichts weitergeleitet.
 
 ### Die Clawdline-Anzeige eines Projects einrichten
 
@@ -820,8 +815,8 @@ an ihrer Stelle wird keine kürzere Liste angeboten.
 `clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) ist stattdessen
 jedes für ein Board-Item **aufgezeichnete** Landing: `{"work_id", "landings": [...], "at"}`, jede Zeile mit
 ihrer `id` und ihrer `source` – `task` (der landed- oder incorporated-Datensatz eines gebundenen Childs; die
-ID ist die Aufgaben-ID), `root` (der Datensatz, den `item phase deploying --commit` geschrieben hat) oder
-`phase_event` (eine Kopie, die ein älterer Daemon im Verlauf des Items aufbewahrt hat). Eine gebundene
+ID ist die Aufgaben-ID) oder `root` (der Datensatz, den `item phase deploying --commit` geschrieben hat, oder
+eine Kopie, die ein älterer Daemon im Verlauf des Items aufbewahrt hat und der der Store eine eigene Zeile gab). Eine gebundene
 Aufgabe, deren Datensatz sich nicht lesen lässt, ist eine Zeile mit `state: "unknown"` und wird nie
 weggelassen. Das Lesen des Items trägt dieselben Zeilen als `landings`. Ein Item, das nicht existiert, ist
 `404 work_not_found`.

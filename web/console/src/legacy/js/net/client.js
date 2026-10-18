@@ -8,6 +8,12 @@
 
 export const LOCAL_MACHINE = "this-mac";
 
+/** The Cloud inventory marker's session id, and how many ids it may name.
+ *  Every console file reads these two here; the daemon's copy is
+ *  internal/domain/cloud InventorySessionID and InventoryLimit. */
+export const SESSION_INVENTORY_ID = "__clawdline_inventory_v1__";
+export const SESSION_INVENTORY_LIMIT = 512;
+
 /** Carry one lazy report selector through both the direct and current closed Cloud Board read. */
 export function boardReportSelection(item, report) {
     if (typeof item !== "string" || !item || typeof report !== "string" || !report)
@@ -23,18 +29,6 @@ export const ClawdlineClient = Object.freeze({
         "events", "sessions", "transcript", "send", "answer", "dispatch", "schedules"
     ])
 });
-
-export function assertClawdlineClient(candidate) {
-    if (!candidate || (typeof candidate !== "object" && typeof candidate !== "function")) {
-        throw new TypeError("ClawdlineClient must be an object");
-    }
-    ClawdlineClient.methods.forEach(function (method) {
-        if (typeof candidate[method] !== "function") {
-            throw new TypeError("ClawdlineClient is missing " + method + "()");
-        }
-    });
-    return candidate;
-}
 
 /** Turn the old local id, or the cloud pair, into the one identity shape. */
 export function sessionIdentity(value, fallbackMachine) {
@@ -54,32 +48,6 @@ export function sessionIdentity(value, fallbackMachine) {
 export function sessionIdentityKey(value, fallbackMachine) {
     var identity = sessionIdentity(value, fallbackMachine);
     return identity.machine + "\u0000" + identity.session;
-}
-
-export function sessionPath(value) {
-    var identity = sessionIdentity(value);
-    return "/m/" + encodeURIComponent(identity.machine) + "/s/" +
-        encodeURIComponent(identity.session);
-}
-
-/** New fleet links, plus the old local-only /s/<session> spelling. */
-export function parseSessionPath(pathname) {
-    var path = String(pathname || "");
-    var fleet = /^\/m\/([^/]+)\/s\/([^/]+)\/?$/.exec(path);
-    if (fleet) return decodedIdentity(fleet[1], fleet[2]);
-    var local = /^\/s\/([^/]+)\/?$/.exec(path);
-    return local ? decodedIdentity(encodeURIComponent(LOCAL_MACHINE), local[1]) : null;
-}
-
-function decodedIdentity(machine, session) {
-    try {
-        return sessionIdentity({
-            machine: decodeURIComponent(machine),
-            session: decodeURIComponent(session)
-        });
-    } catch (e) {
-        return null;
-    }
 }
 
 /** Protocol channel segments are printable ASCII; percent encoding preserves opaque ids. */

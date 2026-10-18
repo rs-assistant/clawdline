@@ -148,7 +148,7 @@
       "description": "GET /v1/diagnostics, this machine's own token only (a paired device is 403): what health used to carry about the process — its state directory, its ports, the clock's last pass and the broker's own account of itself.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["at", "capacity", "console", "dir", "ok", "platform", "port", "scheduler", "served_by", "upstream"],
+      "required": ["at", "capacity", "console", "dir", "ok", "platform", "port", "scheduler", "served_by"],
       "properties": {
         "at": { "type": "integer" },
         "broker": { "$ref": "orchestrator.schema.json#/$defs/BrokerDiagnostics" },
@@ -163,7 +163,6 @@
         "scheduler": { "$ref": "#/$defs/SchedulerPulse" },
         "served_by": { "type": "string" },
         "terminals": { "$ref": "terminals.schema.json#/$defs/TerminalDiagnostics" },
-        "upstream": { "type": "integer" },
         "usage": { "$ref": "usage.schema.json#/$defs/UsageDiagnostics" }
       }
     },

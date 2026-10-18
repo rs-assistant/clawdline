@@ -224,20 +224,14 @@ func lastTurnAt(path string) (time.Time, bool) {
 func (h *Host) recordPath(s session.Session) (string, session.Activity) {
 	switch s.Assistant {
 	case session.AssistantClaude:
-		// The registry's working directory outranks the process table's: a
-		// session files its transcript under the directory it was launched
-		// in, which is the one the registry keeps.
-		cwd := s.CWD
-		if r, ok := h.claudeFor(s.PID); ok && r.CWD != "" {
-			cwd = r.CWD
-		}
-		if s.ConversationID == "" || cwd == "" {
+		path, ok := h.claudeTranscript(s)
+		if !ok {
 			return "", session.Activity{
 				Reason: session.ActivityNoRecord,
 				Detail: "this session has no conversation to read a record of yet",
 			}
 		}
-		return ClaudePath(h.Home, cwd, s.ConversationID), session.Activity{}
+		return path, session.Activity{}
 
 	case session.AssistantCodex:
 		if s.ConversationID == "" {

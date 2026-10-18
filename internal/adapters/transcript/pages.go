@@ -66,9 +66,7 @@ func ReadClaudeAgentBefore(path string, limit int, before int64) (Page, error) {
 
 func ReadCodexBefore(path string, limit int, before int64) (Page, error) {
 	return readBefore(path, limit, before, func(line []byte) []Entry {
-		if !bytes.Contains(line, []byte("item_completed")) &&
-			!bytes.Contains(line, []byte("task_complete")) &&
-			!bytes.Contains(line, []byte("tools.update_plan(")) {
+		if !codexInterestingLine(line) {
 			return nil
 		}
 		return codexEntries(line)

@@ -3,6 +3,7 @@ package cloud
 import (
 	"bytes"
 	"crypto/ed25519"
+	"strings"
 	"testing"
 
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
@@ -59,5 +60,39 @@ func TestPeerFramesNeverEnterViewerEnvelopeCallback(t *testing.T) {
 	eventReceipt := []byte(`{"type":"peer_task_event_ack","status":"delivered"}`)
 	if err := transport.handle(nil, eventReceipt); err != nil || !bytes.Equal(eventAck, eventReceipt) {
 		t.Fatalf("event ack = %q, %v", eventAck, err)
+	}
+}
+
+// TestEveryKnownPeerFrameIsHandledSilently keeps each peer frame type the
+// transport knows from also being reported as unknown. A case that forgets
+// its return falls out of the switch into the "ignored" line, so the frame is
+// delivered and a misleading log line is written for every one of them.
+func TestEveryKnownPeerFrameIsHandledSilently(t *testing.T) {
+	var lines []string
+	transport := &Transport{opts: Options{
+		Log:                  func(line string) { lines = append(lines, line) },
+		PeerInbound:          func([]byte) {},
+		PeerAck:              func([]byte) {},
+		PeerDiscoveryStatus:  func([]byte) {},
+		PeerDiscoveryInbound: func([]byte) {},
+		PeerTaskStartInbound: func([]byte) {},
+		PeerTaskStartAck:     func([]byte) {},
+		PeerTaskProbeInbound: func([]byte) {},
+		PeerTaskProbeAck:     func([]byte) {},
+		PeerTaskEventInbound: func([]byte) {},
+		PeerTaskEventAck:     func([]byte) {},
+	}}
+	for _, kind := range []string{"peer_envelope", "peer_ack", "peer_discovery_ack", "peer_discovery_error",
+		"peer_discovery_envelope", "peer_task_start_envelope", "peer_task_start_ack",
+		"peer_task_probe_envelope", "peer_task_probe_ack", "peer_task_event_envelope", "peer_task_event_ack"} {
+		lines = nil
+		if err := transport.handle(nil, []byte(`{"type":"`+kind+`"}`)); err != nil {
+			t.Fatalf("%s: %v", kind, err)
+		}
+		for _, line := range lines {
+			if strings.Contains(line, "unknown frame") {
+				t.Errorf("%s was delivered and also logged %q", kind, line)
+			}
+		}
 	}
 }

@@ -48,13 +48,14 @@ and projects an assigned item into its owner's Session to-do panel.
    and Issue items under that Epic (§6.5): the person's assignment of the Epic is the authority, so
    no run is needed, and nothing else may be created that way.
 2. **Only a person assigns, reassigns, unassigns, deletes/cancels, completes by hand, or reopens an
-   item.** An Agent may not
+   item, including actions a Session relays from that person's message.** An Agent may not
    appoint itself or another Session — except that an item created under §7.1 with
    `{"assign":{"mode":"self"}}` arrives assigned to the Session that relayed the person's message
    (the default, since 2026-09-30, is unassigned), and an item claimed under §7.2 is assigned to
    the Session the person's message told to take it, because that message is the person's
    assignment — and *(amended 2026-09-27)* the owner Session of an Epic assigns and reassigns that
-   Epic's own open child items (§6.5), because the person assigned it the Epic. A person's completion (`POST /v1/work/v2/items/<id>/complete`, event
+   Epic's own open child items (§6.5), because the person assigned it the Epic. A Session may cancel
+   an item only on the person's explicit Clawdline message, with that message's run (§7.3). A person's completion (`POST /v1/work/v2/items/<id>/complete`, event
    `item.completed`) needs no evidence and is not refused by open steps, whose count it records; no
    Agent can retract it — only a person reopens it.
 3. **An Agent may propose, never promote.** A proposal is a previewable draft. It becomes a work
@@ -62,7 +63,7 @@ and projects an assigned item into its owner's Session to-do panel.
 4. **One item has at most one owning Session at a time.** One Session may own several items.
 5. **The owning Agent advances execution.** It may edit the title and description, maintain
    documents and item-local steps, and request lifecycle transitions. It may not change Project,
-   kind, owner, or deletion/cancellation state.
+   kind or owner. It cannot cancel on its own initiative.
 6. **The broker validates; it does not infer authorship.** Dispatches, landings, clocks, and task
    results never create, assign, defer, close, or delete a work item by themselves.
 7. **A Session responsibility is one row per work item, not one row per dispatch.** Child tasks are
@@ -173,7 +174,10 @@ Item-local steps are a lightweight Agent aid:
 On a successful assignment, an executable item with no existing steps treats two or more
 top-level Markdown list rows in its description as explicit subitems and atomically seeds one step
 per row. A single list row is left as prose, nested rows are not promoted, and reassignment never
-duplicates existing steps. The description remains the authoritative full text; an overlong step
+duplicates existing steps. An item that was a Plan seeds nothing — whether a Session claimed it
+with a conversion or the person converted it and assigned it later — because a Plan's description
+is analysis, not a checklist; its owner adds steps explicitly. Any `item.converted` event in the
+item's history marks it, since every conversion has a Plan on one side. The description remains the authoritative full text; an overlong step
 label is shortened only for the bounded TODO presentation.
 
 Steps do not create Board items, do not assign Sessions, and do not automatically advance the
@@ -565,7 +569,8 @@ Constraints and acceptance and the assignment and reassignment briefs name `claw
 and `clawdline item assign`, the address book the terminal ids come from, and the responsibility
 for the children. Every other owner's brief still says "Do not create Board items." Limits kept on
 purpose: a child cannot have children of its own through this route (it is never an Epic); the
-owner cannot cancel a child (a person can), and an Epic that is reassigned hands its children's
+owner cannot cancel a child on its own initiative (the person can request cancellation through
+§7.3), and an Epic that is reassigned hands its children's
 coordination to the new owner, whose `session_id` then passes the check.
 
 ## 7. Authority
@@ -573,7 +578,8 @@ coordination to the new owner, whose `session_id` then passes the check.
 | Operation | Person/device | Owning Agent | Other Agent | Broker/rule |
 | --- | ---: | ---: | ---: | ---: |
 | Create item | yes | yes, on the person's explicit message relayed by its run (§7.1); arrives unassigned, or assigned to itself with `assign: self` when that message asks it to do the work now. An Epic's owner: Feature/Issue children of that Epic, after its plan gate (§6.5) | no | no |
-| Assign/reassign/unassign/delete (cancel) | yes | assign/reassign only, by an Epic's owner, of that Epic's open children (§6.5) | no | no |
+| Assign/reassign/unassign | yes | assign/reassign only, by an Epic's owner, of that Epic's open children (§6.5) | no | no |
+| Delete (cancel) | yes | yes, on the person's explicit message relayed by its run (§7.3) | yes, on the person's explicit message relayed by its run (§7.3) | no |
 | Complete by hand (to `done` without evidence) | yes | no | no | no |
 | Reopen terminal work | yes | own just-completed `done` only, never a person's completion | no | no |
 | Change Project/kind/deployment policy | yes | may convert an unassigned Plan to an executable kind while claiming it on the person's message (§7.2) | no | no |
@@ -642,7 +648,8 @@ One transaction writes the item with `created_by = user_via_session:<run>` and a
 event carrying `via_run` and `session_id`. For Feature, Refactor, Issue and Epic it also writes its steps:
 the explicit `steps` in order, or — when there are none — the description's two or more top-level
 list rows exactly as a person's assignment seeds them. Explicit steps replace that seeding, and a
-later assignment seeds nothing when steps exist, so no step is written twice. A Plan is created
+later assignment seeds nothing when steps exist, so no step is written twice. An item that was a
+Plan never seeds from its description, so a converted Plan carries only steps its owner adds. A Plan is created
 unassigned in Planning, as a person's would be.
 
 *(Amended 2026-09-30.)* The executable item is created **unassigned**, in `created`, where an
@@ -728,6 +735,23 @@ that assignment, and the Console draws "Claimed by the Session from your message
 card, quoting the excerpt. `clawdline item claim <item id>` is the command; the guide says a Session
 runs it only when the person's message names the item.
 
+### 7.3 A Session cancelling an item on the person's message
+
+`POST /v1/work/v2/agent/items/<id>/cancel` accepts machine authentication, an
+`Idempotency-Key`, and `{"session_id", "via":{"run"}, "expected_version", "reason"}`.
+The run must be a recent message to the live root Session named in the body. The Session may
+relay cancellation of an item it does not own, because the authority comes from the person's
+message rather than item ownership. The agent guide requires the message to identify the item
+and ask for its removal; a run alone cannot prove the meaning of its words. The write requires
+the current item version and a nonempty reason. Stale versions, terminal items, missing runs,
+and runs sent to another Session are refused without changing the item.
+
+The existing cancellation transaction records `item.cancelled` with actor
+`user_via_session:<run>`, releases any active assignment, clears the Session projection, and
+retains the item and audit trail. `clawdline item cancel <id> --reason <text>` reads the run and
+item version unless they are named explicitly. The person's Console cancellation route is
+unchanged.
+
 ## 8. Assignment
 
 ### 8.1 Existing Session
@@ -769,7 +793,8 @@ create another Board item.
 
 Successful activation is also the claim boundary for structured subitems: when the item has no
 steps and its description has at least two top-level Markdown list rows, activation seeds those
-steps in the same transaction as ownership. A failed opening seeds nothing.
+steps in the same transaction as ownership. A failed opening seeds nothing, and neither does an
+item that was a Plan.
 
 For a first assignment, failure returns the item to `created` with `assignment_failed`; the failed
 assignment remains in history and no owner is projected.

@@ -34,11 +34,6 @@ import {
   sessionSelectionIdentity as sessionSelectionIdentityOriginal,
   sessionSelectionKey as sessionSelectionKeyOriginal,
 } from "./js/session/selection.js"
-import {
-  clawdfatherChoiceSupported as clawdfatherChoiceSupportedOriginal,
-  clawdfatherCreationChoice as clawdfatherCreationChoiceOriginal,
-  clawdfatherCreationLabel as clawdfatherCreationLabelOriginal,
-} from "./js/input/clawdfather.js"
 
 export type StartIcon = { cells?: unknown[]; accent?: string } | null | undefined
 
@@ -138,18 +133,3 @@ export const sessionSelectionIdentity = sessionSelectionIdentityOriginal as (
   fallbackMachine?: string,
 ) => SelectionIdentity | null
 export const sessionSelectionKeyOf = sessionSelectionKeyOriginal as (row: unknown) => string | null
-
-export interface ClawdfatherChoice {
-  state: string
-  shown: boolean
-  enabled: boolean
-  checked: boolean
-  coordinator: unknown
-}
-export const clawdfatherChoiceSupported = clawdfatherChoiceSupportedOriginal as (client: unknown) => boolean
-export const clawdfatherCreationChoice = clawdfatherCreationChoiceOriginal as (
-  payload: unknown,
-  selected: boolean,
-  fresh: boolean,
-) => ClawdfatherChoice
-export const clawdfatherCreationLabel = clawdfatherCreationLabelOriginal as () => string

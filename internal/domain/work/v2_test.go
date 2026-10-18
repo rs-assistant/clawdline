@@ -135,11 +135,12 @@ func TestAnUnassignedOrTerminalItemRejectsAgentProgress(t *testing.T) {
 	}
 }
 
-// The Epic gate reads the plan documents in the order they were written: a
-// plan, then a review after the latest plan. Only an Epic's step from
+// The planning gate reads an Epic's plan documents in the order they were
+// written: a plan, then a review after the latest plan. Only the step from
 // assigned to implementing is gated.
-func TestEpicPlanGate(t *testing.T) {
-	epic := ItemV2{ID: "e", Kind: KindEpic, Phase: PhaseAssigned, OwnerSession: "s"}
+func TestPlanningGateReadsAnEpicsPlansInOrder(t *testing.T) {
+	epic := ItemV2{ID: "e", Kind: KindEpic, Phase: PhaseAssigned, OwnerSession: "s",
+		Cycle: 1, GateSnapshotCycle: 1, PlanningGate: true, AcceptanceCriteria: "done when it ships"}
 	docs := func(roles ...string) []DocumentV2 {
 		out := []DocumentV2{}
 		for _, r := range roles {
@@ -147,26 +148,26 @@ func TestEpicPlanGate(t *testing.T) {
 		}
 		return out
 	}
+	back := epic
+	back.Phase = PhaseVerifying
 	cases := []struct {
 		name  string
 		item  ItemV2
-		next  Phase
 		plans []DocumentV2
 		want  string
 	}{
-		{"nothing", epic, PhaseImplementing, docs(), "epic_plan_required"},
-		{"a review alone", epic, PhaseImplementing, docs(DocumentPlanReview), "epic_plan_required"},
-		{"a plan alone", epic, PhaseImplementing, docs(DocumentPlan), "epic_plan_review_required"},
-		{"a review before the plan", epic, PhaseImplementing, docs(DocumentPlanReview, DocumentPlan), "epic_plan_review_required"},
-		{"a rewritten plan", epic, PhaseImplementing, docs(DocumentPlan, DocumentPlanReview, DocumentPlan), "epic_plan_review_required"},
-		{"a reviewed plan", epic, PhaseImplementing, docs(DocumentPlan, DocumentPlanReview), ""},
-		{"a re-reviewed plan", epic, PhaseImplementing, docs(DocumentPlan, DocumentPlanReview, DocumentPlan, DocumentPlanReview), ""},
-		{"a plan rewritten after two reviews", epic, PhaseImplementing, docs(DocumentPlan, DocumentPlanReview, DocumentPlan, DocumentPlanReview, DocumentPlan), ""},
-		{"a Feature", ItemV2{Kind: KindFeature, Phase: PhaseAssigned}, PhaseImplementing, docs(), ""},
-		{"back from verifying", ItemV2{Kind: KindEpic, Phase: PhaseVerifying}, PhaseImplementing, docs(), ""},
+		{"nothing", epic, docs(), "epic_plan_required"},
+		{"a review alone", epic, docs(DocumentPlanReview), "epic_plan_required"},
+		{"a plan alone", epic, docs(DocumentPlan), "epic_plan_review_required"},
+		{"a review before the plan", epic, docs(DocumentPlanReview, DocumentPlan), "epic_plan_review_required"},
+		{"a rewritten plan", epic, docs(DocumentPlan, DocumentPlanReview, DocumentPlan), "epic_plan_review_required"},
+		{"a reviewed plan", epic, docs(DocumentPlan, DocumentPlanReview), ""},
+		{"a re-reviewed plan", epic, docs(DocumentPlan, DocumentPlanReview, DocumentPlan, DocumentPlanReview), ""},
+		{"a plan rewritten after two reviews", epic, docs(DocumentPlan, DocumentPlanReview, DocumentPlan, DocumentPlanReview, DocumentPlan), ""},
+		{"back from verifying", back, docs(), ""},
 	}
 	for _, c := range cases {
-		err := EpicPlanGate(c.item, c.next, c.plans, PlanReviewSummary{})
+		err := PlanningGate(c.item, PhaseImplementing, c.plans, PlanReviewSummary{})
 		got := ""
 		if r, ok := AsRefusalV2(err); ok {
 			got = r.Code

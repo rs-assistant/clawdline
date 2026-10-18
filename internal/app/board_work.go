@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -27,10 +26,11 @@ import (
 //
 //   - a person's command (Command, Create), filed under its request receipt
 //     in the same transaction (D03);
-//   - the sweep (Sweep, run on its own clock by Run), which applies the
-//     automatic rules to the facts: a landing closes an item, a delivery puts
-//     it in the closure queue, a dispatch that names a planned item brings it
-//     onto the board, three quiet days send it back;
+//   - the sweep (Sweep), which applies the automatic rules to the facts: a
+//     landing closes an item, a delivery puts it in the closure queue, a
+//     dispatch that names a planned item brings it onto the board, three
+//     quiet days send it back. Nothing in the daemon runs it on a clock
+//     since work-system v2 (docs/work-system-v2.md);
 //   - nothing else. A read never writes.
 //
 // The sweep is how the board follows the broker without the broker calling
@@ -38,8 +38,7 @@ import (
 // is built, and a board that could stop the broker's beat by failing inside it
 // is the wrong way round. A read shows what the facts say at once, by the
 // same pure function the sweep applies (work.Derive), so a landing is on the
-// page before the sweep has recorded it; the sweep records it within one tick,
-// once. When the broker records a fact, one line in its transaction can make
+// page before the sweep has recorded it; a sweep records it once. When the broker records a fact, one line in its transaction can make
 // the two writes one (report.md).
 type WorkBoard struct {
 	Store  *store.Store
@@ -53,11 +52,6 @@ type WorkBoard struct {
 	// the board a person takes part in (T4 — a proposal's wait, a decision's
 	// due, the digest). Its error is the pass's.
 	Also func(ctx context.Context) error
-
-	mu    sync.Mutex
-	pulse WorkPulse
-	tick  time.Duration
-	run   bool
 }
 
 // NewWorkBoard is the board with the default clocks.
@@ -71,13 +65,12 @@ const (
 	WorkPageSize = 100
 	// workScanLimit is the most board rows one read derives: the open items
 	// are at most OpenLimit, and the recently closed ride on top.
-	workScanLimit     = 5_000
-	workTitleLimit    = work.OutcomeTitleLimit
-	workProjectLimit  = 1_024
-	workAcceptLimit   = 2_000
-	workOwnerLimit    = 256
-	workActorLimit    = 256
-	workStalledFactor = 3
+	workScanLimit    = 5_000
+	workTitleLimit   = work.OutcomeTitleLimit
+	workProjectLimit = 1_024
+	workAcceptLimit  = 2_000
+	workOwnerLimit   = 256
+	workActorLimit   = 256
 )
 
 func (w *WorkBoard) now() time.Time {
@@ -135,7 +128,6 @@ func seconds(t time.Time) time.Time {
 // WorkPulse is the sweep's account of its last pass.
 type WorkPulse struct {
 	At         time.Time
-	Passes     int64
 	Considered int
 	Moved      int
 	// Unknown is items left alone because a task bound to them could not be
@@ -220,58 +212,6 @@ func (w *WorkBoard) applyRules(ctx context.Context, id string) (bool, error) {
 		return false, nil
 	}
 	return moved && err == nil, err
-}
-
-// Run keeps the sweep on its clock until ctx ends: a pass at once, then one
-// per tick. A pass that panics is recorded as an error and the clock goes on.
-func (w *WorkBoard) Run(ctx context.Context, tick time.Duration) {
-	w.mu.Lock()
-	w.tick, w.run = tick, true
-	w.mu.Unlock()
-	t := time.NewTicker(tick)
-	defer t.Stop()
-	for {
-		p := w.safeSweep(ctx)
-		w.mu.Lock()
-		p.Passes = w.pulse.Passes + 1
-		w.pulse = p
-		w.mu.Unlock()
-		select {
-		case <-ctx.Done():
-			w.mu.Lock()
-			w.run = false
-			w.mu.Unlock()
-			return
-		case <-t.C:
-		}
-	}
-}
-
-func (w *WorkBoard) safeSweep(ctx context.Context) (p WorkPulse) {
-	defer func() {
-		if v := recover(); v != nil {
-			p = WorkPulse{At: w.now(), Err: fmt.Sprintf("panic: %v", v)}
-		}
-	}()
-	return w.Sweep(ctx)
-}
-
-// Pulse is the last pass, and the clock it runs on.
-func (w *WorkBoard) Pulse() (WorkPulse, time.Duration, bool) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.pulse, w.tick, w.run
-}
-
-// Stalled says the sweep is supposed to run and has not finished a pass for
-// three ticks (DG-1): the board is then not following its facts, and
-// /v1/health says so.
-func (w *WorkBoard) Stalled() bool {
-	p, tick, running := w.Pulse()
-	if !running || tick <= 0 || p.At.IsZero() {
-		return false
-	}
-	return w.now().Sub(p.At) > workStalledFactor*tick
 }
 
 // ——— A person's commands ———

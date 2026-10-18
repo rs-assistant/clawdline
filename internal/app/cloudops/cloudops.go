@@ -29,6 +29,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/sainteye/clawdline/internal/adapters/store"
+	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
 	"strings"
 )
 
@@ -281,6 +282,12 @@ type SessionsStated struct {
 	// s/ while the page held no subscription to it (`fanout=0`), and the
 	// answer only said the row had been asked for. Nil for every other word.
 	Row json.RawMessage
+	// Generation is the ss/ pass id the status marker of this pass named,
+	// empty when the pass stated no status marker. The pass id hashes the set
+	// (`statusGeneration` in internal/transport/cloud), so a refresh of an
+	// unchanged set states the id the viewer already holds; naming it here is
+	// what lets that viewer answer at once instead of waiting for a new id.
+	Generation string
 }
 
 // Vocabulary is every operation word this bridge knows, sorted. It is what a
@@ -397,7 +404,7 @@ func (b Bridge) serveContentRead(ctx context.Context, cmd Command, parsed body, 
 		return b.refuse(cmd, parsed, o.name, Refusal{Status: 400, Code: "malformed_read",
 			Message: "This Cloud read is malformed.", fixedCopy: true})
 	}
-	if o.name == "info" && p.parts != "full" && p.parts != "list" {
+	if o.name == "info" && p.parts != "full" {
 		return b.contentReadAnswer(cmd, p, b.publish(cmd, p, Refusal{Status: 403, Code: "read_only_channel",
 			Message: "This Cloud channel accepts only pinned Session content reads.", fixedCopy: true}, nil))
 	}
@@ -533,7 +540,8 @@ func (b Bridge) stateSessions(ctx context.Context, cmd Command, parsed body, p p
 }
 
 // statedAnswer is `{"sessions":[ids],"complete":bool}`, after the rows went
-// out, with `"row"` beside them when a `sessions.row` pass had the Session.
+// out, with `"row"` beside them when a `sessions.row` pass had the Session and
+// `"snapshot_generation"` when the pass stated its ss/ marker.
 func (b Bridge) statedAnswer(cmd Command, p plan, stated SessionsStated) Answer {
 	ids := stated.IDs
 	if ids == nil {
@@ -542,6 +550,9 @@ func (b Bridge) statedAnswer(cmd Command, p plan, stated SessionsStated) Answer 
 	answer := map[string]any{"sessions": ids, "complete": stated.Complete}
 	if len(stated.Row) > 0 {
 		answer["row"] = stated.Row
+	}
+	if stated.Generation != "" {
+		answer["snapshot_generation"] = stated.Generation
 	}
 	body, err := json.Marshal(answer)
 	if err != nil {
@@ -751,28 +762,9 @@ func idempotencyKey(cmd Command, plan plan) string {
 	return out.String()
 }
 
-// ChannelSegment is the hosted console's `channelSegment`: percent-encoding
-// with the unreserved set JavaScript's encodeURIComponent leaves alone.
-//
-// It is used for two different things on purpose, exactly as the Swift bridge
-// uses it: the segments of a relay channel, and the segments of a local route's
-// path. A tmux pane is `%19`, and a path that carried that raw would be a
-// different path.
-func ChannelSegment(value string) string {
-	const safe = "-_.!~*'()"
-	var out strings.Builder
-	for i := 0; i < len(value); i++ {
-		c := value[i]
-		switch {
-		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9',
-			strings.IndexByte(safe, c) >= 0:
-			out.WriteByte(c)
-		default:
-			const hex = "0123456789ABCDEF"
-			out.WriteByte('%')
-			out.WriteByte(hex[c>>4])
-			out.WriteByte(hex[c&0x0f])
-		}
-	}
-	return out.String()
-}
+// ChannelSegment is the one channel-segment encoder in internal/domain/cloud,
+// named here as well because this package and the publisher already spell it
+// cloudops.ChannelSegment. It is the same function, not a copy, and a function
+// rather than a variable so nothing can reassign it and let the publisher and
+// the viewer encode differently.
+func ChannelSegment(value string) string { return domaincloud.ChannelSegment(value) }

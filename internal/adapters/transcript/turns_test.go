@@ -284,6 +284,31 @@ func TestCodexTurnFailureIsAVisibleEntry(t *testing.T) {
 	}
 }
 
+func TestCodexRejectedToolAndInterruptedTurnAreVisible(t *testing.T) {
+	denied := m{"timestamp": "2026-10-18T03:34:48.410Z", "type": "response_item", "payload": m{
+		"type": "custom_tool_call_output", "output": []m{
+			{"type": "input_text", "text": "Script failed\nWall time 3.5 seconds\nOutput:\n"},
+			{"type": "input_text", "text": `Script error:
+exec_command failed: CreateProcess { message: "Rejected(\"This action was rejected.\\nReason: ownership was not proved.\\nDo not retry.\")" }`},
+		},
+	}}
+	aborted := m{"timestamp": "2026-10-18T03:34:56.579Z", "type": "event_msg", "payload": m{
+		"type": "turn_aborted", "reason": "interrupted",
+	}}
+	unrelated := m{"timestamp": "2026-10-18T03:34:51.598Z", "type": "response_item", "payload": m{
+		"type": "custom_tool_call_output", "output": []m{{"type": "input_text", "text": "A quoted Rejected(example) is ordinary tool output."}},
+	}}
+	page, err := ReadCodex(writeRecord(t, denied, unrelated, aborted), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Entries) != 2 || page.Entries[0].Kind != KindError ||
+		page.Entries[0].Text != "ownership was not proved." ||
+		page.Entries[1].Kind != KindError || page.Entries[1].Text != "Conversation interrupted" {
+		t.Fatalf("rejected tool and aborted turn: %+v", page.Entries)
+	}
+}
+
 func TestCodexUserMessageCountsLocalImage(t *testing.T) {
 	path := writeRecord(t, codexItem(m{"type": "UserMessage", "content": []m{
 		{"type": "local_image", "path": "/tmp/example.png"},
@@ -319,6 +344,29 @@ func TestCodexPlanIsReadAsLiterals(t *testing.T) {
 	}
 	if p := page.Entries[1].Plan; len(p) != 1 || p[0].Step != "a]" {
 		t.Fatalf("a bracket inside a string is text: %+v", p)
+	}
+}
+
+func TestCodexAsyncQuestionCarriesItsOptions(t *testing.T) {
+	args := `{"questions":[{"title":" Which route? ","options":["Open <b>","Wait"]}]}`
+	path := writeRecord(t,
+		m{"type": "response_item", "payload": m{"type": "function_call", "name": "request_user_input_async", "arguments": args}},
+		m{"type": "response_item", "payload": m{"type": "function_call_output", "output": `{"accepted":true}`}},
+	)
+	want := AskMarker + `[{"q":"Which route?","o":[{"l":"Open <b>"},{"l":"Wait"}]}]`
+	page, err := ReadCodex(path, 10)
+	if err != nil || len(page.Entries) != 1 {
+		t.Fatalf("%v %+v", err, page.Entries)
+	}
+	if got := page.Entries[0]; got.Kind != KindTool || got.Tool != "request_user_input_async" || got.Text != want {
+		t.Fatalf("question: %+v, want %q", got, want)
+	}
+	if questions, ok := askedQuestions(page.Entries[0].Text); !ok || len(questions) != 1 || len(questions[0].Options) != 2 {
+		t.Fatalf("renderable question: %+v, %t", questions, ok)
+	}
+	after, err := ReadCodexAfter(path, 10, 0)
+	if err != nil || len(after.Entries) != 1 || after.Entries[0].Text != want {
+		t.Fatalf("incremental page: %v %+v", err, after.Entries)
 	}
 }
 

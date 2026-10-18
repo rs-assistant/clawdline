@@ -231,32 +231,17 @@ func newTermFixture(t *testing.T, host ports.OwnedTerminals) *termFixture {
 }
 
 // device pairs a reader or a sender. Senders inherit terminal access.
-func (f *termFixture) device(name string, granted bool) (id, token string) {
+func (f *termFixture) device(name string, sender bool) (id, token string) {
 	f.t.Helper()
 	caps := auth.NewCaps(auth.Read)
-	if granted {
+	if sender {
 		caps = auth.NewCaps(auth.Read, auth.Send)
 	}
 	id, token, err := f.s.gate().auth.AddDevice(name, caps, false)
 	if err != nil {
 		f.t.Fatal(err)
 	}
-	if granted {
-		f.grant(id, true)
-	}
 	return id, token
-}
-
-func (f *termFixture) grant(id string, on bool) {
-	f.t.Helper()
-	body := `{"grant":false}`
-	if on {
-		body = `{"grant":true}`
-	}
-	rec := f.do(http.MethodPost, "/v1/auth/devices/"+id+"/terminal", f.local, body)
-	if rec.Code != http.StatusOK {
-		f.t.Fatalf("grant %s %v answered %d %s", id, on, rec.Code, rec.Body)
-	}
 }
 
 func (f *termFixture) do(method, path, token, body string) *httptest.ResponseRecorder {

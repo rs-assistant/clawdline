@@ -19,6 +19,10 @@ export const DIRECT_CHUNK_MS = 2_000
 export const DIRECT_RETRY_MS = 30_000
 /** CloudTerminalDirectBusyRetrySecondsLimit, after the relay refused the upgrade for its own load. */
 export const DIRECT_BUSY_RETRY_MS = 5_000
+/** Direct paths of one terminal that may fail in a row before it stays on the relay for DIRECT_PAUSE_MS. */
+export const DIRECT_PAUSE_AFTER_FAILURES = 2
+/** How long a terminal whose direct path keeps failing stays on the relay before it tries again. */
+export const DIRECT_PAUSE_MS = 5 * 60_000
 // A chunk's JSON may escape each code unit of `d` (a lone surrogate becomes `\udxxx`), plus its fields.
 const CHUNK_TEXT_UNITS = DIRECT_CHUNK_UNITS * 6 + 256
 
@@ -118,6 +122,119 @@ export class DirectReassembler {
   private violation(): Error { this.reset(); return fail("terminal_direct_violation") }
 }
 
+/**
+ * The content-free trace of one direct attempt (docs/cloud-terminal-wire.md, Direct attempt trace).
+ *
+ * The machine writes its own line for the same attempt id (`internal/transport/cloud/direct_trace.go`);
+ * this is the phone's half, sent as a `cloud.direct.attempt` viewer event so it lands beside it. What
+ * is read from a candidate is its type and the family of its address, never the address, its port,
+ * the SDP or its ICE credentials.
+ */
+export type DirectAttemptStage = "open" | "no_answer" | "connected_no_channel" | "no_remote_candidates" |
+  "checks_failed" | "timed_out" | "closed_early"
+export interface DirectAttemptTrace {
+  /** The connection id the offer was made under; the machine keys its line by the same id. */
+  attempt: string
+  kind: "terminal" | "carrier"
+  /** Records the finished summary. It is called once, and nothing it throws reaches the link. */
+  report(data: Record<string, unknown>): void
+}
+
+const CANDIDATE_TYPES = new Set(["host", "srflx", "prflx", "relay"])
+
+/** ipv4, ipv6, mdns (a `.local` name) or name: which kind of address, never which address. */
+export function directAddressFamily(address: unknown): string {
+  if (typeof address !== "string" || !address) return "unknown"
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(address)) return "ipv4"
+  if (address.includes(":")) return "ipv6"
+  if (address.toLowerCase().endsWith(".local")) return "mdns"
+  return "name"
+}
+
+/** `type/family` counts of the candidate lines in an SDP. Nothing else of the SDP is kept. */
+export function directCandidateCounts(sdp: string): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const raw of sdp.split("\n")) {
+    const line = raw.trim()
+    if (!line.startsWith("a=candidate:")) continue
+    const fields = line.slice("a=candidate:".length).split(/\s+/)
+    const at = fields.indexOf("typ", 5)
+    const type = at > 0 && CANDIDATE_TYPES.has(fields[at + 1]) ? fields[at + 1] : "unknown"
+    const key = `${type}/${directAddressFamily(fields[4])}`
+    counts[key] = (counts[key] ?? 0) + 1
+  }
+  return counts
+}
+
+/** Counts as `key:n,key:n` in key order, or `-`. */
+export function directCountsText(counts: Record<string, number>): string {
+  const keys = Object.keys(counts).sort()
+  return keys.length ? keys.map((key) => `${key}:${counts[key]}`).join(",") : "-"
+}
+
+/**
+ * Where an attempt stopped, by the machine's own order (`directTraceStage`): opening wins; then
+ * whether an answer came; then what ICE reached; then why ICE had nothing to reach.
+ */
+export function directAttemptStage(facts: { opened: boolean; answered: boolean; remote: number;
+  ice: readonly string[]; timedOut: boolean }): DirectAttemptStage {
+  const reached = (...states: string[]) => facts.ice.some((state) => states.includes(state))
+  if (facts.opened) return "open"
+  if (!facts.answered) return "no_answer"
+  if (reached("connected", "completed")) return "connected_no_channel"
+  if (facts.remote === 0) return "no_remote_candidates"
+  if (reached("failed")) return "checks_failed"
+  if (facts.timedOut) return "timed_out"
+  return "closed_early"
+}
+
+/** The parts of one `getStats` entry this trace reads. */
+export interface DirectStatsEntry {
+  id?: string; type?: string; state?: string; nominated?: boolean; selected?: boolean
+  selectedCandidatePairId?: string; localCandidateId?: string; remoteCandidateId?: string
+  candidateType?: string; address?: string; ip?: string
+}
+
+/**
+ * The selected pair, as `local type/family>remote type/family`, from a `getStats` report: the pair
+ * the transport names, else a nominated succeeded one. Its addresses are read for their family only.
+ */
+export function directSelectedPair(stats: Iterable<DirectStatsEntry>): string | null {
+  const byID = new Map<string, DirectStatsEntry>()
+  for (const entry of stats) if (entry && typeof entry.id === "string") byID.set(entry.id, entry)
+  let pair: DirectStatsEntry | undefined
+  for (const entry of byID.values()) {
+    if (entry.type === "transport" && entry.selectedCandidatePairId) pair = byID.get(entry.selectedCandidatePairId)
+  }
+  if (!pair) {
+    for (const entry of byID.values()) {
+      if (entry.type === "candidate-pair" && (entry.selected || (entry.nominated && entry.state === "succeeded"))) { pair = entry; break }
+    }
+  }
+  if (!pair) return null
+  const side = (id?: string) => {
+    const candidate = id ? byID.get(id) : undefined
+    if (!candidate) return "unknown/unknown"
+    const type = CANDIDATE_TYPES.has(candidate.candidateType ?? "") ? candidate.candidateType : "unknown"
+    return `${type}/${directAddressFamily(candidate.address ?? candidate.ip)}`
+  }
+  return `${side(pair.localCandidateId)}>${side(pair.remoteCandidateId)}`
+}
+
+/**
+ * The recorder a client's failure log offers (`cloud-viewer-events.js`), as a trace's `report`, or
+ * null when this client has none. The machine writes the row into its log beside its own line.
+ */
+export function directAttemptRecorder(client: unknown, machine: string): ((data: Record<string, unknown>) => void) | null {
+  const log = (client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } } | null)?.viewerEvents
+  if (typeof log?.record !== "function") return null
+  // The failure log is delivered to one paired machine, which need not be the one this attempt was
+  // made to, so the row names it.
+  return (data) => {
+    log.record!("cloud.direct.attempt", { ...data, machine }, ["cloud.direct.attempt", data.kind, data.stage].join("|"))
+  }
+}
+
 /** The parts of RTCDataChannel the browser carrier uses, so a test can stand in for it. */
 export interface DirectChannelLike {
   readonly readyState: string
@@ -133,6 +250,7 @@ export interface DirectPeerLike {
   readonly localDescription: { sdp: string } | null
   readonly iceGatheringState: string
   readonly connectionState?: string
+  readonly iceConnectionState?: string
   createDataChannel(label: string, init: { ordered: boolean }): DirectChannelLike
   createOffer(): Promise<{ type: string; sdp?: string }>
   setLocalDescription(description: { type: string; sdp?: string }): Promise<void>
@@ -140,6 +258,9 @@ export interface DirectPeerLike {
   close(): void
   onicegatheringstatechange: ((event?: unknown) => void) | null
   onconnectionstatechange: ((event?: unknown) => void) | null
+  oniceconnectionstatechange?: ((event?: unknown) => void) | null
+  /** RTCStatsReport is map-like; a stand-in may leave this out, and the trace names no pair. */
+  getStats?(): Promise<{ forEach(callback: (entry: DirectStatsEntry) => void): void }>
 }
 export type DirectPeerFactory = (config: { iceServers: Array<{ urls: string }> }) => DirectPeerLike
 
@@ -163,14 +284,30 @@ export class DirectLink {
   private opened = false
   private closed = false
   private opening: { resolve: () => void; reject: (error: Error) => void } | null = null
+  private readonly trace: DirectAttemptTrace | null
+  private readonly started = Date.now()
+  private readonly states = { ice: [] as Array<[string, number]>, pc: [] as Array<[string, number]> }
+  private local: Record<string, number> = {}
+  private remote: Record<string, number> = {}
+  private gather = "-"
+  private answered = false
+  private timedOut = false
+  private traced = false
 
-  constructor(factory: DirectPeerFactory, onEnvelope: (envelope: TerminalEnvelope) => void, onDown: (code: string) => void) {
+  constructor(factory: DirectPeerFactory, onEnvelope: (envelope: TerminalEnvelope) => void, onDown: (code: string) => void,
+    trace: DirectAttemptTrace | null = null) {
     this.onEnvelope = onEnvelope
     this.onDown = onDown
+    this.trace = trace
     this.peer = factory({ iceServers: DIRECT_STUN.map((urls) => ({ urls })) })
     this.channel = this.peer.createDataChannel(DIRECT_LABEL, { ordered: true })
     this.reassembler = new DirectReassembler(() => this.close("terminal_direct_chunk_timeout"))
-    this.channel.onopen = () => { if (this.closed) return; this.opened = true; this.opening?.resolve() }
+    this.channel.onopen = () => {
+      if (this.closed) return
+      this.opened = true
+      this.report("open", null)
+      this.opening?.resolve()
+    }
     this.channel.onclose = () => this.close("terminal_direct_closed")
     this.channel.onerror = () => this.close("terminal_direct_closed")
     this.channel.onmessage = (event) => {
@@ -181,8 +318,47 @@ export class DirectLink {
       if (envelope) this.onEnvelope(envelope)
     }
     this.peer.onconnectionstatechange = () => {
+      this.state("pc", this.peer.connectionState)
       if (this.peer.connectionState === "failed" || this.peer.connectionState === "closed") this.close("terminal_direct_ice_failed")
     }
+    this.peer.oniceconnectionstatechange = () => this.state("ice", this.peer.iceConnectionState)
+  }
+
+  /** Each state once, at the first time it was reached: the list is bounded by the enum. */
+  private state(which: "ice" | "pc", state: string | undefined): void {
+    if (!this.trace || this.traced || typeof state !== "string") return
+    const list = this.states[which]
+    if (!list.some(([seen]) => seen === state)) list.push([state, Date.now() - this.started])
+  }
+
+  /**
+   * Sends this attempt's one summary. The stats are read before the peer is closed, because a
+   * closed RTCPeerConnection refuses `getStats`; the summary is recorded when they answer.
+   */
+  private report(end: "open" | "closed", code: string | null): void {
+    if (!this.trace || this.traced) return
+    this.traced = true
+    const trace = this.trace
+    const timeline = (list: Array<[string, number]>) => list.length ? list.map(([state, ms]) => `${state}@${ms}ms`).join(",") : "-"
+    const data: Record<string, unknown> = {
+      attempt: trace.attempt, kind: trace.kind,
+      stage: directAttemptStage({ opened: end === "open", answered: this.answered,
+        remote: Object.values(this.remote).reduce((sum, n) => sum + n, 0),
+        ice: this.states.ice.map(([state]) => state), timedOut: this.timedOut }),
+      code, ms: Date.now() - this.started, answer: this.answered ? "received" : "none",
+      offer_cands: directCountsText(this.local), gather: this.gather, answer_cands: directCountsText(this.remote),
+      browser_srflx: Object.keys(this.local).some((key) => key.startsWith("srflx/")),
+      ice: timeline(this.states.ice), pc: timeline(this.states.pc), pair: null as string | null,
+    }
+    const send = () => { try { trace.report(data) } catch { /* a recorder cannot fail the link it records */ } }
+    let stats: Promise<{ forEach(callback: (entry: DirectStatsEntry) => void): void }> | undefined
+    try { stats = this.peer.getStats?.() } catch { stats = undefined }
+    if (!stats) { send(); return }
+    stats.then((report) => {
+      const entries: DirectStatsEntry[] = []
+      report.forEach((entry) => entries.push(entry))
+      data.pair = directSelectedPair(entries)
+    }, () => undefined).finally(send)
   }
 
   get open(): boolean { return this.opened && !this.closed && this.channel.readyState === "open" }
@@ -202,6 +378,10 @@ export class DirectLink {
     if (this.closed) throw fail("terminal_direct_closed")
     const sdp = this.peer.localDescription?.sdp
     if (!sdp) throw fail("terminal_direct_no_offer")
+    if (this.trace) {
+      this.local = directCandidateCounts(sdp)
+      this.gather = this.peer.iceGatheringState === "complete" ? "complete" : "timeout"
+    }
     return sdp
   }
 
@@ -210,7 +390,8 @@ export class DirectLink {
     if (this.closed) throw fail("terminal_direct_closed")
     const open = new Promise<void>((resolve, reject) => { this.opening = { resolve, reject } })
     void open.catch(() => undefined)
-    const timer = setTimeout(() => this.close("terminal_direct_ice_failed"), DIRECT_NEGOTIATE_MS)
+    const timer = setTimeout(() => { this.timedOut = true; this.close("terminal_direct_ice_failed") }, DIRECT_NEGOTIATE_MS)
+    if (this.trace) { this.answered = true; this.remote = directCandidateCounts(sdp) }
     try {
       await this.peer.setRemoteDescription({ type: "answer", sdp })
       if (this.opened) return
@@ -239,6 +420,7 @@ export class DirectLink {
   close(code = "terminal_direct_closed"): void {
     if (this.closed) return
     this.closed = true
+    this.report("closed", code)
     this.reassembler.reset()
     this.opening?.reject(fail(code))
     try { this.channel.close() } catch { /* already closed */ }

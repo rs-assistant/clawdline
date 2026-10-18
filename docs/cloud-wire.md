@@ -533,11 +533,11 @@ capability，**不記 channel 名字**）。
 
 **Machine 不受 capability 管**：它發自己的狀態、收寄給它的 `ctl/` 與依角色收 `ho/`。
 
-`orch/<machine>` advertises `machine.read_content_v1: true` only when the read-only `r/` bridge is connected. An absent value means an older machine; the presence of `ss/` does not imply this capability. The `r/` body accepts pinned `info` with `parts: "full"` or `"list"`, `transcript` with `limit` from 1 to 1000 and optional positive `before`, `skills`, `image`, `git`, `git-diff`, `screen`, `agent`, `shell`, `documents`, and `document`. Every Session-scoped read requires `machine_id`, `session`, and a 32-character lowercase hexadecimal `expected_generation`; `machine_id` must match the channel target. The bridge gets `sender`, `seq`, and `ch` from the verified, decrypted envelope. It checks the current roster, signing key, local revocation, and `read_transcript` capability before the pinned local HTTP read and again before sealing the answer. The bridge repeats fresh execution admission after reading, so a reused Session ID cannot release old content. Other operations refuse with `read_only_channel`; a missing generation refuses with `execution_target_required`, and missing capability with `read_transcript_required`.
+`orch/<machine>` advertises `machine.read_content_v1: true` only when the read-only `r/` bridge is connected. An absent value means an older machine; the presence of `ss/` does not imply this capability. The `r/` body accepts pinned `info` with `parts: "full"`, `transcript` with `limit` from 1 to 1000 and optional positive `before`, `skills`, `image`, `git`, `git-diff`, `screen`, `agent`, `shell`, `documents`, and `document`. Every Session-scoped read requires `machine_id`, `session`, and a 32-character lowercase hexadecimal `expected_generation`; `machine_id` must match the channel target. The bridge gets `sender`, `seq`, and `ch` from the verified, decrypted envelope. It checks the current roster, signing key, local revocation, and `read_transcript` capability before the pinned local HTTP read and again before sealing the answer. The bridge repeats fresh execution admission after reading, so a reused Session ID cannot release old content. Other operations refuse with `read_only_channel`; a missing generation refuses with `execution_target_required`, and missing capability with `read_transcript_required`.
 
-The fleet list uses the machine-scoped exception `sessions.list`: `{type:"sessions.list",machine_id,session:"__clawdline_machine__",request}` on `r/<machine>`, answered on `t/<machine>/__clawdline_machine__` with `read:"read:<request>"`. It routes once to the existing `GET /v1/sessions?parts=list` snapshot and returns only `at`, `complete`, and `sessions:[{id,title,cwd?,icon?,execution_generation?}]`. The machine checks `read_transcript` before and after the read; the signed reply echoes `machine_id`, `session_id`, and request `seq`. This machine-level read has no selected Session generation. The viewer joins each display row only to an `ss/` row with the same machine, Session ID, and execution generation; it never treats the batch as action authority. The previous per-Session `info` `parts:"list"` remains understood by older clients, but the fleet page does not call it.
+The fleet list uses the machine-scoped exception `sessions.list`: `{type:"sessions.list",machine_id,session:"__clawdline_machine__",request}` on `r/<machine>`, answered on `t/<machine>/__clawdline_machine__` with `read:"read:<request>"`. It routes once to the existing `GET /v1/sessions?parts=list` snapshot and returns only `at`, `complete`, and `sessions:[{id,title,cwd?,project_key?,icon?,execution_generation?}]`; `project_key` is the Project the machine would accept that Session into (the claim's own `CanonicalProjectKey`), which the Board's assignment dialog compares with an item's Project. The machine checks `read_transcript` before and after the read; the signed reply echoes `machine_id`, `session_id`, and request `seq`. This machine-level read has no selected Session generation. The viewer joins each display row only to an `ss/` row with the same machine, Session ID, and execution generation; it never treats the batch as action authority.
 
-Successful reads and refusals with a safe reply target use a `stream` envelope on `t/<machine>/<session>`. The payload's `read` field is `info.full`, `info.list`, `transcript`, `transcript.before.<cursor>`, `skills`, `image.<id>`, `git`, `read:<request>` for machine list, Git diffs and documents, `screen`, `agent:<id>[.before.<cursor>]`, `shell:<id>`, or `documents`, alongside `status` and `body` or `error`. Decoded Session-scoped `r/` replies also carry top-level `machine_id`, `session_id`, `expected_generation`, and `seq`, where `seq` is the request envelope's sequence. The machine-list reply carries the same proof without `expected_generation`. A viewer first subscribes to the exact `t/` channel, then sends `r/`; it must match the reply's read name and proof fields to its request before showing content. The machine passes `before` and `expected_generation` through the same local Session read and repeats execution admission after reading.
+Successful reads and refusals with a safe reply target use a `stream` envelope on `t/<machine>/<session>`. The payload's `read` field is `info.full`, `transcript`, `transcript.before.<cursor>`, `skills`, `image.<id>`, `git`, `read:<request>` for machine list, Git diffs and documents, `screen`, `agent:<id>[.before.<cursor>]`, `shell:<id>`, or `documents`, alongside `status` and `body` or `error`. Decoded Session-scoped `r/` replies also carry top-level `machine_id`, `session_id`, `expected_generation`, and `seq`, where `seq` is the request envelope's sequence. The machine-list reply carries the same proof without `expected_generation`. A viewer first subscribes to the exact `t/` channel, then sends `r/`; it must match the reply's read name and proof fields to its request before showing content. The machine passes `before` and `expected_generation` through the same local Session read and repeats execution admission after reading.
 
 #### 8.2.1 `orch/` 的任務清單：有人寫才讀（2026-10-10）
 
@@ -562,6 +562,20 @@ Cloud caller 就是發布者本身，沒有別人。
 `root.terminalId` 這種由機器自己的畫面讀取解析出來、不在紀錄裡的值變了——這也正是那個下限存在的
 理由。`/v1/diagnostics` 的 capacity 列 `cloud.task_list_reread_seconds` 帶上次讀取的秒數，備註是
 「n 次讀 / m 輪」。
+
+**兩次讀之間 child 的 root 不跟著讀取當下的畫面走（2026-10-18）。** 上面那 240 秒對 `root.terminalId`
+有個代價：讀的那一刻如果 root 的分頁不在畫面上（例如那個來源正在刷新、列被標成 unverified），整個窗
+口裡描述的 `tasks` 都沒有 root，ss/ 的 `parent_session_id` 也只能靠 root 那列當輪剛好有
+`sessionId` 才補得回來——手機上同一個 child 就一下縮排、一下變成頂層。現在每一輪在投影前，用紀錄裡
+持久的 `root.sessionId` 對「這一輪列出的 session」重新找 root（唯一一列才算），找到的值同時寫進描述
+的 `root.terminalId` 與 ss/ 的 `parent_session_id`；兩邊都找不到時沿用上一次找到、而且那個分頁仍在
+清單裡的 root；分頁不在了就忘掉，關掉的 root 不會讓 child 繼續縮排。沿用的 root 只是一個終端 id，
+tmux 會把關掉的分頁 id 交給下一個 pane，所以那一列若帶著別的 `sessionId`（另一段對話），就不再沿用。
+重新找 root 只看完整的掃描（`whole`）：只讀到部分來源的那一輪沒看到 root，不代表它關了（viewer 也還
+留著那一列），沿用的 root 不會因此被忘掉。這不增加任何讀取，wire 形狀也沒變；描述的位元組上限量的是
+已經寫進 root 的那筆。仍然找不到 root 的 child 會在 daemon log 留一行 `cloud: child %64 has no listed parent: <原因>`，
+原因變了才再寫一次，重新找到時寫 `cloud: child %64 is listed under %8 again`
+（`internal/transport/cloud/tasklist_root_test.go`）。
 
 #### 8.2.2 頁面等這台機器的字再讀（`FEATURE_WAIT_MS`，2026-10-10）
 
@@ -595,6 +609,8 @@ Go daemon 另外發布 `ss/<machine>/<session>`。每個 JSON 僅有 `machine_id
 `snapshot_generation` 是**這一組的身分**：被列出的終端 ID，加上每一列所代表的 `execution_generation`。兩者都沒變時它不變，所以沒變化的狀態列不重發，relay 留存的那一列就是最新標記所指的那一列；Session 關閉會離開集合，重新執行會帶新的執行世代，兩種情況下這個值都會變，而且每一列都先帶著新值發出、標記才發。這就是標記存在的理由：relay 快取的列不能只因終端 ID 相同就滿足另一組的標記。每一列各有自己的視窗（`internal/domain/capacity` 的 `cloud.session_row_volatile_seconds`），加上 240 秒 heartbeat。2026-10-10 量到的理由：這台機器最忙的一小時發出 3,725 個 `ss/` frame，只為 13 個 Session，其中九成是 viewer 已經持有的內容；改成逐列後，十個 Session（2 工作、8 閒置）半小時的重播從 1,331 降到 337 個 frame（`session_status_coalesce_test.go`）。
 
 `presentation_generation` 是機器端顯示事實（工作行、work state、shell、attention 等）的雜湊，本身不含內容。viewer 看到它變才重讀該機器的 pinned 清單（標題、圖示、work note）。這一欄是可加的：沒有這一欄的頁面沿用 `snapshot_generation` 當重讀鍵，而沒有這一欄的機器其 `snapshot_generation` 本來就隨每次顯示變動而變，所以新頁面對舊機器會退回同樣的行為（`web/console/src/cloud/all-machine-sessions.ts` 的 `presentationPass`）。
+
+A viewer that asks a machine to restate its Session rows (a manual refresh) gets a reply that may carry an optional `snapshot_generation`: the pass id of the `ss/` inventory marker that restatement sent or kept. It is present only when every row of that pass was sent and the marker followed them; a partial read or a failed row send leaves it out. The viewer answers the refresh once it holds that marker and every row carries the same pass, which is immediate when the Session set has not changed. The field is additive: a viewer that does not know it ignores it, and a viewer talking to a machine that does not send it keeps the older rule of waiting for a pass newer than the one it holds (`web/console/src/cloud/relay-reader.ts`).
 
 因為列先發、標記後發，瀏覽器逐封開啟時，同一批還沒到齊的那幾毫秒裡會同時持有「新一批的列」與「舊一批的標記」。固定世代讀取遇到這種 `pass_mismatch` 時，頁面會等這台機器的下一個標記（最多 `PASS_SETTLE_MS`，2 秒）再判斷一次；等不到仍照舊拒絕，且不送出任何請求（`web/console/src/cloud/relay-reader.ts` `coherentSession`）。2026-10-10 以一小時、每 15 秒一批、十個 Session 重播：封包間隔 20 ms 時頁面原本自己拒絕 2 次、50 ms 時 7 次，修正後皆為 0（`read-replay.test.ts`）。
 
@@ -731,6 +747,8 @@ See the [dated read-refusal record](records/cloud-wire-implementation-2026-09.md
 
 Hosted 頁面讀取失敗時，如果失敗發生在送出之前或回答離開機器之後，機器的 log 原本什麼都看不到。現在 relay-reader 把每次 Session 讀取失敗記成一列 `cloud.read.failed`（`word`、`stage`＝`viewer_refused`／`timeout`／`relay_refused`／`answered`、`code`、`cond`、`status`、`layer`、`ms`、`connection`、`marker_age_s`、`row_age_s`、`offline_hold_ms`、`machine`、`session`；沒有標題、文字或內容），由頁面既有的 viewer event 投遞（`legacy/js/net/cloud-client.js` `_deliverViewerEvents`）以 `diagnostics.events` 送到有宣告這個字的那台機器。Go daemon 現在回答它（`internal/app/cloudops/viewer_events.go`）：每列寫成一行 `cloud: viewer reported: event=… age_s=… <欄位依名稱排序> sender=… batch=<前 8 字> n=…`，每批再一行 `cloud: viewer events delivered: …`，同一批重送只回收據不重寫。上限登錄在 `internal/domain/capacity`（`cloud.viewer_events_*`）。
 
+直連嘗試也走同一條投遞：每次 `direct_offer`／`carrier_offer` 結束時，瀏覽器記一列 `cloud.direct.attempt`，機器自己寫一行 `cloud direct attempt:`，兩邊用同一個 `attempt`（瀏覽器為這次 offer 取的 connection id）對得起來；欄位是候選的類型與位址家族計數、ICE 狀態時間線、選中配對的類型與家族，以及停在哪個階段，不記位址、埠、SDP 或 ICE 憑證。完整欄位與階段定義在 [Cloud terminal wire](cloud-terminal-wire.md)「Direct attempt trace」。
+
 相容：這是新增的指令字。舊 daemon 不在描述的 `commands` 裡宣告它，頁面就不送，列留在瀏覽器自己的保存與上限內，不會重試到天荒地老；新 daemon 對今天已上線的頁面只是多一個沒人呼叫的字。
 
 The first-read timing events `cloud.detail.first_read` and `cloud.transcript.first_read` include the opaque Session ID alongside the machine, outcome and stage durations. An abandoned first detail read reports `outcome=aborted`. A slow or refused machine read logs its Session ID too. This joins the phone's opening attempt to the exact machine response without logging a title or conversation text; a timing event for another Session is not evidence about the one on screen.
@@ -788,6 +806,44 @@ relay 的 `delivered` 只證明 fan-out 送出去了，不證明機器執行或�
 ### 10.3 Operations
 
 See the [dated operation record](records/cloud-operations-2026-09.md).
+
+Every word is one row of `internal/domain/cloudvocab/vocabulary.json`. A row's
+`decode` states its decoder as data: each body field's type, limits and named
+checks, where the answer goes, and the local request the fields become (path
+template, query, headers, body, with each value's source and default). The
+table's `wrappers` state what the bridge does around a decoder — the
+`execution_generation` it strips from a session-receipt word, the `machine_id`
+it strips from a content read — and `idempotency` the key every local request
+that is not a GET carries. `go run ./tools/contract-gen` generates a Go decoder
+for every row not marked `hand` (`internal/app/cloudops/zz_decode_generated.go`),
+and production serves those words with them; eight words keep a hand-written
+decoder, each with its reason in the row. A value the answer side reads after
+the local request is built (a picture's id, an info read's parts, a menu
+answer's key and question) is carried `into` the plan by the row. What the
+hand-written decoders answered, before they were removed, is a golden of
+142,267 bodies (`internal/app/cloudops/testdata/cloud_decoders.golden.jsonl.gz`)
+that `TestGeneratedDecodersKeepTheGolden` holds every served decoder to;
+`CLAWDLINE_DECODER_GOLDEN=record` rewrites it for a table change that is meant
+to change what a word accepts, and the decompressed diff is the review. A limit
+the table copies from a Go constant names it under `copies`, and
+`TestCopiedLimitsAreTheirConstants` holds the two equal. The wrapper rules are
+held to the bridge by `TestTheTableStatesTheBridgesWrapperRules`.
+
+The same row says what the hosted console does with the word: `console` is
+`carried`, `deferred` or `no_machine_route`; a carried row names its
+`console_route` and the `console_seam` that parses it, and the other two name
+the `console_sentence` a refusal shows instead. `tools/contract-gen` renders
+the console's three lists from those fields into
+`web/console/src/cloud/carry-generated.ts`, which `carry.ts` imports, and
+`-check` fails while that file and the table disagree; an optional
+`console_note` becomes the comment above the entry. **Adding a word therefore
+means adding its row to the table and the route that serves it (with, for a
+carried word, the console route that asks for it), and nothing else**: the Go
+decoder and the console's lists are both regenerated from the row.
+`TestTheVocabularyTableIsTheBridgesCatalog` fails while the machine registers a
+word with no row, or a row's class disagrees with what the machine answers, and
+`vocabulary.test.ts` fails while a carried row's console route is not parsed as
+its word by the seam the row names.
 
 For a live Session's `send`, `answer`/`key`, `interrupt`, `end`, or
 `archive-session`, the Go machine now requires `request` (the caller's stable

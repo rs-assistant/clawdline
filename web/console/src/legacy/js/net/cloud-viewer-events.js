@@ -83,7 +83,13 @@ export const VIEWER_EVENT_LIMITS = Object.freeze({
      */
     flushMs: 1000,
     /** Without Web Locks, another tab of this device holds delivery this long after claiming it. */
-    leaseMs: 90000
+    leaseMs: 90000,
+    /**
+     * Delivery outcomes the log remembers (`noteDelivery`): which machine each batch went to and
+     * why, and why one was deferred or blocked. A repeat of the newest outcome is counted on it
+     * rather than added, so a page deferred for an hour keeps one entry, not one per attempt.
+     */
+    deliveries: 16
 });
 
 const STORAGE_PREFIX = "clawdline.cloud.viewer-events.v1";
@@ -114,8 +120,32 @@ function freshState(now) {
         v: 1, next_n: 1, cursor: 1, counting_since_ms: now, rows: [], rate_limited_total: 0,
         counts: { rate_limited: 0, overflow: 0, storage_errors: 0, refused: 0, unflushed: 0 },
         rate: {}, outbox: null, sends: [], blocked: null, target: null, acknowledged: null,
-        refusals: 0
+        refusals: 0, deliveries: [], unflushed_spans: []
     };
+}
+
+/**
+ * Where the unflushed numbers are. A killed page's lost rows are one run of numbers, after every
+ * row it had written and before every row the next page records; each span is one such run, by
+ * its last number and how many. Spans with no kept row between them are one gap and are joined,
+ * so there are at most as many as gaps between rows. A batch never ends inside a gap (it ends
+ * just before a kept row), so a span is either wholly below its end or wholly above it.
+ */
+function joinSpans(state) {
+    var spans = state.unflushed_spans;
+    var joined = [];
+    var row = 0;
+    spans.forEach(function (span) {
+        var last = joined[joined.length - 1];
+        while (row < state.rows.length && state.rows[row].n <= (last ? last.to : -Infinity)) row += 1;
+        if (last && !(row < state.rows.length && state.rows[row].n <= span.to)) {
+            last.to = Math.max(last.to, span.to);
+            last.count += span.count;
+        } else {
+            joined.push({ to: span.to, count: span.count });
+        }
+    });
+    state.unflushed_spans = joined;
 }
 
 function usableState(value) {
@@ -128,6 +158,11 @@ function usableState(value) {
     });
     if (!Number.isSafeInteger(value.rate_limited_total)) value.rate_limited_total = 0;
     if (!Number.isSafeInteger(value.refusals)) value.refusals = 0;
+    if (!Array.isArray(value.deliveries)) value.deliveries = [];
+    // A state written before spans were kept has none; its unflushed count is placed as it was then.
+    value.unflushed_spans = Array.isArray(value.unflushed_spans) ? value.unflushed_spans.filter(function (span) {
+        return span && Number.isSafeInteger(span.to) && Number.isSafeInteger(span.count) && span.count > 0;
+    }) : [];
     return true;
 }
 
@@ -490,6 +525,8 @@ export class ViewerEventLog {
         if (!state || !journal || typeof journal !== "object") return state;
         if (Number.isSafeInteger(journal.n) && journal.n > state.next_n) {
             state.counts.unflushed += journal.n - state.next_n;
+            state.unflushed_spans.push({ to: journal.n - 1, count: journal.n - state.next_n });
+            joinSpans(state);
             state.next_n = journal.n;
         }
         if (Number.isSafeInteger(journal.rl) && journal.rl > state.rate_limited_total) {
@@ -528,6 +565,7 @@ export class ViewerEventLog {
             state.rows.splice(Math.floor(this.limits.rows / 2), 1);
             state.counts.overflow += 1;
         }
+        joinSpans(state);
         ["rate_limited", "overflow", "storage_errors"].forEach(function (count) {
             state.counts[count] += memory.counts[count];
         });
@@ -706,6 +744,7 @@ export class ViewerEventLog {
         if (state.rows.length > this.limits.rows) {
             state.rows.splice(Math.floor(this.limits.rows / 2), 1);
             state.counts.overflow += 1;
+            if (state.unflushed_spans.length > 1) joinSpans(state);
         }
         this._journal(state);
         this._save(state);
@@ -730,11 +769,28 @@ export class ViewerEventLog {
             state.counts.overflow > 0 || state.counts.refused > 0 || state.counts.unflushed > 0;
     }
 
+    /** The rows waiting for a batch, oldest first, for a caller deciding where they go. */
+    rows() {
+        return this._load().rows.slice();
+    }
+
+    /** The sealed batch waiting for its receipt, or null. */
+    sealedBatch() {
+        return this._load().outbox || null;
+    }
+
     /**
-     * The batch to send: the sealed outbox if one is waiting, otherwise a new one made from every
-     * row and count now held. A new batch moves those rows into the outbox in the same write, so
+     * The batch to send: the sealed outbox if one is waiting, otherwise a new one made from the
+     * rows and counts now held. A new batch moves those rows into the outbox in the same write, so
      * they are still on the phone and still counted until `acknowledge` names this batch. Only
      * the tab holding the stored state seals.
+     *
+     * `meta.rows` seals only that many of the oldest rows, for rows that go to another machine
+     * (`_deliverViewerEvents`); the rest stay for the next batch. The batch then ends just before
+     * the first row left behind, and the dropped rows below that point are counted in it, so each
+     * batch's `rows + dropped_overflow + dropped_unflushed = n_to - n_from + 1` still holds. The
+     * counts no row carries (rate limits, refusals, storage errors) ride the first batch.
+     * `meta.machine` and `meta.why` are kept on the outbox: where it goes and why.
      */
     takeBatch(meta) {
         meta = meta || {};
@@ -744,6 +800,30 @@ export class ViewerEventLog {
         var storageErrors = state.counts.storage_errors + this.storageErrors;
         if (!this.pending()) return null;
         var now = this.now();
+        var take = Number.isSafeInteger(meta.rows) && meta.rows >= 1 && meta.rows < state.rows.length
+            ? meta.rows : state.rows.length;
+        var rows = state.rows.slice(0, take);
+        var nTo = state.next_n - 1;
+        var overflow = state.counts.overflow;
+        var unflushed = state.counts.unflushed;
+        var spans = [];
+        if (take < state.rows.length) {
+            nTo = state.rows[take].n - 1;
+            // The unflushed numbers below the end are the spans there (`joinSpans`); the rest of
+            // the gap was cut from the middle by the row bound. Unflushed numbers no span places,
+            // from a state written before spans, are counted first, as they were then.
+            var missing = Math.max(0, nTo - state.cursor + 1 - take);
+            var placed = 0;
+            var below = 0;
+            state.unflushed_spans.forEach(function (span) {
+                placed += span.count;
+                if (span.to <= nTo) below += span.count;
+                else spans.push(span);
+            });
+            unflushed = Math.min(state.counts.unflushed, missing,
+                below + Math.max(0, state.counts.unflushed - placed));
+            overflow = Math.min(state.counts.overflow, missing - unflushed);
+        }
         var batch = {
             v: VIEWER_EVENTS_VERSION,
             batch_id: randomID(),
@@ -751,15 +831,15 @@ export class ViewerEventLog {
             device: boundedText(meta.device, 128),
             tab: boundedText(meta.tab, 64),
             web_build: boundedText(meta.webBuild, 64),
-            rows: state.rows,
+            rows: rows,
             completeness: {
                 n_from: state.cursor,
-                n_to: state.next_n - 1,
-                rows: state.rows.length,
+                n_to: nTo,
+                rows: rows.length,
                 dropped_rate_limited: state.counts.rate_limited,
-                dropped_overflow: state.counts.overflow,
+                dropped_overflow: overflow,
                 dropped_refused: state.counts.refused,
-                dropped_unflushed: state.counts.unflushed,
+                dropped_unflushed: unflushed,
                 storage_errors: storageErrors,
                 counting_since_ms: Number.isSafeInteger(state.counting_since_ms) ? state.counting_since_ms : null,
                 rate_limited: Object.keys(state.rate).sort().map(function (key) {
@@ -786,10 +866,12 @@ export class ViewerEventLog {
         }
         state.outbox = { batch_id: batch.batch_id, request: randomID(), body: body,
             rows: batch.rows.length, created_at_ms: now, attempts: 0, last_attempt_ms: null,
-            last_failure: null };
-        state.rows = [];
-        state.cursor = state.next_n;
-        state.counts = { rate_limited: 0, overflow: 0, storage_errors: 0, refused: 0, unflushed: 0 };
+            last_failure: null, machine: boundedText(meta.machine, 128), why: boundedText(meta.why, 32) };
+        state.rows = state.rows.slice(take);
+        state.unflushed_spans = spans;
+        state.cursor = nTo + 1;
+        state.counts = { rate_limited: 0, overflow: state.counts.overflow - overflow, storage_errors: 0,
+            refused: 0, unflushed: state.counts.unflushed - unflushed };
         state.rate = {};
         state.counting_since_ms = now;
         this.storageErrors = 0;
@@ -913,6 +995,41 @@ export class ViewerEventLog {
         if ((blocked.mac_build || null) !== (macBuild || null)) return null;
         if ((blocked.web_build || null) !== (webBuild || null)) return null;
         return blocked;
+    }
+
+    /**
+     * One delivery outcome, kept in the stored state beside the rows: the batch, the machine it
+     * went to and why that one, or why nothing went. The newest repeat of the same outcome is
+     * counted on its entry (`times`, `last_at_ms`); at most `limits.deliveries` are kept.
+     */
+    noteDelivery(outcome) {
+        if (!outcome || typeof outcome.state !== "string" || outcome.state === "empty") return;
+        var state = this._load();
+        var failure = outcome.failure || null;
+        var entry = {
+            state: boundedText(outcome.state, 16),
+            machine: boundedText(outcome.machine, 128),
+            route: boundedText(outcome.route, 32),
+            why: boundedText(outcome.why, 64),
+            code: boundedText(outcome.code || (failure && failure.code), 64),
+            batch_id: boundedText(outcome.batch_id, 128),
+            rows: Number.isSafeInteger(outcome.rows) ? outcome.rows : null
+        };
+        var now = this.now();
+        var last = state.deliveries[state.deliveries.length - 1];
+        if (last && ["state", "machine", "route", "why", "code", "batch_id", "rows"].every(function (field) {
+            return last[field] === entry[field];
+        })) {
+            last.times += 1;
+            last.last_at_ms = now;
+        } else {
+            entry.at_ms = now;
+            entry.last_at_ms = now;
+            entry.times = 1;
+            state.deliveries.push(entry);
+            while (state.deliveries.length > this.limits.deliveries) state.deliveries.shift();
+        }
+        this._save(state);
     }
 
     /** The Mac last chosen, kept so a page that cannot open anything yet still knows where to send. */

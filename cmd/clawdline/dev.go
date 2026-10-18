@@ -135,9 +135,9 @@ func devInstall(stdout, stderr io.Writer, rev string, port int, r runner) int {
 	// It waits in place for the compile slot: a person ran this and is
 	// watching it, so it is not handed to a callback.
 	os.Setenv("HEAVY_HANDOFF", "0")
-	// Signed with this machine's copy of the release certificate when it has
-	// one, so a dev build and a release are one program to macOS and switching
-	// between them asks for nothing again (tools/release/codesign.sh).
+	// Sign with this machine's copy of the release certificate when available.
+	// A Developer ID identity is needed for WebKit's keychain grant to survive
+	// an App replacement (tools/release/codesign.sh).
 	if p12, password, ok := devCodesign(config.Dir()); ok {
 		os.Setenv("CLAWDLINE_CODESIGN_P12", p12)
 		os.Setenv("CLAWDLINE_CODESIGN_PASSWORD", password)

@@ -51,10 +51,6 @@ type screenAnswerWire struct {
 // session answers `pending` and the screen arrives a few milliseconds later on
 // the `screen` event like every other one.
 func (s *Server) sessionScreenRoute(w http.ResponseWriter, r *http.Request, id string) {
-	if !s.ownsSessions() {
-		s.forwardUpstream(w, r)
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 	item, err := s.actions().Find(ctx, id)
@@ -104,46 +100,6 @@ func wireScreen(reading app.ScreenReading) screenWire {
 		out.AskAgainAfterMs = int64(app.ScreenOnDemandFloor / time.Millisecond)
 	}
 	return out
-}
-
-// screensRoute is the machine state this feature creates, published so that
-// somebody can see it.
-//
-// `tmux list-panes -a -F '#{pane_id} #{pane_pipe}'` answers the same question in
-// one command; this answers it *and* says which of those pipes this daemon can
-// account for, which tmux cannot, because `#{pane_pipe}` is a boolean with no
-// owner in it.
-func (s *Server) screensRoute(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		writeRefusal(w, http.StatusMethodNotAllowed, "method_not_allowed",
-			"what this daemon is watching is read with GET")
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
-	defer cancel()
-	reading := s.screens.Inventory(ctx)
-	rows := make([]contract.ScreenWatch, 0, len(reading.Screens))
-	for _, row := range reading.Screens {
-		rows = append(rows, contract.ScreenWatch{
-			ID:        row.ID,
-			Backend:   contract.Backend(row.Backend),
-			Channel:   contract.ScreenChannel(row.Channel),
-			Watching:  row.Watching,
-			ExpiresIn: int64(row.ExpiresIn),
-			Signalled: row.Signalled,
-			Captures:  int64(row.Captures),
-			Signals:   int64(row.Signals),
-			Readable:  row.Readable,
-		})
-	}
-	writeJSON(w, contract.ScreenInventory{
-		Screens:      rows,
-		Attached:     orEmpty(reading.Attached),
-		Piped:        orEmpty(reading.Piped),
-		Unattributed: orEmpty(reading.Unattributed),
-		WindowMs:     int64(app.ScreenWindow / time.Millisecond),
-		LeaseSeconds: int64(app.ScreenLease / time.Second),
-	})
 }
 
 func orEmpty(in []string) []string {

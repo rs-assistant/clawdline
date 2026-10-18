@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { nextWord } from "../next-strings.js"
+import { showModalWithoutChoice } from "../modal-focus.js"
 import * as L from "../legacy/bridge.js"
 import { ProjectedRow } from "../session/List.js"
 import { onAttentionRead } from "../session/attention-changed.js"
@@ -20,6 +21,7 @@ import { matchesFleetFilter, type FleetFilter } from "./fleet-filters.js"
 import { CarrierDot } from "./CarrierDot.js"
 import { machineLight, type CarrierReading } from "./carrier-state.js"
 import { machineSeenWord } from "./machine-seen.js"
+import { MachinePlatformIcon } from "./MachinePlatformIcon.js"
 
 export type MachineToolbarAction = "terminal" | "voice" | "work" | "start" | "start_terminal"
 type Reading = { phase: "loading" } | { phase: "settled"; value: MachineSessionProjection }
@@ -118,7 +120,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   })
 
   useEffect(() => {
-    if (machineAction) machineDialog.current?.showModal()
+    if (machineAction) showModalWithoutChoice(machineDialog.current)
     else machineDialog.current?.close()
   }, [machineAction])
 
@@ -489,11 +491,19 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
         }
       }}>
       <h2>{nextWord(machineAction === "start" ? "cloudStartWhere" : "cloudSwitch")}</h2>
-      {machines.map((machine) => <button className="cloud-all-machine-option" key={machine.id} type="button" onClick={() => {
+      <p className="cloud-all-machine-help">{nextWord(machineAction === "start" ? "cloudStartWhereHelp" : "cloudSwitchWhereHelp")}</p>
+      <div className="cloud-all-machine-options">{machines.map((machine) => <button className="cloud-all-machine-option" key={machine.id} type="button" onClick={() => {
         const action = machineAction
         setMachineAction(null)
         if (action) onMachineAction?.(machine.id, action)
-      }}>{machine.name} · {machine.platform}</button>)}
+      }}>
+        <MachinePlatformIcon platform={machine.platform} />
+        <span className="cloud-all-machine-copy"><strong>{machine.name}</strong><small>{machine.platform}</small></span>
+        <svg className="cloud-all-machine-arrow" aria-hidden="true" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m9 5 7 7-7 7" />
+        </svg>
+      </button>)}</div>
       <div className="cloud-all-machine-actions">
         <button className="cloud-all-machine-cancel" type="button" onClick={() => setMachineAction(null)}>{nextWord("cloudActionCancel")}</button>
       </div>

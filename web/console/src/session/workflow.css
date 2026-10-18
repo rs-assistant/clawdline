@@ -2,8 +2,17 @@
 .snippets-tabs button { flex: 1; padding: .55rem; border-radius: .5rem; }
 .snippets-tabs button[aria-selected="true"] { background: var(--card-hi); color: var(--ink); font-weight: 700; }
 .workflow-picker { display: block; }
-.workflow-detail-nav { padding: .5rem 1rem; border-bottom: 1px solid var(--line); }
+.workflow-detail-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem 1rem; border-bottom: 1px solid var(--line); }
 .workflow-detail-nav button { padding: .55rem .4rem; color: var(--accent); font: inherit; cursor: pointer; }
+.workflow-detail-actions { display: flex; gap: .25rem; white-space: nowrap; }
+.workflow-detail-actions button { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border-radius: 8px; color: var(--dim); }
+.workflow-detail-actions button:hover:not(:disabled) { background: var(--card-hi); color: var(--ink); }
+.workflow-detail-actions .workflow-delete:hover:not(:disabled) { color: var(--danger, #d84a4a); }
+.workflow-detail-actions .work-icon { width: 18px; height: 18px; }
+.workflow-detail-actions button:disabled { opacity: .5; cursor: default; }
+.workflow-quick-message .work-voice-labelled > span { display: block; margin-bottom: 6px; color: var(--faint); font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.workflow-quick-message .work-voice-field { margin: 0; }
+.workflow-quick-message .work-voice-box textarea { display: block; margin: 0; padding-bottom: 48px; }
 .workflow-detail-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .workflow-detail-scroll .workflow-launch { border-top: 0; background: transparent; }
 .workflow-detail-scroll .workflow-launch p { max-height: none; overflow: visible; }
@@ -29,6 +38,9 @@
 .workflow-launch [role="alert"] { margin: .6rem 0 0; color: var(--danger, #d84a4a); }
 .snippets-sheet .buttons .workflow-start { min-height: 2.75rem; padding: .65rem 1rem; border: 1px solid var(--accent); border-radius: .6rem; background: var(--accent); color: #17191d; font: inherit; font-weight: 650; cursor: pointer; }
 .snippets-sheet .buttons .workflow-start:disabled { opacity: .5; cursor: default; }
+@media (max-width: 899px) {
+  .snippets-workflow-sheet { height: min(680px, calc(var(--vvh, 100dvh) - 48px)); }
+}
 
 .snippet-skeleton { display: grid; gap: 2px; width: 100%; }
 .snippet-skeleton-row { display: grid; gap: 7px; padding: 10px 12px; min-height: 58px; }

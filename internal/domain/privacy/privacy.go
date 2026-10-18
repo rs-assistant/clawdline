@@ -87,7 +87,7 @@ var fixtureHomes = map[string]bool{
 }
 
 // Allowance is a match that a rule gets wrong and the file cannot change: a
-// byte-for-byte copy guarded by another check, or a public constant that has
+// word kept from a copy of the retired app, or a public constant that has
 // the shape of a private value. It names the exact text, so the same file can
 // still fail on anything else.
 type Allowance struct {
@@ -109,11 +109,11 @@ var Allowed = []Allowance{
 	{Path: "shell/darwin/Browser.swift", Rule: "uuid", Text: "2faf7ef2-488c-47db-" + "98d9-050ec1781455",
 		Why: "the shell browser's WKWebsiteDataStore identifier, generated once for the app; changing it discards every sign-in that store holds"},
 	{Path: "web/console/src/legacy/js/net/cloud-crypto.js", Rule: "private-repo", Text: "clawdline-" + "cloud-keys",
-		Why: "the browser's IndexedDB database name, not the repository; the file is a byte copy the legacy check compares with its source"},
+		Why: "the browser's IndexedDB database name, not the repository; renaming it would lose every key a browser already stored"},
 	{Path: "README.md", Rule: "private-repo", Text: "clawdline-" + "cloud-optional",
 		Why: "the anchor GitHub generates for the heading \"Turn on Clawdline Cloud (optional)\" — the product's name in a link, not the repository"},
 	{Path: "web/console/src/legacy/js/net/cloud-failure.js", Rule: "private-repo", Text: "clawdline-" + "cloud",
-		Why: "a byte copy of the original's own file, which the copy guard compares with its source; changing it here would make that guard red instead"},
+		Why: "a word kept from the original's own file when it was copied; the file is owned code now and no longer pinned"},
 }
 
 // Scanner holds the person's own words; the rest of the rules are fixed.

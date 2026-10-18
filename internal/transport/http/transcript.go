@@ -22,21 +22,22 @@ import (
 // could not be read: a session whose conversation id was never recovered from
 // its command line has no record to point at, and saying "unreadable" there
 // would blame the disk for a missing identifier.
-func recordPath(item session.Session) string {
-	if item.ConversationID == "" {
-		return ""
+//
+// The answer is transcript.Host.RecordPath's, the one rule every reader of a
+// Session's record shares: a Claude record is under the directory the
+// registry says the session was launched in, and only without that under the
+// directory the scan found the process in.
+func (s *Server) recordPath(item session.Session) string {
+	if h, ok := s.inventory.Identity.(*transcript.Host); ok {
+		return h.RecordPath(item)
 	}
+	// A daemon whose identity port is not the host has no registry, so the
+	// same rule falls back to the scan's directory.
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
-	switch item.Assistant {
-	case session.AssistantClaude:
-		return transcript.ClaudePath(home, item.CWD, item.ConversationID)
-	case session.AssistantCodex:
-		return transcript.CodexPath(home, item.ConversationID)
-	}
-	return ""
+	return (&transcript.Host{Home: home}).RecordPath(item)
 }
 
 // unlocatedNote is what a person reads when the session has no record to read
@@ -146,7 +147,7 @@ func (s *Server) transcriptPage(id string, item session.Session, limit int) cont
 
 func (s *Server) transcriptPageBefore(id string, item session.Session, limit int, before int64) contract.TranscriptPage {
 	page := contract.TranscriptPage{ID: id, Entries: []contract.TranscriptEntry{}}
-	path := recordPath(item)
+	path := s.recordPath(item)
 	if path == "" {
 		if item.Binding == session.BindingNoRecord {
 			// A new assistant has not written its first conversation yet.
@@ -228,7 +229,7 @@ func (s *Server) transcriptPageBefore(id string, item session.Session, limit int
 // page keeps the one its whole read gave it.
 func (s *Server) transcriptPageAfter(id string, item session.Session, limit int, after int64) (contract.TranscriptPage, bool) {
 	page := contract.TranscriptPage{ID: id, Entries: []contract.TranscriptEntry{}}
-	path := recordPath(item)
+	path := s.recordPath(item)
 	if path == "" {
 		return page, true
 	}
@@ -420,31 +421,11 @@ func infoPath(r *http.Request) (string, bool) {
 // It follows /v1/sessions: whichever daemon answers the list answers this, so
 // an id always means the same session to both reads.
 func (s *Server) sessionInfoRoute(w http.ResponseWriter, r *http.Request, id string) {
-	if !s.ownsSessions() {
-		s.forwardUpstream(w, r)
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	item, err := s.actions().FindForRead(ctx, id)
 	if err != nil {
 		writeActionRefusal(w, err)
-		return
-	}
-	// The list form contains only the display name for this pinned execution.
-	// It does not walk transcript, repository or shell state for every row.
-	if r.URL.Query().Get("parts") == "list" {
-		info := contract.SessionInfo{Session: contract.SessionInfoSession{
-			ID: item.ID, Title: s.sessionDisplayLabel(ctx, item), Assistant: contract.Assistant(item.Assistant),
-			CWD: item.CWD,
-		}, Models: []contract.SessionModel{}}
-		if s.icons != nil {
-			info.Session.Icon = wireIcon(s.icons.For(item.CWD))
-		}
-		if !s.admitPinnedTarget(w, r, id) {
-			return
-		}
-		writeJSON(w, contract.SessionInfoReply{Info: info})
 		return
 	}
 	home, _ := os.UserHomeDir()
@@ -474,7 +455,7 @@ func (s *Server) sessionInfoRoute(w http.ResponseWriter, r *http.Request, id str
 	// No record, or one that cannot be read, leaves the model, the usage and
 	// the context absent: a session whose record was not found has not spent
 	// nothing, and it is not 0% full.
-	if path := recordPath(item); path != "" {
+	if path := s.recordPath(item); path != "" {
 		if facts, err := s.facts.Read(path, string(item.Assistant)); err == nil {
 			info.Session.Model = facts.Model
 			info.Session.Effort = facts.Effort

@@ -1,5 +1,6 @@
 import { catalogFormat, catalogWord, catalogWordLanguage, currentCatalogTag } from "../catalog.js"
 import { createPortal } from "react-dom"
+import { showModalWithoutChoice } from "../modal-focus.js"
 import { ProjectTools } from "./projects/ProjectTools.js"
 import { ProjectFolderPicker } from "./projects/ProjectFolderPicker.js"
 import type { ProjectSetupHandle } from "./projects/ProjectSetup.js"
@@ -111,7 +112,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   useLayoutEffect(() => {
     const dialog = removeDialog.current
     if (!dialog) return
-    if (removeTarget && !dialog.open) dialog.showModal()
+    if (removeTarget) showModalWithoutChoice(dialog)
     if (!removeTarget && dialog.open) dialog.close()
   }, [removeTarget])
 
@@ -134,7 +135,7 @@ function ProjectsPageView({ shown }: { shown: boolean }) {
   useLayoutEffect(() => {
     const dialog = worktreeDialog.current
     if (!dialog) return
-    if (worktreeTarget && !dialog.open) dialog.showModal()
+    if (worktreeTarget) showModalWithoutChoice(dialog)
     if (!worktreeTarget && dialog.open) dialog.close()
   }, [worktreeTarget])
 

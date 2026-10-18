@@ -16,11 +16,9 @@
  *    would get a 200 for a change that did not happen, so nothing empty is
  *    sent from here at all — that refusal is `blank`, and it never reaches the
  *    network.
- * 3. **The machine list this console draws is not this API's.** It is what the
- *    relay client decrypted from what the machines themselves published, the
- *    same reason a forgotten machine's snapshot can outlive it (`forget.ts`). So a rename
- *    that worked shows the old name until that machine reports in again, and
- *    the page says so instead of redrawing a row it has no new answer for.
+ * 3. **The machine list also reads retained relay envelopes.** The account's
+ *    label overrides their older descriptor after a confirmed rename, while
+ *    the machine's own hostname remains unchanged.
  *
  * The credential is this browser's account cookie, as `forget.ts` uses. The
  * console served by the daemon has no such cookie and no way to get one, so

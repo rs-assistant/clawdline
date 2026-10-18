@@ -1,9 +1,9 @@
 // What this console carries, what it says when it does not, and the words it
 // says it in: `node --test web/console/src/cloud/*.test.ts`.
 //
-// The other half of these rules is a Go test that reads `carry.ts` against this
-// machine's own catalog (internal/app/cloudops/carry_test.go). This half is
-// what the page does with the table: that the routes and the table cannot
+// The lists themselves are generated from the vocabulary table, which is held
+// to this machine's own catalog by `TestTheVocabularyTableIsTheBridgesCatalog`
+// (internal/app/cloudops). This half is what the page does with the table: that the routes and the table cannot
 // disagree, that a refusal names the word, that `info` reaches the machine and
 // comes back as the status line's own read, and that the document's language
 // is the catalog this build ships.
@@ -318,7 +318,7 @@ test("one word, one list, and every route names a word the table carries", () =>
   // An opened waiting Session's one row, asked when its question has not come.
   assert.ok("sessions.row" in CARRIED)
   assert.ok("session-snippets" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 161)
+  assert.equal(Object.keys(CARRIED).length, 160)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {
@@ -409,8 +409,7 @@ test("terminal HTTP routes remain local while hosted terminals use separate encr
     assert.equal(uncarriedWordOf("GET", path), "", path + " stands for no Cloud word")
   }
   assert.equal(notCarriedDetail("POST", "/v1/terminals/trm_x/input"), MACHINE_ONLY[0].sentence)
-  assert.equal(notCarriedDetail("POST", "/v1/auth/devices/dev-1/terminal"), MACHINE_ONLY[1].sentence)
-  assert.equal(machineOnly("/v1/auth/devices/dev-1/revoke"), "", "only the grant route is a terminal route")
+  assert.equal(machineOnly("/v1/auth/devices/dev-1/revoke"), "", "a device route is not a terminal route")
   assert.equal(machineOnly("/v1/terminalsx"), "", "a prefix is a whole segment")
   for (const word of words()) assert.ok(!/terminal/.test(word), word + ": the generic Router has no terminal word")
   assert.equal(mac.asked.length, 0, "nothing was asked of the machine")

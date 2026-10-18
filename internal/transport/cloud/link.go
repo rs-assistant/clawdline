@@ -63,6 +63,9 @@ type Status struct {
 	Commands bool `json:"commands"`
 	// TerminalDirect controls both Terminal and Session-read direct carriers.
 	TerminalDirect bool `json:"terminal_direct"`
+	// DirectLocalNetwork lets those carriers use private IPv4 addresses on
+	// the same network; off by default.
+	DirectLocalNetwork bool `json:"direct_local_network"`
 	// Configured is whether this machine has an identity and keys — that is,
 	// whether `clawdline cloud login` has ever completed here.
 	Configured bool `json:"configured"`
@@ -187,9 +190,8 @@ type LinkOptions struct {
 	SessionLook func(id string)
 	// TerminalService is the only ingress to the local terminal service from
 	// signed Cloud envelopes. The regular Router remains forbidden.
-	TerminalService   func() (*terminals.Service, error)
-	TerminalProject   func(context.Context, string) (string, bool)
-	DropTerminalGrant func(string) error
+	TerminalService func() (*terminals.Service, error)
+	TerminalProject func(context.Context, string) (string, bool)
 	// PeerReceipts and PeerExecute are the daemon's durable peer inbox seam.
 	// Without all three hooks, peer ingress is refused.
 	PeerReceipts    peerapp.Receipts
@@ -495,6 +497,29 @@ func (l *Link) rosterFresh() bool { return l.rosterRead() == nil }
 // it; the ordinary Cloud command path keeps its own roster policy (the 60 s
 // adaptercloud.RosterRefresh and the background ticker) and never waits for
 // this one.
+//
+// Why there are two refresh paths and not one (checked 2026-10-17). Both
+// end in roster.Refresh, so the fetch itself is one copy; what differs is
+// the policy around it, and each policy is load-bearing:
+//
+//   - Folding the ticker into this read (a 60 s caller of rosterRead) puts
+//     the command path's sender keys and roster_unreadable answer behind a
+//     CloudTerminalRosterDeadlineLimit (2 s) deadline instead of the fetch's
+//     own 10 s one, so a control plane answering in 3 s would turn every
+//     Cloud command into command_roster_unreadable where it is answered today.
+//   - Running the ticker at this read's 2 s freshness instead keeps
+//     revocation latency but costs one GET /v1/devices every 2 s on every
+//     idle connected machine, thirty times today's traffic, for answers
+//     nobody asked for.
+//   - Dropping the ticker and leaving only this lazy read lengthens nothing
+//     for terminals but makes the first command after a quiet minute wait on
+//     a roster fetch inside PublicKeyFor, and leaves the status route's
+//     Readable() as old as the last terminal frame.
+//
+// So the ticker keeps sender keys warm for commands and this read proves the
+// 2 s freshness terminal and Session-content authority need; neither can
+// stand in for the other without changing revocation latency, timeouts or
+// traffic.
 func (l *Link) rosterRead() error {
 	now := l.opts.Now()
 	l.rosterReadMu.Lock()
@@ -735,6 +760,7 @@ func (l *Link) wire() error {
 		PeerTaskEventAck:     l.enqueuePeerAck,
 		OnDisconnect:         l.closeAllTerminalConnections,
 		OnSettled:            l.terminalReceiptSettled,
+		OnAck:                l.publicationAcked,
 		PublicKeyFor:         l.publicKeyFor,
 		ContentKey:           secret,
 		Log:                  func(line string) { l.logf("%s", line) },
@@ -806,6 +832,16 @@ func (l *Link) wire() error {
 	// A press from a page is shown landing at the next look, not the next pass.
 	l.service.Acted = l.publisher.Settle
 	return nil
+}
+
+// publicationAcked hands the relay's fan-out count for each publication to
+// the publisher, which stops building Session rows while they reach nobody
+// (`Publisher.Acked`). The publisher is built after the transport and before
+// the line starts, so every receipt finds it.
+func (l *Link) publicationAcked(frame adaptercloud.AckFrame) {
+	if l.publisher != nil {
+		l.publisher.Acked(frame.Ch, frame.Fanout)
+	}
 }
 
 // machineName is the name this machine publishes to the account's machine
@@ -983,7 +1019,9 @@ func (l *Link) runOnce(ctx context.Context) error {
 	return err
 }
 
-// refreshRoster re-reads the account's viewer devices until ctx is done.
+// refreshRoster re-reads the account's viewer devices until ctx is done. It is
+// the command path's refresh; rosterRead says why it is not merged with the
+// terminal path's.
 func (l *Link) refreshRoster(ctx context.Context) {
 	ticker := time.NewTicker(adaptercloud.RosterRefresh)
 	defer ticker.Stop()
@@ -1386,18 +1424,19 @@ func (l *Link) SpoolRefusalReading() (capacity.Reading, bool) {
 func (l *Link) Status() Status {
 	l.mu.Lock()
 	out := Status{
-		Enabled:        l.settings.Enabled,
-		TerminalDirect: l.settings.TerminalDirect,
-		State:          l.state,
-		RelayURL:       l.settings.RelayURL,
-		APIBase:        l.settings.APIBase,
-		Account:        l.identity.AccountID,
-		MachineID:      l.identity.MachineID,
-		MachineName:    machineName(l.identity, l.settings, HostName(), runtime.GOOS),
-		Fingerprint:    l.fingerprint,
-		LastError:      l.lastErr,
-		Answered:       l.answered,
-		Refused:        l.refused,
+		Enabled:            l.settings.Enabled,
+		TerminalDirect:     l.settings.TerminalDirect,
+		DirectLocalNetwork: l.settings.DirectLocalNetwork,
+		State:              l.state,
+		RelayURL:           l.settings.RelayURL,
+		APIBase:            l.settings.APIBase,
+		Account:            l.identity.AccountID,
+		MachineID:          l.identity.MachineID,
+		MachineName:        machineName(l.identity, l.settings, HostName(), runtime.GOOS),
+		Fingerprint:        l.fingerprint,
+		LastError:          l.lastErr,
+		Answered:           l.answered,
+		Refused:            l.refused,
 	}
 	out.LastErrorKind = string(l.lastKind)
 	if !l.lastErrAt.IsZero() {

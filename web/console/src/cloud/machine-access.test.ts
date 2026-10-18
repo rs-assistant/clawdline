@@ -1,7 +1,14 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node's strip-types test runner.
-import { machinesByCapability } from "./machine-access.ts"
+import { machinesByCapability, reportsMachinePresence } from "./machine-access.ts"
+
+test("reports from either machine refresh presence while a single-machine reader is open", () => {
+  for (const type of ["sessions", "orchestrator", "session_status"]) {
+    assert.equal(reportsMachinePresence({ type }), true, type)
+  }
+  assert.equal(reportsMachinePresence({ type: "connection" }), false)
+})
 
 function row(id: string, pairing: "paired" | "not_paired" | "unknown") {
   return {

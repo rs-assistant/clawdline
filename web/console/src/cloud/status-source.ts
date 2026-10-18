@@ -1,4 +1,4 @@
-import { channelSegment } from "../legacy/js/net/client.js"
+import { SESSION_INVENTORY_ID, SESSION_INVENTORY_LIMIT, channelSegment } from "../legacy/js/net/client.js"
 import type { AssistantSkill, SessionRow, TranscriptEntry } from "@clawdline/contract"
 import type { ArtifactRef } from "../legacy/images-bridge.js"
 // @ts-expect-error -- Node's type-stripping runner loads the source in its focused test.
@@ -111,7 +111,7 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
   const body = record(reply)
   if (!body || (body.complete !== true && body.complete !== false) || !Number.isFinite(body.at) ||
     Math.abs(nowMs - Number(body.at) * 1000) > STATUS_FRESH_MS ||
-    !Array.isArray(body.sessions) || body.sessions.length > 512) return null
+    !Array.isArray(body.sessions) || body.sessions.length > SESSION_INVENTORY_LIMIT) return null
   const sessions = body.sessions.map((value: unknown) => record(value))
   if (sessions.some((row: Record<string, unknown> | null) => !row || typeof row.id !== "string" || !row.id ||
     typeof row.execution_generation !== "string" || !/^[0-9a-f]{32}$/u.test(row.execution_generation) ||
@@ -143,11 +143,19 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
       const ownerConversation = record(status.epic_parent)?.owner_session_id
       const parentSessionID = typeof ownerConversation === "string" ? byConversation.get(ownerConversation) : null
       const before = known.get(String(row!.id) + "\u0000" + String(row!.execution_generation))
+      const menu = record(status.menu)
+      const options = menu?.options
+      const replyProven = status.state === "waiting" && Array.isArray(options) && options.length > 0 &&
+        (status.screen_reading === "read" && !menu?.source ||
+          status.screen_reading === "unavailable" && menu?.source === "transcript")
       return { destination: { machineID, sessionID: String(row!.id),
         executionGeneration: String(row!.execution_generation) }, state: String(status.state),
       parentSessionID: parentSessionID && parentSessionID !== row!.id ? parentSessionID : before?.parentSessionID,
       machineScope: status.machine_scope === true || before?.machineScope === true,
       coordinatorBound: status.coordinator_bound === true || before?.coordinatorBound === true,
+      needsAttention: status.work_person_needed === true ||
+        typeof status.attention_count === "number" && status.attention_count > 0,
+      waitingForReply: replyProven ? true as const : undefined,
       freshness: "current" as const, observedAt: nowMs, snapshotGeneration }
     }) } }
 }
@@ -293,7 +301,7 @@ export function statusSource(current: () => StatusClient | null,
         projection = { ...projection, retryAt: cached.until }
     }
     if (projection.kind === "unavailable" && projection.reason === "unknown" &&
-      !client.statusSnapshots?.has(JSON.stringify([machineID, "__clawdline_inventory_v1__"])) &&
+      !client.statusSnapshots?.has(JSON.stringify([machineID, SESSION_INVENTORY_ID])) &&
       client.recoverStatusMarker && !signal.aborted) {
       const now = client.now?.() ?? Date.now()
       let attempt = markerAttempts.get(machineID)
@@ -402,6 +410,7 @@ export function statusSource(current: () => StatusClient | null,
             observedAt: trustworthyListTime ? listObservedAt : undefined,
             assistant: session.assistant === "claude" || session.assistant === "codex" ? session.assistant : undefined,
             cwd: typeof session.cwd === "string" ? session.cwd : undefined,
+            projectKey: typeof session.project_key === "string" ? session.project_key : undefined,
             status: status && typeof status.work_state === "string" &&
               (statusState === "working" || statusState === "waiting" || statusState === "idle" || statusState === "unknown")
               ? status as Partial<SessionRow> : undefined,
@@ -497,7 +506,7 @@ export function statusSource(current: () => StatusClient | null,
             return
           }
           if (event.type === "sessions" && event.identity?.machine && event.identity?.session &&
-            event.identity.session !== "__clawdline_inventory_v1__") {
+            event.identity.session !== SESSION_INVENTORY_ID) {
             listener({ machineID: event.identity.machine, sessionID: event.identity.session, kind: "detail_changed" })
             return
           }
@@ -513,7 +522,7 @@ export function statusSource(current: () => StatusClient | null,
             return
           }
           clearTransition(machineID)
-          listener({ machineID, sessionID: event.identity.session === "__clawdline_inventory_v1__"
+          listener({ machineID, sessionID: event.identity.session === SESSION_INVENTORY_ID
             ? undefined : event.identity.session,
           kind: projection.kind === "unavailable" && projection.reason === "event_gap" ? "gap" : "changed" })
         })

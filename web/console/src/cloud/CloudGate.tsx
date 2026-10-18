@@ -7,6 +7,7 @@ import { BRAND_MARK } from "../brand-mark.js"
 import type { ConnectionLight } from "../connection-state.js"
 import * as L from "../legacy/bridge.js"
 import { nextWord, type NextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import { bootCatalog } from "../catalog.js"
 import { cardsAreFor } from "../session/send.js"
 import { namesSession, sessionFragment } from "../session/address.js"
@@ -37,6 +38,7 @@ import { machinePresentation } from "../legacy/js/session/selection.js"
 import { forgetPersonas } from "../personas.js"
 import { accountMachineForConfirmation, accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, withAccountRegistrations, type AccountName } from "./unpaired-rows.js"
 import { machineSeenWord } from "./machine-seen.js"
+import { MachinePlatformIcon } from "./MachinePlatformIcon.js"
 import { PairingRun, dropInvitation, watchInvitations, type PairStart, type PairState } from "./pair.js"
 import {
   browserPendingPairings,
@@ -57,7 +59,7 @@ import { machineForAddress } from "./document-target.js"
 import { openingFor } from "./opening.js"
 import { toolMovesConsole } from "./machine-tool.js"
 import { CloudAccountContext } from "./account-context.js"
-import { machinesByCapability } from "./machine-access.js"
+import { machinesByCapability, reportsMachinePresence } from "./machine-access.js"
 import { answerSchedulePresence, publishScheduleFleet, type ScheduleMachine } from "./schedule-machines.js"
 import { bundledCatalog, catalogURL } from "./strings.js"
 import { RelayReader, machineApp, presentsEvery } from "./relay-reader.js"
@@ -182,6 +184,7 @@ type Screen =
   | { at: "device_limit"; tier: string; limit: number | null }
   | { at: "retrying"; reason: RetryReason; seconds: number }
   | { at: "failed"; code: string }
+  | { at: "roster_failed" }
   | { at: "revoked"; url: string }
   | { at: "machines" }
   | { at: "console" }
@@ -292,8 +295,6 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   )
   const [who, setWho] = useState<{ account: string; device: string } | null>(null)
   const [managingMachines, setManagingMachines] = useState(false)
-  const managingMachinesRef = useRef(managingMachines)
-  managingMachinesRef.current = managingMachines
   const [machineList, setMachineList] = useState<MachineListState>({ phase: "loading" })
   const machines = machineList.phase === "ready" ? machineList.machines : null
   const [problem, setProblem] = useState<AccessProblem | null>(null)
@@ -426,6 +427,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // tab does not open a machine meanwhile: the relay can still list one the
   // account revoked (`opening.ts`).
   const [rosterPending, setRosterPending] = useState(transport.kind === "cloud")
+  const [rosterFailed, setRosterFailed] = useState(false)
   const [connectionVersion, setConnectionVersion] = useState(0)
   const pairingStore = useMemo(() => browserPendingPairings(), [])
 
@@ -433,11 +435,14 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const rosterRequest = useRef(0)
   const readAccountRoster = useCallback((apiOrigin: string) => {
     const request = ++rosterRequest.current
+    setRosterPending(true)
+    setRosterFailed(false)
     setAccountRosterStatus("loading")
     void accountMachineRoster(apiOrigin).then((roster) => {
       if (request !== rosterRequest.current) return
       setRosterPending(false)
       if (!roster) {
+        setRosterFailed(true)
         namesRef.current = new Map()
         registeredRef.current = new Map()
         setNames(namesRef.current)
@@ -808,9 +813,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
    * it against the machine's own name.
    *
    * Nothing is retried and nothing is assumed: `rename.ts` answers which of
-   * "refused", "no such machine" and "could not be read" it was, and this only
-   * decides where that is said. It is not destructive, so unlike forgetting it
-   * leaves the list and this tab's chosen machine exactly as they were.
+   * "refused", "no such machine" and "could not be read" it was. A confirmed
+   * rename updates the account labels in this tab immediately; the machine's
+   * retained descriptor may still carry the old hostname.
    */
   const rename = useCallback(
     async (machine: CloudMachine, name: string) => {
@@ -820,6 +825,19 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       const outcome = await renameMachine(transport.config.apiOrigin, machine.id, name)
       setRenaming(false)
       setRenamed({ machine: machine.name || machine.label || machine.id, outcome })
+      if (outcome.kind === "renamed") {
+        // An earlier roster read must not overwrite the successful PATCH with
+        // its pre-rename name when the two requests finish out of order.
+        rosterRequest.current += 1
+        const account = { name: outcome.name, platform: registeredRef.current.get(machine.id)?.platform ?? "" }
+        registeredRef.current = new Map(registeredRef.current).set(machine.id, account)
+        namesRef.current = new Map(namesRef.current).set(machine.id, account)
+        setRegistered(registeredRef.current)
+        setNames(namesRef.current)
+        setRosterPending(false)
+        setRosterFailed(false)
+        setAccountRosterStatus("ready")
+      }
       // A name this page would not send, or a bound the account would refuse,
       // never left the browser: the question stays open with what was typed.
       if (outcome.kind === "blank" || outcome.kind === "too_long") return
@@ -963,13 +981,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   useEffect(() => {
     setMachinePairing((id) => {
       const known = machinesRef.current?.find((m) => m.id === id)
-      const named = known ? withAccountNames([known], namesRef.current, described, present)[0] : null
+      const named = known ? withAccountNames([known], namesRef.current, present)[0] : null
       openPairing({ id, name: named ? named.name || named.label || id : id })
     })
     setMachineForgetting((id) => {
       const named = accountMachineForConfirmation(
         id, machinesRef.current, registeredRef.current, namesRef.current,
-        described, present, gone.current)
+        present, gone.current)
       if (!named) return
       setTold(null)
       forgetReturn.current = "console"
@@ -992,11 +1010,6 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       setScreen({ at: "console" })
     }
   }, [])
-
-  /** Whether this browser has read `machine`'s own snapshot, and so has its own word for its name. */
-  function described(machine: string): boolean {
-    return !!client.current?.machineDescriptor?.(machine)
-  }
 
   const onUpdate = useCallback(
     (update: CloudUpdate) => {
@@ -1030,7 +1043,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             // no session count where it could not read the sessions to count them.
             const named = withAccountNames(
               withAccountRegistrations(answer.machines, registeredRef.current, present),
-              namesRef.current, described, present)
+              namesRef.current, present)
             return {
               machines: devicesPageRows(named, gone.current),
               syncing: answer.syncing,
@@ -1040,16 +1053,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           if (transport.kind === "cloud") readAccountRoster(transport.config.apiOrigin)
           unlisten.current?.()
           unlisten.current = next.events((event) => {
-            // The fleet list stays visible beside an open Session. Refresh its
-            // machine freshness after a complete status pass, not after each
-            // row in that pass (which would churn the list while it arrives).
-            // The management list is also visible over a reader, and a
-            // decrypted session may be its first proof of a machine pairing.
-            if (managingMachinesRef.current && (event.type === "sessions" ||
-              event.type === "orchestrator" || event.type === "session_status")) listMachines()
-            else if (!reader.current && (event.type === "orchestrator" || event.type === "session_status")) listMachines()
-            else if (fleetScopeRef.current && (event.type === "orchestrator" ||
-              event.type === "session_status" && event.identity?.session === "__clawdline_inventory_v1__")) listMachines()
+            // Machine presence belongs to the machine, not the view. A
+            // single-machine page has a reader too; skipping its verified
+            // reports stranded the roster at "offline" after a reconnect.
+            // When every row was stale the timer below was also stopped, so
+            // no later pass could repair either machine's status.
+            if (reportsMachinePresence(event)) listMachines()
             // A decryptable inventory clears only the problem attributed to
             // that machine. One machine answering is not evidence that a
             // different machine's key problem went away.
@@ -1161,29 +1170,6 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     }
   }, [start, connectionVersion])
 
-  // Where this tab lands once it has a list to land on (`opening.ts`). The
-  // list is asked again whenever it changes, so a machine that was still
-  // arriving is opened on the pass that lists it.
-  useEffect(() => {
-    if (screen.at !== "machines" || managingMachines || !machines || !who) return
-    const exact = destinationFromFragment(location.hash)
-    // A Session destination is the fleet's own address; a document address is
-    // one machine's page, and the fleet would put the Session list over it.
-    const document = exact ? null : machineForAddress(location.hash, null)
-    const opening = openingFor({
-      machines,
-      addressed: exact ? { machine: exact.machineID, inFleet: true }
-        : document ? { machine: document } : null,
-      everyMachineAddressed: location.hash === "#all-machines",
-      remembered: remembered(),
-      forgotten,
-      rosterPending,
-    })
-    if (opening.at !== "console") return
-    setFleetScope(opening.fleet)
-    choose(machines.find((machine) => machine.id === opening.machine)!, opening.remember)
-  }, [screen, managingMachines, machines, who, choose, remembered, forgotten, rosterPending])
-
   /**
    * Leave the machine this tab chose and start again at the list. This drops
    * only this tab's choice; the machine keeps its place on the account, which
@@ -1239,7 +1225,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     () => {
       if (machineList.phase === "refused") return machineList
       const relay = machineList.phase === "ready" ? machineList.machines : []
-      const visible = withAccountNames(withAccountRegistrations(relay, registered, present), names, described, present)
+      const visible = withAccountNames(withAccountRegistrations(relay, registered, present), names, present)
         .filter((machine) => !forgotten.includes(machine.id))
         .map((machine) => {
           const operation = client.current?.machineDescriptor?.(machine.id)?.machine?.operation_allowed
@@ -1248,15 +1234,37 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       return visible.length ? { phase: "ready", machines: visible }
         : machineList.phase === "ready" ? { phase: "empty_authoritative" } : machineList
     },
-    // `described` reads the client, which changes only with a new line and
-    // then with a new list.
     [machineList, names, registered, forgotten],
   )
   const quickMachines = shown.phase === "ready" ? shown.machines.filter((machine) => machine.selectable) : []
+  // Decide before paint. React runs the opening effect after paint, so showing
+  // the picker while that effect chooses the fleet creates a visible flash.
+  const opening = useMemo(() => {
+    if (screen.at !== "machines" || managingMachines || rosterPending || rosterFailed || !who ||
+      machineList.phase === "loading" || shown.phase !== "ready") return null
+    const exact = destinationFromFragment(location.hash)
+    const document = exact ? null : machineForAddress(location.hash, null)
+    return openingFor({
+      machines: shown.machines,
+      addressed: exact ? { machine: exact.machineID, inFleet: true }
+        : document ? { machine: document } : null,
+      everyMachineAddressed: location.hash === "#all-machines",
+      remembered: remembered(),
+      forgotten,
+    })
+  }, [screen, managingMachines, rosterPending, rosterFailed, who, machineList.phase, shown, remembered, forgotten])
+  useEffect(() => {
+    if (opening?.at !== "console" || shown.phase !== "ready") return
+    setFleetScope(opening.fleet)
+    choose(shown.machines.find((machine) => machine.id === opening.machine)!, opening.remember)
+  }, [opening, shown, choose])
   // The roster's word for the one machine a single-machine page reads, so that
   // page says "offline" where its own line to the relay would say "connected".
   const readingRow = shown.phase === "ready" ? shown.machines.find((machine) => machine.id === reading) : undefined
-  const readingOffline = readingRow?.freshness === "stale" ? { seenAt: machineIdentityFacts(readingRow).seenAt } : null
+  const readingOffline = readingRow?.freshness === "stale" ? {
+    machine: readingRow.name || readingRow.label || readingRow.id,
+    seenAt: machineIdentityFacts(readingRow).seenAt,
+  } : null
   // The names the detail's own sentences use, read when one is written rather
   // than captured when the effect below was last built.
   const machineNames = useRef(new Map<string, string>())
@@ -1634,7 +1642,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           nameOf: (id: string) => {
             const known = machines?.find((m) => m.id === id)
             if (known) {
-              const named = withAccountNames([known], names, described, present)[0]
+              const named = withAccountNames([known], names, present)[0]
               return named.name || named.label || id
             }
             // A browser that held no key had no list to find it in; the
@@ -1810,7 +1818,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       )}
       {words && (screen.at !== "console" || pairing) && (
         <GateCard
-          screen={screen}
+          screen={screen.at === "machines" && !managingMachines &&
+            (rosterPending || machineList.phase === "loading" || opening?.at === "console") ? { at: "checking" }
+            : screen.at === "machines" && rosterFailed ? { at: "roster_failed" }
+              : screen}
           who={who}
           machineList={shown}
           updateClient={client.current}
@@ -1818,7 +1829,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           onSignIn={signInForMachineList}
           problem={problem}
           onChoose={choose}
-          onRetry={start}
+          onRetry={screen.at === "machines" && rosterFailed && transport.kind === "cloud"
+            ? () => readAccountRoster(transport.config.apiOrigin) : start}
           recovery={screen.at === "device_limit" ? session.current : null}
           asking={asking}
           forgetting={forgetting}
@@ -1875,29 +1887,22 @@ function GateCard(props: {
   const { asking, forgetting, forgotten, told, reading, onAsk, onForget, onLeave, onCloseMachinePicker } = props
   const { naming, renaming, renamed, onName, onRename, pairing, onPair } = props
   const mark = useRef<HTMLCanvasElement>(null)
+  const card = useRef<HTMLDivElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
   const go = useRef<HTMLButtonElement>(null)
   useLayoutEffect(() => {
     L.paintIcon(mark.current, BRAND_MARK, 3)
   }, [])
-  // Cancel, not the destructive button, holds the focus the question opens
-  // with. `#schedule-delete-confirm` focuses its own Delete, and that sheet is
-  // reached from a form somebody opened for one schedule; this question is one
-  // press away from a list whose rows are pressed to *use* a machine, so the
-  // safe answer is the one under the return key.
   useLayoutEffect(() => {
-    if (asking) cancel.current?.focus({ preventScroll: true })
+    if (asking) focusModalContainer(card.current)
   }, [asking])
-  // The same rule for renaming, which is reached from the same rows: the
-  // question opens on Cancel, not on the field and not on the button that
-  // writes to the account. The field is one Tab away for whoever wants it.
   const nameCancel = useRef<HTMLButtonElement>(null)
   const nameGo = useRef<HTMLButtonElement>(null)
   const [typed, setTyped] = useState("")
   useLayoutEffect(() => {
     if (!naming) return
     setTyped(naming.name || "")
-    nameCancel.current?.focus({ preventScroll: true })
+    focusModalContainer(card.current)
   }, [naming])
   const T = L.strings
   // The question belongs to the list it was asked from. A line that drops
@@ -1911,6 +1916,7 @@ function GateCard(props: {
       data-pair-console={pairing && screen.at === "console" ? "true" : undefined}>
       <div
         className="door-card"
+        ref={card}
         role={question || nameQuestion ? "alertdialog" : "dialog"}
         aria-modal="true"
         aria-label={pairing ? undefined : "clawdline"}
@@ -2159,7 +2165,12 @@ function GateCard(props: {
   function body() {
     switch (screen.at) {
       case "checking":
-        return <p className="say calm">{nextWord("cloudChecking")}</p>
+        return (
+          <div className="cloud-opening" role="status" aria-live="polite">
+            <span className="cloud-opening-ring" aria-hidden="true" />
+            <p>{nextWord("cloudChecking")}</p>
+          </div>
+        )
       case "install":
         return (
           <>
@@ -2225,6 +2236,15 @@ function GateCard(props: {
             </button>
           </>
         )
+      case "roster_failed":
+        return (
+          <>
+            <p className="say">{nextWord("cloudRosterFailed")}</p>
+            <button className="go" type="button" onClick={onRetry}>
+              {nextWord("cloudRetry")}
+            </button>
+          </>
+        )
       case "blocked":
         return <p className="say">{nextWord("cloudBlocked", { origin: screen.origin, here: location.origin })}</p>
       case "misdeclared":
@@ -2253,7 +2273,10 @@ function GateCard(props: {
                         disabled={!m.selectable}
                         onClick={() => onChoose(m)}
                       >
-                        <span className="cloud-machine-name">{name}</span>
+                        <span className="cloud-machine-heading">
+                          <MachinePlatformIcon platform={platformWord(identity.platform)} />
+                          <span className="cloud-machine-name">{name}</span>
+                        </span>
                         <span className="cloud-machine-identity">
                           {platformWord(identity.platform)}
                           {" · "}
@@ -2312,6 +2335,7 @@ function GateCard(props: {
                           onClick={() => onName(m)}
                         >
                           <span aria-hidden="true">✎</span>
+                          <span>{nextWord("cloudRename")}</span>
                         </button>
                         <button
                           className="cloud-forget"

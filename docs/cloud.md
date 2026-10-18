@@ -58,6 +58,8 @@ An opened Session's named `info` and `transcript` reads may likewise precede the
 
 **A status row is published when that row changed, not when the set did.** The pass id names the set: the listed terminal ids and the execution each row speaks for. While both stand still it stands still, so an unchanged row is not re-sent and the one the relay retains remains what the newest marker means; a Session that closes leaves the set and a restarted one brings a new execution, and either way the pass id moves and every row states the new one before the marker does. That is the property the marker exists for — a relay-cached row cannot satisfy a marker of a different set merely because it has the same terminal id — and it no longer rests on the id being drawn fresh each pass. Each row then has its own volatile window (`cloud.session_row_volatile_seconds` in [`internal/domain/capacity`](../internal/domain/capacity)) and its own heartbeat. Measured on the running daemon for 2026-10-10: the busiest hour sent 3,725 `ss/` frames for 13 listed Sessions, 287 per Session-hour, because one working Session's elapsed time or token count restated the whole set every 15 to 30 seconds. Replaying half an hour of ten Sessions, two working and eight idle, that publisher sent 1,331 status frames and this one sends 337 — 266 down to 67 per Session-hour, with the idle rows down to their heartbeats (`session_status_coalesce_test.go`).
 
+**Nobody connected, no Session rows.** Each relay receipt says how many sockets a publication reached. When the newest `ss/` or `orch/` receipt reached nobody and no viewer has been heard from since, a pass builds no Session list and sends no row; the descriptor alone keeps its 240-second heartbeat, so a viewer that arrives does not see the machine as stale. A page that connects asks `sessions.snapshot` first and is answered by a pass built then, and any envelope from a viewer, or any receipt that reached one, resumes ordinary passes. Measured on 2026-10-17: in ten minutes, 409 publications all reached nobody, and with no local console open each 5-second pass built the whole list (about 90 ms of CPU) to send them (`publish_idle_test.go`).
+
 `presentation_generation` is the hash of the machine's display facts — the work line, work state, shells, attention — and carries none of their words. A viewer re-reads one pinned machine list per machine when it changes, which is where the list's titles, icons and work notes come from. It is additive: a page without it keys that read on `snapshot_generation` as before, and against a machine without it `snapshot_generation` still moves with every display change, so a new page falls back to the same behaviour (`presentationPass` in [`all-machine-sessions.ts`](../web/console/src/cloud/all-machine-sessions.ts)).
 
 **Deploy the console before the daemon.** The new page is correct against both machines, but a page cached before `presentationPass` keys its pinned read on a pass id this daemon keeps still, so on that page a title, icon or work note in the fleet list is re-read only when a Session is listed, closed or restarted until the page is loaded again. Its rows, states, attention and freshness are unaffected.
@@ -76,7 +78,12 @@ The separate `cloud_terminal_direct` switch controls the WebRTC carrier for Term
 reads. It defaults on; `clawdline cloud direct on|off` or this machine's local Settings → Remote
 page changes it. The local-only `POST /v1/cloud/direct` route persists the choice and replaces the
 Cloud line so existing peers close and the relay remains available. A hosted browser cannot change
-this machine switch. An EC2 instance can additionally set `cloud_direct_udp_port` and
+this machine switch. Beside it, `cloud_direct_local_network` (default off; Settings → Remote while
+direct connections are on, `clawdline cloud direct local on|off`, or the local-only
+`POST /v1/cloud/direct/local-network`) lets the direct carrier use RFC 1918 IPv4 host addresses so a
+phone on the same network connects without hairpinning through the router; on macOS its first use
+shows the Local Network permission prompt once, and a denial leaves the public path or the relay
+([terminal-direct-path.md](terminal-direct-path.md)). An EC2 instance can additionally set `cloud_direct_udp_port` and
 `cloud_direct_public_ip` together to multiplex direct ICE on one inbound UDP port; see
 [Linux setup](linux.md#let-a-cloud-browser-connect-directly-to-ec2).
 
@@ -132,6 +139,18 @@ away under the header's name. A tab that has chosen a single machine keeps it, b
 is that tab's own (`sessionStorage`); a new tab has made none. An account with one readable machine
 still opens its list once, so the first thing a person sees names the machine and offers its
 pairing. The rules are `web/console/src/cloud/opening.ts` and are tested there.
+
+On a cold load the gate holds one opening card until the account machine roster answers. The
+roster's active ids decide which retained relay rows may appear; a revoked registration or an old
+relay snapshot absent from the account cannot restore a machine card. If the account roster cannot
+be read, the page asks for a retry instead of opening from possibly stale relay membership. The
+opening decision is made before the machine picker is painted, so an automatic fleet or addressed
+Session open does not flash the management list first.
+
+When a fleet action needs one machine, its dialog shows each machine's name, platform and a
+server or personal computer silhouette. Machine management keeps Rename as a named control beside
+Pair and Forget. A confirmed rename changes the account label used by the picker, switcher and
+fleet immediately; it does not rename the operating system host.
 
 A cold browser load has two bounded paths. The signed `ss/` inventory marker names the complete
 Session set for each machine. If its marker or a row is missing, a complete, fresh, authorized

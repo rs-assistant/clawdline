@@ -194,7 +194,7 @@ func (s *Server) restoreArchived(w http.ResponseWriter, raw []byte) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	inv := s.freshReading(ctx)
-	reading := startReadingFrom(inv)
+	reading := s.startReadingFrom(inv)
 	results, err := s.archive.RestoreArchived(ctx, ids, inv, func(ctx context.Context, row store.ArchiveRow) (app.Started, error) {
 		return s.resumeConversation(ctx, reading, resumeTarget{verb: "unarchive", cwd: row.CWD, place: row.Place,
 			conversation: row.ConversationID, assistant: row.Assistant, persona: row.Persona, recorded: true})

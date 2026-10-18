@@ -68,6 +68,29 @@ func TestTheDefaultsArePublicClawdline(t *testing.T) {
 	}
 }
 
+// Same-network direct connections are off until the file says true, and the
+// switch survives a write of anything else.
+func TestSameNetworkDirectIsOffUntilTurnedOn(t *testing.T) {
+	t.Parallel()
+	settings, err := ReadSettings(settingsFile(t, `{"cloud_enabled":true,"cloud_terminal_direct":true}`))
+	if err != nil || settings.DirectLocalNetwork {
+		t.Fatalf("same network on by default: %+v %v", settings, err)
+	}
+	if _, err := ReadSettings(settingsFile(t, `{"cloud_direct_local_network":"yes"}`)); err == nil {
+		t.Fatal("accepted a same-network switch that is not a boolean")
+	}
+	file := settingsFile(t, `{"cloud_terminal_direct":false}`)
+	for _, on := range []bool{true, false, true} {
+		if err := SetDirectLocalNetwork(file, on); err != nil {
+			t.Fatal(err)
+		}
+		settings, err := ReadSettings(file)
+		if err != nil || settings.DirectLocalNetwork != on || settings.TerminalDirect {
+			t.Fatalf("round trip to %v: %+v %v", on, settings, err)
+		}
+	}
+}
+
 func TestFixedDirectEndpointRequiresAPublicIPv4AndPort(t *testing.T) {
 	t.Parallel()
 	settings, err := ReadSettings(settingsFile(t, `{"cloud_direct_udp_port":3479,"cloud_direct_public_ip":"198.51.100.10"}`))

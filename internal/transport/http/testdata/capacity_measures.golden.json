@@ -1,0 +1,1613 @@
+[
+  {
+    "Name": "artifacts.drops",
+    "Known": true,
+    "Note": true,
+    "WindowSeconds": true
+  },
+  {
+    "Name": "artifacts.drops_young",
+    "Known": true,
+    "WindowSeconds": true
+  },
+  {
+    "Name": "artifacts.image_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "artifacts.images",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "audit.security",
+    "Known": true
+  },
+  {
+    "Name": "board.receipts",
+    "Known": true
+  },
+  {
+    "Name": "cache.assistant_quota",
+    "Known": true,
+    "WindowSeconds": true
+  },
+  {
+    "Name": "cache.background_agents",
+    "Known": true
+  },
+  {
+    "Name": "cache.git_not_repo",
+    "Known": true,
+    "WindowSeconds": true
+  },
+  {
+    "Name": "cache.git_not_repo_rows",
+    "Known": true
+  },
+  {
+    "Name": "cache.image_thumbs",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.pinned_read",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.reclaim_summary",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.session_activity",
+    "Known": true
+  },
+  {
+    "Name": "cache.session_execution_memo",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.session_inventory",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.session_links",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.session_project_keys",
+    "Known": true
+  },
+  {
+    "Name": "cache.session_skills",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.source_answer",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.terminal_screens",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cache.transcript_titles",
+    "Known": true
+  },
+  {
+    "Name": "callback.args",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "callback.command_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "callback.output_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "callback.per_machine",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "callback.per_root",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "callback.tail_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.header_read_diagnostic_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.header_read_diagnostic_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.peer_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.peer_discovery_reply",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.peer_frame_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.peer_grants",
+    "Known": true
+  },
+  {
+    "Name": "cloud.peer_inbox",
+    "Known": true
+  },
+  {
+    "Name": "cloud.peer_inbox_page",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.peer_ingress",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.peer_outbox",
+    "Known": true
+  },
+  {
+    "Name": "cloud.peer_pairs",
+    "Known": true
+  },
+  {
+    "Name": "cloud.relay_queue",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.reload_stop_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.roster_short_read_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.session_row_asks",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.session_row_id_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.session_row_volatile_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.spool",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.spool_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.spool_channel_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.spool_receipts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.spool_refusals",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.task_list_reread_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_connections",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_ack_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_candidates",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_chunk_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_gather_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_message_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_negotiate_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_offers_per_minute",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_peers",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_probe_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_probe_unsettled_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_direct_sdp_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_early_frames",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_frame_heartbeat_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_history_capture_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_history_line_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_history_receipt_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_ingress",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_key_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_list_ingress",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_list_retries",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_observation_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_receipt_busy_retries",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_receipt_busy_retry_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_receipt_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_receipts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_refusals",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_request_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_revocation_retire_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_roster_deadline_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_roster_refresh_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_roster_retry_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_sweep_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_unconfirmed_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_unverified_retire_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.terminal_viewer_connections",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.viewer_events_batch_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.viewer_events_line_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.viewer_events_logged_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.viewer_events_seen_batches",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_live_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.opened_row_quiet_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.opened_row_restate_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.persona_retry_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.pinned_list_read_timeout_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.relay_feature_wait_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.relay_transcript_expect_reask_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.session_notes_safety_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.status_gap_retry_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.status_marker_recovery_wait_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.status_marker_retry_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.transcript_backoff_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.transcript_follow_fast_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.transcript_follow_later_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.transcript_follow_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.transcript_merged_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.transcript_safety_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "coordinator.aliases",
+    "Known": true
+  },
+  {
+    "Name": "coordinator.bind_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "decisions.open",
+    "Known": true
+  },
+  {
+    "Name": "deploy.health_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "devices.list",
+    "Known": true
+  },
+  {
+    "Name": "diagnostics.route_latency_samples",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "diagnostics.route_stat_keys",
+    "Known": true
+  },
+  {
+    "Name": "dispatch.also_work_ids",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "epic.child_items",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "handoff.pack_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "handoff.patch_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "handoff.worktrees",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "icons.request_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "icons.saved",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "icons.side",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "intent.cloud_wait_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "intent.planner_queue",
+    "Known": true
+  },
+  {
+    "Name": "intent.planner_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "intent.request_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "intent.stderr_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "iterm.osascript_kinds",
+    "Known": true
+  },
+  {
+    "Name": "iterm.stall_cooldown_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "iterm.stall_diagnoses",
+    "Known": true
+  },
+  {
+    "Name": "iterm.stall_failures",
+    "Known": true
+  },
+  {
+    "Name": "iterm.stall_said_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "iterm.stall_section_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "iterm.stall_step_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "iterm.viewer_concurrent",
+    "Known": true
+  },
+  {
+    "Name": "iterm.viewer_open_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "leases.queue",
+    "Known": true
+  },
+  {
+    "Name": "log.daemon",
+    "Known": true
+  },
+  {
+    "Name": "memory.description_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "memory.entries",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "memory.entry_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "memory.group_description_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "memory.groups",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "memory.name_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "naming.context_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "naming.tail_entries",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "notification.rule_label_characters",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "notification.rule_wait_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "notification.rules_rows",
+    "Known": true
+  },
+  {
+    "Name": "orchestrator.opening_stuck_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "personas.catalog",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "personas.suggestion_context_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "personas.text_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "places.git_config_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "places.registered",
+    "Known": true
+  },
+  {
+    "Name": "places.repo_lookups",
+    "Known": true
+  },
+  {
+    "Name": "places.repo_readers",
+    "Known": true
+  },
+  {
+    "Name": "places.repo_wait_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "places.setup_age_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "places.setup_lookups",
+    "Known": true
+  },
+  {
+    "Name": "places.setup_readers",
+    "Known": true
+  },
+  {
+    "Name": "places.setup_wait_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "planreview.blocking_listed",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectfiles.file_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectfiles.list",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectfiles.scan_entries",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectfiles.skill_summary_runes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectfiles.tree_depth",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectfiles.tree_path_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectfiles.write_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projects.folder_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectsync.clones",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectsync.entry_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectsync.file_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectsync.manifest_projects",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectsync.mirrored",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectsync.path_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "projectsync.project_files",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "proposals.open",
+    "Known": true
+  },
+  {
+    "Name": "push.subscriptions",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.app_relist_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.app_swap_poll_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.apply_follow_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.archive_entries",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.artifact_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.auto_apply_retry_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.backups_kept",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.boot_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.check_interval_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.check_jitter_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.download_timeout_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.failed_versions",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.fetch_timeout_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.health_wait_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.list_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.lock_stale_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.manifest_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.pending_deadline_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.previous_releases_kept",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.signature_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.smoke_timeout_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.state_file_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.supervisor_runs",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "release.unpacked_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "run.claimed_items",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "run.created_items",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "schedule.run_transcript_head",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "schedule.run_transcripts_probed",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "screens.capture_slots",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.close_scheduled",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.close_scheduled_per_terminal",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.close_scheduled_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.direct_todo_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.direct_todos",
+    "Known": true
+  },
+  {
+    "Name": "session.executions",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.human_intervention_detail_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.human_intervention_document_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.human_intervention_draft_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.human_intervention_text_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.human_intervention_title_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.human_interventions_open",
+    "Known": true
+  },
+  {
+    "Name": "session.human_interventions_recent",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.human_interventions_total",
+    "Known": true
+  },
+  {
+    "Name": "session.no_movement_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.report_open_todo_characters",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.report_open_todo_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.secret_handoff_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.secret_handoff_delivery_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.secret_handoff_pending",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.secret_handoff_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.title_age",
+    "Known": true
+  },
+  {
+    "Name": "session.title_characters",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.title_request_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.title_rows",
+    "Known": true
+  },
+  {
+    "Name": "session.todo_batch_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "session.waiting_for",
+    "Known": true
+  },
+  {
+    "Name": "sessions.activity_reads",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "sessions.agent_rows",
+    "Known": true
+  },
+  {
+    "Name": "sessions.archive_restore_batch",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "sessions.archive_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "sessions.restore_batch",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "sessions.restore_boots",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "sessions.restore_grace",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "sessions.restore_heartbeat",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "sessions.restore_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "sessions.restore_seen_age",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "sessions.shell_output_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "settings.request_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "snippets.scope",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "snippets.total",
+    "Known": true
+  },
+  {
+    "Name": "squad.body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squad.console_active_skill_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squad.entities",
+    "Known": true
+  },
+  {
+    "Name": "squad.event_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squad.event_id_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squad.event_page_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squad.launch_skill_when_runes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squad.place_lookup",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squad.receipts",
+    "Known": true
+  },
+  {
+    "Name": "squad.recovery_page_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squad.request_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squad.settings_rows",
+    "Known": true
+  },
+  {
+    "Name": "squad.skill_source_summary_runes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squad.snapshot_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squadpackage.archive_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squadpackage.entries",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squadpackage.expanded_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squadpackage.expansion_ratio",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squadpackage.file_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squadpackage.manifest_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squadpackage.preview_age",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "squadpackage.preview_rows",
+    "Known": true
+  },
+  {
+    "Name": "squadpackage.request_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "sse.screen_pending",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "store.db",
+    "Known": true,
+    "HasDiskFree": true
+  },
+  {
+    "Name": "store.done_effect_retention_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "store.events",
+    "Known": true
+  },
+  {
+    "Name": "store.read_connections",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "store.receipt_tombstone_retention_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "store.receipts",
+    "Known": true
+  },
+  {
+    "Name": "store.retention_prune_batch_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "terminal.body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "terminal.count",
+    "HostDependent": true
+  },
+  {
+    "Name": "terminal.history_lines",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "terminal.input_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "terminal.lane",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "terminal.launch_line_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "terminal.launch_scripts",
+    "Known": true
+  },
+  {
+    "Name": "terminal.lease_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "terminal.paste_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "terminal.streams",
+    "Known": true
+  },
+  {
+    "Name": "terminal.viewers",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "update.apply_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "update.build_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "update.fetch_timeout_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "update.refresh_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "usage.work_cursor_queue",
+    "Known": true
+  },
+  {
+    "Name": "usage.work_cursor_rows",
+    "Known": true
+  },
+  {
+    "Name": "usage.work_units_per_answer",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "voice.model_download_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "waits.open",
+    "Known": true
+  },
+  {
+    "Name": "work.assignments",
+    "Known": true
+  },
+  {
+    "Name": "work.completion_reason_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work.digests",
+    "Known": true
+  },
+  {
+    "Name": "work.documents_per_item",
+    "Known": true
+  },
+  {
+    "Name": "work.image_bytes",
+    "Known": true
+  },
+  {
+    "Name": "work.image_bytes_per_item",
+    "Known": true
+  },
+  {
+    "Name": "work.image_bytes_total",
+    "Known": true
+  },
+  {
+    "Name": "work.image_request_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work.images_per_item",
+    "Known": true
+  },
+  {
+    "Name": "work.item_description_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work.item_title_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work.item_user_action_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work.list_page_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work.open",
+    "Known": true
+  },
+  {
+    "Name": "work.planning",
+    "Known": true
+  },
+  {
+    "Name": "work.request_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work.root_landings_per_item",
+    "Known": true
+  },
+  {
+    "Name": "work.steps_per_item",
+    "Known": true
+  },
+  {
+    "Name": "work_gate_claims_per_round",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_due_rows_per_pass",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_evidence_artifact_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_evidence_artifacts_per_task",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_evidence_string_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_evidence_strings_per_claim",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_evidence_total_bytes_per_task",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_owner_offline_grace_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_recent_rounds_per_item_read",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_result_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_retry_backoff_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_round_details_per_item",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_round_details_per_store",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "work_gate_tasks_per_round",
+    "Known": true,
+    "Note": true
+  }
+]

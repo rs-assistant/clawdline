@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { RestorableSession, RestorableSessions, RestoreResult } from "@clawdline/contract"
 import { nextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import { failureSentence } from "../legacy/bridge.js"
 import { uuid } from "../legacy/js/core/util.js"
 import {
@@ -151,7 +152,7 @@ export function RestoreSheet({
   const [rows, setRows] = useState<Map<string, RowOutcome>>(() => new Map())
   const [phase, setPhase] = useState<Phase>("idle")
   const [said, setSaid] = useState("")
-  const goRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   const busy = phase !== "idle"
   const acted = rows.size > 0
   const body = restoreBody(sessions, ticked)
@@ -162,7 +163,7 @@ export function RestoreSheet({
   const personas = usePersonas()
 
   useEffect(() => {
-    goRef.current?.focus()
+    focusModalContainer(dialogRef.current)
   }, [])
 
   // Escape closes; while the sheet is open the list's own keys stand down,
@@ -261,6 +262,7 @@ export function RestoreSheet({
     <div className="overlay" id="restore" onClick={() => !busy && onClose()}>
       <div
         className="sheet restore-sheet"
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="restore-title"
@@ -309,7 +311,7 @@ export function RestoreSheet({
           <p className="said" role="status" aria-live="polite">{said}</p>
         </div>
         <div className="restore-buttons">
-          <button className="chip restore-go" type="button" ref={goRef} disabled={busy || count === 0} onClick={restore}>
+          <button className="chip restore-go" type="button" disabled={busy || count === 0} onClick={restore}>
             {phase === "restoring" ? nextWord("restoreGoing") : nextWord("restoreGo", { n: count })}
           </button>
           <button className="chip" type="button" disabled={busy} onClick={dismissAll}>

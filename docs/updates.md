@@ -26,6 +26,18 @@ up.
 
 ## Release-day procedure for an installed Mac
 
+The macOS LaunchAgent uses `<install-root>/service/clawdline`, a stable real
+path selected atomically from the installed release. TCC records an unbundled
+daemon's Automation permission against that path, so the version directory
+can change without changing the path shown to TCC. Service installations keep
+the existing App bundle when its native shell revision is unchanged; the
+daemon serves the current web console. A native shell change replaces the App
+and needs an authorized Developer ID Application signature to preserve its
+WebKit keychain identity. The first move from the old signing identity may
+ask once more. Acceptance requires checking two successive builds with both
+Automation and WebCrypto enabled; a passing unit test does not establish
+macOS permission persistence.
+
 The homepage's one-line installer is for the first installation. Once this Mac is a release
 install, use Clawdline's built-in updater for subsequent releases. Publishing a GitHub release or
 deploying the hosted console does not require quitting the local app or restarting its service.

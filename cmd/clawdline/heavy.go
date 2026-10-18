@@ -22,7 +22,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/sainteye/clawdline/internal/adapters/machineusage"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/app/orchestrator"
 	"github.com/sainteye/clawdline/internal/contract"
 )
@@ -235,7 +235,7 @@ func runHeavy(opts heavyOptions, argv []string, d heavyDeps) int {
 			SessionID: heavyConversation(d.getenv), CallbackTaskID: d.getenv("CLAWDLINE_CALLBACK_TASK_ID"),
 			PID: int64(d.pid), Phase: "waiting",
 		}
-		if at := swiftstore.ProcessStart(d.pid); !at.IsZero() {
+		if at := ownrecords.ProcessStart(d.pid); !at.IsZero() {
 			req.ProcessStart = at.Unix()
 		}
 		if code := slot.acquire(req, deadline, opts.wait, d, tryHandoff); code != 0 {
@@ -345,6 +345,18 @@ func (s *heavySlot) keepAlive(every time.Duration) func() {
 	if s.b == nil || !s.held {
 		return func() {}
 	}
+	return renewLease(s.b, every, s.owner("running"), func() {
+		s.say(cliCopy("misc", "heavy.slot_lapsed", "the compile slot lapsed while running; the command goes on"))
+		s.held = false
+	})
+}
+
+// renewLease renews owner's lease every tick until the returned stop is
+// called. When the daemon answers lease_lost, lost runs once and renewal
+// stops, since a lease that is gone cannot be renewed back; any other
+// failure is tried again on the next tick. lost runs on the renewal
+// goroutine, and stop waits for it.
+func renewLease(b *broker, every time.Duration, owner contract.LeaseOwnerRequest, lost func()) func() {
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -357,11 +369,10 @@ func (s *heavySlot) keepAlive(every time.Duration) func() {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				a, err := s.b.request("POST", "/v1/orchestrator/leases/renew", nil, s.owner("running"), "")
+				a, err := b.request("POST", "/v1/orchestrator/leases/renew", nil, owner, "")
 				if err == nil && !a.ok() {
 					if code, _ := a.refusal(); code == "lease_lost" {
-						s.say(cliCopy("misc", "heavy.slot_lapsed", "the compile slot lapsed while running; the command goes on"))
-						s.held = false
+						lost()
 						return
 					}
 				}

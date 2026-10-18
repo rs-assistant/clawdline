@@ -142,7 +142,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":{"code":"…","message":"…","request_id":"…", …extras}}` — o mecanismo de admissão e o broker. Extras como `retry_after` ficam dentro do `error`.
 - `{"error":"<code>","detail":"…"}` — erros de rota, métodos errados e algumas leituras.
 
-Uma rota que este daemon não possui é recusada como `501 not_implemented` e a recusa nomeia a rota. Essa é a resposta em qualquer máquina comum. Ele só é encaminhado quando alguém deliberadamente coloca outro daemon atrás deste com `CLAWDLINE_NEXT_UPSTREAM_PORT`, e então um `502 upstream_unreachable` nomeia o endereço que não respondeu. Nem é uma resposta deste daemon. Antes de 19/09/2026, o encaminhamento estava ativado por padrão e ia para o aplicativo Swift em 7717, portanto, uma nota escrita então dirá que uma rota sem proprietário chega a esse aplicativo; isso não acontece.
+Uma rota que este daemon não possui é recusada como `501 not_implemented` e a recusa nomeia a rota. Nada é encaminhado a outro daemon.
 
 ### Configurar o display Clawdline de um projeto
 
@@ -427,7 +427,7 @@ POST /v1/orchestrator/tasks/<id>/landing
 
 `clawdline landings` (`GET /v1/orchestrator/landings`) são todas as integrações pendentes na máquina, cada uma com um `ownership.status`. `unknown` não é “ninguém”: significa que a evidência não pôde ser lida. `503 landings_incomplete` significa que algumas linhas não puderam ser lidas e nenhuma lista mais curta é oferecida em seu lugar.
 
-`clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) é cada integração **registrada** para um item do Board: `{"work_id", "landings": [...], "at"}`, cada linha com seu `id` e `source` — `task` (registro integrado ou incorporado de um agente filho vinculado; o id é o id da tarefa), `root` (o registro que `item phase deploying --commit` escreveu) ou `phase_event` (uma cópia de um daemon mais antigo mantido no histórico do item). Uma tarefa vinculada cujo registro não pode ser lido é uma linha com `state: "unknown"`, nunca deixada de fora. O item lido carrega as mesmas linhas que `landings`. Um item que não existe é `404 work_not_found`.
+`clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) é cada integração **registrada** para um item do Board: `{"work_id", "landings": [...], "at"}`, cada linha com seu `id` e `source` — `task` (registro integrado ou incorporado de um agente filho vinculado; o id é o id da tarefa), ou `root` (o registro que `item phase deploying --commit` escreveu, ou uma cópia que um daemon mais antigo manteve no histórico do item e que o store transformou em uma linha própria). Uma tarefa vinculada cujo registro não pode ser lido é uma linha com `state: "unknown"`, nunca deixada de fora. O item lido carrega as mesmas linhas que `landings`. Um item que não existe é `404 work_not_found`.
 
 **Duas sessões raiz integrando trabalho no mesmo checkout** faça primeiro uma reserva de integração (§11).
 

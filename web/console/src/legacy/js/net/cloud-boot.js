@@ -120,24 +120,6 @@ export function readCloudConfig(scope) {
     };
 }
 
-/** The immutable static catalog for this browser, or null when English HTML is the fallback. */
-export function cloudStringsURL(config, languages) {
-    if (!config || !config.build || !config.strings) return null;
-    var aliases = Object.keys(config.strings).sort(function (a, b) { return b.length - a.length; });
-    var wanted = Array.isArray(languages) ? languages : [];
-    for (var i = 0; i < wanted.length; i += 1) {
-        var language = String(wanted[i]).toLowerCase();
-        for (var j = 0; j < aliases.length; j += 1) {
-            var alias = aliases[j];
-            if (language.indexOf(alias.toLowerCase()) === 0) {
-                return "/app/" + encodeURIComponent(config.build) + "/strings/"
-                    + encodeURIComponent(config.strings[alias]) + ".json";
-            }
-        }
-    }
-    return null;
-}
-
 /**
  * `mock` | `local` | `cloud` | `blocked`.
  *
@@ -1300,37 +1282,6 @@ function pageLifecycle(options) {
             add(win, "online", function () { on.online(); });
             return function () { removals.forEach(function (remove) { remove(); }); };
         }
-    };
-}
-
-/** A transport that satisfies the seam and does nothing, held while the cloud one boots. */
-export function idleClient() {
-    var listeners = new Set();
-    function offline() {
-        return Promise.reject(Object.assign(
-            bootError("cloud_starting", "the cloud connection is not ready"), { retryable: true }));
-    }
-    return {
-        // `main.js` calls `api.start()` for every selected transport after the DOM boots.
-        // The cloud session has already started its own reconnect loop before this placeholder
-        // is installed, so the honest implementation here is deliberately a no-op.
-        start: function () {},
-        events: function (listener) {
-            listeners.add(listener);
-            return function () { listeners.delete(listener); };
-        },
-        sessions: function () {
-            return Promise.resolve({ sessions: [], at: 0, scan: { emptyAuthoritative: false } });
-        },
-        transcript: offline,
-        board: offline,
-        boardCommand: offline,
-        documents: offline,
-        document: offline,
-        send: offline,
-        answer: offline,
-        dispatch: offline,
-        schedules: function () { return Promise.resolve({ schedules: [] }); }
     };
 }
 

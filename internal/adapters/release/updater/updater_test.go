@@ -71,6 +71,37 @@ func TestAHealthyUpdateSwitchesCurrentAndPrunesOldReleases(t *testing.T) {
 	}
 }
 
+func TestMacRollbackRestoresTheStableServiceBinary(t *testing.T) {
+	f := newFixture(t, "v0.10.0")
+	f.env.GOOS, f.env.GOARCH = "darwin", "arm64"
+	if err := install.WriteServiceFile(f.env.StateDir, install.ServiceFile{
+		Supervisor: "launchd", Name: "com.example.clawdline-next.test", Domain: "gui/501",
+		Port: 1, Root: f.env.Layout.Root,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.env.Layout.InstallServiceBinary("v0.10.0"); err != nil {
+		t.Fatal(err)
+	}
+	f.exe = f.env.Layout.ServiceBin
+	if name, kind := Running(f.env.Layout, f.exe); name != "v0.10.0" || kind != install.KindRelease {
+		t.Fatalf("stable executable: %s %s", name, kind)
+	}
+	f.publish("v0.11.0", commitOf('b'), daemonArchive(t, commitOf('b')), true, func(m *release.Manifest) {
+		m.Artifacts[0].OS, m.Artifacts[0].Arch = "darwin", "arm64"
+	})
+	if err := f.update(Request{}); err != nil {
+		t.Fatal(err)
+	}
+	f.healthy = commitOf('a')
+	if err := f.env.Finish(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if name, _ := Running(f.env.Layout, f.exe); name != "v0.10.0" {
+		t.Fatalf("rollback left the stable executable on %s", name)
+	}
+}
+
 func TestAReleaseThatDoesNotComeUpIsRolledBackAndNotRetriedByItself(t *testing.T) {
 	f := newFixture(t, "v0.10.0")
 	// A store, so there is a snapshot that an additive release must not
@@ -705,7 +736,7 @@ func TestTheAppBundleIsSwappedOnlyWhenItIsNotRunning(t *testing.T) {
 	runFake := f.env.Run
 	f.env.Run = func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		if name == "ps" {
-			return []byte("/sbin/launchd\n" + installed + "/Contents/MacOS/Clawdline Next\n"), nil
+			return []byte("    1 /sbin/launchd\n  812 " + installed + "/Contents/MacOS/Clawdline Next\n"), nil
 		}
 		return runFake(ctx, name, args...)
 	}
@@ -737,6 +768,42 @@ func TestTheAppBundleIsSwappedOnlyWhenItIsNotRunning(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(f.env.Layout.ReleaseDir("v0.10.0"), "app", AppBundleName, "Contents", "old")); err != nil {
 		t.Fatal("the replaced bundle was not kept")
+	}
+}
+
+func TestDaemonOnlyMacUpdateKeepsTheInstalledApp(t *testing.T) {
+	f := newFixture(t, "v0.10.0")
+	f.env.GOOS, f.env.GOARCH, f.env.AppsDir = "darwin", "arm64", filepath.Join(t.TempDir(), "Applications")
+	installed := filepath.Join(f.env.AppsDir, AppBundleName)
+	marker := filepath.Join(installed, "Contents", "Resources", "shell-revision")
+	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	revision := strings.Repeat("a", 64)
+	if err := os.WriteFile(marker, []byte(revision+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	app := tarGz(t,
+		entry{name: AppBundleName + "/", typ: tar.TypeDir},
+		entry{name: AppBundleName + "/Contents/Resources/shell-revision", body: revision + "\n"})
+	f.mu.Lock()
+	f.files["/files/app.tar.gz"] = app
+	f.mu.Unlock()
+	f.publish("v0.11.0", commitOf('b'), daemonArchive(t, commitOf('b')), true, func(m *release.Manifest) {
+		m.Artifacts[0].OS, m.Artifacts[0].Arch = "darwin", "arm64"
+		a := release.Artifact{OS: "darwin", Arch: "arm64", Kind: release.KindApp, Name: "app.tar.gz", URL: f.srv.URL + "/files/app.tar.gz", Size: int64(len(app))}
+		a.SHA256 = sha(app)
+		m.Artifacts = append(m.Artifacts, a)
+	})
+	if err := f.update(Request{}); err != nil {
+		t.Fatal(err)
+	}
+	p, _, _ := f.env.ReadPending()
+	if p.StagedApp != "" {
+		t.Fatalf("same native shell was staged for replacement: %s", p.StagedApp)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatal("installed app was removed", err)
 	}
 }
 

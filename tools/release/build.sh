@@ -94,6 +94,9 @@ finished=0
 trap 's=$?; codesign_end; rm -rf -- "$work"; if [ "$finished" != 1 ] && [ "$s" = 0 ]; then exit 1; fi' EXIT
 if [ "$(uname -s)" = Darwin ]; then
   codesign_begin
+  if [ "$channel" != dev ] && [ -z "$test_key" ]; then
+    codesign_require_developer_id
+  fi
 fi
 
 if [ "$tests" = 1 ]; then

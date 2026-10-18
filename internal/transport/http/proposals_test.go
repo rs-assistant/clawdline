@@ -31,7 +31,6 @@ func TestTheProposalRoutesAndTheDiagnosticsCounts(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/v1/work/", s.workRoute)
 	mux.HandleFunc("/v1/orchestrator/sessions/", s.brokerSessionRoute)
-	mux.HandleFunc("/v1/orchestrator/runs/", s.runRoute)
 	for _, rt := range s.participationRoutes() {
 		mux.HandleFunc(rt.Pattern, rt.handle)
 	}
@@ -227,21 +226,13 @@ func TestTheProposalRoutesAndTheDiagnosticsCounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The session finds its run by its conversation id; anyone who may
-	// read finds what a run was by its id.
+	// The session finds its run by its conversation id.
 	if rec := do(machine, http.MethodGet, "/v1/orchestrator/sessions/root-conv/run", "", ""); rec.Code != 200 ||
 		!strings.Contains(rec.Body.String(), `"id":"`+mine.ID+`"`) {
 		t.Fatalf("the session's run: %d %s", rec.Code, rec.Body)
 	}
 	if rec := do(person, http.MethodGet, "/v1/orchestrator/sessions/root-conv/run", "", ""); rec.Code != 403 {
 		t.Fatalf("a person reading a session's run route: %d %s", rec.Code, rec.Body)
-	}
-	if rec := do(person, http.MethodGet, "/v1/orchestrator/runs/"+mine.ID, "", ""); rec.Code != 200 ||
-		!strings.Contains(rec.Body.String(), `"session_id":"root-conv"`) || !strings.Contains(rec.Body.String(), `"principal":"device:phone"`) {
-		t.Fatalf("what the run was: %d %s", rec.Code, rec.Body)
-	}
-	if rec := do(person, http.MethodGet, "/v1/orchestrator/runs/run-9", "", ""); rec.Code != 404 || code(rec) != "run_unknown" {
-		t.Fatalf("a run nobody issued: %d %s", rec.Code, rec.Body)
 	}
 	rec = do(machine, http.MethodPost, path, "a1", `{"answer":"track","via":{"run":"`+mine.ID+`"}}`)
 	made := read(rec)

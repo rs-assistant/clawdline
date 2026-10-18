@@ -11,6 +11,7 @@ package main
 //	clawdline cloud on | off            the switch
 //	clawdline cloud commands on | off   whether a viewer may act on this machine
 //	clawdline cloud direct on | off     whether Terminal and Session reads try WebRTC
+//	clawdline cloud direct local on | off  whether that may use same-network addresses
 //	clawdline cloud login               register this machine, and wait for approval
 //	clawdline cloud pair [--offer …]    hand a browser the account key (cloudpair.go)
 //	clawdline cloud devices             who may speak to this machine
@@ -96,6 +97,7 @@ func cloudUsage() {
 	fmt.Fprintln(os.Stderr, cliCopy("cloud", "usage.switch", "  on | off               turn the cloud line on or off in the settings file"))
 	fmt.Fprintln(os.Stderr, cliCopy("cloud", "usage.commands", "  commands on | off      whether a paired viewer may act on this machine; off by default"))
 	fmt.Fprintln(os.Stderr, cliCopy("cloud", "usage.direct", "  direct on | off        use a direct WebRTC carrier for Terminal and Session reads"))
+	fmt.Fprintln(os.Stderr, cliCopy("cloud", "usage.direct_local", "  direct local on | off  let it use same-network addresses; off by default, macOS asks once"))
 	fmt.Fprintln(os.Stderr, cliCopy("cloud", "usage.login", "  login [--wait 10m]     register this machine and wait for the approval"))
 	fmt.Fprintln(os.Stderr, cliCopy("cloud", "usage.pair", "  pair [--offer <code>]  show a browser a one-time link, or finish with its code"))
 	fmt.Fprintln(os.Stderr, cliCopy("cloud_peer", "usage.entry", "  peer <command>         pair machines and grant exact Agent work scopes"))
@@ -156,6 +158,7 @@ func cloudStatusCommand() {
 	fmt.Printf(cliCopy("cloud", "status.enabled", "enabled    %v\n"), parts.settings.Enabled)
 	fmt.Printf(cliCopy("cloud", "status.commands", "commands   %v\n"), parts.settings.Commands)
 	fmt.Printf(cliCopy("cloud", "status.direct", "direct     %v\n"), parts.settings.TerminalDirect)
+	fmt.Printf(cliCopy("cloud", "status.direct_local", "same net   %v\n"), parts.settings.DirectLocalNetwork)
 	fmt.Printf(cliCopy("cloud", "status.relay", "relay      %s\n"), parts.settings.RelayURL)
 	fmt.Printf(cliCopy("cloud", "status.api", "api        %s\n"), parts.settings.APIBase)
 	fmt.Printf(cliCopy("cloud", "status.keys", "keys       %s\n"), parts.keys.Dir())
@@ -256,6 +259,10 @@ func cloudCommandsCommand(args []string) {
 }
 
 func cloudDirectCommand(args []string) {
+	if len(args) == 2 && args[0] == "local" && (args[1] == "on" || args[1] == "off") {
+		cloudDirectLocalCommand(args[1])
+		return
+	}
 	if len(args) != 1 || (args[0] != "on" && args[0] != "off") {
 		fmt.Fprintln(os.Stderr, cliCopy("cloud", "direct.usage", "usage: clawdline cloud direct <on|off>"))
 		os.Exit(2)
@@ -271,7 +278,34 @@ func cloudDirectCommand(args []string) {
 		os.Exit(1)
 	}
 	fmt.Printf(cliCopy("cloud", "direct.result", "direct %-3s %s\n"), args[0], parts.file.Path())
-	err = cloudDaemonJSON(http.MethodPost, "/v1/cloud/direct", map[string]bool{"enabled": on}, nil)
+	cloudApplySwitch("/v1/cloud/direct", on)
+}
+
+// cloudDirectLocalCommand is `cloud direct local on|off`: whether the direct
+// carrier may use this machine's and the viewer's private IPv4 addresses.
+func cloudDirectLocalCommand(arg string) {
+	parts, err := openCloud()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "clawdline:", err)
+		os.Exit(1)
+	}
+	on := arg == "on"
+	if err := cloud.SetDirectLocalNetwork(parts.file, on); err != nil {
+		fmt.Fprintln(os.Stderr, "clawdline:", err)
+		os.Exit(1)
+	}
+	fmt.Printf(cliCopy("cloud", "direct_local.result", "same network %-3s %s\n"), arg, parts.file.Path())
+	if on && runtime.GOOS == "darwin" {
+		fmt.Print(cliCopy("cloud", "direct_local.permission",
+			"           macOS asks once for Local Network access when it is first used; if it is denied, connections use the public path or the relay\n"))
+	}
+	cloudApplySwitch("/v1/cloud/direct/local-network", on)
+}
+
+// cloudApplySwitch asks the running daemon to apply a switch already written
+// to the settings file, and says whether it did.
+func cloudApplySwitch(route string, on bool) {
+	err := cloudDaemonJSON(http.MethodPost, route, map[string]bool{"enabled": on}, nil)
 	var unreachable *url.Error
 	switch {
 	case err == nil:

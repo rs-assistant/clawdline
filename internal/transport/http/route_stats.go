@@ -67,7 +67,7 @@ var routeWords = func() map[string]bool {
 		peer persona-suggestion personas phase places preview progress project project-sync projects
 		promotions proposals push rebind receipts reclaim reconcile refresh register release remind
 		removing renew reopen reports resize restorable restore resume resumed retry revoke
-		root-assignments rotate run running runs safe schedule-exports schedule-imports
+		root-assignments rotate run running runs safe schedule-exports
 		schedule-webhooks schedules scopes screen screens seen send session-bindings session-events
 		session-name session-snapshots session-todos sessions settings shells skill skill-sources skills
 		smart-title snippets squad squad-packages stall start status steps stop stream strings subscribe

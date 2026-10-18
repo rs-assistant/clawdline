@@ -1,15 +1,10 @@
 # Sourced by tools/release/build.sh and tools/package-macos.sh: how a macOS
 # binary or bundle of Clawdline is signed.
 #
-# With an ad hoc signature (`codesign --sign -`) a build's identity is its
-# cdhash, so every build is, to macOS, another program: a reinstall or an update
-# asked again for Dropbox, for the local network, and for the keychain password
-# behind "Clawdline Next WebCrypto Master Key" (2026-10-16). Signed with one
-# certificate, the designated requirement is `identifier … and certificate leaf
-# = H"…"`, the same for every build, and what the person allowed once stays
-# allowed. The certificate is self-signed; codesign accepts it untrusted, and
-# nothing here asks Gatekeeper, which an installer that does not quarantine
-# never consults.
+# A stable certificate alone does not preserve all grants. Securityd rejected
+# the self-signed certificate for WebKit's keychain item and remembered each
+# build's cdhash. Official releases require a Developer ID Application identity;
+# development builds can still use an ad hoc or local identity.
 #
 # CLAWDLINE_CODESIGN_P12 names the certificate and key as a .p12 file, and
 # CLAWDLINE_CODESIGN_PASSWORD its password. Without them every signature is ad
@@ -52,6 +47,16 @@ codesign_path() {
   for p in "$@"; do
     codesign --force --sign "${CLAWDLINE_CODESIGN_ID:--}" "$p"
   done
+}
+
+codesign_require_developer_id() {
+  [ "${CLAWDLINE_CODESIGN_ID:-}" != - ] || { echo "official macOS releases require a Developer ID Application identity" >&2; return 1; }
+  security find-identity -v -p codesigning |
+    grep -F "${CLAWDLINE_CODESIGN_ID:-missing}" |
+    grep -q 'Developer ID Application:' || {
+      echo "official macOS releases require a Developer ID Application identity" >&2
+      return 1
+    }
 }
 
 codesign_end() {

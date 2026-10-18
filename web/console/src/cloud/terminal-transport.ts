@@ -2,7 +2,7 @@ import { base64Bytes, bytesBase64, envelopeSigningBytes } from "../legacy/js/net
 import type { TerminalFrame } from "@clawdline/contract"
 import type { TerminalObservation } from "./terminal-observation.js"
 // @ts-expect-error -- a `.ts` path, so Node's strip-types runner can load this file in its suite.
-import { DirectLink, browserDirectPeers, sealDirectOffer, type DirectPeerFactory } from "./terminal-direct.ts"
+import { DirectLink, browserDirectPeers, directAttemptRecorder, sealDirectOffer, type DirectPeerFactory } from "./terminal-direct.ts"
 
 export interface TerminalEnvelope {
   v: number; ch: string; seq: number; ts: number; class: string; key_id: string
@@ -292,6 +292,7 @@ export class TerminalChannelTransport {
       const carrier = this.shared
       return carrier && carrier.current() === link ? carrier : null
     }
+    const record = directAttemptRecorder(this.client, this.machine)
     const link: DirectLink = new DirectLink(this.peers, (envelope) => {
       const carrier = held()
       if (carrier) carrier.receive(envelope)
@@ -302,7 +303,7 @@ export class TerminalChannelTransport {
       if (carrier) carrier.dropped(link, code)
       this.observation?.record("direct_down", { connection, code })
       onDown(code)
-    })
+    }, record ? { attempt: connection, kind: "terminal", report: record } : null)
     this.ownLink = link
     try {
       const sealed = await sealDirectOffer(state.key, connection, await link.offer())

@@ -29,6 +29,8 @@ export interface SessionListPresentation {
   observedAt?: number
   assistant?: "claude" | "codex"
   cwd?: string
+  /** The Project the machine would accept this Session into (`project_key`). */
+  projectKey?: string
   icon?: Icon
   /** Display fields from the same per-machine batch read as the title. */
   status?: Partial<SessionRow>

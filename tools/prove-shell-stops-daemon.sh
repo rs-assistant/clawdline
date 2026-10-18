@@ -56,7 +56,7 @@ trial() { # mode (new|legacy), how (quit|sigterm)
   out="$WORK/probe-$mode-$how.out"
   local args=()
   [ "$mode" = legacy ] && args=(--legacy)
-  env CLAWDLINE_NEXT_PORT="$port" CLAWDLINE_NEXT_DIR="$dir" CLAWDLINE_NEXT_STANDALONE=1 \
+  env CLAWDLINE_NEXT_PORT="$port" CLAWDLINE_NEXT_DIR="$dir" \
     PROBE_DAEMON="$WORK/clawdline" "$APP/Contents/MacOS/ShellProbe" ${args[@]+"${args[@]}"} >"$out" 2>&1 &
   shell=$!
   daemon=""

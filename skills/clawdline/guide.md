@@ -37,8 +37,8 @@ differences are where people fall:
 4. **A different door.** Port 7727 (or `CLAWDLINE_NEXT_PORT`), state in `~/.config/clawdline-next`
    (or `CLAWDLINE_NEXT_DIR`). Never read `~/.config/clawdline`: its token is not this daemon's and
    is refused with `401 unauthorized`.
-5. **Things the Swift app had and this daemon does not:** durable-report promotion (answers
-   `501 durable_report_promotion_unsupported`), coordinator succession (answers
+5. **Things the Swift app had and this daemon does not:** durable-report promotion (no route:
+   answers `501 not_implemented`), coordinator succession (answers
    `501 succession_unavailable`), and the brief fields `serialize`
    and `attach_session` (each refused by name as `bad_task`). `reasoning_effort` is supported:
    `high` or `xhigh`, on a `codex` task only.
@@ -335,11 +335,7 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 - `{"error":"<code>","detail":"…"}` — route misses, wrong methods and some reads.
 
 A route this daemon does not own is refused as `501 not_implemented`, and the refusal names the
-route. That is the answer on any ordinary machine. It is only forwarded when somebody deliberately
-put another daemon behind this one with `CLAWDLINE_NEXT_UPSTREAM_PORT`, and then a `502
-upstream_unreachable` names the address that did not answer. Neither is an answer from this
-daemon. Before 2026-09-19 the forwarding was on by default and went to the Swift app on 7717, so a
-note written then will say an unowned route reaches that app; it does not.
+route. Nothing is forwarded to another daemon.
 
 ### Set up a Project's Clawdline display
 
@@ -933,8 +929,8 @@ their place.
 `clawdline landings --work-id <item id>` (`GET /v1/orchestrator/landings?work_id=<item id>`) is
 every landing **recorded** for one Board item instead: `{"work_id", "landings": [...], "at"}`, each
 row with its `id` and `source` — `task` (a bound child's landed or incorporated record; the id is
-the task id), `root` (the record `item phase deploying --commit` wrote) or `phase_event` (a copy an
-older daemon kept in the item's history). A bound task whose record cannot be read is a row with
+the task id) or `root` (the record `item phase deploying --commit` wrote, or a copy an older daemon
+kept in the item's history, which the store gave a row of its own). A bound task whose record cannot be read is a row with
 `state: "unknown"`, never left out. The item read carries the same rows as `landings`. An item that
 does not exist is `404 work_not_found`.
 
@@ -1309,6 +1305,20 @@ echo "Clean up the release notes before the next release." | \
 
 Never create a Board item on your own initiative, and never several to plan speculative work.
 
+**Cancel a Board item the person asked you to remove.** The person's message sent through
+Clawdline must identify the item and explicitly ask to remove or cancel it. Read the item first
+and use its id; do not infer cancellation from a changed plan or from an unrelated message.
+
+Use `clawdline item cancel <item id> --reason "What the person asked to remove"`.
+
+`item cancel` reads this conversation's latest run and the item's current version unless `--run`
+or `--expected-version` names them. It sends `POST /v1/work/v2/agent/items/<id>/cancel` with
+`{"session_id", "via":{"run"}, "expected_version", "reason"}` under an Idempotency-Key.
+The item leaves the active Board and its Session projection; its cancelled record and reason
+remain in the audit trail. A missing or expired run, a run sent to another Session, a stale
+version, a terminal item, or an empty reason changes nothing. The person can also cancel an
+item directly in the Board. Never cancel on your own initiative.
+
 **Claim a Board item the person pointed you at.** When the person's message through Clawdline tells
 you to take a specific item already on the Board — *"take the release-notes item"*, *"claim
 <item id>"* — claim it; that is one command:
@@ -1323,7 +1333,9 @@ clawdline item claim <item id>
   `{"expected_version", "session_id", "via": {"run"}}`, and it assigns the item to **you, the
   Session that message was sent to** — nothing in it names another Session or terminal.
 - The item then reads exactly as if the person had assigned it to you from the Board: you own it,
-  it moves to `assigned`, its steps are seeded from the description's list if it had none. Nothing
+  it moves to `assigned`, its steps are seeded from the description's list if it had none — except
+  for a Plan you claimed with `--kind`: its description is analysis, so it seeds nothing and you add
+  the steps yourself with `clawdline item step-add`. Nothing
   is typed into your terminal. Work it as any assigned item (below).
 - The person sees the card marked "Claimed by the Session from your message at HH:MM", with their
   words quoted.
@@ -1654,7 +1666,7 @@ POST /v1/work/v2/agent/items/<id>/finish    (Idempotency-Key required)
   `finish_not_started` (still before `implementing`).
 
 An assigned item may contain `steps`. A successful assignment can seed them from two or more top-level
-Markdown list rows in the description, and an item you created with `clawdline item add` carries
+Markdown list rows in the description (never for an item that was a Plan), and an item you created with `clawdline item add` carries
 its `--step` rows. Each step is a checklist entry on that item, not another Board item.
 Complete a verified step with `clawdline item step-done <item id> <step id>`; it sends
 `POST /v1/work/v2/agent/items/<item-id>/steps/<step-id>/complete` with `{"session_id"}`. On the

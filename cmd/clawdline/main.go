@@ -284,12 +284,12 @@ func serve() {
 	// Verification rounds depend on the broker's durable task ledger and are
 	// therefore supervised only after the broker beat is running.
 	srv.StartWorkGateCoordinator(context.Background())
+	// The push for a session standing on a question nobody has answered; its
+	// push is a broker outbox effect, so it starts after the beat.
+	srv.StartWaiting(context.Background())
 	// The capacity register's beat: every bounded thing measured on the same
 	// tick, and health red when evidence has nowhere left to go.
 	srv.StartCapacity(context.Background())
-	// The board's sweep: a landing closes its item, a delivery waits to be
-	// closed, three quiet days send an item back to the Backlog.
-	srv.StartWork(context.Background())
 	// The token ledger: transcripts read, a bounded pass a minute, into what
 	// each session spent (docs/token-ledger.md).
 	srv.StartUsage(context.Background())
@@ -351,7 +351,6 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		Handler:               srv.Handler(),
 		TerminalService:       srv.CloudTerminalService,
 		TerminalProject:       srv.CloudTerminalProject,
-		DropTerminalGrant:     srv.CloudDropTerminalGrant,
 		PeerReceipts:          srv.PeerReceipts(),
 		PeerAdmitTarget:       srv.AdmitExecutionTarget,
 		PeerExecute:           srv.PeerExecute,
@@ -449,14 +448,6 @@ func doctor() {
 		port = p
 	}
 	fmt.Printf(cliCopy("entry", "main_port_d", "port      %d\n"), port)
-	// "0" would read like a port. Nobody behind this daemon is the ordinary
-	// answer and it is said in words (config.NoUpstream).
-	if port, ok := cfg.Upstream(); ok {
-		fmt.Printf(cliCopy("entry", "main_upstream_d", "upstream  %d\n"), port)
-	} else {
-		fmt.Printf(cliCopy("entry", "main_upstream_none_an_unowned_route_answers", "upstream  none (an unowned route answers 501 not_implemented; %s asks for one)\n"),
-			config.UpstreamPortEnv)
-	}
 	fmt.Printf(cliCopy("entry", "main_dir_s", "dir       %s\n"), cfg.Dir)
 
 	st, err := store.Open(cfg.Dir)

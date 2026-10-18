@@ -116,6 +116,14 @@ func openBroker(db *sql.DB) error {
 	if err := openRootLandings(db); err != nil {
 		return err
 	}
+	// The tally's index holds the version column, which an older store gets
+	// from migrate; running it here first is the no-op it is everywhere else.
+	if err := migrate(db); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS broker_tasks_updated ON broker_tasks(updated_at, version)`); err != nil {
+		return err
+	}
 	return migrateBrokerNotices(db)
 }
 
@@ -431,12 +439,50 @@ type BrokerHead struct {
 // nothing is decoded: a reader that already holds a row at this version has
 // nothing more to fetch.
 func (s *Store) BrokerTaskHeads(ctx context.Context) ([]BrokerHead, error) {
+	return s.queryHeads(ctx, `SELECT `+headColumns+` FROM broker_tasks ORDER BY created_at DESC, id DESC`)
+}
+
+// BrokerTaskHeadsSince reads the heads of the rows written at or after since,
+// in no particular order. It is how a reader that holds every head brings
+// itself up to date without reading the history again; broker_tasks_updated
+// keeps its cost the number of rows written, not the number stored.
+func (s *Store) BrokerTaskHeadsSince(ctx context.Context, since time.Time) ([]BrokerHead, error) {
+	return s.queryHeads(ctx, `SELECT `+headColumns+` FROM broker_tasks WHERE updated_at >= ?`, since.Unix())
+}
+
+// BrokerTally is the task table in three numbers. Rows are never deleted and
+// every write either adds a row or moves one row's version up by one, so two
+// equal tallies mean no write happened between them — whatever the writer's
+// clock said, which the updated_at a write carries cannot promise.
+// TestNoWriteBreaksTheBrokerTally reads every statement that names the table
+// and fails on one that does not keep this.
+type BrokerTally struct {
+	Rows     int64
+	Versions int64
+	// Through is the newest updated_at, in Unix seconds.
+	Through int64
+}
+
+// BrokerTaskTally reads the tally from broker_tasks_updated alone; no row's
+// record is touched.
+func (s *Store) BrokerTaskTally(ctx context.Context) (BrokerTally, error) {
+	if err := reading(); err != nil {
+		return BrokerTally{}, err
+	}
+	var t BrokerTally
+	err := s.rd.QueryRowContext(ctx,
+		`SELECT COUNT(*), COALESCE(SUM(version), 0), COALESCE(MAX(updated_at), 0) FROM broker_tasks`).
+		Scan(&t.Rows, &t.Versions, &t.Through)
+	return t, err
+}
+
+const headColumns = `id, project, repository, assistant, state, created_at, updated_at, version`
+
+func (s *Store) queryHeads(ctx context.Context, query string, args ...any) ([]BrokerHead, error) {
 	if err := reading(); err != nil {
 		return nil, err
 	}
-	rows, err := s.rd.QueryContext(ctx,
-		`SELECT id, project, repository, assistant, state, created_at, updated_at, version
-		 FROM broker_tasks ORDER BY created_at DESC, id DESC`)
+	rows, err := s.rd.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -453,6 +499,43 @@ func (s *Store) BrokerTaskHeads(ctx context.Context) ([]BrokerHead, error) {
 		out = append(out, h)
 	}
 	return out, rows.Err()
+}
+
+// BrokerNoticesFor reads the envelopes of the tasks named, keyed by task. A
+// task with none is absent from the answer.
+func (s *Store) BrokerNoticesFor(ctx context.Context, ids []string) (map[string]BrokerNotice, error) {
+	out := map[string]BrokerNotice{}
+	for len(ids) > 0 {
+		batch := ids
+		if len(batch) > 256 {
+			batch = batch[:256]
+		}
+		ids = ids[len(batch):]
+		marks := strings.TrimSuffix(strings.Repeat("?,", len(batch)), ",")
+		args := make([]any, len(batch))
+		for i, v := range batch {
+			args[i] = v
+		}
+		rows, err := s.rd.QueryContext(ctx,
+			`SELECT `+noticeColumns+` FROM broker_notices WHERE task_id IN (`+marks+`)`, args...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			n, err := scanNotice(rows)
+			if err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out[n.TaskID] = n
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // BrokerTaskRecords reads the rows named, without their long prose, keyed by

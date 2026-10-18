@@ -24,8 +24,8 @@ func TestEntryCatalogNineLanguagesAndFormatBranches(t *testing.T) {
 	if len(english) < 120 {
 		t.Fatalf("entry catalog has %d keys; expected the entry, guide, skill, and usage copy", len(english))
 	}
-	if len(bundle.baseline) != 126 {
-		t.Fatalf("entry initial baseline has %d keys, expected 126", len(bundle.baseline))
+	if len(bundle.baseline) != 124 {
+		t.Fatalf("entry initial baseline has %d keys, expected 124", len(bundle.baseline))
 	}
 	for _, language := range []string{"en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"} {
 		translated, total := cliCatalogCoverage("entry", language)

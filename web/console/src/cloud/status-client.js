@@ -1,8 +1,7 @@
-// The archived Cloud client is pinned byte for byte. This subclass accepts the
-// new content-free ss/ channel without changing that archive or weakening its
-// validation for any existing channel.
+// This subclass accepts the new content-free ss/ channel without changing the
+// copied Cloud client or weakening its validation for any existing channel.
 import { CatalogCloudClient } from "./refusal-client.js"
-import { channelSegment, decodedChannelSegment } from "../legacy/js/net/client.js"
+import { SESSION_INVENTORY_ID, SESSION_INVENTORY_LIMIT, channelSegment, decodedChannelSegment } from "../legacy/js/net/client.js"
 import { base64Bytes, bytesBase64, envelopeSigningBytes, importMasterSecret, openEnvelope, sealEnvelope, validateEnvelope } from "../legacy/js/net/cloud-crypto.js"
 
 const decoder = new TextDecoder()
@@ -20,7 +19,6 @@ const GENERATION = /^[0-9a-f]{32}$/u
 const CARRIER_WORD = "carrier-offer"
 const CARRIER_SESSION = "__clawdline_machine__"
 /** The machine's whole-list channel, which the carrier never carries. */
-const INVENTORY_SESSION = "__clawdline_inventory_v1__"
 /** A carrier either negotiates in a few seconds or is not available on this network. */
 const CARRIER_TIMEOUT_MS = 15_000
 /** A cold list must yield promptly when the relay or direct carrier stops answering. */
@@ -36,7 +34,7 @@ function refused(code, message) {
 
 function pinnedRead(type, body) {
   return (type === "sessions.list" && typeof body?.request === "string" ||
-    type === "info" && (body?.parts === "full" || body?.parts === "list") ||
+    type === "info" && body?.parts === "full" ||
     ["transcript", "skills", "image", "git", "git-diff", "screen", "agent", "shell", "documents", "document", "peer-inbox"].includes(type)) &&
     (body?.expected_generation !== undefined || type === "sessions.list")
 }
@@ -48,7 +46,6 @@ function pinnedReplyKey(machine, session, read) {
 function pinnedReadName(type, body) {
   if (type === "sessions.list" && typeof body?.request === "string" && body.request) return "read:" + body.request
   if (type === "info" && body?.parts === "full") return "info.full"
-  if (type === "info" && body?.parts === "list") return "info.list"
   if (type === "skills") return "skills"
   if (type === "git" || type === "screen" || type === "documents") return type
   if ((type === "git-diff" || type === "document" || type === "peer-inbox") &&
@@ -220,23 +217,18 @@ export class StatusCloudClient extends CatalogCloudClient {
     return remembered
   }
 
-  // The copied client delivers this page's failure log to the one paired
-  // machine that takes it and refuses two as ambiguous. Every current daemon
-  // takes it, so an account with two machines would deliver nothing at all.
-  // Each row names its machine, so any one of them may hold the record: the
+  // The copied client sends a row about no machine it can reach to the one
+  // paired machine that takes viewer events, and refuses two as ambiguous.
+  // Every current daemon takes them, so an account with two machines would
+  // deliver those rows nowhere. A row about a machine goes to that machine
+  // first (`_viewerEventRoute`); this is only the account-wide fallback: the
   // machine this page is reading if it is one of them, else the first by id.
   _viewerEventTarget(remember) {
     try {
       return super._viewerEventTarget(remember)
     } catch (error) {
       if (error?.code !== "cloud_machine_ambiguous") throw error
-      const candidates = []
-      this.viewerVerified.forEach((seen, machine) => {
-        if (this._machineImplements(machine, "diagnostics.events", { learned: false }) === "yes") {
-          candidates.push({ machine, sender: seen.sender, capable: true })
-        }
-      })
-      candidates.sort((a, b) => a.machine < b.machine ? -1 : a.machine > b.machine ? 1 : 0)
+      const candidates = this._viewerEventCandidates()
       // A fleet page has no single classicSessionMachine. Prefer the paired
       // Mac's durable diagnostic log over an incidental Linux test machine
       // whose id sorts first; a Linux-only account still has a recipient.
@@ -291,10 +283,10 @@ export class StatusCloudClient extends CatalogCloudClient {
   _recoverClassicSessionRows() {
     const machine = this.classicSessionMachine
     if (!machine || !this.ready) return
-    const marker = this.statusSnapshots.get(JSON.stringify([machine, "__clawdline_inventory_v1__"]))?.payload
+    const marker = this.statusSnapshots.get(JSON.stringify([machine, SESSION_INVENTORY_ID]))?.payload
     const ids = marker?.complete === true && marker?.inventory?.version === 1 &&
       Array.isArray(marker.inventory.sessions) ? marker.inventory.sessions : null
-    if (!ids || ids.length > 512 || !GENERATION.test(marker.snapshot_generation)) return
+    if (!ids || ids.length > SESSION_INVENTORY_LIMIT || !GENERATION.test(marker.snapshot_generation)) return
     if (this.classicSessionPass !== marker.snapshot_generation) {
       this.classicSessionAttempted.clear()
       this.classicSessionPass = marker.snapshot_generation
@@ -315,7 +307,7 @@ export class StatusCloudClient extends CatalogCloudClient {
     const available = Math.max(0, 2 - this.classicSessionReads.size)
     let opened = 0
     for (const id of selected) {
-      if (typeof id !== "string" || !id || id === "__clawdline_inventory_v1__") return
+      if (typeof id !== "string" || !id || id === SESSION_INVENTORY_ID) return
       const status = this.statusSnapshots.get(JSON.stringify([machine, id]))?.payload
       if (!status || status.snapshot_generation !== marker.snapshot_generation ||
         !GENERATION.test(status.execution_generation)) continue
@@ -586,7 +578,7 @@ export class StatusCloudClient extends CatalogCloudClient {
       // `sessionInventoryByMachine` and raise the authoritative `sessions` event, which drives
       // the older whole-list recovery this list deliberately does not use — and an inventory
       // this page then believed would delete every row it does not name.
-      if (row && decodedChannelSegment(channel.session) === INVENTORY_SESSION) {
+      if (row && decodedChannelSegment(channel.session) === SESSION_INVENTORY_ID) {
         throw refused("bad_channel", "the carrier may not carry a machine's Session inventory")
       }
       probe.stage = "machine_pairing_lookup"
@@ -956,7 +948,7 @@ export class StatusCloudClient extends CatalogCloudClient {
   _emit(event) {
     if (event?.type === "connection" && event.state === "live") this._recoverClassicSessionRows()
     if (event?.type === "session_status" && event.identity?.machine === this.classicSessionMachine &&
-      event.identity.session === "__clawdline_inventory_v1__") this._recoverClassicSessionRows()
+      event.identity.session === SESSION_INVENTORY_ID) this._recoverClassicSessionRows()
     if (event?.type === "sessions" && event.identity?.machine === this.classicSessionMachine &&
       event.identity.session) {
       const channel = "s/" + channelSegment(event.identity.machine) + "/" + channelSegment(event.identity.session)
@@ -1110,7 +1102,7 @@ export class StatusCloudClient extends CatalogCloudClient {
 
   /** A cold browser may know a machine from orch/ before its default ss/ marker arrives. */
   recoverStatusMarker(machineID) {
-    const sessionID = INVENTORY_SESSION
+    const sessionID = SESSION_INVENTORY_ID
     if (!machineID || !this.ready) return Promise.resolve(false)
     const key = JSON.stringify([machineID, sessionID])
     if (this.statusSnapshots.get(key)?.payload?.inventory) return Promise.resolve(true)

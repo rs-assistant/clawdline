@@ -2,7 +2,7 @@
  * What a row may say about a machine this browser cannot read.
  *
  * Two things the relay client's list gets wrong about such a machine, both for
- * the same reason, and both fixed here rather than in the byte-for-byte copy
+ * the same reason, and both fixed here rather than in the copied client
  * that makes them (`cloud-client.js` `_machineRows`).
  *
  * **Its session count.** The count is the number of session snapshots this
@@ -24,8 +24,9 @@
  * (`requireAccount`, the same credential `forget.ts` and `rename.ts` send); the
  * machine registered that name when it signed in (`MachineName`,
  * `internal/transport/cloud/name.go`) and a rename from this page writes it.
- * It is a label, not a key: nothing is trusted from it, and a machine whose
- * own snapshot *can* be read keeps the name it published.
+ * It is a label, not a key: nothing is trusted from it. The account label wins
+ * over a readable snapshot too, so a rename does not wait for the machine to
+ * publish another descriptor.
  *
  * Asking is best-effort. An account that will not answer leaves the rows as
  * they were — a short id is less friendly than a name, and still true.
@@ -110,8 +111,11 @@ export function withAccountRegistrations(
   registered: ReadonlyMap<string, AccountName>,
   present: (id: string, name: string, platform: string) => { name: string; label: string; kind: string },
 ): CloudMachine[] {
-  const result = [...rows]
-  const seen = new Set(rows.map((row) => row.id))
+  // The account is authoritative about membership. A relay envelope can
+  // outlive a revoked or removed registration, including one no longer in the
+  // API response at all. Do not turn that envelope back into a machine card.
+  const result = rows.filter((row) => registered.has(row.id))
+  const seen = new Set(result.map((row) => row.id))
   for (const [id, account] of registered) {
     if (seen.has(id)) continue
     const shown = present(id, account.name, account.platform)
@@ -127,29 +131,25 @@ export function accountMachineForConfirmation(
   relay: readonly CloudMachine[] | null,
   registered: ReadonlyMap<string, AccountName>,
   names: ReadonlyMap<string, AccountName>,
-  described: (id: string) => boolean,
   present: (id: string, name: string, platform: string) => { name: string; label: string; kind: string },
   forgotten: readonly string[],
 ): CloudMachine | null {
   if (forgotten.includes(id)) return null
   const known = withAccountRegistrations(relay ?? [], registered, present).find((machine) => machine.id === id)
-  return known ? withAccountNames([known], names, described, present)[0] ?? null : null
+  return known ? withAccountNames([known], names, present)[0] ?? null : null
 }
 
 /**
- * The rows, with the account's name on every one this browser could not name
- * itself. `described` says whether this browser has read a machine's own
- * snapshot; `present` is the copied presentation (`machinePresentation`), so a
- * renamed row reads exactly like a described one.
+ * The rows, with the account's name wherever one exists. `present` is the
+ * copied presentation (`machinePresentation`), so a renamed row immediately
+ * reads the same way as a newly published descriptor.
  */
 export function withAccountNames<T extends Row>(
   rows: readonly T[],
   names: ReadonlyMap<string, AccountName>,
-  described: (id: string) => boolean,
   present: (id: string, name: string, platform: string) => { name: string; label: string; kind: string },
 ): T[] {
   return rows.map((row) => {
-    if (described(row.id)) return row
     const known = names.get(row.id)
     if (!known) return row
     const shown = present(row.id, known.name, known.platform)

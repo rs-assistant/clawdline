@@ -13,6 +13,10 @@ import { arrangeSessions } from "../session/order.ts"
 import { RelayReader, headerReadDiagnostics, ROW_RESTATE_MS, TRANSCRIPT_LINE_REREAD_MS, TRANSCRIPT_MAX_REUSE_MS, type CloudEvent, type CloudIdentity, type CloudReadClient, type CloudRow, type CloudSchedules, type CloudSnippets } from "./relay-reader.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { acceptSnapshot } from "../../../core/src/fleet-accept.ts"
+// @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
+import { fetchWithDeadline } from "../pages/work/fetch-deadline.ts"
+// @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
+import { SESSION_LIST_READ } from "../pages/work/session-assignment.ts"
 
 test("a failed send can queue a private-free phone diagnostic while reconnecting", () => {
   const reader = new RelayReader("mac-a")
@@ -953,6 +957,115 @@ test("refresh waits for a resumed Session even when its id has not changed", asy
   assert.equal((await refreshed).sessions[0]?.execution_generation, resumed)
 })
 
+test("refreshing an unchanged Session set answers as soon as the machine names the pass it holds", async () => {
+  // The pass id hashes the set, so an unchanged set restates the id the page
+  // already holds. Before the machine named it, the refresh waited for a newer
+  // id until the request deadline (15 s on the page).
+  const client = new FakeClient()
+  const generation = "a".repeat(32)
+  client.rows = [row("mac-a", "s1", { execution_generation: generation })]
+  client.statusSnapshots = statusPass("mac-a", generation, "s1")
+  client.readAnswer = async () => ({ sessions: ["s1"], complete: true, snapshot_generation: generation })
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000 })
+  r.attach(client)
+  await r.fetch("/v1/sessions", { signal: new AbortController().signal })
+  const deadline = new AbortController()
+  let answered = false
+  const refreshed = r.fetch("/v1/sessions", { signal: deadline.signal })
+    .then((response) => { answered = true; return body<SessionsSnapshot>(response) })
+  await settled()
+  await settled()
+  const early = answered
+  deadline.abort()
+  assert.deepEqual((await refreshed).sessions.map((session) => session.id), ["s1"])
+  assert.equal(early, true, "the held marker names the confirmed pass; nothing newer is coming")
+})
+
+test("a named pass the page does not hold yet is still waited for", async () => {
+  const client = new FakeClient()
+  const previous = "a".repeat(32)
+  const resumed = "b".repeat(32)
+  client.rows = [row("mac-a", "s1", { execution_generation: previous })]
+  client.statusSnapshots = statusPass("mac-a", previous, "s1")
+  client.readAnswer = async () => ({ sessions: ["s1"], complete: true, snapshot_generation: resumed })
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => 1000 })
+  r.attach(client)
+  await r.fetch("/v1/sessions", { signal: new AbortController().signal })
+  let answered = false
+  const refreshed = r.fetch("/v1/sessions", { signal: new AbortController().signal })
+    .then((response) => { answered = true; return body<SessionsSnapshot>(response) })
+  await settled()
+  assert.equal(answered, false, "the same ids under an older pass are not the stated list")
+  client.rows = [row("mac-a", "s1", { execution_generation: resumed })]
+  client.statusSnapshots = statusPass("mac-a", resumed, "s1")
+  client.emit({ type: "sessions", identity: { machine: "mac-a" } })
+  assert.equal((await refreshed).sessions[0]?.execution_generation, resumed)
+})
+
+/**
+ * The account has two Macs; the Board item's Project is on `mac-b`, the one
+ * under the console. `mac-a` hears every read and never answers. The page's
+ * own session list has already read `mac-b` once.
+ */
+async function boardOnSecondMac(sessions: string[], held: string[]) {
+  const client = new FakeClient()
+  const generation = "a".repeat(32)
+  client.machineRows = [{ id: "mac-a", freshness: "current" }, { id: "mac-b", freshness: "current" }]
+  client.rows = held.map((session) => row("mac-b", session, { execution_generation: generation }))
+  client.statusSnapshots = statusPass("mac-b", generation, ...sessions)
+  client._machineRequest = (machine, word, reqBody) => {
+    client.reads.push({ machine, word, body: reqBody })
+    return machine === "mac-b" ? Promise.resolve({ sessions, complete: true }) : new Promise(() => {})
+  }
+  const r = new RelayReader("mac-b", { classicStatus: true, now: () => 1000 })
+  r.attach(client)
+  const first = new AbortController()
+  setTimeout(() => first.abort(), 20)
+  await r.fetch("/v1/sessions", { signal: first.signal, headers: { "X-Clawdline-Initial-Read": "1" } })
+  client.reads = []
+  return { client, r }
+}
+
+/** The Board's Session list read, as `readSessionsForWorkV2` sends it, through `r`, with a short deadline. */
+async function boardSessionRead(r: RelayReader, timeoutMs: number): Promise<SessionsSnapshot> {
+  const saved = globalThis.fetch
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => r.fetch(input, init)) as typeof fetch
+  try {
+    const res = await fetchWithDeadline(SESSION_LIST_READ.path, { headers: SESSION_LIST_READ.headers }, timeoutMs, SESSION_LIST_READ.answerMs)
+    return await body<SessionsSnapshot>(res)
+  } finally { globalThis.fetch = saved }
+}
+
+test("the Board's Session list answers at once when the machine's set has not changed", async () => {
+  const { client, r } = await boardOnSecondMac(["s1"], ["s1"])
+  const started = Date.now()
+  const snap = await boardSessionRead(r, 200)
+  assert.deepEqual(snap.sessions.map((session) => session.id), ["s1"])
+  assert.equal(snap.scan.complete, true)
+  assert.ok(Date.now() - started < 200, "a held complete list is not a wait for the machine's next pass")
+  assert.ok(client.reads.every((read) => read.machine === "mac-b"), "only the Project's machine is asked")
+})
+
+test("the Board's Session list is the held list, incomplete, when the machine's new pass does not come", async () => {
+  const { client, r } = await boardOnSecondMac(["s1", "s2"], ["s1"])
+  const snap = await boardSessionRead(r, 30)
+  assert.deepEqual(snap.sessions.map((session) => session.id), ["s1"])
+  assert.equal(snap.scan.complete, false, "a list missing a row says it is incomplete, not that it failed")
+  assert.deepEqual(client.reads.map((read) => read.machine), ["mac-b"], "the silent machine is never asked")
+})
+
+test("the Board's Session list failure is recorded for the machine's log without anything of the person's", () => {
+  const rows: { event: string; data: Record<string, unknown>; key?: string }[] = []
+  const client = new FakeClient()
+  client.viewerEvents = { record(event, data, key) { rows.push({ event, data, key }); return { n: rows.length } } }
+  const r = new RelayReader("mac-b")
+  assert.equal(r.reportSessionListFailure({ code: "timeout", elapsedMs: 15000.4 }), false)
+  r.attach(client)
+  assert.equal(r.reportSessionListFailure({ code: "timeout", elapsedMs: 15000.4 }), true)
+  assert.deepEqual(rows, [{ event: "work.sessions.read_failed", key: "work.sessions.read_failed|mac-b|timeout",
+    data: { word: "sessions.snapshot", machine: "mac-b", code: "timeout", elapsed_ms: 15000, connection: "ready" } }])
+})
+
 test("reopening a complete list reads the relay once without restating every Session", async () => {
   const client = new FakeClient()
   client.rows = [row("mac-a", "s1")]
@@ -1495,6 +1608,57 @@ test("a machine read the connection does not come back for is refused as reconne
   }
 })
 
+// Seen on 2026-10-18 on app.clawdline.com: the phone came back to the
+// Schedules page a moment before its relay line did, and the list read threw
+// `NotConnected`, which `jsonFetch` spells `offline`. Every machine on the
+// account — the online Mac among them — was drawn as offline or unreadable,
+// and the lane asked again only a minute later. One schedule's read had waited
+// for the line since 2026-09-27; the list did not.
+test("the schedule list asked while the page's connection is paused waits for it to come back", async () => {
+  const retired = new FakeClient() as FakeClient & { lifecycle?: (reason: string) => boolean }
+  retired.ready = false
+  const demands: string[] = []
+  retired.lifecycle = (reason) => {
+    demands.push(reason)
+    return true
+  }
+  const r = reader(retired, { t: 1000 })
+  const renewed = new FakeClient()
+  renewed.scheduleAnswer = async (options) => ({ schedules: [schedule(options?.machine || "mac-a", "s-1")], at: 1_700 })
+
+  const asked = r.fetch("/v1/orchestrator/schedules?machine=mac-a")
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  r.attach(renewed)
+  const res = await asked
+  assert.equal(res.status, 200)
+  assert.deepEqual((await body<{ schedules: { id: string }[] }>(res)).schedules.map((row) => row.id), ["s-1"])
+  assert.deepEqual(demands, ["demand"], "the paused client is asked to reconnect")
+  assert.deepEqual(retired.scheduleAsks, [], "nothing is sent through the retired client")
+  assert.deepEqual(renewed.scheduleAsks, [{ fresh: true, machine: "mac-a" }])
+})
+
+test("a schedule list the connection does not come back for is refused as reconnecting, recorded, not offline", async () => {
+  const retired = new FakeClient() as FakeClient & { lifecycle?: (reason: string) => boolean }
+  retired.ready = false
+  retired.lifecycle = () => true
+  const rows: { event: string; data: Record<string, unknown> }[] = []
+  retired.viewerEvents = { record(event, data) { rows.push({ event, data }); return { n: rows.length } } }
+  const r = new RelayReader("mac-a", { now: () => 1000, reconnectWaitMs: 20 })
+  r.attach(retired)
+  const res = await r.fetch("/v1/orchestrator/schedules?machine=mac-b")
+  assert.equal(res.status, 503)
+  assert.equal((await body<{ error: string }>(res)).error, "cloud_reconnecting")
+  assert.deepEqual(retired.scheduleAsks, [])
+  // The machine's log is where a phone's failure is read (`diagnostics.events`):
+  // a failed schedule read names its word and the machine it was for.
+  const failed = rows.filter((row) => row.event === "cloud.read.failed")
+  assert.equal(failed.length, 1)
+  assert.equal(failed[0]?.data.word, "schedules")
+  assert.equal(failed[0]?.data.code, "http_503")
+  assert.equal(failed[0]?.data.machine, "mac-b")
+  assert.equal(failed[0]?.data.connection, "not_ready")
+})
+
 // The distinction this whole read is drawn around: "this machine has none" and
 // "nobody answered" are opposite facts, and `pages/schedules.tsx` draws the
 // section for one and leaves it alone for the other. An empty answer is an
@@ -1667,16 +1831,6 @@ const CARRIED_READS: [string, string, Record<string, unknown>][] = [
   ["/v1/projects/%2Fp/worktrees", "project-worktree-lifecycle", { project: "/p" }],
   ["/v1/board?project=p1", "board", { project: "p1", item: "" }],
   ["/v1/board?project=p1&item=i1", "board", { project: "p1", item: "i1" }],
-  [
-    "/v1/board?project=p1&audience=human",
-    "board.items",
-    { project: "p1", audience: "human", cursor: 0, limit: 30 },
-  ],
-  [
-    "/v1/board?project=p1&audience=agent&cursor=60&limit=90",
-    "board.items",
-    { project: "p1", audience: "agent", cursor: 60, limit: 90 },
-  ],
 ]
 
 test("the work system and projects reach the machine as their own words", async () => {

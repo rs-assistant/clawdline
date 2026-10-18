@@ -74,6 +74,9 @@ type directPeer struct {
 	carrier bool
 	pc      *webrtc.PeerConnection
 	dc      *webrtc.DataChannel
+	// trace is this attempt's content-free record, written once when the
+	// channel opens or the peer ends before it did (direct_trace.go).
+	trace *directTrace
 
 	mu      sync.Mutex
 	open    bool
@@ -186,11 +189,36 @@ func directRemoteAllowed(ip net.IP) bool {
 	return directAddressAllowed(ip) && !ip.IsPrivate()
 }
 
+// directLocalNetworkAllowed is the one widening of directRemoteAllowed, and
+// only while the person has turned on same-network connections
+// (adaptercloud.KeyDirectLocalNetwork): a host candidate on a private IPv4
+// network (RFC 1918). Link-local, loopback and unique-local IPv6 stay out —
+// a phone on the same Wi-Fi reaches this machine on its RFC 1918 address, and
+// nothing found so far needs the others. Sending a check to one of these is
+// what makes macOS ask for Local Network access, once.
+func directLocalNetworkAllowed(ip net.IP, typ string) bool {
+	return typ == "host" && ip.To4() != nil && directAddressAllowed(ip) && ip.IsPrivate()
+}
+
+// directCandidateAllowed is the whole rule for one candidate this machine
+// would send to (an offer's) or tell the viewer about (its own answer's).
+func (l *Link) directCandidateAllowed(ip net.IP, typ string) bool {
+	return directRemoteAllowed(ip) || (l.directLoopback && ip.IsLoopback()) ||
+		(l.settings.DirectLocalNetwork && directLocalNetworkAllowed(ip, typ))
+}
+
 // filterDirectOffer keeps the offer's UDP candidates whose address passes
-// directRemoteAllowed — never an mDNS name, which would be resolved by a
+// directCandidateAllowed — never an mDNS name, which would be resolved by a
 // multicast query — and refuses an offer with more candidate lines than the
 // bound.
 func (l *Link) filterDirectOffer(sdp string) (string, error) {
+	return l.filterDirectOfferTraced(sdp, nil)
+}
+
+// filterDirectOfferTraced is filterDirectOffer that also counts, in trace,
+// the shape of every candidate it kept and why it removed each other one.
+// Counting changes nothing about which candidates are kept.
+func (l *Link) filterDirectOfferTraced(sdp string, trace *directTrace) (string, error) {
 	lines := strings.Split(sdp, "\n")
 	out := make([]string, 0, len(lines))
 	candidates := 0
@@ -205,34 +233,74 @@ func (l *Link) filterDirectOffer(sdp string) (string, error) {
 			return "", terminal.Refuse(terminal.CodeInvalid, "the offer has too many candidates")
 		}
 		fields := strings.Fields(strings.TrimPrefix(trimmed, "a=candidate:"))
+		protocol, shape := directCandidateShape(fields)
 		if len(fields) < 8 || !strings.EqualFold(fields[2], "udp") {
+			trace.offerCandidate(shape, directDropReason(len(fields) < 8, protocol))
 			continue
 		}
 		ip := net.ParseIP(fields[4])
-		if ip == nil || (!directRemoteAllowed(ip) && !(l.directLoopback && ip.IsLoopback())) {
+		if ip == nil {
+			trace.offerCandidate(shape, "name")
 			continue
 		}
+		if !l.directCandidateAllowed(ip, directCandidateTyp(fields)) {
+			trace.offerCandidate(shape, "private")
+			continue
+		}
+		trace.offerCandidate(shape, "")
 		out = append(out, line)
 	}
 	return strings.Join(out, "\n"), nil
 }
 
+// directCandidateTyp is the `typ` of one candidate line's fields, or "".
+func directCandidateTyp(fields []string) string {
+	for i := 5; i+1 < len(fields); i++ {
+		if fields[i] == "typ" {
+			return fields[i+1]
+		}
+	}
+	return ""
+}
+
+// directDropReason names why a candidate line that is not a usable UDP line
+// was removed.
+func directDropReason(short bool, protocol string) string {
+	if short {
+		return "malformed"
+	}
+	if protocol == "tcp" {
+		return "tcp"
+	}
+	return "protocol"
+}
+
 // filterDirectAnswer leaves this machine's own private and link-local host
 // addresses out of the answer, so the viewer has no local address to send
-// to; the public address STUN found stays.
+// to; the public address STUN found stays. With same-network connections on,
+// the RFC 1918 IPv4 host addresses stay too (directLocalNetworkAllowed).
 func (l *Link) filterDirectAnswer(sdp string) string {
+	return l.filterDirectAnswerTraced(sdp, nil)
+}
+
+// filterDirectAnswerTraced is filterDirectAnswer that counts, in trace, the
+// shape of what this machine gathered and offers, and what it left out.
+func (l *Link) filterDirectAnswerTraced(sdp string, trace *directTrace) string {
 	lines := strings.Split(sdp, "\n")
 	out := make([]string, 0, len(lines))
 	for _, line := range lines {
 		trimmed := strings.TrimSuffix(line, "\r")
 		if strings.HasPrefix(trimmed, "a=candidate:") {
 			fields := strings.Fields(strings.TrimPrefix(trimmed, "a=candidate:"))
+			_, shape := directCandidateShape(fields)
 			if len(fields) >= 5 {
 				ip := net.ParseIP(fields[4])
-				if ip == nil || (!directRemoteAllowed(ip) && !(l.directLoopback && ip.IsLoopback())) {
+				if ip == nil || !l.directCandidateAllowed(ip, directCandidateTyp(fields)) {
+					trace.answerCandidate(shape, "private")
 					continue
 				}
 			}
+			trace.answerCandidate(shape, "")
 		}
 		out = append(out, line)
 	}
@@ -311,9 +379,20 @@ func (l *Link) directEnabled() bool {
 // answerDirectOffer makes this machine's answer to one admitted offer. The
 // caller holds the viewer's reservation and gives it back on error. `owner` is
 // the terminal connection the peer belongs to, or "" with `carrier` set for a
-// peer the viewer itself owns.
-func (l *Link) answerDirectOffer(viewer, owner string, carrier bool, sdp string) (string, error) {
-	sdp, err := l.filterDirectOffer(sdp)
+// peer the viewer itself owns. `attempt` is the connection id the browser
+// named the offer with; the attempt's trace is keyed by it.
+//
+// An attempt that fails here is traced at once; one that has an answer is
+// traced when its channel opens or its peer ends (closeDirectPeer). The caller
+// says when the answer has left this machine (directAnswerSent).
+func (l *Link) answerDirectOffer(viewer, owner string, carrier bool, attempt, sdp string) (answerSDP string, err error) {
+	trace := newDirectTrace(attempt, carrier, l.opts.Now)
+	defer func() {
+		if err != nil {
+			l.refuseDirectTrace(trace, err)
+		}
+	}()
+	sdp, err = l.filterDirectOfferTraced(sdp, trace)
 	if err != nil {
 		return "", err
 	}
@@ -329,7 +408,11 @@ func (l *Link) answerDirectOffer(viewer, owner string, carrier bool, sdp string)
 	if err != nil {
 		return "", terminal.Refuse(terminal.CodeUnreachable, "the direct connection could not be created")
 	}
-	peer := &directPeer{l: l, viewer: viewer, owner: owner, carrier: carrier, pc: pc}
+	peer := &directPeer{l: l, viewer: viewer, owner: owner, carrier: carrier, pc: pc, trace: trace}
+	pc.OnICEConnectionStateChange(func(s webrtc.ICEConnectionState) { trace.iceState(s.String()) })
+	if sctp := pc.SCTP(); sctp != nil && sctp.Transport() != nil && sctp.Transport().ICETransport() != nil {
+		sctp.Transport().ICETransport().OnSelectedCandidatePairChange(trace.selectedPair)
+	}
 	pc.OnDataChannel(func(dc *webrtc.DataChannel) {
 		if dc.Label() != directLabel || dc.Ordered() != true {
 			_ = dc.Close()
@@ -346,7 +429,11 @@ func (l *Link) answerDirectOffer(viewer, owner string, carrier bool, sdp string)
 		dc.OnOpen(func() {
 			peer.mu.Lock()
 			peer.open = !peer.closed
+			opened := peer.open
 			peer.mu.Unlock()
+			if opened {
+				l.logDirectTrace(trace, true, false)
+			}
 			if carrier {
 				l.logf("cloud carrier=direct opened for a viewer's Session reads")
 			} else {
@@ -377,7 +464,9 @@ func (l *Link) answerDirectOffer(viewer, owner string, carrier bool, sdp string)
 	}
 	select {
 	case <-gathered:
+		trace.gathered(true)
 	case <-time.After(CloudTerminalDirectGatherSecondsLimit * time.Second):
+		trace.gathered(false)
 	}
 	local := pc.LocalDescription()
 	if local == nil {
@@ -397,10 +486,22 @@ func (l *Link) answerDirectOffer(viewer, owner string, carrier bool, sdp string)
 		open := peer.open
 		peer.mu.Unlock()
 		if !open {
-			l.closeDirectPeer(peer, "the data channel did not open in time")
+			l.closeDirectPeer(peer, directWhyOpenTimeout)
 		}
 	})
-	return l.filterDirectAnswer(local.SDP), nil
+	trace.answerMade()
+	return l.filterDirectAnswerTraced(local.SDP, trace), nil
+}
+
+// directAnswerSent records that the answer to viewer's current attempt has
+// left this machine.
+func (l *Link) directAnswerSent(viewer string) {
+	l.directMu.Lock()
+	peer := l.directPeers[viewer]
+	l.directMu.Unlock()
+	if peer != nil && peer.trace != nil {
+		peer.trace.answerSent()
+	}
 }
 
 // releaseDirectReservation gives back a viewer's place when no peer was made.
@@ -421,6 +522,9 @@ func (l *Link) handleDirectOffer(ctx context.Context, svc *terminals.Service, p 
 		code, known := terminal.CodeOf(err)
 		if !known {
 			code = terminal.CodeUnreachable
+		}
+		if code == terminal.CodeBusy {
+			l.logTerminalBusy(c.viewer, req.Operation, err.Error())
 		}
 		l.sendTerminalReceipt(ctx, c, terminalReceipt{V: 1, Type: "terminal_receipt", RequestID: req.RequestID,
 			Connection: req.Connection, Operation: req.Operation, Status: "refused", Error: string(code)})
@@ -449,7 +553,7 @@ func (l *Link) handleDirectOffer(ctx context.Context, svc *terminals.Service, p 
 		return
 	}
 	go func() {
-		answer, err := l.answerDirectOffer(c.viewer, c.id, false, sdp)
+		answer, err := l.answerDirectOffer(c.viewer, c.id, false, c.id, sdp)
 		if err != nil {
 			l.releaseDirectReservation(c.viewer)
 			refuse(err)
@@ -459,7 +563,9 @@ func (l *Link) handleDirectOffer(ctx context.Context, svc *terminals.Service, p 
 			RequestID: req.RequestID, Connection: req.Connection, Operation: req.Operation, Status: "ok",
 			Result: map[string]any{"sdp": answer, "direct_receipts": true}}) != nil {
 			l.closeDirectPeerOf(c.viewer, "the answer could not be sent")
+			return
 		}
+		l.directAnswerSent(c.viewer)
 	}()
 }
 
@@ -554,6 +660,7 @@ func (l *Link) closeDirectPeer(peer *directPeer, why string) {
 	}
 	l.directMu.Unlock()
 	go func() { _ = peer.pc.Close() }()
+	l.logDirectTrace(peer.trace, false, why == directWhyOpenTimeout)
 	l.logf("cloud terminal carrier=direct closed: %s", why)
 	l.terminalMu.Lock()
 	direct := []*terminalConnection{}

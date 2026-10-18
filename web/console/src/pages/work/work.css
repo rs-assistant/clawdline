@@ -737,6 +737,7 @@
 .work-project-check { display: grid; place-items: center; color: var(--accent); }
 .work-project-check .work-icon { width: 14px; height: 14px; }
 .work-project-empty { margin: 0; padding: 12px; color: var(--faint); font-size: 12px; }
+.work-project-empty.work-session-loading { display: flex; align-items: center; gap: 8px; }
 
 /* The create sheet is a compact decision flow: choose where, choose what kind,
    then name the work. Planning-only kinds remain visible but explain where

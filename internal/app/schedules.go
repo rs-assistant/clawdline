@@ -106,9 +106,6 @@ type ScheduleBook struct {
 	// `401 no_machine_credential` for.
 	// expectedRevision is the revision the hook is at: 0 for a new one.
 	Activate func(ctx context.Context, hookID, requestID string, expectedRevision int64) (int64, error)
-	// ImportsEnabled is `schedule_imports_enabled`; nil or false keeps the
-	// import route shut.
-	ImportsEnabled func() bool
 	// Conversations matches a run to the conversation its child had, so a
 	// finished run can be resumed (schedule_resume.go). Zero answers none.
 	Conversations RunConversations
@@ -1209,95 +1206,6 @@ func boolText(ok bool) string {
 		return "1"
 	}
 	return "0"
-}
-
-// ImportFile is one schedule file handed over whole, as the Swift app wrote it.
-type ImportFile struct {
-	Name string
-	Body []byte
-}
-
-// Import takes schedule files from another holder — the Swift app's
-// `~/.config/clawdline/schedules/*.json` — and stores each byte for byte.
-//
-// Everything the previous holder was responsible for stays its own: the row's
-// first sighting is now, and its latest occurrence at or before now is recorded
-// as already decided, so importing at 09:05 does not run a 09:00 the Swift app
-// already ran, and does not announce it as missed either. The next occurrence
-// is this daemon's.
-//
-// An import stores repeating schedules and any project directory, which makes
-// it what a hand-written file was for the Swift app — the door the orchestrator
-// token's once-only rule does not cover. So it is shut unless this daemon's
-// config.json turns it on (`schedule_imports_enabled`), for the migration.
-//
-// A file that does not parse is still imported, and is listed as the
-// `invalid` row it is — hiding it would be the one way a migration loses a
-// schedule without saying so. A name already held is left alone; the same
-// bytes again are reported as unchanged.
-func (b *ScheduleBook) Import(ctx context.Context, files []ImportFile) ([]map[string]any, *ScheduleReply) {
-	if b.ImportsEnabled == nil || !b.ImportsEnabled() {
-		r := refusedSchedule(403, "schedule_imports_disabled",
-			"Importing schedule files is switched off. Set \"schedule_imports_enabled\": true in this daemon's "+
-				"config.json for the migration, and take it out again afterwards.")
-		return nil, &r
-	}
-	now := b.now()
-	out := []map[string]any{}
-	for _, file := range files {
-		row := map[string]any{"file": file.Name}
-		id := strings.TrimSuffix(file.Name, ".json")
-		if !strings.HasSuffix(file.Name, ".json") || !schedule.ValidID(id) {
-			row["state"] = "refused"
-			row["error"] = "the file name must be <schedule-id>.json with a lower-case UUID"
-			out = append(out, row)
-			continue
-		}
-		row["id"] = id
-		var parsed *schedule.Schedule
-		if obj, err := schedule.Decode(file.Body); err != nil {
-			row["error"] = "The file does not contain a JSON object."
-		} else if s, err := schedule.Parse(obj, id, b.isDirectory); err != nil {
-			row["error"] = err.Error()
-			if title, _ := obj["title"].(string); title != "" {
-				row["title"] = title
-			}
-		} else {
-			parsed = &s
-			row["title"] = s.Title
-			row["enabled"] = s.Enabled
-		}
-		handled := time.Time{}
-		if parsed != nil {
-			handled = parsed.When.LatestFire(now, b.scheduleLoc(*parsed))
-		}
-		err := b.Store.CreateScheduleFile(ctx, id, file.Body, now, handled)
-		switch {
-		case errors.Is(err, store.ErrScheduleExists):
-			if f, ok, _ := b.Store.ScheduleFileByID(ctx, id); ok && string(f.Body) == string(file.Body) {
-				row["state"] = "unchanged"
-			} else {
-				row["state"] = "exists"
-			}
-		case err != nil:
-			row["state"] = "refused"
-			row["error"] = "The schedule could not be stored."
-		case parsed == nil:
-			row["state"] = "invalid"
-		default:
-			row["state"] = "imported"
-		}
-		if parsed != nil {
-			if next := parsed.When.NextFire(now, b.scheduleLoc(*parsed)); !next.IsZero() {
-				row["next_fire"] = next.Unix()
-			}
-		}
-		sum := sha256.Sum256(file.Body)
-		row["sha256"] = hex.EncodeToString(sum[:])
-		b.audit("orchestrator.schedule.imported", map[string]string{"schedule": id, "state": fmt.Sprint(row["state"])})
-		out = append(out, row)
-	}
-	return out, nil
 }
 
 // Export is every stored schedule file, byte for byte, by the name the Swift

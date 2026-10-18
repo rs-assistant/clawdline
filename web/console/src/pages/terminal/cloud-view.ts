@@ -98,3 +98,42 @@ export async function listCloudTerminals(session: Pick<CloudTerminalStarter, "re
   if (!Array.isArray(terminals)) throw new Error("terminal_bad_receipt")
   return terminals as TerminalRow[]
 }
+
+/**
+ * The one situation the hosted terminal page is in, which decides its header line and the single
+ * action under the screen. Ended comes first: a terminal the machine says is gone can be neither
+ * taken nor reconnected, and offering either was the page's failure on 2026-10-18.
+ */
+export type CloudTerminalPhase = "ended" | "denied" | "reconnecting" | "offline" | "error" | "needs_review" | "other_holder" |
+  "watching" | "typing" | "loading"
+
+export interface CloudTerminalPhaseInput {
+  state: string
+  error: string
+  /** The terminal's own status from the machine's last read, "" before one. */
+  status: string
+  /** The page's close request as far as it settled: "ok" and "ended" both mean gone. */
+  closeStatus: string
+  retrying: boolean
+  frameTimedOut: boolean
+  needsReview: boolean
+  canType: boolean
+  hasFrame: boolean
+  control: TerminalControl | null
+}
+
+const DENIED = new Set(["forbidden", "terminal_forbidden", "terminal_access_revoked"])
+
+export function cloudTerminalPhase(v: CloudTerminalPhaseInput): CloudTerminalPhase {
+  if (v.state === "closed" || v.error === "terminal_closed" || (v.status !== "" && v.status !== "running") ||
+    v.closeStatus === "ok" || v.closeStatus === "ended") return "ended"
+  if (DENIED.has(v.error) || v.state === "revoked") return "denied"
+  if (v.retrying || v.state === "stale") return "reconnecting"
+  if (v.state === "offline") return "offline"
+  if (v.error || v.frameTimedOut) return "error"
+  if (v.needsReview || v.state === "unknown") return "needs_review"
+  if (v.canType) return "typing"
+  if (!v.hasFrame) return "loading"
+  if (v.control?.held && !v.control.holder?.same_client) return "other_holder"
+  return "watching"
+}

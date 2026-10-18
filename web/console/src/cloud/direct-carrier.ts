@@ -17,7 +17,7 @@
 // that travels on it is authorized by the machine one read at a time, exactly
 // as a read off the relay is.
 // @ts-expect-error -- a `.ts` path, so Node's strip-types runner can load this file in its suite.
-import { DirectLink, DIRECT_BUSY_RETRY_MS, DIRECT_RETRY_MS, browserDirectPeers, type DirectPeerFactory } from "./terminal-direct.ts"
+import { DirectLink, DIRECT_BUSY_RETRY_MS, DIRECT_RETRY_MS, browserDirectPeers, directAttemptRecorder, type DirectPeerFactory } from "./terminal-direct.ts"
 import type { SharedCarrier, TerminalEnvelope } from "./terminal-transport.js"
 import { base64Bytes, bytesBase64 } from "../legacy/js/net/cloud-crypto.js"
 
@@ -182,8 +182,9 @@ export class DirectCarrier implements SharedCarrier {
     const keyID = "rk-" + random22()
     const key = crypto.getRandomValues(new Uint8Array(32))
     const request = crypto.randomUUID()
+    const record = directAttemptRecorder(this.client, this.machine)
     const link: DirectLink = new DirectLink(this.peers!, (envelope) => this.deliver(link, envelope),
-      (code) => this.lost(link, code))
+      (code) => this.lost(link, code), record ? { attempt: connection, kind: "carrier", report: record } : null)
     try {
       const sdp = await link.offer()
       const answer = await this.client.publishCarrierOffer(this.machine, { request, connection, keyID, key, sdp })

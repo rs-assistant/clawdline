@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
-	"github.com/sainteye/clawdline/internal/adapters/swiftstore"
+	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
@@ -39,8 +39,8 @@ func titleWithinLimit(title string) bool {
 // ownSessionTitles reads only this daemon's rows. A malformed row is skipped,
 // as the retired Config did; a malformed settings file is refused by the
 // settings adapter before a write can replace it.
-func ownSessionTitles(v nextconfig.Values, now time.Time) []swiftstore.SessionTitle {
-	var rows []swiftstore.SessionTitle
+func ownSessionTitles(v nextconfig.Values, now time.Time) []ownrecords.SessionTitle {
+	var rows []ownrecords.SessionTitle
 	if raw := v.Raw[sessionTitlesKey]; len(raw) > 0 {
 		_ = json.Unmarshal(raw, &rows)
 	}
@@ -71,7 +71,7 @@ func ownSessionTitles(v nextconfig.Values, now time.Time) []swiftstore.SessionTi
 // newestPerConversation keeps one row per conversation, the last of rows
 // sorted oldest first, so the newer name wins. A row without a conversation is
 // a legacy terminal-addressed name and is kept as it is.
-func newestPerConversation(rows []swiftstore.SessionTitle) []swiftstore.SessionTitle {
+func newestPerConversation(rows []ownrecords.SessionTitle) []ownrecords.SessionTitle {
 	last := map[string]int{}
 	for i, row := range rows {
 		if row.SessionID != nil && *row.SessionID != "" {
@@ -91,12 +91,12 @@ func newestPerConversation(rows []swiftstore.SessionTitle) []swiftstore.SessionT
 // withOwnSessionTitles lays this daemon's manual names after the retired
 // store's rows. The projection takes the last matching manual row, so a name
 // chosen in the current product wins without modifying the retired app's file.
-func (s *Server) withOwnSessionTitles(base swiftstore.Snapshot, now time.Time) swiftstore.Snapshot {
+func (s *Server) withOwnSessionTitles(base ownrecords.Snapshot, now time.Time) ownrecords.Snapshot {
 	v, err := s.settingsFile().Read()
 	if err != nil {
 		return base
 	}
-	base.Titles = append(append([]swiftstore.SessionTitle(nil), base.Titles...), ownSessionTitles(v, now)...)
+	base.Titles = append(append([]ownrecords.SessionTitle(nil), base.Titles...), ownSessionTitles(v, now)...)
 	base.TitlesKnown = true
 	return base
 }
@@ -104,7 +104,7 @@ func (s *Server) withOwnSessionTitles(base swiftstore.Snapshot, now time.Time) s
 // sameSessionTitle keys a name by conversation. A terminal address decides
 // only when the row or the Session has no conversation, so a terminal reused by
 // another conversation leaves the first conversation's name alone.
-func sameSessionTitle(row swiftstore.SessionTitle, item session.Session) bool {
+func sameSessionTitle(row ownrecords.SessionTitle, item session.Session) bool {
 	if item.ConversationID != "" && row.SessionID != nil && *row.SessionID != "" {
 		return *row.SessionID == item.ConversationID
 	}
@@ -126,19 +126,19 @@ func (s *Server) saveSessionTitle(item session.Session, raw string, now time.Tim
 		}
 		rows = kept
 		if title != "" {
-			row := swiftstore.SessionTitle{Title: title, TerminalID: item.ID}
+			row := ownrecords.SessionTitle{Title: title, TerminalID: item.ID}
 			if item.ConversationID != "" {
 				id := item.ConversationID
 				row.SessionID = &id
 			}
-			if started := swiftstore.ProcessStart(item.PID); !started.IsZero() {
-				at := swiftstore.Seconds(float64(started.UnixNano()) / 1e9)
+			if started := ownrecords.ProcessStart(item.PID); !started.IsZero() {
+				at := ownrecords.Seconds(float64(started.UnixNano()) / 1e9)
 				row.StartedAt = &at
 			}
 			// A later /rename is a newer human utterance and retires this local
 			// name. Capture the current transcript title only when the record
 			// exists; before the first turn there is no baseline to compare.
-			if path := recordPath(item); path != "" {
+			if path := s.recordPath(item); path != "" {
 				if _, statErr := os.Stat(path); statErr == nil {
 					row.SeenTranscriptPath = &path
 					if item.CustomTitle != "" {
@@ -147,7 +147,7 @@ func (s *Server) saveSessionTitle(item session.Session, raw string, now time.Tim
 					}
 				}
 			}
-			updated := swiftstore.Seconds(float64(now.UnixNano()) / 1e9)
+			updated := ownrecords.Seconds(float64(now.UnixNano()) / 1e9)
 			row.UpdatedAt = &updated
 			rows = append(rows, row)
 			limit := int(CapacityLimit(capacity.SessionTitleRows))
@@ -165,8 +165,8 @@ func (s *Server) saveSessionTitle(item session.Session, raw string, now time.Tim
 // that has just become visible instead of flashing the terminal's raw label.
 func (s *Server) sessionDisplayLabel(ctx context.Context, item session.Session) string {
 	live := liveOf(item)
-	lives := []swiftstore.Live{live}
-	view := swiftstore.Snapshot{}
+	lives := []ownrecords.Live{live}
+	view := ownrecords.Snapshot{}
 	if s.store != nil {
 		records, release := recordsContext(ctx)
 		own, err := s.ownOverlay(records, lives)

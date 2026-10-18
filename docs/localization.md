@@ -4,8 +4,8 @@ English is the source language and the fallback for Clawdline's product copy. A
 translated interface must use a validated catalog. User, project, and
 agent-authored content is data and stays in the language in which it was written.
 Protocol names, JSON fields, error codes, and machine-readable CLI output stay
-stable. The retired Swift archive and its byte-for-byte console copies stay
-read-only.
+stable. The retired Swift archive stays read-only, and the console stylesheets
+copied from it stay pinned byte for byte (`web/console/src/legacy/README.md`).
 
 The first frozen catalog baseline must be complete in all nine languages.
 Later keys may use the fallback policy below even if they reach the first

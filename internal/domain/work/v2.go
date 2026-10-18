@@ -35,7 +35,7 @@ func (k Kind) Valid() bool {
 
 // Executable kinds are assigned to a Session and move through the execution
 // phases. An Epic is executable too, behind a plan-and-review gate
-// (EpicPlanGate); only a Plan stays in Planning.
+// (PlanningGate); only a Plan stays in Planning.
 func (k Kind) Executable() bool { return k.FeatureLike() || k == KindIssue || k == KindEpic }
 
 // FeatureLike kinds follow a Feature's rules: a Refactor is an internal
@@ -737,24 +737,6 @@ func planReviewBlocking(i ItemV2, prefix string, lastPlan, lastReview, reviews, 
 // takes effect for an item's next cycle.
 const PlanningGateOverride = "only the person can: uncheck the Feature's Needs independent review switch on the Board, " +
 	"or `clawdline setting set planning_gate off` before the item's next cycle"
-
-// EpicPlanGate remains as a source-compatible name for callers outside the
-// runtime path. New enforcement calls PlanningGate so Features are included.
-func EpicPlanGate(i ItemV2, next Phase, plans []DocumentV2, review PlanReviewSummary) error {
-	if i.Kind != KindEpic {
-		return nil
-	}
-	if !i.HasGateSnapshot() {
-		if i.Cycle == 0 {
-			i.Cycle = 1
-		}
-		i.GateSnapshotCycle, i.PlanningGate = i.Cycle, true
-		if strings.TrimSpace(i.AcceptanceCriteria) == "" {
-			i.AcceptanceCriteria = "legacy Epic acceptance"
-		}
-	}
-	return PlanningGate(i, next, plans, review)
-}
 
 // EpicPlanReviewRounds is how many plan reviews the gate asks of an Epic at
 // most: after the second, a revised plan goes into implementing without a

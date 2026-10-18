@@ -50,8 +50,6 @@
   "main_type_session_id_text_type_straight": "  type <session-id> <text>      type straight into a terminal, recording nothing (for testing a backend)",
   "main_update_json_apply_force_whether_this": "  update [--json] [--apply [--force]]   whether this machine trails the cloud's latest build; exit 0 current, 10 behind, 3 unknown",
   "main_update_release_help": "  update [--apply [--version vX.Y.Z] [--force]] [--json] [--port n]   check or install a release; exit 0 current, 10 newer, 3 unknown",
-  "main_upstream_d": "upstream  %d\n",
-  "main_upstream_none_an_unowned_route_answers": "upstream  none (an unowned route answers 501 not_implemented; %s asks for one)\n",
   "main_usage_clawdline_lang_tag_command_arguments": "usage: clawdline --lang <tag> <command> [arguments]",
   "main_usage_clawdline_s_session_id_text": "usage: clawdline %s <session-id> [text]\n",
   "main_usage_clawdline_serve_doctor_guide_skill": "usage: clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|tunnel|cloud|board|project|task|webhook|update|version>",

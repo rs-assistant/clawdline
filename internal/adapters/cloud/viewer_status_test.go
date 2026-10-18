@@ -36,9 +36,9 @@ func TestViewerStatusRequiresOneFreshGenerationForEachMachine(t *testing.T) {
 			"at": now.Unix(), "complete": true, "snapshot_generation": pass}
 	}
 	put("machine-a", "same", 1, row("machine-a", generationA, passA))
-	put("machine-a", viewerInventorySession, 2, marker(passA))
+	put("machine-a", domain.InventorySessionID, 2, marker(passA))
 	put("machine-b", "same", 1, row("machine-b", generationB, passB))
-	put("machine-b", viewerInventorySession, 2, marker(passB))
+	put("machine-b", domain.InventorySessionID, 2, marker(passB))
 	a := ViewerDestination{MachineID: "machine-a", SessionID: "same", ExecutionGeneration: generationA}
 	b := ViewerDestination{MachineID: "machine-b", SessionID: "same", ExecutionGeneration: generationB}
 	if got := store.Project("machine-a", now); got.Available(a) != "current" || got.Available(b) != "changed" {
@@ -47,7 +47,7 @@ func TestViewerStatusRequiresOneFreshGenerationForEachMachine(t *testing.T) {
 	if got := store.Project("machine-b", now); got.Available(b) != "current" || got.Available(a) != "changed" {
 		t.Fatalf("B projection: %+v", got)
 	}
-	put("machine-a", viewerInventorySession, 3, marker(passB))
+	put("machine-a", domain.InventorySessionID, 3, marker(passB))
 	if got := store.Project("machine-a", now); got.Reason != "event_gap" {
 		t.Fatalf("mixed passes: %+v", got)
 	}
@@ -67,7 +67,7 @@ func TestViewerStatusAcceptsAuthoritativeEmptySnapshot(t *testing.T) {
 	marker := map[string]any{"inventory": map[string]any{"version": 1, "sessions": []string{}},
 		"at": now.Unix(), "complete": true, "snapshot_generation": "11111111111111111111111111111111"}
 	body, _ := json.Marshal(marker)
-	if !store.Apply(domain.Envelope{Ch: "ss/machine-a/" + viewerInventorySession, Sender: "machine-a", Seq: 1}, body) {
+	if !store.Apply(domain.Envelope{Ch: "ss/machine-a/" + domain.InventorySessionID, Sender: "machine-a", Seq: 1}, body) {
 		t.Fatal("empty marker was not accepted")
 	}
 	projection := store.Project("machine-a", now)
