@@ -3,6 +3,7 @@ import type { Terminal as TerminalRow } from "@clawdline/contract"
 import type { Terminal as XTerm } from "@xterm/xterm"
 import type { FitAddon } from "@xterm/addon-fit"
 import { nextWord } from "../../next-strings.js"
+import { showModalWithoutChoice } from "../../modal-focus.js"
 import { watchTerminalHost, type TerminalHost } from "../../cloud/terminal-host.js"
 import { acquireTerminalConnection } from "../../cloud/terminal-connection-owner.js"
 import { TerminalObservation } from "../../cloud/terminal-observation.js"
@@ -118,7 +119,7 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
   useEffect(() => {
     const dialog = closeDialog.current
     if (!dialog) return
-    if (closeConfirm && !dialog.open) { dialog.showModal(); closeCancel.current?.focus() }
+    if (closeConfirm) showModalWithoutChoice(dialog)
     if (!closeConfirm && dialog.open) dialog.close()
   }, [closeConfirm])
   useEffect(() => {

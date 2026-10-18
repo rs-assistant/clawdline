@@ -6,6 +6,6 @@ const source = readFileSync(new URL("./UserMessages.tsx", import.meta.url), "utf
 
 test("opening My messages does not put the keyboard in the search field", () => {
   // Focus still enters the sheet, so its own Escape handler keeps closing it.
-  assert.match(source, /closeButton\.current\?\.focus\(\{ preventScroll: true \}\)/)
+  assert.match(source, /focusModalContainer\(dialogRef\.current\)/)
   assert.match(source, /id="user-messages-close"[\s\S]*?ref=\{closeButton\}/)
 })

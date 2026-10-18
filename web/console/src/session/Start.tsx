@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
+import { focusModalContainer, showModalWithoutChoice } from "../modal-focus.js"
 import { loadPersonas, personaById, personasNow, rememberTeam, rememberedTeam, switchTeam } from "../personas.js"
 import { drawRoleRow } from "./RoleRow.js"
 import "./persona.css"
@@ -966,7 +967,7 @@ function openMode(machine: boolean, requested: StartMode = "session", on: { id: 
   if (!wait) load()
   if (mode === "terminal") checkTerminalAccess()
   draw()
-  el("start-title").focus({ preventScroll: true })
+  focusModalContainer(el("start-sheet"))
 }
 
 function open(): void { openMode(false) }
@@ -1105,7 +1106,7 @@ export function StartSheet() {
   useEffect(() => {
     const dialog = removeDialog.current
     if (!dialog) return
-    if (removeTarget && !dialog.open) dialog.showModal()
+    if (removeTarget) showModalWithoutChoice(dialog)
     if (!removeTarget && dialog.open) dialog.close()
   }, [removeTarget])
   async function confirmRemoveProject() {

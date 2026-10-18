@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef } from "react"
 import * as L from "../legacy/bridge.js"
 import { nextWord, type NextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import { toast } from "../overlays/index.js"
 import { readAnswer, readFailure, readReady, type ReadState } from "../read-state.js"
 import { invalidScheduleErrorHTML } from "../schedule-errors.js"
@@ -1194,7 +1195,7 @@ const Schedule = (() => {
     if (!el("schedule-form").hidden) return
     reset()
     el("schedule-form").hidden = false
-    el("schedule-title").focus({ preventScroll: true })
+    focusModalContainer(el("schedule-form"))
     ensurePlaces().then(() => {
       defaultAssistant(null)
       drawWith()
@@ -1219,7 +1220,7 @@ const Schedule = (() => {
     drawDays()
     drawPlaces()
     said(draft.question || hint())
-    el("schedule-title").focus({ preventScroll: true })
+    focusModalContainer(el("schedule-form"))
     ensurePlaces().then(() => {
       defaultAssistant(draft.assistant)
       chosenModel = chosenAssistant === "claude" && MODELS.includes(draft.model || "") ? draft.model || "" : ""
@@ -1328,7 +1329,7 @@ const Schedule = (() => {
     el("schedule-delete-confirm-go").textContent = T().webScheduleDelete
     el("schedule-delete-confirm").hidden = false
     paintDeleteConfirm()
-    el("schedule-delete-confirm-go").focus({ preventScroll: true })
+    focusModalContainer(el("schedule-delete-confirm"))
   }
 
   function closeDeleteConfirm(restore: boolean): void {
@@ -2167,7 +2168,7 @@ const ScheduleHistory = (() => {
     el("schedule-history-said").textContent = ""
     el("schedule-history").hidden = false
     draw()
-    el("schedule-history-close").focus({ preventScroll: true })
+    focusModalContainer(el("schedule-history"))
     const mine = ++ticket
     const detail = scheduleApi.schedule(id, scheduleOwner(id))
     const availablePlaces = scheduleApi.places(scheduleOwner(id)).catch(() => ({ places: [] }) as SchedulePlaces)

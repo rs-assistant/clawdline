@@ -2,6 +2,7 @@ import type { CloseReason } from "@clawdline/contract"
 import { RefusalError } from "@clawdline/core"
 import "./action-confirm.css"
 import { client } from "../client.js"
+import { focusModalContainer } from "../modal-focus.js"
 import * as L from "../legacy/bridge.js"
 import { closeExecutionChanged, getClosingId, setClosingId } from "./events.js"
 import {
@@ -280,12 +281,7 @@ export const ActionConfirm = {
     else this.renderSay(L.fillString(T.webConfirmActionSay, { action }), null, [])
     overlay.hidden = false
     this.sync()
-    // Cancel, not the destructive button, when the question was reached from
-    // the list: the same rule, and for the same reason, as the question that
-    // forgets a machine (`cloud/CloudGate.tsx`).
-    const cancel = node<HTMLButtonElement>("action-confirm-cancel")
-    const first = ((asked && asked.focus === "cancel") || this.pending.workState === "loading") && cancel ? cancel : go
-    first.focus({ preventScroll: true })
+    focusModalContainer(sheet)
     if (closes(kind) && !unstartedCodex && !recovery) void this.loadOpenWork(this.pending)
   },
 

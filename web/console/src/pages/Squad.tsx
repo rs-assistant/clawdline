@@ -1,5 +1,6 @@
 import { catalogFormat, catalogWordLanguage } from "../catalog.js"
 import { catalogWord } from "../catalog.js"
+import { showModalWithoutChoice } from "../modal-focus.js"
 import { catalogLabel, closingMark, colonMark, fullStop, labelled, listSeparator, parenthesized } from "../punctuation.js"
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { Icon } from "@clawdline/contract"
@@ -458,9 +459,8 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
     skillGlobalAtOpen.current = JSON.stringify(persona.skillsSetting.global)
     setSkillMode(draft?.mode ?? "create"); setImportKind(draft?.kind ?? "folder"); setImportSource(draft?.source ?? (scope ? "project" : "codex"))
     setNewSkillName(draft?.name ?? ""); setNewSkillPurpose(draft?.purpose ?? ""); setNewSkillContent(draft?.content ?? ""); setSelectedSourceID(draft?.sourceID ?? ""); setExistingSkillId(""); setSkillError(""); setSkillCloseConfirm(false); setImportAttachedFiles(draft?.files ?? [])
-    skillDialog.current?.showModal()
+    showModalWithoutChoice(skillDialog.current)
     setSkillDialogOpen(true)
-    requestAnimationFrame(() => (skillNameInput.current ?? skillDialog.current?.querySelector<HTMLInputElement>('input[name="squad-skill-mode"]:checked'))?.focus())
   }
   const recoverSavedSkill = () => {
     const pending = skillTransaction.current
@@ -610,7 +610,7 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
     setIncludeGlobal(false); setIncludeProjects([]); setPrivateConfirm(false); setPack(kind)
   }
   const closePack = () => { packDialog.current?.close(); setPack(null); setPackPreview(null); setPackFile(null); packOpener.current?.focus() }
-  useEffect(() => { if (pack && packDialog.current && !packDialog.current.open) packDialog.current.showModal() }, [pack])
+  useEffect(() => { if (pack) showModalWithoutChoice(packDialog.current) }, [pack])
 
   const previewPack = async () => {
     if (!packFile) { setPackError(catalogWord("literal", "864e8653cc52")); return }
