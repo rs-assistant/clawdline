@@ -182,6 +182,7 @@ type Screen =
   | { at: "device_limit"; tier: string; limit: number | null }
   | { at: "retrying"; reason: RetryReason; seconds: number }
   | { at: "failed"; code: string }
+  | { at: "roster_failed" }
   | { at: "revoked"; url: string }
   | { at: "machines" }
   | { at: "console" }
@@ -424,6 +425,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // tab does not open a machine meanwhile: the relay can still list one the
   // account revoked (`opening.ts`).
   const [rosterPending, setRosterPending] = useState(transport.kind === "cloud")
+  const [rosterFailed, setRosterFailed] = useState(false)
   const [connectionVersion, setConnectionVersion] = useState(0)
   const pairingStore = useMemo(() => browserPendingPairings(), [])
 
@@ -431,11 +433,14 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const rosterRequest = useRef(0)
   const readAccountRoster = useCallback((apiOrigin: string) => {
     const request = ++rosterRequest.current
+    setRosterPending(true)
+    setRosterFailed(false)
     setAccountRosterStatus("loading")
     void accountMachineRoster(apiOrigin).then((roster) => {
       if (request !== rosterRequest.current) return
       setRosterPending(false)
       if (!roster) {
+        setRosterFailed(true)
         namesRef.current = new Map()
         registeredRef.current = new Map()
         setNames(namesRef.current)
@@ -1155,29 +1160,6 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     }
   }, [start, connectionVersion])
 
-  // Where this tab lands once it has a list to land on (`opening.ts`). The
-  // list is asked again whenever it changes, so a machine that was still
-  // arriving is opened on the pass that lists it.
-  useEffect(() => {
-    if (screen.at !== "machines" || managingMachines || !machines || !who) return
-    const exact = destinationFromFragment(location.hash)
-    // A Session destination is the fleet's own address; a document address is
-    // one machine's page, and the fleet would put the Session list over it.
-    const document = exact ? null : machineForAddress(location.hash, null)
-    const opening = openingFor({
-      machines,
-      addressed: exact ? { machine: exact.machineID, inFleet: true }
-        : document ? { machine: document } : null,
-      everyMachineAddressed: location.hash === "#all-machines",
-      remembered: remembered(),
-      forgotten,
-      rosterPending,
-    })
-    if (opening.at !== "console") return
-    setFleetScope(opening.fleet)
-    choose(machines.find((machine) => machine.id === opening.machine)!, opening.remember)
-  }, [screen, managingMachines, machines, who, choose, remembered, forgotten, rosterPending])
-
   /**
    * Leave the machine this tab chose and start again at the list. This drops
    * only this tab's choice; the machine keeps its place on the account, which
@@ -1247,6 +1229,27 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     [machineList, names, registered, forgotten],
   )
   const quickMachines = shown.phase === "ready" ? shown.machines.filter((machine) => machine.selectable) : []
+  // Decide before paint. React runs the opening effect after paint, so showing
+  // the picker while that effect chooses the fleet creates a visible flash.
+  const opening = useMemo(() => {
+    if (screen.at !== "machines" || managingMachines || rosterPending || rosterFailed || !who ||
+      machineList.phase === "loading" || shown.phase !== "ready") return null
+    const exact = destinationFromFragment(location.hash)
+    const document = exact ? null : machineForAddress(location.hash, null)
+    return openingFor({
+      machines: shown.machines,
+      addressed: exact ? { machine: exact.machineID, inFleet: true }
+        : document ? { machine: document } : null,
+      everyMachineAddressed: location.hash === "#all-machines",
+      remembered: remembered(),
+      forgotten,
+    })
+  }, [screen, managingMachines, rosterPending, rosterFailed, who, machineList.phase, shown, remembered, forgotten])
+  useEffect(() => {
+    if (opening?.at !== "console" || shown.phase !== "ready") return
+    setFleetScope(opening.fleet)
+    choose(shown.machines.find((machine) => machine.id === opening.machine)!, opening.remember)
+  }, [opening, shown, choose])
   // The roster's word for the one machine a single-machine page reads, so that
   // page says "offline" where its own line to the relay would say "connected".
   const readingRow = shown.phase === "ready" ? shown.machines.find((machine) => machine.id === reading) : undefined
@@ -1807,7 +1810,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       )}
       {words && (screen.at !== "console" || pairing) && (
         <GateCard
-          screen={screen}
+          screen={screen.at === "machines" && !managingMachines &&
+            (rosterPending || machineList.phase === "loading" || opening?.at === "console") ? { at: "checking" }
+            : screen.at === "machines" && rosterFailed ? { at: "roster_failed" }
+              : screen}
           who={who}
           machineList={shown}
           updateClient={client.current}
@@ -1815,7 +1821,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           onSignIn={signInForMachineList}
           problem={problem}
           onChoose={choose}
-          onRetry={start}
+          onRetry={screen.at === "machines" && rosterFailed && transport.kind === "cloud"
+            ? () => readAccountRoster(transport.config.apiOrigin) : start}
           recovery={screen.at === "device_limit" ? session.current : null}
           asking={asking}
           forgetting={forgetting}
@@ -2156,7 +2163,12 @@ function GateCard(props: {
   function body() {
     switch (screen.at) {
       case "checking":
-        return <p className="say calm">{nextWord("cloudChecking")}</p>
+        return (
+          <div className="cloud-opening" role="status" aria-live="polite">
+            <span className="cloud-opening-ring" aria-hidden="true" />
+            <p>{nextWord("cloudChecking")}</p>
+          </div>
+        )
       case "install":
         return (
           <>
@@ -2217,6 +2229,15 @@ function GateCard(props: {
         return (
           <>
             <p className="say">{nextWord("cloudFailed", { code: screen.code })}</p>
+            <button className="go" type="button" onClick={onRetry}>
+              {nextWord("cloudRetry")}
+            </button>
+          </>
+        )
+      case "roster_failed":
+        return (
+          <>
+            <p className="say">{nextWord("cloudRosterFailed")}</p>
             <button className="go" type="button" onClick={onRetry}>
               {nextWord("cloudRetry")}
             </button>

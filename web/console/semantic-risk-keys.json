@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6051,
+  "englishKeys": 6052,
   "counts": {
-    "negation": 1922,
-    "state": 1082,
+    "negation": 1923,
+    "state": 1083,
     "permission": 372,
     "deletion": 159,
     "uncertainty": 176
   },
-  "unionCount": 2893,
+  "unionCount": 2894,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1518,6 +1518,7 @@
       "next.cloudRenameUnreadable",
       "next.cloudRetrying",
       "next.cloudRetryingUnknown",
+      "next.cloudRosterFailed",
       "next.cloudSwitchUnpaired",
       "next.cloudTerminalPermissionConnectionFailed",
       "next.cloudTerminalPermissionDeviceMissing",
@@ -2742,6 +2743,7 @@
       "next.cloudPeerSync",
       "next.cloudPeerTargetReceipt",
       "next.cloudRenameRefused",
+      "next.cloudRosterFailed",
       "next.defaultModelsSaved",
       "next.devicesPairHelp",
       "next.documentsWalked",
@@ -5926,6 +5928,7 @@
     "next.cloudRetrying",
     "next.cloudRetryingUnknown",
     "next.cloudRevoked",
+    "next.cloudRosterFailed",
     "next.cloudSignInFine",
     "next.cloudSignInLede",
     "next.cloudSwitchUnpaired",
