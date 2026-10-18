@@ -2,8 +2,13 @@
 .snippets-tabs button { flex: 1; padding: .55rem; border-radius: .5rem; }
 .snippets-tabs button[aria-selected="true"] { background: var(--card-hi); color: var(--ink); font-weight: 700; }
 .workflow-picker { display: block; }
-.workflow-detail-nav { padding: .5rem 1rem; border-bottom: 1px solid var(--line); }
+.workflow-detail-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem 1rem; border-bottom: 1px solid var(--line); }
 .workflow-detail-nav button { padding: .55rem .4rem; color: var(--accent); font: inherit; cursor: pointer; }
+.workflow-detail-actions { display: flex; gap: .5rem; white-space: nowrap; }
+.workflow-detail-actions .workflow-delete { color: var(--danger, #d84a4a); }
+.workflow-detail-actions button:disabled { opacity: .5; cursor: default; }
+.workflow-quick-voice { display: flex; align-items: center; gap: .75rem; margin: .5rem 0 1rem; }
+.workflow-quick-voice .voice { flex: 1; min-width: 0; }
 .workflow-detail-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .workflow-detail-scroll .workflow-launch { border-top: 0; background: transparent; }
 .workflow-detail-scroll .workflow-launch p { max-height: none; overflow: visible; }
