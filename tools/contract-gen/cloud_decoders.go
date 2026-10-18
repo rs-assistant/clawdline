@@ -106,6 +106,18 @@ func renderDecoder(b *bytes.Buffer, o cloudvocab.Operation) error {
 			fmt.Fprintf(b, "if v, named := b[%q]; named {\np.target = genText(v)\n}\n", field)
 		case cloudvocab.IntoExecutionGeneration:
 			fmt.Fprintf(b, "if v, named := b[%q]; named {\np.executionGeneration = genText(v)\n}\n", field)
+		case cloudvocab.IntoID:
+			fmt.Fprintf(b, "if v, named := b[%q]; named {\np.id = genText(v)\n}\n", field)
+		case cloudvocab.IntoParts:
+			fmt.Fprintf(b, "if v, named := b[%q]; named {\np.parts = genText(v)\n}\n", field)
+		case cloudvocab.IntoKey:
+			fmt.Fprintf(b, "if v, named := b[%q]; named {\np.key = genText(v)\n}\n", field)
+		case cloudvocab.IntoExpect:
+			fmt.Fprintf(b, "if v, named := b[%q]; named {\np.expect = genText(v)\n}\n", field)
+		case cloudvocab.IntoTyped:
+			fmt.Fprintf(b, "if v, named := b[%q]; named {\np.typed, p.namesTyped = genText(v), true\n}\n", field)
+		case cloudvocab.IntoDocument:
+			fmt.Fprintf(b, "if _, named := b[%q]; named {\np.document = b.genObject(%q)\n}\n", field, field)
 		}
 	}
 	if d.Route == nil {

@@ -234,6 +234,15 @@ func genDecodeAnswer(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
+	if v, named := b["answer"]; named {
+		p.key = genText(v)
+	}
+	if v, named := b["expect"]; named {
+		p.expect = genText(v)
+	}
+	if v, named := b["typed"]; named {
+		p.typed, p.namesTyped = genText(v), true
+	}
 	path := "/v1/sessions/" + segment(genText(b["session"])) + "/key"
 	req := LocalRequest{Method: "POST", Path: path}
 	req.Body = b.genFields(map[string]genValue{"expect": genValue{from: "expect"}, "key": genValue{from: "answer"}, "typed": genValue{from: "typed"}})
@@ -441,6 +450,9 @@ func genDecodeDiagnosticsEvents(b body) (plan, LocalRequest, bool) {
 	if !ok {
 		return plan{}, LocalRequest{}, false
 	}
+	if _, named := b["batch"]; named {
+		p.document = b.genObject("batch")
+	}
 	return p, LocalRequest{}, true
 }
 
@@ -646,6 +658,9 @@ func genDecodeImage(b body) (plan, LocalRequest, bool) {
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
 	}
+	if v, named := b["id"]; named {
+		p.id = genText(v)
+	}
 	path := "/v1/artifacts/images/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
 	req.Query = b.genQuery(map[string]genValue{"session": genValue{from: "session"}})
@@ -672,6 +687,9 @@ func genDecodeInfo(b body) (plan, LocalRequest, bool) {
 	}
 	if v, named := b["expected_generation"]; named {
 		p.executionGeneration = genText(v)
+	}
+	if v, named := b["parts"]; named {
+		p.parts = genText(v)
 	}
 	path := "/v1/sessions/" + segment(genText(b["session"])) + "/info"
 	req := LocalRequest{Method: "GET", Path: path}
@@ -738,6 +756,15 @@ func genDecodeKey(b body) (plan, LocalRequest, bool) {
 	p, ok := actionPlan(b, true)
 	if !ok {
 		return plan{}, LocalRequest{}, false
+	}
+	if v, named := b["expect"]; named {
+		p.expect = genText(v)
+	}
+	if v, named := b["key"]; named {
+		p.key = genText(v)
+	}
+	if v, named := b["typed"]; named {
+		p.typed, p.namesTyped = genText(v), true
 	}
 	path := "/v1/sessions/" + segment(genText(b["session"])) + "/key"
 	req := LocalRequest{Method: "POST", Path: path}
@@ -3188,6 +3215,9 @@ func genDecodeWorkV2Image(b body) (plan, LocalRequest, bool) {
 	p, ok := machinePlan(b)
 	if !ok {
 		return plan{}, LocalRequest{}, false
+	}
+	if v, named := b["id"]; named {
+		p.id = genText(v)
 	}
 	path := "/v1/work/v2/images/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}

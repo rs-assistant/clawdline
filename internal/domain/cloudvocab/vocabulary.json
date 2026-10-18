@@ -37,7 +37,7 @@
         {"body": ["answer", "expect", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["expect", "key"]},
         {"body": ["answer", "request", "session", "typed"], "path": "/v1/sessions/{session}/key", "local_body": ["key", "typed"]}
       ],
-      "decode": {"reply": "session_action", "fields": {"answer": {"type": "string"}, "expect": {"type": "string", "checks": ["fingerprint"]}, "typed": {"type": "string"}}, "route": {"path": "/v1/sessions/{session}/key", "body": {"fields": {"key": {"from": "answer"}, "expect": {"from": "expect"}, "typed": {"from": "typed"}}}}}
+      "decode": {"reply": "session_action", "fields": {"answer": {"type": "string", "into": "key"}, "expect": {"type": "string", "checks": ["fingerprint"], "into": "expect"}, "typed": {"type": "string", "into": "typed"}}, "route": {"path": "/v1/sessions/{session}/key", "body": {"fields": {"key": {"from": "answer"}, "expect": {"from": "expect"}, "typed": {"from": "typed"}}}}}
     },
     {
       "op": "archive-session",
@@ -196,7 +196,7 @@
       "shapes": [
         {"body": ["batch", "request", "session"]}
       ],
-      "decode": {"reply": "action", "fields": {"batch": {"type": "object", "max_bytes": 262144}}}
+      "decode": {"reply": "action", "fields": {"batch": {"type": "object", "max_bytes": 262144, "into": "document"}}}
     },
     {
       "op": "diagnostics.report",
@@ -366,7 +366,7 @@
         {"body": ["id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]},
         {"body": ["expected_generation", "id", "session"], "path": "/v1/artifacts/images/{id}", "query": ["session"]}
       ],
-      "decode": {"reply": "session", "name": "image.{id}", "fields": {"id": {"type": "string", "non_empty": true}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/artifacts/images/{id}", "query": {"session": {"from": "session"}}}}
+      "decode": {"reply": "session", "name": "image.{id}", "fields": {"id": {"type": "string", "non_empty": true, "into": "id"}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/artifacts/images/{id}", "query": {"session": {"from": "session"}}}}
     },
     {
       "op": "info",
@@ -382,7 +382,7 @@
         {"body": ["parts", "session"], "path": "/v1/sessions/{session}/info", "query": ["parts"]},
         {"body": ["expected_generation", "parts", "session"], "path": "/v1/sessions/{session}/info", "query": ["parts"]}
       ],
-      "decode": {"reply": "session", "name": "info.{parts}", "fields": {"parts": {"type": "string", "enum": ["full", "summary"]}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/info", "query": {"parts": {"from": "parts", "only": "summary"}}}}
+      "decode": {"reply": "session", "name": "info.{parts}", "fields": {"parts": {"type": "string", "enum": ["full", "summary"], "into": "parts"}, "expected_generation": {"type": "string", "checks": ["generation"], "into": "execution_generation"}}, "route": {"path": "/v1/sessions/{session}/info", "query": {"parts": {"from": "parts", "only": "summary"}}}}
     },
     {
       "op": "intents",
@@ -427,7 +427,7 @@
         {"body": ["expect", "key", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["expect", "key"]},
         {"body": ["key", "request", "session", "typed"], "path": "/v1/sessions/{session}/key", "local_body": ["key", "typed"]}
       ],
-      "decode": {"reply": "session_action", "fields": {"key": {"type": "string"}, "expect": {"type": "string", "checks": ["fingerprint"]}, "typed": {"type": "string"}}, "route": {"path": "/v1/sessions/{session}/key", "body": {"fields": {"key": {"from": "key"}, "expect": {"from": "expect"}, "typed": {"from": "typed"}}}}}
+      "decode": {"reply": "session_action", "fields": {"key": {"type": "string", "into": "key"}, "expect": {"type": "string", "checks": ["fingerprint"], "into": "expect"}, "typed": {"type": "string", "into": "typed"}}, "route": {"path": "/v1/sessions/{session}/key", "body": {"fields": {"key": {"from": "key"}, "expect": {"from": "expect"}, "typed": {"from": "typed"}}}}}
     },
     {
       "op": "machine-usage",
@@ -2172,7 +2172,7 @@
         {"body": ["id", "request", "session"], "path": "/v1/work/v2/images/{id}"},
         {"body": ["id", "request", "session", "size"], "path": "/v1/work/v2/images/{id}", "query": ["size"]}
       ],
-      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256}, "size": {"type": "string", "enum": ["thumb"]}}, "route": {"path": "/v1/work/v2/images/{id}", "query": {"size": {"from": "size"}}}}
+      "decode": {"reply": "machine", "fields": {"id": {"type": "string", "non_empty": true, "max_bytes": 256, "into": "id"}, "size": {"type": "string", "enum": ["thumb"]}}, "route": {"path": "/v1/work/v2/images/{id}", "query": {"size": {"from": "size"}}}}
     },
     {
       "op": "work.v2.image-create",

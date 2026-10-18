@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -93,7 +94,7 @@ func compareDecoders(o op, decode genDecoder, b body) string {
 	if !oldOK {
 		return ""
 	}
-	if got, want := planIdentity(newPlan), planIdentity(oldPlan); got != want {
+	if got, want := planIdentity(o, newPlan), planIdentity(o, oldPlan); got != want {
 		return fmt.Sprintf("identity: generated %s, hand-written %s", got, want)
 	}
 	var oldReq LocalRequest
@@ -106,9 +107,26 @@ func compareDecoders(o op, decode genDecoder, b body) string {
 	return ""
 }
 
-func planIdentity(p plan) string {
-	return fmt.Sprintf("session=%q name=%q request=%q target=%q generation=%q",
+// planIdentity is the answer identity, and every other plan field the
+// production code reads for o once the local request is built: a guard's
+// key, question and typed words, a shaped picture's id, an info read's parts
+// (the content read rail admits only full), a viewer event batch.
+func planIdentity(o op, p plan) string {
+	out := fmt.Sprintf("session=%q name=%q request=%q target=%q generation=%q",
 		p.session, p.name, p.request, p.target, p.executionGeneration)
+	if o.guard != nil {
+		out += fmt.Sprintf(" key=%q expect=%q typed=%q/%v", p.key, p.expect, p.typed, p.namesTyped)
+	}
+	if o.shape != nil {
+		out += fmt.Sprintf(" id=%q", p.id)
+	}
+	if o.name == "info" {
+		out += fmt.Sprintf(" parts=%q", p.parts)
+	}
+	if o.name == viewerEventsWord {
+		out += fmt.Sprintf(" document=%q", p.document)
+	}
+	return out
 }
 
 // describeRequest spells a local request so that two compare equal exactly
@@ -521,4 +539,57 @@ func TestTheEquivalenceTestSeesAChangedDecoder(t *testing.T) {
 	if handWrittenBodyKeys(t)["zzz_new"] {
 		t.Fatal("this package's source already spells zzz_new; pick a mutant key nothing spells")
 	}
+}
+
+// TestRecordHandWrittenGolden writes the golden from the hand-written
+// decoders, over the probe set above. Run once, before they are removed.
+func TestRecordHandWrittenGolden(t *testing.T) {
+	if os.Getenv("CLAWDLINE_RECORD_HAND_GOLDEN") != "1" {
+		t.Skip("set CLAWDLINE_RECORD_HAND_GOLDEN=1")
+	}
+	ops, err := cloudvocab.Operations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	universe := bodyKeyUniverse(t, ops)
+	_, compared := handWrittenLiterals(t)
+	examples := map[string]any{}
+	for _, row := range ops {
+		for key, value := range row.Example {
+			if _, ok := examples[key]; !ok {
+				examples[key] = value
+			}
+		}
+	}
+	cases := []goldenCase{}
+	for _, row := range ops {
+		if _, ok := generatedDecoders[row.Op]; !ok {
+			continue
+		}
+		o := catalog[row.Op]
+		hand := func(b body) (plan, LocalRequest, bool) {
+			p, ok := o.decode(b)
+			if !ok {
+				return plan{}, LocalRequest{}, false
+			}
+			var req LocalRequest
+			if o.route != nil {
+				req = o.route(p)
+			}
+			return p, req, true
+		}
+		seen := map[string]bool{}
+		for _, b := range decoderProbes(row, universe, examples, compared) {
+			c, err := goldenAnswer(o, hand, row.Op, b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if seen[string(c.Body)] {
+				continue
+			}
+			seen[string(c.Body)] = true
+			cases = append(cases, c)
+		}
+	}
+	writeDecoderGolden(t, cases)
 }

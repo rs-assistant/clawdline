@@ -114,6 +114,19 @@ const (
 	IntoTarget Into = "target"
 	// IntoExecutionGeneration is the execution the request is pinned to.
 	IntoExecutionGeneration Into = "execution_generation"
+
+	// The rest are the few values the answer side reads after the local
+	// request is built, so they travel in the plan beside it: a picture's
+	// id (named in its payload), an info read's parts (which the content
+	// read rail admits only in full), a menu answer's key, question and
+	// typed words (which its guard checks), and a viewer event batch (which
+	// is written here rather than routed).
+	IntoID       Into = "id"
+	IntoParts    Into = "parts"
+	IntoKey      Into = "key"
+	IntoExpect   Into = "expect"
+	IntoTyped    Into = "typed"
+	IntoDocument Into = "document"
 )
 
 // Checks is every named validator a Field may ask for, and what it holds a
@@ -377,7 +390,14 @@ func validateField(f Field, known func(string) bool) error {
 		return fmt.Errorf("same_as %s names no field", f.SameAs)
 	}
 	switch f.Into {
-	case "", IntoTarget, IntoExecutionGeneration:
+	case "", IntoTarget, IntoExecutionGeneration, IntoID, IntoParts, IntoKey, IntoExpect, IntoTyped:
+		if f.Into != "" && f.Type != TypeString {
+			return fmt.Errorf("a %s goes into %s, which holds a string", f.Type, f.Into)
+		}
+	case IntoDocument:
+		if f.Type != TypeObject {
+			return fmt.Errorf("a %s goes into %s, which holds an object", f.Type, f.Into)
+		}
 	default:
 		return fmt.Errorf("into %q", f.Into)
 	}
