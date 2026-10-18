@@ -1,0 +1,6587 @@
+[
+  {
+    "Register": "daemon",
+    "Name": "artifacts.drops",
+    "Class": "user_input",
+    "Unit": "bytes",
+    "Limit": 268435456,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/artifacts.MaxDropsBytes",
+      "internal/adapters/artifacts.DropsAgeLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "artifacts.drops_young",
+    "Class": "user_input",
+    "Unit": "rows",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": true,
+    "Sources": [
+      "internal/adapters/artifacts.DropsYoungLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "artifacts.image_bytes",
+    "Class": "user_input",
+    "Unit": "bytes",
+    "Limit": 67108864,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "artifacts.images",
+    "Class": "user_input",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "audit.security",
+    "Class": "security_audit",
+    "Unit": "bytes",
+    "Limit": 8388608,
+    "WarnAt": 0,
+    "AtLimit": "rotate",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "board.receipts",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "tool",
+    "Name": "build.disk_reserve_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 2147483648,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/capacity.MaxHeavyGoDiskReserveKiB"
+    ]
+  },
+  {
+    "Register": "tool",
+    "Name": "build.go_cache_bytes",
+    "Class": "cache",
+    "Unit": "bytes",
+    "Limit": 4294967296,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/capacity.MaxHeavyGoCacheKiB"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.assistant_quota",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/limits.quotaCacheLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.background_agents",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/subagents.MaximumCache"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.git_not_repo",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/git.NotRepoAgeLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.git_not_repo_rows",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/git.NotRepoRowsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.image_thumbs",
+    "Class": "cache",
+    "Unit": "bytes",
+    "Limit": 8388608,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.pinned_read",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 3,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.PinnedReadAgeLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.reclaim_summary",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 30,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.reclaimSummaryLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.session_activity",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.session_execution_memo",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.ExecutionMemoLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.session_inventory",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 120,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.LastGoodInventoryAgeLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.session_links",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.session_skills",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.source_answer",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 30,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.SourceAnswerAgeLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.terminal_screens",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.ScreenHeldLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cache.transcript_titles",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "callback.args",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.MaxCallbackArgs"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "callback.command_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.CallbackCommandLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "callback.output_bytes",
+    "Class": "observation",
+    "Unit": "bytes",
+    "Limit": 8388608,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.CallbackLogLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "callback.per_machine",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.MaxCallbacksPerMachine"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "callback.per_root",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.MaxCallbacksPerRoot"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "callback.tail_bytes",
+    "Class": "observation",
+    "Unit": "bytes",
+    "Limit": 8192,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.CallbackTailLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.header_read_diagnostic_rows",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 24,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.header_read_diagnostic_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 3600,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.peer_body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 524288,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/agenthandoff.MaxBodyBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.peer_discovery_reply",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "sender",
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.DiscoveryReplyLimit",
+      "internal/transport/cloud.(*Link).InspectPeer:chan(DiscoveryReplyLimit)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.peer_frame_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.PeerFrameBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.peer_grants",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/peerstore.GrantLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.peer_inbox",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/peerstore.InboxLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.peer_inbox_page",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/peerstore.InboxPageLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.peer_ingress",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.PeerIngressLimit",
+      "internal/transport/cloud.PeerAckIngressLimit",
+      "internal/transport/cloud.PeerTaskStartIngressLimit",
+      "internal/transport/cloud.PeerProbeIngressLimit",
+      "internal/transport/cloud.(*Link).runOnce:chan(PeerIngressLimit)",
+      "internal/transport/cloud.(*Link).runOnce:chan(PeerAckIngressLimit)",
+      "internal/transport/cloud.(*Link).runOnce:chan(PeerTaskStartIngressLimit)",
+      "internal/transport/cloud.(*Link).runOnce:chan(PeerProbeIngressLimit)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.peer_outbox",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/peerstore.OutboxLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.peer_pairs",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/peerstore.PairLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.relay_queue",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "cloud_status",
+      "log",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.(*Relay).start:chan(r.depth())"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.reload_stop_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 15,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "cmd/clawdline.startCloudLine.maxCloudReloadStopSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.roster_short_read_attempts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.RosterShortReadAttemptsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.session_row_asks",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.SessionRowAsksLimit",
+      "internal/transport/cloud.(*Publisher).open:chan(SessionRowAsksLimit)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.session_row_id_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/cloudops.SessionRowIDBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.session_row_volatile_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 15,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.SessionRowVolatileSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.spool",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 2000,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.spool_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16777216,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.spool_channel_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4194304,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.spool_receipts",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.spool_refusals",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.task_list_reread_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 240,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.TaskListRereadSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_connections",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalConnectionsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_ack_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 3,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectAckSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_candidates",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectCandidatesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_chunk_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "disconnect",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectChunkSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_gather_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 3,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectGatherSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_message_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 9437184,
+    "WarnAt": 0,
+    "AtLimit": "disconnect",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectMessageBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_negotiate_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectNegotiateSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_offers_per_minute",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 6,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectOffersPerMinuteLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_peers",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectPeersLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_probe_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectProbeSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_probe_unsettled_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectProbeUnsettledSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_direct_sdp_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalDirectSDPBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_early_frames",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_frame_heartbeat_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 3,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalFrameHeartbeatSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_history_capture_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4194304,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalHistoryCaptureBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_history_line_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalHistoryLineBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_history_receipt_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 8192,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalHistoryReceiptBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_ingress",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalIngressLimit",
+      "internal/transport/cloud.(*Link).runOnce:chan(CloudTerminalIngressLimit)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_key_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 600,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalKeySecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_list_ingress",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalListIngressLimit",
+      "internal/transport/cloud.(*Link).runOnce:chan(CloudTerminalListIngressLimit)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_list_retries",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_observation_rows",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalObservationRowsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_receipt_busy_retries",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 3,
+    "WarnAt": 0,
+    "AtLimit": "disconnect",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalReceiptBusyRetriesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_receipt_busy_retry_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalReceiptBusyRetrySecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_receipt_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 15,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalReceiptSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_receipts",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "limits §4.2 has an idempotency row refuse new requests rather than evict inside its window. Decided 2026-10-07: refusing here refused every key of a key held down past 12.8 s (40 a second against 512 in 15 s), while the bound exists only for memory and the viewer never resends a request id itself (cloud-terminal-wire.md); the oldest receipt, the least likely to be asked for again, goes instead, counted as Evicted and logged as stage receipt_evicted.",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalReceiptsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_refusals",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalRefusalsLimit",
+      "internal/transport/cloud.(*Link).runOnce:chan(CloudTerminalRefusalsLimit)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_request_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 6295552,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalRequestBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_revocation_retire_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 3,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalRevocationRetireSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_roster_deadline_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalRosterDeadlineLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_roster_refresh_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalRosterRefreshLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_roster_retry_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalRosterRetrySecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_sweep_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalSweepSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_unconfirmed_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 15,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalUnconfirmedSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_unverified_retire_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalUnverifiedRetireSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.terminal_viewer_connections",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.CloudTerminalViewerConnectionsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.viewer_events_batch_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 262144,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/cloudops.ViewerEventsBatchBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.viewer_events_line_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/cloudops.ViewerEventsLineBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.viewer_events_logged_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/cloudops.ViewerEventsLoggedRowsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.viewer_events_seen_batches",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/cloudops.ViewerEventsSeenBatchesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_live_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 90,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.opened_row_quiet_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.opened_row_restate_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.persona_retry_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.pinned_list_read_timeout_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.relay_feature_wait_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.relay_transcript_expect_reask_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.session_notes_safety_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.status_gap_retry_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.status_marker_recovery_wait_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.status_marker_retry_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.transcript_backoff_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 30,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.transcript_follow_fast_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.transcript_follow_later_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.transcript_follow_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 90,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.transcript_merged_rows",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 1000,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.transcript_safety_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 30,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "coordinator.aliases",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/coordinator.AliasLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "coordinator.bind_attempts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 6,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "cmd/clawdline.coordinatorBindAttemptLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "decisions.open",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.DecisionOpenLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "deploy.health_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 30,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/capacity.DeployHealthLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "devices.list",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/devices.storeLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "diagnostics.route_latency_samples",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaxRouteLatencySamples"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "diagnostics.route_stat_keys",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaxRouteStatKeys"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "dispatch.also_work_ids",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 7,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.MaxAlsoWorkIDs"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "epic.child_items",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/work.EpicChildLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "handoff.pack_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 33554432,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.MaxHandoffPackBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "handoff.patch_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 8388608,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.MaxHandoffPatchBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "handoff.worktrees",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.MaxHandoffWorktrees"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "icons.request_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 98304,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/icon.MaxIconRequestBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "icons.saved",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/icon.MaxIconOverrides"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "icons.side",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/icon.MaxIconSide"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "intent.cloud_wait_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 130,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.intentCloudWaitLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "intent.planner_queue",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.intentQueueLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "intent.planner_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 30,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.intentTimeLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "intent.request_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.intentLimit",
+      "internal/app/cloudops.intentTextLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "intent.stderr_bytes",
+    "Class": "observation",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/planner.stderrLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "iterm.osascript_kinds",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/terminal.osascriptKindsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "iterm.stall_cooldown_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 1800,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/terminal.stallCooldownLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "iterm.stall_diagnoses",
+    "Class": "diagnostic_log",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "rotate",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/terminal.stallDiagnosesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "iterm.stall_failures",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/terminal.stallFailuresLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "iterm.stall_said_bytes",
+    "Class": "observation",
+    "Unit": "bytes",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/terminal.saidLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "iterm.stall_section_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 524288,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/terminal.stallSectionLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "iterm.stall_step_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 30,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/terminal.stallStepLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "iterm.viewer_concurrent",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/tmuxview.viewerSlotLimit",
+      "internal/app/tmuxview.package:chan(viewerSlotLimit)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "iterm.viewer_open_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/tmuxview.viewerOpenLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "leases.queue",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.LeaseQueueLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "log.daemon",
+    "Class": "diagnostic_log",
+    "Unit": "bytes",
+    "Limit": 10485760,
+    "WarnAt": 0,
+    "AtLimit": "rotate",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/logs.maxSegments"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "memory.description_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/memory.DescriptionByteLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "memory.entries",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/memory.EntryCountLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "memory.entry_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/memory.EntryBodyLimit",
+      "internal/adapters/memory.entryFileReadLimit",
+      "internal/transport/http.memoryRequestBodyLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "memory.group_description_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/memory.GroupDescriptionByteLimit",
+      "internal/adapters/memory.groupsFileReadLimit",
+      "internal/transport/http.memoryGroupRequestBodyLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "memory.groups",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/memory.GroupCountLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "memory.name_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/memory.nameByteLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "naming.context_bytes",
+    "Class": "observation",
+    "Unit": "bytes",
+    "Limit": 12288,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.namingContextLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "naming.tail_entries",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 400,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.namingTailLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "notification.rule_label_characters",
+    "Class": "buffer",
+    "Unit": "characters",
+    "Limit": 80,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/notificationrule.MaximumLabelRunes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "notification.rule_wait_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 7200,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/notificationrule.MaxMinutes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "notification.rules_rows",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "health",
+      "sender"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/notificationrule.MaximumRules"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "orchestrator.opening_stuck_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 1800,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.OpeningStuckSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "personas.catalog",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/persona.MaxPersonas"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "personas.suggestion_context_bytes",
+    "Class": "observation",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.personaSuggestionContextLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "personas.text_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 8192,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/persona.MaxPersonaBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "places.git_config_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projects.MaxGitConfigBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "places.registered",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "places.repo_lookups",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 40,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projects.MaxRepoLookups"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "places.repo_readers",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projects.MaxRepoReaders",
+      "internal/adapters/projects.NewRepoLookup:chan(MaxRepoReaders)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "places.repo_wait_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projects.MaxRepoWaitSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "places.setup_age_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaxProjectSetupAgeSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "places.setup_lookups",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 40,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaxProjectSetupLookups"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "places.setup_readers",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaxProjectSetupReaders",
+      "internal/transport/http.newSetupLookup:chan(MaxProjectSetupReaders)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "places.setup_wait_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaxProjectSetupWaitSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "planreview.blocking_listed",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/work.PlanReviewBlockingListLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectfiles.file_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 131072,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projectfiles.MaxFileBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectfiles.list",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projectfiles.MaxFiles"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectfiles.scan_entries",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projectfiles.MaxScanEntries"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectfiles.skill_summary_runes",
+    "Class": "observation",
+    "Unit": "characters",
+    "Limit": 240,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projectfiles.MaxSkillSummaryRunes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectfiles.tree_depth",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projectfiles.MaxTreeDepth"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectfiles.tree_path_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projectfiles.MaxTreePathBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectfiles.write_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 262144,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projectfiles.MaxWriteBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projects.folder_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.maxProjectFolderRows"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectsync.clones",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projectsync.MaxCloneJobs"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectsync.entry_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4194304,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/projectsync.MaxEntryBytes",
+      "internal/app/cloudops.projectSyncCloudBodyLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectsync.file_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 262144,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/projectsync.MaxFileBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectsync.manifest_projects",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/projectsync.MaxManifestProjects"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectsync.mirrored",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/projectsync.MaxMirrorRecords"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectsync.path_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/projectsync.MaxPathBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "projectsync.project_files",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/projectsync.MaxProjectFiles"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "proposals.open",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 500,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.ProposalOpenLimit",
+      "internal/adapters/store.WorkV2ProposalLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "push.subscriptions",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/push.subscriptionsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.app_relist_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.AppRelistSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.app_swap_poll_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.AppSwapPollSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.apply_follow_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 1500,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "cmd/clawdline.applyFollowSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.archive_entries",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 20000,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.maxArchiveEntries"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.artifact_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 536870912,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.maxArtifactBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.auto_apply_retry_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 300,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.AutoApplyRetrySecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.backups_kept",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.BackupsKeptLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.boot_attempts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 3,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.BootAttemptsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.check_interval_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 21600,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.CheckIntervalSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.check_jitter_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 1800,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.CheckJitterSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.download_timeout_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 900,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.DownloadTimeoutSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.failed_versions",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.FailedVersionsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.fetch_timeout_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 30,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.FetchTimeoutSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.health_wait_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.HealthWaitSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.list_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.maxReleaseListBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.lock_stale_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 1800,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.LockStaleSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.manifest_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release.maxManifestBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.pending_deadline_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 600,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.PendingDeadlineSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.previous_releases_kept",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.PreviousReleasesKeptLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.signature_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release.maxSignatureBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.smoke_timeout_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 15,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.SmokeTimeoutSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.state_file_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.maxStateFileBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.supervisor_runs",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.SupervisorRunsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "release.unpacked_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 2147483648,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/release/updater.maxUnpackedBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "run.claimed_items",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.runClaimLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "run.created_items",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.runItemLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "schedule.run_transcript_head",
+    "Class": "observation",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projects.MaxChildTranscriptHead"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "schedule.run_transcripts_probed",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projects.MaxChildTranscriptsProbed"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "screens.capture_slots",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.ScreenCaptureLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.close_scheduled",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.maxScheduledCloses"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.close_scheduled_per_terminal",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.maxScheduledClosesPerTerminal"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.close_scheduled_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 900,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.maxScheduledCloseWait"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.direct_todo_bytes",
+    "Class": "evidence",
+    "Unit": "bytes",
+    "Limit": 8192,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.directTodoTextLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.direct_todos",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 500,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.DirectTodoV2Limit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.executions",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "health",
+      "sender",
+      "log"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.ExecutionRecordsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.human_intervention_detail_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.humanInterventionDetailLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.human_intervention_document_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 2048,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.humanInterventionDocumentLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.human_intervention_draft_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 2048,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.humanInterventionDraftLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.human_intervention_text_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 500,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.humanInterventionTextLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.human_intervention_title_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 120,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.humanInterventionTitleLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.human_interventions_open",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.HumanInterventionsOpenLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.human_interventions_recent",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.HumanInterventionsRecentLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.human_interventions_total",
+    "Class": "progress",
+    "Unit": "rows",
+    "Limit": 2000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.HumanInterventionsTotalLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.no_movement_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 1800,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/cloud.SessionNoMovementSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.report_open_todo_characters",
+    "Class": "buffer",
+    "Unit": "characters",
+    "Limit": 120,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.reportOpenTodoTextLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.report_open_todo_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.reportOpenTodoLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.secret_handoff_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.MaxSecretHandoffBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.secret_handoff_delivery_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.MaxSecretHandoffDeliverySeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.secret_handoff_pending",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.MaxSecretHandoffPending"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.secret_handoff_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 900,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.MaxSecretHandoffSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.title_age",
+    "Class": "user_input",
+    "Unit": "seconds",
+    "Limit": 7776000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.title_characters",
+    "Class": "buffer",
+    "Unit": "characters",
+    "Limit": 200,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.title_request_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.title_rows",
+    "Class": "user_input",
+    "Unit": "rows",
+    "Limit": 200,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.todo_batch_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.sessionTodoBatchLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "session.waiting_for",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.MaximumWaitTargets"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.activity_reads",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.ActivityReadLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.agent_rows",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 6,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/subagents.MaximumShown"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.archive_restore_batch",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.archiveBatchLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.archive_rows",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 500,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.archiveRowsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.restore_batch",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.restoreBatchLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.restore_boots",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.restoreBootsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.restore_grace",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 180,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.restoreGraceLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.restore_heartbeat",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.restoreBeatLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.restore_rows",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 200,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.restoreRowsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.restore_seen_age",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 300,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.restoreSeenLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sessions.shell_output_bytes",
+    "Class": "observation",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/transcript.MaxShellOutput"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "settings.request_body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.settingsRequestBodyLimit",
+      "internal/app/cloudops.defaultModelsCloudBodyLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "snippets.scope",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 50,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.SnippetScopeLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "snippets.total",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 100,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.SnippetTotalLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squad.MaxSquadBodyBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.console_active_skill_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 524288,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squad.MaxSquadConsoleActiveSkillBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.entities",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "health",
+      "sender"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squad.MaxSquadEntities"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.event_body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.maxSquadEventBodyBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.event_id_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.MaxSquadEventIDBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.event_page_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 100,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.MaxSquadEventPageRows"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.launch_skill_when_runes",
+    "Class": "observation",
+    "Unit": "characters",
+    "Limit": 240,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/squadfiles.maxSkillWhenRunes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.place_lookup",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squad.MaxSquadPlaceLookup"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.receipts",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 10000,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squad.MaxSquadReceipts"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.recovery_page_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.MaxSquadRecoveryRows"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.request_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 262144,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squad.MaxSquadRequestBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.settings_rows",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 10000,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "health",
+      "sender"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squad.MaxSquadSettingsRows"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.skill_source_summary_runes",
+    "Class": "observation",
+    "Unit": "characters",
+    "Limit": 240,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.maxSkillSourceSummaryRunes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squad.snapshot_bytes",
+    "Class": "evidence",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.MaxSquadSnapshotBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squadpackage.archive_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 524288,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squadpack.MaxArchiveBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squadpackage.entries",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squadpack.MaxEntries"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squadpackage.expanded_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4194304,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squadpack.MaxExpandedBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squadpackage.expansion_ratio",
+    "Class": "buffer",
+    "Unit": "multipliers",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squadpack.MaxExpansionRatio"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squadpackage.file_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squadpack.MaxFileBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squadpackage.manifest_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 131072,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squadpack.MaxManifestBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squadpackage.preview_age",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 900,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/squadpackages.MaxPreviewAgeSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squadpackage.preview_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/squadpackages.MaxPreviewRows"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "squadpackage.request_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/squadpack.MaxRequestBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "sse.screen_pending",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "disconnect",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "store.db",
+    "Class": "evidence",
+    "Unit": "bytes",
+    "Limit": 1073741824,
+    "WarnAt": 0,
+    "AtLimit": "none",
+    "Deviation": "limits §7.1: C1 only measures this row. Its class refuses new writes at the limit (limits §4.4 step 5, 507 storage_exhausted); nothing refuses yet, and ok:false on /v1/health is the only effect of full.",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "store.done_effect_retention_seconds",
+    "Class": "journal",
+    "Unit": "seconds",
+    "Limit": 604800,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.DoneEffectRetentionSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "store.events",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 150000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.EventAgeLimit",
+      "internal/adapters/store.EventKeepLimit",
+      "internal/adapters/store.EventPruneBatchLimit",
+      "internal/adapters/store.EventKeptAgeLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "store.read_connections",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.ReadConnectionsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "store.receipt_tombstone_retention_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 604800,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.ReceiptTombstoneRetentionSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "store.receipts",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.ReceiptLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "store.retention_prune_batch_rows",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 500,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.RetentionPruneBatchLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 6295552,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.terminalBodyLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.count",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/terminal.MaxTerminals"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.history_lines",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 2000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/terminal.MaxHistoryLines"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.input_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/terminal.MaxInputBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.lane",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/terminals.LaneLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.launch_line_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/terminal.MaxTypedLaunchBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.launch_scripts",
+    "Class": "work",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/terminal.MaxLaunchScripts"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.lease_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 30,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/terminals.MaxLeaseSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.paste_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/terminal.MaxPasteBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.streams",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/terminals.MaxStreams"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "terminal.viewers",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/terminals.MaxViewers"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "update.apply_body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.updateApplyBodyLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "update.build_body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/updatecheck.maxBuildBodyBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "update.fetch_timeout_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/updatecheck.FetchTimeoutSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "update.refresh_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 1800,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/updatecheck.RefreshSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "usage.work_cursor_queue",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "log"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.workCursorQueueLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "usage.work_cursor_rows",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 50000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.WorkCursorRowLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "usage.work_units_per_answer",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 500,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.workUnitAnswerLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "voice.model_download_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 574041195,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/whisper.ModelDownloadBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "waits.open",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app/orchestrator.WaitsOpenLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.assignments",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 4000,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.WorkV2AssignmentLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.completion_reason_bytes",
+    "Class": "evidence",
+    "Unit": "bytes",
+    "Limit": 8192,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.workV2CompletionReasonLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.digests",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 800,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.DigestKeepLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.documents_per_item",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.WorkV2DocumentLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.image_bytes",
+    "Class": "evidence",
+    "Unit": "bytes",
+    "Limit": 5242880,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.workV2ImageByteLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.image_bytes_per_item",
+    "Class": "evidence",
+    "Unit": "bytes",
+    "Limit": 15728640,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.WorkV2ImageItemLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.image_bytes_total",
+    "Class": "evidence",
+    "Unit": "bytes",
+    "Limit": 536870912,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.WorkV2ImageTotalLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.image_request_body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 18874368,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.workV2ImageBodyLimit",
+      "internal/app/cloudops.workV2CloudImageBodyLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.images_per_item",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 6,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.WorkV2ImageLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.item_description_bytes",
+    "Class": "evidence",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.workV2DescriptionLimit",
+      "cmd/clawdline.itemTextLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.item_title_bytes",
+    "Class": "evidence",
+    "Unit": "bytes",
+    "Limit": 240,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.workV2TitleLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.item_user_action_bytes",
+    "Class": "evidence",
+    "Unit": "bytes",
+    "Limit": 8192,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.workV2UserActionLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.list_page_rows",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 24,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/app.WorkV2ListPageLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.open",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 2000,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.WorkOpenLimit",
+      "internal/adapters/store.WorkV2OpenLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.planning",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 1000,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.WorkV2PlanningLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.request_body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 98304,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.workV2BodyLimit",
+      "internal/app/cloudops.workV2CloudBodyLimit",
+      "cmd/clawdline.todoInputLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.root_landings_per_item",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.WorkV2RootLandingLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work.steps_per_item",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.WorkV2StepLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_claims_per_round",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateClaimsPerRoundLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_due_rows_per_pass",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateDueRowsPerPassLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_evidence_artifact_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 2097152,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateEvidenceArtifactBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_evidence_artifacts_per_task",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateEvidenceArtifactsPerTaskLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_evidence_string_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 500,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateEvidenceStringBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_evidence_strings_per_claim",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateEvidenceStringsPerClaimLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_evidence_total_bytes_per_task",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 8388608,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateEvidenceTotalBytesPerTaskLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_owner_offline_grace_seconds",
+    "Class": "observation",
+    "Unit": "seconds",
+    "Limit": 900,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateOwnerOfflineGraceSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_recent_rounds_per_item_read",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateRecentRoundsPerItemReadLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_result_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateResultBytesLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_retry_backoff_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 300,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateRetryBackoffSecondsLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_round_details_per_item",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateRoundDetailsPerItemLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_round_details_per_store",
+    "Class": "evidence",
+    "Unit": "rows",
+    "Limit": 10000,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "notice",
+      "health"
+    ],
+    "EvictedBy": "person",
+    "Projects": true,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateRoundDetailsPerStoreLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "work_gate_tasks_per_round",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 2,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/contract.WorkGateTasksPerRoundLimit"
+    ]
+  }
+]
