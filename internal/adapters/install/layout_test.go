@@ -73,6 +73,15 @@ func TestStableServicePathIdentifiesTheActualBinaryAcrossSwitches(t *testing.T) 
 	l := NewLayout(t.TempDir(), t.TempDir())
 	unpack(t, l, "v0.10.0")
 	unpack(t, l, "v0.11.0")
+	for _, version := range []string{"v0.10.0", "v0.11.0"} {
+		dist := filepath.Join(l.ReleaseDir(version), "dist")
+		if err := os.MkdirAll(dist, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dist, "index.html"), []byte(version), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := l.SwitchCurrent("v0.10.0"); err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +90,13 @@ func TestStableServicePathIdentifiesTheActualBinaryAcrossSwitches(t *testing.T) 
 	}
 	if got, _ := l.ServiceRelease(l.ServiceBin); got != "v0.10.0" {
 		t.Fatalf("initial service: %s", got)
+	}
+	console := filepath.Join(filepath.Dir(l.ServiceBin), "dist")
+	if target, err := os.Readlink(console); err != nil || target != "../current/dist" {
+		t.Fatalf("service console link: %q, %v", target, err)
+	}
+	if body, err := os.ReadFile(filepath.Join(console, "index.html")); err != nil || string(body) != "v0.10.0" {
+		t.Fatalf("initial service console: %q, %v", body, err)
 	}
 	if err := l.SwitchCurrent("v0.11.0"); err != nil {
 		t.Fatal(err)
@@ -93,6 +109,9 @@ func TestStableServicePathIdentifiesTheActualBinaryAcrossSwitches(t *testing.T) 
 	}
 	if got, _ := l.ServiceRelease(l.ServiceBin); got != "v0.11.0" {
 		t.Fatalf("new service: %s", got)
+	}
+	if body, err := os.ReadFile(filepath.Join(console, "index.html")); err != nil || string(body) != "v0.11.0" {
+		t.Fatalf("updated service console: %q, %v", body, err)
 	}
 }
 

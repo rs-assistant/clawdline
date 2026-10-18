@@ -192,6 +192,21 @@ func (l Layout) InstallServiceBinary(name string) error {
 	if err := os.MkdirAll(filepath.Dir(l.ServiceBin), 0o755); err != nil {
 		return err
 	}
+	// The daemon discovers its console beside its executable. The stable
+	// service path needs the current release's dist/ there as well, including
+	// when an older updater switches to this release before it restarts.
+	console := filepath.Join(filepath.Dir(l.ServiceBin), "dist")
+	const consoleTarget = "../current/dist"
+	if err := os.Symlink(consoleTarget, console); err != nil && !errors.Is(err, os.ErrExist) {
+		return err
+	}
+	target, err := os.Readlink(console)
+	if err != nil {
+		return fmt.Errorf("service console path %s: %w", console, err)
+	}
+	if target != consoleTarget {
+		return fmt.Errorf("service console path %s links to %q, want %q", console, target, consoleTarget)
+	}
 	tmp := l.ServiceBin + ".new"
 	_ = os.Remove(tmp)
 	if err := os.Link(filepath.Join(l.ReleaseDir(name), "clawdline"), tmp); err != nil {
