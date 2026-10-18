@@ -46,8 +46,8 @@ if [ "$dev" = no ]; then
   ( umask 022; go test ./... )
   go vet ./...
 fi
-build_args=()
-if [ "$dev" = yes ]; then build_args=(-ldflags "-X main.releaseVersion=v0.0.0-dev.${commit:0:7}"); fi
+build_args=(-ldflags "-X main.releaseCommit=$commit")
+if [ "$dev" = yes ]; then build_args=(-ldflags "-X main.releaseVersion=v0.0.0-dev.${commit:0:7} -X main.releaseCommit=$commit"); fi
 CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build ${build_args[@]+"${build_args[@]}"} -buildvcs=true -o "$stage/clawdline" ./cmd/clawdline
 ( cd web && npm ci --ignore-scripts && { [ "$dev" = yes ] || npm run check; } && npm run build )
 cp -R web/console/dist "$stage/dist"
