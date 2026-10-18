@@ -63,6 +63,9 @@ type Status struct {
 	Commands bool `json:"commands"`
 	// TerminalDirect controls both Terminal and Session-read direct carriers.
 	TerminalDirect bool `json:"terminal_direct"`
+	// DirectLocalNetwork lets those carriers use private IPv4 addresses on
+	// the same network; off by default.
+	DirectLocalNetwork bool `json:"direct_local_network"`
 	// Configured is whether this machine has an identity and keys — that is,
 	// whether `clawdline cloud login` has ever completed here.
 	Configured bool `json:"configured"`
@@ -1421,18 +1424,19 @@ func (l *Link) SpoolRefusalReading() (capacity.Reading, bool) {
 func (l *Link) Status() Status {
 	l.mu.Lock()
 	out := Status{
-		Enabled:        l.settings.Enabled,
-		TerminalDirect: l.settings.TerminalDirect,
-		State:          l.state,
-		RelayURL:       l.settings.RelayURL,
-		APIBase:        l.settings.APIBase,
-		Account:        l.identity.AccountID,
-		MachineID:      l.identity.MachineID,
-		MachineName:    machineName(l.identity, l.settings, HostName(), runtime.GOOS),
-		Fingerprint:    l.fingerprint,
-		LastError:      l.lastErr,
-		Answered:       l.answered,
-		Refused:        l.refused,
+		Enabled:            l.settings.Enabled,
+		TerminalDirect:     l.settings.TerminalDirect,
+		DirectLocalNetwork: l.settings.DirectLocalNetwork,
+		State:              l.state,
+		RelayURL:           l.settings.RelayURL,
+		APIBase:            l.settings.APIBase,
+		Account:            l.identity.AccountID,
+		MachineID:          l.identity.MachineID,
+		MachineName:        machineName(l.identity, l.settings, HostName(), runtime.GOOS),
+		Fingerprint:        l.fingerprint,
+		LastError:          l.lastErr,
+		Answered:           l.answered,
+		Refused:            l.refused,
 	}
 	out.LastErrorKind = string(l.lastKind)
 	if !l.lastErrAt.IsZero() {

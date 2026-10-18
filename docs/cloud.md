@@ -78,7 +78,12 @@ The separate `cloud_terminal_direct` switch controls the WebRTC carrier for Term
 reads. It defaults on; `clawdline cloud direct on|off` or this machine's local Settings → Remote
 page changes it. The local-only `POST /v1/cloud/direct` route persists the choice and replaces the
 Cloud line so existing peers close and the relay remains available. A hosted browser cannot change
-this machine switch. An EC2 instance can additionally set `cloud_direct_udp_port` and
+this machine switch. Beside it, `cloud_direct_local_network` (default off; Settings → Remote while
+direct connections are on, `clawdline cloud direct local on|off`, or the local-only
+`POST /v1/cloud/direct/local-network`) lets the direct carrier use RFC 1918 IPv4 host addresses so a
+phone on the same network connects without hairpinning through the router; on macOS its first use
+shows the Local Network permission prompt once, and a denial leaves the public path or the relay
+([terminal-direct-path.md](terminal-direct-path.md)). An EC2 instance can additionally set `cloud_direct_udp_port` and
 `cloud_direct_public_ip` together to multiplex direct ICE on one inbound UDP port; see
 [Linux setup](linux.md#let-a-cloud-browser-connect-directly-to-ec2).
 

@@ -866,3 +866,112 @@ func TestDirectRekeyRefusesWithoutAnOpenChannel(t *testing.T) {
 		}
 	}
 }
+
+// Same-network direct connections (adaptercloud.KeyDirectLocalNetwork) widen
+// the filters by exactly one thing, RFC 1918 IPv4 host candidates, and only
+// while the setting is on. Off, the filters answer byte for byte what they
+// answered before the setting existed.
+func TestSameNetworkCandidatesFollowTheSetting(t *testing.T) {
+	// Built rather than written, as in TestDirectOfferRefusals.
+	home, office := net.IPv4(192, 168, 1, 20).String(), net.IPv4(10, 0, 0, 5).String()
+	linkLocal, lab := net.IPv4(169, 254, 1, 1).String(), net.IPv4(172, 16, 4, 4).String()
+	offer := strings.Join([]string{
+		"v=0",
+		"a=candidate:1 1 udp 1 127.0.0.1 5000 typ host",
+		"a=candidate:2 1 udp 1 " + linkLocal + " 5000 typ host",
+		"a=candidate:3 1 udp 1 0f1e2d3c.local 5000 typ host",
+		"a=candidate:4 1 udp 1 fd00::1 5000 typ host",
+		"a=candidate:5 1 udp 1 fe80::1 5000 typ host",
+		"a=candidate:6 1 udp 1 " + home + " 5000 typ host",
+		"a=candidate:7 1 udp 1 " + office + " 5001 typ host",
+		"a=candidate:8 1 udp 1 " + lab + " 5002 typ srflx raddr 0.0.0.0 rport 0",
+		"a=candidate:9 1 tcp 1 " + home + " 9 typ host tcptype active",
+		"a=candidate:10 1 udp 1 192.0.2.7 5000 typ srflx raddr 0.0.0.0 rport 0",
+		"a=end-of-candidates",
+	}, "\r\n")
+	answer := strings.Join([]string{
+		"v=0",
+		"a=candidate:1 1 udp 1 " + home + " 6000 typ host",
+		"a=candidate:2 1 udp 1 " + linkLocal + " 6000 typ host",
+		"a=candidate:3 1 udp 1 fd00::2 6000 typ host",
+		"a=candidate:4 1 udp 1 198.51.100.4 6000 typ srflx raddr " + home + " rport 6000",
+		"a=end-of-candidates",
+	}, "\r\n")
+	link := func(local bool) *Link {
+		return &Link{opts: LinkOptions{Now: time.Now}, settings: adaptercloud.Settings{TerminalDirect: true, DirectLocalNetwork: local}}
+	}
+
+	t.Run("off is what the filters always answered", func(t *testing.T) {
+		gotOffer, err := link(false).filterDirectOffer(offer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantOffer := "v=0\r\na=candidate:10 1 udp 1 192.0.2.7 5000 typ srflx raddr 0.0.0.0 rport 0\r\na=end-of-candidates"
+		if gotOffer != wantOffer {
+			t.Errorf("offer with the setting off:\n%q\nwant\n%q", gotOffer, wantOffer)
+		}
+		gotAnswer := link(false).filterDirectAnswer(answer)
+		wantAnswer := "v=0\r\na=candidate:4 1 udp 1 198.51.100.4 6000 typ srflx raddr " + home + " rport 6000\r\na=end-of-candidates"
+		if gotAnswer != wantAnswer {
+			t.Errorf("answer with the setting off:\n%q\nwant\n%q", gotAnswer, wantAnswer)
+		}
+	})
+
+	t.Run("on keeps RFC 1918 host candidates and nothing else new", func(t *testing.T) {
+		trace := newDirectTrace("conn-bbbbbbbbbbbbbbbbbbbb", false, time.Now)
+		gotOffer, err := link(true).filterDirectOfferTraced(offer, trace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantOffer := strings.Join([]string{
+			"v=0",
+			"a=candidate:6 1 udp 1 " + home + " 5000 typ host",
+			"a=candidate:7 1 udp 1 " + office + " 5001 typ host",
+			"a=candidate:10 1 udp 1 192.0.2.7 5000 typ srflx raddr 0.0.0.0 rport 0",
+			"a=end-of-candidates",
+		}, "\r\n")
+		if gotOffer != wantOffer {
+			t.Errorf("offer with the setting on:\n%q\nwant\n%q", gotOffer, wantOffer)
+		}
+		gotAnswer := link(true).filterDirectAnswerTraced(answer, trace)
+		wantAnswer := strings.Join([]string{
+			"v=0",
+			"a=candidate:1 1 udp 1 " + home + " 6000 typ host",
+			"a=candidate:4 1 udp 1 198.51.100.4 6000 typ srflx raddr " + home + " rport 6000",
+			"a=end-of-candidates",
+		}, "\r\n")
+		if gotAnswer != wantAnswer {
+			t.Errorf("answer with the setting on:\n%q\nwant\n%q", gotAnswer, wantAnswer)
+		}
+		// A kept private candidate is counted as kept, not as dropped; what
+		// is still dropped keeps its reason.
+		line := trace.line(false, true)
+		for _, want := range []string{
+			"offer=host/ipv4:2,srflx/ipv4:1",
+			"offer_dropped=name:host/mdns:1,private:host/ipv4:2,private:host/ipv6:2,private:srflx/ipv4:1,tcp:host/ipv4:1",
+			"answer_cands=host/ipv4:1,srflx/ipv4:1",
+			"answer_dropped=private:host/ipv4:1,private:host/ipv6:1",
+		} {
+			if !strings.Contains(line, want) {
+				t.Errorf("the trace lacks %q:\n%s", want, line)
+			}
+		}
+	})
+
+	t.Run("the rule itself", func(t *testing.T) {
+		for _, c := range []struct {
+			ip, typ string
+			want    bool
+		}{
+			{home, "host", true}, {office, "host", true}, {lab, "host", true},
+			{home, "srflx", false}, {home, "prflx", false}, {home, "", false},
+			{"127.0.0.1", "host", false}, {linkLocal, "host", false},
+			{"fd00::1", "host", false}, {"fe80::1", "host", false}, {"::1", "host", false},
+			{net.IPv4(224, 0, 0, 1).String(), "host", false}, {"192.0.2.7", "host", false},
+		} {
+			if got := directLocalNetworkAllowed(net.ParseIP(c.ip), c.typ); got != c.want {
+				t.Errorf("directLocalNetworkAllowed(%s, %q) = %v, want %v", c.ip, c.typ, got, c.want)
+			}
+		}
+	})
+}

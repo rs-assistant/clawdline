@@ -189,8 +189,26 @@ func directRemoteAllowed(ip net.IP) bool {
 	return directAddressAllowed(ip) && !ip.IsPrivate()
 }
 
+// directLocalNetworkAllowed is the one widening of directRemoteAllowed, and
+// only while the person has turned on same-network connections
+// (adaptercloud.KeyDirectLocalNetwork): a host candidate on a private IPv4
+// network (RFC 1918). Link-local, loopback and unique-local IPv6 stay out —
+// a phone on the same Wi-Fi reaches this machine on its RFC 1918 address, and
+// nothing found so far needs the others. Sending a check to one of these is
+// what makes macOS ask for Local Network access, once.
+func directLocalNetworkAllowed(ip net.IP, typ string) bool {
+	return typ == "host" && ip.To4() != nil && directAddressAllowed(ip) && ip.IsPrivate()
+}
+
+// directCandidateAllowed is the whole rule for one candidate this machine
+// would send to (an offer's) or tell the viewer about (its own answer's).
+func (l *Link) directCandidateAllowed(ip net.IP, typ string) bool {
+	return directRemoteAllowed(ip) || (l.directLoopback && ip.IsLoopback()) ||
+		(l.settings.DirectLocalNetwork && directLocalNetworkAllowed(ip, typ))
+}
+
 // filterDirectOffer keeps the offer's UDP candidates whose address passes
-// directRemoteAllowed — never an mDNS name, which would be resolved by a
+// directCandidateAllowed — never an mDNS name, which would be resolved by a
 // multicast query — and refuses an offer with more candidate lines than the
 // bound.
 func (l *Link) filterDirectOffer(sdp string) (string, error) {
@@ -225,7 +243,7 @@ func (l *Link) filterDirectOfferTraced(sdp string, trace *directTrace) (string, 
 			trace.offerCandidate(shape, "name")
 			continue
 		}
-		if !directRemoteAllowed(ip) && !(l.directLoopback && ip.IsLoopback()) {
+		if !l.directCandidateAllowed(ip, directCandidateTyp(fields)) {
 			trace.offerCandidate(shape, "private")
 			continue
 		}
@@ -233,6 +251,16 @@ func (l *Link) filterDirectOfferTraced(sdp string, trace *directTrace) (string, 
 		out = append(out, line)
 	}
 	return strings.Join(out, "\n"), nil
+}
+
+// directCandidateTyp is the `typ` of one candidate line's fields, or "".
+func directCandidateTyp(fields []string) string {
+	for i := 5; i+1 < len(fields); i++ {
+		if fields[i] == "typ" {
+			return fields[i+1]
+		}
+	}
+	return ""
 }
 
 // directDropReason names why a candidate line that is not a usable UDP line
@@ -249,7 +277,8 @@ func directDropReason(short bool, protocol string) string {
 
 // filterDirectAnswer leaves this machine's own private and link-local host
 // addresses out of the answer, so the viewer has no local address to send
-// to; the public address STUN found stays.
+// to; the public address STUN found stays. With same-network connections on,
+// the RFC 1918 IPv4 host addresses stay too (directLocalNetworkAllowed).
 func (l *Link) filterDirectAnswer(sdp string) string {
 	return l.filterDirectAnswerTraced(sdp, nil)
 }
@@ -266,7 +295,7 @@ func (l *Link) filterDirectAnswerTraced(sdp string, trace *directTrace) string {
 			_, shape := directCandidateShape(fields)
 			if len(fields) >= 5 {
 				ip := net.ParseIP(fields[4])
-				if ip == nil || (!directRemoteAllowed(ip) && !(l.directLoopback && ip.IsLoopback())) {
+				if ip == nil || !l.directCandidateAllowed(ip, directCandidateTyp(fields)) {
 					trace.answerCandidate(shape, "private")
 					continue
 				}

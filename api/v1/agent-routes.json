@@ -53,6 +53,11 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/cloud/direct/local-network",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/cloud/enabled",
       "guide": "cloud"
     },

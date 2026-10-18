@@ -51,6 +51,13 @@ const (
 	// use a direct data channel (docs/cloud-terminal-wire.md). Absent is on;
 	// false keeps both on the relay.
 	KeyTerminalDirect = "cloud_terminal_direct"
+	// KeyDirectLocalNetwork lets a direct connection use this machine's and
+	// the viewer's private IPv4 addresses (RFC 1918), so a phone on the same
+	// network connects without going out through the router. Absent is off:
+	// the first check sent to the local network makes macOS ask for Local
+	// Network access, and that prompt is the person's to invite
+	// (docs/terminal-direct-path.md).
+	KeyDirectLocalNetwork = "cloud_direct_local_network"
 	// KeyDirectUDPPort and KeyDirectPublicIP opt this machine into one shared
 	// ICE UDP listener. Both must be set; EC2's public IPv4 is not on its NIC.
 	KeyDirectUDPPort  = "cloud_direct_udp_port"
@@ -83,8 +90,11 @@ type Settings struct {
 	MachineName string
 	// TerminalDirect is KeyTerminalDirect, true unless the file says false.
 	TerminalDirect bool
-	DirectUDPPort  int
-	DirectPublicIP string
+	// DirectLocalNetwork is KeyDirectLocalNetwork, false unless the file says
+	// true.
+	DirectLocalNetwork bool
+	DirectUDPPort      int
+	DirectPublicIP     string
 }
 
 // ReadSettings answers what the settings file says now.
@@ -120,6 +130,13 @@ func ReadSettings(file *nextconfig.File) (Settings, error) {
 			return Settings{}, fmt.Errorf("%s must be true or false", KeyTerminalDirect)
 		}
 		settings.TerminalDirect = direct
+	}
+	if raw, ok := values.Raw[KeyDirectLocalNetwork]; ok {
+		var local bool
+		if err := json.Unmarshal(raw, &local); err != nil {
+			return Settings{}, fmt.Errorf("%s must be true or false", KeyDirectLocalNetwork)
+		}
+		settings.DirectLocalNetwork = local
 	}
 	if raw, ok := values.Raw[KeyDirectUDPPort]; ok {
 		if err := json.Unmarshal(raw, &settings.DirectUDPPort); err != nil || settings.DirectUDPPort < 1024 || settings.DirectUDPPort > 65535 {
@@ -180,6 +197,12 @@ func SetCommands(file *nextconfig.File, allowed bool) error {
 // SetTerminalDirect keeps the transport choice across daemon restarts.
 func SetTerminalDirect(file *nextconfig.File, enabled bool) error {
 	_, err := file.Set(map[string]any{KeyTerminalDirect: enabled})
+	return err
+}
+
+// SetDirectLocalNetwork keeps the same-network choice across daemon restarts.
+func SetDirectLocalNetwork(file *nextconfig.File, enabled bool) error {
+	_, err := file.Set(map[string]any{KeyDirectLocalNetwork: enabled})
 	return err
 }
 

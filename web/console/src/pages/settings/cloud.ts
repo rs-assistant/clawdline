@@ -59,6 +59,8 @@ export type CloudStatus = {
   enabled: boolean
   commands: boolean
   terminal_direct: boolean
+  /** Whether direct connections may use same-network addresses; absent from an older daemon. */
+  direct_local_network?: boolean
   configured: boolean
   /** off | idle | connected | reconnecting | stopped */
   state: string
@@ -172,6 +174,10 @@ export function setCloudCommands(enabled: boolean): Promise<{ commands: boolean 
 
 export function setCloudDirect(enabled: boolean): Promise<{ terminal_direct: boolean }> {
   return cloudCall("POST", "/v1/cloud/direct", { enabled })
+}
+
+export function setCloudDirectLocalNetwork(enabled: boolean): Promise<{ direct_local_network: boolean }> {
+  return cloudCall("POST", "/v1/cloud/direct/local-network", { enabled })
 }
 
 /** Show a fresh one-time link. Whatever was waiting is replaced. */

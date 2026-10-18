@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -28,7 +29,7 @@ func onboardingRequest(t *testing.T, s *Server, route func(http.ResponseWriter, 
 
 func TestCloudOnboardingSwitchesRequireTheMachineAndAnApprovedIdentity(t *testing.T) {
 	s := &Server{cfg: config.Config{Dir: t.TempDir()}}
-	for _, route := range []func(http.ResponseWriter, *http.Request){s.cloudLoginRoute, s.cloudEnabledRoute, s.cloudCommandsRoute, s.cloudDirectRoute} {
+	for _, route := range []func(http.ResponseWriter, *http.Request){s.cloudLoginRoute, s.cloudEnabledRoute, s.cloudCommandsRoute, s.cloudDirectRoute, s.cloudDirectLocalNetworkRoute} {
 		if rec := onboardingRequest(t, s, route, http.MethodPost, "/v1/cloud/anything", `{"enabled":true}`, false); rec.Code != http.StatusForbidden {
 			t.Fatalf("paired browser changed Cloud: %d %s", rec.Code, rec.Body)
 		}
@@ -90,6 +91,43 @@ func TestCloudDirectSwitchReloadsAnEnabledLineAndKeepsOtherSettings(t *testing.T
 	}
 }
 
+func TestCloudSameNetworkSwitchReloadsAnEnabledLineAndKeepsOtherSettings(t *testing.T) {
+	dir := t.TempDir()
+	file := nextconfig.Open(dir)
+	if _, err := file.Set(map[string]any{adaptercloud.KeyEnabled: true, adaptercloud.KeyCommands: true}); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{cfg: config.Config{Dir: dir}}
+	reloads := 0
+	s.SetCloudReload(func() error { reloads++; return nil })
+	if settings, err := adaptercloud.ReadSettings(file); err != nil || settings.DirectLocalNetwork {
+		t.Fatalf("same network on by default: %+v %v", settings, err)
+	}
+	for _, on := range []bool{true, false} {
+		body := `{"enabled":false}`
+		if on {
+			body = `{"enabled":true}`
+		}
+		rec := onboardingRequest(t, s, s.cloudDirectLocalNetworkRoute, http.MethodPost, "/v1/cloud/direct/local-network", body, true)
+		if rec.Code != http.StatusOK || rec.Body.String() != fmt.Sprintf("{\"direct_local_network\":%v}\n", on) {
+			t.Fatalf("same-network switch: %d %s", rec.Code, rec.Body)
+		}
+		settings, err := adaptercloud.ReadSettings(file)
+		if err != nil || settings.DirectLocalNetwork != on || !settings.Enabled || !settings.Commands || !settings.TerminalDirect {
+			t.Fatalf("same-network switch changed another setting: %+v %v", settings, err)
+		}
+	}
+	if reloads != 2 {
+		t.Fatalf("expected a live reload for each switch, got %d", reloads)
+	}
+	if rec := onboardingRequest(t, s, s.cloudDirectLocalNetworkRoute, http.MethodPost, "/v1/cloud/direct/local-network", `{"enabled":"yes"}`, true); rec.Code != http.StatusBadRequest {
+		t.Fatalf("malformed same-network switch: %d %s", rec.Code, rec.Body)
+	}
+	if rec := onboardingRequest(t, s, s.cloudDirectLocalNetworkRoute, http.MethodGet, "/v1/cloud/direct/local-network", "", true); rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("same-network switch by GET: %d %s", rec.Code, rec.Body)
+	}
+}
+
 func TestCloudOnboardingRoutesRejectPairedBrowsersThroughTheRealGate(t *testing.T) {
 	s, err := New(config.Config{Dir: filepath.Join(t.TempDir(), "next"), Port: 7757})
 	if err != nil {
@@ -100,7 +138,7 @@ func TestCloudOnboardingRoutesRejectPairedBrowsersThroughTheRealGate(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/v1/cloud/login", "/v1/cloud/enabled", "/v1/cloud/commands", "/v1/cloud/direct"} {
+	for _, path := range []string{"/v1/cloud/login", "/v1/cloud/enabled", "/v1/cloud/commands", "/v1/cloud/direct", "/v1/cloud/direct/local-network"} {
 		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:7757"+path, strings.NewReader(`{"enabled":true}`))
 		req.Header.Set("Authorization", "Bearer "+viewer)
 		req.Header.Set("Content-Type", "application/json")

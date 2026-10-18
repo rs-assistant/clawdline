@@ -98,14 +98,7 @@ func directCandidateShape(fields []string) (protocol, shape string) {
 	if len(fields) < 5 {
 		return "", "malformed/unknown"
 	}
-	typ := "unknown"
-	for i := 5; i+1 < len(fields); i++ {
-		if fields[i] == "typ" {
-			typ = directCandidateType(fields[i+1])
-			break
-		}
-	}
-	return strings.ToLower(fields[2]), typ + "/" + directAddressFamily(fields[4])
+	return strings.ToLower(fields[2]), directCandidateType(directCandidateTyp(fields)) + "/" + directAddressFamily(fields[4])
 }
 
 func directCandidateType(typ string) string {
