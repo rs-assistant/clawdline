@@ -73,10 +73,12 @@ keepSamePageLinksHere(window)
 // The gate is loaded only when declared, so the daemon's console does not
 // carry the relay client.
 const declared = import.meta.env.VITE_HOSTED_CONSOLE as string | undefined
-// `/admin` on the hosted build is Cloud's operations page, which stands apart
-// from the machine gate so an operator with no machine or relay still reaches
-// it (cloud/admin/AdminGate.tsx).
-const operations = location.pathname === "/admin" || location.pathname === "/admin/"
+// `/admin` and every address under it on the hosted build are Cloud's
+// operations pages, which stand apart from the machine gate so an operator
+// with no machine or relay still reaches them (cloud/admin/AdminGate.tsx). The
+// page itself decides which of its pages an address names, so a deep link and
+// Back and Forward all land on it (`adminRoute` in cloud/admin/words.ts).
+const operations = location.pathname === "/admin" || location.pathname.startsWith("/admin/")
 if (declared && operations) {
   void import("./cloud/admin/AdminGate.js").then(({ AdminGate }) =>
     // Session establishment registers a revocable viewer device. React's

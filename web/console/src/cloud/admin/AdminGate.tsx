@@ -3,14 +3,17 @@ import { chooseTransport, cloudViewerDeviceMetadata, newCloudSession, readCloudC
 import { DeviceLimitPanel } from "../DeviceLimitPanel.js"
 import { bootCatalog } from "../../catalog.js"
 import { catalogURL } from "../strings.js"
-import { AdminDashboard } from "./AdminDashboard.js"
+import { AccountsPage, OverviewPage, RouteLink, UsagePage, type Go } from "./AdminDashboard.js"
+import { PromoManagement } from "./PromoManagement.js"
 import { loadOverview, type Overview } from "./api.js"
-import { adminLocale, adminWords, type Say } from "./words.js"
+import { ADMIN_ROUTES, adminLocale, adminPath, adminRoute, adminWords, type AdminRoute, type Say } from "./words.js"
 import "./admin.css"
 
 /*
- * The hosted console's `/admin`: Cloud's operations overview, for the accounts
- * the API names superusers. It stands apart from `CloudGate` on purpose — an
+ * The hosted console's `/admin`: Cloud's operations console, for the accounts
+ * the API names superusers. Four pages — overview, accounts, promotions,
+ * usage — each at its own address under `/admin`, behind one sign-in; a
+ * sidebar on a desktop, a drawer behind a menu button on a phone. It stands apart from `CloudGate` on purpose — an
  * operator with no machine paired, or a relay that is down, still reaches it —
  * so it signs in through the same revocable cookie session and nothing else:
  * no relay, no pairing. Who may see the numbers is the API's decision, made on
@@ -57,7 +60,6 @@ export function AdminGate({ declared }: { declared: string }) {
   useEffect(() => {
     document.documentElement.lang = locale
     document.documentElement.dir = "ltr"
-    document.title = say("docTitle")
     document.documentElement.classList.remove("booting")
   }, [locale, say])
 
@@ -106,7 +108,8 @@ export function AdminGate({ declared }: { declared: string }) {
       config,
       deviceKind: device.kind,
       deviceName: device.name,
-      returnTo: config.appOrigin + "/admin",
+      // The sign-in comes back to the page it left, so a deep link survives it.
+      returnTo: config.appOrigin + (adminRoute(location.pathname) ? location.pathname + location.search : adminPath("overview")),
     })
     session.current = next
     let ensured: EnsuredSession
@@ -142,34 +145,263 @@ export function AdminGate({ declared }: { declared: string }) {
     void fetchOverview(phase.overview)
   }, [phase, start, fetchOverview])
 
+  // A mutation elsewhere changed the totals: read them again behind the page.
+  const latest = useRef(phase)
+  latest.current = phase
+  const reread = useCallback(() => {
+    const current = latest.current
+    if (current.kind !== "ready") return
+    setPhase({ ...current, refreshing: true })
+    void fetchOverview(current.overview)
+  }, [fetchOverview])
+
+  const { route, search, go, moved } = useAdminRoute()
   const consoleHref = config ? config.appOrigin + "/" : "/"
+  const navigable = phase.kind === "ready" || phase.kind === "loading"
+  const pageTitle = say(`nav_${route}`)
+
+  useEffect(() => {
+    document.title = navigable ? say("docTitlePage", { page: pageTitle }) : say("docTitle")
+  }, [navigable, pageTitle, say])
+
+  if (!navigable) {
+    return (
+      <div className="adm adm-plain">
+        <header className="adm-bar">
+          <div className="adm-bar-in">
+            <a className="adm-back" href={consoleHref}>
+              <span aria-hidden="true">←</span> {say("back")}
+            </a>
+            <div className="adm-heading">
+              <h1>{say("title")}</h1>
+              <p className="adm-sub">{say("subtitle")}</p>
+            </div>
+          </div>
+        </header>
+        <main className="adm-main" aria-live="polite" aria-busy={phase.kind === "checking"}>
+          <Body phase={phase} say={say} session={session.current} onRetry={start} catalogReady={catalogReady} />
+        </main>
+      </div>
+    )
+  }
 
   return (
-    <div className="adm">
-      <header className="adm-bar">
-        <div className="adm-bar-in">
+    <Shell route={route} go={go} say={say} consoleHref={consoleHref}
+      stampText={phase.kind === "ready" ? say("generated", { time: stamp(phase.overview.generated_at, locale) }) : null}
+      refreshing={phase.kind === "ready" && phase.refreshing} onRefresh={phase.kind === "ready" ? refresh : null}>
+      <PageHead route={route} say={say} moved={moved} />
+      {phase.kind === "loading" ? (
+        <Skeleton label={say("loading")} />
+      ) : (
+        <>
+          {phase.stale ? (
+            <p className="adm-stale" role="status">
+              {say("staleNote", { code: phase.stale.code, time: new Intl.DateTimeFormat(locale, { timeZone: "UTC", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(phase.overview.generated_at)) })}
+            </p>
+          ) : null}
+          {route === "overview" ? <OverviewPage overview={phase.overview} say={say} locale={locale} go={go} /> : null}
+          {route === "accounts" ? <AccountsPage overview={phase.overview} say={say} locale={locale} go={go} /> : null}
+          {route === "usage" ? <UsagePage overview={phase.overview} say={say} locale={locale} go={go} /> : null}
+          {route === "promotions" && config ? (
+            <PromoManagement overview={phase.overview} apiOrigin={config.apiOrigin} say={say} locale={locale}
+              search={search} go={go} onChanged={reread} onLostAccess={() => void start()} />
+          ) : null}
+        </>
+      )}
+    </Shell>
+  )
+}
+
+/* ---- where the page is ---------------------------------------------------- */
+
+/**
+ * The route from the address, kept in step with Back and Forward. `moved`
+ * counts the moves after the first draw, so the page heading takes the focus
+ * on a move and not on arrival.
+ */
+function useAdminRoute() {
+  const read = () => ({ route: adminRoute(location.pathname), search: location.search })
+  const [where, setWhere] = useState(read)
+  const [moved, setMoved] = useState(0)
+
+  useEffect(() => {
+    // An address under /admin that names no page opens the overview in its place.
+    if (where.route === null) {
+      history.replaceState(history.state, "", adminPath("overview"))
+      setWhere(read())
+    }
+    const onPop = () => {
+      setWhere(read())
+      setMoved((m) => m + 1)
+    }
+    addEventListener("popstate", onPop)
+    return () => removeEventListener("popstate", onPop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const go = useCallback((href: string) => {
+    const target = new URL(href, location.href)
+    if (target.pathname + target.search === location.pathname + location.search) return
+    history.pushState(null, "", target.pathname + target.search)
+    setWhere(read())
+    setMoved((m) => m + 1)
+    scrollTo({ top: 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return { route: where.route ?? "overview", search: where.search, go, moved }
+}
+
+function useNarrow(): boolean {
+  const query = "(max-width: 899px)"
+  const [narrow, setNarrow] = useState(() => matchMedia(query).matches)
+  useEffect(() => {
+    const list = matchMedia(query)
+    const on = () => setNarrow(list.matches)
+    list.addEventListener("change", on)
+    return () => list.removeEventListener("change", on)
+  }, [])
+  return narrow
+}
+
+function PageHead({ route, say, moved }: { route: AdminRoute; say: Say; moved: number }) {
+  const heading = useRef<HTMLHeadingElement>(null)
+  // A move inside the page is announced by putting the focus on its heading,
+  // which a screen reader reads, and from where Tab continues into the page.
+  useEffect(() => {
+    if (moved > 0) heading.current?.focus({ preventScroll: true })
+  }, [moved, route])
+  return (
+    <header className="adm-pagehead">
+      <h1 ref={heading} tabIndex={-1}>{say(`nav_${route}`)}</h1>
+      <p className="adm-sub">{say(`lead_${route}`)}</p>
+    </header>
+  )
+}
+
+function Shell({ route, go, say, consoleHref, stampText, refreshing, onRefresh, children }: {
+  route: AdminRoute
+  go: Go
+  say: Say
+  consoleHref: string
+  stampText: string | null
+  refreshing: boolean
+  onRefresh: (() => void) | null
+  children: React.ReactNode
+}) {
+  const narrow = useNarrow()
+  const [open, setOpen] = useState(false)
+  const drawer = useRef<HTMLElement>(null)
+  const menu = useRef<HTMLButtonElement>(null)
+  const closeButton = useRef<HTMLButtonElement>(null)
+  const drawerOpen = narrow && open
+
+  const close = useCallback((restore: boolean) => {
+    setOpen(false)
+    if (restore) requestAnimationFrame(() => menu.current?.focus())
+  }, [])
+
+  useEffect(() => {
+    if (!narrow) setOpen(false)
+  }, [narrow])
+
+  useEffect(() => {
+    if (!drawerOpen) return
+    const before = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    const current = drawer.current?.querySelector<HTMLElement>('[aria-current="page"]')
+    ;(current ?? closeButton.current)?.focus()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        close(true)
+        return
+      }
+      if (event.key !== "Tab" || !drawer.current) return
+      // The rest of the page is inert while the drawer is open; Tab cycles in it.
+      const items = [...drawer.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled])")]
+      if (!items.length) return
+      const first = items[0]
+      const last = items[items.length - 1]
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+    }
+    document.addEventListener("keydown", onKey)
+    return () => {
+      document.body.style.overflow = before
+      document.removeEventListener("keydown", onKey)
+    }
+  }, [drawerOpen, close])
+
+  const follow: Go = useCallback((href: string) => {
+    // Choosing a page closes the drawer; the page heading then takes the focus.
+    setOpen(false)
+    go(href)
+  }, [go])
+
+  return (
+    <div className={drawerOpen ? "adm adm-shell adm-drawer-open" : "adm adm-shell"}>
+      <a className="adm-skip" href="#adm-main">{say("skipToContent")}</a>
+      <header className="adm-top" inert={drawerOpen || undefined}>
+        <button ref={menu} type="button" className="adm-menu" aria-expanded={drawerOpen} aria-controls="adm-side" onClick={() => setOpen(true)}>
+          <span className="adm-menu-icon" aria-hidden="true"><span /><span /><span /></span>
+          <span className="adm-visually-hidden">{say("menuOpen")}</span>
+        </button>
+        <p className="adm-top-title"><span className="adm-top-brand">{say("title")}</span><span aria-hidden="true"> / </span>{say(`nav_${route}`)}</p>
+        {onRefresh ? (
+          <button type="button" className="adm-btn adm-btn-quiet adm-btn-small" onClick={onRefresh} disabled={refreshing} aria-busy={refreshing}>
+            {refreshing ? say("refreshing") : say("refresh")}
+          </button>
+        ) : null}
+      </header>
+      {drawerOpen ? <div className="adm-scrim" aria-hidden="true" onClick={() => close(true)} /> : null}
+      <aside id="adm-side" ref={drawer} className="adm-side"
+        role={narrow ? "dialog" : undefined} aria-modal={drawerOpen || undefined} aria-label={narrow ? say("menuLabel") : undefined}
+        aria-hidden={narrow && !open ? true : undefined}>
+        <div className="adm-brand">
+          <span className="adm-brand-mark" aria-hidden="true" />
+          <span className="adm-brand-text">
+            <span className="adm-brand-name">Clawdline Cloud</span>
+            <span className="adm-brand-sub">{say("title")}</span>
+          </span>
+          {narrow ? (
+            <button ref={closeButton} type="button" className="adm-close" onClick={() => close(true)}>
+              <span aria-hidden="true">×</span><span className="adm-visually-hidden">{say("menuClose")}</span>
+            </button>
+          ) : null}
+        </div>
+        <nav className="adm-nav" aria-label={say("navLabel")}>
+          <ul>
+            {ADMIN_ROUTES.map((r) => (
+              <li key={r}>
+                <RouteLink href={adminPath(r)} go={follow} className={r === route ? "adm-nav-link adm-nav-on" : "adm-nav-link"} current={r === route}>
+                  <span className={"adm-nav-icon adm-nav-icon-" + r} aria-hidden="true" />
+                  <span className="adm-nav-text">
+                    <span className="adm-nav-label">{say(`nav_${r}`)}</span>
+                    <span className="adm-nav-hint">{say(`hint_${r}`)}</span>
+                  </span>
+                </RouteLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        <div className="adm-side-foot">
+          {stampText ? <p className="adm-stamp">{stampText}</p> : null}
+          {onRefresh && !narrow ? (
+            <button type="button" className="adm-btn adm-btn-quiet adm-btn-block" onClick={onRefresh} disabled={refreshing} aria-busy={refreshing}>
+              {refreshing ? say("refreshing") : say("refresh")}
+            </button>
+          ) : null}
           <a className="adm-back" href={consoleHref}>
             <span aria-hidden="true">←</span> {say("back")}
           </a>
-          <div className="adm-heading">
-            <h1>{say("title")}</h1>
-            <p className="adm-sub">{say("subtitle")}</p>
-          </div>
-          {phase.kind === "ready" ? (
-            <div className="adm-actions">
-              <p className="adm-stamp">
-                {say("generated", { time: stamp(phase.overview.generated_at, locale) })}
-              </p>
-              <button type="button" className="adm-btn" onClick={refresh} disabled={phase.refreshing} aria-busy={phase.refreshing}>
-                {phase.refreshing ? say("refreshing") : say("refresh")}
-              </button>
-            </div>
-          ) : null}
         </div>
-      </header>
-      <main className="adm-main" aria-live="polite" aria-busy={phase.kind === "checking" || phase.kind === "loading"}>
-        <Body phase={phase} say={say} locale={locale} session={session.current} onRetry={start} catalogReady={catalogReady} />
-      </main>
+      </aside>
+      <div className="adm-content" inert={drawerOpen || undefined}>
+        <main id="adm-main" className="adm-main" tabIndex={-1}>
+          {children}
+        </main>
+      </div>
     </div>
   )
 }
@@ -180,10 +412,9 @@ function stamp(iso: string, locale: string): string {
   }).format(new Date(iso))
 }
 
-function Body({ phase, say, locale, session, onRetry, catalogReady }: {
+function Body({ phase, say, session, onRetry, catalogReady }: {
   phase: Phase
   say: Say
-  locale: string
   session: SessionHandle | null
   onRetry: () => void
   catalogReady: boolean
@@ -226,7 +457,8 @@ function Body({ phase, say, locale, session, onRetry, catalogReady }: {
         </Notice>
       )
     case "ready":
-      return <AdminDashboard overview={phase.overview} say={say} locale={locale} stale={phase.stale} />
+      // Drawn by the shell instead.
+      return null
   }
 }
 
