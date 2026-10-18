@@ -366,36 +366,52 @@ export function DailyChart({ title, days, say, locale, tall = false }: { title: 
   }
   const total = days.reduce((s, d) => s + d.count, 0)
   const peak = days.reduce((best, d) => (d.count > best.count ? d : best), days[0])
+  const tied = days.filter((d) => d.count === peak.count).length
   const max = Math.max(1, peak.count)
   const from = shortDay(days[0].day, locale)
   const to = shortDay(days[days.length - 1].day, locale)
-  const summary = say("chartSummary", { total: n.format(total), days: days.length, peakDay: shortDay(peak.day, locale), peak: n.format(peak.count) })
-  // A fixed drawing box scaled to the panel's width; the bars keep a gap of a
-  // fifth of their slot so 30 of them stay distinct at 375 px.
-  const W = 300
-  const H = 96
-  const slot = W / days.length
-  const bar = slot * 0.72
+  const summary = say(total === 0 ? "chartSummaryZero" : tied > 1 ? "chartSummaryTie" : "chartSummary", {
+    total: n.format(total), days: days.length, peakDay: shortDay(peak.day, locale), peak: n.format(peak.count), tied: n.format(tied),
+  })
+  // Fixed coordinates keep the daily points evenly spaced at desktop and phone
+  // widths. The seven-day line starts only when seven complete days exist.
+  const W = 600
+  const H = 150
+  const left = 6
+  const right = W - 6
+  const top = 18
+  const bottom = H - 8
+  const x = (i: number) => days.length === 1 ? W / 2 : left + i * (right - left) / (days.length - 1)
+  const y = (count: number) => bottom - count / max * (bottom - top)
+  const dailyPoints = days.map((d, i) => `${x(i)},${y(d.count)}`).join(" ")
+  const average = days.map((_, i) => i < 6 ? null : days.slice(i - 6, i + 1).reduce((sum, d) => sum + d.count, 0) / 7)
+  const averagePoints = average.flatMap((value, i) => value === null ? [] : [`${x(i)},${y(value)}`]).join(" ")
+  const hasAverage = days.length >= 7 && total > 0
+  const area = `${left},${bottom} ${dailyPoints} ${right},${bottom}`
   return (
     <figure className="adm-panel adm-chart" aria-labelledby={id + "t"} aria-describedby={id + "s"}>
       <figcaption className="adm-chart-head">
         <span id={id + "t"} className="adm-chart-title">{title}</span>
         <span className="adm-chart-range">{say("chartRange", { from, to })}</span>
       </figcaption>
+      <div className="adm-chart-legend" aria-label={say("chartLegend")}>
+        <span><i className="adm-legend-daily" aria-hidden="true" />{say("chartDaily")}</span>
+        {hasAverage ? <span><i className="adm-legend-average" aria-hidden="true" />{say("chartAverage")}</span> : null}
+      </div>
       <div className="adm-chart-body">
         <span className="adm-chart-max" aria-hidden="true">{n.format(peak.count)}</span>
         <svg className={tall ? "adm-svg adm-svg-tall" : "adm-svg"} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label={`${title}. ${summary}`}>
-          <line x1="0" x2={W} y1={H - 0.5} y2={H - 0.5} className="adm-axis" />
-          <line x1="0" x2={W} y1={5.5} y2={5.5} className="adm-axis adm-axis-top" />
-          {days.map((d, i) => {
-            const h = d.count === 0 ? 0 : Math.max(2, (d.count / max) * (H - 6))
-            return (
-              <rect key={d.day} x={i * slot + (slot - bar) / 2} y={H - 1 - h} width={bar} height={h} rx="1"
-                className={d === peak && d.count > 0 ? "adm-bar adm-bar-peak" : "adm-bar"}>
-                <title>{`${shortDay(d.day, locale)}: ${n.format(d.count)}`}</title>
-              </rect>
-            )
-          })}
+          <line x1="0" x2={W} y1={bottom} y2={bottom} className="adm-axis" />
+          <line x1="0" x2={W} y1={top} y2={top} className="adm-axis adm-axis-top" />
+          {total > 0 ? <polygon points={area} className="adm-line-area" /> : null}
+          <polyline points={dailyPoints} className={total > 0 ? "adm-line-daily" : "adm-line-zero"} />
+          {hasAverage ? <polyline points={averagePoints} className="adm-line-average" /> : null}
+          {total > 0 ? days.map((d, i) => (
+            <circle key={d.day} cx={x(i)} cy={y(d.count)} r={d.count === peak.count && d.count > 0 ? 3.6 : 2.3}
+              className={d.count === peak.count && d.count > 0 ? "adm-line-point adm-line-peak" : "adm-line-point"}>
+              <title>{`${shortDay(d.day, locale)}: ${n.format(d.count)}`}</title>
+            </circle>
+          )) : null}
         </svg>
       </div>
       <div className="adm-chart-scale" aria-hidden="true">
