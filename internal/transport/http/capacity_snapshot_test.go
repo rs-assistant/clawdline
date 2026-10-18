@@ -15,7 +15,9 @@ import (
 var update = flag.Bool("update", false, "rewrite testdata/capacity_measures.golden.json from capacityMeasures")
 
 // measureShape is what one measure answers on a fresh directory, without its
-// live numbers or its words: which fields of the reading it fills.
+// live numbers or its words: which fields of the reading it fills. Used,
+// OldestAt and the counters are left out: whether they are zero is a live
+// number too, and some come from caches this package's other tests fill.
 type measureShape struct {
 	Name string
 	// HostDependent is a measure that reads this machine rather than the
@@ -24,11 +26,8 @@ type measureShape struct {
 	Known           bool `json:",omitempty"`
 	Err             bool `json:",omitempty"`
 	Note            bool `json:",omitempty"`
-	Used            bool `json:",omitempty"`
-	OldestAt        bool `json:",omitempty"`
 	HasDiskFree     bool `json:",omitempty"`
 	WindowSeconds   bool `json:",omitempty"`
-	Counters        bool `json:",omitempty"`
 	DurableCounters bool `json:",omitempty"`
 	Failing         bool `json:",omitempty"`
 }
@@ -51,11 +50,8 @@ func renderMeasures(t *testing.T) []byte {
 		r := m()
 		shapes = append(shapes, measureShape{
 			Name: name, Known: r.Known, Err: r.Err != "", Note: r.Note != "",
-			Used:            r.Used != 0,
-			OldestAt:        !r.OldestAt.IsZero(),
 			HasDiskFree:     r.HasDiskFree,
 			WindowSeconds:   r.WindowSeconds != 0,
-			Counters:        r.Counters != (capacity.Counters{}),
 			DurableCounters: r.DurableCounters,
 			Failing:         r.Failing,
 		})

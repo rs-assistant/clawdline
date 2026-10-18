@@ -22,8 +22,7 @@
   },
   {
     "Name": "audit.security",
-    "Known": true,
-    "Used": true
+    "Known": true
   },
   {
     "Name": "board.receipts",
@@ -546,8 +545,7 @@
   },
   {
     "Name": "devices.list",
-    "Known": true,
-    "Used": true
+    "Known": true
   },
   {
     "Name": "diagnostics.route_latency_samples",
@@ -733,8 +731,7 @@
   {
     "Name": "personas.catalog",
     "Known": true,
-    "Note": true,
-    "Used": true
+    "Note": true
   },
   {
     "Name": "personas.suggestion_context_bytes",
@@ -744,8 +741,7 @@
   {
     "Name": "personas.text_bytes",
     "Known": true,
-    "Note": true,
-    "Used": true
+    "Note": true
   },
   {
     "Name": "places.git_config_bytes",
@@ -1212,13 +1208,11 @@
   {
     "Name": "snippets.scope",
     "Known": true,
-    "Note": true,
-    "Used": true
+    "Note": true
   },
   {
     "Name": "snippets.total",
-    "Known": true,
-    "Used": true
+    "Known": true
   },
   {
     "Name": "squad.body_bytes",
@@ -1339,7 +1333,6 @@
   {
     "Name": "store.db",
     "Known": true,
-    "Used": true,
     "HasDiskFree": true
   },
   {
