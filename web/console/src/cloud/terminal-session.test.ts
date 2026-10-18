@@ -600,7 +600,7 @@ test("an omitted zero input watermark keeps a renewed idle lease typable", async
     assert.equal(session.snapshot.canType, true)
     ;(session as unknown as { lastRenew: number }).lastRenew = Date.now() - 11_000
     ;(session as unknown as { checkFreshness(): void }).checkFreshness()
-    assert.equal((session as unknown as { renewing: boolean }).renewing, true, "the renewal is out")
+    assert.equal((session as unknown as { renewing: number }).renewing, 1, "the renewal is out")
     await until(() => !(session as unknown as { renewing: boolean }).renewing)
     assert.equal(session.snapshot.canType, true)
   } finally { session.dispose() }
@@ -1322,3 +1322,71 @@ test("an activation the machine refuses is not asked again on every frame; a fre
     assert.equal(wire.channels.has(direct), false, "the refused connection is let go")
   } finally { session.dispose() }
 })
+
+type RenewalInternals = { lastRenew: number; leaseConfirmedAt: number; renewing: number; carrier: string
+  checkFreshness(): void; directClosing(): void; directFailed(terminal: string): number }
+const renewals = (wire: Wire) => wire.requests.filter((request) => (request.body as { action?: string } | undefined)?.action === "renew").length
+
+test("a renewal lost on a DC is given up after four seconds and the connection goes back to the relay", async (t) => {
+  // 2026-10-18 19:45–19:46: renewals sent on a failing DC waited ten seconds each and the lease lapsed.
+  const wire = new Wire()
+  const session = new CloudTerminalSession(wire, "stable-tab")
+  const inner = session as unknown as RenewalInternals
+  try {
+    await session.start(); await session.attach(terminalID); await session.acquire("acquire")
+    wire.frame(wire.latest(), 1, "screen")
+    let fellBack = 0
+    inner.directClosing = () => { fellBack++ }
+    inner.carrier = "direct"
+    wire.delayed.add("control")
+    t.mock.timers.enable({ apis: ["setTimeout"] })
+    inner.lastRenew = Date.now() - 11_000
+    inner.checkFreshness()
+    assert.equal(inner.renewing, 1)
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
+    t.mock.timers.tick(3_999)
+    assert.equal(fellBack, 0, "not before four seconds")
+    t.mock.timers.tick(1)
+    assert.equal(fellBack, 1, "the DC is given up with the renewal")
+    await until(() => inner.renewing === 0)
+  } finally { t.mock.timers.reset(); session.dispose() }
+})
+
+test("a lease running short under an unanswered renewal sends one more renewal, and no third", async () => {
+  const wire = new Wire()
+  const session = new CloudTerminalSession(wire, "stable-tab")
+  const inner = session as unknown as RenewalInternals
+  try {
+    await session.start(); await session.attach(terminalID); await session.acquire("acquire")
+    wire.frame(wire.latest(), 1, "screen")
+    wire.delayed.add("control")
+    inner.lastRenew = Date.now() - 11_000
+    inner.checkFreshness()
+    assert.equal(renewals(wire), 1)
+    // Ten seconds of lease left would still be a wait with the first renewal out; fourteen left is not.
+    inner.leaseConfirmedAt = Date.now() - 14_000
+    inner.lastRenew = Date.now() - 3_000
+    inner.checkFreshness()
+    assert.equal(renewals(wire), 1, "sixteen seconds left: the first renewal is still waited for")
+    inner.leaseConfirmedAt = Date.now() - 16_000
+    inner.checkFreshness()
+    assert.equal(renewals(wire), 2, "under fifteen seconds left: a second renewal goes out")
+    inner.lastRenew = Date.now() - 3_000
+    inner.checkFreshness()
+    assert.equal(renewals(wire), 2, "never a third while two are out")
+    wire.replies.splice(0).forEach((reply) => reply())
+    await until(() => inner.renewing === 0)
+    assert.equal(session.snapshot.canType, true)
+  } finally { session.dispose() }
+})
+
+test("a terminal whose direct path failed twice in a row stays on the relay for five minutes", () => {
+  const session = new CloudTerminalSession(new Wire(), "stable-tab")
+  const inner = session as unknown as RenewalInternals
+  try {
+    assert.equal(inner.directFailed(terminalID), 30_000)
+    assert.equal(inner.directFailed(terminalID), 5 * 60_000)
+    assert.equal(inner.directFailed("trm_other"), 30_000, "counted per terminal")
+  } finally { session.dispose() }
+})
+

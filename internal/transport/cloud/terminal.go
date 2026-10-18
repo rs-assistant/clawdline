@@ -663,6 +663,7 @@ func (l *Link) refuseTerminalBusy(ctx context.Context, in Inbound) {
 	if err != nil {
 		return
 	}
+	l.logTerminalBusy(in.Sender, req.Operation, "the terminal lanes are full")
 	c := l.getTerminalConnection(in.Sender, req.Connection)
 	if c == nil && (req.Operation == "open_connection" || req.Operation == "rekey_connection") {
 		key, err := parseConnectionKey(req)
@@ -811,6 +812,7 @@ func (l *Link) handleTerminal(ctx context.Context, in Inbound) {
 	}
 	if err := svc.Allow(p); terminals.Unverified(err) {
 		// Cannot tell right now: a retryable refusal, and the connection stays.
+		l.logTerminalBusy(c.viewer, req.Operation, "access unverified: "+err.Error())
 		l.sendTerminalReceipt(ctx, c, terminalReceipt{V: 1, Type: "terminal_receipt", RequestID: req.RequestID,
 			Connection: req.Connection, Operation: req.Operation, TerminalID: req.TerminalID,
 			Status: "refused", Error: string(terminal.CodeBusy)})
@@ -863,6 +865,7 @@ func (l *Link) handleTerminal(ctx context.Context, in Inbound) {
 	}
 	if c.pendingReceipts[req.RequestID] {
 		l.terminalMu.Unlock()
+		l.logTerminalBusy(c.viewer, req.Operation, "the same request is still being answered")
 		busy, _ := json.Marshal(terminalReceipt{V: 1, Type: "terminal_receipt", RequestID: req.RequestID,
 			Connection: req.Connection, Operation: req.Operation, TerminalID: req.TerminalID,
 			Status: "refused", Error: string(terminal.CodeBusy)})
@@ -888,6 +891,9 @@ func (l *Link) handleTerminal(ctx context.Context, in Inbound) {
 			code = terminal.CodeUnreachable
 		}
 		receipt.Status, receipt.Error, receipt.Result, receipt.reason = "refused", string(code), nil, stageReasonOf(err)
+		if code == terminal.CodeBusy {
+			l.logTerminalBusy(c.viewer, req.Operation, err.Error())
+		}
 		if code == terminal.CodeInputStateUnknown {
 			receipt.Status = "unknown"
 		}
@@ -968,12 +974,13 @@ func (l *Link) openTerminalConnection(ctx context.Context, svc *terminals.Servic
 		c.terminalID, c.client = old.terminalID, old.client
 		l.terminalMu.Unlock()
 	}
-	switch verdict, _ := l.terminalAuthority(p.Device, false); verdict {
+	switch verdict, why := l.terminalAuthority(p.Device, false); verdict {
 	case TerminalDenied:
 		return // A viewer the account does not let in is not someone to encrypt to.
 	case TerminalUnverified:
 		// The viewer's own key is in the request, so it can be told to try
 		// again rather than left to time out. Nothing is registered.
+		l.logTerminalBusy(p.Device, req.Operation, "access unverified: "+why)
 		l.sendTerminalReceipt(ctx, c, terminalReceipt{V: 1, Type: "terminal_receipt", RequestID: req.RequestID,
 			Connection: req.Connection, Operation: req.Operation, Status: "refused", Error: string(terminal.CodeBusy)})
 		return
@@ -1001,7 +1008,10 @@ func (l *Link) openTerminalConnection(ctx context.Context, svc *terminals.Servic
 		}
 	}
 	if len(l.terminalConnections) >= CloudTerminalConnectionsLimit || viewerConnections >= CloudTerminalViewerConnectionsLimit {
+		total := len(l.terminalConnections)
 		l.terminalMu.Unlock()
+		l.logTerminalBusy(p.Device, req.Operation, fmt.Sprintf("connections full: %d of %d for this viewer, %d of %d on this machine",
+			viewerConnections, CloudTerminalViewerConnectionsLimit, total, CloudTerminalConnectionsLimit))
 		l.sendTerminalReceipt(ctx, c, terminalReceipt{V: 1, Type: "terminal_receipt", RequestID: req.RequestID,
 			Connection: req.Connection, Operation: req.Operation, Status: "refused", Error: string(terminal.CodeBusy)})
 		return
@@ -1015,12 +1025,14 @@ func (l *Link) openTerminalConnection(ctx context.Context, svc *terminals.Servic
 	code := preCode
 	if err := l.TerminalViewerAccess(p.Device); terminals.Unverified(err) {
 		code = string(terminal.CodeBusy)
+		l.logTerminalBusy(p.Device, req.Operation, "access unverified: "+err.Error())
 	} else if err != nil {
 		code = string(terminal.CodeForbidden)
 	} else if svc == nil {
 		code = string(terminal.CodeUnsupported)
 	} else if err := svc.Allow(p); terminals.Unverified(err) {
 		code = string(terminal.CodeBusy)
+		l.logTerminalBusy(p.Device, req.Operation, "access unverified: "+err.Error())
 	} else if err != nil {
 		code = string(terminal.CodeForbidden)
 	}
@@ -1332,6 +1344,13 @@ var routineStageOutcomes = map[string]bool{"ok": true, "ok_direct": true, "deliv
 
 // logTerminalStage logs one stage for a receipt that does not pass through
 // sendTerminalReceipt, such as a refusal published directly.
+// logTerminalBusy says why a request was refused terminal_busy. The receipt carries only the code,
+// and six different conditions answer it: on 2026-10-18 a phone was refused for two minutes and
+// the log could not say whether it was the per-viewer connection limit or unverified access.
+func (l *Link) logTerminalBusy(viewer, operation, why string) {
+	l.logf("cloud terminal: refused terminal_busy op=%s viewer=%s why=%s", terminalStageWord(operation), viewer, why)
+}
+
 func (l *Link) logTerminalStage(c *terminalConnection, stage, operation, outcome string) {
 	l.terminalMu.Lock()
 	line := l.terminalStageLocked(c, stage, operation, outcome)

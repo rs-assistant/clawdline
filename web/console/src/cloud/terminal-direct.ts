@@ -19,6 +19,10 @@ export const DIRECT_CHUNK_MS = 2_000
 export const DIRECT_RETRY_MS = 30_000
 /** CloudTerminalDirectBusyRetrySecondsLimit, after the relay refused the upgrade for its own load. */
 export const DIRECT_BUSY_RETRY_MS = 5_000
+/** Direct paths of one terminal that may fail in a row before it stays on the relay for DIRECT_PAUSE_MS. */
+export const DIRECT_PAUSE_AFTER_FAILURES = 2
+/** How long a terminal whose direct path keeps failing stays on the relay before it tries again. */
+export const DIRECT_PAUSE_MS = 5 * 60_000
 // A chunk's JSON may escape each code unit of `d` (a lone surrogate becomes `\udxxx`), plus its fields.
 const CHUNK_TEXT_UNITS = DIRECT_CHUNK_UNITS * 6 + 256
 

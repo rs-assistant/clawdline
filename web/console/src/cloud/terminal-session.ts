@@ -6,7 +6,7 @@ import type { TerminalObservation } from "./terminal-observation.js"
 // @ts-expect-error -- Node's strip-types runner loads this module directly.
 import { reconstructTerminalDelta, type TerminalDelta } from "./terminal-delta.ts"
 // @ts-expect-error -- Node's strip-types runner loads this module directly.
-import { DIRECT_BUSY_RETRY_MS, DIRECT_RETRY_MS } from "./terminal-direct.ts"
+import { DIRECT_BUSY_RETRY_MS, DIRECT_PAUSE_AFTER_FAILURES, DIRECT_PAUSE_MS, DIRECT_RETRY_MS } from "./terminal-direct.ts"
 
 export interface TerminalWire {
   subscribeTerminal(connection: string, keyID: string, raw: Uint8Array, listener: (event: TerminalChannelEvent) => void): Promise<void>
@@ -57,6 +57,16 @@ const RECEIPT_MS = 10_000
 const RENEW_MS = 10_000
 /** CloudTerminalRenewRetrySecondsLimit: a renewal that went unanswered or was refused for load is asked again this soon. */
 export const RENEW_RETRY_MS = 2_000
+/**
+ * A renewal unanswered this long is given up and asked again. Ten seconds, the ordinary receipt
+ * wait, let two renewals lost on a failing DC eat a thirty-second lease (19:45–19:46 on
+ * 2026-10-18): one sent on a DC is now given up after four, and the connection falls back first.
+ */
+export const RENEW_RECEIPT_MS = 4_000
+/** terminal.lease_seconds: the machine lets a lease lapse this long after its last renewal. */
+export const LEASE_MS = 30_000
+/** With less than this left on the lease, a renewal goes out even while an earlier one is unanswered. */
+export const RENEW_URGENT_MS = 15_000
 /** CloudTerminalRotationRetrySecondsLimit: a key rotation that failed is tried again this soon while the old key lasts. */
 export const ROTATION_RETRY_MS = 5_000
 /** Refusals that say the machine or relay was briefly too busy, not that the lease is gone. */
@@ -97,9 +107,14 @@ export class CloudTerminalSession {
   private rotationReady = false
   private activating = false
   private lastRenew = 0
-  private renewing = false
-  /** The request id of the renewal in flight: its loss is retried, never read as a lost lease. */
-  private renewID = ""
+  /** Renewals in flight: normally one, two when the lease ran short while the first went unanswered. */
+  private renewing = 0
+  /** The request ids of the renewals in flight: their loss is retried, never read as a lost lease. */
+  private renewIDs = new Set<string>()
+  /** When the machine last confirmed this tab's lease, by this tab's clock. */
+  private leaseConfirmedAt = 0
+  /** Direct upgrades of each terminal that failed in a row; after DIRECT_PAUSE_AFTER_FAILURES the terminal stays on the relay a while. */
+  private directFailures = new Map<string, number>()
   /** When this browser last drew a verified frame. Staleness is judged by it, not by the machine's clock. */
   private frameSeenAt = 0
   private carrier: TerminalCarrier = "relay"
@@ -316,6 +331,7 @@ export class CloudTerminalSession {
       this.direct = offer
       await this.start({ carrier: "direct" })
       if (this.carrier !== "direct") throw fail("terminal_direct_unavailable")
+      this.directFailures.delete(terminal)
     } catch (error) {
       // A machine without the direct path (`terminal_invalid`), or refusing it now
       // (`terminal_direct_disabled`, `terminal_direct_unavailable`), leaves the terminal on the relay silently.
@@ -324,7 +340,7 @@ export class CloudTerminalSession {
       // The relay's account budget or its two-connection rotation room is briefly full
       // while a page opens; that passes in seconds, unlike a machine's refusal.
       const busy = code === "rate_limited" || code === "over_capacity"
-      this.directRetryAt.set(terminal, Date.now() + (busy ? DIRECT_BUSY_RETRY_MS : DIRECT_RETRY_MS))
+      this.directRetryAt.set(terminal, Date.now() + (busy ? DIRECT_BUSY_RETRY_MS : this.directFailed(terminal)))
       if (this.directAttempt === attempt) { this.directAttempt = null; this.direct = null }
       offer?.close()
     } finally { this.upgrading = false }
@@ -334,8 +350,19 @@ export class CloudTerminalSession {
     if (this.directAttempt !== attempt) return
     this.directAttempt = null
     this.direct = null
-    if (this.terminal) this.directRetryAt.set(this.terminal, Date.now() + DIRECT_RETRY_MS)
+    if (this.terminal) this.directRetryAt.set(this.terminal, Date.now() + this.directFailed(this.terminal))
     if (this.carrier === "direct") void this.fallback()
+  }
+  /**
+   * Counts one more failed direct path for terminal and says how long to wait before the next try. A
+   * network that cannot hold a DC (a phone on a mobile network, 2026-10-18) failed every thirty
+   * seconds, and each failure moved the connection under the person's keys; after a few in a row the
+   * terminal stays on the relay for DIRECT_PAUSE_MS.
+   */
+  private directFailed(terminal: string): number {
+    const failures = (this.directFailures.get(terminal) ?? 0) + 1
+    this.directFailures.set(terminal, failures)
+    return failures >= DIRECT_PAUSE_AFTER_FAILURES ? DIRECT_PAUSE_MS : DIRECT_RETRY_MS
   }
   private closeDirect(): void {
     const offer = this.direct
@@ -370,18 +397,21 @@ export class CloudTerminalSession {
     const requestID = crypto.randomUUID()
     onRequestID?.(requestID)
     const connection = this.connection
+    const renewal = this.renewIDs.has(requestID)
+    const carrier = this.carrier
     const receipt = new Promise<Receipt>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(requestID)
         this.observation?.record("receipt_timeout", { connection, requestID, operation })
         if (operation === "input" || operation === "paste") { this.inputUnknown = true; this.set({ state: "unknown", reason: "terminal_input_state_unknown" }) }
-        // A renewal changes nothing the browser cannot ask again; the next one is due shortly.
-        else if (requestID === this.renewID) { /* retried by checkFreshness */ }
+        // A renewal changes nothing the browser cannot ask again; the next one is due shortly. One lost
+        // on a DC says the DC is failing: the connection goes back to the relay before it is asked again.
+        else if (renewal) { if (carrier === "direct" && connection === this.connection) this.directClosing() }
         else if (operation !== "release_connection" && operation !== "direct_offer") { this.connectionUnknown = true; this.set({ state: "unknown", reason: "terminal_receipt_timeout" }) }
         // A key with no receipt may or may not have been typed (the machine drops an envelope it
         // takes for a replay without a word): it is refused as unknown, with the way back.
         reject(fail(operation === "input" || operation === "paste" ? "terminal_input_state_unknown" : "terminal_receipt_timeout"))
-      }, RECEIPT_MS)
+      }, renewal ? RENEW_RECEIPT_MS : RECEIPT_MS)
       this.pending.set(requestID, { operation, connection,
         terminal: typeof fields.terminal_id === "string" ? fields.terminal_id : null, resolve, reject, timer })
       this.observation?.record("request_pending", { connection, requestID, operation })
@@ -479,6 +509,7 @@ export class CloudTerminalSession {
     this.nextSeq = this.confirmed + 1
     this.inputUnknown = false
     this.lastRenew = Date.now()
+    this.leaseConfirmedAt = Date.now()
     // Typing waits for the next verified screen, but the one drawn stays as the base of the machine's
     // next delta: the machine keeps its own base across a lease change, and a tab that dropped its
     // copy read that delta as corrupt and threw the connection away (after 接手, 2026-10-06).
@@ -501,6 +532,7 @@ export class CloudTerminalSession {
     this.nextSeq = Math.max(this.nextSeq, this.confirmed + 1)
     this.inputUnknown = false
     this.lastRenew = Date.now()
+    this.leaseConfirmedAt = Date.now()
     this.set({ control })
   }
   input(data: Uint8Array): Promise<void> {
@@ -682,7 +714,7 @@ export class CloudTerminalSession {
           this.pending.delete(event.requestID)
           pending.reject(fail(event.error))
           if (["list", "read", "capture", "history"].includes(pending.operation) && event.error === "rate_limited") return
-          if (event.requestID === this.renewID && TRANSIENT.has(event.error)) return
+          if (this.renewIDs.has(event.requestID) && TRANSIENT.has(event.error)) return
         }
       }
       this.inputUnknown = true
@@ -875,19 +907,24 @@ export class CloudTerminalSession {
   }
   private checkFreshness(): void {
     if (this.s.state === "revoked") return
+    const leaseLeft = this.leaseConfirmedAt + LEASE_MS - Date.now()
+    const due = this.renewing === 0 ? Date.now() - this.lastRenew >= RENEW_MS
+      // The lease is running out under an unanswered renewal: one more goes out, and no third.
+      : this.renewing === 1 && leaseLeft < RENEW_URGENT_MS && Date.now() - this.lastRenew >= RENEW_RETRY_MS
     if (this.epoch !== null && this.active && !this.openingNew && !this.retiringConnection &&
-      !this.inputUnknown && !this.renewing && Date.now() - this.lastRenew >= RENEW_MS) {
-      this.renewing = true
+      !this.inputUnknown && due) {
+      this.renewing++
       this.lastRenew = Date.now()
       const epoch = this.epoch
+      let renewID = ""
       void this.request("control", { terminal_id: this.terminal, client: this.client, body: { action: "renew" } },
-        (id) => { this.renewID = id })
+        (id) => { renewID = id; this.renewIDs.add(id) })
         .then((receipt) => {
           const control = (receipt.result?.control ?? receipt.result) as TerminalControl | undefined
           if (!control?.held || !control.holder?.same_client || !control.holder?.same_device ||
             control.epoch !== this.epoch || (control.expires_at ?? 0) * 1000 <= Date.now() ||
             (control.applied_through ?? 0) < this.confirmed) this.forgetLease("terminal_input_state_unknown")
-          else this.set({ control })
+          else { this.leaseConfirmedAt = Date.now(); this.set({ control }) }
         })
         .catch((error: { code?: string; receiptStatus?: string }) => {
           // Unsent, unanswered, or refused for load: the lease's own expiry still bounds typing, and
@@ -908,7 +945,7 @@ export class CloudTerminalSession {
           }
           this.forgetLease("terminal_input_state_unknown")
         })
-        .finally(() => { this.renewing = false; this.renewID = "" })
+        .finally(() => { this.renewing--; this.renewIDs.delete(renewID) })
     }
     if (this.connection && this.terminal && !this.openingNew && (!this.rotationAttempted || Date.now() >= this.rotationRetryAt) &&
       this.expiresAt - Date.now() < 60_000 && Date.now() < this.expiresAt) {
