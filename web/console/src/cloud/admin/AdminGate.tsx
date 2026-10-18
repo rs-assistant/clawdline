@@ -11,6 +11,7 @@ import { mayLeaveCode } from "./navigation-guard.js"
 import { loadOverview, type Overview } from "./api.js"
 import { ADMIN_ROUTES, adminLocale, adminPath, adminRoute, adminWords, type AdminRoute, type Say } from "./words.js"
 import "./admin.css"
+import { BRAND_MARK } from "../../brand-mark.js"
 
 /*
  * The hosted console's `/admin`: Cloud's operations console, for the accounts
@@ -381,7 +382,11 @@ function Shell({ route, go, say, consoleHref, stampText, refreshing, onRefresh, 
         role={narrow ? "dialog" : undefined} aria-modal={drawerOpen || undefined} aria-label={narrow ? say("menuLabel") : undefined}
         aria-hidden={narrow && !open ? true : undefined}>
         <div className="adm-brand">
-          <span className="adm-brand-mark" aria-hidden="true" />
+          <svg className="adm-brand-mark" viewBox="0 0 8 4" aria-hidden="true" focusable="false" shapeRendering="crispEdges">
+            {BRAND_MARK.cells.flatMap((row, y) => row.map((fill, x) => fill ? (
+              <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill={fill} />
+            ) : null))}
+          </svg>
           <span className="adm-brand-text">
             <span className="adm-brand-name">Clawdline Cloud</span>
             <span className="adm-brand-sub">{say("title")}</span>
