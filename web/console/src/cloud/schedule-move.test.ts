@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { askAgainBeforeRefusing, createdScheduleID, hookMoveRequest, movedRevision, moveSchedule, planScheduleMove, recordBody, refusedAsStaleRevision, refusedByOlderBinder, refusedByOlderTarget, retargetInstructions, targetBody, type MoveHook, type MoveRecord, type MovePlace } from "./schedule-move.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
-import { answerSchedulePresence, choosesMachine, groupSchedules, noteScheduleMachineAnswered, publishScheduleFleet, recheckSchedulePresence, scheduleFleet, type ScheduleFleet } from "./schedule-machines.ts"
+import { answerSchedulePresence, choosesMachine, groupSchedules, noteScheduleMachineAnswered, publishScheduleFleet, recheckSchedulePresence, scheduleFleet, silentMachineWord, type ScheduleFleet } from "./schedule-machines.ts"
 
 const record: MoveRecord = {
   id: "s1",
@@ -612,4 +612,18 @@ test("asking which machines report in brings the published fleet up to the answe
     answerSchedulePresence(null)
     publishScheduleFleet(null)
   }
+})
+
+// 2026-10-18: the online Mac was drawn as "offline or unreadable" because its
+// schedule read failed. A failed read is this page's; offline is the machine's.
+test("a machine the account hears from is a failed read, never offline", () => {
+  const mac = { id: "mac-a", name: "Studio", platform: "macOS", seenAt: 1_700_000_000_000, online: true }
+  for (const code of ["offline", "cloud_read_timeout", "cloud_read_unavailable", "unanswered"]) {
+    assert.equal(silentMachineWord(mac, code), "scheduleMachineReadFailed", code)
+  }
+  // The page's own line was down: the machine was not asked, whatever its row said last.
+  assert.equal(silentMachineWord({ ...mac, online: false }, "cloud_reconnecting"), "scheduleMachineReadFailed")
+  // A machine that stopped reporting in is offline since then; with no time, not known which.
+  assert.equal(silentMachineWord({ ...mac, online: false }, "cloud_read_timeout"), "scheduleMachineOffline")
+  assert.equal(silentMachineWord({ ...mac, online: false, seenAt: null }, "cloud_read_timeout"), "scheduleMachineUnread")
 })

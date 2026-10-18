@@ -1086,7 +1086,18 @@ export class RelayReader {
           // person with a Mac and a Linux machine sees both machines'
           // schedules without switching the whole console.
           const query = this.only(url, path, "machine")
-          const client = this.connected()
+          // A paused or renewing line waits for its successor, as one
+          // schedule's read does (`machineRead`). This list threw
+          // `NotConnected` instead, which `jsonFetch` spells `offline`: a
+          // phone that came back to the page before its line did drew every
+          // machine on the account as offline or unreadable, the online Mac
+          // included, and asked again only a minute later.
+          const client = await this.connectedFor(init?.signal)
+          if (!client) {
+            if (init?.signal?.aborted) throw new NotConnected()
+            return this.refuse(method, path, 503, "cloud_reconnecting",
+              "This page's Cloud connection is renewing or reconnecting; the machine was not asked.")
+          }
           if (typeof client.schedules !== "function") {
             return this.refuse(method, path, 501, "cloud_not_carried",
               "This console cannot read this machine's schedules.")
@@ -2872,6 +2883,8 @@ function readFailureWord(input: RequestInfo | URL, init?: RequestInit): { word: 
       return { word: url.searchParams.has("before") ? "transcript_page" : "transcript", session: url.searchParams.get("session") }
     }
     if (path === "/v1/sessions") return { word: "session_list", session: null }
+    if (path === "/v1/orchestrator/schedules") return { word: "schedules", session: null,
+      machine: url.searchParams.get("machine") || undefined }
     if (path === "/v1/personas") return { word: "personas", session: null,
       machine: url.searchParams.get("machine") || undefined }
     const todos = workV2SessionTodosTerminal(path)

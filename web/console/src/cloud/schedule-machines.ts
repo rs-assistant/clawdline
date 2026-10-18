@@ -124,6 +124,25 @@ export function machineWords(machine: ScheduleMachine): string {
   return machine.platform ? machine.name + " · " + machine.platform : machine.name
 }
 
+/**
+ * Which sentence a machine that did not answer its schedule read is drawn
+ * with. Online and offline are the machine's own presence; a failed read is
+ * this page's. A machine the account hears from now, or one this page did not
+ * ask because its own line was reconnecting, is a read that failed, never an
+ * offline machine: on 2026-10-18 a phone back on the page before its line
+ * drew the online Mac as "offline or unreadable". Offline since a time is
+ * kept for a machine that has stopped reporting in; with neither, which of
+ * the two it is is not known here.
+ */
+export function silentMachineWord(
+  machine: ScheduleMachine,
+  code: string | null,
+): "scheduleMachineReadFailed" | "scheduleMachineOffline" | "scheduleMachineUnread" {
+  if (machine.online || code === "cloud_reconnecting") return "scheduleMachineReadFailed"
+  if (machine.seenAt) return "scheduleMachineOffline"
+  return "scheduleMachineUnread"
+}
+
 export function machineNamed(id: string, f: ScheduleFleet | null = fleet): ScheduleMachine | null {
   return f?.machines.find((m) => m.id === id) ?? null
 }

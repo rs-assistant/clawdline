@@ -58,6 +58,7 @@ import {
   rememberScheduleOwners,
   scheduleFleet,
   scheduleOwner,
+  silentMachineWord,
   type ScheduleMachine,
 } from "../cloud/schedule-machines.js"
 import {
@@ -279,7 +280,7 @@ function renderSchedules(
             (group.unanswered ? ' data-state="' + (group.unanswered === "loading" ? "loading" : "unanswered") + '"' : "") +
             ">" +
             esc(group.unanswered === "loading" ? machineWords(group.machine) + " · " + nextWord("schedulesLoading") :
-              group.unanswered ? silentMachine(group.machine) : machineWords(group.machine)) +
+              group.unanswered ? silentMachine(group.machine, group.unanswered) : machineWords(group.machine)) +
             "</li>" +
             group.rows.map(row).join(""),
         )
@@ -310,13 +311,12 @@ function seenClock(at: number): string {
   return when.toLocaleString(lang() || undefined, options)
 }
 
-/** A machine that did not answer: offline since a time when one is known, otherwise offline or unreadable. */
-function silentMachine(machine: ScheduleMachine): string {
+/** A machine that did not answer, in the words `silentMachineWord` chooses. */
+function silentMachine(machine: ScheduleMachine, code: string): string {
   const name = machineWords(machine)
-  if (!machine.online && machine.seenAt) {
-    return nextWord("scheduleMachineOffline", { machine: name, time: seenClock(machine.seenAt) })
-  }
-  return nextWord("scheduleMachineUnread", { machine: name })
+  const word = silentMachineWord(machine, code)
+  return nextWord(word, word === "scheduleMachineOffline"
+    ? { machine: name, time: seenClock(machine.seenAt ?? 0) } : { machine: name })
 }
 
 /* ---- net/schedules.js: the one-minute lane -------------------------------- */
