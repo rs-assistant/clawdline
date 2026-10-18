@@ -222,9 +222,9 @@ func handWrittenLiterals(t *testing.T) (keys, compared map[string]bool) {
 }
 
 var (
-	literalsOnce                  sync.Once
+	literalsOnce                 sync.Once
 	literalKeys, literalCompared map[string]bool
-	literalErr                    error
+	literalErr                   error
 )
 
 func scanHandWrittenLiterals() (map[string]bool, map[string]bool, error) {

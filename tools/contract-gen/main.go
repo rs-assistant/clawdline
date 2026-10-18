@@ -135,8 +135,8 @@ func main() {
 
 	want := map[string][]byte{
 		filepath.Join(root, "internal", "app", "cloudops", "zz_decode_generated.go"): decoders,
-		filepath.Join(root, "internal", "contract", "zz_generated.go"): renderGo(names),
-		filepath.Join(root, "web", "contract", "src", "generated.ts"):  renderTS(names),
+		filepath.Join(root, "internal", "contract", "zz_generated.go"):               renderGo(names),
+		filepath.Join(root, "web", "contract", "src", "generated.ts"):                renderTS(names),
 		routesPath: renderRoutes(routes),
 		filepath.Join(root, "skills", "clawdline", "routes.md"):         renderAgentRoutes(routes, agentRoutes, false),
 		filepath.Join(root, "skills", "clawdline", "routes.zh-TW.md"):   renderAgentRoutes(routes, agentRoutes, true),

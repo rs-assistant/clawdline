@@ -266,12 +266,12 @@ func genTreeDirectory(s string) bool {
 	_, err := projectfiles.TreePath(s, false)
 	return err == nil
 }
-func genUsageID(s string) bool         { return usageID.MatchString(s) && !strings.Contains(s, "..") }
-func genVerificationID(s string) bool  { return verificationID.MatchString(s) }
-func genCompareSince(s string) bool    { return compareSince.MatchString(s) }
-func genWorkUntil(s string) bool       { return workUntil.MatchString(s) }
-func genAbsolutePath(s string) bool    { return filepath.IsAbs(s) }
-func genNotBlank(s string) bool        { return strings.TrimSpace(s) != "" }
+func genUsageID(s string) bool        { return usageID.MatchString(s) && !strings.Contains(s, "..") }
+func genVerificationID(s string) bool { return verificationID.MatchString(s) }
+func genCompareSince(s string) bool   { return compareSince.MatchString(s) }
+func genWorkUntil(s string) bool      { return workUntil.MatchString(s) }
+func genAbsolutePath(s string) bool   { return filepath.IsAbs(s) }
+func genNotBlank(s string) bool       { return strings.TrimSpace(s) != "" }
 func genLowerHex(s string) bool {
 	for _, c := range s {
 		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
