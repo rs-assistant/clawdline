@@ -298,6 +298,8 @@
 .adm-facts > div { display: grid; gap: 3px; min-width: 0; }
 .adm-facts dt { color: var(--dim); font-size: 12px; }
 .adm-facts dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.adm-campaign-pages { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 16px; }
+.adm-campaign-pages > span { color: var(--dim); font-size: 13px; }
 .adm-issue { display: grid; gap: 12px; }
 .adm-issue-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
 .adm-issue-form .adm-field { flex: 1 1 240px; max-width: 360px; }
