@@ -126,10 +126,6 @@ export async function importSenderPublicKey(value) {
     return subtle().importKey("raw", bytes, { name: "Ed25519" }, false, ["verify"]);
 }
 
-export async function importDevicePrivateKey(value) {
-    return subtle().importKey("pkcs8", byteView(value), { name: "Ed25519" }, false, ["sign"]);
-}
-
 async function verificationKey(envelope, keyOrResolver) {
     var key = typeof keyOrResolver === "function"
         ? await keyOrResolver(envelope.sender, envelope) : keyOrResolver;

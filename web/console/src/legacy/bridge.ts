@@ -1,11 +1,13 @@
 // The copied modules, given types and one way in.
 //
-// Everything under `js/` is the Swift app's console, copied byte for byte. It
-// is copied rather than reimplemented because the instruction was to replicate
-// the screen strictly, and the first attempt here did the other thing: it
-// invented class names the stylesheet has never heard of, and Chinese the
-// catalog does not contain, and got `tint` wrong in both its target colour and
-// its amount. Reading the function beats inferring it from a screenshot.
+// Everything under `js/` began as the Swift app's console, copied byte for
+// byte; since that app retired it is this console's own code, maintained here
+// (`README.md`). It was copied rather than reimplemented because the
+// instruction was to replicate the screen strictly, and the first attempt here
+// did the other thing: it invented class names the stylesheet has never heard
+// of, and Chinese the catalog does not contain, and got `tint` wrong in both its
+// target colour and its amount. Reading the function beats inferring it from a
+// screenshot.
 //
 // What comes through here is markup and words, not components. `derive.js`
 // touches no DOM and returns strings, so React hands what it returns to
@@ -18,13 +20,13 @@ import { currentCloseability, currentCloseabilityBadge, currentCloseabilityShape
 
 /* The imports below are the copied modules. They are plain JavaScript with no
    types, read with allowJs so the compiler infers what it can and checks none
-   of it: they are byte-for-byte copies, and a type error found in them would
-   have nowhere to be fixed. */
+   of it: they were written without types, and checking them is a port of its
+   own, not something an import should start. */
 
 import { S } from "./js/core/state.js"
 import { T, applyStrings, fill, words } from "./js/core/i18n.js"
 import { atMac as atMacOriginal, hasKeyboard } from "./js/core/env.js"
-import { generatedMark as generatedMarkOriginal, projectLabel as projectLabelOriginal } from "./js/view/project-mark.js"
+import { projectLabel as projectLabelOriginal } from "./js/view/project-mark.js"
 import { copyForUserMessages } from "./js/view/user-messages-data.js"
 import { copyCodeBlock, inlineMd, richText } from "./js/view/markdown.js"
 import { boardWorkflowRecordHTML, parseBoardWorkflowRecord } from "./js/view/board-workflow-record.js"
@@ -45,7 +47,6 @@ import { bindSessionUI as bindSessionUIOriginal } from "./js/session/ui.js"
 import {
   featureRootChip as featureRootChipOriginal,
   projectSessionWorkState,
-  rowDepth as rowDepthOriginal,
   selfReportedPeerWaitCopy,
   sessionStatusGlyphHTML,
   sessionWorkStateHTML,
@@ -260,7 +261,6 @@ export const markForSession = (session: unknown, _projectKey?: string): (Icon & 
   return row?.icon?.cells?.length ? row.icon : null
 }
 export const projectLabel = projectLabelOriginal as (key: string | undefined) => string
-export const generatedMark = generatedMarkOriginal as (key: string | undefined) => (Icon & { generated?: boolean }) | null
 /** The "my messages" copy in the page's language, from that module's own table. */
 export const userMessagesCopy = copyForUserMessages as (language: string) => { title: string } & Record<string, string>
 
@@ -285,8 +285,6 @@ export const taskOfChild = taskOfChildOriginal as (id: string) => LegacyTask | n
 export const tasksOfRoot = tasksOfRootOriginal as (id: string) => LegacyTask[]
 /** One word for where a task got to. */
 export const taskWord = taskWordOriginal as (t: LegacyTask | null | undefined) => string
-/** How far a row is indented under the sessions that asked for it: 0, 1 or 2. */
-export const rowDepth = rowDepthOriginal as (id: string) => number
 /** The Feature Root chip, or null. */
 export const featureRootChip = featureRootChipOriginal as (
   s: SessionRow,

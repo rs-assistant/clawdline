@@ -317,26 +317,6 @@ export async function createPairingOffer(input) {
     };
 }
 
-export function decodePairingOffer(fragment, nowMilliseconds) {
-    var text = decoder.decode(base64URLBytes(fragment));
-    var offer;
-    try { offer = JSON.parse(text); } catch (e) {
-        throw pairingError("bad_offer", "the pairing offer is not JSON");
-    }
-    if (!offer || typeof offer !== "object" || Array.isArray(offer)) {
-        throw pairingError("bad_offer", "the pairing offer is not an object");
-    }
-    exactMembers(offer, OFFER_MEMBERS, "bad_offer");
-    if (offer.v !== 1 || offer.type !== "pairing_offer") {
-        throw pairingError("bad_offer", "the pairing offer is not version 1");
-    }
-    if (canonicalJSON(offer) !== text) {
-        throw pairingError("bad_offer", "the pairing offer is not canonical JSON");
-    }
-    validateOfferWindow(offer, nowMilliseconds);
-    return offer;
-}
-
 function validateOfferWindow(offer, nowMilliseconds) {
     if (!Number.isSafeInteger(offer.expires_at) || offer.expires_at < 0) {
         throw pairingError("bad_offer", "the pairing offer has an unusable expiry");

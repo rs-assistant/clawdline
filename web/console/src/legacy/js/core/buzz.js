@@ -54,11 +54,3 @@ export function tap() {
 export function done() {
     if (watched()) vibrate([12, 60, 12]);
 }
-
-/**
- * Whether anything here is going to be felt. For a settings row that would
- * otherwise offer a switch for a thing that cannot happen on this device.
- */
-export function available() {
-    return !!navigator.vibrate;
-}

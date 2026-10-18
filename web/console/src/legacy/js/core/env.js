@@ -22,21 +22,6 @@ export var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-mo
 export var phone = function () { return window.matchMedia("(max-width: 899px)").matches; };
 
 /**
- * Put away whichever control still owns the software keyboard before replacing a phone screen.
- *
- * A tap on a session row does not necessarily focus the row on iOS, so a filter field can remain
- * `document.activeElement` even after the list has been hidden behind the detail pane. Keeping
- * that stale focus makes the viewport tracker believe the keyboard is still authoritative while
- * WebKit is animating it away. `blur()` is deliberately used rather than naming the filter: sheets
- * and the composer can open a session too, and the invariant is about the screen transition, not
- * about one particular field.
- */
-export function releaseKeyboardFocus() {
-    var el = document.activeElement;
-    if (el && el !== document.body && typeof el.blur === "function") el.blur();
-}
-
-/**
  * Whether there is a keyboard to press Return on.
  *
  * Asked of the pointer rather than of the width, because the question is not how big the screen

@@ -18,10 +18,11 @@
 #
 # **It does not read the copies.** `web/console/src/legacy/`,
 # `public/strings/zh-Hant.json` and the files that declare themselves copies of
-# the retired Swift app's `Copy+Chinese.swift` are that app's words, checked
-# byte for byte by check-legacy-css.sh. Changing one there is drift, not a fix,
-# so this guard stays out of them — and the list of what it skips is the list of
-# places this repository cannot reach, which is worth reading on its own.
+# the retired Swift app's `Copy+Chinese.swift` began as that app's words. The
+# stylesheets are still pinned byte for byte by check-legacy-css.sh; the
+# JavaScript and the catalog are this console's own now, but bringing their
+# words under this guard is a change of its own, so it stays out of them — and
+# the list of what it skips is worth reading on its own.
 #
 # A line where Mac is the right word — the platform this machine really is, a
 # user-agent string, a host name in a fixture — goes in tools/machine-words.allow

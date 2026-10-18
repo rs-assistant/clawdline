@@ -1,17 +1,11 @@
 import { api } from "./api.js";
-import { S } from "../core/state.js";
-import { renderSchedules } from "../view/schedules.js";
 
 /* --------------------------------------------------------------------------
-   Schedules move on a wall clock, not on the session stream's breath. Wait for
-   the first session answer as proof authentication has settled, fetch once, then
-   stay on a deliberately slow one-minute lane. A failed refresh keeps the last
-   truthful answer on screen; a failed first read claims nothing and draws nothing.
+   Where each schedule runs, and the places read behind it. The list itself, its
+   slow one-minute lane and its visibility handling are `pages/schedules.tsx`;
+   this file keeps the project lookup and `createPlacesCache`, which that page
+   builds its own caches from.
    -------------------------------------------------------------------------- */
-
-var started = false;
-var inFlight = false;
-var projectBySchedule = {};
 
 function projectLabel(path) {
     var parts = String(path || "").replace(/\/+$/, "").split("/");
@@ -193,116 +187,3 @@ export function createPlacesCache(options) {
 var placesCache = createPlacesCache({
     places: function (machine) { return machine === undefined ? api.places() : api.places(machine); }
 });
-
-function cachedPlacesReader() {
-    if (typeof api.places !== "function") return null;
-    return placesCache.read;
-}
-
-/** A Project added or renamed while this list is on screen must not wait out the TTL. */
-export function forgetCachedPlaces() { placesCache.forget(); }
-
-var lastRefreshAt = null;
-var lane = null;
-var LANE_MS = 60000;
-
-function pageHidden() {
-    return typeof document !== "undefined" && !!document && document.hidden === true;
-}
-
-function refresh() {
-    if (inFlight || !S.arrived || S.locked || S.conn === "locked"
-        || !api || typeof api.schedules !== "function") return;
-    inFlight = true;
-    lastRefreshAt = Date.now();
-    // Cloud treats its retained orchestrator envelope as first paint only; `fresh` asks the Mac
-    // for a named reply. Local and fixture clients ignore the optional argument.
-    api.schedules({ fresh: true }).then(function (data) {
-        var schedules = (data && data.schedules) || [];
-        var at = data && data.at;
-        // Do not make the useful list wait for its supplementary labels. The second render changes
-        // only metadata after all detail reads have settled, successfully or otherwise. Keep the
-        // previous label during later minute refreshes so a stable row does not visibly blink.
-        renderSchedules(schedules.map(function (schedule) {
-            var project = schedule && projectBySchedule[schedule.id];
-            return project ? Object.assign({}, schedule, { project: project }) : schedule;
-        }), at);
-        return loadScheduleProjects(schedules,
-            typeof api.schedule === "function" ? api.schedule.bind(api) : null,
-            cachedPlacesReader())
-            .then(function (withProjects) {
-                withProjects.forEach(function (schedule) {
-                    if (schedule && schedule.id && schedule.project) {
-                        projectBySchedule[schedule.id] = schedule.project;
-                    }
-                });
-                renderSchedules(withProjects.map(function (schedule) {
-                    var project = schedule && projectBySchedule[schedule.id];
-                    return project && !schedule.project
-                        ? Object.assign({}, schedule, { project: project }) : schedule;
-                }), at);
-            });
-    }).catch(function () {
-        // Read-only and ambient: connection state already has a visible home in the header.
-        //
-        // **Nothing is rendered from here, and that is the point.** A refusal — the Cloud
-        // transport's `cloud_read_unavailable` and `cloud_schedules_unpublished`, or a dropped
-        // request on the direct path — means the inventory is unknown, and `renderSchedules([])`
-        // would be the page saying "there are none" on its behalf. Not drawing keeps the section
-        // as it was: absent before any answer, and holding the last truthful list after one. An
-        // inventory that really is empty still arrives as an answer and still draws, which is the
-        // difference a person can see.
-    }).then(function () { inFlight = false; });
-}
-
-function beginWhenAuthed(attempt) {
-    if (!S.arrived) {
-        if (S.locked || S.conn === "locked" || attempt >= 40) return;
-        setTimeout(function () { beginWhenAuthed(attempt + 1); }, 250);
-        return;
-    }
-    refresh();
-}
-
-export var Schedules = {
-    /** Read again now, rather than at the next tick of the slow lane. Making one is the single
-     *  moment somebody is watching this list, and a minute of nothing after the sheet closes
-     *  reads as a schedule that did not get made. A read already in the air was started before
-     *  the new file existed, so its answer cannot contain the new row — let it land first. */
-    refresh: function (tries) {
-        var n = tries || 0;
-        if (inFlight && n < 10) {
-            setTimeout(function () { Schedules.refresh(n + 1); }, 300);
-            return;
-        }
-        refresh();
-    },
-    start: function () {
-        if (started) return;
-        started = true;
-        beginWhenAuthed(0);
-        // Also owns recovery after a later pairing: the bounded fast wait above stops making
-        // noise at the door, while this slow lane notices the first authenticated session frame.
-        if (!pageHidden()) lane = setInterval(refresh, LANE_MS);
-        watchVisibility();
-    }
-};
-
-/**
- * **Nobody reads a list on a page that is put away.** The lane stops while the document is hidden —
- * on the Cloud path each tick is a machine-scoped read per machine, and a phone in a pocket was
- * asking every minute — and on return the list is read at once if a tick was missed, then the lane
- * starts again. A page that was away for less than a tick waits for its next one.
- */
-function watchVisibility() {
-    if (typeof document === "undefined" || !document || typeof document.addEventListener !== "function") return;
-    document.addEventListener("visibilitychange", function () {
-        if (pageHidden()) {
-            if (lane !== null) { clearInterval(lane); lane = null; }
-            return;
-        }
-        if (lane !== null) return;
-        lane = setInterval(refresh, LANE_MS);
-        if (lastRefreshAt === null || Date.now() - lastRefreshAt >= LANE_MS) refresh();
-    });
-}

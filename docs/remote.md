@@ -81,8 +81,8 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
 
 ### 配對頁
 
-- `web/console/src/legacy/js/door/door.js` 是舊版原檔的逐位元組拷貝，登記在 `MANIFEST.json`，
-  `tools/check-legacy-css.sh` 會比對；`door.css` 早就在。React 的 `web/console/src/door/Door.tsx`
+- `web/console/src/legacy/js/door/door.js` 當時是舊版原檔的逐位元組拷貝，登記在 `MANIFEST.json`；
+  2026-10-18 因為兩個 bundle 都沒有收它而刪除，`door.css` 仍是釘住的拷貝。React 的 `web/console/src/door/Door.tsx`
   不 import 它（它 import 整個舊頁面、在 import 時查 id），而是逐行照它寫，產出 `index.html` 那段門口相同的
   id、class、屬性，字是 `view/static.js` 貼進去的那些 `webDoor*` 鍵。
 - **什麼時候出現**照舊版 `net/live.js` 的 `check`：開頁先讀公開的 `/v1/health`（不走快取），只有明確的

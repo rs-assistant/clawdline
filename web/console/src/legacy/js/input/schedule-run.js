@@ -39,7 +39,3 @@ export function scheduleRunMessage(error, language) {
     if (error && error.code === "not_found") return words.gone;
     return words.failed;
 }
-
-export function scheduleRunConfirmation(title, language) {
-    return scheduleRunCopy(language).confirm.replace("{title}", String(title || "Schedule"));
-}

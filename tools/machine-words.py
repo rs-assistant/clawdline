@@ -12,9 +12,9 @@ import sys
 import os
 
 SKIP_PREFIX = (
-    # Copied from the retired Swift app and compared byte for byte by
-    # check-legacy-css.sh. The bridge files beside them are this build's own
-    # and are read.
+    # Copied from the retired Swift app. They are this console's own code now
+    # and no longer pinned, but their words have not been brought under this
+    # guard yet; that is its own change. The bridge files beside them are read.
     "web/console/src/legacy/js/",
     "web/console/public/strings/",
     # The macOS shell: a file that exists because the platform does.

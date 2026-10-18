@@ -30,18 +30,6 @@ export const ClawdlineClient = Object.freeze({
     ])
 });
 
-export function assertClawdlineClient(candidate) {
-    if (!candidate || (typeof candidate !== "object" && typeof candidate !== "function")) {
-        throw new TypeError("ClawdlineClient must be an object");
-    }
-    ClawdlineClient.methods.forEach(function (method) {
-        if (typeof candidate[method] !== "function") {
-            throw new TypeError("ClawdlineClient is missing " + method + "()");
-        }
-    });
-    return candidate;
-}
-
 /** Turn the old local id, or the cloud pair, into the one identity shape. */
 export function sessionIdentity(value, fallbackMachine) {
     var machine = fallbackMachine || LOCAL_MACHINE;
@@ -60,32 +48,6 @@ export function sessionIdentity(value, fallbackMachine) {
 export function sessionIdentityKey(value, fallbackMachine) {
     var identity = sessionIdentity(value, fallbackMachine);
     return identity.machine + "\u0000" + identity.session;
-}
-
-export function sessionPath(value) {
-    var identity = sessionIdentity(value);
-    return "/m/" + encodeURIComponent(identity.machine) + "/s/" +
-        encodeURIComponent(identity.session);
-}
-
-/** New fleet links, plus the old local-only /s/<session> spelling. */
-export function parseSessionPath(pathname) {
-    var path = String(pathname || "");
-    var fleet = /^\/m\/([^/]+)\/s\/([^/]+)\/?$/.exec(path);
-    if (fleet) return decodedIdentity(fleet[1], fleet[2]);
-    var local = /^\/s\/([^/]+)\/?$/.exec(path);
-    return local ? decodedIdentity(encodeURIComponent(LOCAL_MACHINE), local[1]) : null;
-}
-
-function decodedIdentity(machine, session) {
-    try {
-        return sessionIdentity({
-            machine: decodeURIComponent(machine),
-            session: decodeURIComponent(session)
-        });
-    } catch (e) {
-        return null;
-    }
 }
 
 /** Protocol channel segments are printable ASCII; percent encoding preserves opaque ids. */
