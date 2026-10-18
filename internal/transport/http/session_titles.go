@@ -138,7 +138,7 @@ func (s *Server) saveSessionTitle(item session.Session, raw string, now time.Tim
 			// A later /rename is a newer human utterance and retires this local
 			// name. Capture the current transcript title only when the record
 			// exists; before the first turn there is no baseline to compare.
-			if path := recordPath(item); path != "" {
+			if path := s.recordPath(item); path != "" {
 				if _, statErr := os.Stat(path); statErr == nil {
 					row.SeenTranscriptPath = &path
 					if item.CustomTitle != "" {

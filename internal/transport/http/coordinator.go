@@ -208,7 +208,7 @@ func (s *Server) startCoordinator(w http.ResponseWriter, r *http.Request, assist
 			Message: "The machine workspace or its instructions could not be prepared; nothing was started."})
 		return
 	}
-	starter := s.starter(startReadingFrom(st.Seen.Inventory))
+	starter := s.starter(s.startReadingFrom(st.Seen.Inventory))
 	made, err := starter.Start(ctx, projects.Place{Path: workspace}, assistant, "", "", "")
 	if err != nil {
 		writeStartRefusal(w, err)

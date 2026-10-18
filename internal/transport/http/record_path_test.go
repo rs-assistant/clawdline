@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
+	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/domain/session"
 )
 
@@ -45,18 +46,58 @@ func movedClaudeSession(t *testing.T) (*transcript.Host, session.Session, string
 	return host, item, record, transcript.ClaudePath(home, moved, conv)
 }
 
-// Pins the behaviour before one resolver existed: the conversation reader
-// composed its path from the scanned directory while the host used the
-// registry's, so one Session had two records.
-func TestOneSessionHasTwoRecordsBeforeTheResolver(t *testing.T) {
+// One Session has one record. A Session that changed directory after it was
+// launched is read from the launch directory's record by every reader in this
+// package: the conversation page, the session's facts, the start screen's
+// "already open" set, and the host's own readers.
+func TestOneSessionHasOneRecord(t *testing.T) {
 	host, item, launchedRecord, movedRecord := movedClaudeSession(t)
-	if got := recordPath(item); got != movedRecord {
-		t.Fatalf("reader path = %q, want the scanned directory's %q", got, movedRecord)
+	s := &Server{inventory: app.Inventory{Identity: host}}
+	if got := s.recordPath(item); got != launchedRecord {
+		t.Fatalf("reader path = %q, want the registry's %q", got, launchedRecord)
+	}
+	if got := host.RecordPath(item); got != launchedRecord {
+		t.Fatalf("host path = %q, want %q", got, launchedRecord)
 	}
 	if a := host.LastActivity(t.Context(), item); a.Reason != "" {
-		t.Fatalf("host did not find the record at %q: %+v", launchedRecord, a)
+		t.Fatalf("host did not find the record: %+v", a)
+	}
+	page := s.transcriptPage(item.ID, item, 10)
+	if page.Note != "" || len(page.Entries) == 0 {
+		t.Fatalf("the conversation page did not read the record: %+v", page)
+	}
+	reading := s.startReadingFrom(session.Inventory{Sessions: []session.Session{item}})
+	open := launchedRecord
+	if resolved, err := filepath.EvalSymlinks(open); err == nil {
+		open = resolved
+	}
+	if !reading.openClaude[open] || len(reading.openClaude) != 1 {
+		t.Fatalf("start screen's open records = %v, want only %q", reading.openClaude, open)
 	}
 	if _, err := os.Stat(movedRecord); !os.IsNotExist(err) {
-		t.Fatalf("the reader's path should not exist: %v", err)
+		t.Fatalf("the scanned directory should hold no record: %v", err)
+	}
+}
+
+// Without a registry entry the scan's directory is the answer, as before;
+// and a daemon whose identity port is not the host still finds records there.
+func TestARecordFallsBackToTheScannedDirectory(t *testing.T) {
+	_, item, _, movedRecord := movedClaudeSession(t)
+	item.PID = 9999
+	host := transcript.NewHost()
+	host.Home = os.Getenv("HOME")
+	host.Refresh()
+	for name, s := range map[string]*Server{
+		"host":    {inventory: app.Inventory{Identity: host}},
+		"no host": {},
+	} {
+		if got := s.recordPath(item); got != movedRecord {
+			t.Fatalf("%s: path = %q, want the scan's %q", name, got, movedRecord)
+		}
+	}
+	none := item
+	none.ConversationID = ""
+	if got := (&Server{}).recordPath(none); got != "" {
+		t.Fatalf("a session with no conversation id has a record: %q", got)
 	}
 }

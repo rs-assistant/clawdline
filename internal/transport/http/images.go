@@ -175,7 +175,7 @@ func (s *Server) imagesRoute(w http.ResponseWriter, r *http.Request) {
 			writeRefusal(w, http.StatusNotFound, "session_not_found", "No Session on this machine has that terminal id.")
 			return
 		}
-		record := recordPath(item)
+		record := s.recordPath(item)
 		offset, ok := recordEnd(record)
 		if !ok {
 			writeRefusal(w, http.StatusConflict, "session_has_no_record",

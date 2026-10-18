@@ -172,8 +172,32 @@ func (h *Host) ShellOutput(ctx context.Context, s session.Session, id string, wi
 	return h.shells.Output(path, id, window)
 }
 
+// RecordPath is where this session's own conversation record is, and the
+// only place that answers it: the conversation page, the session's facts,
+// its naming and the host's own readers all ask here, so no two of them can
+// read different files for one Session. Empty means nothing names a record:
+// no conversation id, or a Claude session with no working directory at all.
+//
+// A Codex thread's rollout is found by walking the tree for its id.
+func (h *Host) RecordPath(s session.Session) string {
+	switch s.Assistant {
+	case session.AssistantClaude:
+		path, _ := h.claudeTranscript(s)
+		return path
+	case session.AssistantCodex:
+		if s.ConversationID == "" {
+			return ""
+		}
+		return CodexPath(h.Home, s.ConversationID)
+	}
+	return ""
+}
+
 // claudeTranscript is where a Claude session's transcript is, from the
 // registry's working directory when it has one and the scan's otherwise.
+// Claude Code files a conversation under the directory it was launched in,
+// which the registry keeps; the scan reports where the process is now, which
+// differs once the session has changed directory.
 func (h *Host) claudeTranscript(s session.Session) (string, bool) {
 	if s.Assistant != session.AssistantClaude || s.ConversationID == "" {
 		return "", false
