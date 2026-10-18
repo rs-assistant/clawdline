@@ -207,16 +207,22 @@ func TestALongLineIsTheRowsItWrappedOnto(t *testing.T) {
 
 // sleeper is the pid of the `sleep 600` running in a terminal, or 0. By
 // its command line, because under an emulator (qemu in a container) every
-// process's name is the emulator's.
+// process's name is the emulator's. The pane's process is the wrapper that
+// records how the shell ended (ends.go), so the sleep is its grandchild.
 func sleeper(t *testing.T, s *Server, id terminal.ID) int {
 	t.Helper()
 	pane, err := raw(t, s, "display-message", "-p", "-t", "="+id.SessionName()+":", "#{pane_pid}")
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, _ := exec.Command("pgrep", "-f", "-P", pane, "sleep 600").Output()
-	pid, _ := strconv.Atoi(strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0]))
-	return pid
+	shells, _ := exec.Command("pgrep", "-P", pane).Output()
+	for _, shell := range strings.Fields(string(shells)) {
+		out, _ := exec.Command("pgrep", "-f", "-P", shell, "sleep 600").Output()
+		if pid, _ := strconv.Atoi(strings.TrimSpace(strings.SplitN(string(out), "\n", 2)[0])); pid > 0 {
+			return pid
+		}
+	}
+	return 0
 }
 
 func alive(pid int) bool { return pid > 0 && syscall.Kill(pid, 0) == nil }

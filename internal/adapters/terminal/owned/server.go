@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,6 +50,10 @@ type Server struct {
 	// two opens at once cannot both be the eighth.
 	mu sync.Mutex
 
+	// logf is the daemon's log, for the one line a shell that ended by
+	// itself leaves; nil reads nobody's end (CountReading's Server).
+	logf func(format string, args ...any)
+
 	signal ports.PaneSignal
 	subsMu sync.Mutex
 	subs   map[string]map[*subscription]struct{}
@@ -72,7 +77,7 @@ func New(nextDir string) (*Server, error) {
 		return nil, err
 	}
 	s := &Server{sock: sock, conf: filepath.Join(dir, "term.conf"), environ: os.Environ,
-		subs: map[string]map[*subscription]struct{}{}}
+		logf: log.Printf, subs: map[string]map[*subscription]struct{}{}}
 	s.signal = tmuxterm.NewPaneSignal(filepath.Join(dir, "signal"), pipeHost{s})
 	if s.signal != nil {
 		s.signal.OnMoved(s.moved)
@@ -209,7 +214,13 @@ func (s *Server) callWithOutputLimit(ctx context.Context, stdin string, maxBytes
 		return "", terminal.Refuse(terminal.CodeHistoryTooLarge, "history capture exceeds the Cloud byte limit")
 	}
 	if err != nil {
-		return output.String(), classify(ctx, args[0], strings.TrimSpace(stderr.String()), err)
+		err = classify(ctx, args[0], strings.TrimSpace(stderr.String()), err)
+		if code, _ := terminal.CodeOf(err); code == terminal.CodeClosed {
+			// A terminal found gone may be one whose shell ended by itself;
+			// its end is said now, while somebody is looking for it.
+			s.logEnds()
+		}
+		return output.String(), err
 	}
 	return output.String(), nil
 }
@@ -281,6 +292,9 @@ func (s *Server) ensureServer(ctx context.Context) error {
 	if err := os.Chmod(dir, 0o700); err != nil {
 		return terminal.Refuse(terminal.CodeUnreachable, "the terminal server's directory: "+err.Error())
 	}
+	if err := os.MkdirAll(s.endsDir(), 0o700); err != nil {
+		return terminal.Refuse(terminal.CodeUnreachable, "the terminal server's directory: "+err.Error())
+	}
 	want := conf()
 	if have, err := os.ReadFile(s.conf); err != nil || string(have) != want {
 		tmp := s.conf + ".tmp"
@@ -324,10 +338,12 @@ func (s *Server) Open(ctx context.Context, req ports.OpenTerminal) (terminal.Ter
 	if err := s.ready(ctx); err != nil {
 		return terminal.Terminal{}, err
 	}
+	id := terminal.NewID()
 	command, err := s.paneCommand()
 	if err != nil {
 		return terminal.Terminal{}, err
 	}
+	command = append([]string{"/bin/sh", "-c", endWrapper, "clawdline-shell", s.endPath(id)}, command...)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -343,7 +359,6 @@ func (s *Server) Open(ctx context.Context, req ports.OpenTerminal) (terminal.Ter
 			fmt.Sprintf("%d terminals are open on this machine, the most it holds", len(open)))
 	}
 
-	id := terminal.NewID()
 	target := "=" + id.SessionName() + ":"
 	args := []string{"new-session", "-d", "-s", id.SessionName(),
 		"-x", strconv.Itoa(req.Cols), "-y", strconv.Itoa(req.Rows),
@@ -399,6 +414,7 @@ func (s *Server) List(ctx context.Context) ([]terminal.Terminal, error) {
 		return nil, err
 	}
 	terms := parseList(out)
+	s.logEnds()
 	if terms == nil {
 		terms = []terminal.Terminal{}
 	}
