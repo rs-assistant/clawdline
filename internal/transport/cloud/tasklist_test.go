@@ -505,7 +505,7 @@ func TestTheTaskListIsCutToItsByteBound(t *testing.T) {
 	for i := 0; i < TaskListLimit; i++ {
 		rows = append(rows, map[string]any{"id": taskID(i), "state": "briefed", "title": title, "created": 10_000 - i})
 	}
-	projected, omitted := projectTasks(rows, nil)
+	projected, omitted := projectTasks(rows, nil, nil)
 	encoded := mustJSON(projected)
 	// The records and their commas, without the brackets around them.
 	if size := len(encoded) - 2; size > TaskListBytesLimit || size < TaskListBytesLimit-len(mustJSON(projected[0])) {
