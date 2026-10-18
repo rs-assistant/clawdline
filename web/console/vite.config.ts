@@ -13,7 +13,9 @@ const daemon = process.env.CLAWDLINE_NEXT_ORIGIN ?? "http://127.0.0.1:7727"
 
 export default defineConfig({
   plugins: [react()],
-  base: "./",
+  // Hosted routes live below the origin root (/admin/accounts, for example),
+  // while a daemon-served console still needs relative asset URLs.
+  base: process.env.VITE_HOSTED_CONSOLE ? "/" : "./",
   server: {
     port: 5273,
     proxy: {
