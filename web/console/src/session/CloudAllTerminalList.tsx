@@ -112,7 +112,9 @@ export function CloudAllTerminalList({ shown, filter, reloadRef }: {
     openTerminalPage(row.project, row.terminal.id)
   }
 
-  if (!host) return <p className="terminal-list-message" role="status">{nextWord("terminalCloudLineReconnecting")}</p>
+  if (!host) return <div className="session-terminal-list" aria-busy="true">
+    <p className="sr-only" role="status">{nextWord("terminalCloudLineReconnecting")}</p><TerminalRowsSkeleton />
+  </div>
   return <div className="session-terminal-list" aria-busy={loading ? "true" : undefined}>
     <h2 className="terminal-sr">{nextWord("terminalListMode")}</h2>
     {projectError && <div className="terminal-list-message" role="alert">{nextWord("terminalProjectsFailedCode", { code: projectError })} <button type="button" onClick={retry}>{nextWord("terminalAllRetry")}</button></div>}
@@ -137,8 +139,8 @@ export function CloudAllTerminalList({ shown, filter, reloadRef }: {
           <button type="button" onClick={() => repairPairing(error.machine)}>{nextWord("terminalAllRepairPairing")}</button> :
           <button type="button" onClick={retry} disabled={loading}>{nextWord("terminalAllRetry")}</button>}</p>
     })}
-    {loading && <p className="terminal-list-message terminal-list-progress" role="status"><span className="terminal-list-spinner" aria-hidden="true" />{nextWord("terminalListLoading")}</p>}
-    {loading && !rows.length && <div className="terminal-list-skeleton" aria-hidden="true"><span /><span /></div>}
+    {loading && <p className="sr-only" role="status">{nextWord("terminalListLoading")}</p>}
+    {loading && !rows.length && <TerminalRowsSkeleton />}
     {!loading && !projectError && !matching.length && query &&
       <p className="terminal-list-message">{nextWord("terminalAllEmptyFilter")}</p>}
     {!loading && !projectError && !errors.length && !matching.length && !query &&
@@ -159,4 +161,23 @@ export function CloudAllTerminalList({ shown, filter, reloadRef }: {
       </button>
     </li>)}</ul>
   </div>
+}
+
+/**
+ * The list before its first answer: rows in the cards' own frame (`.session-terminal-rows`, the
+ * marks column, three lines and the folder), so the real rows take their places without a jump.
+ * The words for a screen reader are said apart, in the status line above it.
+ */
+function TerminalRowsSkeleton() {
+  return <ul className="session-terminal-rows terminal-list-skeleton" aria-hidden="true">{[0, 1, 2].map((index) => <li key={index}>
+    <span className="session-terminal-card">
+      <span className="session-terminal-marks"><span className="terminal-skel terminal-skel-glyph" /></span>
+      <span className="session-terminal-main terminal-skel-main">
+        <span className="terminal-skel terminal-skel-title" />
+        <span className="terminal-skel terminal-skel-line" />
+        <span className="terminal-skel terminal-skel-line terminal-skel-short" />
+        <span className="terminal-skel terminal-skel-line terminal-skel-dir" />
+      </span>
+    </span>
+  </li>)}</ul>
 }
