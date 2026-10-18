@@ -8,7 +8,7 @@ import { TerminalObservation } from "../cloud/terminal-observation.js"
 import { openTerminalPage } from "../pages/terminal/navigate.js"
 import { TAB } from "../pages/terminal/tab.js"
 import { holderWords, terminalRefusalWords, terminalShortID, terminalStatusWords } from "../pages/terminal/words.js"
-import { collectCloudTerminals, readCloudTerminalList, terminalListErrorKind, withTerminalListRetries, CLOUD_TERMINAL_LIST_RETRY_DELAYS_MS,
+import { collectCloudTerminals, readCloudTerminalList, terminalListNotices, withTerminalListRetries, CLOUD_TERMINAL_LIST_RETRY_DELAYS_MS,
   type CloudTerminalRow, type CloudTerminalError } from "./cloud-terminal-all.js"
 import { recentTerminalCloseStates, terminalCloseRevision, terminalCloseState, watchTerminalClose } from "../cloud/terminal-close-state.js"
 import { openMachinePairing } from "../legacy/devices-bridge.js"
@@ -117,27 +117,31 @@ export function CloudAllTerminalList({ shown, filter, reloadRef }: {
   </div>
   return <div className="session-terminal-list" aria-busy={loading ? "true" : undefined}>
     <h2 className="terminal-sr">{nextWord("terminalListMode")}</h2>
-    {projectError && <div className="terminal-list-message" role="alert">{nextWord("terminalProjectsFailedCode", { code: projectError })} <button type="button" onClick={retry}>{nextWord("terminalAllRetry")}</button></div>}
     {routeError && <p className="terminal-list-message" role="alert">{routeError}</p>}
     {latestClose && <p className="terminal-list-message" role="status">
       {nextWord("terminalIdentity", { id: terminalShortID(latestClose.terminal) })} · {nextWord(latestClose.status === "ok" ? "terminalTerminateSucceeded" :
         latestClose.status === "ended" ? "terminalTerminateEnded" : latestClose.status === "pending" ? "terminalTerminatePending" :
           latestClose.status === "unknown" ? "terminalTerminateUnknown" : "terminalCloudError",
         { code: terminalRefusalWords(latestClose.error) })}</p>}
-    {errors.map((error) => {
-      const machineName = fleet?.machines.find((machine) => machine.id === error.machine)?.name ?? error.machine
-      const kind = terminalListErrorKind(error.code)
-      if (kind === "retryable" && loading && retrying > 0) {
-        return <p className="terminal-list-message" role="status" key={error.machine}>
-          {nextWord("terminalAllMachineRetrying", { machine: machineName, why: error.code,
-            attempt: String(retrying), max: String(CLOUD_TERMINAL_LIST_RETRY_DELAYS_MS.length) })}</p>
-      }
-      return <p className="terminal-list-message" role="alert" key={error.machine}>
-        {kind === "denied" ? nextWord("terminalAllMachineAccessDenied", { machine: machineName }) :
-          kind === "retryable" ? nextWord("terminalAllMachineUnverified", { machine: machineName, why: error.code }) :
-            nextWord("terminalAllMachineFailed", { machine: machineName, why: error.code })} {kind === "denied" ?
-          <button type="button" onClick={() => repairPairing(error.machine)}>{nextWord("terminalAllRepairPairing")}</button> :
-          <button type="button" onClick={retry} disabled={loading}>{nextWord("terminalAllRetry")}</button>}</p>
+    {terminalListNotices(projectError, errors, host.machine, loading && retrying > 0).map((notice) => {
+      const machineName = fleet?.machines.find((machine) => machine.id === notice.machine)?.name || notice.machine
+      const checking = notice.kind === "checking"
+      return <section className="terminal-list-notice" data-tone={notice.kind === "offline" || checking ? "warn" : "bad"}
+        role={checking ? "status" : "alert"} key={notice.key}>
+        <strong>{notice.kind === "offline" ? nextWord("terminalNoticeOfflineTitle", { machine: machineName }) :
+          notice.kind === "denied" ? nextWord("terminalNoticeDeniedTitle", { machine: machineName }) :
+          checking || notice.kind === "unverified" ? nextWord("terminalNoticeCheckingTitle", { machine: machineName }) :
+          notice.kind === "projects" ? nextWord("terminalNoticeProjectsTitle") : nextWord("terminalNoticeFailedTitle", { machine: machineName })}</strong>
+        <p>{notice.kind === "offline" ? nextWord("terminalNoticeOfflineBody") : notice.kind === "denied" ? nextWord("terminalNoticeDeniedBody") :
+          checking ? nextWord("terminalNoticeCheckingBody", { attempt: String(retrying), max: String(CLOUD_TERMINAL_LIST_RETRY_DELAYS_MS.length) }) :
+          notice.kind === "unverified" ? nextWord("terminalNoticeUnverifiedBody") : terminalRefusalWords(notice.code) !== notice.code ? terminalRefusalWords(notice.code) : nextWord("terminalNoticeFailedBody")}</p>
+        <div className="terminal-list-notice-foot">
+          <code>{notice.code}</code>
+          {!checking && (notice.kind === "denied"
+            ? <button type="button" onClick={() => repairPairing(notice.machine)}>{nextWord("terminalAllRepairPairing")}</button>
+            : <button type="button" onClick={retry} disabled={loading}>{nextWord("terminalAllRetry")}</button>)}
+        </div>
+      </section>
     })}
     {loading && <p className="sr-only" role="status">{nextWord("terminalListLoading")}</p>}
     {loading && !rows.length && <TerminalRowsSkeleton />}

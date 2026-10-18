@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { Terminal } from "@clawdline/contract"
 // @ts-expect-error -- Node strips TypeScript for this focused test.
-import { collectCloudTerminals, readCloudTerminalList, terminalListErrorKind, withTerminalListRetries, CLOUD_TERMINAL_LIST_RETRY_DELAYS_MS } from "./cloud-terminal-all.ts"
+import { collectCloudTerminals, noticeCode, readCloudTerminalList, terminalListErrorKind, terminalListNotices, withTerminalListRetries, CLOUD_TERMINAL_LIST_RETRY_DELAYS_MS } from "./cloud-terminal-all.ts"
 
 test("a relay grant refusal retries one list read after renewal without retrying other errors", async () => {
   let calls = 0
@@ -132,4 +132,22 @@ test("a list refusal the machine could not verify is retried, a denial is not", 
     return { rows: [], errors: [{ machine: "mac", code: "terminal_busy" }] }
   }, () => {}, () => live, async () => { live = false })
   assert.equal(reads, 1)
+})
+
+test("an offline machine is one card, not a Project failure and a terminal failure", () => {
+  // 2026-10-18: two paragraphs, two codes and two Try again buttons for one offline machine.
+  assert.deepEqual(terminalListNotices("machine_offline: the machine is not connected to the relay",
+    [{ machine: "mac_1", code: "machine_offline" }], "mac_1", false),
+  [{ key: "machine:mac_1", kind: "offline", machine: "mac_1", code: "machine_offline" }])
+  assert.deepEqual(terminalListNotices("machine_offline: gone", [], "mac_1", false),
+    [{ key: "projects", kind: "offline", machine: "mac_1", code: "machine_offline" }])
+})
+
+test("each other failure keeps its own card and kind", () => {
+  assert.deepEqual(terminalListNotices("project_list_failed", [{ machine: "mac_1", code: "terminal_forbidden" }], "mac_1", false).map((n) => n.kind),
+    ["projects", "denied"])
+  assert.equal(terminalListNotices("", [{ machine: "mac_1", code: "terminal_busy" }], "mac_1", true)[0].kind, "checking")
+  assert.equal(terminalListNotices("", [{ machine: "mac_1", code: "terminal_busy" }], "mac_1", false)[0].kind, "unverified")
+  assert.equal(terminalListNotices("", [{ machine: "mac_1", code: "terminal_bad_receipt" }], "mac_1", false)[0].kind, "failed")
+  assert.equal(noticeCode("machine_offline: the machine is not connected"), "machine_offline")
 })

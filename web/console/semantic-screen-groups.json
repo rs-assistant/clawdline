@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6101,
-  "riskKeys": 2911,
-  "nonRiskCount": 3190,
+  "englishContentKeys": 6111,
+  "riskKeys": 2916,
+  "nonRiskCount": 3195,
   "groups": [
     {
       "name": "bar / other",
@@ -2457,7 +2457,7 @@
     },
     {
       "name": "next / terminal",
-      "count": 125,
+      "count": 130,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2539,6 +2539,11 @@
         "next.terminalMoreActions",
         "next.terminalMoreKeys",
         "next.terminalNeedsReviewContinue",
+        "next.terminalNoticeCheckingBody",
+        "next.terminalNoticeDeniedTitle",
+        "next.terminalNoticeFailedTitle",
+        "next.terminalNoticeOfflineTitle",
+        "next.terminalNoticeProjectsTitle",
         "next.terminalNowHeldBy",
         "next.terminalNowHeldByYou",
         "next.terminalNowNobody",

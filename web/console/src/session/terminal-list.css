@@ -34,6 +34,17 @@
 .terminal-skel-line { width: 58%; height: 10px; margin-top: 3px; }
 .terminal-skel-short { width: 34%; }
 .terminal-skel-dir { width: 72%; }
+/* A failure above the rows (terminalListNotices): one card per cause, its title, what it means,
+   the code small, and the one way forward. */
+.terminal-list-notice { display: grid; gap: 6px; margin: 4px 0 10px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.terminal-list-notice strong { display: flex; align-items: center; gap: 8px; font-size: 14px; line-height: 1.4; color: var(--ink); }
+.terminal-list-notice strong::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
+.terminal-list-notice[data-tone="warn"] strong::before { background: var(--warn); }
+.terminal-list-notice p { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.55; }
+.terminal-list-notice-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.terminal-list-notice code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); font: 11.5px var(--mono); }
+.terminal-list-notice button { flex: none; min-height: 40px; padding: 0 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--card-hi); color: var(--ink); font: 600 13px var(--ui); cursor: pointer; }
+.terminal-list-notice button:disabled { opacity: .5; cursor: progress; }
 .sheet #start-mode-panel [hidden] { display: none; }
 .session-mode-tabs { flex: 0 0 auto; align-self: stretch; display: flex; overflow: hidden; border: 1px solid var(--line); border-radius: 9px; }
 .filter-row .session-mode-tabs .session-mode-choice { border: 0; border-radius: 0; }
