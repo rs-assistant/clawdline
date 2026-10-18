@@ -363,6 +363,25 @@
   },
   {
     "Register": "daemon",
+    "Name": "cache.session_project_keys",
+    "Class": "cache",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/transport/http.ProjectKeyCacheLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cache.session_skills",
     "Class": "cache",
     "Unit": "rows",

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6055,
-  "riskKeys": 2895,
-  "nonRiskCount": 3160,
+  "englishContentKeys": 6061,
+  "riskKeys": 2899,
+  "nonRiskCount": 3162,
   "groups": [
     {
       "name": "bar / other",
@@ -3586,7 +3586,7 @@
     },
     {
       "name": "work / other",
-      "count": 64,
+      "count": 66,
       "sources": [
         "src/pages/work/words.ts"
       ],
@@ -3597,6 +3597,8 @@
         "work.answerLater",
         "work.answerTrack",
         "work.apply",
+        "work.assignSessionsLoading",
+        "work.assignSessionsRetry",
         "work.assignedViaSession",
         "work.assignedViaSessionPersona",
         "work.backProjects",

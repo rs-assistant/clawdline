@@ -410,6 +410,7 @@ export function statusSource(current: () => StatusClient | null,
             observedAt: trustworthyListTime ? listObservedAt : undefined,
             assistant: session.assistant === "claude" || session.assistant === "codex" ? session.assistant : undefined,
             cwd: typeof session.cwd === "string" ? session.cwd : undefined,
+            projectKey: typeof session.project_key === "string" ? session.project_key : undefined,
             status: status && typeof status.work_state === "string" &&
               (statusState === "working" || statusState === "waiting" || statusState === "idle" || statusState === "unknown")
               ? status as Partial<SessionRow> : undefined,

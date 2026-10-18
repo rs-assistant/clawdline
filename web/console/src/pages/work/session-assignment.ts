@@ -2,8 +2,10 @@
 import { catalogFormat } from "../../catalog.ts"
 // @ts-expect-error -- Node's strip-types test runner needs the source extension.
 import { catalogWord } from "../../catalog.ts"
-import type { Assistant, SessionRow } from "@clawdline/contract"
+import type { Assistant, Scan, SessionRow } from "@clawdline/contract"
 import type { SessionWorkV2 } from "./api.js"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { workWord } from "./words.ts"
 
 export interface SessionWorkCounts {
   board: number
@@ -63,6 +65,16 @@ export function sessionWorkCounts(page: SessionWorkV2): SessionWorkCounts {
 }
 
 /**
+ * The Project a Session would be accepted into. The daemon decides it with the
+ * claim's own rule (`project_key`: the nearest repository, a linked worktree
+ * followed to the repository it belongs to); a machine too old to say falls
+ * back to the exact working directory, which is what it was compared by before.
+ */
+export function sessionProjectKey(session: Pick<SessionRow, "cwd" | "project_key">): string | undefined {
+  return session.project_key || session.cwd || undefined
+}
+
+/**
  * The Sessions an item can be handed to: those working in its Project with a
  * conversation id, less the one that already owns it — moving an item to its
  * own owner is refused by the daemon (`assignment_unchanged`).
@@ -71,7 +83,183 @@ export function assignmentCandidates(
   sessions: SessionRow[],
   item: { project: { path: string }; owner_session: string | null },
 ): SessionRow[] {
-  return sessions.filter((s) => s.cwd === item.project.path && s.sessionId && s.sessionId !== item.owner_session)
+  return sessions.filter((s) => sessionProjectKey(s) === item.project.path && s.sessionId && s.sessionId !== item.owner_session)
+}
+
+/**
+ * What the Board knows about the Session list it picks from. The list is read
+ * after the Board itself, so until that read answers there is no list at all,
+ * which is not the same as a list with nothing in it. `settling` names the rows
+ * first listed less than ASSIGNMENT_SETTLE_MS before this answer: only they may
+ * still be waiting for a cwd or a conversation id.
+ */
+export type SessionListReading =
+  | { phase: "loading" }
+  | { phase: "failed"; error: string }
+  | { phase: "ready"; complete: boolean; settling: readonly string[] }
+
+/**
+ * How long a row without its cwd or conversation id keeps the list from saying
+ * "none". A Session that is still being read names itself within a pass or two;
+ * one that never will (nobody typed into it, its transcripts are ambiguous, the
+ * machine cannot read its open files, it is not an assistant at all) must not
+ * hold the dialog incomplete for as long as it runs.
+ */
+export const ASSIGNMENT_SETTLE_MS = 60_000
+
+/**
+ * Whether a `/v1/sessions` answer may say there is nothing, by the daemon's
+ * own rule for `emptyAuthoritative` (internal/transport/http/sessions.go,
+ * `EmptyAuthoritative: inv.Complete && len(inv.DisabledSources) == 0`): a
+ * source turned off was not looked at, so an empty list says nothing about it
+ * either. Cloud's relay snapshot says `complete: false` until every machine's
+ * inventory has arrived.
+ */
+export function sessionListComplete(scan: Pick<Scan, "complete" | "sources">): boolean {
+  return scan.complete && !(scan.sources ?? []).some((source) => source.disabled)
+}
+
+/** The choices "assign to an existing Session" can offer, and whether "none" may be said. */
+export type AssignmentChoices =
+  | { phase: "loading" }
+  | { phase: "failed"; error: string; rows: SessionRow[] }
+  | { phase: "incomplete"; rows: SessionRow[] }
+  | { phase: "empty" }
+  | { phase: "candidates"; rows: SessionRow[] }
+
+/**
+ * Only a complete answer may say the Project has no Session. A row that could
+ * be in the Project but has no cwd or conversation id yet keeps the list
+ * incomplete while it is settling: it may be the Session the person is looking
+ * for. A row the machine said it cannot name (`ambiguous`, `unreadable`) is an
+ * answer, not a wait.
+ */
+export function assignmentChoices(
+  reading: SessionListReading,
+  sessions: SessionRow[],
+  item: { project: { path: string }; owner_session: string | null },
+): AssignmentChoices {
+  if (reading.phase === "loading") return { phase: "loading" }
+  const rows = assignmentCandidates(sessions, item)
+  if (reading.phase === "failed") return { phase: "failed", error: reading.error, rows }
+  const settling = new Set(reading.settling)
+  const unsettled = sessions.some((s) => {
+    if (s.sessionId && s.sessionId === item.owner_session) return false
+    if (!settling.has(s.id) || s.identity === "ambiguous" || s.identity === "unreadable") return false
+    const key = sessionProjectKey(s)
+    return !key || (key === item.project.path && !s.sessionId)
+  })
+  if (!reading.complete || unsettled) return { phase: "incomplete", rows }
+  return rows.length ? { phase: "candidates", rows } : { phase: "empty" }
+}
+
+/** A `/v1/sessions` answer, as the Board reads it. */
+export interface SessionListAnswer {
+  sessions: SessionRow[]
+  scan: Pick<Scan, "complete" | "sources">
+}
+
+/** What one read of the Session list did: whether it reached the page, and its failure. */
+export interface SessionListOutcome {
+  applied: boolean
+  error?: string
+}
+
+/** What the page shows of the Session list. */
+export interface SessionListState {
+  reading: SessionListReading
+  sessions: SessionRow[]
+}
+
+export interface SessionListReaderOptions {
+  read: () => Promise<SessionListAnswer>
+  publish: (state: SessionListState) => void
+  words: (error: unknown) => string
+  /** A newer answer arrived after this failure was shown: its notice is stale. */
+  recovered?: (failure: string) => void
+  now?: () => number
+}
+
+/**
+ * The Board's reading of the Session list: the 30-second Board load and the
+ * picker's retry both read through it. Every read takes a sequence number and
+ * an answer is shown only when it is newer than the one on screen, so a slow
+ * old answer — success or failure — never replaces a newer one. The retry
+ * reads `/v1/sessions` and nothing else; the Board behind the dialog stays as
+ * it is.
+ */
+export class SessionListReader {
+  state: SessionListState = { reading: { phase: "loading" }, sessions: [] }
+  private issued = 0
+  private shown = 0
+  private failure = ""
+  /** When each listed row was first seen, by row id; only listed rows are kept. */
+  private firstSeen = new Map<string, number>()
+
+  private readonly options: SessionListReaderOptions
+
+  constructor(options: SessionListReaderOptions) {
+    this.options = options
+  }
+
+  /** The Board load's read: what is on screen stays until the answer. */
+  refresh(): Promise<SessionListOutcome> {
+    return this.ask()
+  }
+
+  /** The picker's "read again": says loading at once and reads only the Session list. */
+  readonly retry = (): void => {
+    this.set({ ...this.state, reading: { phase: "loading" } })
+    void this.ask()
+  }
+
+  private async ask(): Promise<SessionListOutcome> {
+    const sequence = ++this.issued
+    let answer: SessionListAnswer
+    try {
+      answer = await this.options.read()
+    } catch (error) {
+      if (sequence <= this.shown) return { applied: false }
+      this.shown = sequence
+      const words = this.options.words(error)
+      this.failure = words
+      this.set({ ...this.state, reading: { phase: "failed", error: words } })
+      return { applied: true, error: words }
+    }
+    if (sequence <= this.shown) return { applied: false }
+    this.shown = sequence
+    const now = (this.options.now ?? Date.now)()
+    const seen = new Map<string, number>()
+    for (const row of answer.sessions) seen.set(row.id, this.firstSeen.get(row.id) ?? now)
+    this.firstSeen = seen
+    const settling = answer.sessions.filter((row) => now - (seen.get(row.id) ?? now) < ASSIGNMENT_SETTLE_MS).map((row) => row.id)
+    this.set({ sessions: answer.sessions, reading: { phase: "ready", complete: sessionListComplete(answer.scan), settling } })
+    const failure = this.failure
+    this.failure = ""
+    if (failure) this.options.recovered?.(failure)
+    return { applied: true }
+  }
+
+  private set(state: SessionListState): void {
+    this.state = state
+    this.options.publish(state)
+  }
+}
+
+/** The rows a picker lists for these choices. */
+export function assignmentChoiceRows(choices: AssignmentChoices): SessionRow[] {
+  return "rows" in choices ? choices.rows : []
+}
+
+/** The sentence the picker says with its rows, or null when the rows say it all. */
+export function assignmentChoicesWords(choices: AssignmentChoices): string | null {
+  switch (choices.phase) {
+    case "loading": return workWord("assignSessionsLoading")
+    case "failed": return workWord("assignSessionsFailed", { error: choices.error })
+    case "incomplete": return workWord("assignSessionsIncomplete")
+    case "empty": return catalogWord("inline", "7b9c3fe68d48")
+    case "candidates": return null
+  }
 }
 
 /** The assistants a new Session can be opened with, in the order the Board offers them. */

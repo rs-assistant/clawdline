@@ -6871,6 +6871,15 @@ export interface SessionRow {
    * process reading.
    */
   persona?: string
+
+  /**
+   * The Project this Session would be accepted into, decided from `cwd` by the same
+   * rule an assignment's claim applies: the nearest repository, with a linked
+   * worktree followed to the repository it belongs to and symlinks resolved. A
+   * Board item's `project.path` is compared with it. Absent when `cwd` is absent or
+   * not absolute.
+   */
+  project_key?: string
   root_assignment?: RootAssignmentRecord
   screen_reading?: SessionScreenReading
 

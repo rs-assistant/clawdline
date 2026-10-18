@@ -377,6 +377,18 @@ test("a stale retained status pass recovers from one pinned machine list without
   assert.deepEqual(calls, ["sessions.list:" + machineID])
 })
 
+test("a machine list's project key travels beside its cwd, so the Board picks a worktree Session over Cloud", async () => {
+  const { client } = clientFixture()
+  client.listPresentationsForMachine = async () => ({ at: Math.floor(Date.now() / 1000), complete: true,
+    sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "The real title", assistant: "claude",
+      cwd: "/repo/.worktrees/feature", project_key: "/repo",
+      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "" } }] })
+  const source = statusSource(() => client as never)
+  await source.readMachine(machineID, new AbortController().signal)
+  assert.deepEqual((await source.readMachinePresentations?.(machineID, new AbortController().signal))
+    ?.map((row) => [row.cwd, row.projectKey]), [["/repo/.worktrees/feature", "/repo"]])
+})
+
 test("a direct fallback refreshes its presentation after the short gap window", async () => {
   const { client, calls } = clientFixture()
   client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))

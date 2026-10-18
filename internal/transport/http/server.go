@@ -139,6 +139,9 @@ type Server struct {
 	// executions remembers what observeExecutions last committed, so an
 	// unchanged scan does not open a write transaction (execution_memo.go).
 	executions executionMemo
+	// projectKeys holds each working directory's Project key for the
+	// session list's `project_key` (project_keys.go).
+	projectKeys projectKeyCache
 	// turns keeps each working session's turn start steady across readings,
 	// so `working_since` is a change only when a new turn starts (sessions.go).
 	turns workingClock

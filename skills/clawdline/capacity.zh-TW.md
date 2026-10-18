@@ -21,6 +21,7 @@
 | `cache.session_execution_memo` | 4096 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cache.session_inventory` | 120 | `seconds` | `expire` | `diagnostics` | — |
 | `cache.session_links` | 64 | `rows` | `evict_oldest` | `diagnostics, notice` | — |
+| `cache.session_project_keys` | 256 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cache.session_skills` | 64 | `rows` | `evict_oldest` | `diagnostics, notice` | — |
 | `cache.source_answer` | 30 | `seconds` | `expire` | `diagnostics` | — |
 | `cache.terminal_screens` | 64 | `rows` | `evict_oldest` | `diagnostics, notice` | — |

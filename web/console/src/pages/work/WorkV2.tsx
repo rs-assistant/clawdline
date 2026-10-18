@@ -72,7 +72,9 @@ import {
   type SessionWorkV2,
 } from "./api.js"
 import {
-  assignmentCandidates,
+  assignmentChoiceRows,
+  assignmentChoices,
+  assignmentChoicesWords,
   assistantName,
   awaitsAcceptance,
   NEW_SESSION_ASSISTANTS,
@@ -81,6 +83,9 @@ import {
   sessionActivityName,
   sessionWorkCounts,
   sessionWorkLabel,
+  type AssignmentChoices,
+  SessionListReader,
+  type SessionListReading,
 } from "./session-assignment.js"
 import { workV2CreateDecision, type WorkV2CreateDecision } from "./create-decision.js"
 import { claimedViaLine, createdViaLine, epicOwnerLine, originLine, workOrigin, workWord } from "./words.js"
@@ -103,6 +108,16 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
   const [items, setItems] = useState<WorkV2Item[]>([])
   const [places, setPlaces] = useState<ProjectPlace[]>([])
   const [sessions, setSessions] = useState<SessionRow[]>([])
+  const [failure, setFailure] = useState("")
+  // The Board load and the picker's retry read the Session list through one
+  // reader, which keeps the newest answer on screen (session-assignment.ts).
+  const [sessionReader] = useState(() => new SessionListReader({
+    read: readSessionsForWorkV2,
+    publish: (state) => { setSessions(state.sessions); setSessionList(state.reading) },
+    words: failureWords,
+    recovered: (notice) => setFailure((current) => current === notice ? "" : current),
+  }))
+  const [sessionList, setSessionList] = useState<SessionListReading>(() => sessionReader.state.reading)
   const [proposals, setProposals] = useState<WorkV2Proposal[]>([])
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [project, setProject] = useState("")
@@ -124,7 +139,6 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState("")
   const [busy, setBusy] = useState("")
-  const [failure, setFailure] = useState("")
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
   const loadGeneration = useRef(0)
   const answeredDecisionIDs = useRef(new Set<string>())
@@ -150,7 +164,7 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
       // Sessions can be the slowest inventory read. Start the independent
       // reads now; the Board waits only for the Project catalog it needs to
       // resolve the URL, never for those reads before it starts its own.
-      const supportRead = Promise.allSettled([readSessionsForWorkV2(), readWorkV2Proposals(), readDecisions()])
+      const supportRead = Promise.allSettled([sessionReader.refresh(), readWorkV2Proposals(), readDecisions()])
       const projects = await readProjectPlaces()
       const selectedProject = workProjectID(routeProject, projects.places)
       const work = await readWorkV2(selectedProject || undefined, status, search)
@@ -168,11 +182,14 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
       // slow Session, proposal, decision, or Epic-family request.
       void supportRead.then(([live, suggestions, questions]) => {
         if (generation !== loadGeneration.current) return
-        if (live.status === "fulfilled") setSessions(live.value.sessions)
         if (suggestions.status === "fulfilled") setProposals(suggestions.value.rows)
         if (questions.status === "fulfilled") setDecisions(questions.value.rows.filter((row) => !answeredDecisionIDs.current.has(row.id)))
-        const failed = [live, suggestions, questions].find((result) => result.status === "rejected")
-        if (failed?.status === "rejected") setFailure(failureWords(failed.reason))
+        // The Session list applied its own answer; its failure is named here
+        // only when that answer is the one on screen.
+        const sessionFailure = live.status === "fulfilled" && live.value.applied ? live.value.error : undefined
+        const failed = [suggestions, questions].find((result) => result.status === "rejected")
+        if (sessionFailure) setFailure(sessionFailure)
+        else if (failed?.status === "rejected") setFailure(failureWords(failed.reason))
       })
       void readEpicFamily(selectedProject, status, search, work).then((relatives) => {
         if (generation === loadGeneration.current) setFamily(relatives)
@@ -190,7 +207,7 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
     } finally {
       if (generation === loadGeneration.current) setRefreshing(false)
     }
-  }, [routeProject, status, search])
+  }, [routeProject, status, search, sessionReader])
   const loadMore = useCallback(async () => {
     if (!nextCursor || paging) return
     const generation = loadGeneration.current
@@ -470,10 +487,10 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
     }} />}
     {createdItem && <CreatedWorkModal item={createdItem} sessions={sessions} decisions={decisionsForWorkItem(decisions, createdItem.id)} decisionAnswers={decisionAnswers} busy={busy} failure={failure}
       detailLoading={false} detailError="" retryDetail={() => void readWorkV2Item(createdItem.id).then((answer) => setCreatedItem([...answeredDecisionIDs.current].reduce(withoutAnsweredWait, answer.item))).catch((error: unknown) => setFailure(failureWords(error)))}
-      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} onClose={() => setCreatedItem(null)} />}
+      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} sessionList={sessionList} retrySessions={sessionReader.retry} onClose={() => setCreatedItem(null)} />}
     {openedItem && <CreatedWorkModal item={openedItem} created={false} key={openedItem.id} back={detailReturn.current} sessions={sessions} decisions={decisionsForWorkItem(decisions, openedItem.id)} decisionAnswers={decisionAnswers} busy={busy} failure={failure}
       detailLoading={detailLoading} detailError={detailError} retryDetail={() => refreshDetail(openedItem.id)}
-      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} onClose={() => setOpenedItem(null)} />}
+      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} sessionList={sessionList} retrySessions={sessionReader.retry} onClose={() => setOpenedItem(null)} />}
   </EpicFamilyContext.Provider>
 }
 
@@ -773,9 +790,11 @@ function CompactWorkCard({ item, sessions, nowSeconds, decisions, onOpen }: {
   </article>
 }
 
-function WorkCard({ item, sessions, decisions, decisionAnswers, busy, failure, clearFailure, run, answerWorkDecision, detailLoading, detailError, retryDetail, focusAssignment = false, reportsExpanded = false, foldDescription = false }: {
+function WorkCard({ item, sessions, sessionList, retrySessions, decisions, decisionAnswers, busy, failure, clearFailure, run, answerWorkDecision, detailLoading, detailError, retryDetail, focusAssignment = false, reportsExpanded = false, foldDescription = false }: {
   item: WorkV2Item
   sessions: SessionRow[]
+  sessionList: SessionListReading
+  retrySessions: () => void
   decisions: Decision[]
   decisionAnswers: Record<string, DecisionAnswerStatus>
   busy: string
@@ -861,7 +880,7 @@ function WorkCard({ item, sessions, decisions, decisionAnswers, busy, failure, c
     })
   }
   const imagePicker = useRef<HTMLInputElement>(null)
-  const eligible = useMemo(() => assignmentCandidates(sessions, item), [sessions, item.project.path, item.owner_session])
+  const choices = useMemo(() => assignmentChoices(sessionList, sessions, item), [sessionList, sessions, item.project.path, item.owner_session])
   const owner = item.owner_session ? sessions.find((session) => session.sessionId === item.owner_session) : undefined
   const assignable = item.area !== "planning" && !item.closed_at && !item.owner_session
   const reassignable = item.area !== "planning" && !item.closed_at && !!item.owner_session
@@ -966,7 +985,7 @@ function WorkCard({ item, sessions, decisions, decisionAnswers, busy, failure, c
       {reassignable && <p className="work-reassign-note">{catalogWord("inline", "58f4894c12b1")}</p>}
       <section className="work-assignment-route" aria-labelledby={`work-assign-existing-${item.id}`}>
         <h4 id={`work-assign-existing-${item.id}`}>{catalogWord("inline", "c8232bd59817")}</h4>
-        <SessionAssignmentPicker sessions={eligible} value={terminal} onChange={setTerminal} autoFocus={!focusAssignment && epic && reassigning} />
+        <SessionAssignmentPicker choices={choices} onRetry={retrySessions} value={terminal} onChange={setTerminal} autoFocus={!focusAssignment && epic && reassigning} />
         {terminal && <button className="chip on work-assignment-action" type="button" disabled={!!busy} aria-busy={busy === item.id && assigningRoute === "existing"}
           onClick={() => assign("existing", () => assignWorkV2(item, terminal))}>
           {busy === item.id && assigningRoute === "existing" && <span className="work-assignment-spinner" aria-hidden="true" />}
@@ -1152,13 +1171,16 @@ interface SessionWorkReading {
   update?: MachineNeedsUpdate | null
 }
 
-function SessionAssignmentPicker({ sessions, value, onChange, autoFocus = false }: {
-  sessions: SessionRow[]
+function SessionAssignmentPicker({ choices, onRetry, value, onChange, autoFocus = false }: {
+  choices: AssignmentChoices
+  onRetry: () => void
   value: string
   onChange: (id: string) => void
   autoFocus?: boolean
 }) {
   const [open, setOpen] = useState(false)
+  const sessions = useMemo(() => assignmentChoiceRows(choices), [choices])
+  const said = assignmentChoicesWords(choices)
   const personas = usePersonas()
   const [readings, setReadings] = useState<Record<string, SessionWorkReading>>({})
   const root = useRef<HTMLDivElement>(null)
@@ -1219,7 +1241,10 @@ function SessionAssignmentPicker({ sessions, value, onChange, autoFocus = false 
     {open && <div className="work-session-menu" role="listbox" aria-label={catalogWord("inline", "498ac2845b60")}>
       {sessions.map((session) => <SessionChoice key={session.id} session={session} reading={readings[session.id]}
         selected={session.id === value} onChoose={() => choose(session.id)} />)}
-      {!sessions.length && <p className="work-project-empty">{catalogWord("inline", "7b9c3fe68d48")}</p>}
+      {/* Only a complete answer says the Project has none; loading, failed and
+          incomplete lists say so instead (session-assignment.ts). */}
+      {said && <p className="work-project-empty" role={choices.phase === "failed" ? "alert" : "status"}>{said}</p>}
+      {choices.phase === "failed" && <button className="chip work-session-retry" type="button" onClick={onRetry}>{workWord("assignSessionsRetry")}</button>}
     </div>}
     </div>
     {selected && <SessionAssignmentDetail session={selected} reading={selectedReading} />}
@@ -1278,12 +1303,14 @@ function SessionWorkList({ title, empty, rows }: {
   </li>)}</ul> : <small>{empty}</small>}</div>
 }
 
-function CreatedWorkModal({ item, created = true, back, sessions, decisions, decisionAnswers, busy, failure, clearFailure, run, answerWorkDecision, detailLoading, detailError, retryDetail, onClose }: {
+function CreatedWorkModal({ item, created = true, back, sessions, sessionList, retrySessions, decisions, decisionAnswers, busy, failure, clearFailure, run, answerWorkDecision, detailLoading, detailError, retryDetail, onClose }: {
   item: WorkV2Item
   created?: boolean
   /** Shared by successive dialogs opened from one another, so focus returns to the first opener. */
   back?: ModalReturn
   sessions: SessionRow[]
+  sessionList: SessionListReading
+  retrySessions: () => void
   decisions: Decision[]
   decisionAnswers: Record<string, DecisionAnswerStatus>
   busy: string
@@ -1310,7 +1337,7 @@ function CreatedWorkModal({ item, created = true, back, sessions, decisions, dec
         <button className="work-modal-close" type="button" aria-label={catalogWord("inline", "c7fdddf79eaa")} onClick={onClose}><WorkIcon name="close" /></button></div>
       {failure && <p className="work-note" role="alert">{failure}</p>}
       <WorkCard item={item} sessions={sessions} decisions={decisions} decisionAnswers={decisionAnswers} busy={busy} failure={failure} clearFailure={clearFailure} run={run} answerWorkDecision={answerWorkDecision}
-        detailLoading={detailLoading} detailError={detailError} retryDetail={retryDetail} focusAssignment={created} reportsExpanded={!created} foldDescription={!created} />
+        sessionList={sessionList} retrySessions={retrySessions} detailLoading={detailLoading} detailError={detailError} retryDetail={retryDetail} focusAssignment={created} reportsExpanded={!created} foldDescription={!created} />
     </div>
   </div>, document.body)
 }

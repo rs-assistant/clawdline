@@ -14,6 +14,17 @@ func cacheBounds() []Entry {
 			Sources: []string{"internal/transport/http.ExecutionMemoLimit"},
 		},
 		{
+			// Each working directory's Project key as the claim decides it
+			// (projects.CanonicalProjectKey), for the session list's
+			// `project_key`. An answer stands for thirty seconds
+			// (projectKeyFresh); past the limit the one read longest ago is
+			// let go, and a miss walks up to the repository marker again.
+			Name: CacheSessionProjectKeys, Class: Cache, Unit: Rows,
+			Limit: 256, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.ProjectKeyCacheLimit"},
+		},
+		{
 			// Each conversation's title as last read, keyed on the file's size
 			// and time (limits N18). A miss reads the transcript's tail again.
 			Name: CacheTranscriptTitles, Class: Cache, Unit: Rows,
