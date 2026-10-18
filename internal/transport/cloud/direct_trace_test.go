@@ -176,3 +176,31 @@ func TestADirectAttemptThatOpensIsTracedOnce(t *testing.T) {
 		t.Errorf("the trace carries an address:\n%s", got[0])
 	}
 }
+
+// TestADirectAddressFamilyIsOnlyEverAWordFromItsSet holds the family to its
+// four words for the addresses that do not parse as an IP: a host name, an
+// IPv6 address with a zone id, a bracketed literal, an IPv4-mapped address,
+// an mDNS name. A family that fell back to the address itself would put a
+// network location into daemon.log, and the pair line is the place it would
+// go, so the pair is checked too.
+func TestADirectAddressFamilyIsOnlyEverAWordFromItsSet(t *testing.T) {
+	words := map[string]bool{"ipv4": true, "ipv6": true, "mdns": true, "name": true}
+	addresses := []string{"router.example.net", "fe80::1%en0", "[2001:db8::1]", "::ffff:198.51.100.7",
+		"3f1c2b9e-0d6a-4f3e-9b1a-2c4d5e6f7a8b.local", "198.51.100.7", "2001:db8::1", ""}
+	for _, address := range addresses {
+		if family := directAddressFamily(address); !words[family] {
+			t.Errorf("directAddressFamily(%q) = %q, not one of its four words", address, family)
+		}
+	}
+	trace := newDirectTrace("conn-bbbbbbbbbbbbbbbbbbbb", false, time.Now)
+	trace.selectedPair(&webrtc.ICECandidatePair{
+		Local:  &webrtc.ICECandidate{Typ: webrtc.ICECandidateTypeHost, Address: "router.example.net", Port: 61003},
+		Remote: &webrtc.ICECandidate{Typ: webrtc.ICECandidateTypeHost, Address: "fe80::1%en0", Port: 61004},
+	})
+	line := trace.line(false, true)
+	for _, secret := range []string{"router.example.net", "fe80", "en0", "61003", "61004"} {
+		if strings.Contains(line, secret) {
+			t.Errorf("the trace carries %q:\n%s", secret, line)
+		}
+	}
+}
