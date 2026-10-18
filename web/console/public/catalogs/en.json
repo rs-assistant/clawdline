@@ -3813,6 +3813,7 @@
   "next.scheduleInvalidStatus": "Invalid",
   "next.scheduleMachineField": "Machine",
   "next.scheduleMachineOffline": "{machine}: offline (last seen {time})",
+  "next.scheduleMachineReadFailed": "{machine}: its schedules could not be read",
   "next.scheduleMachineUnread": "{machine}: offline or unreadable",
   "next.scheduleMoveCopyLeft": "The copy on {machine} could not be deleted: it is there, switched on. Delete it on {machine}.",
   "next.scheduleMoveCreateFailed": "{machine} refused the copy, so the schedule stays on {source} as it was. {why}",
