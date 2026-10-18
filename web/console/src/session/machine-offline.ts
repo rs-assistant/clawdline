@@ -10,6 +10,8 @@
  * and this decides where the page says it.
  */
 export interface MachineOffline {
+  /** The machine whose last report this page shows. */
+  machine: string
   /** The newest signed report this browser opened from it, or null when it has seen none. */
   seenAt: number | null
 }

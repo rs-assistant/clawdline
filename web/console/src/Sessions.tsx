@@ -211,7 +211,8 @@ export function SessionsPage({
   const drawn = skeleton ? [] : shown
   const offlineAt = offlinePlacement(machineOffline ?? null, drawn.length)
   const offlineSeen = machineOffline ? machineSeenWord(machineOffline.seenAt) : ""
-  const readingSaid = offlineAt === "line" ? nextWord("sessionsMachineOfflineLine", { seen: offlineSeen })
+  const readingSaid = offlineAt === "line" ? nextWord("sessionsMachineOfflineLine", {
+    machine: machineOffline?.machine ?? "", seen: offlineSeen })
     : sourceFailure ?? (briefRefresh ? null : batchReadingWords(readingSource))
   const depths = visualDepths(drawn, tasks ?? [], L.taskShaping)
   const branches = visualBranches(drawn, depths)
@@ -248,7 +249,7 @@ export function SessionsPage({
   const homeEmpty = empty && rows.length === 0 && !filter
   const said = useRef<"skel" | [string, string] | null>(null)
   if (offlineAt === "empty") said.current = [nextWord("sessionsMachineOfflineTitle"),
-    nextWord("sessionsMachineOfflineHint", { seen: offlineSeen })]
+    nextWord("sessionsMachineOfflineHint", { machine: machineOffline?.machine ?? "", seen: offlineSeen })]
   else if (skeleton) said.current = "skel"
   else if (empty) {
     said.current = rows.length

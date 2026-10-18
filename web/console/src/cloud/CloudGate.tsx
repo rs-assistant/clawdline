@@ -34,7 +34,6 @@ import { setAccountMachines, setAccountRosterStatus, setMachineForgetting, setMa
 import { machinePaired } from "./pairing-completion.js"
 import { setProjectSyncSeam, syncSeamFor, type SyncClient } from "./project-sync.js"
 import { machinePresentation } from "../legacy/js/session/selection.js"
-import { SESSION_INVENTORY_ID } from "../legacy/js/net/client.js"
 import { forgetPersonas } from "../personas.js"
 import { accountMachineForConfirmation, accountMachineRoster, devicesPageRows, machineIdentityFacts, sessionsFact, withAccountNames, withAccountRegistrations, type AccountName } from "./unpaired-rows.js"
 import { machineSeenWord } from "./machine-seen.js"
@@ -58,7 +57,7 @@ import { machineForAddress } from "./document-target.js"
 import { openingFor } from "./opening.js"
 import { toolMovesConsole } from "./machine-tool.js"
 import { CloudAccountContext } from "./account-context.js"
-import { machinesByCapability } from "./machine-access.js"
+import { machinesByCapability, reportsMachinePresence } from "./machine-access.js"
 import { answerSchedulePresence, publishScheduleFleet, type ScheduleMachine } from "./schedule-machines.js"
 import { bundledCatalog, catalogURL } from "./strings.js"
 import { RelayReader, machineApp, presentsEvery } from "./relay-reader.js"
@@ -293,8 +292,6 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   )
   const [who, setWho] = useState<{ account: string; device: string } | null>(null)
   const [managingMachines, setManagingMachines] = useState(false)
-  const managingMachinesRef = useRef(managingMachines)
-  managingMachinesRef.current = managingMachines
   const [machineList, setMachineList] = useState<MachineListState>({ phase: "loading" })
   const machines = machineList.phase === "ready" ? machineList.machines : null
   const [problem, setProblem] = useState<AccessProblem | null>(null)
@@ -1041,16 +1038,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           if (transport.kind === "cloud") readAccountRoster(transport.config.apiOrigin)
           unlisten.current?.()
           unlisten.current = next.events((event) => {
-            // The fleet list stays visible beside an open Session. Refresh its
-            // machine freshness after a complete status pass, not after each
-            // row in that pass (which would churn the list while it arrives).
-            // The management list is also visible over a reader, and a
-            // decrypted session may be its first proof of a machine pairing.
-            if (managingMachinesRef.current && (event.type === "sessions" ||
-              event.type === "orchestrator" || event.type === "session_status")) listMachines()
-            else if (!reader.current && (event.type === "orchestrator" || event.type === "session_status")) listMachines()
-            else if (fleetScopeRef.current && (event.type === "orchestrator" ||
-              event.type === "session_status" && event.identity?.session === SESSION_INVENTORY_ID)) listMachines()
+            // Machine presence belongs to the machine, not the view. A
+            // single-machine page has a reader too; skipping its verified
+            // reports stranded the roster at "offline" after a reconnect.
+            // When every row was stale the timer below was also stopped, so
+            // no later pass could repair either machine's status.
+            if (reportsMachinePresence(event)) listMachines()
             // A decryptable inventory clears only the problem attributed to
             // that machine. One machine answering is not evidence that a
             // different machine's key problem went away.
@@ -1257,7 +1250,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // The roster's word for the one machine a single-machine page reads, so that
   // page says "offline" where its own line to the relay would say "connected".
   const readingRow = shown.phase === "ready" ? shown.machines.find((machine) => machine.id === reading) : undefined
-  const readingOffline = readingRow?.freshness === "stale" ? { seenAt: machineIdentityFacts(readingRow).seenAt } : null
+  const readingOffline = readingRow?.freshness === "stale" ? {
+    machine: readingRow.name || readingRow.label || readingRow.id,
+    seenAt: machineIdentityFacts(readingRow).seenAt,
+  } : null
   // The names the detail's own sentences use, read when one is written rather
   // than captured when the effect below was last built.
   const machineNames = useRef(new Map<string, string>())

@@ -12,6 +12,11 @@ interface MachineCapabilityClient {
   machines(): Promise<MachineAnswer>
 }
 
+/** A verified machine report can change presence on every console view. */
+export function reportsMachinePresence(event: { type: string }): boolean {
+  return event.type === "sessions" || event.type === "orchestrator" || event.type === "session_status"
+}
+
 /**
  * A successfully opened pairing handover or a verified and decrypted envelope
  * is the pairing capability. The handover is the bootstrap proof: it was
