@@ -46,6 +46,7 @@
       "console": "carried",
       "console_route": "POST /v1/sessions/{id}/archive",
       "console_seam": "writer",
+      "console_note": "Archived Sessions (docs/session-archive.md): the swipe's 封存 on a row (`session/List.tsx`) and the sidebar's Archive page (`pages/archive.tsx`). The archive rides the Session's own channel, as `end` does; the list is a machine read and the restore a machine command under the press's key.",
       "local": {"method": "POST"},
       "special": ["session_receipt"],
       "example": {"expected_closeability_version": "cl1-current", "force": false, "request": "req-archive", "session": "%19"},
@@ -107,6 +108,7 @@
       "console": "carried",
       "console_route": "GET /v1/capacity",
       "console_seam": "writer",
+      "console_note": "The capacity block on Settings (`pages/settings/CapacityBlock.tsx`), which every capacity push names: a machine read with no parameter.",
       "local": {"method": "GET"},
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
@@ -191,6 +193,7 @@
       "console": "carried",
       "console_route": "cloud-client.js _deliverViewerEvents (after a recorded failure)",
       "console_seam": "client",
+      "console_note": "A page's own failures, delivered by the copied client with nobody pressing anything once a row is recorded (`cloud-viewer-events.js`); a failed carried read is one (`cloud.read.failed`, `relay-reader.ts`).",
       "special": ["read_level", "viewer_events"],
       "example": {"batch": {"rows": []}, "request": "req-events", "session": "__clawdline_machine__"},
       "shapes": [
@@ -203,6 +206,7 @@
       "kind": "command",
       "write_gate": false,
       "console": "no_machine_route",
+      "console_sentence": "This machine does not take a diagnostic report over Clawdline Cloud.",
       "special": ["read_level", "unavailable"],
       "example": {"report": {"page": "session"}, "request": "req", "session": "__clawdline_machine__"},
       "shapes": [
@@ -230,6 +234,7 @@
       "kind": "command",
       "write_gate": true,
       "console": "no_machine_route",
+      "console_sentence": "Dispatching a task over Clawdline Cloud has no pinned wire shape on this machine: dispatch it on the machine.",
       "special": ["any_class", "open_body", "refused:cloud_dispatch_unpinned", "unavailable"],
       "example": {"request": "req-dispatch", "session": "__clawdline_machine__", "task": {}},
       "shapes": [
@@ -418,6 +423,8 @@
       "kind": "command",
       "write_gate": true,
       "console": "deferred",
+      "console_sentence": "A waiting card's press is sent as `answer`, which names the question it answers; `key` is the older spelling of the same command.",
+      "console_note": "`key` and `answer` are one command under two names on the wire. This console sends a waiting card's press as `answer`, because only that spelling carries `expect`, the fingerprint of the question the press was chosen for (F1, `RelayWriter.press`). `key` is the older spelling and is deliberately never sent.",
       "local": {"method": "POST"},
       "special": ["guard", "session_receipt"],
       "example": {"expect": "8eca80fffc9359d5f0fca31f3e36b741bd50218b658fc086f05931747bd4c5ce", "key": "1", "request": "req-1", "session": "%19", "typed": "please read CHILD.md"},
@@ -436,6 +443,7 @@
       "console": "carried",
       "console_route": "GET /v1/machine/usage",
       "console_seam": "writer",
+      "console_note": "The dashboard behind the session counts (`machine/`): CPU, memory, disk space and grouped reclaim backlog, a machine read with no parameter.",
       "local": {"method": "GET"},
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
@@ -605,6 +613,7 @@
       "console": "carried",
       "console_route": "GET /v1/personas",
       "console_seam": "reader",
+      "console_note": "The built-in personas a start may name (docs/personas.md): a machine read with no parameter. A machine that does not list it is refused by the copied client before anything leaves (`_unsupportedRefusal`).",
       "local": {"method": "GET"},
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
@@ -732,6 +741,7 @@
       "console": "carried",
       "console_route": "GET /v1/project-sync/manifest",
       "console_seam": "reader",
+      "console_note": "Project settings sync (docs/project-sync.md). The two source reads are also asked of *another* paired machine by `cloud/project-sync.ts`, which is how a mirror reads its source without either machine reaching the other.",
       "local": {"method": "GET"},
       "example": {"request": "req-manifest", "session": "__clawdline_machine__"},
       "shapes": [
@@ -831,6 +841,7 @@
       "console": "carried",
       "console_route": "GET /v1/projects/{project}/unify",
       "console_seam": "reader",
+      "console_note": "The 「Claude 與 Codex 共用」 block in Project settings (`pages/projects/ProjectUnify.tsx`, docs/project-files.md §Unify): the plan is a read, and apply carries the press's Idempotency-Key.",
       "local": {"method": "GET"},
       "example": {"project": "p1", "request": "plan-1", "session": "__clawdline_machine__"},
       "shapes": [
@@ -961,6 +972,7 @@
       "console": "carried",
       "console_route": "GET /v1/sessions/restorable",
       "console_seam": "writer",
+      "console_note": "The sessions a reboot took away (docs/session-restore.md), offered where the empty session list stands (`session/Restore.tsx`). The read is the machine's; the two commands carry the sheet's press key as their request.",
       "local": {"method": "GET"},
       "example": {"request": "req-offer", "session": "__clawdline_machine__"},
       "shapes": [
@@ -1118,6 +1130,7 @@
       "console": "carried",
       "console_route": "GET /v1/sessions/{id}/screen",
       "console_seam": "writer",
+      "console_note": "The live screen (`session/ScreenPanel.tsx`). It sat in `DEFERRED` and in `DEFERRED_ASKED` while this machine answered it, so 「即時畫面」 on a phone only ever said to go and look on the machine — including from the Waiting card that sends a person there to read the question.",
       "local": {"method": "GET"},
       "special": ["content_read"],
       "example": {"expected_generation": "0123456789abcdef0123456789abcdef", "session": "%19"},
@@ -1194,6 +1207,7 @@
       "console": "carried",
       "console_route": "relay-reader.ts askForOpenedQuestion (when advertised)",
       "console_seam": "client",
+      "console_note": "An opened waiting Session whose question has not come asks for its one row (`relay-reader.ts` askForOpenedQuestion), when the machine advertises it.",
       "special": ["session_publisher"],
       "example": {"request": "req-1", "row": "%19", "session": "__clawdline_machine__"},
       "shapes": [
@@ -1208,6 +1222,7 @@
       "console": "carried",
       "console_route": "cloud-client.js _recoverSessions (on connect)",
       "console_seam": "client",
+      "console_note": "No console route asks this: the copied client does, on every connection that did not take over a live socket (`_recoverSessions`), so a list opened after a relay eviction is sent every row rather than whichever changed.",
       "special": ["session_publisher"],
       "example": {"initial": false, "orchestrator": true, "request": "req-1", "session": "__clawdline_machine__"},
       "shapes": [
@@ -1240,6 +1255,7 @@
       "console": "carried",
       "console_route": "GET /v1/sessions/{id}/shells/{shell}?bytes=",
       "console_seam": "reader",
+      "console_note": "The Shell panel (`session/ShellPanel.tsx`): the tail of one background command's output, polled while the panel is open.",
       "local": {"method": "GET"},
       "special": ["content_read"],
       "example": {"bytes": 65536, "expected_generation": "0123456789abcdef0123456789abcdef", "session": "%19", "shell": "b0aau3e6s"},
@@ -1655,6 +1671,7 @@
       "console": "carried",
       "console_route": "GET /v1/update",
       "console_seam": "writer",
+      "console_note": "The Settings page's update panel and the list's banner (`machine/update.ts`): whether this machine trails the latest build, a machine read with no parameter.",
       "local": {"method": "GET"},
       "example": {"request": "req", "session": "__clawdline_machine__"},
       "shapes": [
@@ -1669,6 +1686,7 @@
       "console": "carried",
       "console_route": "POST /v1/update/apply",
       "console_seam": "writer",
+      "console_note": "The Settings page's 「立即更新」 (`machine/UpdatePanel.tsx`): install the newest release of the machine's channel, a machine command with no body.",
       "local": {"method": "POST", "device": true},
       "example": {"request": "req-apply", "session": "__clawdline_machine__"},
       "shapes": [
@@ -1697,6 +1715,7 @@
       "console": "carried",
       "console_route": "GET /v1/usage/compare-compaction[?since=]",
       "console_seam": "writer",
+      "console_note": "The token bill (`pages/work/TokenBill.tsx`). Machine reads, not session reads: a conversation id is the ledger's key and not a row this page holds. Whether compacting early paid (docs/token-ledger.md \"Did compacting early pay\"): a machine read with its one query field.",
       "local": {"method": "GET"},
       "example": {"request": "req", "session": "__clawdline_machine__", "since": "14d"},
       "shapes": [
@@ -1712,6 +1731,7 @@
       "console": "carried",
       "console_route": "GET /v1/usage/compare-handoff[?since=]",
       "console_seam": "writer",
+      "console_note": "Whether handing over paid (docs/token-ledger.md \"Did handing over pay\"): the same one query field. No page asks it yet; `clawdline usage --compare-handoff` does.",
       "local": {"method": "GET"},
       "example": {"request": "req-usage-handoff", "session": "__clawdline_machine__", "since": "14d"},
       "shapes": [
@@ -1769,6 +1789,7 @@
       "console": "carried",
       "console_route": "GET /v1/usage/work-samples[?since=&until=]",
       "console_seam": "writer",
+      "console_note": "The raw samples a before/after report is folded from (docs/token-ledger.md \"Did a change make one unit of work cheaper\"): a machine read with its two query fields. No page asks it yet; `clawdline usage --work-report` does.",
       "local": {"method": "GET"},
       "example": {"request": "req", "session": "__clawdline_machine__", "since": "14d", "until": "1790000000"},
       "shapes": [
@@ -1786,6 +1807,7 @@
       "console": "carried",
       "console_route": "GET /v1/usage/work-units[?since=]",
       "console_seam": "writer",
+      "console_note": "What each unit of work added (docs/token-ledger.md \"One unit of work\").",
       "local": {"method": "GET"},
       "example": {"request": "req-usage-work", "session": "__clawdline_machine__", "since": "36h"},
       "shapes": [
@@ -1801,6 +1823,7 @@
       "console": "carried",
       "console_route": "POST /v1/verifications/{id}/close",
       "console_seam": "writer",
+      "console_note": "Things waiting to be verified (`pages/verify.tsx`, docs/verifications.md): the phone is where the person reads them, so every route crosses. Two machine reads and five commands, each with its body as the route reads it.",
       "local": {"method": "POST", "device": true},
       "example": {"id": "7e000000-0000-4000-8000-000000000006", "request": "req-verify-close", "session": "__clawdline_machine__", "verification": {"reason": "it held", "status": "accepted"}},
       "shapes": [

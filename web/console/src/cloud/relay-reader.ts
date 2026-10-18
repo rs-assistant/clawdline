@@ -797,9 +797,9 @@ export class RelayReader {
   /**
    * What this bundle and this machine disagree about, right now, on the page.
    *
-   * The build-time half of this is a Go test that reads `carry.ts`
-   * (internal/app/cloudops/carry_test.go), and it can only compare this bundle
-   * with the checkout it was built from. A hosted console is an *older* bundle
+   * The build-time half of this is the generated `carry-generated.ts`, held
+   * to the vocabulary table by `go run ./tools/contract-gen -check`, and it can
+   * only compare this bundle with the checkout it was built from. A hosted console is an *older* bundle
    * reading a machine that has been updated since, which no test in either repo can
    * see. The machine says what it can do in its own descriptor —
    * `cloudops.Implemented()`, carried as `machine.commands` — so the same

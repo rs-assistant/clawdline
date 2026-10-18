@@ -292,3 +292,24 @@ func vocabularySpecials(o op) []string {
 	sort.Strings(out)
 	return out
 }
+
+func set(words []string) map[string]bool {
+	out := map[string]bool{}
+	for _, word := range words {
+		out[word] = true
+	}
+	return out
+}
+
+// missing is every key of `want` that `have` does not hold, sorted, whichever
+// of the two map shapes each side is.
+func missing[A any, B any](want map[string]A, have map[string]B) []string {
+	out := []string{}
+	for word := range want {
+		if _, ok := have[word]; !ok {
+			out = append(out, word)
+		}
+	}
+	sort.Strings(out)
+	return out
+}

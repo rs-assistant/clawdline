@@ -827,6 +827,22 @@ the table copies from a Go constant names it under `copies`, and
 `TestCopiedLimitsAreTheirConstants` holds the two equal. The wrapper rules are
 held to the bridge by `TestTheTableStatesTheBridgesWrapperRules`.
 
+The same row says what the hosted console does with the word: `console` is
+`carried`, `deferred` or `no_machine_route`; a carried row names its
+`console_route` and the `console_seam` that parses it, and the other two name
+the `console_sentence` a refusal shows instead. `tools/contract-gen` renders
+the console's three lists from those fields into
+`web/console/src/cloud/carry-generated.ts`, which `carry.ts` imports, and
+`-check` fails while that file and the table disagree; an optional
+`console_note` becomes the comment above the entry. **Adding a word therefore
+means adding its row to the table and the route that serves it (with, for a
+carried word, the console route that asks for it), and nothing else**: the Go
+decoder and the console's lists are both regenerated from the row.
+`TestTheVocabularyTableIsTheBridgesCatalog` fails while the machine registers a
+word with no row, or a row's class disagrees with what the machine answers, and
+`vocabulary.test.ts` fails while a carried row's console route is not parsed as
+its word by the seam the row names.
+
 For a live Session's `send`, `answer`/`key`, `interrupt`, `end`, or
 `archive-session`, the Go machine now requires `request` (the caller's stable
 Idempotency-Key) and `execution_generation` (the authoritative 32-digit

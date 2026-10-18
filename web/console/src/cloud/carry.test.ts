@@ -1,9 +1,9 @@
 // What this console carries, what it says when it does not, and the words it
 // says it in: `node --test web/console/src/cloud/*.test.ts`.
 //
-// The other half of these rules is a Go test that reads `carry.ts` against this
-// machine's own catalog (internal/app/cloudops/carry_test.go). This half is
-// what the page does with the table: that the routes and the table cannot
+// The lists themselves are generated from the vocabulary table, which is held
+// to this machine's own catalog by `TestTheVocabularyTableIsTheBridgesCatalog`
+// (internal/app/cloudops). This half is what the page does with the table: that the routes and the table cannot
 // disagree, that a refusal names the word, that `info` reaches the machine and
 // comes back as the status line's own read, and that the document's language
 // is the catalog this build ships.

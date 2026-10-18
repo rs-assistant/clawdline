@@ -58,6 +58,17 @@ func TestATableThatContradictsItselfIsRefused(t *testing.T) {
 			return bytes.Replace(raw, []byte(`"limit": {"type": "integer", "min": 1, "max": 1000}`),
 				[]byte(`"limit": {"type": "integer", "min": 1, "max": 1000, "max_bytes": 4}`), 1)
 		},
+		"an unrouted word with no sentence": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"console_sentence": "This machine does not take a diagnostic report over Clawdline Cloud.",`), nil, 1)
+		},
+		"a sentence too short to act on": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"console_sentence": "This machine does not take a diagnostic report over Clawdline Cloud."`),
+				[]byte(`"console_sentence": "Not carried."`), 1)
+		},
+		"a carried word that says why it is not": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"console_route": "GET /v1/capacity",`),
+				[]byte(`"console_route": "GET /v1/capacity", "console_sentence": "The capacity block is not read over Clawdline Cloud yet: open it on the machine.",`), 1)
+		},
 		"a wrapper check nobody knows": func(raw []byte) []byte {
 			return bytes.Replace(raw, []byte(`"strip_check": "generation"`), []byte(`"strip_check": "generations"`), 1)
 		},
