@@ -1914,3 +1914,19 @@ func TestNotificationRulesCrossOnlyTheirMachineRoute(t *testing.T) {
 		t.Fatalf("write: %+v %+v", write, got)
 	}
 }
+
+// The pass id a re-statement's status marker named rides beside the ids, so a
+// page refreshing an unchanged set can tell its held marker is the confirmed
+// one. An empty id (no marker this pass) leaves the older answer unchanged.
+func TestSessionsSnapshotNamesThePassItsMarkerCarried(t *testing.T) {
+	pass := strings.Repeat("a", 32)
+	bridge := Bridge{MachineID: "mac-01", SessionsFor: func(context.Context, string, bool) (SessionsStated, *Refusal) {
+		return SessionsStated{IDs: []string{"%19"}, Complete: true, Generation: pass}, nil
+	}}
+	answer := bridge.Handle(context.Background(), request(t, ClassCtl,
+		map[string]any{"type": "sessions.snapshot", "session": MachineReplySession, "request": "req-1"}))
+	got, _ := json.Marshal(answerOf(t, answer)["body"])
+	if string(got) != `{"complete":true,"sessions":["%19"],"snapshot_generation":"`+pass+`"}` {
+		t.Fatalf("the answer said %s", got)
+	}
+}

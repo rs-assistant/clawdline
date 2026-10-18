@@ -173,6 +173,12 @@ type Publisher struct {
 	// be skipped against whatever the relay still retains under it. It is the
 	// inventory's own set and so bounded by InventoryLimit.
 	statusRows map[string]bool
+	// statusPass is the pass id the ss/ marker of the current pass stated, or
+	// empty when this pass stated none (a partial reading, a refused row). A
+	// re-statement answers with it, so a viewer whose held marker already
+	// names that id knows its list is confirmed without waiting for a pass id
+	// that only a changed set would produce (statusGeneration).
+	statusPass string
 
 	// listed is the sessions a viewer holds rows for, which decides whether a
 	// finished task is still reachable (tasklist.go).
@@ -543,7 +549,8 @@ func (p *Publisher) restatePass(ctx context.Context) {
 	p.steady = map[string][32]byte{}
 	p.unsent = 0
 	inventory, reading, ok := p.pass(ctx)
-	result := snapshotResult{stated: cloudops.SessionsStated{IDs: inventory, Complete: ok && reading.whole()}}
+	result := snapshotResult{stated: cloudops.SessionsStated{IDs: inventory, Complete: ok && reading.whole(),
+		Generation: p.statusPass}}
 	if ok && p.unsent > 0 {
 		// A row that did not leave would be named and never arrive; the page
 		// retries a busy answer once, five seconds on.
@@ -825,6 +832,7 @@ func (p *Publisher) Acked(ch string, fanout int) {
 // this machine's own list could not be read and nothing about Sessions went out.
 func (p *Publisher) pass(ctx context.Context) ([]string, sessionReading, bool) {
 	p.unsent = 0
+	p.statusPass = ""
 	if p.takeRestate() {
 		// A viewer this machine has not stated its channels to is out there.
 		// What it holds is not this machine's to guess, so the skip's memory

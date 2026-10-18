@@ -331,6 +331,8 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 	if !p.changedCoalesced(statusMarkerKey,
 		mustJSON(markerIdentity{IDs: ids, Pass: pass, Presentation: presentation, Complete: true}),
 		mustJSON(markerIdentity{IDs: ids, Pass: pass, Presentation: statusGeneration(steadyDisplays), Complete: true})) {
+		// Unchanged and still retained: the viewer's marker already names it.
+		p.statusPass = pass
 		return
 	}
 	body, err := json.Marshal(marker)
@@ -342,7 +344,9 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 	if err := p.Publish(ctx, Outbound{Channel: channel, Class: string(domaincloud.ClassStream), Payload: body}); err != nil {
 		p.forget(statusMarkerKey)
 		p.logf("cloud: the status inventory was not published: %v", err)
+		return
 	}
+	p.statusPass = pass
 }
 
 // statusParents projects only terminal ancestry. The signed orch task list
