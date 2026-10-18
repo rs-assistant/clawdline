@@ -27,9 +27,8 @@ test("labels and paths are quoted as data rather than interpolated as new instru
 
 test("the setup dialog gives both unreadable and empty Project lists an actionable next step", () => {
   const source = readFileSync(new URL("./ProjectSetup.tsx", import.meta.url), "utf8")
-  assert.match(source, /showModal\(\)/)
+  assert.match(source, /showModalWithoutChoice\(dialog\.current\)/)
   assert.match(source, /aria-haspopup="dialog"/)
-  assert.match(source, /focus\(\{ preventScroll: true \}\)/)
   assert.match(source, /role="alert"/)
   assert.match(source, pattern`onClick=\{\(\) => void load\(\)\}>\{${wordCall("重新讀取")}\}<\/button>`)
   assert.match(source, pattern`<code>\{${wordCall("clawdline project add")}\}`)

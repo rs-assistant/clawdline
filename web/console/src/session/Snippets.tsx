@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react"
+import { focusModalContainer } from "../modal-focus.js"
 import { createPortal } from "react-dom"
 import type { SessionRow, TranscriptPage } from "@clawdline/contract"
 import { client } from "../client.js"
@@ -196,6 +197,9 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
 
   const list = useRef<HTMLDivElement>(null)
   const closeButton = useRef<HTMLButtonElement>(null)
+  const sheet = useRef<HTMLDivElement>(null)
+  const editorSheet = useRef<HTMLDivElement>(null)
+  const clawdfatherSheet = useRef<HTMLDivElement>(null)
   const newButton = useRef<HTMLButtonElement>(null)
   const titleField = useRef<HTMLInputElement>(null)
   // One write at a time: a second ↑ before the first has landed would send an
@@ -337,7 +341,7 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
   // The sheet is shown first and filled behind: paint what was last answered for
   // this session, then read again.
   useEffect(() => {
-    closeButton.current?.focus({ preventScroll: true })
+    focusModalContainer(sheet.current)
     void refresh({ keepScroll: !!answered[row.id] })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [row.id])
@@ -502,7 +506,6 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
         })
         .catch(() => {})
     }
-    window.setTimeout(() => titleField.current?.focus({ preventScroll: true }), 0)
   }
 
   const closeEditor = () => {
@@ -532,6 +535,9 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
     setClawdfatherArmed(false)
     closeButton.current?.focus({ preventScroll: true })
   }
+
+  useLayoutEffect(() => { if (draft) focusModalContainer(editorSheet.current) }, [draft !== null])
+  useLayoutEffect(() => { if (clawdfatherDraft) focusModalContainer(clawdfatherSheet.current) }, [clawdfatherDraft !== null])
 
   const clawdfatherWrite = async (work: () => Promise<unknown>) => {
     if (busy.current) return
@@ -687,6 +693,7 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
     <>
       <div
         className="sheet snippets-sheet"
+        ref={sheet}
         id="snippets-sheet"
         role="dialog"
         aria-modal="true"
@@ -777,6 +784,7 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
         <div className="overlay" id="snippet-editor" onClick={closeEditor}>
           <div
             className="sheet snippet-editor-sheet"
+            ref={editorSheet}
             id="snippet-editor-sheet"
             role="dialog"
             aria-modal="true"
@@ -909,11 +917,11 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
         </div>
       ) : null}
       {clawdfatherDraft && <div className="overlay" id="clawdfather-editor" onClick={closeClawdfatherEditor}>
-        <div className="sheet snippet-editor-sheet" role="dialog" aria-modal="true" aria-labelledby="clawdfather-editor-title" onClick={(event) => event.stopPropagation()}>
+        <div className="sheet snippet-editor-sheet" ref={clawdfatherSheet} role="dialog" aria-modal="true" aria-labelledby="clawdfather-editor-title" onClick={(event) => event.stopPropagation()}>
           <h2 id="clawdfather-editor-title">{clawdfatherWord(clawdfatherDraft.id ? "editing" : "new")}</h2>
           <div className="block"><label className="field-label" htmlFor="clawdfather-editor-title-field">{clawdfatherWord("name")}</label>
             <input className="find" id="clawdfather-editor-title-field" type="text" maxLength={200} autoComplete="off" value={clawdfatherDraft.title}
-              data-1p-ignore="" data-lpignore="true" data-bwignore="" autoFocus
+              data-1p-ignore="" data-lpignore="true" data-bwignore=""
               onChange={(event) => { setClawdfatherArmed(false); setClawdfatherDraft({ ...clawdfatherDraft, title: event.target.value }) }} /></div>
           <div className="block"><label className="field-label" htmlFor="clawdfather-editor-body">{clawdfatherWord("message")}</label>
             <textarea className="find" id="clawdfather-editor-body" rows={6} maxLength={4000} spellCheck={false} value={clawdfatherDraft.body}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { focusModalContainer } from "../modal-focus.js"
 import type { Snippet, WorkflowSource } from "../legacy/snippets-bridge.js"
 import { readProjectPlaces, type ProjectPlace } from "./work/api.js"
 import { listProjectFiles, readProjectFile, type ProjectFile } from "./projects/project-files-api.js"
@@ -82,7 +83,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
   }
   useEffect(() => {
     if (!skillOpen) return
-    skillDialog.current?.querySelector<HTMLElement>("button")?.focus()
+    focusModalContainer(skillDialog.current)
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") { event.preventDefault(); closeSkill(); return }
       if (event.key !== "Tab") return
@@ -117,7 +118,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
   useEffect(() => {
     if (!sourcePreview) return
     const closeButton = sourceDialog.current?.querySelector<HTMLElement>("header button")
-    closeButton?.focus()
+    focusModalContainer(sourceDialog.current)
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") { event.preventDefault(); closeSource() }
       if (event.key === "Tab" && closeButton) { event.preventDefault(); closeButton.focus() }
@@ -128,7 +129,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
 
   useEffect(() => {
     if (!draft) return
-    editor.current?.querySelector<HTMLElement>("form")?.focus()
+    focusModalContainer(editor.current)
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") { event.preventDefault(); setDraft(null); return }
       if (event.key !== "Tab") return

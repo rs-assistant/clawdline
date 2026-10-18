@@ -3,6 +3,7 @@ import type { ReactNode, RefObject } from "react"
 import type { AssistantSkill, SessionRow } from "@clawdline/contract"
 import { RefusalError } from "@clawdline/core"
 import { client, followsRelay } from "../client.js"
+import { showModalWithoutChoice } from "../modal-focus.js"
 import * as L from "../legacy/bridge.js"
 import {
   Shots,
@@ -145,7 +146,7 @@ export function Composer({
   useEffect(() => {
     const dialog = voiceInstallDialog.current
     if (!dialog) return
-    if (voiceInstall && !dialog.open) dialog.showModal()
+    if (voiceInstall) showModalWithoutChoice(dialog)
     if (!voiceInstall && dialog.open) dialog.close()
   }, [voiceInstall])
 

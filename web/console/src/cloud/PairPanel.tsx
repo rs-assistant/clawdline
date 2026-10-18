@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import * as L from "../legacy/bridge.js"
 import { nextWord } from "../next-strings.js"
+import { focusModalContainer } from "../modal-focus.js"
 import { pairingCommand, type PairState } from "./pair.js"
 import { PairScanner } from "./PairScanner.js"
 import {
@@ -72,18 +73,16 @@ export function PairPanel(props: {
   const field = useRef<HTMLTextAreaElement>(null)
   const codeField = useRef<HTMLTextAreaElement>(null)
   const titleRef = useRef<HTMLHeadingElement>(null)
+  const panel = useRef<HTMLDivElement>(null)
   const first = useRef<HTMLButtonElement>(null)
   const scanStart = useRef<HTMLButtonElement>(null)
   const phase = state.phase
   const offer = request.mode === "offer"
   const asked = offer ? request.machine : null
   const requestKey = offer ? asked?.id ?? "" : request.code
-  // In the Home Screen app, the recommended QR scanner is the first action.
-  // Elsewhere the offer starts at its title before the recommended route.
   useLayoutEffect(() => {
-    if (phase === "idle" && offer) (canScan ? scanStart.current : titleRef.current)?.focus({ preventScroll: true })
-    else (first.current ?? titleRef.current)?.focus({ preventScroll: true })
-  }, [phase, offer, requestKey, canScan])
+    focusModalContainer(panel.current)
+  }, [requestKey])
   useLayoutEffect(() => {
     setCopied("")
     setCodeCopied("")
@@ -160,6 +159,7 @@ export function PairPanel(props: {
   return (
     <div
       className="cloud-pair-ask"
+      ref={panel}
       data-pair-phase={phase}
       onKeyDown={(event) => {
         if (event.key !== "Escape") return
