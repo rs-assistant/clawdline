@@ -232,8 +232,8 @@ func TestAChildTaskIsProjectedAndItsLifecycleRecordsAreNot(t *testing.T) {
 		t.Errorf("child is %v; want only its terminal", got)
 	}
 	if got := projected["root"].(map[string]any); len(got) != 1 || got["terminalId"] != rootTerminal {
-		// The parent is the whole point: `rowDepth`, `tasksOfRoot` and
-		// `grouped` read root.terminalId and nothing else of it.
+		// The parent is the whole point: `tasksOfRoot`, `groupUnderRoots`
+		// and `visualDepths` find it by root.terminalId.
 		t.Errorf("root is %v; want only the parent's terminal", got)
 	}
 	if got := projected["usage"].(map[string]any); len(got) != 2 || got["total"] != float64(123456) || got["costUsd"] != 1.25 {

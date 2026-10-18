@@ -1,7 +1,7 @@
 // The Swift app's hosted-console transport, given types and one way in.
 //
-// `legacy/js/net/cloud-*.js` are that console's Cloud modules, copied byte for
-// byte (`legacy/MANIFEST.json`, `tools/check-legacy-css.sh`). They are the code
+// `legacy/js/net/cloud-*.js` are that console's Cloud modules, copied from it
+// and maintained here since it retired (`legacy/README.md`). They are the code
 // app.clawdline.com runs today against the relay that is deployed today, and
 // the places they look over-careful are the places they were taught something
 // (docs/cloud-wire.md). So they are used as they are, and what this console

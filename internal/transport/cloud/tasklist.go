@@ -5,8 +5,9 @@ package cloud
 // A hosted console groups a child session under the session that dispatched
 // it, indents it, and puts the "child session · running" chip on the root —
 // and every one of those reads `tasks` out of the machine's `orch/` snapshot
-// (`view/derive.js`: `taskOfChild`, `taskShaping`, `rowDepth`, `tasksOfRoot`,
-// `grouped`, `featureRootChip`, `lostIfClosed`). A machine whose snapshot
+// (`view/derive.js`: `taskOfChild`, `taskShaping`, `tasksOfRoot`,
+// `featureRootChip`, `lostIfClosed`; `session/order.ts`: `groupUnderRoots`,
+// `visualDepths`). A machine whose snapshot
 // carries no `tasks` is drawn as a flat list of sessions, whatever it has
 // dispatched. This file is that list, ported from the Swift app's
 // `RemoteServer.cloudOrchestratorProjection` (`OrchestratorPersistence.swift`)

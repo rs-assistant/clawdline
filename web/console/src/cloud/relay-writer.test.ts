@@ -1386,7 +1386,7 @@ test("F6: a blocked close, through the copied client's real failure path", async
 })
 
 test("F6: a blocked close keeps its reasons across Clawdline Cloud",
-  { todo: "cloud-failure.js (copied byte for byte from the Swift app) drops them; fix it at its source" },
+  { todo: "cloud-failure.js (copied from the Swift app) drops them; fix it there" },
   async () => {
     const client = new FakeClient()
     client.rows = [row("s1")]

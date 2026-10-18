@@ -2,7 +2,7 @@
 //
 // The page itself is gone. Two consumers remain deliberately separate from
 // it: Settings still reads and writes the board-level enabled setting,
-// and the byte-for-byte Projects view still calls `openBoard` for catalog rows
+// and the copied Projects view still calls `openBoard` for catalog rows
 // that carry an old board Project id. The latter is redirected to the Projects
 // page's own repository detail; it never opens or reads an old card.
 import { T } from "./js/core/i18n.js"
@@ -102,7 +102,7 @@ export function registerRetiredBoardProjectFallback(open: (project: RetiredBoard
 }
 
 /**
- * Compatibility name called only by the byte-for-byte Projects module bridge.
+ * Compatibility name called only by the copied Projects module bridge.
  * The Board page no longer exists: the old association is discarded before
  * the Projects page opens the same repository as an ordinary Project.
  */

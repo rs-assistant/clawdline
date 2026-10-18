@@ -1,7 +1,7 @@
 // Snippets — the copied data module, the press that opens the sheet, and the
 // one way text reaches the composer.
 //
-// `js/view/snippets-data.js` is the Swift app's, byte for byte, and it is the
+// `js/view/snippets-data.js` began as the Swift app's, and it is the
 // whole of what this feature decides: which rows a session sees, in which two
 // groups, what a row's line says, which controls may be drawn at all, what each
 // request's body is, and the markup of the list itself. `input/snippets.js` is

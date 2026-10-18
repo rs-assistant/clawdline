@@ -2,7 +2,7 @@
  * What a row may say about a machine this browser cannot read.
  *
  * Two things the relay client's list gets wrong about such a machine, both for
- * the same reason, and both fixed here rather than in the byte-for-byte copy
+ * the same reason, and both fixed here rather than in the copied client
  * that makes them (`cloud-client.js` `_machineRows`).
  *
  * **Its session count.** The count is the number of session snapshots this

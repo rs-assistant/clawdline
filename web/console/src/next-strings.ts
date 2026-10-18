@@ -1,7 +1,7 @@
 /*
  * Words this app says that the Swift app never did (design-decisions D35).
  *
- * The copied `public/strings/zh-Hant.json` stays byte for byte. This typed
+ * The copied `public/strings/zh-Hant.json` is not extended here. This typed
  * table is the English source for new app copy; the maintained nine-language
  * catalogs under `public/catalogs/` supply the words shown on screen.
  *

@@ -1,7 +1,7 @@
 // Previous and next in the picture preview.
 //
-// The preview itself (`legacy/js/view/transcript-images.js`) is the Swift
-// app's module, pinned byte for byte, and knows only the one picture it was
+// The preview itself (`legacy/js/view/transcript-images.js`) began as the Swift
+// app's module, and knows only the one picture it was
 // opened on. Stepping is therefore done from outside it, the one way that
 // module already accepts a picture: the neighbouring tile is pressed, and its
 // own click opens the preview on its own bytes — the same source, the same

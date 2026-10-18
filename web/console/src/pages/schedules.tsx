@@ -2322,7 +2322,7 @@ const ScheduleHistory = (() => {
         runningNow = false
         if (error && error.code === "write_disabled") write = false
         // `scheduleRunMessage` is the Swift app's (`js/input/schedule-run.js`,
-        // copied byte for byte and so not correctable there): it names five
+        // copied from it): it names five
         // codes and answers every other one with "無法啟動這個排程。" That was
         // the sentence a `machine_offline` or a `rate_limited` press got. The
         // five keep their words — they are better than the catalog's — and the

@@ -1,6 +1,6 @@
 // "My messages" — its copied data module, and the press that opens it.
 //
-// `js/view/user-messages-data.js` is the Swift app's, byte for byte, and it is
+// `js/view/user-messages-data.js` began as the Swift app's, and it is
 // the whole of what this feature decides: which turns are the person's, which
 // of them survive the search field, where one of them is in the transcript, and
 // the words for the sheet before the catalog has arrived. `input/user-messages.js`
