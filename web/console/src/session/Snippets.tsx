@@ -35,13 +35,17 @@ import {
   SNIPPET_CONTROLS,
   createSnippet,
   createWorkflow,
+  deleteWorkflow,
   deleteSnippet,
   orderSnippets,
   readSnippets,
   readWorkflowProject,
   SnippetFailure,
   updateSnippet,
+  updateWorkflow,
 } from "./snippets-api.js"
+import * as V from "../legacy/voice-bridge.js"
+import { voiceSource } from "./voice-source.js"
 import { RefusalError } from "@clawdline/core"
 import { createDirectTodoV2, directTodoActionV2 } from "../pages/work/api.js"
 import { workflowTodoText } from "./workflow-run.js"
@@ -178,9 +182,13 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
   const [selectedWorkflow, setSelectedWorkflow] = useState<Snippet | null>(null)
   const [startingWorkflow, setStartingWorkflow] = useState(false)
   const [workflowError, setWorkflowError] = useState("")
-  const [workflowDraft, setWorkflowDraft] = useState<{ title: string; body: string; global: boolean } | null>(null)
+  const [workflowDraft, setWorkflowDraft] = useState<{ id?: string; title: string; body: string; global: boolean; source?: Snippet["source"] } | null>(null)
   const [workflowSaveError, setWorkflowSaveError] = useState("")
   const [workflowSaving, setWorkflowSaving] = useState(false)
+  const [workflowDeleting, setWorkflowDeleting] = useState(false)
+  const [workflowVoice, setWorkflowVoice] = useState<V.VoiceState>("off")
+  const workflowVoiceRow = useRef<HTMLDivElement>(null)
+  const workflowVoiceActive = useRef(false)
   const [workflowSourceStatus, setWorkflowSourceStatus] = useState<"checking" | "ready" | "unavailable" | "scope">("checking")
   const [workflowPreview, setWorkflowPreview] = useState<{ id: string; body: string; name: string; version: string } | null>(null)
   const [projectUnresolved, setProjectUnresolved] = useState(false)
@@ -355,7 +363,7 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
       if (event.key !== "Escape") return
       event.preventDefault()
       event.stopPropagation()
-      if (workflowDraft) setWorkflowDraft(null)
+      if (workflowDraft) closeWorkflowEditor()
       else if (clawdfatherDraft) closeClawdfatherEditor()
       else if (editorOpen) closeEditor()
       else if (coordination) setCoordination(false)
@@ -584,15 +592,48 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
     if (new TextEncoder().encode(title).length > 200 || new TextEncoder().encode(body).length > 4000) {
       setWorkflowSaveError(W("tooLong")); return
     }
-    if (!workflowDraft.global && (!projectKey || projectUnresolved)) { setWorkflowSaveError(W("projectResolveUnavailable")); return }
+    if (!workflowDraft.id && !workflowDraft.global && (!projectKey || projectUnresolved)) { setWorkflowSaveError(W("projectResolveUnavailable")); return }
     setWorkflowSaving(true); setWorkflowSaveError("")
     try {
-      await createWorkflow(machine ?? "", workflowDraft.global ? "" : projectKey, title, body)
-      if (await refresh({ keepScroll: true })) setWorkflowDraft(null)
+      if (workflowDraft.id) await updateWorkflow(machine ?? "", workflowDraft.id, title, body, workflowDraft.source ?? null)
+      else await createWorkflow(machine ?? "", workflowDraft.global ? "" : projectKey, title, body)
+      if (await refresh({ keepScroll: true })) closeWorkflowEditor()
     } catch (cause) {
       setWorkflowSaveError(cause instanceof SnippetFailure && cause.code === "snippet_limit_reached" ? W("limitReached")
         : cause instanceof SnippetFailure && cause.status !== null && cause.status < 500 ? W("saveRefused") : W("saveUnknown"))
     } finally { setWorkflowSaving(false) }
+  }
+
+  const closeWorkflowEditor = () => {
+    if (workflowVoiceActive.current) V.cancel()
+    workflowVoiceActive.current = false
+    setWorkflowVoice("off")
+    setWorkflowDraft(null)
+    setWorkflowSaveError("")
+  }
+
+  const removeWorkflow = async () => {
+    if (!currentWorkflow || workflowDeleting || startingWorkflow) return
+    if (!window.confirm(W("confirmDelete", { name: currentWorkflow.title }))) return
+    setWorkflowDeleting(true); setWorkflowError("")
+    try {
+      await deleteWorkflow(machine ?? "", currentWorkflow.id)
+      if (await refresh()) setSelectedWorkflow(null)
+    } catch (cause) {
+      setWorkflowError(cause instanceof SnippetFailure && cause.status !== null && cause.status < 500 ? W("deleteRefused") : W("deleteUnknown"))
+    } finally { setWorkflowDeleting(false) }
+  }
+
+  const dictateWorkflow = () => {
+    const host = workflowVoiceRow.current
+    if (!host || !workflowDraft || workflowDraft.source) return
+    V.press({
+      host, composer: null, source: voiceSource,
+      sink: (heard) => setWorkflowDraft((draft) => draft ? { ...draft, body: V.appendedText(draft.body, heard) } : draft),
+      guard: () => !host.isConnected,
+      changed: (state) => { workflowVoiceActive.current = state !== "off"; setWorkflowVoice(state) },
+      say: (message) => setWorkflowSaveError(message),
+    })
   }
 
   const save = () => {
@@ -725,7 +766,13 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
             ＋
           </button>
         </div>
-        {tab === "clawdfather" && coordination ? null : tab === "workflow" && currentWorkflow ? <div className="workflow-detail-nav"><button type="button" onClick={() => setSelectedWorkflow(null)}>← {W("backToWorkflows")}</button></div> : <div className="snippets-tabs" role="tablist" aria-label={tabs.map(tabLabel).join(" / ")}
+        {tab === "clawdfather" && coordination ? null : tab === "workflow" && currentWorkflow ? <div className="workflow-detail-nav">
+          <button type="button" onClick={() => setSelectedWorkflow(null)}>← {W("backToWorkflows")}</button>
+          <span className="workflow-detail-actions">
+            <button type="button" disabled={workflowDeleting || startingWorkflow} onClick={() => { setWorkflowSaveError(""); setWorkflowDraft({ id: currentWorkflow.id, title: currentWorkflow.title, body: currentWorkflow.body, global: !currentWorkflow.project, source: currentWorkflow.source }) }}>{W("editAction")}</button>
+            <button type="button" className="workflow-delete" disabled={workflowDeleting || startingWorkflow} onClick={() => void removeWorkflow()}>{W("delete")}</button>
+          </span>
+        </div> : <div className="snippets-tabs" role="tablist" aria-label={tabs.map(tabLabel).join(" / ")}
           onKeyDown={(event) => {
             if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
             event.preventDefault()
@@ -936,23 +983,27 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
           </div>
         </div>
       </div>}
-      {workflowDraft && <div className="overlay" id="workflow-quick-editor" onClick={() => setWorkflowDraft(null)}>
+      {workflowDraft && <div className="overlay" id="workflow-quick-editor" onClick={closeWorkflowEditor}>
         <div className="sheet snippet-editor-sheet" role="dialog" aria-modal="true" aria-labelledby="workflow-quick-title" onClick={(event) => event.stopPropagation()}>
-          <h2 id="workflow-quick-title">{W("new")}</h2>
+          <h2 id="workflow-quick-title">{W(workflowDraft.id ? "edit" : "new")}</h2>
           <div className="block"><label className="field-label" htmlFor="workflow-quick-name">{W("name")}</label>
             <input className="find" id="workflow-quick-name" type="text" maxLength={200} value={workflowDraft.title}
               onChange={(event) => setWorkflowDraft({ ...workflowDraft, title: event.target.value })} /></div>
           <div className="block"><label className="field-label" htmlFor="workflow-quick-message">{W("message")}</label>
-            <textarea className="find" id="workflow-quick-message" rows={6} maxLength={4000} value={workflowDraft.body}
+            <textarea className="find" id="workflow-quick-message" rows={6} maxLength={4000} readOnly={!!workflowDraft.source} value={workflowDraft.body}
               onChange={(event) => setWorkflowDraft({ ...workflowDraft, body: event.target.value })} /></div>
-          <div className="block"><span className="field-label">{W("availability")}</span><div className="row">
+          {workflowDraft.source && <p className="workflow-linked-hint">{W("linkedMessageHint")}</p>}
+          {!workflowDraft.source && <div className="workflow-quick-voice"><div className="voice" ref={workflowVoiceRow} role="status" hidden />
+            <button type="button" className="chip" aria-pressed={workflowVoice === "recording"} disabled={workflowVoice === "opening" || workflowVoice === "reading"} onClick={dictateWorkflow}>{workflowVoice === "recording" ? L.strings.webVoiceStop : L.strings.webVoiceStart}</button>
+          </div>}
+          {!workflowDraft.id && <div className="block"><span className="field-label">{W("availability")}</span><div className="row">
             {!!projectKey && !projectUnresolved && <button type="button" className={"chip" + (!workflowDraft.global ? " on" : "")}
               aria-pressed={!workflowDraft.global} onClick={() => setWorkflowDraft({ ...workflowDraft, global: false })}>{W("projectOnly")}</button>}
             <button type="button" className={"chip" + (workflowDraft.global ? " on" : "")}
               aria-pressed={workflowDraft.global} onClick={() => setWorkflowDraft({ ...workflowDraft, global: true })}>{W("global")}</button>
-          </div></div>
+          </div></div>}
           {workflowSaveError && <p className="said" role="alert">{workflowSaveError}</p>}
-          <div className="buttons"><button className="chip" type="button" onClick={() => setWorkflowDraft(null)}>{W("cancel")}</button>
+          <div className="buttons"><button className="chip" type="button" onClick={closeWorkflowEditor}>{W("cancel")}</button>
             <button className="chip confirm-go" type="button" disabled={workflowSaving} onClick={() => void saveWorkflow()}>{W("save")}</button></div>
         </div>
       </div>}
