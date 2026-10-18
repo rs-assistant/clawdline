@@ -1006,7 +1006,7 @@ test("the Board's Session list is the held list, incomplete, when the machine's 
   const snap = await boardSessionRead(r, 30)
   assert.deepEqual(snap.sessions.map((session) => session.id), ["s1"])
   assert.equal(snap.scan.complete, false, "a list missing a row says it is incomplete, not that it failed")
-  assert.deepEqual(client.reads.map((read) => read.machine), ["mac-b"], "the silent Mac is never asked")
+  assert.deepEqual(client.reads.map((read) => read.machine), ["mac-b"], "the silent machine is never asked")
 })
 
 test("the Board's Session list failure is recorded for the machine's log without anything of the person's", () => {
