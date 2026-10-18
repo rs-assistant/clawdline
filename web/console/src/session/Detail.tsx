@@ -45,6 +45,7 @@ import "./work-tree.css"
 import "./git-status.css"
 import "./empty-detail.css"
 import "./detail-head.css"
+import "./detail-loading.css"
 
 /**
  * Whether this transport can read a project's snippets — `snippetControls(api).read`
@@ -211,7 +212,8 @@ export function Detail({
   // is blank rather than that while the list is still on its way — a pane that
   // says "pick a session" and then opens one on its own has changed its mind in
   // front of the reader.
-  const home = !row && !listUnknown
+  const home = !row && !listUnknown && !loadingDetail
+  const loading = loadingDetail && !row && !emptyProblem
 
   return (
     <DetailPane
@@ -229,6 +231,10 @@ export function Detail({
         <button className="back" id="back" onClick={onBack} aria-label={T.webBackLabel} disabled={ending}>
           ‹ {T.webBack}
         </button>
+        {loading && <div className="detail-loading-identity" aria-hidden="true">
+          <span className="detail-loading-mark" />
+          <div><span className="detail-loading-name" /><span className="detail-loading-sub" /></div>
+        </div>}
         <div className="detail-identity-block" hidden={!row}>
           <button
             className="detail-mark-go"
@@ -334,7 +340,13 @@ export function Detail({
               <p>{emptyProblem.text}</p>
               {emptyProblem.action && <button type="button" className="cloud-detail-act"
                 onClick={emptyProblem.action.run}>{emptyProblem.action.label}</button>}
-            </div> : loadingDetail ? <p className="cloud-detail-problem" role="status">{nextWord("cloudAllLoadingDetail")}</p>
+            </div> : loadingDetail ? <div className="detail-loading" role="status" aria-live="polite">
+                <span className="detail-loading-label">{nextWord("cloudAllLoadingDetail")}</span>
+                <div className="detail-loading-conversation" aria-hidden="true">
+                  <div className="detail-loading-message detail-loading-user"><span /><span /></div>
+                  <div className="detail-loading-message"><i /><span /><span /><span /></div>
+                </div>
+              </div>
               : home ? <HomeHero /> : null}
         </div>
       </div>
@@ -343,7 +355,7 @@ export function Detail({
           line above the composer. Kept while an agent's transcript is open, so
           the way to the next one is where the last one was. */}
       {row ? <BackgroundStrip row={row} selected={agentId} onAgent={chooseAgent} onShell={openShell} /> : null}
-      {selectedAgent ? null : <Composer row={row} onDid={onDid} onSent={onSent} onScreen={() => setScreenOpen(true)} restoredDraft={savedComposerDraft} suggestedDraft={suggestedDraft} />}
+      {loading ? <div className="composer detail-loading-composer" aria-hidden="true"><div><span /><i /></div></div> : selectedAgent ? null : <Composer row={row} onDid={onDid} onSent={onSent} onScreen={() => setScreenOpen(true)} restoredDraft={savedComposerDraft} suggestedDraft={suggestedDraft} />}
       {selectedAgent || !row ? null : <StatusLine row={row} onOpenGit={() => setGitOpen(true)} />}
       {/* `input/user-messages.js` puts its overlay on the body at import; this
           one is drawn into the body from here, because the `⋯` row that opens

@@ -1,0 +1,24 @@
+/* Keep the pending Cloud detail inside the real header, transcript and composer geometry. */
+.detail-loading-identity { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.detail-loading-identity > div { display: grid; gap: 7px; width: min(50vw, 220px); }
+.detail-loading-identity span, .detail-loading-message span, .detail-loading-message i,
+.detail-loading-composer span, .detail-loading-composer i {
+    display: block; background: var(--line); border-radius: 4px;
+}
+.detail-loading-mark { width: 28px; height: 28px; flex: 0 0 auto; }
+.detail-loading-name { height: 12px; width: 72%; }
+.detail-loading-sub { height: 8px; width: 48%; }
+.detail-loading { padding-top: 8px; animation: detail-loading-arrive 150ms ease-out both; }
+.detail-loading-label { display: block; color: var(--dim); font-size: 12px; line-height: 1.5; }
+.detail-loading-conversation { display: grid; gap: 32px; margin-top: 24px; }
+.detail-loading-message { display: grid; gap: 10px; }
+.detail-loading-message span { height: 10px; width: 94%; }
+.detail-loading-message span:last-child { width: 62%; }
+.detail-loading-message i { width: 58px; height: 8px; margin-bottom: 6px; }
+.detail-loading-user { margin-left: auto; width: 70%; padding: 16px; border-radius: 12px; background: var(--card); }
+.detail-loading-user span:last-child { width: 72%; }
+.detail-loading-composer > div { display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.detail-loading-composer span { height: 10px; width: 42%; }
+.detail-loading-composer i { margin-left: auto; height: 28px; width: 48px; }
+@keyframes detail-loading-arrive { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .detail-loading { animation: none; } }

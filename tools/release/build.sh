@@ -111,7 +111,7 @@ main=$(find "$dist/assets" -maxdepth 1 -type f -name 'main-*.js' -print)
 [ "$(printf '%s\n' "$main" | sed '/^$/d' | wc -l | tr -d ' ')" = 1 ] || die "the console does not hold exactly one main bundle"
 if grep -q 'CloudGate' "$main"; then die "the console is the hosted build (CloudGate); unset VITE_HOSTED_CONSOLE"; fi
 
-ldflags="-s -w -X main.releaseVersion=$version"
+ldflags="-s -w -X main.releaseVersion=$version -X main.releaseCommit=$commit"
 [ -z "$test_key" ] || ldflags="$ldflags -X github.com/sainteye/clawdline/internal/adapters/release.extraKey=$test_key"
 
 # tar_into <archive> <dir>: the directory's contents at the archive's root.
