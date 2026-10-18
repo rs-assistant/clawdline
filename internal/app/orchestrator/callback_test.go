@@ -364,6 +364,8 @@ func TestTheLockFencesStartingFromSettling(t *testing.T) {
 	b, ctx := newTestBroker(t)
 	id := "c0000000-0000-4000-8000-000000000012"
 	r, files := stranded(t, b, ctx, id, 0)
+	// Keep the command alive until cleanup so the assertion observes a held lock.
+	r.Callback.Argv = []string{"sleep", "60"}
 	held, err := fence(files.lock())
 	if err != nil || held == nil {
 		t.Fatalf("fence: %v", err)
