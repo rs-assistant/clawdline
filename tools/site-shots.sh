@@ -1,14 +1,16 @@
 #!/bin/bash
-# Recapture the website's three feature pictures from the built console and the
+# Recapture the website's feature pictures from the built console and the
 # story in web/console/src/session/site-shots.ts, in English and Taiwan
 # Traditional Chinese, with their numbered callouts drawn in. docs/site-shots.md
 # is the whole of it.
 #
 #   tools/site-shots.sh <directory>
 #
-# Writes attention-note-*.png, session-todo-*.png and board-item-*.png (each in
-# -en and -zh-Hant) into <directory>, normally the website's public/features.
-# Builds the console first through tools/heavy.sh. Exit: 0 when all six were
+# Writes attention-note, session-todo and board-item (the feature gallery) and
+# todo-screenshot, session-message, ask-person, squad-list and review-notice
+# (the blog's pictures), each
+# as <scene>-en.png and <scene>-zh-Hant.png, into <directory>.
+# Builds the console first through tools/heavy.sh. Exit: 0 when all sixteen were
 # written, 1 otherwise, 2 for a usage error.
 set -euo pipefail
 
@@ -21,7 +23,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 
 ( cd "$root/web" && "$root/tools/heavy.sh" npm run build )
 
-scenes=(attention-note session-todo board-item)
+scenes=(attention-note session-todo board-item todo-screenshot session-message ask-person squad-list review-notice)
 for lang in en zh-Hant; do
   for scene in ${scenes[@]+"${scenes[@]}"}; do rm -f "$out/$scene-$lang.png"; done
   ( cd "$root/web/console" && SITE_SHOTS="$out" SITE_SHOTS_LANG="$lang" \
@@ -38,4 +40,4 @@ for lang in en zh-Hant; do
   done
 done
 [ "$missing" -eq 0 ] || exit 1
-echo "site-shots: six pictures in $out; look at every one before publishing them"
+echo "site-shots: sixteen pictures in $out; look at every one before publishing them"

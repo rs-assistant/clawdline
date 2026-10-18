@@ -1,5 +1,5 @@
-// The website's three feature pictures, photographed from the built console
-// against a stand-in daemon that serves one small story (`site-shots.ts`).
+// The website's feature pictures, photographed from the built console against
+// a stand-in daemon that serves one of two small stories (`site-shots.ts`).
 // `tools/site-shots.sh` builds the console and runs this once per language;
 // without SITE_SHOTS every test skips. docs/site-shots.md is the whole of it.
 import { test, before, after } from "node:test"
@@ -11,21 +11,83 @@ import { tmpdir } from "node:os"
 import { dirname, extname, join, normalize, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 // @ts-expect-error -- Node's strip-types test runner needs the source extension.
-import { SITE_CALLOUTS, SITE_LANG, SITE_SHOTS, STORY, calloutScript, siteSuffix, type Callout } from "./site-shots.ts"
+import { SITE_CALLOUTS, SITE_LANG, SITE_SHOTS, STORY, calloutScript, inventedScreenshotScript, siteSuffix, type Callout } from "./site-shots.ts"
 
 const dist = resolve(dirname(fileURLToPath(import.meta.url)), "../../dist")
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 const now = Math.floor(Date.now() / 1000)
 const PROJECT_PATH = "~/code/shop"
+const TRIP_PATH = "~/code/trips"
+const TRIP = STORY.trip
+const SQUAD = STORY.squad
+const SQUAD_PATH = "~/code/budget"
 
 const CHECKOUT = "site-checkout"
 const SIGN_IN = "site-sign-in"
 const SEARCH = "site-search"
 const conversation = (id: string) => "conversation-" + id
 
+const REFACTOR = "site-refactor"
+const SYNC = "site-sync-tests"
+const CALENDAR = "site-calendar"
+
 // The Session asking the question is waiting on the person; the picture of the
 // queued to-do shows it working again after the answer.
 let checkoutWaiting = true
+// Which story the daemon tells: the shop's, or the blog's trip planner, whose
+// refactoring Session asks the person through its terminal's own menu.
+let story: "shop" | "trip" | "squad" = "shop"
+let refactorAsking = false
+// The squad's code review has finished and reported back to its coordinator.
+let reviewFinished = false
+
+const COORDINATOR = "site-coordinator"
+const CHILDREN = { backend: "site-backend", checker: "site-checker", review: "site-review" } as const
+// The child's built-in role, by the id the daemon's catalog uses.
+const ROLES = { backend: "backend", checker: "reality-checker", review: "code-reviewer" } as const
+
+/**
+ * The four built-in roles the squad uses, as `GET /v1/personas` serves them:
+ * names and summaries read from the catalog itself, icons copied from
+ * `internal/domain/persona/icons.go`.
+ */
+const ICONS: Record<string, { accent: string; palette: Record<string, string>; rows: string[] }> = {
+  architect: { accent: "B", palette: { B: "#6c7bd9", o: "#141416", Y: "#f2c14e", y: "#c9962a" },
+    rows: ["..YYYY..", ".YYYYYY.", "yyyyyyyy", ".BoBBoB.", ".BBBBBB.", ".BBBBBB.", "..B..B.."] },
+  backend: { accent: "B", palette: { B: "#3f8f86", o: "#141416", A: "#9be7c4", g: "#56e39a", d: "#24524c" },
+    rows: ["...AA...", "...dd...", ".BBBBBB.", ".BoBBoB.", ".dddddd.", ".dgdgdg.", "..B..B.."] },
+  "reality-checker": { accent: "B", palette: { B: "#e0664f", o: "#141416", c: "#2f9e5b", W: "#f4efe3", A: "#ffd166" },
+    rows: ["...AA...", "...BB...", ".BBBBBB.", ".BoBBoB.", ".BWWWcB.", ".BcWcWB.", ".BWcWWB."] },
+  "code-reviewer": { accent: "B", palette: { B: "#a371f7", o: "#141416", G: "#f0f0f0", A: "#f0f0f0" },
+    rows: ["...AA...", "...BB...", ".BBBBBB.", "GGGGGGGG", ".GoBBoG.", ".BBBBBB.", "..B..B.."] },
+}
+const catalog = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../internal/domain/persona/catalog")
+const personas = () => ({
+  license: "MIT",
+  personas: Object.entries(ICONS).map(([id, art]) => {
+    const head = readFileSync(join(catalog, id + ".md"), "utf8").split("\n---")[0]
+    const field = (key: string) => (new RegExp("^" + key + ": (.+)$", "m").exec(head)?.[1] ?? "").trim()
+    return {
+      id, name: { en: field("name_en"), "zh-Hant": field("name_zh") }, summary: { en: field("summary_en"), "zh-Hant": field("summary_zh") },
+      suggested_kinds: [], icon: { accent: art.palette[art.accent], cells: art.rows.map((row) => [...row].map((c) => c === "." ? null : art.palette[c])) },
+    }
+  }),
+})
+
+const squadSessions = () => [
+  session(COORDINATOR, SQUAD.coordinator, 1, { cwd: SQUAD_PATH, persona: "architect", state: "working", work_state: "working", line: "12m" }),
+  session(CHILDREN.backend, SQUAD.children.backend, 1, { cwd: SQUAD_PATH, persona: ROLES.backend, state: "working", work_state: "working", line: "8m" }),
+  session(CHILDREN.checker, SQUAD.children.checker, 3, { cwd: SQUAD_PATH, persona: ROLES.checker, assistant: "codex", isClaude: false, state: "working", work_state: "working", line: "5m" }),
+  session(CHILDREN.review, SQUAD.children.review, reviewFinished ? 1 : 2, { cwd: SQUAD_PATH, persona: ROLES.review,
+    ...(reviewFinished ? {} : { state: "working", work_state: "working", line: "3m" }) }),
+]
+
+// The coordinator's dispatched tasks, which is what nests each child under it.
+const squadTasks = () => (Object.keys(CHILDREN) as (keyof typeof CHILDREN)[]).map((key, index) => ({
+  id: "site-task-" + key, kind: "custom", title: SQUAD.children[key], created: now - 900 + index * 60,
+  ...(key === "review" && reviewFinished ? { state: "success", finishedAt: now - 120 } : { state: "briefed" }),
+  root: { terminalId: COORDINATOR, sessionId: conversation(COORDINATOR) }, child: { terminalId: CHILDREN[key] },
+}))
 
 function session(id: string, label: string, minutesAgo: number, extra: Record<string, unknown> = {}) {
   return {
@@ -38,10 +100,24 @@ function session(id: string, label: string, minutesAgo: number, extra: Record<st
   }
 }
 
+const menu = () => ({
+  question: TRIP.question,
+  // The caret on none of the rows, so no "highlighted" word sits in the picture.
+  options: TRIP.options.map(([label, detail], index) => ({ n: index + 1, label, detail, can: true, selected: false })),
+})
+
+const tripSessions = () => [
+  session(REFACTOR, TRIP.refactor, 1, { cwd: TRIP_PATH, ...(refactorAsking
+    ? { state: "waiting", work_state: "waiting_you", menu: menu() }
+    : { state: "working", work_state: "working", line: "4m" }) }),
+  session(SYNC, TRIP.sync, 2, { cwd: TRIP_PATH, assistant: "codex", isClaude: false, state: "working", work_state: "working", line: "9m" }),
+  session(CALENDAR, TRIP.calendar, 55, { cwd: TRIP_PATH }),
+]
+
 const snapshot = () => ({
   at: Date.now(),
   scan: { complete: true, completed: { complete: true, sequence: 1 }, emptyAuthoritative: true, epoch: 1, generation: 1, provenance: "fixture" },
-  sessions: [
+  sessions: story === "squad" ? squadSessions() : story === "trip" ? tripSessions() : [
     session(CHECKOUT, STORY.checkout, 1, checkoutWaiting
       ? { attention_count: 1, state: "waiting", work_state: "waiting_you" }
       : { state: "working", work_state: "working", line: "2m" }),
@@ -85,6 +161,23 @@ const todo = () => ({
 const transcript = (id: string) => id === CHECKOUT ? [
   { role: "user", text: STORY.asked, at: now - 1800, kind: "message" },
   { role: "assistant", text: STORY.answered, at: now - 90, kind: "message" },
+] : id === COORDINATOR ? [
+  { role: "user", text: SQUAD.asked, at: now - 1500, kind: "message" },
+  { role: "assistant", text: SQUAD.planned, at: now - 900, kind: "message" },
+  ...(reviewFinished ? [
+    // The completion notice as the daemon's transcript reader hands it on
+    // (`clawdline.notice` kind `task_finished`, for the root that asked).
+    { role: "notice", text: "", at: now - 120, notice: { kind: "task_finished", state: "success", audience: "parent", outstanding: 2,
+      task: { id: "site-task-review", title: SQUAD.children.review } } },
+    { role: "assistant", text: SQUAD.verdict, at: now - 60, kind: "message" },
+  ] : []),
+] : id === REFACTOR ? [
+  { role: "user", text: TRIP.asked, at: now - 3600, kind: "message" },
+  { role: "assistant", text: TRIP.answered, at: now - 600, kind: "message" },
+  // A session message as the daemon's transcript reader hands it on
+  // (`internal/adapters/transcript` KindMessage): the sender's label and assistant.
+  { role: "message", text: TRIP.message, at: now - 240, source: TRIP.sync, sourceAssistant: "codex", sourceMode: "clawdline" },
+  ...(refactorAsking ? [{ role: "assistant", text: TRIP.considered, at: now - 60, kind: "message" }] : []),
 ] : []
 
 const TYPES: Record<string, string> = { ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".json": "application/json", ".png": "image/png", ".webp": "image/webp", ".ico": "image/x-icon" }
@@ -120,21 +213,26 @@ function daemon(): Server {
     if (about) {
       const row = snapshot().sessions.find((s) => s.id === decodeURIComponent(about[1]))
       if (!row) return json(res, 404, { error: "not_found" })
-      if (about[2] === "git") return json(res, 200, { git: { ahead: 0, behind: 0, branch: "checkout-redesign", clean: true, head: "0123456789abcdef", files: [] } })
+      if (about[2] === "git") return json(res, 200, { git: { ahead: 0, behind: 0, branch: story === "squad" ? "split-sync-engine" : story === "trip" ? "storage-refactor" : "checkout-redesign", clean: true, head: "0123456789abcdef", files: [] } })
       return json(res, 200, { info: {
-        session: { id: row.id, title: row.label, assistant: row.assistant, namingAssistant: row.assistant, sessionId: row.sessionId, cwd: PROJECT_PATH, model: "claude-opus-5-5" },
+        session: { id: row.id, title: row.label, assistant: row.assistant, namingAssistant: row.assistant, sessionId: row.sessionId, cwd: row.cwd, model: "claude-opus-5-5" },
         models: [{ id: "claude-opus-5-5", name: "Opus 5.5" }], context: { usedPercent: 18 }, deploy: [], links: [],
       } })
     }
-    if (path === "/v1/places") return json(res, 200, { places: [{ id: project.id, label: project.label, path: PROJECT_PATH,
-      icon: { accent: "#e07a5f", cells: [["#e07a5f", "#e07a5f"], ["#e07a5f", "#141416"]] } }], assistants: [{ id: "claude", label: "Claude" }] })
+    if (path === "/v1/personas") return json(res, 200, personas())
+    if (path === "/v1/places") return json(res, 200, { places: [story === "squad"
+      ? { id: "site-budget", label: SQUAD.project, path: SQUAD_PATH, icon: { accent: "#8fd06b", cells: [["#8fd06b", "#8fd06b"], ["#141416", "#8fd06b"]] } }
+      : story === "trip"
+      ? { id: "site-trips", label: TRIP.project, path: TRIP_PATH, icon: { accent: "#5fa8e0", cells: [["#5fa8e0", "#141416"], ["#5fa8e0", "#5fa8e0"]] } }
+      : { id: project.id, label: project.label, path: PROJECT_PATH, icon: { accent: "#e07a5f", cells: [["#e07a5f", "#e07a5f"], ["#e07a5f", "#141416"]] } }],
+    assistants: [{ id: "claude", label: "Claude" }] })
     if (path.startsWith("/v1/work/v2/human-interventions/")) {
-      const mine = decodeURIComponent(path).includes(CHECKOUT) && checkoutWaiting
+      const mine = story === "shop" && decodeURIComponent(path).includes(CHECKOUT) && checkoutWaiting
       return json(res, 200, { ok: true, rows: mine ? [note()] : [], pruned_resolved: 0 })
     }
     const todos = /^\/v1\/work\/v2\/session-todos\/(.+)$/.exec(path)
     if (todos && req.method === "GET") {
-      const mine = decodeURIComponent(todos[1]).includes(CHECKOUT) && !checkoutWaiting
+      const mine = story === "shop" && decodeURIComponent(todos[1]).includes(CHECKOUT) && !checkoutWaiting
       return json(res, 200, { ok: true, assigned_items: [], recent_items: [], direct_todos: mine ? [todo()] : [],
         open_decisions: [], decisions_error: null, truncated: false })
     }
@@ -146,7 +244,8 @@ function daemon(): Server {
     }
     if (path === "/v1/work/v2/proposals") return json(res, 200, { rows: [], truncated: false })
     if (path === "/v1/work/decisions") return json(res, 200, { counts: {}, rows: [], next_cursor: null })
-    if (path === "/v1/orchestrator/tasks") return json(res, 200, { at: Date.now(), tasks: [] })
+    if (path === "/v1/orchestrator/tasks") return json(res, 200, { at: Date.now(), tasks: story === "squad" ? squadTasks() : [] })
+    if (path === "/v1/orchestrator/schedules") return json(res, 200, { at: Date.now(), schedules: [] })
     if (path === "/v1/work/v2/images/site-todo-image") {
       res.writeHead(200, { "content-type": "image/png" })
       return res.end(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64"))
@@ -286,4 +385,88 @@ test("site shot: a Board item shows its stage and its Session", { skip: !SITE_SH
     { sel: ".work-item-detail-modal .work-milestones" },
     { sel: ".work-item-detail-modal .work-session-link", pad: 4 },
   ])
+})
+
+test("site shot: a bug reported from the phone, with the problem circled", { skip: !SITE_SHOTS }, async () => {
+  story = "trip"
+  try {
+    await shoot("todo-screenshot", "/#session=" + REFACTOR, async (run, until) => {
+      await until(`(() => {
+        const fold = document.querySelector('.session-todos')
+        if (fold && !fold.open) fold.querySelector('summary')?.click()
+        return !!document.querySelector('.session-todos-add')
+      })()`)
+      await run(`document.querySelector('.session-todos-add').click()`)
+      await until(`!!document.querySelector('.session-todo-modal textarea')`)
+      // Typed and attached as a person would: React reads the native setter's input event and the picker's change event.
+      await run(`(() => {
+        const box = document.querySelector('.session-todo-modal textarea')
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(box, ${JSON.stringify(TRIP.todo)})
+        box.dispatchEvent(new Event('input', { bubbles: true }))
+      })()`)
+      await run(`(async () => {
+        const file = await ${inventedScreenshotScript(TRIP.screenshot, TRIP.picture)}
+        const picker = document.querySelector('.session-todo-modal input[type=file]')
+        const files = new DataTransfer(); files.items.add(file); picker.files = files.files
+        picker.dispatchEvent(new Event('change', { bubbles: true }))
+        return true
+      })()`)
+      await until(`!!document.querySelector('.session-todo-modal .work-pending-picture img')?.complete`)
+    }, [
+      { sel: ".session-todo-modal textarea", pad: 3 },
+      { sel: ".session-todo-modal .work-pending-picture", pad: 5 },
+    ])
+  } finally { story = "shop" }
+})
+
+test("site shot: another Session asks this one to take a Board item", { skip: !SITE_SHOTS }, async () => {
+  story = "trip"
+  try {
+    await shoot("session-message", "/#session=" + REFACTOR, async (run, until) => {
+      await until(`!!document.querySelector('.entry[data-role="message"] .message-card')`)
+      await run(`document.querySelector('.entry[data-role="message"]').scrollIntoView({ block: "center" })`)
+    }, [
+      // The sender's name alone, padded clear so the number does not sit on its first letter.
+      { sel: '.entry[data-role="message"] .message-source > span:first-child', pad: 7 },
+      { sel: '.entry[data-role="message"] .message-card > div:not(.message-source)', pad: 4 },
+    ])
+  } finally { story = "shop" }
+})
+
+test("site shot: the Session asks the person before it takes the work", { skip: !SITE_SHOTS }, async () => {
+  story = "trip"; refactorAsking = true
+  try {
+    await shoot("ask-person", "/#session=" + REFACTOR, async (run, until) => {
+      await until(`!!document.querySelector('#waiting:not([hidden]) .menu .opt')`)
+    }, [
+      { sel: "#waiting .question" },
+      { sel: "#waiting .menu", pad: 4 },
+    ])
+  } finally { story = "shop"; refactorAsking = false }
+})
+
+test("site shot: a coordinating Session with its squad nested under it", { skip: !SITE_SHOTS }, async () => {
+  story = "squad"
+  try {
+    await shoot("squad-list", "/", async (run, until) => {
+      await until(`document.querySelectorAll('li.row[data-depth] .persona-state-name').length === 3
+        && !!document.querySelector('li.row[data-id="${COORDINATOR}"] .persona-state-name')`)
+    }, [
+      { sel: `li.row[data-id="${COORDINATOR}"]`, pad: 2 },
+      { sel: "li.row[data-depth]", pad: 2 },
+    ])
+  } finally { story = "shop" }
+})
+
+test("site shot: the code review reports back with its verdict", { skip: !SITE_SHOTS }, async () => {
+  story = "squad"; reviewFinished = true
+  try {
+    await shoot("review-notice", "/#session=" + COORDINATOR, async (run, until) => {
+      await until(`!!document.querySelector('.entry[data-role="notice"] .notice-card')`)
+      await run(`document.querySelector('.entry[data-role="notice"]').scrollIntoView({ block: "center" })`)
+    }, [
+      { sel: '.entry[data-role="notice"] .notice-card', pad: 4 },
+      { sel: '.entry[data-role="notice"] ~ .entry[data-role="assistant"] .body', pad: 4 },
+    ])
+  } finally { story = "shop"; reviewFinished = false }
 })
