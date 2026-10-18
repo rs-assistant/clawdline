@@ -181,6 +181,15 @@ export const SESSION_LIST_READ = {
 } as const
 
 /**
+ * The Board's Session read, given the page's `call`: the one place the read's
+ * path, header, deadline and late-answer window are put together, so the
+ * Board cannot send a plain list read that waits for a pass that never comes.
+ */
+export function readSessionListWith<T>(call: (path: string, init: RequestInit, timeoutMs: number, answerMs: number) => Promise<T>): Promise<T> {
+  return call(SESSION_LIST_READ.path, { headers: SESSION_LIST_READ.headers }, SESSION_LIST_READ.timeoutMs, SESSION_LIST_READ.answerMs)
+}
+
+/**
  * A failed Session list read as one word for the page's diagnostics: the
  * refusal's code, `timeout` for a deadline, otherwise the error's name. Never
  * its message, which can carry a path.

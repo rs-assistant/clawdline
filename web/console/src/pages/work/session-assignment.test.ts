@@ -3,7 +3,7 @@ import test from "node:test"
 import type { SessionRow } from "@clawdline/contract"
 import type { SessionWorkV2 } from "./api.js"
 // @ts-expect-error -- a `.ts` path is required by Node's native type stripping.
-import { ASSIGNMENT_SETTLE_MS, SessionListReader, sessionListFailureCode, assignmentCandidates, assignmentChoiceRows, assignmentChoices, assignmentChoicesWords, assistantName, sessionListComplete, awaitsAcceptance, rememberAssistant, rememberedAssistant, sessionActivityName, sessionWorkCounts, sessionWorkLabel, sessionWorkStateName } from "./session-assignment.ts"
+import { ASSIGNMENT_SETTLE_MS, SessionListReader, readSessionListWith, sessionListFailureCode, assignmentCandidates, assignmentChoiceRows, assignmentChoices, assignmentChoicesWords, assistantName, sessionListComplete, awaitsAcceptance, rememberAssistant, rememberedAssistant, sessionActivityName, sessionWorkCounts, sessionWorkLabel, sessionWorkStateName } from "./session-assignment.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { withCatalog } from "../../catalog-testing.ts"
 
@@ -303,4 +303,17 @@ test("a Session list failure code is the refusal's code or what kind of failure,
   assert.equal(sessionListFailureCode(new DOMException("Timed out", "AbortError")), "timeout")
   assert.equal(sessionListFailureCode(Object.assign(new Error("/private/path"), { name: "TransportError" })), "transport")
   assert.equal(sessionListFailureCode(null), "unknown")
+})
+
+test("the Board's Session read asks for the held list and waits for the reader's late answer", async () => {
+  const asked: unknown[][] = []
+  await readSessionListWith(async (...args) => { asked.push(args); return null })
+  assert.equal(asked.length, 1)
+  const [path, init, timeoutMs, answerMs] = asked[0] as [string, RequestInit, number, number]
+  assert.equal(path, "/v1/sessions")
+  // Without the header the relay reader treats the Board's poll as a manual
+  // refresh and waits for a pass that an unchanged Session set never makes.
+  assert.equal(new Headers(init.headers).get("X-Clawdline-Initial-Read"), "1")
+  assert.ok(answerMs > 0, "the list the reader hands over at the deadline is taken, not dropped")
+  assert.ok(timeoutMs > 0)
 })

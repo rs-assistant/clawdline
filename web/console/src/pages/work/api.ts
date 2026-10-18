@@ -1,6 +1,6 @@
 import { RefusalError, TransportError, isRefusal } from "@clawdline/core"
 import { fetchWithDeadline } from "./fetch-deadline.js"
-import { SESSION_LIST_READ } from "./session-assignment.js"
+import { readSessionListWith } from "./session-assignment.js"
 import type { PersonaSuggestionReply, SessionsSnapshot, UsageItem, UsageSession, WorkGateCompactRead, WorkGateDetailRead, WorkGateDecisionAction } from "@clawdline/contract"
 import type { CreatedVia } from "./words.js"
 
@@ -500,8 +500,7 @@ export const submitSecretHandoffV2 = (conversationID: string, noteID: string, va
     `/v1/work/v2/human-interventions/${encodeURIComponent(`conversation:${conversationID}`)}/${noteID}/handoff`,
     { value },
   )
-export const readSessionsForWorkV2 = () => call<SessionsSnapshot>(SESSION_LIST_READ.path,
-  { headers: SESSION_LIST_READ.headers }, SESSION_LIST_READ.timeoutMs, SESSION_LIST_READ.answerMs)
+export const readSessionsForWorkV2 = () => readSessionListWith<SessionsSnapshot>(call)
 /** The token ledger's bill of a Board item, and of one session (docs/token-ledger.md). */
 export const readItemUsage = (itemID: string) => call<UsageItem>(`/v1/usage/items/${encodeURIComponent(itemID)}`)
 export const readSessionUsage = (conversation: string) =>
