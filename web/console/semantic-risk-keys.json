@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6055,
+  "englishKeys": 6059,
   "counts": {
-    "negation": 1924,
-    "state": 1083,
+    "negation": 1926,
+    "state": 1084,
     "permission": 372,
     "deletion": 159,
-    "uncertainty": 176
+    "uncertainty": 177
   },
-  "unionCount": 2895,
+  "unionCount": 2897,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1888,6 +1888,8 @@
       "verify.unreadable",
       "verify.whyNone",
       "work.answerNo",
+      "work.assignSessionsFailed",
+      "work.assignSessionsIncomplete",
       "work.backlogLede",
       "work.boardLede",
       "work.digestNone",
@@ -2980,6 +2982,7 @@
       "verify.stillRunning",
       "verify.tally",
       "verify.title",
+      "work.assignSessionsIncomplete",
       "work.cardEpicParentLabel",
       "work.closureClock",
       "work.decisionBlocking",
@@ -3721,6 +3724,7 @@
       "resourceCoordination.incompleteScan",
       "resourceCoordination.unknown",
       "template.ad7d5cc31425",
+      "work.assignSessionsIncomplete",
       "work.closureClock",
       "work.digestClosureAsked",
       "work.projectDirectoryUnreadable",
@@ -6543,6 +6547,8 @@
     "verify.unreadable",
     "verify.whyNone",
     "work.answerNo",
+    "work.assignSessionsFailed",
+    "work.assignSessionsIncomplete",
     "work.backlogLede",
     "work.boardLede",
     "work.cardEpicParentLabel",
