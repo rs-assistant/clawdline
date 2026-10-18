@@ -89,6 +89,7 @@ func (s *Server) cacheCapacityMeasures() map[string]func() capacity.Reading {
 			return capacity.Reading{Known: true, Used: int64(held),
 				Note: strconv.FormatInt(skipped, 10) + " unchanged scan(s) answered without a write"}
 		},
+		capacity.CacheSessionProjectKeys: func() capacity.Reading { return s.projectKeys.Reading() },
 		capacity.CacheImageThumbs: func() capacity.Reading {
 			held, entries, evicted, lastAt := s.thumbs.Reading()
 			return capacity.Reading{Known: true, Used: held,

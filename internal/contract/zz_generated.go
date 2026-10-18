@@ -5779,7 +5779,14 @@ type SessionRow struct {
 	// The built-in persona (GET /v1/personas) this session was launched as, read back
 	// from its process command line; absent for none, and absent on a row with no
 	// process reading.
-	Persona        string                `json:"persona,omitempty"`
+	Persona string `json:"persona,omitempty"`
+
+	// The Project this Session would be accepted into, decided from `cwd` by the same
+	// rule an assignment's claim applies: the nearest repository, with a linked
+	// worktree followed to the repository it belongs to and symlinks resolved. A Board
+	// item's `project.path` is compared with it. Absent when `cwd` is absent or not
+	// absolute.
+	ProjectKey     string                `json:"project_key,omitempty"`
 	RootAssignment *RootAssignmentRecord `json:"root_assignment,omitempty"`
 	ScreenReading  SessionScreenReading  `json:"screen_reading,omitempty"`
 

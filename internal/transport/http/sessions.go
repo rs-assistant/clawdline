@@ -108,13 +108,14 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 			ID                  string         `json:"id"`
 			Title               string         `json:"title"`
 			CWD                 string         `json:"cwd,omitempty"`
+			ProjectKey          string         `json:"project_key,omitempty"`
 			Icon                *contract.Icon `json:"icon,omitempty"`
 			ExecutionGeneration string         `json:"execution_generation,omitempty"`
 			Status              status         `json:"status"`
 		}
 		rows := make([]presentation, 0, len(snapshot.Sessions))
 		for _, row := range snapshot.Sessions {
-			rows = append(rows, presentation{ID: row.ID, Title: row.Label, CWD: row.CWD,
+			rows = append(rows, presentation{ID: row.ID, Title: row.Label, CWD: row.CWD, ProjectKey: row.ProjectKey,
 				Icon: row.Icon, ExecutionGeneration: row.ExecutionGeneration,
 				Status: status{SessionID: row.SessionID, EpicParent: row.EpicParent, Persona: row.Persona, State: row.State, WorkState: row.WorkState, WorkNote: row.WorkNote,
 					WorkProvenance: row.WorkProvenance, WorkMovedBy: row.WorkMovedBy,
@@ -899,6 +900,11 @@ func (s *Server) sessionRow(in rowInput) sessionRowWire {
 		// Read back from the process's command line; absent for none.
 		Persona:      item.Persona,
 		MachineScope: projects.IsMachineWorkspace(s.cfg.Dir, item.CWD),
+	}
+	// The Project this row would be accepted into, by the claim's own rule:
+	// a subdirectory or a linked worktree of a repository is that repository.
+	if key, ok := s.projectKeys.key(item.CWD); ok {
+		row.ProjectKey = key
 	}
 	out := sessionRowWire{Menu: wireMenu(item), processPID: item.PID, processStart: in.live.ProcessStart}
 	// Only a waiting row says whether its screen was read: it is what tells

@@ -121,6 +121,7 @@
         "coordinator": { "$ref": "#/$defs/SessionCoordinator" },
         "machine_scope": { "description": "This Session is in the daemon's machine workspace. It may still need role registration; the coordinator field is the registration receipt.", "type": "boolean" },
         "cwd": { "type": "string" },
+        "project_key": { "description": "The Project this Session would be accepted into, decided from `cwd` by the same rule an assignment's claim applies: the nearest repository, with a linked worktree followed to the repository it belongs to and symlinks resolved. A Board item's `project.path` is compared with it. Absent when `cwd` is absent or not absolute.", "type": "string" },
         "disposition": { "$ref": "#/$defs/WorkDisposition" },
         "evidence": { "$ref": "common.schema.json#/$defs/Evidence" },
         "icon": { "$ref": "common.schema.json#/$defs/Icon" },

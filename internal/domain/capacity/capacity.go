@@ -169,9 +169,11 @@ const (
 	CloudTaskListReread = "cloud.task_list_reread_seconds"
 	// The last committed execution scan, so an unchanged one opens no write.
 	CacheSessionExecutionMemo = "cache.session_execution_memo"
-	BoardReceipts             = "board.receipts"
-	CloudRelayQueue           = "cloud.relay_queue"
-	StoreReceipts             = "store.receipts"
+	// Each working directory's Project key, for the session list's rows.
+	CacheSessionProjectKeys = "cache.session_project_keys"
+	BoardReceipts           = "board.receipts"
+	CloudRelayQueue         = "cloud.relay_queue"
+	StoreReceipts           = "store.receipts"
 	// How long the store keeps what nothing reads any more.
 	StoreDoneEffectRetention       = "store.done_effect_retention_seconds"
 	StoreReceiptTombstoneRetention = "store.receipt_tombstone_retention_seconds"

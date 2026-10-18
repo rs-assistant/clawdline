@@ -1036,6 +1036,6 @@ func (s *Server) agentAssignOnRun(ctx context.Context, id, sessionID, runID stri
 // sessionInProject is whether a Session works in an item's Project, the check
 // a person's "existing Session" assignment and a Session's claim both make.
 func sessionInProject(sess session.Session, item work.ItemV2) bool {
-	canonical, ok := projects.CanonicalProjectKey(sess.CWD)
+	canonical, ok := sessionProjectKey(sess.CWD)
 	return ok && canonical == item.ProjectPath
 }

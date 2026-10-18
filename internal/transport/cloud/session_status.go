@@ -233,6 +233,10 @@ func (p *Publisher) publishStatuses(ctx context.Context, reading sessionReading,
 			// without them here the list never learned to read its title
 			// again and kept drawing "Claude Session" with no icon.
 			"label": row["label"], "cwd": row["cwd"], "icon": row["icon"],
+			// The Project the row would be accepted into moves with its cwd
+			// (or with a repository appearing around it), and the Board's
+			// assignment dialog picks by it.
+			"project_key": row["project_key"],
 			// What a waiting card draws. Its line names the question, the
 			// rows and the caret but not a multi-select's ticks, so a box
 			// ticked from the phone never woke the list and the card kept

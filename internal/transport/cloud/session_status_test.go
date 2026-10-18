@@ -210,6 +210,31 @@ func TestStatusNotifiesOneMachineListReadWhenItsTitleSettles(t *testing.T) {
 	}
 }
 
+// The Board's assignment dialog picks a Session by the Project its machine
+// says it belongs to. That answer can settle without the cwd moving (a
+// repository appearing around it), so it wakes the machine list the way the
+// cwd does, and like the cwd it never rides on ss/.
+func TestStatusNotifiesOneMachineListReadWhenItsProjectKeySettles(t *testing.T) {
+	c := &collector{}
+	p := &Publisher{MachineID: "mac_a", published: map[string][32]byte{}, sent: map[string]time.Time{}, Publish: c.publish}
+	row := map[string]any{"id": "%19", "state": "working", "cwd": "/private/project/sub"}
+	reading := sessionReading{sessions: []map[string]any{row}, at: json.RawMessage(`100`), complete: true}
+	p.publishStatuses(context.Background(), reading, []string{"%19"})
+	first := c.payload(t, "ss/mac_a/"+InventorySessionID)
+	row["project_key"] = "/private/project"
+	p.publishStatuses(context.Background(), reading, []string{"%19"})
+	next := c.payload(t, "ss/mac_a/"+InventorySessionID)
+	if next["presentation_generation"] == first["presentation_generation"] {
+		t.Fatalf("a settled project key did not move the presentation: %v -> %v", first, next)
+	}
+	for _, channel := range c.channels() {
+		body, err := json.Marshal(c.payload(t, channel))
+		if err != nil || strings.Contains(string(body), "private") {
+			t.Fatalf("status channel %s copied the project key: %s (%v)", channel, body, err)
+		}
+	}
+}
+
 // A box ticked on a multi-select changed nothing the list was told about: the
 // waiting row's line names the question, its rows and the caret, not the
 // ticks, so the phone's card kept every box empty while the pane showed four

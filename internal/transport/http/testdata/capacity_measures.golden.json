@@ -81,6 +81,10 @@
     "Note": true
   },
   {
+    "Name": "cache.session_project_keys",
+    "Known": true
+  },
+  {
     "Name": "cache.session_skills",
     "Known": true,
     "Note": true

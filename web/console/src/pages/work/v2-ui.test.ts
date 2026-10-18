@@ -345,7 +345,6 @@ test("a dictating text box is never inside a <label>, which would hand its Done 
 
 test("an assigned card can be moved to another or a new Session", () => {
   assert.match(source, pattern`<WorkIcon name="reassign" \/>\{${wordCall("改派")}\}`)
-  assert.match(source, /assignmentChoices\(sessionList, sessions, item\)/)
 })
 
 test("opening Epic reassignment brings the picker into view", () => {

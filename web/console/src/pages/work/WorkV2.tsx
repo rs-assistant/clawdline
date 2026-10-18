@@ -80,10 +80,10 @@ import {
   rememberAssistant,
   rememberedAssistant,
   sessionActivityName,
-  sessionListRead,
   sessionWorkCounts,
   sessionWorkLabel,
   type AssignmentChoices,
+  SessionListReader,
   type SessionListReading,
 } from "./session-assignment.js"
 import { workV2CreateDecision, type WorkV2CreateDecision } from "./create-decision.js"
@@ -107,7 +107,16 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
   const [items, setItems] = useState<WorkV2Item[]>([])
   const [places, setPlaces] = useState<ProjectPlace[]>([])
   const [sessions, setSessions] = useState<SessionRow[]>([])
-  const [sessionList, setSessionList] = useState<SessionListReading>({ phase: "loading" })
+  const [failure, setFailure] = useState("")
+  // The Board load and the picker's retry read the Session list through one
+  // reader, which keeps the newest answer on screen (session-assignment.ts).
+  const [sessionReader] = useState(() => new SessionListReader({
+    read: readSessionsForWorkV2,
+    publish: (state) => { setSessions(state.sessions); setSessionList(state.reading) },
+    words: failureWords,
+    recovered: (notice) => setFailure((current) => current === notice ? "" : current),
+  }))
+  const [sessionList, setSessionList] = useState<SessionListReading>(() => sessionReader.state.reading)
   const [proposals, setProposals] = useState<WorkV2Proposal[]>([])
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [project, setProject] = useState("")
@@ -129,7 +138,6 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState("")
   const [busy, setBusy] = useState("")
-  const [failure, setFailure] = useState("")
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
   const loadGeneration = useRef(0)
   const answeredDecisionIDs = useRef(new Set<string>())
@@ -155,7 +163,7 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
       // Sessions can be the slowest inventory read. Start the independent
       // reads now; the Board waits only for the Project catalog it needs to
       // resolve the URL, never for those reads before it starts its own.
-      const supportRead = Promise.allSettled([readSessionsForWorkV2(), readWorkV2Proposals(), readDecisions()])
+      const supportRead = Promise.allSettled([sessionReader.refresh(), readWorkV2Proposals(), readDecisions()])
       const projects = await readProjectPlaces()
       const selectedProject = workProjectID(routeProject, projects.places)
       const work = await readWorkV2(selectedProject || undefined, status, search)
@@ -173,12 +181,14 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
       // slow Session, proposal, decision, or Epic-family request.
       void supportRead.then(([live, suggestions, questions]) => {
         if (generation !== loadGeneration.current) return
-        if (live.status === "fulfilled") { setSessions(live.value.sessions); setSessionList(sessionListRead(live.value.scan)) }
-        else setSessionList({ phase: "failed", error: failureWords(live.reason) })
         if (suggestions.status === "fulfilled") setProposals(suggestions.value.rows)
         if (questions.status === "fulfilled") setDecisions(questions.value.rows.filter((row) => !answeredDecisionIDs.current.has(row.id)))
-        const failed = [live, suggestions, questions].find((result) => result.status === "rejected")
-        if (failed?.status === "rejected") setFailure(failureWords(failed.reason))
+        // The Session list applied its own answer; its failure is named here
+        // only when that answer is the one on screen.
+        const sessionFailure = live.status === "fulfilled" && live.value.applied ? live.value.error : undefined
+        const failed = [suggestions, questions].find((result) => result.status === "rejected")
+        if (sessionFailure) setFailure(sessionFailure)
+        else if (failed?.status === "rejected") setFailure(failureWords(failed.reason))
       })
       void readEpicFamily(selectedProject, status, search, work).then((relatives) => {
         if (generation === loadGeneration.current) setFamily(relatives)
@@ -196,19 +206,7 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
     } finally {
       if (generation === loadGeneration.current) setRefreshing(false)
     }
-  }, [routeProject, status, search])
-  // Assigning to an existing Session can ask for the Session list again on its
-  // own, without reloading the Board behind it.
-  const retrySessions = useCallback(() => {
-    const generation = loadGeneration.current
-    setSessionList({ phase: "loading" })
-    readSessionsForWorkV2().then((live) => {
-      if (generation !== loadGeneration.current) return
-      setSessions(live.sessions); setSessionList(sessionListRead(live.scan))
-    }, (error: unknown) => {
-      if (generation === loadGeneration.current) setSessionList({ phase: "failed", error: failureWords(error) })
-    })
-  }, [])
+  }, [routeProject, status, search, sessionReader])
   const loadMore = useCallback(async () => {
     if (!nextCursor || paging) return
     const generation = loadGeneration.current
@@ -488,10 +486,10 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
     }} />}
     {createdItem && <CreatedWorkModal item={createdItem} sessions={sessions} decisions={decisionsForWorkItem(decisions, createdItem.id)} decisionAnswers={decisionAnswers} busy={busy} failure={failure}
       detailLoading={false} detailError="" retryDetail={() => void readWorkV2Item(createdItem.id).then((answer) => setCreatedItem([...answeredDecisionIDs.current].reduce(withoutAnsweredWait, answer.item))).catch((error: unknown) => setFailure(failureWords(error)))}
-      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} sessionList={sessionList} retrySessions={retrySessions} onClose={() => setCreatedItem(null)} />}
+      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} sessionList={sessionList} retrySessions={sessionReader.retry} onClose={() => setCreatedItem(null)} />}
     {openedItem && <CreatedWorkModal item={openedItem} created={false} key={openedItem.id} back={detailReturn.current} sessions={sessions} decisions={decisionsForWorkItem(decisions, openedItem.id)} decisionAnswers={decisionAnswers} busy={busy} failure={failure}
       detailLoading={detailLoading} detailError={detailError} retryDetail={() => refreshDetail(openedItem.id)}
-      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} sessionList={sessionList} retrySessions={retrySessions} onClose={() => setOpenedItem(null)} />}
+      clearFailure={() => setFailure("")} run={run} answerWorkDecision={answerWorkDecision} sessionList={sessionList} retrySessions={sessionReader.retry} onClose={() => setOpenedItem(null)} />}
   </EpicFamilyContext.Provider>
 }
 
