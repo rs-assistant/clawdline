@@ -38,10 +38,10 @@ func TestCloudCatalogKeepsBaselineAndReportsNewFallbacks(t *testing.T) {
 		translated, total := cliCatalogCoverage("cloud", language)
 		want := 94
 		if language == "en" || language == "zh-Hant" {
-			want = 98
+			want = 102
 		}
-		if total != 98 || translated != want {
-			t.Errorf("cloud coverage %s = %d/%d, want %d/98", language, translated, total, want)
+		if total != 102 || translated != want {
+			t.Errorf("cloud coverage %s = %d/%d, want %d/102", language, translated, total, want)
 		}
 	}
 }

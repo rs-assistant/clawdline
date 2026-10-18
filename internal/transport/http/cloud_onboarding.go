@@ -322,6 +322,47 @@ func (s *Server) cloudDirectRoute(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]bool{"terminal_direct": on})
 }
 
+// cloudDirectLocalNetworkRoute changes whether the direct carrier may use
+// private IPv4 addresses on the same network. Like the direct switch it
+// replaces an enabled line, which retires the current direct peers, so every
+// later offer and answer is filtered by the new choice.
+func (s *Server) cloudDirectLocalNetworkRoute(w http.ResponseWriter, r *http.Request) {
+	if !requireLocal(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeAuthRefusal(w, http.StatusMethodNotAllowed, "bad_request", "The same-network connection switch is changed with POST.")
+		return
+	}
+	on, ok := readCloudSwitch(w, r)
+	if !ok {
+		return
+	}
+	file := nextconfig.Open(s.cfg.Dir)
+	settings, err := adaptercloud.ReadSettings(file)
+	if err != nil {
+		writeCloudOnboardingFailure(w, err)
+		return
+	}
+	if settings.Enabled && s.cloudReload == nil {
+		writeAuthRefusal(w, http.StatusServiceUnavailable, "cloud_runtime_unavailable", "The Cloud connection is not available in this daemon.")
+		return
+	}
+	if settings.DirectLocalNetwork != on {
+		if err := adaptercloud.SetDirectLocalNetwork(file, on); err != nil {
+			writeCloudOnboardingFailure(w, err)
+			return
+		}
+	}
+	if settings.Enabled {
+		if err := s.cloudReload(); err != nil {
+			writeCloudOnboardingFailure(w, err)
+			return
+		}
+	}
+	writeJSON(w, map[string]bool{"direct_local_network": on})
+}
+
 func readCloudSwitch(w http.ResponseWriter, r *http.Request) (bool, bool) {
 	var body struct {
 		Enabled *bool `json:"enabled"`

@@ -20,6 +20,7 @@ import {
   revokeCloudViewer,
   setCloudCommands,
   setCloudDirect,
+  setCloudDirectLocalNetwork,
   setCloudEnabled,
   startCloudLogin,
   type CloudLogin,
@@ -27,6 +28,7 @@ import {
   type CloudViewer,
   type MachineOnly,
 } from "../cloud.js"
+import { directLocalNetworkShown } from "../direct-local.js"
 import { DEFAULTS, reading, type SettingKey } from "./defaults.js"
 import { readTunnelStatus } from "../tunnel.js"
 import { installVoiceModel, readVoiceLanguage, readVoiceSetup } from "../voice.js"
@@ -886,6 +888,15 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
             <Chip disabled={cloudSetupBusy} onClick={() => run(() => setCloudDirect(!cloud.terminal_direct))}>
               {cloud.terminal_direct ? W.cloudDirectOff : W.cloudDirectOn}
             </Chip>
+            {directLocalNetworkShown(cloud) && (
+              <>
+                <Note dot={cloud.direct_local_network ? "live" : "idle"}>{W.cloudDirectLocalTitle}</Note>
+                <Note dot="idle">{W.cloudDirectLocalHint}</Note>
+                <Chip disabled={cloudSetupBusy} onClick={() => run(() => setCloudDirectLocalNetwork(!cloud.direct_local_network))}>
+                  {cloud.direct_local_network ? W.cloudDirectLocalOff : W.cloudDirectLocalOn}
+                </Chip>
+              </>
+            )}
           </>
         )}
         {cloudSetupSaid && <Note dot="warn">{cloudSetupSaid}</Note>}

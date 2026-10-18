@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6097,
+  "englishKeys": 6101,
   "counts": {
     "negation": 1933,
     "state": 1090,
-    "permission": 373,
+    "permission": 374,
     "deletion": 160,
     "uncertainty": 177
   },
-  "unionCount": 2910,
+  "unionCount": 2911,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -3374,6 +3374,7 @@
       "settings.cloudCommandsHint",
       "settings.cloudCommandsOn",
       "settings.cloudCommandsTitle",
+      "settings.cloudDirectLocalHint",
       "settings.cloudLineNeedsLogin",
       "settings.cloudPairPermission",
       "settings.settingsAgentNotify",
@@ -6390,6 +6391,7 @@
     "settings.cloudCommandsOn",
     "settings.cloudCommandsTitle",
     "settings.cloudDirectHint",
+    "settings.cloudDirectLocalHint",
     "settings.cloudLineNeedsLogin",
     "settings.cloudPairPermission",
     "settings.settingsAgentNotify",
