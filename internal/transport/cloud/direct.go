@@ -523,6 +523,9 @@ func (l *Link) handleDirectOffer(ctx context.Context, svc *terminals.Service, p 
 		if !known {
 			code = terminal.CodeUnreachable
 		}
+		if code == terminal.CodeBusy {
+			l.logTerminalBusy(c.viewer, req.Operation, err.Error())
+		}
 		l.sendTerminalReceipt(ctx, c, terminalReceipt{V: 1, Type: "terminal_receipt", RequestID: req.RequestID,
 			Connection: req.Connection, Operation: req.Operation, Status: "refused", Error: string(code)})
 	}

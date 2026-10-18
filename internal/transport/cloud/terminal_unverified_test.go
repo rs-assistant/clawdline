@@ -357,3 +357,45 @@ func TestRosterFailureIsLoggedOncePerStreak(t *testing.T) {
 		}
 	}
 }
+
+// A terminal_busy receipt carries only its code. On 2026-10-18 a phone was refused for two minutes
+// and the log could not say which of the conditions it was; each one now says itself.
+func TestABusyRefusalSaysWhyInTheLog(t *testing.T) {
+	busyLine := func(f *unverifiedFixture, want string) {
+		t.Helper()
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		for _, line := range f.logs {
+			if strings.Contains(line, "refused terminal_busy") && strings.Contains(line, want) {
+				return
+			}
+		}
+		t.Fatalf("no busy line saying %q in %q", want, f.logs)
+	}
+
+	f := newUnverifiedFixture(t)
+	f.register()
+	f.set(func(f *unverifiedFixture) { f.fail = true })
+	f.l.handleTerminal(context.Background(), f.request("list"))
+	busyLine(f, "op=list viewer=viewer why=access unverified")
+
+	g := newUnverifiedFixture(t)
+	g.l.terminalMu.Lock()
+	if g.l.terminalConnections == nil {
+		g.l.terminalConnections = map[string]*terminalConnection{}
+	}
+	for i := 0; i < CloudTerminalViewerConnectionsLimit; i++ {
+		id := fmt.Sprintf("held-%d", i)
+		g.l.terminalConnections[terminalConnectionID("viewer", id)] = &terminalConnection{viewer: "viewer", id: id}
+	}
+	g.l.terminalMu.Unlock()
+	g.l.handleTerminal(context.Background(), Inbound{Channel: "termi/machine/viewer", Class: string(domaincloud.ClassCtl),
+		Sender: "viewer", Plaintext: []byte(`{"v":1,"type":"terminal_request","request_id":"` + testRequestID +
+			`","connection":"` + testConnection + `","operation":"open_connection","key_id":"` + testKeyID +
+			`","key":"` + base64.StdEncoding.EncodeToString(g.key.Bytes()) + `"}`)})
+	if got := g.published(); len(got) != 1 || got[0]["error"] != string(terminal.CodeBusy) {
+		t.Fatalf("a third connection for one viewer: %v", got)
+	}
+	busyLine(g, fmt.Sprintf("op=open_connection viewer=viewer why=connections full: %d of %d for this viewer",
+		CloudTerminalViewerConnectionsLimit, CloudTerminalViewerConnectionsLimit))
+}

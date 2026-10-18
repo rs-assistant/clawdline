@@ -62,6 +62,9 @@ func (l *Link) handleCarrierOffer(ctx context.Context, svc *terminals.Service, p
 		if !known {
 			code = terminal.CodeUnreachable
 		}
+		if code == terminal.CodeBusy {
+			l.logTerminalBusy(viewer, req.Operation, err.Error())
+		}
 		status := 503
 		switch code {
 		case terminal.CodeForbidden:
