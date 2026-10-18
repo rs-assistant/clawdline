@@ -18,6 +18,14 @@ name expression. Quick mode is explicitly a development check, not a commit or
 integration receipt. A package with slow tests may need a narrower expression to
 meet ten seconds. Use `tools/heavy.sh` for other ad hoc test commands too.
 
+A result must not depend on the developer's machine. `cmd/clawdline` tests run
+under a `TestMain` (`cmd/clawdline/hermetic_test.go`) that clears every
+`CLAWDLINE_*` variable, points the state directory and home at a temporary
+tree, and aims the daemon port at a closed loopback port, so a machine whose
+saved `product_language` is not English, or whose daemon answers on 7727,
+gets the same result as CI. A test that needs a language, directory or daemon
+sets it with `t.Setenv` or starts its own.
+
 ## Ordinary local commits
 
 ```sh
