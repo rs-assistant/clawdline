@@ -202,7 +202,8 @@ type Wrapper struct {
 // Idempotency is the key every local request that is not a GET carries.
 type Idempotency struct {
 	Header string `json:"header"`
-	// From is the body field the key is, when the body named it.
+	// From is the body field the key is, when the body named it: the
+	// answer's request, which a hand row may read from another field.
 	From string `json:"from"`
 	// Fallback is the key when it did not, in the bridge's own spelling.
 	Fallback string `json:"fallback"`

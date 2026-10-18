@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/sainteye/clawdline/internal/domain/cloudvocab"
@@ -33,6 +34,7 @@ func TestGeneratedDecodersDecideAsTheHandWrittenOnes(t *testing.T) {
 		t.Fatal(err)
 	}
 	universe := bodyKeyUniverse(t, ops)
+	_, compared := handWrittenLiterals(t)
 	examples := map[string]any{}
 	for _, row := range ops {
 		for key, value := range row.Example {
@@ -61,7 +63,7 @@ func TestGeneratedDecodersDecideAsTheHandWrittenOnes(t *testing.T) {
 		}
 		t.Run(row.Op, func(t *testing.T) {
 			failures := 0
-			for _, b := range decoderProbes(row, universe, examples) {
+			for _, b := range decoderProbes(row, universe, examples, compared) {
 				if msg := compareDecoders(o, decode, b); msg != "" {
 					failures++
 					if failures <= 6 {
@@ -198,11 +200,49 @@ func bodyKeyUniverse(t *testing.T, ops []cloudvocab.Operation) []string {
 // call in this package's own source.
 func handWrittenBodyKeys(t *testing.T) map[string]bool {
 	t.Helper()
+	keys, _ := handWrittenLiterals(t)
+	return keys
+}
+
+// handWrittenLiterals reads this package's own source once: every string
+// literal inside a `has` or `hasOneOf` call (a body key), and every one a
+// value is compared with by `==`, `!=` or a `case` (an allowed value), so a
+// value a hand-written decoder still allows and the table dropped is probed.
+func handWrittenLiterals(t *testing.T) (keys, compared map[string]bool) {
+	t.Helper()
+	literalsOnce.Do(func() { literalKeys, literalCompared, literalErr = scanHandWrittenLiterals() })
+	if literalErr != nil {
+		t.Fatal(literalErr)
+	}
+	if len(literalKeys) < 50 || len(literalCompared) < 20 {
+		t.Fatalf("found %d keys and %d compared values; the source scan is not reading this package",
+			len(literalKeys), len(literalCompared))
+	}
+	return literalKeys, literalCompared
+}
+
+var (
+	literalsOnce                  sync.Once
+	literalKeys, literalCompared map[string]bool
+	literalErr                    error
+)
+
+func scanHandWrittenLiterals() (map[string]bool, map[string]bool, error) {
 	files, err := filepath.Glob("*.go")
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, err
 	}
-	out := map[string]bool{}
+	keys, compared := map[string]bool{}, map[string]bool{}
+	collect := func(into map[string]bool, n ast.Node) {
+		ast.Inspect(n, func(n ast.Node) bool {
+			if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
+				if value, err := strconv.Unquote(lit.Value); err == nil {
+					into[value] = true
+				}
+			}
+			return true
+		})
+	}
 	fset := token.NewFileSet()
 	for _, name := range files {
 		if strings.HasSuffix(name, "_test.go") || strings.HasPrefix(name, "zz_") {
@@ -210,38 +250,40 @@ func handWrittenBodyKeys(t *testing.T) map[string]bool {
 		}
 		file, err := parser.ParseFile(fset, name, nil, 0)
 		if err != nil {
-			t.Fatal(err)
+			return nil, nil, err
 		}
 		ast.Inspect(file, func(n ast.Node) bool {
-			call, ok := n.(*ast.CallExpr)
-			if !ok {
-				return true
-			}
-			selector, ok := call.Fun.(*ast.SelectorExpr)
-			if !ok || selector.Sel.Name != "has" && selector.Sel.Name != "hasOneOf" {
-				return true
-			}
-			for _, arg := range call.Args {
-				ast.Inspect(arg, func(n ast.Node) bool {
-					if lit, ok := n.(*ast.BasicLit); ok && lit.Kind == token.STRING {
-						if value, err := strconv.Unquote(lit.Value); err == nil {
-							out[value] = true
+			switch n := n.(type) {
+			case *ast.CallExpr:
+				if selector, ok := n.Fun.(*ast.SelectorExpr); ok &&
+					(selector.Sel.Name == "has" || selector.Sel.Name == "hasOneOf") {
+					for _, arg := range n.Args {
+						collect(keys, arg)
+					}
+				}
+			case *ast.BinaryExpr:
+				if n.Op == token.EQL || n.Op == token.NEQ {
+					for _, side := range []ast.Expr{n.X, n.Y} {
+						if lit, ok := side.(*ast.BasicLit); ok {
+							collect(compared, lit)
 						}
 					}
-					return true
-				})
+				}
+			case *ast.CaseClause:
+				for _, value := range n.List {
+					if lit, ok := value.(*ast.BasicLit); ok {
+						collect(compared, lit)
+					}
+				}
 			}
 			return true
 		})
 	}
-	if len(out) < 50 {
-		t.Fatalf("found %d keys in has and hasOneOf calls; the source scan is not reading this package", len(out))
-	}
-	return out
+	return keys, compared, nil
 }
 
 // decoderProbes is every body one row is tried with.
-func decoderProbes(row cloudvocab.Operation, universe []string, examples map[string]any) []body {
+func decoderProbes(row cloudvocab.Operation, universe []string, examples map[string]any, compared map[string]bool) []body {
 	out := []body{}
 	for _, shape := range row.Shapes {
 		example := row.Example
@@ -278,6 +320,11 @@ func decoderProbes(row cloudvocab.Operation, universe []string, examples map[str
 			values := genericProbes()
 			if rule, ok := row.Decode.Fields[field]; ok {
 				values = append(values, ruleProbes(rule, base[field])...)
+			}
+			if _, isString := base[field].(string); isString {
+				for value := range compared {
+					values = append(values, value)
+				}
 			}
 			for _, value := range values {
 				swapped := cloneBody(base)
@@ -459,7 +506,7 @@ func TestTheEquivalenceTestSeesAChangedDecoder(t *testing.T) {
 			universe = append(universe, mutant.key)
 		}
 		caught := false
-		for _, b := range decoderProbes(rows[mutant.word], universe, examples) {
+		for _, b := range decoderProbes(rows[mutant.word], universe, examples, nil) {
 			if compareDecoders(o, generatedDecoders[mutant.word], b) != "" {
 				caught = true
 				break
