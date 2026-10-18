@@ -357,6 +357,33 @@ func TestAPickerWithItsTopCutOffIsStillRead(t *testing.T) {
 	}
 }
 
+// A picker that lost its frame off the top still has its question on screen,
+// and the question is what the phone shows above the rows. On 2026-10-18 an
+// 80×24 pane drew a two-line multi-select question under one blank row with
+// its tab bar gone; the rows were read but the question was not, because
+// nothing above it closed it off, and the phone asked "which?" with no "what".
+// The transcript could not stand in: Claude Code 2.1.302 had not written the
+// call to disk while it waited. The screen's top edge closes the question when
+// the key line has already stood in for the frame; a question whose first
+// line is the top of the screen may have lost words above it, and says so.
+func TestACutOffPickerKeepsItsQuestion(t *testing.T) {
+	m, ok := ReadMenu(fixture(t, "menu-ask-clipped-multi.txt"), AssistantClaude, true)
+	if !ok {
+		t.Fatal("no menu on a cut-off multi-select")
+	}
+	want := "Which rooms should be booked for Friday? (Pick any; only the hall is booked now, and it was full both times it was tried)"
+	if m.Question != want {
+		t.Fatalf("question %q", m.Question)
+	}
+	if m.Options[0].Checked == nil || m.Submit == nil {
+		t.Fatalf("menu %+v", m)
+	}
+	m, ok = ReadMenu(fixture(t, "menu-ask-clipped.txt"), AssistantClaude, true)
+	if !ok || !strings.HasPrefix(m.Question, "… The afternoon order goes out at three") || !strings.HasSuffix(m.Question, "meeting room?") {
+		t.Fatalf("question %q", m.Question)
+	}
+}
+
 // What the key line is standing in for is still required: the gate, the key
 // line itself, and nothing of the session's own between the top of the screen
 // and the rows.
