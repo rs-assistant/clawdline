@@ -73,7 +73,19 @@ keepSamePageLinksHere(window)
 // The gate is loaded only when declared, so the daemon's console does not
 // carry the relay client.
 const declared = import.meta.env.VITE_HOSTED_CONSOLE as string | undefined
-if (declared) {
+// `/admin` on the hosted build is Cloud's operations page, which stands apart
+// from the machine gate so an operator with no machine or relay still reaches
+// it (cloud/admin/AdminGate.tsx).
+const operations = location.pathname === "/admin" || location.pathname === "/admin/"
+if (declared && operations) {
+  void import("./cloud/admin/AdminGate.js").then(({ AdminGate }) =>
+    createRoot(host).render(
+      <StrictMode>
+        <AdminGate declared={declared} />
+      </StrictMode>,
+    ),
+  )
+} else if (declared) {
   void import("./cloud/CloudGate.js").then(({ CloudGate }) =>
     createRoot(host).render(
       <StrictMode>
