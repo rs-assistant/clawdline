@@ -2213,11 +2213,19 @@ test("a phone can edit and delete a Workflow from its launch review", () =>
       look()
     })`)
     await tab.press(".workflow-picker-row")
-    assert.match(await tab.run(`document.querySelector('.workflow-detail-actions')?.textContent`), /編輯.*刪除/)
+    await tab.shot("workflow-review-actions-phone")
+    assert.deepEqual(await tab.run(`[...document.querySelectorAll('.workflow-detail-actions button')].map((button) => ({
+      name: button.getAttribute('aria-label'), icon: button.querySelector('.work-icon') !== null,
+      text: button.textContent.trim()
+    }))`), [
+      { name: "編輯", icon: true, text: "" }, { name: "刪除", icon: true, text: "" },
+    ])
     await tab.press(".workflow-detail-actions button:first-child")
+    await tab.shot("workflow-editor-voice-phone")
     assert.equal(await tab.run(`document.querySelector('#workflow-quick-name')?.value`), "Daily check")
     assert.equal(await tab.run(`document.querySelector('#workflow-quick-message')?.value`), "Check status.")
-    assert.equal(await tab.run(`document.querySelector('.workflow-quick-voice button') !== null`), true)
+    assert.equal(await tab.run(`document.querySelector('.workflow-quick-message .work-voice-box .work-voice-mic')?.getAttribute('aria-label')`), "用說的寫一則訊息")
+    assert.equal(await tab.run(`document.querySelector('.workflow-quick-message .work-voice-row')?.hidden`), true)
     assert.equal(await tab.run(`document.querySelector('#workflow-quick-editor .block .row') === null`), true)
     await tab.run(`(() => {
       const field = document.querySelector('#workflow-quick-message')
