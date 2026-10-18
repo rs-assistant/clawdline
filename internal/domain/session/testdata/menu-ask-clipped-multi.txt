@@ -1,0 +1,22 @@
+
+│ Which rooms should be booked for Friday? (Pick any; only the hall is
+│ booked now, and it was full both times it was tried)
+
+❯ 1. [ ] The library (Recommended)
+         Quiet and close to the kitchen, so the tea arrives hot. It has
+         twelve chairs and a long table; the projector needs a cable
+         brought from the office, which somebody has to remember.
+  2. [ ] The garden room
+         Light all afternoon, and the doors open onto the lawn when it is
+         dry. It is cold before noon from October on.
+  3. [ ] The attic
+         Nobody else wants it, so it is always free. The stairs are steep
+         and the ceiling is low at the far end; good for six, not for ten.
+  4. [ ] None of these
+         Keep the hall only, and move the meeting if it is full again.
+  5. [ ] Type something
+     Submit
+────────────────────────────────────────────────────────────────────────────────
+  6. Chat about this
+
+Enter to select · ↑/↓ to navigate · Esc to cancel
