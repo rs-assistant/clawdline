@@ -312,7 +312,7 @@ function seenClock(at: number): string {
 }
 
 /** A machine that did not answer, in the words `silentMachineWord` chooses. */
-function silentMachine(machine: ScheduleMachine, code: string): string {
+function silentMachine(machine: ScheduleMachine, code: string | null): string {
   const name = machineWords(machine)
   const word = silentMachineWord(machine, code)
   return nextWord(word, word === "scheduleMachineOffline"
@@ -775,7 +775,7 @@ const Schedule = (() => {
       chip.type = "button"
       chip.className = "chip" + (m.id === machine ? " on" : "")
       chip.textContent = machineWords(m)
-      if (!m.online) chip.title = silentMachine(m)
+      if (!m.online) chip.title = silentMachine(m, null)
       chip.setAttribute("aria-pressed", m.id === machine ? "true" : "false")
       chip.onclick = () => chooseMachine(m.id)
       row.appendChild(chip)
