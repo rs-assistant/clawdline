@@ -214,3 +214,12 @@ func TestApplyingAnUpdateNeedsPairingAndAReleaseInstall(t *testing.T) {
 		t.Fatalf("not a release install: %d %s", rec.Code, rec.Body)
 	}
 }
+
+func TestSourceUpdateStatusIncludesRunningDevVersion(t *testing.T) {
+	s := &Server{version: "v0.0.0-dev.abcdef1", update: updatecheck.New("")}
+	s.updateOnce.Do(func() {})
+	st := s.updateStatus()
+	if st.Running.Version != s.version {
+		t.Fatalf("running version = %q, want %q", st.Running.Version, s.version)
+	}
+}

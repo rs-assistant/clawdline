@@ -581,3 +581,20 @@ test("installing a dev build is not reported as a finished update; its line says
     running: { stamp: "4b7c3f8d9e0f1a2b3c4d", version: "v0.11.0" } })
   assert.match(panel({ read: answered(back) }).done ?? "", /v0\.11\.0/)
 })
+
+test("source dev builds keep their strip without signed-release actions", () => {
+  for (const install_kind of ["source_deploy", "source_checkout"] as const) {
+    for (const state of ["current", "update_available", "unknown"] as const) {
+      const status = release(state, undefined, {
+        install_kind, running: { stamp: "abcdef123456", version: "v0.0.0-dev.abcdef1" },
+      })
+      for (const overCloud of [false, true]) {
+        assert.deepEqual(devStrip(status, overCloud, nextWord), {
+          commit: "abcdef1", relation: "unknown", standing: "", back: null, release: false,
+        })
+      }
+      assert.equal(updateBannerVersion(status, null), null)
+    }
+    assert.equal(devStrip(release("current", undefined, { install_kind }), false, nextWord), null)
+  }
+})

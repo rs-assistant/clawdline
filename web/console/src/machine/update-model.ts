@@ -321,9 +321,12 @@ export interface DevStrip {
 }
 
 export function devStrip(status: UpdateStatus | null, overCloud: boolean, say: Say): DevStrip | null {
-  if (!status || status.install_kind !== "release") return null
+  if (!status || !["release", "source_deploy", "source_checkout"].includes(status.install_kind ?? "")) return null
   const commit = devCommit(status.running)
   if (!commit) return null
+  if (status.install_kind !== "release") {
+    return { commit, relation: "unknown", standing: "", back: null, release: false }
+  }
   const latest = buildName(status.latest)
   const relation = status.dev?.relation ?? "unknown"
   const strip: DevStrip = { commit, relation, standing: "", back: null, release: !overCloud }

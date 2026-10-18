@@ -80,6 +80,7 @@ func (s *Server) updateStatus() contract.UpdateStatus {
 	}
 	st := s.update.Status()
 	st.InstallKind = s.installKind()
+	st.Running.Version = s.version
 	return st
 }
 
