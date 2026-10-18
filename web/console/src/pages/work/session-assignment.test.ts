@@ -3,7 +3,7 @@ import test from "node:test"
 import type { SessionRow } from "@clawdline/contract"
 import type { SessionWorkV2 } from "./api.js"
 // @ts-expect-error -- a `.ts` path is required by Node's native type stripping.
-import { assignmentCandidates, assistantName, awaitsAcceptance, rememberAssistant, rememberedAssistant, sessionActivityName, sessionWorkCounts, sessionWorkLabel, sessionWorkStateName } from "./session-assignment.ts"
+import { assignmentCandidates, assignmentChoiceRows, assignmentChoices, assignmentChoicesWords, assistantName, sessionListRead, awaitsAcceptance, rememberAssistant, rememberedAssistant, sessionActivityName, sessionWorkCounts, sessionWorkLabel, sessionWorkStateName } from "./session-assignment.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { withCatalog } from "../../catalog-testing.ts"
 
@@ -55,6 +55,59 @@ test("an owned item can be handed to any other Session in its Project, never bac
   const item = { project: { path: "/p" }, owner_session: "owner" }
   assert.deepEqual(assignmentCandidates(sessions, item).map((s) => s.id), ["%2"])
   assert.deepEqual(assignmentCandidates(sessions, { ...item, owner_session: null }).map((s) => s.id), ["%1", "%2"])
+})
+
+const emptySentence = "這個 Project 目前沒有可用的 Session。"
+const candidate = (id: string, sessionId: string | undefined, cwd: string | undefined = "/p") => ({ id, sessionId, cwd }) as SessionRow
+const project = { project: { path: "/p" }, owner_session: null }
+const said = (reading: Parameters<typeof assignmentChoices>[0], sessions: SessionRow[]) =>
+  assignmentChoicesWords(assignmentChoices(reading, sessions, project))
+
+test("a Session list still being read never says the Project has no Session", () => {
+  assert.equal(said({ phase: "loading" }, []), "正在讀取 Session 清單…")
+  assert.notEqual(said({ phase: "loading" }, []), emptySentence)
+  // Rows kept from an earlier reading do not make a pending one an answer.
+  assert.equal(said({ phase: "loading" }, [candidate("%1", "s1", "/q")]), "正在讀取 Session 清單…")
+})
+
+test("a failed Session read says so and offers to read again", () => {
+  const choices = assignmentChoices({ phase: "failed", error: "逾時" }, [], project)
+  assert.equal(choices.phase, "failed")
+  assert.equal(assignmentChoicesWords(choices), "讀不到 Session 清單：逾時")
+  // Rows from an earlier reading stay choosable beside the failure.
+  const kept = assignmentChoices({ phase: "failed", error: "逾時" }, [candidate("%1", "s1")], project)
+  assert.deepEqual(assignmentChoiceRows(kept).map((s) => s.id), ["%1"])
+})
+
+test("only a complete answer with no candidate says the Project has no Session", () => {
+  assert.equal(said({ phase: "ready", complete: true }, []), emptySentence)
+  assert.equal(said({ phase: "ready", complete: true }, [candidate("%1", "s1", "/q")]), emptySentence)
+  const found = assignmentChoices({ phase: "ready", complete: true }, [candidate("%1", "s1")], project)
+  assert.equal(found.phase, "candidates")
+  assert.equal(assignmentChoicesWords(found), null)
+  assert.deepEqual(assignmentChoiceRows(found).map((s) => s.id), ["%1"])
+})
+
+test("a partial list, or a row without its cwd or conversation yet, is incomplete rather than empty", () => {
+  const incomplete = "Session 清單還沒讀完整，這個 Project 的 Session 可能還不在裡面。"
+  assert.equal(said({ phase: "ready", complete: false }, []), incomplete)
+  assert.equal(said({ phase: "ready", complete: true }, [candidate("%1", undefined)]), incomplete)
+  assert.equal(said({ phase: "ready", complete: true }, [candidate("%1", "s1", "")]), incomplete)
+  // The item's own owner cannot be offered, so lacking a cwd it hides nothing.
+  assert.equal(assignmentChoicesWords(assignmentChoices({ phase: "ready", complete: true },
+    [candidate("%1", "owner", "")], { ...project, owner_session: "owner" })), emptySentence)
+  // Candidates already found are still offered while the list settles.
+  const partial = assignmentChoices({ phase: "ready", complete: false }, [candidate("%1", "s1")], project)
+  assert.deepEqual([partial.phase, assignmentChoiceRows(partial).map((s) => s.id)], ["incomplete", ["%1"]])
+})
+
+test("a scan is complete unless a source is still settling; a source turned off does not hold it open", () => {
+  assert.deepEqual(sessionListRead({ complete: true }), { phase: "ready", complete: true })
+  // Cloud's relay snapshot names no sources and says complete only once every machine's list arrived.
+  assert.deepEqual(sessionListRead({ complete: false }), { phase: "ready", complete: false })
+  const source = (complete: boolean, disabled?: boolean) => ({ complete, disabled }) as NonNullable<Parameters<typeof sessionListRead>[0]["sources"]>[number]
+  assert.deepEqual(sessionListRead({ complete: false, sources: [source(true), source(false, true)] }), { phase: "ready", complete: true })
+  assert.deepEqual(sessionListRead({ complete: false, sources: [source(true), source(false)] }), { phase: "ready", complete: false })
 })
 
 test("a reported turn reads 本輪已回報 until an owned item awaits acceptance, and says when the Board was unread", () => {

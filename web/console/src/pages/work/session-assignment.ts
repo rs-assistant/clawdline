@@ -2,8 +2,12 @@
 import { catalogFormat } from "../../catalog.ts"
 // @ts-expect-error -- Node's strip-types test runner needs the source extension.
 import { catalogWord } from "../../catalog.ts"
-import type { Assistant, SessionRow } from "@clawdline/contract"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { scanRecovering } from "../../session-reading.ts"
+import type { Assistant, Scan, SessionRow } from "@clawdline/contract"
 import type { SessionWorkV2 } from "./api.js"
+// @ts-expect-error -- Node's strip-types test runner needs the source extension.
+import { workWord } from "./words.ts"
 
 export interface SessionWorkCounts {
   board: number
@@ -72,6 +76,67 @@ export function assignmentCandidates(
   item: { project: { path: string }; owner_session: string | null },
 ): SessionRow[] {
   return sessions.filter((s) => s.cwd === item.project.path && s.sessionId && s.sessionId !== item.owner_session)
+}
+
+/**
+ * What the Board knows about the Session list it picks from. The list is read
+ * after the Board itself, so until that read answers there is no list at all,
+ * which is not the same as a list with nothing in it.
+ */
+export type SessionListReading =
+  | { phase: "loading" }
+  | { phase: "failed"; error: string }
+  | { phase: "ready"; complete: boolean }
+
+/** A `/v1/sessions` answer as the Board reads it: complete unless a source is still settling. */
+export function sessionListRead(scan: Pick<Scan, "complete" | "sources">): SessionListReading {
+  // A source turned off by a setting is incomplete for good and holds nothing
+  // to offer; Cloud's relay snapshot says `complete: false` until every
+  // machine's inventory has arrived.
+  return { phase: "ready", complete: !scanRecovering(scan) }
+}
+
+/** The choices "assign to an existing Session" can offer, and whether "none" may be said. */
+export type AssignmentChoices =
+  | { phase: "loading" }
+  | { phase: "failed"; error: string; rows: SessionRow[] }
+  | { phase: "incomplete"; rows: SessionRow[] }
+  | { phase: "empty" }
+  | { phase: "candidates"; rows: SessionRow[] }
+
+/**
+ * Only a complete answer may say the Project has no Session. A row that could
+ * be in the Project but has no cwd or conversation id yet keeps the list
+ * incomplete: it may be the Session the person is looking for.
+ */
+export function assignmentChoices(
+  reading: SessionListReading,
+  sessions: SessionRow[],
+  item: { project: { path: string }; owner_session: string | null },
+): AssignmentChoices {
+  if (reading.phase === "loading") return { phase: "loading" }
+  const rows = assignmentCandidates(sessions, item)
+  if (reading.phase === "failed") return { phase: "failed", error: reading.error, rows }
+  const unsettled = sessions.some((s) => (!s.sessionId || s.sessionId !== item.owner_session) &&
+    (!s.cwd || (s.cwd === item.project.path && !s.sessionId)))
+  if (!reading.complete || unsettled) return { phase: "incomplete", rows }
+  return rows.length ? { phase: "candidates", rows } : { phase: "empty" }
+}
+
+/** The rows a picker lists for these choices. */
+export function assignmentChoiceRows(choices: AssignmentChoices): SessionRow[] {
+  return "rows" in choices ? choices.rows : []
+}
+
+/** The sentence the picker says with its rows, or null when the rows say it all. */
+export function assignmentChoicesWords(choices: AssignmentChoices): string | null {
+  switch (choices.phase) {
+    case "loading": return workWord("assignSessionsLoading")
+    case "failed": return workWord("assignSessionsFailed", { error: choices.error })
+    case "incomplete": return workWord("assignSessionsIncomplete")
+    case "empty": return catalogWord("inline", "7b9c3fe68d48")
+    case "candidates": return null
+  }
 }
 
 /** The assistants a new Session can be opened with, in the order the Board offers them. */
