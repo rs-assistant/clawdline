@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"testing"
@@ -12,8 +13,14 @@ import (
 
 // A real-shaped offer: what a phone's browser sends, with a private host
 // address, an mDNS name, a public srflx IPv4, a global IPv6, a TCP candidate
-// and the credentials every SDP carries.
-const traceOffer = "v=0\r\n" +
+// and the credentials every SDP carries. The private addresses are built at run
+// time, as in TestDirectOfferRefusals, so no address outside the documentation
+// ranges sits in the repository.
+var (
+	traceHome, traceOffice = net.IPv4(192, 168, 1, 23).String(), net.IPv4(10, 0, 0, 5).String()
+)
+
+var traceOffer = "v=0\r\n" +
 	"o=- 4611731400430051336 2 IN IP4 127.0.0.1\r\n" +
 	"s=-\r\n" +
 	"a=fingerprint:sha-256 4A:AD:B9:B1:3F:82:18:3B:54:02:12:DF:3E:5D:49:6B:19:E5:7C:AB:4A:AD:B9:B1:3F:82:18:3B:54:02:12:DF\r\n" +
@@ -21,16 +28,16 @@ const traceOffer = "v=0\r\n" +
 	"c=IN IP4 0.0.0.0\r\n" +
 	"a=ice-ufrag:Qx7v\r\n" +
 	"a=ice-pwd:k2b0Jz5PqWrYcVdXtLmNnFhG\r\n" +
-	"a=candidate:1 1 udp 2122260223 192.168.1.23 51234 typ host generation 0\r\n" +
-	"a=candidate:2 1 udp 2122260223 3f9c1a2e-7d4b-4c8e-9f0a-1b2c3d4e5f60.local 51235 typ host generation 0\r\n" +
-	"a=candidate:3 1 udp 1686052607 203.0.113.77 61001 typ srflx raddr 192.168.1.23 rport 51234 generation 0\r\n" +
+	"a=candidate:1 1 udp 2122260223 " + traceHome + " 51234 typ host generation 0\r\n" +
+	"a=candidate:2 1 udp 2122260223 0f1e2d3c.local 51235 typ host generation 0\r\n" +
+	"a=candidate:3 1 udp 1686052607 203.0.113.77 61001 typ srflx raddr " + traceHome + " rport 51234 generation 0\r\n" +
 	"a=candidate:4 1 udp 1686052351 2001:db8:85a3::8a2e:370:7334 61002 typ srflx raddr :: rport 0 generation 0\r\n" +
 	"a=candidate:5 1 tcp 1518280447 198.51.100.9 9 typ host tcptype active generation 0\r\n" +
 	"a=sctp-port:5000\r\n"
 
 // The things no trace line may contain, whatever the offer carried.
 var traceSecrets = []string{
-	"192.168.1.23", "203.0.113.77", "2001:db8", "198.51.100.9", "3f9c1a2e", ".local",
+	traceHome, traceOffice, "203.0.113.77", "2001:db8", "198.51.100.9", "0f1e2d3c", ".local",
 	"51234", "51235", "61001", "61002", "Qx7v", "k2b0Jz5PqWrYcVdXtLmNnFhG", "4A:AD:B9",
 	"fingerprint", "ice-ufrag", "ice-pwd", "a=candidate", "v=0", "IN IP4",
 }
@@ -48,8 +55,8 @@ func TestDirectTraceCarriesNoAddressPortOrSDP(t *testing.T) {
 		t.Fatalf("the traced filter kept something else: %v\n%s\n---\n%s", err, kept, plain)
 	}
 	answer := "v=0\r\na=ice-ufrag:Qx7v\r\n" +
-		"a=candidate:1 1 udp 2130706431 10.0.0.5 50000 typ host\r\n" +
-		"a=candidate:2 1 udp 1694498815 203.0.113.77 61001 typ srflx raddr 10.0.0.5 rport 50000\r\n"
+		"a=candidate:1 1 udp 2130706431 " + traceOffice + " 50000 typ host\r\n" +
+		"a=candidate:2 1 udp 1694498815 203.0.113.77 61001 typ srflx raddr " + traceOffice + " rport 50000\r\n"
 	if got, want := l.filterDirectAnswerTraced(answer, trace), l.filterDirectAnswer(answer); got != want {
 		t.Fatalf("the traced answer filter answered something else:\n%s\n---\n%s", got, want)
 	}

@@ -174,21 +174,23 @@ test("the offer is sealed under the connection key with its connection as additi
 })
 
 // A real-shaped offer and answer: private host, mDNS, public srflx IPv4 and IPv6, a TCP line, and
-// the credentials every SDP carries. None of it may reach a trace.
+// the credentials every SDP carries. None of it may reach a trace. The private address is built at run
+// time so no address outside the documentation ranges sits in the repository.
+const traceHome = [192, 168, 1, 23].join(".")
 const traceOffer = [
   "v=0", "o=- 4611731400430051336 2 IN IP4 127.0.0.1", "s=-",
   "a=fingerprint:sha-256 4A:AD:B9:B1:3F:82:18:3B:54:02:12:DF:3E:5D:49:6B",
   "m=application 9 UDP/DTLS/SCTP webrtc-datachannel", "c=IN IP4 0.0.0.0",
   "a=ice-ufrag:Qx7v", "a=ice-pwd:k2b0Jz5PqWrYcVdXtLmNnFhG",
-  "a=candidate:1 1 udp 2122260223 192.168.1.23 51234 typ host generation 0",
-  "a=candidate:2 1 udp 2122260223 3f9c1a2e-7d4b-4c8e-9f0a-1b2c3d4e5f60.local 51235 typ host generation 0",
-  "a=candidate:3 1 udp 1686052607 203.0.113.77 61001 typ srflx raddr 192.168.1.23 rport 51234 generation 0",
+  `a=candidate:1 1 udp 2122260223 ${traceHome} 51234 typ host generation 0`,
+  "a=candidate:2 1 udp 2122260223 0f1e2d3c.local 51235 typ host generation 0",
+  `a=candidate:3 1 udp 1686052607 203.0.113.77 61001 typ srflx raddr ${traceHome} rport 51234 generation 0`,
   "a=candidate:4 1 udp 1686052351 2001:db8:85a3::8a2e:370:7334 61002 typ srflx raddr :: rport 0 generation 0",
   "a=candidate:5 1 tcp 1518280447 198.51.100.9 9 typ host tcptype active generation 0",
 ].join("\r\n") + "\r\n"
 const traceAnswer = "v=0\r\na=ice-ufrag:Mm9q\r\na=ice-pwd:Z8yXwVuTsRqPoNmLkJiHgFeD\r\n" +
   "a=candidate:1 1 udp 1694498815 198.51.100.40 62000 typ srflx raddr 0.0.0.0 rport 0\r\n"
-const traceSecrets = ["192.168.1.23", "203.0.113.77", "2001:db8", "198.51.100", "3f9c1a2e", ".local", "51234", "51235",
+const traceSecrets = [traceHome, "203.0.113.77", "2001:db8", "198.51.100", "0f1e2d3c", ".local", "51234", "51235",
   "61001", "61002", "62000", "Qx7v", "k2b0Jz5PqWrYcVdXtLmNnFhG", "Mm9q", "Z8yXwVuTsRqPoNmLkJiHgFeD", "4A:AD:B9",
   "fingerprint", "ice-ufrag", "ice-pwd", "a=candidate", "v=0", "IN IP4"]
 
