@@ -149,9 +149,6 @@ function stateLine(row: SessionRow): { html: string; shape: string } {
   const callbackSaid = row.heavy_work
     ? `<span class="session-callback-active" title="${L.escapeHTML(callbackDetail)}"><span aria-hidden="true">🏗️</span><span class="session-callback-label">${L.escapeHTML(row.heavy_work.reason || callbackLabel)}</span>${L.workState(row).state === "working" ? "" : '<canvas class="spin" aria-hidden="true"></canvas>'}</span>`
     : ""
-  // The heavy-work marker already occupies the icon slot. Keep the distinct
-  // waiting reason in words without crowding a second glyph against it.
-  const waitText = (text: string) => row.heavy_work ? L.escapeHTML(text) : L.glyphHTML("⏳", text)
   const n = row.shells?.length ?? 0
   const shellsSaid = n
     ? `<span class="shells">${L.escapeHTML(n === 1 ? T.sessionShellOne : L.fillString(T.sessionShellMany, { n }))}</span>`
@@ -180,7 +177,7 @@ function stateLine(row: SessionRow): { html: string; shape: string } {
       .join("\n")
   }
   let peerSaid = peerText
-    ? `<span class="coordination-wait" title="${L.escapeHTML(peerTitle)}">${waitText(peerText)}</span>`
+    ? `<span class="coordination-wait" title="${L.escapeHTML(peerTitle)}">${L.glyphHTML("⏳", peerText)}</span>`
     : ""
 
   // A broker-decided wait is the daemon's, proved by the tasks it names in
@@ -192,11 +189,11 @@ function stateLine(row: SessionRow): { html: string; shape: string } {
   if (work.state === "waiting_session" && !peerSaid) {
     if (row.work_provenance === "self" && row.work_note && row.work_moved_by && row.work_person_needed === false) {
       const declaredTitle = row.work_moved_by + " · " + row.work_note
-      peerSaid = `<span class="coordination-wait" title="${L.escapeHTML(declaredTitle)}">${waitText(L.selfReportedPeerWait(row))}</span>`
+      peerSaid = `<span class="coordination-wait" title="${L.escapeHTML(declaredTitle)}">${L.glyphHTML("⏳", L.selfReportedPeerWait(row))}</span>`
     } else if (waitingFor.text) {
-      peerSaid = `<span class="coordination-wait" title="${L.escapeHTML(waitingFor.title)}">${waitText(waitingFor.text)}</span>`
+      peerSaid = `<span class="coordination-wait" title="${L.escapeHTML(waitingFor.title)}">${L.glyphHTML("⏳", waitingFor.text)}</span>`
     } else if (!waitingFor.covered) {
-      peerSaid = `<span class="coordination-wait">${waitText(nextWord("sessionWaitingOnSession"))}</span>`
+      peerSaid = `<span class="coordination-wait">${L.glyphHTML("⏳", nextWord("sessionWaitingOnSession"))}</span>`
     }
   }
 
