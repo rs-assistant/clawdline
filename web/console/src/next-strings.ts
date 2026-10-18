@@ -24,6 +24,7 @@ const words = {
     sidebarChooseMachineVersion: "Select a machine to see its version",
     sessionPairToSend: "Pair this browser",
     codexAsyncAnswerHint: "Answer this question in Codex. This copy cannot submit an answer.",
+    codexAsyncChoiceHint: "Tap an option to send your answer, or write a reply in the conversation.",
     voiceInstallPromptTitle: "Set up Whisper on this machine?",
     voiceInstallPromptNoBinary:
       "None of the available machines has a working Whisper command. Would you like to open the setup instructions?",
@@ -1560,6 +1561,7 @@ const words = {
     secretHandoffNoticeError: "機密值已收到，但無法通知 Session。請傳送一則只提及此機密交付便條紙的訊息。",
     sessionPairToSend: "配對這個瀏覽器",
     codexAsyncAnswerHint: "請在 Codex 回答；這裡顯示的副本無法送出答案。",
+    codexAsyncChoiceHint: "點選選項即可送出答案，也可以直接在對話中回覆。",
     voiceInstallPromptTitle: "要在這台機器設定 Whisper 嗎？",
     voiceInstallPromptNoBinary: "目前可用的機器都沒有可執行的 Whisper。要查看安裝方式嗎？",
     voiceInstallPromptNoModel: "目前可用的機器都沒有 Whisper 模型。要現在下載並設定嗎？",

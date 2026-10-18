@@ -4490,6 +4490,7 @@
   "next.terminalNoticeProjectsTitle": "Couldn't read this machine's projects",
   "next.terminalNoticeFailedTitle": "Couldn't read the terminals on {machine}",
   "next.terminalNoticeFailedBody": "The machine did not give a usable answer.",
+  "next.codexAsyncChoiceHint": "Tap an option to send your answer, or write a reply in the conversation.",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",
