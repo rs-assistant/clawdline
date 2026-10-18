@@ -51,6 +51,10 @@ var version = buildVersion()
 // `version` itself was silently dropped and every release said `devel`.
 var releaseVersion string
 
+// releaseCommit is stamped by packaging because some Go toolchains omit VCS
+// settings in linked worktrees, whose .git entry is a file rather than a directory.
+var releaseCommit string
+
 func buildVersion() string {
 	if releaseVersion != "" {
 		return releaseVersion
@@ -70,8 +74,11 @@ func buildVersion() string {
 	return "devel"
 }
 
-// buildRevision is the full commit Go recorded for this binary, or "".
+// buildRevision is the packaging commit, or Go's recorded revision for a local build.
 func buildRevision() string {
+	if releaseCommit != "" {
+		return releaseCommit
+	}
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, s := range info.Settings {
 			if s.Key == "vcs.revision" {
