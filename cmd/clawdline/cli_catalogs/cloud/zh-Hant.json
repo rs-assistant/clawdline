@@ -39,7 +39,7 @@
   "direct.usage": "用法：clawdline cloud direct <on|off>",
   "direct.result": "直連 %-3s %s\n",
   "direct_local.result": "同網路直連 %-3s %s\n",
-  "direct_local.permission": "           第一次使用時 macOS 會詢問一次「本機網路」權限；若拒絕，連線改走公開路徑或中繼\n",
+  "direct_local.permission": "           第一次使用時 macOS 會詢問一次「區域網路」權限；若拒絕，連線改走公開路徑或中繼\n",
   "login.wait_help": "等待核准的時間",
   "login.name_help": "這台機器的名稱；預設使用主機名稱",
   "login.replacing": "正在取代  機器 %s（原註冊端點：%s）\n",

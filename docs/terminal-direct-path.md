@@ -196,5 +196,11 @@ removed on 2026-10-06: a hidden page now keeps its Cloud connection exactly as a
   byte what they answered before the setting existed (`TestSameNetworkCandidatesFollowTheSetting`).
   Changing it replaces the Cloud line like the direct switch does, so open peers close and the next
   offer is filtered by the new choice.
+  The residual risk when it is on: a viewer the person has paired can now name private IPv4 hosts
+  in its offer, and this machine sends ICE connectivity checks to them. That is bounded by the same
+  admission as every offer — it must decrypt under that viewer's key, at most 32 candidates per
+  offer, 6 offers a minute per viewer, 8 peers per machine (`direct.go`) — so a paired viewer can
+  make this machine probe at most a few hundred LAN addresses a minute with STUN binding requests.
+  Off, it cannot name any.
 - **No relay change.** Keeping receipts and registrations on the relay and probing it from the
   machine gives the relay's gate the same reach without a new relay message or deploy.
