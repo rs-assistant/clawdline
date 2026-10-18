@@ -7,6 +7,7 @@ export function demoOverview(now = new Date()): Overview {
   const series = (values: number[]): DailyCount[] => values.map((count, i) => ({ day: day(values.length - i), count }))
   const accounts = series([8, 6, 9, 11, 7, 13, 10, 12, 9, 15, 11, 14, 12, 17, 13, 12, 18, 16, 14, 20, 18, 21, 17, 24, 19, 23, 21, 28, 25, 31])
   const redemptions = series([2, 1, 3, 4, 2, 5, 4, 4, 6, 5, 7, 6, 5, 8, 7, 6, 10, 9, 8, 11, 10, 13, 12, 14, 11, 16, 15, 18, 17, 21])
+  const active = series([42, 38, 45, 49, 44, 52, 47, 55, 50, 58, 54, 61, 57, 64, 59, 68, 63, 72, 66, 76, 70, 81, 74, 86, 78, 91, 83, 95, 88, 102])
   const sum = (days: DailyCount[]) => days.reduce((total, entry) => total + entry.count, 0)
   const month = (offset: number) => new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + offset, 1)).toISOString().slice(0, 7)
   return {
@@ -37,6 +38,7 @@ export function demoOverview(now = new Date()): Overview {
     usage: {
       current: { period: month(0), coverage: "partial", active_accounts: 1_124, counters: { dispatches: 8_460, connect_minutes: 192_480, bytes_in: 7_840_000_000, bytes_out: 5_120_000_000 } },
       previous: { period: month(-1), coverage: "available", active_accounts: 983, counters: { dispatches: 7_215, connect_minutes: 176_920, bytes_in: 6_930_000_000, bytes_out: 4_680_000_000 } },
+      active_daily: active,
     },
   }
 }

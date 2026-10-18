@@ -224,6 +224,18 @@ export function UsagePage({ overview, say, locale }: PageProps) {
         <UsageCard heading={say("usagePrevious")} period={usage.previous} say={say} locale={locale} n={n} asOf={overview.generated_at} />
       </div>
 
+      {usage.active_daily === null ? (
+        <section className="adm-panel" aria-label={say("chartActiveAccounts")}>
+          <h2 className="adm-h3">{say("chartActiveAccounts")}</h2>
+          <p className="adm-fine">{say("chartActiveUnavailable")}</p>
+        </section>
+      ) : (
+        <>
+          <DailyChart title={say("chartActiveAccounts")} days={usage.active_daily} say={say} locale={locale} tall unique />
+          <p className="adm-fine">{say("chartActiveBasis")}</p>
+        </>
+      )}
+
       <section className="adm-panel adm-compare" aria-labelledby="adm-usage-side">
         <h2 id="adm-usage-side" className="adm-h3">{say("usageSideBySide")}</h2>
         <p className="adm-fine">{say("usageNoGrowth")}</p>
@@ -353,7 +365,7 @@ function longDay(day: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" }).format(new Date(day + "T00:00:00Z"))
 }
 
-export function DailyChart({ title, days, say, locale, tall = false }: { title: string; days: DailyCount[]; say: Say; locale: string; tall?: boolean }) {
+export function DailyChart({ title, days, say, locale, tall = false, unique = false }: { title: string; days: DailyCount[]; say: Say; locale: string; tall?: boolean; unique?: boolean }) {
   const id = useId()
   const n = new Intl.NumberFormat(locale)
   if (days.length === 0) {
@@ -370,7 +382,10 @@ export function DailyChart({ title, days, say, locale, tall = false }: { title: 
   const max = Math.max(1, peak.count)
   const from = shortDay(days[0].day, locale)
   const to = shortDay(days[days.length - 1].day, locale)
-  const summary = say(total === 0 ? "chartSummaryZero" : tied > 1 ? "chartSummaryTie" : "chartSummary", {
+  const summaryKey = unique
+    ? total === 0 ? "chartActiveZero" : tied > 1 ? "chartActiveTie" : "chartActiveSummary"
+    : total === 0 ? "chartSummaryZero" : tied > 1 ? "chartSummaryTie" : "chartSummary"
+  const summary = say(summaryKey, {
     total: n.format(total), days: days.length, peakDay: shortDay(peak.day, locale), peak: n.format(peak.count), tied: n.format(tied),
   })
   // Fixed coordinates keep the daily points evenly spaced at desktop and phone
