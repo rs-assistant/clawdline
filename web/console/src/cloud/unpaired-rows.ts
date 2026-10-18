@@ -110,8 +110,11 @@ export function withAccountRegistrations(
   registered: ReadonlyMap<string, AccountName>,
   present: (id: string, name: string, platform: string) => { name: string; label: string; kind: string },
 ): CloudMachine[] {
-  const result = [...rows]
-  const seen = new Set(rows.map((row) => row.id))
+  // The account is authoritative about membership. A relay envelope can
+  // outlive a revoked or removed registration, including one no longer in the
+  // API response at all. Do not turn that envelope back into a machine card.
+  const result = rows.filter((row) => registered.has(row.id))
+  const seen = new Set(result.map((row) => row.id))
   for (const [id, account] of registered) {
     if (seen.has(id)) continue
     const shown = present(id, account.name, account.platform)

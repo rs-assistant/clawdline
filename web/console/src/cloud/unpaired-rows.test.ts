@@ -75,7 +75,8 @@ test("account-only registrations remain identifiable and revocable without inven
     observedAt: 100, freshness: "current" as const, pairing: "paired" as const,
     sessions: 3, selectable: true, autoSelectable: true,
   }
-  const rows = withAccountRegistrations([witnessed], roster.registered, present)
+  const retained = { ...witnessed, id: "mac_missing", name: "Retained only" }
+  const rows = withAccountRegistrations([witnessed, retained], roster.registered, present)
   assert.equal(rows[0], witnessed)
   assert.deepEqual(rows.map((row) => row.id), ["mac_1", "mac_c0ffee42", "mac_blank"])
   for (const row of rows.slice(1)) {

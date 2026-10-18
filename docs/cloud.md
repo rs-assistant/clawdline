@@ -135,6 +135,13 @@ is that tab's own (`sessionStorage`); a new tab has made none. An account with o
 still opens its list once, so the first thing a person sees names the machine and offers its
 pairing. The rules are `web/console/src/cloud/opening.ts` and are tested there.
 
+On a cold load the gate holds one opening card until the account machine roster answers. The
+roster's active ids decide which retained relay rows may appear; a revoked registration or an old
+relay snapshot absent from the account cannot restore a machine card. If the account roster cannot
+be read, the page asks for a retry instead of opening from possibly stale relay membership. The
+opening decision is made before the machine picker is painted, so an automatic fleet or addressed
+Session open does not flash the management list first.
+
 A cold browser load has two bounded paths. The signed `ss/` inventory marker names the complete
 Session set for each machine. If its marker or a row is missing, a complete, fresh, authorized
 `sessions.list` answer supplies the set and its titles in one read; an unanswered list falls back
