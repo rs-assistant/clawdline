@@ -1333,7 +1333,9 @@ clawdline item claim <item id>
   `{"expected_version", "session_id", "via": {"run"}}`, and it assigns the item to **you, the
   Session that message was sent to** — nothing in it names another Session or terminal.
 - The item then reads exactly as if the person had assigned it to you from the Board: you own it,
-  it moves to `assigned`, its steps are seeded from the description's list if it had none. Nothing
+  it moves to `assigned`, its steps are seeded from the description's list if it had none — except
+  for a Plan you claimed with `--kind`: its description is analysis, so it seeds nothing and you add
+  the steps yourself with `clawdline item step-add`. Nothing
   is typed into your terminal. Work it as any assigned item (below).
 - The person sees the card marked "Claimed by the Session from your message at HH:MM", with their
   words quoted.
@@ -1664,7 +1666,7 @@ POST /v1/work/v2/agent/items/<id>/finish    (Idempotency-Key required)
   `finish_not_started` (still before `implementing`).
 
 An assigned item may contain `steps`. A successful assignment can seed them from two or more top-level
-Markdown list rows in the description, and an item you created with `clawdline item add` carries
+Markdown list rows in the description (never for an item that was a Plan), and an item you created with `clawdline item add` carries
 its `--step` rows. Each step is a checklist entry on that item, not another Board item.
 Complete a verified step with `clawdline item step-done <item id> <step id>`; it sends
 `POST /v1/work/v2/agent/items/<item-id>/steps/<step-id>/complete` with `{"session_id"}`. On the

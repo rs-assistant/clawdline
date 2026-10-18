@@ -1163,7 +1163,8 @@ clawdline item claim <item id>
   而且只會把項目指派給**你，也就是那則訊息送達的 Session**——裡面沒有任何欄位能指名別的 Session 或
   terminal。
 - 之後這個項目看起來就跟使用者從看板把它指派給你一模一樣：你是 owner，phase 變成 `assigned`，原本沒有
-  steps 的話會從 description 的清單補上。不會有任何字打進你的 terminal。照任何已指派項目的做法做（見下文）。
+  steps 的話會從 description 的清單補上——用 `--kind` 認領的 Plan 例外：它的 description 是分析，
+  不會補上任何 step，請你自己用 `clawdline item step-add` 加。不會有任何字打進你的 terminal。照任何已指派項目的做法做（見下文）。
 - 使用者會看到卡片上寫著「Session 依你 HH:MM 的訊息認領」，並引用他的原話。
 - 拒絕，每一種都什麼都不寫：`run_unknown`、`run_expired`、`run_other_session`、`session_not_found`、
   `child_session`（同 `item add`）；`work_not_found`；`project_mismatch`（項目在你沒在工作的 Project）；
@@ -1432,7 +1433,7 @@ POST /v1/work/v2/agent/items/<id>/finish    (Idempotency-Key required)
   `implementing` 之前）。
 
 已指派的項目可能帶有 `steps`。成功指派時，description 裡兩個以上的頂層 Markdown 列點可以自動成為
-steps，用 `clawdline item add` 建立的項目則帶著它的 `--step`；每一列都是父項目清單上的一個 step，不是另一張看板項目。確認完成一列後，用
+steps（曾經是 Plan 的項目不會），用 `clawdline item add` 建立的項目則帶著它的 `--step`；每一列都是父項目清單上的一個 step，不是另一張看板項目。確認完成一列後，用
 `clawdline item step-done <item id> <step id>` 勾掉；它送出
 `POST /v1/work/v2/agent/items/<item-id>/steps/<step-id>/complete` 與 `{"session_id"}`。Agent 路由上的
 `expected_version` 可省略：省略時寫入作用在當下的版本；有帶（`--expected-version`）就會比對，過期的版本回 `version_conflict`。

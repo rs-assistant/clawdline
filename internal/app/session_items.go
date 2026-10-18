@@ -203,7 +203,7 @@ func explicitSteps(in []string) ([]string, error) {
 // addSessionItemSteps writes the steps a Session named, in order, or — when it
 // named none — seeds them from the description's list exactly as a person's
 // assignment does (seedDescriptionSteps). Never both, so no step is written
-// twice.
+// twice. An item that was a Plan seeds nothing; a new item never was one.
 func addSessionItemSteps(tx *store.WorkV2Tx, item work.ItemV2, titles []string, session string, at time.Time) ([]work.StepV2, error) {
 	if len(titles) == 0 {
 		return seedDescriptionSteps(tx, item, session, at)
