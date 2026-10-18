@@ -34,17 +34,33 @@ func TestTheVocabularyTableIsTheBridgesCatalog(t *testing.T) {
 	for _, word := range missing(rows, catalog) {
 		t.Errorf("the vocabulary table has a row for %q and this machine registers no such word", word)
 	}
+	// A body one field larger is tried with every field any word carries, so
+	// a decoder that starts taking a neighbour's field fails here.
+	fields := map[string]bool{"unexpected_field": true}
+	examples := map[string]any{"unexpected_field": "x"}
+	for _, row := range ops {
+		for _, shape := range row.Shapes {
+			for _, field := range shape.Body {
+				fields[field] = true
+			}
+		}
+		for key, value := range row.Example {
+			if _, ok := examples[key]; !ok {
+				examples[key] = value
+			}
+		}
+	}
 	implemented := set(Implemented())
 	for _, row := range ops {
 		o, ok := catalog[row.Op]
 		if !ok {
 			continue
 		}
-		t.Run(row.Op, func(t *testing.T) { checkVocabularyRow(t, row, o, implemented[row.Op]) })
+		t.Run(row.Op, func(t *testing.T) { checkVocabularyRow(t, row, o, implemented[row.Op], fields, examples) })
 	}
 }
 
-func checkVocabularyRow(t *testing.T, row cloudvocab.Operation, o op, implemented bool) {
+func checkVocabularyRow(t *testing.T, row cloudvocab.Operation, o op, implemented bool, fields map[string]bool, examples map[string]any) {
 	if got := row.Kind == cloudvocab.Read; got != o.read {
 		t.Errorf("the table says kind %s and the op says read=%v", row.Kind, o.read)
 	}
@@ -79,12 +95,8 @@ func checkVocabularyRow(t *testing.T, row cloudvocab.Operation, o op, implemente
 	}
 
 	listed := map[string]bool{}
-	fields := map[string]bool{"unexpected_field": true}
 	for _, shape := range row.Shapes {
 		listed[strings.Join(shape.Body, ",")] = true
-		for _, field := range shape.Body {
-			fields[field] = true
-		}
 	}
 	for _, shape := range row.Shapes {
 		example := row.Example
@@ -105,12 +117,9 @@ func checkVocabularyRow(t *testing.T, row cloudvocab.Operation, o op, implemente
 			if listed[strings.Join(neighbour, ",")] || open && len(neighbour) > len(shape.Body) {
 				continue
 			}
-			with := map[string]any{"unexpected_field": "x"}
-			for key, value := range example {
-				with[key] = value
-			}
-			for key, value := range row.Example {
-				if _, ok := with[key]; !ok {
+			with := map[string]any{}
+			for _, source := range []map[string]any{examples, row.Example, example} {
+				for key, value := range source {
 					with[key] = value
 				}
 			}

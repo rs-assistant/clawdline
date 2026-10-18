@@ -391,11 +391,12 @@
       "console": "deferred",
       "local": {"method": "POST"},
       "special": ["guard", "session_receipt"],
-      "example": {"expect": "8eca80fffc9359d5f0fca31f3e36b741bd50218b658fc086f05931747bd4c5ce", "key": "1", "request": "req-1", "session": "%19"},
+      "example": {"expect": "8eca80fffc9359d5f0fca31f3e36b741bd50218b658fc086f05931747bd4c5ce", "key": "1", "request": "req-1", "session": "%19", "typed": "please read CHILD.md"},
       "shapes": [
         {"body": ["key", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["key"]},
         {"body": ["key", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["key"]},
-        {"body": ["expect", "key", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["expect", "key"]}
+        {"body": ["expect", "key", "request", "session"], "path": "/v1/sessions/{session}/key", "local_body": ["expect", "key"]},
+        {"body": ["key", "request", "session", "typed"], "path": "/v1/sessions/{session}/key", "local_body": ["key", "typed"]}
       ]
     },
     {
@@ -1504,9 +1505,10 @@
       "console_route": "POST /v1/sessions/{id}/title",
       "console_seam": "writer",
       "local": {"method": "POST"},
-      "example": {"request": "req-title", "session": "%19", "text": "New name"},
+      "example": {"execution_generation": "0123456789abcdef0123456789abcdef", "request": "req-title", "session": "%19", "text": "New name"},
       "shapes": [
-        {"body": ["request", "session", "text"], "path": "/v1/sessions/{session}/title", "local_body": ["title"]}
+        {"body": ["request", "session", "text"], "path": "/v1/sessions/{session}/title", "local_body": ["title"]},
+        {"body": ["execution_generation", "request", "session", "text"], "path": "/v1/sessions/{session}/title", "local_body": ["title"]}
       ]
     },
     {
