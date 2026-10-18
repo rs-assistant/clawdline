@@ -223,8 +223,12 @@ clock fires it. There is no shared schedule and no machine-to-machine channel, a
 machine independently (`cloud/relay-reader.ts`, `pages/schedules.tsx`) and draws each answered group without
 waiting for its peers, the header's first,
 each headed by the machine's name and platform word as the header switcher says it. A machine that did not
-answer is a named line — "offline (last seen HH:MM)" when a last-seen time is known, "offline or unreadable"
-otherwise — never an empty group. Every action on a row (history, Run now, Edit, Delete, the webhook
+answer is a named line, never an empty group: "its schedules could not be read" when the account hears from
+it now, or when this page did not ask because its own Cloud line was reconnecting; "offline (last seen
+HH:MM)" for a machine that stopped reporting in; "offline or unreadable" when neither is known
+(`schedule-machines.ts` `silentMachineWord`). A list read asked while the page's line is paused or renewing
+waits for it, as one schedule's read does, and answers `cloud_reconnecting` when it does not come back; each
+failed list read reaches the machine's log as `cloud.read.failed word=schedules`. Every action on a row (history, Run now, Edit, Delete, the webhook
 binding) is sent to the machine the row was listed on (`?machine=`, `relay-writer.ts` `namedMachine`).
 A console with one machine — the daemon's own page, or an account with one machine — draws no machine
 column and no machine field, and sends what it sent before.

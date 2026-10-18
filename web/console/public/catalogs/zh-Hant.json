@@ -3816,6 +3816,7 @@
   "next.scheduleInvalidStatus": "無效",
   "next.scheduleMachineField": "機器",
   "next.scheduleMachineOffline": "{machine}：離線（最後在線 {time}）",
+  "next.scheduleMachineReadFailed": "{machine}：讀不到排定的工作",
   "next.scheduleMachineUnread": "{machine}：離線／讀不到",
   "next.scheduleMoveCopyLeft": "{machine} 上的那份複本沒能刪掉：它還在那裡，而且是啟用的。請到 {machine} 刪掉它。",
   "next.scheduleMoveCreateFailed": "{machine} 拒絕建立這份排程，排程仍在 {source}，維持原狀。{why}",

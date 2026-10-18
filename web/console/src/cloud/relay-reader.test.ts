@@ -1495,6 +1495,57 @@ test("a machine read the connection does not come back for is refused as reconne
   }
 })
 
+// Seen on 2026-10-18 on app.clawdline.com: the phone came back to the
+// Schedules page a moment before its relay line did, and the list read threw
+// `NotConnected`, which `jsonFetch` spells `offline`. Every machine on the
+// account — the online Mac among them — was drawn as offline or unreadable,
+// and the lane asked again only a minute later. One schedule's read had waited
+// for the line since 2026-09-27; the list did not.
+test("the schedule list asked while the page's connection is paused waits for it to come back", async () => {
+  const retired = new FakeClient() as FakeClient & { lifecycle?: (reason: string) => boolean }
+  retired.ready = false
+  const demands: string[] = []
+  retired.lifecycle = (reason) => {
+    demands.push(reason)
+    return true
+  }
+  const r = reader(retired, { t: 1000 })
+  const renewed = new FakeClient()
+  renewed.scheduleAnswer = async (options) => ({ schedules: [schedule(options?.machine || "mac-a", "s-1")], at: 1_700 })
+
+  const asked = r.fetch("/v1/orchestrator/schedules?machine=mac-a")
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  r.attach(renewed)
+  const res = await asked
+  assert.equal(res.status, 200)
+  assert.deepEqual((await body<{ schedules: { id: string }[] }>(res)).schedules.map((row) => row.id), ["s-1"])
+  assert.deepEqual(demands, ["demand"], "the paused client is asked to reconnect")
+  assert.deepEqual(retired.scheduleAsks, [], "nothing is sent through the retired client")
+  assert.deepEqual(renewed.scheduleAsks, [{ fresh: true, machine: "mac-a" }])
+})
+
+test("a schedule list the connection does not come back for is refused as reconnecting, recorded, not offline", async () => {
+  const retired = new FakeClient() as FakeClient & { lifecycle?: (reason: string) => boolean }
+  retired.ready = false
+  retired.lifecycle = () => true
+  const rows: { event: string; data: Record<string, unknown> }[] = []
+  retired.viewerEvents = { record(event, data) { rows.push({ event, data }); return { n: rows.length } } }
+  const r = new RelayReader("mac-a", { now: () => 1000, reconnectWaitMs: 20 })
+  r.attach(retired)
+  const res = await r.fetch("/v1/orchestrator/schedules?machine=mac-b")
+  assert.equal(res.status, 503)
+  assert.equal((await body<{ error: string }>(res)).error, "cloud_reconnecting")
+  assert.deepEqual(retired.scheduleAsks, [])
+  // The machine's log is where a phone's failure is read (`diagnostics.events`):
+  // a failed schedule read names its word and the machine it was for.
+  const failed = rows.filter((row) => row.event === "cloud.read.failed")
+  assert.equal(failed.length, 1)
+  assert.equal(failed[0]?.data.word, "schedules")
+  assert.equal(failed[0]?.data.code, "http_503")
+  assert.equal(failed[0]?.data.machine, "mac-b")
+  assert.equal(failed[0]?.data.connection, "not_ready")
+})
+
 // The distinction this whole read is drawn around: "this machine has none" and
 // "nobody answered" are opposite facts, and `pages/schedules.tsx` draws the
 // section for one and leaves it alone for the other. An empty answer is an
