@@ -29,6 +29,9 @@
 .workflow-launch [role="alert"] { margin: .6rem 0 0; color: var(--danger, #d84a4a); }
 .snippets-sheet .buttons .workflow-start { min-height: 2.75rem; padding: .65rem 1rem; border: 1px solid var(--accent); border-radius: .6rem; background: var(--accent); color: #17191d; font: inherit; font-weight: 650; cursor: pointer; }
 .snippets-sheet .buttons .workflow-start:disabled { opacity: .5; cursor: default; }
+@media (max-width: 899px) {
+  .snippets-workflow-sheet { height: min(680px, calc(var(--vvh, 100dvh) - 48px)); }
+}
 
 .snippet-skeleton { display: grid; gap: 2px; width: 100%; }
 .snippet-skeleton-row { display: grid; gap: 7px; padding: 10px 12px; min-height: 58px; }

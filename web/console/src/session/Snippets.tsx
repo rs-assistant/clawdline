@@ -692,7 +692,7 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
   return (
     <>
       <div
-        className="sheet snippets-sheet"
+        className={`sheet snippets-sheet${tab === "workflow" ? " snippets-workflow-sheet" : ""}`}
         ref={sheet}
         id="snippets-sheet"
         role="dialog"
