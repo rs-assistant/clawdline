@@ -27,3 +27,16 @@ func TestEveryRowIsDeclaredInItsArea(t *testing.T) {
 		}
 	}
 }
+
+// TestTheRegisterIsInNameOrder pins the order Register returns. The bounds are
+// declared by area, and the raw /v1/capacity and /v1/diagnostics entries, and
+// the order one pass records crossings in, follow Register; sorting by name is
+// what keeps that order independent of which area file a bound lives in.
+func TestTheRegisterIsInNameOrder(t *testing.T) {
+	rows := Register()
+	for i := 1; i < len(rows); i++ {
+		if rows[i-1].Name >= rows[i].Name {
+			t.Fatalf("Register()[%d] %q comes before [%d] %q", i-1, rows[i-1].Name, i, rows[i].Name)
+		}
+	}
+}
