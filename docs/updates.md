@@ -309,6 +309,12 @@ progress and the final result in the same place. A withdrawn release or an unava
 cannot be installed from an old banner. Dismissing the banner is remembered per version in that
 browser. Settings retains the full version check, release notes, and update controls.
 
+A running dev build keeps a banner visible on both the machine's console and the Cloud
+**All machines** list, including Linux source deployments and source checkouts. It shows
+the dev commit even when there is no newer build. Source builds do not offer signed-release
+return or release actions; their update status includes the running daemon version so the
+console can recognize a dev build. The Cloud banner names the machine and opens its console.
+
 The Cloud console's **All machines** Session list also checks each paired online machine for a
 fresh signed release when the row opens or the page returns from hidden, blur, or the back-forward
 cache. Its ten-minute checks are fresh; progress polling reads cached status. If a fresh client
