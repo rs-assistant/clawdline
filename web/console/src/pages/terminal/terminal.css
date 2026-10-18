@@ -296,3 +296,19 @@
 .cloud-key[data-danger] { border-color: var(--warn); color: var(--warn); }
 .cloud-key[data-danger] small { color: var(--warn); }
 .cloud-key[aria-pressed="true"] { background: var(--accent-in); border-color: var(--accent); }
+
+/* The hosted terminal's skeleton (TerminalSkeleton.tsx): bars in the places the live page fills. */
+.cloud-skel {
+    display: block; border-radius: 6px;
+    background: linear-gradient(90deg, var(--card) 25%, var(--card-hi) 45%, var(--card) 65%);
+    background-size: 300% 100%; animation: cloud-skel 1.6s ease-in-out infinite;
+}
+@keyframes cloud-skel { from { background-position: 100% 50%; } to { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .cloud-skel { animation: none; background: var(--card-hi); } }
+.cloud-skel-title { width: 7.5em; height: 15px; margin: 2px 0; }
+.cloud-skel-more { flex: none; width: 44px; height: 44px; margin-left: auto; border-radius: 8px; }
+.cloud-skel-lines { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px; pointer-events: none; overflow: hidden; }
+.cloud-skel-line { flex: none; height: 9px; }
+.cloud-skel-gap { flex: none; height: 9px; }
+.cloud-skel-round { flex: none; width: 44px; height: 44px; border-radius: 22px; }
+.cloud-skel-chip { flex: none; width: 56px; height: 44px; border-radius: 22px; }

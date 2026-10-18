@@ -13,6 +13,7 @@ import { TAB } from "./tab.js"
 import { closeTerminalPane, openTerminalPage } from "./navigate.js"
 import { firstSize } from "./TerminalProjectList.js"
 import { TerminalBackButton } from "./TerminalBackButton.js"
+import { CloudTerminalSkeleton, TerminalSkeletonKeys, TerminalSkeletonLines } from "./TerminalSkeleton.js"
 import { COMBO_KEYS, PANEL_KEYS, QUICK_KEYS, bindTerminalKeyboard, isRegionKey, readClipboardPaste, withCtrl } from "./keys.js"
 import { PasteField } from "./PasteField.js"
 import { holderWords, terminalRefusalWords, terminalShortID } from "./words.js"
@@ -387,7 +388,7 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
       () => { setDiagnosticsText(text); setDockNote(nextWord("terminalDiagnosticsCopyFailed")) })
   }
   const body = cloudTerminalBody(host, channelProject, id)
-  if (body === "offline" || !host) return <p className="terminal-note" role="status">{nextWord("terminalCloudLineReconnecting")}</p>
+  if (body === "offline" || !host) return <CloudTerminalSkeleton label={label} status={nextWord("terminalPhaseReconnecting")} onBack={goBack} />
   if (body === "no_project") return <p className="terminal-note" role="alert">{nextWord("terminalNoProject")}</p>
   if (body === "list") return <section className="terminal-wrap" aria-label={nextWord("terminalEntryFor", { project: label })}>
     <header className="board-head terminal-page-head"><TerminalBackButton onClick={goBack} /></header>
@@ -464,8 +465,9 @@ export function CloudTerminalPage({ project, channelProject, machine, label, id,
       {refusal.action && <button className="board-button" type="button" disabled={!!busy || accessError || snapshot.state === "revoked"}
         onClick={() => refusal.action === "reconnect" ? reconnect() : takeInput()}>{nextWord(refusal.action === "acquire" ? "terminalAcquire" :
           refusal.action === "takeover" ? "terminalTypeHere" : refusal.action === "reacquire" ? "terminalNeedsReviewContinue" : "terminalCloudReconnect")}</button>}
-    </div>}{firstFramePending && !error && phase !== "ended" && <p className="terminal-loading terminal-wait" role="status" aria-live="polite"><span className="terminal-wait-indicator" aria-hidden="true" />{nextWord("terminalCloudSyncing")}</p>}<div className="terminal-host" ref={screen} /></div>
+    </div>}{firstFramePending && !error && phase !== "ended" && <TerminalSkeletonLines />}<div className="terminal-host" ref={screen} /></div>
     <div className="cloud-dock" hidden={history !== null}>
+      {phase === "loading" && <TerminalSkeletonKeys />}
       {phase === "ended" && <section className="cloud-ended" aria-labelledby="cloud-ended-title">
         <h2 id="cloud-ended-title">{nextWord("terminalEndedTitle")}</h2>
         <p>{nextWord("terminalEndedHelp")}</p>

@@ -9,6 +9,7 @@ import { closeTerminalPane, openTerminalPage } from "./navigate.js"
 import { TerminalView } from "./TerminalView.js"
 import { TerminalBackButton } from "./TerminalBackButton.js"
 import { CloudTerminalPage } from "./CloudTerminalPage.js"
+import { CloudTerminalSkeleton } from "./TerminalSkeleton.js"
 import "./terminal.css"
 
 /**
@@ -102,8 +103,10 @@ export function TerminalPane({ route, create = false, shown }: {
           <p className="terminal-note" role="alert">{cloud.temporary ? nextWord("terminalProjectsReconnecting") : nextWord("terminalProjectsFailedCode", { code: cloud.code })}
             {" "}{cloud.retryInMs !== null ? nextWord("terminalProjectsRetryIn", { seconds: String(Math.round(cloud.retryInMs / 1000)) }) : nextWord("terminalProjectsRetryStopped")}</p>
           <button className="board-button" type="button" onClick={() => reader.current?.retry()}>{nextWord("terminalRetry")}</button></div>)
-          : cloud.state === "loading" ? note(<p className="terminal-note">{nextWord("terminalListLoading")}</p>)
-            : !host ? note(<p className="terminal-note" role="status">{nextWord("terminalCloudLineReconnecting")}</p>)
+          // While the Project or the machine's line is on its way, the terminal page's own frame stands
+          // in its place, so nothing shifts when the terminal arrives.
+          : cloud.state === "loading" ? <CloudTerminalSkeleton label={found?.label ?? ""} status={nextWord("terminalPhaseLoading")} onBack={closeTerminalPane} />
+            : !host ? <CloudTerminalSkeleton label={found?.label ?? ""} status={nextWord("terminalPhaseReconnecting")} onBack={closeTerminalPane} />
               : !found ? note(<p className="terminal-note" role="alert">{nextWord("terminalProjectUnknown")}</p>)
                 : <CloudTerminalPage key={route.terminal || "new"} create={create} project={found.page} channelProject={found.local} machine={targetMachine} label={name} id={route.terminal} shown={shown} />
       ) : place === "failed" ? note(
