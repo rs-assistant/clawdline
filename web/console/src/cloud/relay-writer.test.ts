@@ -55,6 +55,7 @@ class FakeClient implements CloudWriteClient {
   voiceFor?: CloudWriteClient["voiceFor"]
   /** What `_machineRequestAs` settles with, as the copied client resolves a payload's `body`. */
   machineAnswer: unknown = undefined
+  documentReply: Record<string, unknown> | null = null
   events(_listener: (event: CloudEvent) => void) {
     return () => {}
   }
@@ -83,7 +84,7 @@ class FakeClient implements CloudWriteClient {
   }
   _read(identity: CloudIdentity, type: string, extra: Record<string, unknown>, answer: string, timeoutMs?: number, options?: unknown) {
     return this.act("_read", [identity, type, extra, answer, timeoutMs, options], type === "document"
-      ? { scope: "project", path: "demo.md", media_type: "text/markdown; charset=utf-8", byte_count: 7, data: "IyBEZW1vCg==" }
+      ? this.documentReply ?? { scope: "project", path: "demo.md", media_type: "text/markdown; charset=utf-8", byte_count: 7, data: "IyBEZW1vCg==" }
       : type === "documents" ? { documents: [{ scope: "project", path: "demo.md", bytes: 7, modified: 1 }] }
       : { ok: true, id: identity.session, action: "keyed" })
   }
@@ -2530,5 +2531,24 @@ test("usage overview browser bodies match the fixtures accepted by the daemon de
       assert.equal(call?.[2], "usage.overview")
       assert.deepEqual(JSON.parse(JSON.stringify(call?.[3])), fixture.body, "browser wire must be accepted by the real daemon fixture")
     }
+  }
+})
+
+
+test("a static HTML document crosses the Cloud reader transport with its exact MIME and bytes", async () => {
+  const client = new FakeClient()
+  const text = "<p>report</p>"
+  client.documentReply = {scope: "project", path: "report.html", media_type: "text/html; charset=utf-8", byte_count: text.length, data: btoa(text)}
+  const {reader} = seam(client)
+  const response = await reader.fetch("/v1/sessions/s1/documents/project/report.html?machine=mac-a")
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get("content-type"), "text/html; charset=utf-8")
+  assert.equal(await response.text(), text)
+  for (const change of [{media_type: "application/xhtml+xml"}, {media_type: "text/html"}, {byte_count: 1}, {data: "%%%"}]) {
+    client.documentReply = {...client.documentReply, ...change}
+    const rejected = await reader.fetch("/v1/sessions/s1/documents/project/report.html?machine=mac-a")
+    assert.equal(rejected.status, 502)
+    assert.equal((await json<{error: string}>(rejected)).error, "malformed_answer")
+    client.documentReply = {scope: "project", path: "report.html", media_type: "text/html; charset=utf-8", byte_count: text.length, data: btoa(text)}
   }
 })

@@ -1371,7 +1371,7 @@ export class RelayWriter {
           ? this.pinnedRead(client, route.session, "document", fields, init?.signal)
           : client._read({ machine: this.host.machine, session: route.session }, "document",
             fields, "read:" + request)) as { media_type?: unknown; byte_count?: unknown; data?: unknown }
-        if ((answer.media_type !== "text/markdown; charset=utf-8" && answer.media_type !== "text/plain; charset=utf-8") ||
+        if ((answer.media_type !== "text/markdown; charset=utf-8" && answer.media_type !== "text/plain; charset=utf-8" && answer.media_type !== "text/html; charset=utf-8") ||
           typeof answer.data !== "string" || !Number.isSafeInteger(answer.byte_count) || Number(answer.byte_count) < 0) {
           throw failure("malformed_answer", "The document answer is invalid.", 502)
         }
