@@ -109,7 +109,8 @@ func TestAReportNeverTravelsOverCloud(t *testing.T) {
 func TestAReportIsRefusedThroughTheTunnelAndFromElsewhere(t *testing.T) {
 	_, handler, local, _ := turnReportServer(t)
 	for name, edit := range map[string]func(*http.Request){
-		"quick tunnel":      func(r *http.Request) { r.Host = "abc.trycloudflare.com" },
+		"named tunnel":      func(r *http.Request) { r.Host = "box.example.com" },
+		"Tailscale Serve":   func(r *http.Request) { r.Host = "machine.tailnet-example.ts.net" },
 		"cloudflare header": func(r *http.Request) { r.Header.Set("Cf-Connecting-Ip", "198.51.100.7") },
 		"another machine":   func(r *http.Request) { r.RemoteAddr = "192.0.2.1:52000" },
 		"no peer":           func(r *http.Request) { r.RemoteAddr = "" },

@@ -6183,7 +6183,7 @@ type SettingsRequest struct {
 	// A hostname, or empty.
 	RemoteHostname *string `json:"remote_hostname"`
 
-	// `off`, `quick` or `named`.
+	// `off` or `named`. A file that still holds the removed `quick` reads as `off`.
 	RemoteTunnel *string `json:"remote_tunnel"`
 
 	// Whether the bar comes back with the terminal.
@@ -6194,6 +6194,9 @@ type SettingsRequest struct {
 
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
+
+	// A full Tailscale name ending in `.ts.net`, or empty.
+	TailscaleHostname *string `json:"tailscale_hostname"`
 
 	// `auto`, `iterm`, `iterm_native` or `tmux`.
 	Terminal *string `json:"terminal"`
@@ -6374,13 +6377,18 @@ type SettingsSnapshot struct {
 	// Notify when a Session waits for the person.
 	PushOnWaiting *bool `json:"push_on_waiting"`
 
+	// True while the file still holds `remote_tunnel: "quick"`, the address under
+	// trycloudflare.com that was removed. It is reported as `off` and starts nothing;
+	// the settings page explains once, and writing `remote_tunnel` clears it.
+	QuickTunnelRetired bool `json:"quick_tunnel_retired,omitempty"`
+
 	// Whether anything but this Mac may read the session list.
 	Remote *bool `json:"remote"`
 
 	// The hostname a named tunnel answers on.
 	RemoteHostname *string `json:"remote_hostname"`
 
-	// `off`, `quick` or `named`.
+	// `off` or `named`. A file that still holds the removed `quick` reads as `off`.
 	RemoteTunnel *string `json:"remote_tunnel"`
 
 	// Whether the bar comes back with the terminal.
@@ -6392,6 +6400,10 @@ type SettingsSnapshot struct {
 
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
+
+	// This machine's full Tailscale name (`<machine>.<tailnet>.ts.net`) that Tailscale
+	// Serve answers on; accepted only while `remote` is on.
+	TailscaleHostname *string `json:"tailscale_hostname"`
 
 	// Where a new session opens: `auto`, `iterm`, `iterm_native` or `tmux`. With tmux
 	// installed, `auto` and `iterm` run the session in tmux and show it in an iTerm2
@@ -7558,19 +7570,18 @@ type TranscriptUnread struct {
 	WindowBytes int64 `json:"windowBytes"`
 }
 
-// `off`; `quick`, an address made up per run under trycloudflare.com; `named`,
-// the person's own tunnel (`remote_tunnel_name`) and hostname
-// (`remote_hostname`).
+// `off`, or `named`: the person's own tunnel (`remote_tunnel_name`) and
+// hostname (`remote_hostname`). A settings file that still holds the removed
+// `quick` reads as `off`.
 type TunnelMode string
 
 const (
 	TunnelModeOff   TunnelMode = "off"
-	TunnelModeQuick TunnelMode = "quick"
 	TunnelModeNamed TunnelMode = "named"
 )
 
 // TunnelModeValues is every value the contract allows, in contract order.
-var TunnelModeValues = []TunnelMode{TunnelModeOff, TunnelModeQuick, TunnelModeNamed}
+var TunnelModeValues = []TunnelMode{TunnelModeOff, TunnelModeNamed}
 
 // `off`; `starting`, launched or waiting to retry and not yet registered with
 // the edge; `up`; `failed`, with a reason — including a refusal to start.

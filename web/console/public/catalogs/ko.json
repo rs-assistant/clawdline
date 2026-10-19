@@ -4107,7 +4107,6 @@
   "settings.settingsTunnelHint": "cloudflared는 이 기기에서 외부로 연결합니다. 포트 포워딩이 필요 없고 로컬 네트워크에서 수신 대기하는 서비스도 없습니다. 터널 뒤에는 이 기기의 모든 저장소 이름과 작업 제목이 있으므로 기기를 하나 이상 페어링한 뒤에만 시작됩니다.",
   "settings.settingsTunnelHostname": "호스트명",
   "settings.settingsTunnelNamed": "내 도메인",
-  "settings.settingsTunnelQuick": "자동으로 생성된 URL",
   "settings.settingsVoice": "음성 입력",
   "settings.settingsVoiceLanguage": "인식 언어",
   "settings.settingsVoiceLanguageFollow": "Clawdline 설정 따르기",

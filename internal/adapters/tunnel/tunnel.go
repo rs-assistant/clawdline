@@ -38,24 +38,32 @@ type Mode string
 
 const (
 	Off   Mode = "off"
-	Quick Mode = "quick"
 	Named Mode = "named"
 )
 
 // ParseMode reads `remote_tunnel`. Anything unrecognised is Off: a typo in a
-// config file must not be a config file that opens a tunnel.
+// config file must not be a config file that opens a tunnel. That includes
+// `quick`, the address made up per run under trycloudflare.com that was
+// removed on 2026-10-19: a settings file that still names it starts nothing,
+// and the settings page says why (RetiredMode).
 func ParseMode(configured string) Mode {
-	switch m := Mode(strings.ToLower(strings.TrimSpace(configured))); m {
-	case Quick, Named:
+	if m := Mode(strings.ToLower(strings.TrimSpace(configured))); m == Named {
 		return m
 	}
 	return Off
 }
 
+// RetiredMode is the `remote_tunnel` value that no longer opens anything.
+const RetiredMode = "quick"
+
+// Retired is whether a stored `remote_tunnel` names the removed quick tunnel.
+func Retired(configured string) bool {
+	return strings.EqualFold(strings.TrimSpace(configured), RetiredMode)
+}
+
 // Plan is everything one launch is a function of. Comparable, so that a
 // settings write which changed nothing about the tunnel leaves a running one
-// alone: restarting a quick tunnel throws its address away and hands the
-// person a new one.
+// alone: a restart cuts off every phone that is connected through it.
 type Plan struct {
 	Mode     Mode
 	Name     string
@@ -200,9 +208,7 @@ const ConfigName = "cloudflared.yml"
 //     ~/.cloudflared/config.yml, which belongs to whatever else the person runs
 //     tunnels for. Its `tunnel:` key overrides the name on the command line, so
 //     `tunnel run clawdline` quietly started somebody's production tunnel
-//     instead; and its ingress list applies to a quick tunnel too, so a
-//     well-written one ending in `http_status:404` answered 404 for every
-//     request. Both were seen on a real machine.
+//     instead. That was seen on a real machine.
 //   - `--no-autoupdate`: an updating cloudflared replaces itself and restarts,
 //     which from here is indistinguishable from the tunnel dying.
 //   - `--metrics 127.0.0.1:0`: left alone it takes the first free port of
@@ -218,10 +224,7 @@ func Arguments(p Plan, configPath string) []string {
 		"--metrics", "127.0.0.1:0",
 		"--grace-period", "2s",
 	}
-	switch p.Mode {
-	case Quick:
-		args = append(args, "--url", fmt.Sprintf("http://127.0.0.1:%d", p.Port))
-	case Named:
+	if p.Mode == Named {
 		args = append(args, "run", p.Name)
 	}
 	return args
@@ -230,10 +233,8 @@ func Arguments(p Plan, configPath string) []string {
 // ConfigFile is the file that goes with those arguments. Pure, so what is
 // written can be tested.
 //
-// A quick tunnel gets an almost empty one: its address is made up per run and
-// cannot be in an ingress list, so `--url` is the whole of its routing. A named
-// tunnel gets its one mapping and a 404 for everything else, because a tunnel
-// that answers for hostnames it was never asked about is an open proxy.
+// A named tunnel gets its one mapping and a 404 for everything else, because a
+// tunnel that answers for hostnames it was never asked about is an open proxy.
 //
 // Every value that came from a setting is written as a double-quoted YAML
 // scalar, which is JSON's string syntax, so no setting can become structure.
@@ -269,42 +270,6 @@ func ConfigFile(p Plan, credentials string) string {
 func yamlString(s string) string {
 	out, _ := json.Marshal(s)
 	return string(out)
-}
-
-// QuickURL is the address a quick tunnel was given, out of one line of
-// cloudflared's logging, or "".
-//
-// It arrives inside a banner on stderr, where cloudflared writes everything:
-//
-//	2026-08-18T09:31:17Z INF |  https://denied-franchise-william-jade.trycloudflare.com                                   |
-//
-// Matched by its suffix, trying every `https://` on the line, because the run
-// prints two other addresses first — "the first URL in the output" would have
-// published Cloudflare's terms of use as the address of this machine:
-//
-//	2026-08-18T09:31:14Z INF Thank you for trying Cloudflare Tunnel. … (https://www.cloudflare.com/website-terms/) …
-func QuickURL(line string) string {
-	rest := line
-	for {
-		at := strings.Index(rest, "https://")
-		if at < 0 {
-			return ""
-		}
-		run := rest[at:]
-		end := len(run)
-		for i, r := range run {
-			if !(r < 0x80 && (r == '.' || r == '-' || r == ':' || r == '/' ||
-				(r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9'))) {
-				end = i
-				break
-			}
-		}
-		text := strings.TrimRight(run[:end], "/")
-		if strings.HasSuffix(text, ".trycloudflare.com") && len(text) > len("https://.trycloudflare.com") {
-			return text
-		}
-		rest = rest[at+len("https://"):]
-	}
 }
 
 // RegisteredConnection reports whether a line says a connection to
@@ -381,9 +346,9 @@ func clip(s string, n int) string {
 
 func utf8Start(b byte) bool { return b&0xC0 != 0x80 }
 
-// Redacted is an address with the part that is secret taken out:
-// `https://….trycloudflare.com`. While a quick tunnel is up, holding its four
-// words *is* the access.
+// Redacted is an address with its first label taken out:
+// `https://….example.com`, so a log line about a reconnection does not name
+// the machine.
 func Redacted(url string) string {
 	scheme := strings.Index(url, "://")
 	if scheme < 0 {

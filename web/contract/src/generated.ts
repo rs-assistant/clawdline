@@ -7447,7 +7447,7 @@ export interface SettingsRequest {
   remote_hostname: string | null
 
   /**
-   * `off`, `quick` or `named`.
+   * `off` or `named`. A file that still holds the removed `quick` reads as `off`.
    */
   remote_tunnel: string | null
 
@@ -7465,6 +7465,11 @@ export interface SettingsRequest {
    * Have a model write the sentence a notification carries.
    */
   smart_notifications: boolean | null
+
+  /**
+   * A full Tailscale name ending in `.ts.net`, or empty.
+   */
+  tailscale_hostname: string | null
 
   /**
    * `auto`, `iterm`, `iterm_native` or `tmux`.
@@ -7749,6 +7754,13 @@ export interface SettingsSnapshot {
   push_on_waiting: boolean | null
 
   /**
+   * True while the file still holds `remote_tunnel: "quick"`, the address under
+   * trycloudflare.com that was removed. It is reported as `off` and starts nothing;
+   * the settings page explains once, and writing `remote_tunnel` clears it.
+   */
+  quick_tunnel_retired?: boolean
+
+  /**
    * Whether anything but this Mac may read the session list.
    */
   remote: boolean | null
@@ -7759,7 +7771,7 @@ export interface SettingsSnapshot {
   remote_hostname: string | null
 
   /**
-   * `off`, `quick` or `named`.
+   * `off` or `named`. A file that still holds the removed `quick` reads as `off`.
    */
   remote_tunnel: string | null
 
@@ -7778,6 +7790,12 @@ export interface SettingsSnapshot {
    * Have a model write the sentence a notification carries.
    */
   smart_notifications: boolean | null
+
+  /**
+   * This machine's full Tailscale name (`<machine>.<tailnet>.ts.net`) that
+   * Tailscale Serve answers on; accepted only while `remote` is on.
+   */
+  tailscale_hostname: string | null
 
   /**
    * Where a new session opens: `auto`, `iterm`, `iterm_native` or `tmux`. With tmux
@@ -9175,15 +9193,15 @@ export interface TranscriptUnread {
 }
 
 /**
- * `off`; `quick`, an address made up per run under trycloudflare.com; `named`, the
- * person's own tunnel (`remote_tunnel_name`) and hostname (`remote_hostname`).
+ * `off`, or `named`: the person's own tunnel (`remote_tunnel_name`) and hostname
+ * (`remote_hostname`). A settings file that still holds the removed `quick` reads
+ * as `off`.
  */
 export type TunnelMode =
     "off"
-  | "quick"
   | "named"
 
-export const TunnelModeValues: readonly TunnelMode[] = ["off", "quick", "named"] as const
+export const TunnelModeValues: readonly TunnelMode[] = ["off", "named"] as const
 
 /**
  * `off`; `starting`, launched or waiting to retry and not yet registered with the

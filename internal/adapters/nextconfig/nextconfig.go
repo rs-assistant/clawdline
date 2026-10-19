@@ -496,10 +496,18 @@ var Settables = []Settable{
 	{Name: "voice_settle_seconds", Kind: "number", Min: 0, Max: 30},
 	{Name: "voice_stop_seconds", Kind: "number", Min: 0, Max: 300},
 	{Name: "remote", Kind: "bool"},
-	{Name: "remote_tunnel", Kind: "string", Choices: []string{"off", "quick", "named"},
-		Refusal: "invalid_tunnel", Because: "off, quick or named"},
+	// `quick` was removed on 2026-10-19; a file that still holds it reads as
+	// off (tunnel.ParseMode) and the route no longer accepts it.
+	{Name: "remote_tunnel", Kind: "string", Choices: []string{"off", "named"},
+		Refusal: "invalid_tunnel", Because: "off or named"},
 	{Name: "remote_hostname", Kind: "string", Check: ValidHostname, Refusal: "invalid_hostname",
 		Because: "a hostname, or empty"},
+	// The address Tailscale Serve answers on for this machine
+	// (docs/user/remote-access.md). Separate from `remote_hostname`, which is
+	// the named Cloudflare tunnel's and is written into its ingress.
+	{Name: "tailscale_hostname", Kind: "string", Check: ValidTailscaleHostname,
+		Refusal: "invalid_tailscale_hostname",
+		Because: "a full Tailscale name such as machine.tailnet.ts.net, or empty"},
 	{Name: "push_on_delivery", Kind: "bool"},
 	{Name: "push_on_fanout", Kind: "bool"},
 	{Name: "smart_notifications", Kind: "bool"},
@@ -649,6 +657,19 @@ func ValidFont(s string) bool {
 }
 
 // ValidHostname reports whether s is a hostname, or empty for none.
+// ValidTailscaleHostname is a machine's full MagicDNS name as Tailscale Serve
+// answers on it: lowercase, `<machine>.<tailnet>.ts.net`, no scheme, port or
+// path. Empty is valid and means none.
+func ValidTailscaleHostname(s string) bool {
+	if s == "" {
+		return true
+	}
+	if s != strings.ToLower(s) || !ValidHostname(s) || !strings.HasSuffix(s, ".ts.net") {
+		return false
+	}
+	return len(strings.Split(s, ".")) >= 4
+}
+
 func ValidHostname(s string) bool {
 	if s == "" {
 		return true

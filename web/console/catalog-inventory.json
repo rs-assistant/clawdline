@@ -98,7 +98,6 @@
     "settings.settingsStateHookHint",
     "settings.settingsRemote",
     "settings.settingsRemoteServe",
-    "settings.settingsTunnelQuick",
     "settings.settingsTunnelNamed",
     "settings.settingsTunnelHostname",
     "settings.settingsRemoteWrite",

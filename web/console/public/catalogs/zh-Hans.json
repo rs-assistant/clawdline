@@ -4107,7 +4107,6 @@
   "settings.settingsTunnelHint": "cloudflared 从这台机器向外建立连接，无需端口转发，也不会在局域网监听。至少有一台设备完成配对后才会启动，因为通过隧道可以看到这台机器上的代码仓库名称和工作标题。",
   "settings.settingsTunnelHostname": "主机名称",
   "settings.settingsTunnelNamed": "我自己的网域",
-  "settings.settingsTunnelQuick": "自动产生的网址",
   "settings.settingsVoice": "语音输入",
   "settings.settingsVoiceLanguage": "识别语言",
   "settings.settingsVoiceLanguageFollow": "跟着 Clawdline",

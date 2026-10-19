@@ -4107,7 +4107,6 @@
   "settings.settingsTunnelHint": "Cloudflared se connecte vers l'extérieur de cette machine — pas de transfert de port, et rien n'écoute sur votre réseau. Il ne commence qu'après qu'un périphérique a été apparié, parce que derrière le tunnel sont tous les noms de dépôt et le titre de travail sur cette machine.",
   "settings.settingsTunnelHostname": "Nom de l'hôte",
   "settings.settingsTunnelNamed": "Mon propre domaine",
-  "settings.settingsTunnelQuick": "URL générée automatiquement",
   "settings.settingsVoice": "Entrée vocale",
   "settings.settingsVoiceLanguage": "Langue de reconnaissance",
   "settings.settingsVoiceLanguageFollow": "Suivre Clawdline",

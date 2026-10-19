@@ -82,11 +82,12 @@ func (s *Server) tunnelInputs() (tunnel.Inputs, bool) {
 	in.Binary, _ = v.String("cloudflared_path")
 	in.Remote, _ = v.Bool("remote")
 	g.setHostname(in.Hostname)
+	g.setTailscale(v)
 	return in, true
 }
 
 // tunnelRoute is GET /v1/tunnel: what the tunnel is doing. This machine's own
-// token only, because a quick tunnel's address is the access itself.
+// token only: it names the binary, the command line and the state directory.
 func (s *Server) tunnelRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		writeAuthRefusal(w, http.StatusMethodNotAllowed, "bad_request",

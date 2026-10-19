@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "tunnel.schema.json",
   "title": "The way in from outside",
-  "description": "GET /v1/tunnel, this machine's own token only (a paired device is 403): what the cloudflared this daemon runs is doing. It is turned on and off by `remote_tunnel` in the settings (POST /v1/settings), and it refuses to start while nothing but this machine is let in. A quick tunnel's address is its secret, which is why a paired phone cannot read this.",
+  "description": "GET /v1/tunnel, this machine's own token only (a paired device is 403): what the cloudflared this daemon runs is doing. It is turned on and off by `remote_tunnel` in the settings (POST /v1/settings), and it refuses to start while nothing but this machine is let in. It names the binary, the command line and the state directory, which is why a paired phone cannot read this.",
   "$defs": {
     "TunnelStatus": {
       "description": "One reading of the tunnel.",
@@ -24,9 +24,9 @@
       }
     },
     "TunnelMode": {
-      "description": "`off`; `quick`, an address made up per run under trycloudflare.com; `named`, the person's own tunnel (`remote_tunnel_name`) and hostname (`remote_hostname`).",
+      "description": "`off`, or `named`: the person's own tunnel (`remote_tunnel_name`) and hostname (`remote_hostname`). A settings file that still holds the removed `quick` reads as `off`.",
       "type": "string",
-      "enum": ["off", "quick", "named"]
+      "enum": ["off", "named"]
     },
     "TunnelState": {
       "description": "`off`; `starting`, launched or waiting to retry and not yet registered with the edge; `up`; `failed`, with a reason — including a refusal to start.",

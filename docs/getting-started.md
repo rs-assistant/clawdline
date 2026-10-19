@@ -143,11 +143,27 @@ at login, and a mascot in the notch.
 
 ## 6. Reach it from a phone
 
-Three ways, compared in [user/remote-access.md](user/remote-access.md): an SSH port forward, your
-own cloudflared tunnel with six-digit pairing (no account; a device paired that way can read and send, like every paired device),
-or Clawdline Cloud, below. When a device asks to pair over the tunnel, the code appears on this
-machine, in the macOS app or through `./bin/clawdline pair --watch`, and is never sent back to the
-device that asked.
+Four ways, compared in [user/remote-access.md](user/remote-access.md): an SSH port forward,
+Tailscale Serve on your own tailnet, your own cloudflared tunnel on your own domain, or Clawdline
+Cloud, below. The automatically generated `trycloudflare.com` address is no longer offered. Over
+Serve and over a tunnel a device pairs with a six-digit code, and like every paired device it can
+then read and send. When a device asks to pair, the code appears on this machine, in the macOS app
+or through `./bin/clawdline pair --watch`, and is never sent back to the device that asked.
+
+### Through Tailscale Serve (optional)
+
+Real-device verification pending. With Tailscale installed and signed in on this machine and the
+phone, and MagicDNS and HTTPS certificates turned on for the tailnet:
+
+```sh
+tailscale serve --bg 7727             # HTTPS on https://<machine>.<tailnet>.ts.net, private to the tailnet
+tailscale serve status                # the address
+```
+
+Turn remote access on and enter that full name in **Tailscale address** (`tailscale_hostname` in
+`config.json`), then open the address on the phone and pair it. Serve is private to your tailnet;
+Funnel would make the address public and is not recommended. `tailscale serve --https=443 off` or
+`tailscale serve reset` stops it.
 
 ### Turn on Clawdline Cloud (optional)
 

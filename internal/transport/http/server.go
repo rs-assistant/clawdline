@@ -469,8 +469,7 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/cloud/devices/revoke"}, s.cloudDeviceRoute},
 		{Route{"*", "/v1/cloud/keys/rotate"}, s.cloudRotateRoute},
 		// The account-free way in from outside: what this daemon's cloudflared is
-		// doing (tunnel.go). This machine's own token only — a quick tunnel's
-		// address is its secret.
+		// doing (tunnel.go). This machine's own token only.
 		{Route{"*", "/v1/tunnel"}, s.tunnelRoute},
 		{Route{"*", "/v1/sessions"}, s.sessions},
 		// Everything under a session id is about that session: its info, which is

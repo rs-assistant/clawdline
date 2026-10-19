@@ -4107,7 +4107,6 @@
   "settings.settingsTunnelHint": "cloudflared はこのマシンから外部へ接続するため、ポート転送は不要で、ネットワーク上に待ち受けるものもありません。トンネルの先からこのマシンのすべてのリポジトリ名と作業タイトルにアクセスできるため、デバイスを 1 台以上ペアリングした後にだけ起動します。",
   "settings.settingsTunnelHostname": "ホスト名",
   "settings.settingsTunnelNamed": "自分のドメイン",
-  "settings.settingsTunnelQuick": "自動的に生成された URL",
   "settings.settingsVoice": "音声入力",
   "settings.settingsVoiceLanguage": "音声認識の言語",
   "settings.settingsVoiceLanguageFollow": "Clawdline の設定に従う",
