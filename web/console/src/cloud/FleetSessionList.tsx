@@ -426,8 +426,9 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
           {offline && <p role="status" className="cloud-all-offline">{nextWord("cloudAllMachineOffline",
             { seen: machineSeenWord(machine.seenAt ?? null) })}</p>}
           {!reading || reading.phase === "loading" ? !offline && <p role="status">{nextWord("cloudAllLoading")}</p> : <>
-            {/* // refusal-ok: Unknown means the list is still being verified; its reason stays in the reading for the scheduled retry. */}
-            {reading.value.kind === "unavailable" && !offline && (reading.value.reason === "unknown"
+            {/* // refusal-ok: Background verification keeps its reason and scheduled retry without announcing transient recovery above retained rows. */}
+            {reading.value.kind === "unavailable" && !offline && (reading.value.reason === "unknown" ||
+              reading.value.reason === "stale" || reading.value.reason === "event_gap"
               ? !reading.value.rows?.length && <p role="status">{nextWord("cloudAllLoading")}</p>
               : <p role="status">{problemWord(reading.value.reason)}</p>)}
             {reading.value.kind === "ready" && !reading.value.complete && !offline &&
@@ -451,8 +452,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
                     status={displayedPresentationStatus(row, presentation)}
                     sessionID={row.destination.sessionID} machineID={machine.id} machineName={machine.name}
                     assistant={row.assistant ?? presentation?.assistant} state={row.state} stateLabel={stateWord(row.state)}
-                    freshness={row.freshness === "current" ? "" : nextWord(
-                      row.freshness === "stale" ? "cloudAllStale" : "cloudAllUnknown")}
+                    freshness={row.freshness === "unknown" ? nextWord("cloudAllUnknown") : ""}
                     lastMovementAt={row.lastMovementAt} attention={row.needsAttention === true}
                     depth={depth} branchThrough={branchThrough} ancestorThrough={ancestorThrough}
                     open={!!target && destinationKey(target) === destinationKey(row.destination)}
