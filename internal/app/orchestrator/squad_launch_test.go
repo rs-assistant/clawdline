@@ -75,6 +75,11 @@ func TestSquadDispatchRequiresBoundActorAndHonorsDisabledRole(t *testing.T) {
 	if err := b.checkSquadDispatchActor(ctx, DispatchRequest{}, record, "legacy-terminal"); err != nil {
 		t.Fatalf("legacy Session dispatch: %v", err)
 	}
+	record.Root.SessionID = "new-conversation"
+	if err := b.checkSquadDispatchActor(ctx, DispatchRequest{}, record, "terminal-a"); err != nil {
+		t.Fatalf("new Session on reused bound terminal: %v", err)
+	}
+	check(launch.ActorCapability, "terminal-a", "new-conversation", "session_actor_required")
 	pending, err := st.PrepareSquadLaunch(ctx, document)
 	if err != nil {
 		t.Fatal(err)
