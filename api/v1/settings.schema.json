@@ -20,6 +20,10 @@
           "description": "Where the file is, whether or not it exists.",
           "type": "string"
         },
+        "quick_tunnel_retired": {
+          "description": "True while the file still holds `remote_tunnel: \"quick\"`, the address under trycloudflare.com that was removed. It is reported as `off` and starts nothing; the settings page explains once, and writing `remote_tunnel` clears it.",
+          "type": "boolean"
+        },
         "hotkey": {
           "description": "The file's `hotkey`, or null when the file does not carry one as a string. Null means the default, option+space, which the Swift app used to own and no longer does; an empty string means the person asked for none, and registers nothing.",
           "nullable": true,
@@ -161,7 +165,7 @@
           "type": "boolean"
         },
         "remote_tunnel": {
-          "description": "`off`, `quick` or `named`.",
+          "description": "`off` or `named`. A file that still holds the removed `quick` reads as `off`.",
           "nullable": true,
           "type": "string"
         },
@@ -416,7 +420,7 @@
           "type": "boolean"
         },
         "remote_tunnel": {
-          "description": "`off`, `quick` or `named`.",
+          "description": "`off` or `named`. A file that still holds the removed `quick` reads as `off`.",
           "nullable": true,
           "type": "string"
         },

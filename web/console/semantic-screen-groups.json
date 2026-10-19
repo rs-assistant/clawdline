@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "englishContentKeys": 6880,
-  "riskKeys": 3134,
+  "englishContentKeys": 6881,
+  "riskKeys": 3135,
   "nonRiskCount": 3746,
   "groups": [
     {
@@ -3661,7 +3661,7 @@
         "settings.settingsTunnel",
         "settings.settingsTunnelHostname",
         "settings.settingsTunnelNamed",
-        "settings.settingsTunnelQuick",
+        "settings.settingsTunnelQuickRetiredDone",
         "settings.settingsVoice",
         "settings.settingsVoiceLanguage",
         "settings.settingsVoiceLanguageFollow",

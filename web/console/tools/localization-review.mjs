@@ -320,7 +320,7 @@ export async function serveReview(options) {
         if (path === '/v1/cloud/status') return json(response, 200, { enabled: false, configured: false, commands: false, terminal_direct: false,
           state: 'off', connects: 0, reconnects: 0, published: 0, acked: 0, publish_errors: 0, inbound_total: 0, answered: 0, refused: 0,
           queue_refused: 0, queue_unanswered: 0, roster_readable: true, pinned_readable: true, devices: [], pairing: { phase: 'idle' } })
-        if (path === '/v1/tunnel') return json(response, 200, { at: 1768478400, changed: 1768478400, config: '/synthetic/review/tunnel.yml', installed: false, mode: 'quick', state: 'off' })
+        if (path === '/v1/tunnel') return json(response, 200, { at: 1768478400, changed: 1768478400, config: '/synthetic/review/tunnel.yml', installed: false, mode: 'off', state: 'off' })
         if (path === '/v1/machine/usage') return json(response, 200, { at: 1768478400, cores: 4, cpu_percent: 12, interval_ms: 1000,
           load: [.2, .3, .4], memory_total_bytes: 8589934592, memory_used_bytes: 2147483648, memory_available_bytes: 6442450944,
           swap_total_bytes: 0, swap_used_bytes: 0, groups: [], others: [] })

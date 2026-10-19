@@ -115,8 +115,8 @@ type gate struct {
 	// err is why the gate could not open. Every route behind it is then
 	// refused; an unreadable device file is never an empty one.
 	err error
-	// hostname is `remote_hostname` from this app's config.json: the one name
-	// besides loopback and a quick tunnel that the Host check accepts. The
+	// hostname is `remote_hostname` from this app's config.json: the named
+	// tunnel's name, which the Host check accepts besides loopback. The
 	// Origin check follows the Host that passed. It is read when the daemon
 	// starts and again every time the tunnel is applied (tunnel.go), through
 	// the same reading the tunnel's own ingress is written from, so a named
@@ -215,8 +215,8 @@ func openGate(cfg config.Config) *gate {
 }
 
 // setHostname takes `remote_hostname` as the file has it. A value that is not
-// a hostname admits no name at all: the Host check then answers loopback and
-// quick tunnels only, which is what an unreadable setting should open.
+// a hostname admits no name at all: the Host check then answers loopback
+// only, which is what an unreadable setting should open.
 func (g *gate) setHostname(raw string) {
 	h, ok := tunnel.Hostname(raw)
 	if !ok {
@@ -615,10 +615,10 @@ func isCrossSiteSubresource(h http.Header) bool {
 
 // isAllowedHost is the DNS-rebinding defence: rebinding changes what a name
 // resolves to, never the Host header, so a Host this daemon does not answer
-// to is refused before anything else is looked at. A quick tunnel's name is
-// generated per run, so its whole suffix is allowed; rebinding needs the
-// attacker to control that DNS answer, and those answers are Cloudflare's.
-// The Tailscale name is matched exactly, and is "" while remote access is off.
+// to is refused before anything else is looked at. Every name besides
+// loopback is matched exactly: the named tunnel's, and the Tailscale name,
+// which is "" while remote access is off. No suffix is allowed — the quick
+// tunnel's `*.trycloudflare.com` went with it on 2026-10-19.
 func isAllowedHost(header, hostname, tailscale string) bool {
 	host := hostOnly(header)
 	if host == "" {
@@ -631,10 +631,7 @@ func isAllowedHost(header, hostname, tailscale string) bool {
 	if hostname != "" && host == hostname {
 		return true
 	}
-	if tailscale != "" && host == tailscale {
-		return true
-	}
-	return strings.HasSuffix(host, ".trycloudflare.com")
+	return tailscale != "" && host == tailscale
 }
 
 // hostOnly is a Host header's name, lowercase, without its port or IPv6

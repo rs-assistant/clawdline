@@ -496,8 +496,10 @@ var Settables = []Settable{
 	{Name: "voice_settle_seconds", Kind: "number", Min: 0, Max: 30},
 	{Name: "voice_stop_seconds", Kind: "number", Min: 0, Max: 300},
 	{Name: "remote", Kind: "bool"},
-	{Name: "remote_tunnel", Kind: "string", Choices: []string{"off", "quick", "named"},
-		Refusal: "invalid_tunnel", Because: "off, quick or named"},
+	// `quick` was removed on 2026-10-19; a file that still holds it reads as
+	// off (tunnel.ParseMode) and the route no longer accepts it.
+	{Name: "remote_tunnel", Kind: "string", Choices: []string{"off", "named"},
+		Refusal: "invalid_tunnel", Because: "off or named"},
 	{Name: "remote_hostname", Kind: "string", Check: ValidHostname, Refusal: "invalid_hostname",
 		Because: "a hostname, or empty"},
 	// The address Tailscale Serve answers on for this machine

@@ -7444,7 +7444,7 @@ export interface SettingsRequest {
   remote_hostname: string | null
 
   /**
-   * `off`, `quick` or `named`.
+   * `off` or `named`. A file that still holds the removed `quick` reads as `off`.
    */
   remote_tunnel: string | null
 
@@ -7751,6 +7751,13 @@ export interface SettingsSnapshot {
   push_on_waiting: boolean | null
 
   /**
+   * True while the file still holds `remote_tunnel: "quick"`, the address under
+   * trycloudflare.com that was removed. It is reported as `off` and starts nothing;
+   * the settings page explains once, and writing `remote_tunnel` clears it.
+   */
+  quick_tunnel_retired?: boolean
+
+  /**
    * Whether anything but this Mac may read the session list.
    */
   remote: boolean | null
@@ -7761,7 +7768,7 @@ export interface SettingsSnapshot {
   remote_hostname: string | null
 
   /**
-   * `off`, `quick` or `named`.
+   * `off` or `named`. A file that still holds the removed `quick` reads as `off`.
    */
   remote_tunnel: string | null
 
@@ -9183,15 +9190,15 @@ export interface TranscriptUnread {
 }
 
 /**
- * `off`; `quick`, an address made up per run under trycloudflare.com; `named`, the
- * person's own tunnel (`remote_tunnel_name`) and hostname (`remote_hostname`).
+ * `off`, or `named`: the person's own tunnel (`remote_tunnel_name`) and hostname
+ * (`remote_hostname`). A settings file that still holds the removed `quick` reads
+ * as `off`.
  */
 export type TunnelMode =
     "off"
-  | "quick"
   | "named"
 
-export const TunnelModeValues: readonly TunnelMode[] = ["off", "quick", "named"] as const
+export const TunnelModeValues: readonly TunnelMode[] = ["off", "named"] as const
 
 /**
  * `off`; `starting`, launched or waiting to retry and not yet registered with the

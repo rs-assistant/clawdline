@@ -17,6 +17,9 @@ const ownWords = {
     settingsTailscaleHint:
       "When this machine and your phone are on the same tailnet, run tailscale serve --bg 7727 on this machine and enter its full name here, such as my-machine.your-tailnet.ts.net. It answers only while the switch above is on, and a device still pairs before it sees anything. Serve stays private to your tailnet; Funnel would make the address public, so do not use it.",
     settingsTunnel: "Connect to this machine from anywhere",
+    settingsTunnelQuickRetired:
+      "The automatically generated URL is no longer offered, so this machine stopped opening it. To reach this machine from your phone, use Tailscale Serve (the Tailscale address above) or Clawdline Cloud; your own domain still works below.",
+    settingsTunnelQuickRetiredDone: "Got it",
     settingsTunnelHint:
       "cloudflared connects outward from this machine — no port forwarding, and nothing listens on your network. It starts only after a device has been paired, because behind the tunnel are every repository name and work title on this machine.",
     settingsRemoteWriteHint:
@@ -112,6 +115,9 @@ const ownWords = {
     settingsTailscaleHint:
       "這台機器和手機在同一個 tailnet 時，在這台機器上執行 tailscale serve --bg 7727，再把它的完整名稱填在這裡，例如 my-machine.your-tailnet.ts.net。只有上面的開關打開時才會回應，裝置也一樣要先配對才看得到東西。Serve 只在你的 tailnet 裡看得到；Funnel 會把位址公開到網路上，不要用它。",
     settingsTunnel: "從任何地方連到這台機器",
+    settingsTunnelQuickRetired:
+      "「自動產生的網址」已經不再提供，這台機器也不會再開啟它。要從手機連回這台機器，請改用 Tailscale Serve（上面的 Tailscale 位址）或 Clawdline Cloud；下面「我自己的網域」仍可使用。",
+    settingsTunnelQuickRetiredDone: "知道了",
     settingsTunnelHint:
       "透過 cloudflared 從這台機器往外連出去——不必開通訊埠轉發，你的網路上也沒有東西在聽。要先配對過一台裝置它才會啟動，因為通道後面就是這台機器上每一個儲存庫名稱、每一個工作標題。",
     settingsRemoteWriteHint:
@@ -270,9 +276,10 @@ const baseW = {
   settingsRemoteServe: "讓瀏覽器或你的手機看得到你的 session",
   settingsRemoteHint: ownWord("settingsRemoteHint"),
   settingsTunnel: ownWord("settingsTunnel"),
+  settingsTunnelQuickRetired: ownWord("settingsTunnelQuickRetired"),
+  settingsTunnelQuickRetiredDone: ownWord("settingsTunnelQuickRetiredDone"),
   settingsTailscaleHostname: ownWord("settingsTailscaleHostname"),
   settingsTailscaleHint: ownWord("settingsTailscaleHint"),
-  settingsTunnelQuick: "自動產生的網址",
   settingsTunnelNamed: "我自己的網域",
   settingsTunnelHostname: "主機名稱",
   settingsTunnelHint: ownWord("settingsTunnelHint"),

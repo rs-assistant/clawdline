@@ -14,6 +14,7 @@ import (
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
 	"github.com/sainteye/clawdline/internal/adapters/terminal"
 	"github.com/sainteye/clawdline/internal/adapters/transcript"
+	"github.com/sainteye/clawdline/internal/adapters/tunnel"
 	"github.com/sainteye/clawdline/internal/contract"
 )
 
@@ -516,6 +517,14 @@ func settingsSnapshot(f *nextconfig.File, v nextconfig.Values) settingsSnapshotW
 			// A half-decoded slice is worse than an absent one.
 			field.SetZero()
 		}
+	}
+	// A file from before the quick tunnel was removed still says `quick`.
+	// It starts nothing (tunnel.ParseMode) and reads as off here, so the
+	// settings page picks a choice it has; the flag lets it say why once.
+	if stored, ok := v.String("remote_tunnel"); ok && tunnel.Retired(stored) {
+		off := string(tunnel.Off)
+		out.RemoteTunnel = &off
+		out.QuickTunnelRetired = true
 	}
 	return out
 }

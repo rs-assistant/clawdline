@@ -4107,7 +4107,6 @@
   "settings.settingsTunnelHint": "cloudflared establece una conexión saliente desde esta máquina: no hace falta redirigir puertos y nada queda escuchando en tu red. Solo empieza después de emparejar un dispositivo, porque tras el túnel están los nombres de todos los repositorios y títulos de trabajo de esta máquina.",
   "settings.settingsTunnelHostname": "Nombre de host",
   "settings.settingsTunnelNamed": "Mi propio dominio",
-  "settings.settingsTunnelQuick": "URL generada automáticamente",
   "settings.settingsVoice": "Entrada de voz",
   "settings.settingsVoiceLanguage": "Idioma de reconocimiento",
   "settings.settingsVoiceLanguageFollow": "Seguir Clawdline",

@@ -1192,12 +1192,19 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
               value={String(now("remote_tunnel"))}
               options={[
                 { label: W.settingsOff, value: "off" },
-                { label: W.settingsTunnelQuick, value: "quick" },
                 { label: W.settingsTunnelNamed, value: "named" },
               ]}
               onPick={pick("remote_tunnel")}
             />
           </Row>
+          {snapshot?.quick_tunnel_retired ? (
+            <Block>
+              {/* Shown until the tunnel setting is written once: the file still
+                  says `quick`, which now starts nothing and reads as off. */}
+              <Note dot="warn">{W.settingsTunnelQuickRetired}</Note>
+              <Chip onClick={() => void change({ remote_tunnel: "off" })}>{W.settingsTunnelQuickRetiredDone}</Chip>
+            </Block>
+          ) : null}
           <Row label={W.settingsTunnelHostname}>
             <MemoField
               label={W.settingsTunnelHostname}

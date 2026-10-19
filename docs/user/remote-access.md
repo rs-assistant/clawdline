@@ -10,7 +10,7 @@ Your agents and code stay on your machine whichever way you choose.
 | --- | --- | --- | --- | --- |
 | A. SSH port forward | None | Another computer you can SSH from | Read and send | Works |
 | B. Tailscale Serve | A Tailscale account, signed in on both ends | Devices on your own tailnet, including a phone | Read and send after pairing | Built; real-device verification pending |
-| C. Your own cloudflared tunnel | None | Any browser, including a phone | Read and send after pairing | Built; the real Cloudflare leg has not been tested end to end |
+| C. Your own cloudflared tunnel | Cloudflare, with your own domain | Any browser, including a phone | Read and send after pairing | Built; the real Cloudflare leg has not been tested end to end |
 | D. Clawdline Cloud | Clawdline account (GitHub sign-in) | Any browser, including a phone; several machines | Read and act on paired machines while their Cloud commands are on | Preview |
 
 The daemon itself listens on `127.0.0.1` only. None of these opens a port on your network.
@@ -78,7 +78,13 @@ address to the whole internet; it is not recommended, and nothing in Clawdline n
 **Tailscale address**; revoke the phone (see
 [Signed-in devices](#see-and-revoke-devices-signed-in-directly)).
 
-## C. A phone, through your own cloudflared tunnel
+## C. A phone, through your own cloudflared tunnel on your own domain
+
+This needs a Cloudflare account, a domain on it, and a named tunnel you created with
+`cloudflared tunnel create`. The automatically generated `trycloudflare.com` address is no longer
+offered: a settings file that still names it (`"remote_tunnel": "quick"`) starts no tunnel and
+reads as **Off**, and the settings page says so once. Use Tailscale Serve (B) or Clawdline Cloud
+(D) instead.
 
 You need [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
 installed on the machine. The daemon starts and stops it itself, and only when all three hold:
@@ -86,21 +92,21 @@ installed on the machine. The daemon starts and stops it itself, and only when a
 1. **At least one device is already paired.** A browser signed in with `clawdline open` counts.
    Otherwise the tunnel would lead only to a locked door.
 2. **Remote access is on**: **Let a browser or your phone view your sessions**.
-3. **The tunnel is on**: **Connect to this machine from anywhere**, set to
-   **Automatically generated URL** or **My own domain**
-   (a named tunnel on your own domain, with its **Hostname**).
+3. **The tunnel is on**: **Connect to this machine from anywhere**, set to **My own domain**
+   (the named tunnel on your own domain, with its **Hostname**).
 
 On a Mac, both switches are on the **Remote** tab of the macOS app's settings window. Without
 the app, set them in `config.json` in the state directory and restart `serve`:
 
 ```json
-{ "remote": true, "remote_tunnel": "quick" }
+{ "remote": true, "remote_tunnel": "named", "remote_tunnel_name": "clawdline",
+  "remote_hostname": "clawdline.example.com" }
 ```
 
 Then:
 
 ```sh
-./bin/clawdline tunnel                # state, mode and the public address
+./bin/clawdline tunnel                # state, mode and the address
 ./bin/clawdline pair --watch          # leave running: shows a code when a device asks
 ```
 
