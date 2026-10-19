@@ -278,12 +278,12 @@
 .adm-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
 .adm-field { display: grid; gap: 6px; align-content: start; min-width: 0; }
 .adm-field label { font-size: 13px; font-weight: 580; }
-.adm-field input {
+.adm-field input, .adm-field select {
   min-height: 42px; width: 100%; box-sizing: border-box; padding: 0 12px;
   border-radius: 9px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
   font: inherit; font-size: 15px; color-scheme: dark;
 }
-.adm-field input:disabled { color: var(--dim); }
+.adm-field input:disabled, .adm-field select:disabled { color: var(--dim); }
 .adm-field-bad input { border-color: var(--bad); }
 .adm-field-hint { margin: 0; color: var(--dim); font-size: 12.5px; line-height: 1.45; }
 .adm-field-error { margin: 0; color: var(--ink); font-size: 12.5px; font-weight: 560; }

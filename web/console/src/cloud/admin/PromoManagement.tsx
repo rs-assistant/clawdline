@@ -381,7 +381,7 @@ function CreateCampaign({ apiOrigin, say, onCancel, onCreated, onLostAccess }: {
   const id = useId()
   const [draft, setDraft] = useState<CampaignDraft>(() => {
     const now = Date.now()
-    return { name: "", notBefore: localInput(now), expiresAt: localInput(now + 30 * 86_400_000), redemptionLimit: "100" }
+    return { name: "", notBefore: localInput(now), expiresAt: localInput(now + 30 * 86_400_000), redemptionLimit: "100", durationCalendarMonths: "3" }
   })
   const [showProblems, setShowProblems] = useState(false)
   const [state, setState] = useState<Mutation>({ kind: "idle" })
@@ -420,7 +420,7 @@ function CreateCampaign({ apiOrigin, say, onCancel, onCreated, onLostAccess }: {
     setState({ kind: "error", code: result.kind === "no_access" ? "no_access" : result.code })
   }
 
-  const field = (name: keyof CampaignDraft, label: string, input: React.ReactNode, hint?: string) => {
+  const field = (name: "name" | "notBefore" | "expiresAt" | "redemptionLimit", label: string, input: React.ReactNode, hint?: string) => {
     const problem = problems[name]
     return (
       <div className={problem ? "adm-field adm-field-bad" : "adm-field"}>
@@ -431,7 +431,7 @@ function CreateCampaign({ apiOrigin, say, onCancel, onCreated, onLostAccess }: {
       </div>
     )
   }
-  const describe = (name: keyof CampaignDraft, hint: boolean) =>
+  const describe = (name: "name" | "notBefore" | "expiresAt" | "redemptionLimit", hint: boolean) =>
     [hint ? id + name + "h" : "", problems[name] ? id + name + "e" : ""].filter(Boolean).join(" ") || undefined
   const preview = (value: string) => {
     const ms = Date.parse(value)
@@ -452,6 +452,14 @@ function CreateCampaign({ apiOrigin, say, onCancel, onCreated, onLostAccess }: {
           <input id={id + "redemptionLimit"} type="number" inputMode="numeric" min={1} step={1} value={draft.redemptionLimit} onChange={edit("redemptionLimit")}
             aria-invalid={problems.redemptionLimit ? true : undefined} aria-describedby={describe("redemptionLimit", true)} disabled={busy} />
         ), say("createLimitHint"))}
+        <div className="adm-field">
+          <label htmlFor={id + "durationCalendarMonths"}>{say("createDuration")}</label>
+          <select id={id + "durationCalendarMonths"} value={draft.durationCalendarMonths} disabled={busy}
+            onChange={(event) => { intent.reset(); setDraft((d) => ({ ...d, durationCalendarMonths: event.target.value as "3" | "12" })) }}>
+            <option value="3">{say("createDurationThree")}</option>
+            <option value="12">{say("createDurationYear")}</option>
+          </select>
+        </div>
         {field("notBefore", say("createStart"), (
           <input id={id + "notBefore"} type="datetime-local" value={draft.notBefore} onChange={edit("notBefore")}
             aria-invalid={problems.notBefore ? true : undefined} aria-describedby={describe("notBefore", true)} disabled={busy} />
