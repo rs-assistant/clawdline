@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- Node runs source tests with type stripping.
-import { compactValue, comparisonComplete, dailyValue, lineSegments, percentageChange, selectedDay, shortDate, UsageRequestScope } from "./model.ts"
+import { compactValue, dateRange, comparisonComplete, dailyValue, lineSegments, percentageChange, selectedDay, shortDate, UsageRequestScope } from "./model.ts"
 // @ts-expect-error -- Node runs source tests with type stripping.
 import { readUsageOverview, UsageReadError, type UsageOverview, type UsageOverviewDay } from "./api.ts"
 
@@ -87,4 +87,12 @@ test("overview fetch carries real filters, caller cancellation and flat offline 
     assert.deepEqual(result.project_options, [])
     assert.deepEqual(result.daily, [])
   } finally { globalThis.fetch = original }
+})
+
+test("large totals use billions and calendar ranges preserve year boundaries", () => {
+ assert.equal(compactValue(2_889_100_000), "2.9B")
+ assert.equal(compactValue(1_000_000_000), "1B")
+ assert.equal(compactValue(950_000_000), "950M")
+ assert.equal(dateRange("2026-10-12", "2026-10-18"), "2026-10-12 – 10-18")
+ assert.equal(dateRange("2026-12-25", "2027-01-01"), "2026-12-25 – 2027-01-01")
 })

@@ -36,6 +36,7 @@ export function percentageChange(current: number | null, previous: number | null
 
 export function compactValue(value: number | null): string {
   if (value === null) return "—"
+  if (value >= 1_000_000_000) return `${Number((value / 1_000_000_000).toFixed(1))}B`
   if (value >= 1_000_000) return `${Number((value / 1_000_000).toFixed(1))}M`
   if (value >= 1_000) return `${Number((value / 1_000).toFixed(1))}K`
   return Number(value.toFixed(1)).toLocaleString()
@@ -56,4 +57,10 @@ export class UsageRequestScope {
   begin(): AbortSignal { this.cancel(); this.controller = new AbortController(); return this.controller.signal }
   cancel(): void { this.controller?.abort(); this.controller = null }
   current(signal: AbortSignal): boolean { return signal === this.controller?.signal && !signal.aborted }
+}
+
+/** Keep calendar endpoints explicit, repeating the year only across a year boundary. */
+export function dateRange(first: string | undefined, last: string | undefined): string {
+  if (!first || !last) return first ?? last ?? ""
+  return `${first} – ${first.slice(0, 4) === last.slice(0, 4) ? last.slice(5) : last}`
 }

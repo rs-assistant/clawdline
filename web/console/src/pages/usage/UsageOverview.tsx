@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react"
 import { onMachineChanged } from "../../cloud/machine-switch.js"
 import { scheduleFleet } from "../../cloud/schedule-machines.js"
 import { readUsageOverview, UsageReadError, type UsageOverview } from "./api.js"
-import { compactValue, comparisonComplete, dailyValue, lineSegments, percentageChange, selectedDay, shortDate, UsageRequestScope, type UsageMetric } from "./model.js"
+import { compactValue, dateRange, comparisonComplete, dailyValue, lineSegments, percentageChange, selectedDay, shortDate, UsageRequestScope, type UsageMetric } from "./model.js"
 import { usageWord as w } from "./words.js"
 import "./usage.css"
 
@@ -54,11 +54,12 @@ export default function UsageOverviewPage({ shown }: { shown: boolean }) {
   const machine = fleet?.machines.find(m => m.id === fleet.current)?.name ?? w("usageThisMachine")
   return <section id="usage" className="page board-page usage-page" data-page-view="usage" hidden={!shown} aria-labelledby="usage-title">
     <div className="usage-wrap">
-      <header className="usage-header"><div><h1 id="usage-title" tabIndex={-1} ref={title}>{w("usageOverview")}</h1>
-        <div className="usage-metadata">{data && <span>{data.daily[0]?.date}–{data.daily.at(-1)?.date} · {data.timezone}</span>}<span>{machine}</span></div>
-      </div><div className="usage-filters">
-        <button type="button" aria-label={w("usageRefresh")} title={w("usageRefresh")} onClick={() => setRevision(n => n + 1)}>↻</button>
-        <label>{w("usageProject")}<select value={project} onChange={event => { scope.current.cancel(); setRead({ state: "loading" }); setProject(event.target.value) }}>
+      <header className="usage-header"><div className="usage-heading"><div className="usage-title-block"><h1 id="usage-title" tabIndex={-1} ref={title}>{w("usageOverview")}</h1>
+        <div className="usage-metadata">{data && <span>{dateRange(data.daily[0]?.date, data.daily.at(-1)?.date)} · {data.timezone}</span>}<span className="usage-machine">{machine}</span></div>
+      </div>
+        <button className="usage-refresh" type="button" aria-label={w("usageRefresh")} title={w("usageRefresh")} onClick={() => setRevision(n => n + 1)}>↻</button></div>
+      <div className="usage-filters">
+        <label className="usage-project-filter"><span className="usage-filter-label">{w("usageProject")}</span><select value={project} onChange={event => { scope.current.cancel(); setRead({ state: "loading" }); setProject(event.target.value) }}>
           <option value="">{w("usageAllProjects")}</option>
           {options.map(option => <option key={option.id} value={option.id}>{option.id === "unattributed" ? w("usageUnattributed") : option.name}</option>)}
         </select></label>
