@@ -141,7 +141,9 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
     rows: sessions.map((row: Record<string, unknown> | null) => {
       const status = record(row!.status)!
       const ownerConversation = record(status.epic_parent)?.owner_session_id
-      const parentSessionID = typeof ownerConversation === "string" ? byConversation.get(ownerConversation) : null
+      const listedParent = typeof status.parent_session_id === "string" && ids.includes(status.parent_session_id) &&
+        status.parent_session_id !== row!.id ? status.parent_session_id : null
+      const parentSessionID = listedParent ?? (typeof ownerConversation === "string" ? byConversation.get(ownerConversation) : null)
       const before = known.get(String(row!.id) + "\u0000" + String(row!.execution_generation))
       const menu = record(status.menu)
       const options = menu?.options
