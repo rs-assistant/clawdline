@@ -1,0 +1,6442 @@
+{
+  "raw": {
+    "combined": [
+      {
+        "round": 1,
+        "ViewerWSBytes": 0,
+        "scenario": "initial_idle",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 0,
+        "Connections": 1,
+        "Acks": 0,
+        "Retries": 0,
+        "Deliveries": 0,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 0,
+        "EnvelopeBytes": 0,
+        "CiphertextBytes": 0,
+        "PlaintextBytes": 0,
+        "AckWSBytes": 0,
+        "InitNS": 2057792,
+        "IdleNS": 201282625,
+        "IdleCPUNS": 288000,
+        "ProcessCPUNS": 1000,
+        "WallNS": 1875,
+        "P50NS": 0,
+        "P95NS": 0,
+        "SealP50NS": 0,
+        "SealP95NS": 0,
+        "OpenP50NS": 0,
+        "OpenP95NS": 0,
+        "LatencyNS": null,
+        "SealNS": null,
+        "OpenNS": null
+      },
+      {
+        "round": 1,
+        "ViewerWSBytes": 21290,
+        "scenario": "active_one",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 12,
+        "Connections": 1,
+        "Acks": 12,
+        "Retries": 0,
+        "Deliveries": 12,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 21326,
+        "EnvelopeBytes": 20870,
+        "CiphertextBytes": 13480,
+        "PlaintextBytes": 13288,
+        "AckWSBytes": 938,
+        "InitNS": 1030000,
+        "IdleNS": 201052459,
+        "IdleCPUNS": 200000,
+        "ProcessCPUNS": 10602000,
+        "WallNS": 1201193750,
+        "P50NS": 99854333,
+        "P95NS": 101451417,
+        "SealP50NS": 120167,
+        "SealP95NS": 288875,
+        "OpenP50NS": 185125,
+        "OpenP95NS": 292542,
+        "LatencyNS": [
+          101451417,
+          98105459,
+          101406458,
+          99838584,
+          99854333,
+          100498750,
+          99901417,
+          98399000,
+          100562500,
+          101201375,
+          99847125,
+          99758500
+        ],
+        "SealNS": [
+          288875,
+          71917,
+          118083,
+          120167,
+          205000,
+          146125,
+          133708,
+          149375,
+          107583,
+          66583,
+          121417,
+          79500
+        ],
+        "OpenNS": [
+          292542,
+          175417,
+          94458,
+          190375,
+          185125,
+          178250,
+          205542,
+          175583,
+          90917,
+          191208,
+          202333,
+          186458
+        ]
+      },
+      {
+        "round": 1,
+        "ViewerWSBytes": 56790,
+        "scenario": "active_multi_session",
+        "Sessions": 16,
+        "Viewers": 1,
+        "Operations": 32,
+        "Connections": 1,
+        "Acks": 32,
+        "Retries": 0,
+        "Deliveries": 32,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 56886,
+        "EnvelopeBytes": 55670,
+        "CiphertextBytes": 35980,
+        "PlaintextBytes": 35468,
+        "AckWSBytes": 2518,
+        "InitNS": 1030167,
+        "IdleNS": 200270875,
+        "IdleCPUNS": 193000,
+        "ProcessCPUNS": 35670000,
+        "WallNS": 3102208000,
+        "P50NS": 99927166,
+        "P95NS": 101647583,
+        "SealP50NS": 119208,
+        "SealP95NS": 704583,
+        "OpenP50NS": 182292,
+        "OpenP95NS": 305625,
+        "LatencyNS": [
+          2547209,
+          99211917,
+          100241375,
+          99850625,
+          99692334,
+          100121667,
+          99225458,
+          102124375,
+          98149333,
+          99557625,
+          100874333,
+          98940167,
+          101239667,
+          98926708,
+          99927166,
+          99828583,
+          101211583,
+          98170708,
+          101647583,
+          99971250,
+          99483083,
+          100758667,
+          98869792,
+          100085750,
+          100767042,
+          99655834,
+          100192750,
+          100311708,
+          100059791,
+          99106000,
+          100519750,
+          99948458
+        ],
+        "SealNS": [
+          147000,
+          129167,
+          704583,
+          118166,
+          74375,
+          193333,
+          118333,
+          110875,
+          72875,
+          91209,
+          1061083,
+          74125,
+          77709,
+          143917,
+          113708,
+          123250,
+          102417,
+          72833,
+          110291,
+          69042,
+          119208,
+          63584,
+          119875,
+          114917,
+          129833,
+          127417,
+          141583,
+          653417,
+          264333,
+          152000,
+          166792,
+          277541
+        ],
+        "OpenNS": [
+          219875,
+          191958,
+          92042,
+          91666,
+          240958,
+          245250,
+          204083,
+          179375,
+          110917,
+          945167,
+          98000,
+          77958,
+          185458,
+          177542,
+          173084,
+          174791,
+          108917,
+          88584,
+          120250,
+          95750,
+          255458,
+          295792,
+          182292,
+          225792,
+          169333,
+          204375,
+          185875,
+          214500,
+          305625,
+          227583,
+          226333,
+          178542
+        ]
+      },
+      {
+        "round": 1,
+        "ViewerWSBytes": 113560,
+        "scenario": "independent_viewers",
+        "Sessions": 4,
+        "Viewers": 4,
+        "Operations": 16,
+        "Connections": 1,
+        "Acks": 16,
+        "Retries": 0,
+        "Deliveries": 64,
+        "HTTPHandshakeBytes": 1563,
+        "PublishWSBytes": 28438,
+        "EnvelopeBytes": 27830,
+        "CiphertextBytes": 17980,
+        "PlaintextBytes": 17724,
+        "AckWSBytes": 1254,
+        "InitNS": 947334,
+        "IdleNS": 201065333,
+        "IdleCPUNS": 201000,
+        "ProcessCPUNS": 32326000,
+        "WallNS": 1602339208,
+        "P50NS": 100039500,
+        "P95NS": 127270583,
+        "SealP50NS": 136292,
+        "SealP95NS": 1455542,
+        "OpenP50NS": 187917,
+        "OpenP95NS": 512250,
+        "LatencyNS": [
+          101701958,
+          99533584,
+          99802208,
+          100562500,
+          99832959,
+          100070792,
+          98740209,
+          100751792,
+          100091125,
+          127270583,
+          72899292,
+          100039500,
+          99376083,
+          99471834,
+          100936667,
+          100424208
+        ],
+        "SealNS": [
+          211500,
+          128292,
+          113458,
+          112709,
+          126709,
+          1455542,
+          144917,
+          136292,
+          126333,
+          75041,
+          206333,
+          671125,
+          137125,
+          142000,
+          178958,
+          121833
+        ],
+        "OpenNS": [
+          225875,
+          310292,
+          348458,
+          321666,
+          175459,
+          167833,
+          223208,
+          240416,
+          207833,
+          170584,
+          162750,
+          167042,
+          166458,
+          193958,
+          319250,
+          158417,
+          177958,
+          166083,
+          144291,
+          512250,
+          199042,
+          213375,
+          280208,
+          145292,
+          299958,
+          350875,
+          158542,
+          318292,
+          167041,
+          183167,
+          172333,
+          175417,
+          148792,
+          141542,
+          177667,
+          124500,
+          84375,
+          80459,
+          65291,
+          218584,
+          197708,
+          265000,
+          204125,
+          183459,
+          187917,
+          203083,
+          245292,
+          151541,
+          173500,
+          161000,
+          208083,
+          149708,
+          199125,
+          196750,
+          229250,
+          189083,
+          172334,
+          1145667,
+          1186625,
+          1293917,
+          172291,
+          232042,
+          221833,
+          146250
+        ]
+      },
+      {
+        "round": 1,
+        "ViewerWSBytes": 23064,
+        "scenario": "reconnect_unacked",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 12,
+        "Connections": 2,
+        "Acks": 12,
+        "Retries": 1,
+        "Deliveries": 12,
+        "HTTPHandshakeBytes": 991,
+        "PublishWSBytes": 23103,
+        "EnvelopeBytes": 22609,
+        "CiphertextBytes": 14603,
+        "PlaintextBytes": 13288,
+        "AckWSBytes": 938,
+        "InitNS": 1021125,
+        "IdleNS": 200789625,
+        "IdleCPUNS": 230000,
+        "ProcessCPUNS": 12716000,
+        "WallNS": 1455520292,
+        "P50NS": 100251583,
+        "P95NS": 352768083,
+        "SealP50NS": 129375,
+        "SealP95NS": 164625,
+        "OpenP50NS": 192542,
+        "OpenP95NS": 226417,
+        "LatencyNS": [
+          352768083,
+          100822542,
+          101026959,
+          100264167,
+          98803042,
+          100484000,
+          100153125,
+          100166916,
+          100251583,
+          100104875,
+          99304250,
+          100961000
+        ],
+        "SealNS": [
+          164625,
+          107708,
+          115500,
+          122417,
+          151083,
+          57792,
+          131416,
+          145625,
+          130375,
+          129375,
+          143250,
+          78500
+        ],
+        "OpenNS": [
+          110834,
+          174042,
+          224875,
+          207417,
+          202834,
+          75791,
+          188416,
+          209542,
+          226417,
+          220667,
+          192542,
+          104916,
+          184000
+        ]
+      },
+      {
+        "round": 1,
+        "ViewerWSBytes": 21290,
+        "scenario": "ack_delay",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 12,
+        "Connections": 1,
+        "Acks": 12,
+        "Retries": 0,
+        "Deliveries": 12,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 21326,
+        "EnvelopeBytes": 20870,
+        "CiphertextBytes": 13480,
+        "PlaintextBytes": 13288,
+        "AckWSBytes": 938,
+        "InitNS": 1103958,
+        "IdleNS": 200313458,
+        "IdleCPUNS": 132000,
+        "ProcessCPUNS": 19824000,
+        "WallNS": 1227348333,
+        "P50NS": 100068209,
+        "P95NS": 126136375,
+        "SealP50NS": 154125,
+        "SealP95NS": 475000,
+        "OpenP50NS": 193875,
+        "OpenP95NS": 385875,
+        "LatencyNS": [
+          126136375,
+          100068209,
+          104191125,
+          95321000,
+          101598291,
+          99199875,
+          101466416,
+          98330834,
+          99476167,
+          100122875,
+          102699583,
+          98105833
+        ],
+        "SealNS": [
+          173917,
+          82042,
+          200417,
+          130292,
+          169916,
+          307250,
+          150375,
+          154125,
+          475000,
+          130333,
+          160250,
+          142125
+        ],
+        "OpenNS": [
+          139375,
+          231334,
+          385875,
+          215542,
+          183708,
+          200917,
+          343167,
+          190709,
+          182042,
+          193875,
+          191166,
+          333541
+        ]
+      },
+      {
+        "round": 2,
+        "ViewerWSBytes": 0,
+        "scenario": "initial_idle",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 0,
+        "Connections": 1,
+        "Acks": 0,
+        "Retries": 0,
+        "Deliveries": 0,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 0,
+        "EnvelopeBytes": 0,
+        "CiphertextBytes": 0,
+        "PlaintextBytes": 0,
+        "AckWSBytes": 0,
+        "InitNS": 1347959,
+        "IdleNS": 201032667,
+        "IdleCPUNS": 129000,
+        "ProcessCPUNS": 1000,
+        "WallNS": 1583,
+        "P50NS": 0,
+        "P95NS": 0,
+        "SealP50NS": 0,
+        "SealP95NS": 0,
+        "OpenP50NS": 0,
+        "OpenP95NS": 0,
+        "LatencyNS": null,
+        "SealNS": null,
+        "OpenNS": null
+      },
+      {
+        "round": 2,
+        "ViewerWSBytes": 21290,
+        "scenario": "active_one",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 12,
+        "Connections": 1,
+        "Acks": 12,
+        "Retries": 0,
+        "Deliveries": 12,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 21326,
+        "EnvelopeBytes": 20870,
+        "CiphertextBytes": 13480,
+        "PlaintextBytes": 13288,
+        "AckWSBytes": 938,
+        "InitNS": 1201417,
+        "IdleNS": 201044125,
+        "IdleCPUNS": 503000,
+        "ProcessCPUNS": 11242000,
+        "WallNS": 1200464291,
+        "P50NS": 99916833,
+        "P95NS": 101682416,
+        "SealP50NS": 138875,
+        "SealP95NS": 558834,
+        "OpenP50NS": 185833,
+        "OpenP95NS": 363917,
+        "LatencyNS": [
+          101682416,
+          99691375,
+          99916833,
+          99729958,
+          100513833,
+          98795583,
+          100965167,
+          100141709,
+          99589041,
+          100313458,
+          100401125,
+          98316667
+        ],
+        "SealNS": [
+          179125,
+          143250,
+          68250,
+          159708,
+          133708,
+          137083,
+          120417,
+          558834,
+          138875,
+          116583,
+          152208,
+          503292
+        ],
+        "OpenNS": [
+          227250,
+          92208,
+          239208,
+          183250,
+          181625,
+          171375,
+          185833,
+          329167,
+          215250,
+          363917,
+          336083,
+          169958
+        ]
+      },
+      {
+        "round": 2,
+        "ViewerWSBytes": 56790,
+        "scenario": "active_multi_session",
+        "Sessions": 16,
+        "Viewers": 1,
+        "Operations": 32,
+        "Connections": 1,
+        "Acks": 32,
+        "Retries": 0,
+        "Deliveries": 32,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 56886,
+        "EnvelopeBytes": 55670,
+        "CiphertextBytes": 35980,
+        "PlaintextBytes": 35468,
+        "AckWSBytes": 2518,
+        "InitNS": 1401958,
+        "IdleNS": 201035833,
+        "IdleCPUNS": 197000,
+        "ProcessCPUNS": 37136000,
+        "WallNS": 3201111292,
+        "P50NS": 99882959,
+        "P95NS": 101943208,
+        "SealP50NS": 132084,
+        "SealP95NS": 210792,
+        "OpenP50NS": 186125,
+        "OpenP95NS": 545500,
+        "LatencyNS": [
+          101413166,
+          98963667,
+          100002459,
+          100987791,
+          98388292,
+          101535000,
+          98765917,
+          103628083,
+          97750666,
+          99864250,
+          99683875,
+          100083542,
+          99110000,
+          100892000,
+          99882959,
+          99923250,
+          100056209,
+          100269709,
+          99704708,
+          99285917,
+          100607666,
+          99805417,
+          99393542,
+          100019583,
+          99933375,
+          101249875,
+          99061166,
+          99058292,
+          99052291,
+          101943208,
+          99220334,
+          100252959
+        ],
+        "SealNS": [
+          165625,
+          139917,
+          136167,
+          113416,
+          132875,
+          117333,
+          73875,
+          62542,
+          110333,
+          131084,
+          127709,
+          67459,
+          132084,
+          134500,
+          112584,
+          67000,
+          174250,
+          118834,
+          80708,
+          152417,
+          184916,
+          135375,
+          153875,
+          230000,
+          136458,
+          184083,
+          177250,
+          147334,
+          130375,
+          52666,
+          124167,
+          210792
+        ],
+        "OpenNS": [
+          224208,
+          190000,
+          178416,
+          190542,
+          178583,
+          94750,
+          77875,
+          2666875,
+          247417,
+          180125,
+          93708,
+          261083,
+          107250,
+          172584,
+          184125,
+          186084,
+          185000,
+          210750,
+          183333,
+          184458,
+          189208,
+          186125,
+          201958,
+          174833,
+          198583,
+          335042,
+          209625,
+          195000,
+          69500,
+          188834,
+          545500,
+          188667
+        ]
+      },
+      {
+        "round": 2,
+        "ViewerWSBytes": 113560,
+        "scenario": "independent_viewers",
+        "Sessions": 4,
+        "Viewers": 4,
+        "Operations": 16,
+        "Connections": 1,
+        "Acks": 16,
+        "Retries": 0,
+        "Deliveries": 64,
+        "HTTPHandshakeBytes": 1563,
+        "PublishWSBytes": 28438,
+        "EnvelopeBytes": 27830,
+        "CiphertextBytes": 17980,
+        "PlaintextBytes": 17724,
+        "AckWSBytes": 1254,
+        "InitNS": 1255292,
+        "IdleNS": 200129417,
+        "IdleCPUNS": 136000,
+        "ProcessCPUNS": 25682000,
+        "WallNS": 1602392542,
+        "P50NS": 100001583,
+        "P95NS": 102376916,
+        "SealP50NS": 121750,
+        "SealP95NS": 456916,
+        "OpenP50NS": 170334,
+        "OpenP95NS": 358417,
+        "LatencyNS": [
+          102376916,
+          101680833,
+          97157041,
+          101301417,
+          99984792,
+          99020125,
+          100735167,
+          99857583,
+          100019042,
+          99918750,
+          100140583,
+          100001583,
+          99745292,
+          99411583,
+          100529167,
+          100053500
+        ],
+        "SealNS": [
+          191625,
+          130125,
+          456916,
+          100667,
+          121750,
+          133083,
+          58333,
+          117792,
+          120542,
+          122042,
+          229291,
+          150500,
+          143042,
+          116875,
+          66500,
+          53250
+        ],
+        "OpenNS": [
+          196208,
+          212333,
+          192250,
+          199166,
+          193625,
+          178875,
+          299375,
+          185250,
+          167916,
+          162250,
+          169083,
+          170083,
+          342125,
+          329416,
+          143834,
+          489166,
+          181334,
+          332042,
+          500792,
+          496042,
+          69417,
+          73500,
+          75250,
+          81041,
+          169166,
+          170334,
+          160542,
+          146750,
+          180375,
+          175917,
+          199209,
+          358417,
+          274958,
+          157709,
+          147667,
+          164083,
+          171667,
+          170458,
+          213125,
+          189750,
+          191292,
+          179834,
+          145833,
+          157167,
+          185625,
+          199250,
+          189167,
+          152000,
+          174000,
+          164083,
+          138583,
+          138875,
+          65833,
+          68041,
+          71458,
+          76750,
+          75791,
+          79000,
+          72000,
+          82166,
+          214250,
+          206833,
+          168541,
+          146375
+        ]
+      },
+      {
+        "round": 2,
+        "ViewerWSBytes": 23064,
+        "scenario": "reconnect_unacked",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 12,
+        "Connections": 2,
+        "Acks": 12,
+        "Retries": 1,
+        "Deliveries": 12,
+        "HTTPHandshakeBytes": 991,
+        "PublishWSBytes": 23103,
+        "EnvelopeBytes": 22609,
+        "CiphertextBytes": 14603,
+        "PlaintextBytes": 13288,
+        "AckWSBytes": 938,
+        "InitNS": 719708,
+        "IdleNS": 201053084,
+        "IdleCPUNS": 122000,
+        "ProcessCPUNS": 14299000,
+        "WallNS": 1452930709,
+        "P50NS": 100149375,
+        "P95NS": 351600500,
+        "SealP50NS": 124250,
+        "SealP95NS": 294000,
+        "OpenP50NS": 183417,
+        "OpenP95NS": 268750,
+        "LatencyNS": [
+          351600500,
+          102229291,
+          100468417,
+          99444916,
+          99351333,
+          100578333,
+          98295541,
+          101088000,
+          99795666,
+          100503750,
+          100149375,
+          99100042
+        ],
+        "SealNS": [
+          294000,
+          109166,
+          154292,
+          130875,
+          123666,
+          111917,
+          126666,
+          114833,
+          124250,
+          145291,
+          126917,
+          109625
+        ],
+        "OpenNS": [
+          212208,
+          162750,
+          175000,
+          268750,
+          169542,
+          184334,
+          183417,
+          163209,
+          251791,
+          258500,
+          180208,
+          178416,
+          252917
+        ]
+      },
+      {
+        "round": 2,
+        "ViewerWSBytes": 21290,
+        "scenario": "ack_delay",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 12,
+        "Connections": 1,
+        "Acks": 12,
+        "Retries": 0,
+        "Deliveries": 12,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 21326,
+        "EnvelopeBytes": 20870,
+        "CiphertextBytes": 13480,
+        "PlaintextBytes": 13288,
+        "AckWSBytes": 938,
+        "InitNS": 874167,
+        "IdleNS": 201311083,
+        "IdleCPUNS": 201000,
+        "ProcessCPUNS": 11678000,
+        "WallNS": 1226101292,
+        "P50NS": 99953625,
+        "P95NS": 126710166,
+        "SealP50NS": 128125,
+        "SealP95NS": 169709,
+        "OpenP50NS": 173833,
+        "OpenP95NS": 444125,
+        "LatencyNS": [
+          126710166,
+          98521541,
+          100575084,
+          100350500,
+          99528500,
+          100176292,
+          99614000,
+          99901375,
+          99953625,
+          101492541,
+          98218875,
+          100742500
+        ],
+        "SealNS": [
+          152916,
+          123916,
+          122834,
+          130208,
+          168250,
+          169709,
+          128167,
+          154250,
+          127959,
+          123166,
+          128125,
+          123000
+        ],
+        "OpenNS": [
+          183542,
+          167250,
+          178583,
+          444125,
+          185333,
+          177458,
+          164208,
+          199125,
+          164458,
+          173833,
+          164750,
+          173459
+        ]
+      },
+      {
+        "round": 3,
+        "ViewerWSBytes": 0,
+        "scenario": "initial_idle",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 0,
+        "Connections": 1,
+        "Acks": 0,
+        "Retries": 0,
+        "Deliveries": 0,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 0,
+        "EnvelopeBytes": 0,
+        "CiphertextBytes": 0,
+        "PlaintextBytes": 0,
+        "AckWSBytes": 0,
+        "InitNS": 2360708,
+        "IdleNS": 201092333,
+        "IdleCPUNS": 297000,
+        "ProcessCPUNS": 10000,
+        "WallNS": 15375,
+        "P50NS": 0,
+        "P95NS": 0,
+        "SealP50NS": 0,
+        "SealP95NS": 0,
+        "OpenP50NS": 0,
+        "OpenP95NS": 0,
+        "LatencyNS": null,
+        "SealNS": null,
+        "OpenNS": null
+      },
+      {
+        "round": 3,
+        "ViewerWSBytes": 21290,
+        "scenario": "active_one",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 12,
+        "Connections": 1,
+        "Acks": 12,
+        "Retries": 0,
+        "Deliveries": 12,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 21326,
+        "EnvelopeBytes": 20870,
+        "CiphertextBytes": 13480,
+        "PlaintextBytes": 13288,
+        "AckWSBytes": 938,
+        "InitNS": 1236000,
+        "IdleNS": 201072666,
+        "IdleCPUNS": 218000,
+        "ProcessCPUNS": 16927000,
+        "WallNS": 1201408083,
+        "P50NS": 100009541,
+        "P95NS": 100898333,
+        "SealP50NS": 137833,
+        "SealP95NS": 1328083,
+        "OpenP50NS": 200833,
+        "OpenP95NS": 791167,
+        "LatencyNS": [
+          100879625,
+          100888208,
+          98541583,
+          100749084,
+          100055667,
+          100009541,
+          99075875,
+          99898458,
+          100898333,
+          99561250,
+          100664292,
+          99681667
+        ],
+        "SealNS": [
+          230750,
+          137833,
+          1328083,
+          117667,
+          452583,
+          87375,
+          71375,
+          136500,
+          135292,
+          144708,
+          147667,
+          150250
+        ],
+        "OpenNS": [
+          310833,
+          677625,
+          188917,
+          791167,
+          100750,
+          114375,
+          248084,
+          203125,
+          215125,
+          200833,
+          186208,
+          92834
+        ]
+      },
+      {
+        "round": 3,
+        "ViewerWSBytes": 56790,
+        "scenario": "active_multi_session",
+        "Sessions": 16,
+        "Viewers": 1,
+        "Operations": 32,
+        "Connections": 1,
+        "Acks": 32,
+        "Retries": 0,
+        "Deliveries": 32,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 56886,
+        "EnvelopeBytes": 55670,
+        "CiphertextBytes": 35980,
+        "PlaintextBytes": 35468,
+        "AckWSBytes": 2518,
+        "InitNS": 1169167,
+        "IdleNS": 200287000,
+        "IdleCPUNS": 192000,
+        "ProcessCPUNS": 37580000,
+        "WallNS": 3202292208,
+        "P50NS": 99951875,
+        "P95NS": 101929167,
+        "SealP50NS": 125459,
+        "SealP95NS": 467792,
+        "OpenP50NS": 187250,
+        "OpenP95NS": 451583,
+        "LatencyNS": [
+          101172000,
+          101170875,
+          98841458,
+          99951875,
+          107091500,
+          93750292,
+          98691208,
+          100253250,
+          99244333,
+          100738500,
+          99977875,
+          100984500,
+          99762292,
+          99554333,
+          100621333,
+          99963584,
+          99482334,
+          99502583,
+          99585417,
+          101357292,
+          101929167,
+          98063542,
+          99136417,
+          100039959,
+          99713750,
+          99872000,
+          100979667,
+          98650833,
+          101368958,
+          99570875,
+          100284875,
+          100029375
+        ],
+        "SealNS": [
+          467792,
+          61083,
+          133666,
+          121916,
+          144084,
+          124000,
+          118750,
+          115458,
+          667458,
+          108458,
+          124708,
+          108000,
+          122333,
+          133500,
+          157417,
+          152834,
+          128292,
+          134208,
+          232625,
+          102292,
+          144959,
+          125459,
+          112292,
+          125875,
+          122750,
+          104291,
+          107250,
+          127667,
+          114750,
+          145125,
+          281084,
+          217750
+        ],
+        "OpenNS": [
+          111709,
+          219541,
+          176208,
+          775167,
+          451583,
+          383167,
+          183166,
+          186750,
+          179750,
+          191958,
+          196166,
+          183875,
+          234667,
+          201375,
+          206916,
+          196542,
+          222459,
+          181416,
+          166917,
+          187250,
+          199458,
+          280667,
+          212792,
+          238709,
+          167708,
+          180084,
+          187000,
+          171250,
+          192500,
+          139833,
+          136917,
+          181792
+        ]
+      },
+      {
+        "round": 3,
+        "ViewerWSBytes": 113560,
+        "scenario": "independent_viewers",
+        "Sessions": 4,
+        "Viewers": 4,
+        "Operations": 16,
+        "Connections": 1,
+        "Acks": 16,
+        "Retries": 0,
+        "Deliveries": 64,
+        "HTTPHandshakeBytes": 1563,
+        "PublishWSBytes": 28438,
+        "EnvelopeBytes": 27830,
+        "CiphertextBytes": 17980,
+        "PlaintextBytes": 17724,
+        "AckWSBytes": 1254,
+        "InitNS": 1078583,
+        "IdleNS": 200065958,
+        "IdleCPUNS": 160000,
+        "ProcessCPUNS": 33031000,
+        "WallNS": 1601641334,
+        "P50NS": 100133250,
+        "P95NS": 102126792,
+        "SealP50NS": 120500,
+        "SealP95NS": 691708,
+        "OpenP50NS": 201375,
+        "OpenP95NS": 964625,
+        "LatencyNS": [
+          102126792,
+          101588833,
+          98115917,
+          100133250,
+          100249792,
+          100008542,
+          100231375,
+          99155208,
+          101355791,
+          100386958,
+          98937834,
+          101226000,
+          98693292,
+          99957625,
+          100423125,
+          98461958
+        ],
+        "SealNS": [
+          161084,
+          120500,
+          330042,
+          99792,
+          115292,
+          65167,
+          72375,
+          114041,
+          128375,
+          125833,
+          118667,
+          117166,
+          213708,
+          124542,
+          133834,
+          691708
+        ],
+        "OpenNS": [
+          227208,
+          305000,
+          306500,
+          247917,
+          720750,
+          205042,
+          244042,
+          2159791,
+          77334,
+          84125,
+          80166,
+          103375,
+          162667,
+          340708,
+          228709,
+          172917,
+          75958,
+          140250,
+          75209,
+          135000,
+          159792,
+          171333,
+          174416,
+          179583,
+          226459,
+          245458,
+          168750,
+          204333,
+          172750,
+          194250,
+          206250,
+          206792,
+          193416,
+          156875,
+          153208,
+          153708,
+          964625,
+          1007416,
+          240667,
+          803792,
+          252500,
+          417667,
+          316667,
+          189500,
+          283125,
+          153208,
+          552958,
+          771084,
+          175708,
+          201875,
+          230208,
+          340417,
+          176375,
+          176458,
+          175417,
+          166834,
+          385000,
+          1233583,
+          939792,
+          201375,
+          185125,
+          313416,
+          176125,
+          163167
+        ]
+      },
+      {
+        "round": 3,
+        "ViewerWSBytes": 23064,
+        "scenario": "reconnect_unacked",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 12,
+        "Connections": 2,
+        "Acks": 12,
+        "Retries": 1,
+        "Deliveries": 12,
+        "HTTPHandshakeBytes": 991,
+        "PublishWSBytes": 23103,
+        "EnvelopeBytes": 22609,
+        "CiphertextBytes": 14603,
+        "PlaintextBytes": 13288,
+        "AckWSBytes": 938,
+        "InitNS": 2123291,
+        "IdleNS": 201068542,
+        "IdleCPUNS": 335000,
+        "ProcessCPUNS": 15663000,
+        "WallNS": 1455801542,
+        "P50NS": 100387458,
+        "P95NS": 353617625,
+        "SealP50NS": 132791,
+        "SealP95NS": 12830208,
+        "OpenP50NS": 201375,
+        "OpenP95NS": 2979584,
+        "LatencyNS": [
+          353617625,
+          101474542,
+          101148667,
+          98206416,
+          112060541,
+          87412208,
+          99981416,
+          100639584,
+          100387458,
+          98275959,
+          99845042,
+          102145083
+        ],
+        "SealNS": [
+          416583,
+          239542,
+          196834,
+          131666,
+          202833,
+          12830208,
+          153833,
+          75625,
+          84125,
+          75084,
+          67583,
+          132791
+        ],
+        "OpenNS": [
+          330208,
+          353959,
+          326167,
+          378958,
+          242667,
+          2979584,
+          125125,
+          72792,
+          91416,
+          91000,
+          188667,
+          192166,
+          201375
+        ]
+      },
+      {
+        "round": 3,
+        "ViewerWSBytes": 21290,
+        "scenario": "ack_delay",
+        "Sessions": 1,
+        "Viewers": 1,
+        "Operations": 12,
+        "Connections": 1,
+        "Acks": 12,
+        "Retries": 0,
+        "Deliveries": 12,
+        "HTTPHandshakeBytes": 648,
+        "PublishWSBytes": 21326,
+        "EnvelopeBytes": 20870,
+        "CiphertextBytes": 13480,
+        "PlaintextBytes": 13288,
+        "AckWSBytes": 938,
+        "InitNS": 1878292,
+        "IdleNS": 201025833,
+        "IdleCPUNS": 275000,
+        "ProcessCPUNS": 18461000,
+        "WallNS": 1226518458,
+        "P50NS": 99967459,
+        "P95NS": 126615083,
+        "SealP50NS": 154666,
+        "SealP95NS": 1326375,
+        "OpenP50NS": 226250,
+        "OpenP95NS": 707791,
+        "LatencyNS": [
+          126615083,
+          100025666,
+          99637458,
+          99820792,
+          100250625,
+          98973167,
+          100530167,
+          99783625,
+          101024375,
+          100089750,
+          99440375,
+          99967459
+        ],
+        "SealNS": [
+          154208,
+          207291,
+          696083,
+          135042,
+          90208,
+          137917,
+          173917,
+          203291,
+          1326375,
+          394000,
+          154666,
+          124167
+        ],
+        "OpenNS": [
+          398209,
+          352167,
+          327417,
+          147792,
+          180333,
+          184584,
+          249833,
+          549750,
+          203333,
+          178708,
+          707791,
+          226250
+        ]
+      }
+    ],
+    "isolated": [
+      {
+        "round": 1,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "initial_idle",
+        "ParentPID": 39172,
+        "WorkerPIDs": {
+          "machine": 39175,
+          "relay": 39173,
+          "viewer": 39174
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1211000,
+            "SystemNS": 988000,
+            "WallNS": 2542333
+          },
+          "parent_generator": {
+            "UserNS": 675000,
+            "SystemNS": 3246000,
+            "WallNS": 48954834
+          },
+          "relay": {
+            "UserNS": 1409000,
+            "SystemNS": 960000,
+            "WallNS": 34356750
+          },
+          "viewer": {
+            "UserNS": 917000,
+            "SystemNS": 324000,
+            "WallNS": 18346042
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 101000,
+            "SystemNS": 355000,
+            "WallNS": 200591542
+          },
+          "parent_generator": {
+            "UserNS": 138000,
+            "SystemNS": 225000,
+            "WallNS": 200620583
+          },
+          "relay": {
+            "UserNS": 96000,
+            "SystemNS": 360000,
+            "WallNS": 200444250
+          },
+          "viewer": {
+            "UserNS": 35000,
+            "SystemNS": 66000,
+            "WallNS": 200530583
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 25000,
+            "SystemNS": 56000,
+            "WallNS": 192000
+          },
+          "parent_generator": {
+            "UserNS": 60000,
+            "SystemNS": 90000,
+            "WallNS": 174667
+          },
+          "relay": {
+            "UserNS": 17000,
+            "SystemNS": 39000,
+            "WallNS": 348083
+          },
+          "viewer": {
+            "UserNS": 16000,
+            "SystemNS": 27000,
+            "WallNS": 251250
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 0,
+          "scenario": "initial_idle",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 0,
+          "Connections": 1,
+          "Acks": 0,
+          "Retries": 0,
+          "Deliveries": 0,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 0,
+          "EnvelopeBytes": 0,
+          "CiphertextBytes": 0,
+          "PlaintextBytes": 0,
+          "AckWSBytes": 0,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 0,
+          "P95NS": 0,
+          "SealP50NS": 0,
+          "SealP95NS": 0,
+          "OpenP50NS": 0,
+          "OpenP95NS": 0,
+          "LatencyNS": null,
+          "SealNS": null,
+          "OpenNS": null
+        }
+      },
+      {
+        "round": 1,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "active_one",
+        "ParentPID": 39172,
+        "WorkerPIDs": {
+          "machine": 39181,
+          "relay": 39178,
+          "viewer": 39179
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1234000,
+            "SystemNS": 675000,
+            "WallNS": 2836584
+          },
+          "parent_generator": {
+            "UserNS": 653000,
+            "SystemNS": 2916000,
+            "WallNS": 51189167
+          },
+          "relay": {
+            "UserNS": 1543000,
+            "SystemNS": 1030000,
+            "WallNS": 35327083
+          },
+          "viewer": {
+            "UserNS": 1017000,
+            "SystemNS": 812000,
+            "WallNS": 18960625
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 143000,
+            "SystemNS": 316000,
+            "WallNS": 201763458
+          },
+          "parent_generator": {
+            "UserNS": 136000,
+            "SystemNS": 235000,
+            "WallNS": 201823542
+          },
+          "relay": {
+            "UserNS": 98000,
+            "SystemNS": 352000,
+            "WallNS": 201429000
+          },
+          "viewer": {
+            "UserNS": 116000,
+            "SystemNS": 430000,
+            "WallNS": 201592833
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 5837000,
+            "SystemNS": 7764000,
+            "WallNS": 1201128834
+          },
+          "parent_generator": {
+            "UserNS": 1434000,
+            "SystemNS": 1345000,
+            "WallNS": 1201128750
+          },
+          "relay": {
+            "UserNS": 1571000,
+            "SystemNS": 1769000,
+            "WallNS": 1201378750
+          },
+          "viewer": {
+            "UserNS": 4705000,
+            "SystemNS": 5360000,
+            "WallNS": 1201332375
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 21290,
+          "scenario": "active_one",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 100144208,
+          "P95NS": 101358375,
+          "SealP50NS": 193625,
+          "SealP95NS": 1020667,
+          "OpenP50NS": 199334,
+          "OpenP95NS": 990834,
+          "LatencyNS": [
+            100665084,
+            98735000,
+            101358375,
+            100293625,
+            100913292,
+            98472834,
+            98699250,
+            100144208,
+            100952000,
+            99706791,
+            100249291,
+            100084959
+          ],
+          "SealNS": [
+            205667,
+            607916,
+            193625,
+            193750,
+            214125,
+            145333,
+            177583,
+            172500,
+            309167,
+            171250,
+            137583,
+            1020667
+          ],
+          "OpenNS": [
+            990834,
+            215209,
+            197375,
+            243708,
+            201709,
+            191458,
+            199000,
+            188916,
+            207583,
+            92125,
+            199334,
+            232292
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "active_multi_session",
+        "ParentPID": 39172,
+        "WorkerPIDs": {
+          "machine": 39191,
+          "relay": 39189,
+          "viewer": 39190
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1279000,
+            "SystemNS": 832000,
+            "WallNS": 4474542
+          },
+          "parent_generator": {
+            "UserNS": 641000,
+            "SystemNS": 2923000,
+            "WallNS": 57992458
+          },
+          "relay": {
+            "UserNS": 1545000,
+            "SystemNS": 1217000,
+            "WallNS": 41759250
+          },
+          "viewer": {
+            "UserNS": 956000,
+            "SystemNS": 653000,
+            "WallNS": 24762000
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 145000,
+            "SystemNS": 405000,
+            "WallNS": 201387209
+          },
+          "parent_generator": {
+            "UserNS": 120000,
+            "SystemNS": 231000,
+            "WallNS": 201410875
+          },
+          "relay": {
+            "UserNS": 103000,
+            "SystemNS": 338000,
+            "WallNS": 201387500
+          },
+          "viewer": {
+            "UserNS": 33000,
+            "SystemNS": 55000,
+            "WallNS": 201359375
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 11172000,
+            "SystemNS": 12941000,
+            "WallNS": 3201148959
+          },
+          "parent_generator": {
+            "UserNS": 4889000,
+            "SystemNS": 6049000,
+            "WallNS": 3201167916
+          },
+          "relay": {
+            "UserNS": 3912000,
+            "SystemNS": 4142000,
+            "WallNS": 3201239792
+          },
+          "viewer": {
+            "UserNS": 12488000,
+            "SystemNS": 14635000,
+            "WallNS": 3201197958
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 56790,
+          "scenario": "active_multi_session",
+          "Sessions": 16,
+          "Viewers": 1,
+          "Operations": 32,
+          "Connections": 1,
+          "Acks": 32,
+          "Retries": 0,
+          "Deliveries": 32,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 56886,
+          "EnvelopeBytes": 55670,
+          "CiphertextBytes": 35980,
+          "PlaintextBytes": 35468,
+          "AckWSBytes": 2518,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 99978667,
+          "P95NS": 102912209,
+          "SealP50NS": 135542,
+          "SealP95NS": 466291,
+          "OpenP50NS": 209458,
+          "OpenP95NS": 885042,
+          "LatencyNS": [
+            100111166,
+            100574625,
+            98697083,
+            99320333,
+            101867209,
+            99885375,
+            100399792,
+            99511875,
+            98919875,
+            101147167,
+            101769375,
+            98429042,
+            102264333,
+            96728833,
+            100563583,
+            102425500,
+            97098750,
+            100460708,
+            100429667,
+            99190666,
+            100312333,
+            99047875,
+            103661000,
+            97733708,
+            102428583,
+            96883500,
+            99944417,
+            100953625,
+            98185750,
+            102912209,
+            96022416,
+            99978667
+          ],
+          "SealNS": [
+            115083,
+            129750,
+            138167,
+            83917,
+            81375,
+            187584,
+            132208,
+            135542,
+            76792,
+            78375,
+            68167,
+            151583,
+            466291,
+            319334,
+            135542,
+            171542,
+            132167,
+            492875,
+            67125,
+            98125,
+            150500,
+            167708,
+            134917,
+            259916,
+            154000,
+            293458,
+            144917,
+            128125,
+            128042,
+            135042,
+            173500,
+            185875
+          ],
+          "OpenNS": [
+            618750,
+            196708,
+            93000,
+            105417,
+            926958,
+            218625,
+            194792,
+            157584,
+            95625,
+            124333,
+            289833,
+            214500,
+            194500,
+            215667,
+            382209,
+            264417,
+            249792,
+            97917,
+            245792,
+            183417,
+            192958,
+            200750,
+            545708,
+            206250,
+            885042,
+            346791,
+            209458,
+            98750,
+            222167,
+            291916,
+            199125,
+            234125
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "independent_viewers",
+        "ParentPID": 39172,
+        "WorkerPIDs": {
+          "machine": 39213,
+          "relay": 39211,
+          "viewer": 39212
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1252000,
+            "SystemNS": 811000,
+            "WallNS": 2972667
+          },
+          "parent_generator": {
+            "UserNS": 727000,
+            "SystemNS": 3036000,
+            "WallNS": 55895542
+          },
+          "relay": {
+            "UserNS": 1630000,
+            "SystemNS": 1293000,
+            "WallNS": 38617875
+          },
+          "viewer": {
+            "UserNS": 1116000,
+            "SystemNS": 1153000,
+            "WallNS": 21047042
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 110000,
+            "SystemNS": 220000,
+            "WallNS": 202227666
+          },
+          "parent_generator": {
+            "UserNS": 140000,
+            "SystemNS": 146000,
+            "WallNS": 202306458
+          },
+          "relay": {
+            "UserNS": 92000,
+            "SystemNS": 305000,
+            "WallNS": 201568250
+          },
+          "viewer": {
+            "UserNS": 95000,
+            "SystemNS": 271000,
+            "WallNS": 202000000
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 6767000,
+            "SystemNS": 6691000,
+            "WallNS": 1601059875
+          },
+          "parent_generator": {
+            "UserNS": 1764000,
+            "SystemNS": 1830000,
+            "WallNS": 1601058000
+          },
+          "relay": {
+            "UserNS": 2384000,
+            "SystemNS": 2578000,
+            "WallNS": 1601419292
+          },
+          "viewer": {
+            "UserNS": 15229000,
+            "SystemNS": 8854000,
+            "WallNS": 1601047083
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 113560,
+          "scenario": "independent_viewers",
+          "Sessions": 4,
+          "Viewers": 4,
+          "Operations": 16,
+          "Connections": 1,
+          "Acks": 16,
+          "Retries": 0,
+          "Deliveries": 64,
+          "HTTPHandshakeBytes": 1563,
+          "PublishWSBytes": 28438,
+          "EnvelopeBytes": 27830,
+          "CiphertextBytes": 17980,
+          "PlaintextBytes": 17724,
+          "AckWSBytes": 1254,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 99966000,
+          "P95NS": 108072750,
+          "SealP50NS": 150084,
+          "SealP95NS": 592458,
+          "OpenP50NS": 189083,
+          "OpenP95NS": 810333,
+          "LatencyNS": [
+            108072750,
+            93006750,
+            99091083,
+            98813166,
+            100627333,
+            99998708,
+            99014375,
+            100958209,
+            103138583,
+            97051250,
+            99825042,
+            100512709,
+            99075625,
+            100200125,
+            99966000,
+            100533750
+          ],
+          "SealNS": [
+            592458,
+            202416,
+            128250,
+            219750,
+            293791,
+            67209,
+            65584,
+            237750,
+            343042,
+            144584,
+            184917,
+            135625,
+            163833,
+            150084,
+            139750,
+            71791
+          ],
+          "OpenNS": [
+            1581416,
+            269916,
+            810333,
+            222292,
+            194125,
+            165375,
+            170917,
+            211709,
+            292125,
+            207125,
+            218417,
+            214333,
+            202208,
+            661625,
+            726000,
+            193667,
+            103875,
+            65000,
+            89291,
+            95416,
+            85833,
+            99125,
+            87875,
+            140083,
+            87667,
+            55375,
+            100625,
+            101500,
+            178375,
+            175250,
+            151375,
+            142250,
+            1938416,
+            804834,
+            937500,
+            172042,
+            223625,
+            189083,
+            217083,
+            218458,
+            216083,
+            169959,
+            201209,
+            209084,
+            230209,
+            240291,
+            217208,
+            261542,
+            182375,
+            220000,
+            154750,
+            328041,
+            203792,
+            150583,
+            174041,
+            172583,
+            86959,
+            103708,
+            71417,
+            81041,
+            288541,
+            97666,
+            97958,
+            645833
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "reconnect_unacked",
+        "ParentPID": 39172,
+        "WorkerPIDs": {
+          "machine": 39228,
+          "relay": 39226,
+          "viewer": 39227
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1131000,
+            "SystemNS": 720000,
+            "WallNS": 3155375
+          },
+          "parent_generator": {
+            "UserNS": 715000,
+            "SystemNS": 3594000,
+            "WallNS": 63765542
+          },
+          "relay": {
+            "UserNS": 1463000,
+            "SystemNS": 1139000,
+            "WallNS": 44127833
+          },
+          "viewer": {
+            "UserNS": 861000,
+            "SystemNS": 341000,
+            "WallNS": 22870625
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 96000,
+            "SystemNS": 148000,
+            "WallNS": 201347667
+          },
+          "parent_generator": {
+            "UserNS": 145000,
+            "SystemNS": 276000,
+            "WallNS": 201411083
+          },
+          "relay": {
+            "UserNS": 94000,
+            "SystemNS": 332000,
+            "WallNS": 201271000
+          },
+          "viewer": {
+            "UserNS": 87000,
+            "SystemNS": 383000,
+            "WallNS": 201324833
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 3110000,
+            "SystemNS": 4639000,
+            "WallNS": 1453279167
+          },
+          "parent_generator": {
+            "UserNS": 1112000,
+            "SystemNS": 1207000,
+            "WallNS": 1453275042
+          },
+          "relay": {
+            "UserNS": 1561000,
+            "SystemNS": 1985000,
+            "WallNS": 1453392833
+          },
+          "viewer": {
+            "UserNS": 3303000,
+            "SystemNS": 4870000,
+            "WallNS": 1453327708
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 23064,
+          "scenario": "reconnect_unacked",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 12,
+          "Connections": 2,
+          "Acks": 12,
+          "Retries": 1,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 991,
+          "PublishWSBytes": 23103,
+          "EnvelopeBytes": 22609,
+          "CiphertextBytes": 14603,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 100544875,
+          "P95NS": 351689708,
+          "SealP50NS": 83000,
+          "SealP95NS": 152459,
+          "OpenP50NS": 101250,
+          "OpenP95NS": 296583,
+          "LatencyNS": [
+            351689708,
+            101073666,
+            106255417,
+            94037625,
+            100544875,
+            98995708,
+            101113334,
+            99253209,
+            100716834,
+            102392875,
+            97539166,
+            99103667
+          ],
+          "SealNS": [
+            122750,
+            103959,
+            66875,
+            152459,
+            141708,
+            72542,
+            71416,
+            88750,
+            64333,
+            83000,
+            145500,
+            81917
+          ],
+          "OpenNS": [
+            296583,
+            101250,
+            89500,
+            229125,
+            195625,
+            95375,
+            98333,
+            94875,
+            94583,
+            93167,
+            192792,
+            117000,
+            101292
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "ack_delay",
+        "ParentPID": 39172,
+        "WorkerPIDs": {
+          "machine": 39287,
+          "relay": 39285,
+          "viewer": 39286
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1198000,
+            "SystemNS": 785000,
+            "WallNS": 2806583
+          },
+          "parent_generator": {
+            "UserNS": 460000,
+            "SystemNS": 2057000,
+            "WallNS": 47249459
+          },
+          "relay": {
+            "UserNS": 1398000,
+            "SystemNS": 955000,
+            "WallNS": 33221916
+          },
+          "viewer": {
+            "UserNS": 823000,
+            "SystemNS": 274000,
+            "WallNS": 18890250
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 122000,
+            "SystemNS": 191000,
+            "WallNS": 201471417
+          },
+          "parent_generator": {
+            "UserNS": 124000,
+            "SystemNS": 160000,
+            "WallNS": 201510584
+          },
+          "relay": {
+            "UserNS": 74000,
+            "SystemNS": 182000,
+            "WallNS": 201292625
+          },
+          "viewer": {
+            "UserNS": 25000,
+            "SystemNS": 33000,
+            "WallNS": 201386750
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 5832000,
+            "SystemNS": 5005000,
+            "WallNS": 1225363500
+          },
+          "parent_generator": {
+            "UserNS": 1232000,
+            "SystemNS": 1352000,
+            "WallNS": 1225387084
+          },
+          "relay": {
+            "UserNS": 2218000,
+            "SystemNS": 2936000,
+            "WallNS": 1225491208
+          },
+          "viewer": {
+            "UserNS": 4492000,
+            "SystemNS": 5874000,
+            "WallNS": 1225426083
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 21290,
+          "scenario": "ack_delay",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 99914542,
+          "P95NS": 125579834,
+          "SealP50NS": 161708,
+          "SealP95NS": 563875,
+          "OpenP50NS": 205958,
+          "OpenP95NS": 697458,
+          "LatencyNS": [
+            125579834,
+            99564792,
+            100636000,
+            99914542,
+            102640750,
+            97295041,
+            98541292,
+            101498125,
+            99956833,
+            98588291,
+            101123958,
+            99345667
+          ],
+          "SealNS": [
+            165375,
+            144042,
+            176500,
+            147875,
+            126334,
+            175417,
+            242417,
+            162208,
+            151500,
+            124750,
+            161708,
+            563875
+          ],
+          "OpenNS": [
+            697458,
+            205958,
+            199125,
+            212208,
+            291667,
+            81625,
+            373625,
+            189625,
+            210625,
+            226541,
+            189084,
+            201708
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "initial_idle",
+        "ParentPID": 39400,
+        "WorkerPIDs": {
+          "machine": 39403,
+          "relay": 39401,
+          "viewer": 39402
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1003000,
+            "SystemNS": 503000,
+            "WallNS": 2418625
+          },
+          "parent_generator": {
+            "UserNS": 502000,
+            "SystemNS": 2142000,
+            "WallNS": 41552250
+          },
+          "relay": {
+            "UserNS": 1274000,
+            "SystemNS": 835000,
+            "WallNS": 29192000
+          },
+          "viewer": {
+            "UserNS": 732000,
+            "SystemNS": 261000,
+            "WallNS": 16354500
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 142000,
+            "SystemNS": 182000,
+            "WallNS": 204445125
+          },
+          "parent_generator": {
+            "UserNS": 184000,
+            "SystemNS": 209000,
+            "WallNS": 204699375
+          },
+          "relay": {
+            "UserNS": 61000,
+            "SystemNS": 184000,
+            "WallNS": 201343458
+          },
+          "viewer": {
+            "UserNS": 28000,
+            "SystemNS": 52000,
+            "WallNS": 201664292
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 29000,
+            "SystemNS": 65000,
+            "WallNS": 542000
+          },
+          "parent_generator": {
+            "UserNS": 79000,
+            "SystemNS": 110000,
+            "WallNS": 355125
+          },
+          "relay": {
+            "UserNS": 35000,
+            "SystemNS": 68000,
+            "WallNS": 3522708
+          },
+          "viewer": {
+            "UserNS": 43000,
+            "SystemNS": 89000,
+            "WallNS": 2608250
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 0,
+          "scenario": "initial_idle",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 0,
+          "Connections": 1,
+          "Acks": 0,
+          "Retries": 0,
+          "Deliveries": 0,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 0,
+          "EnvelopeBytes": 0,
+          "CiphertextBytes": 0,
+          "PlaintextBytes": 0,
+          "AckWSBytes": 0,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 0,
+          "P95NS": 0,
+          "SealP50NS": 0,
+          "SealP95NS": 0,
+          "OpenP50NS": 0,
+          "OpenP95NS": 0,
+          "LatencyNS": null,
+          "SealNS": null,
+          "OpenNS": null
+        }
+      },
+      {
+        "round": 2,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "active_one",
+        "ParentPID": 39400,
+        "WorkerPIDs": {
+          "machine": 39406,
+          "relay": 39404,
+          "viewer": 39405
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1033000,
+            "SystemNS": 596000,
+            "WallNS": 2450625
+          },
+          "parent_generator": {
+            "UserNS": 507000,
+            "SystemNS": 2580000,
+            "WallNS": 46108125
+          },
+          "relay": {
+            "UserNS": 1276000,
+            "SystemNS": 778000,
+            "WallNS": 32725875
+          },
+          "viewer": {
+            "UserNS": 777000,
+            "SystemNS": 259000,
+            "WallNS": 17789166
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 131000,
+            "SystemNS": 235000,
+            "WallNS": 201369958
+          },
+          "parent_generator": {
+            "UserNS": 135000,
+            "SystemNS": 202000,
+            "WallNS": 201390167
+          },
+          "relay": {
+            "UserNS": 80000,
+            "SystemNS": 204000,
+            "WallNS": 201279042
+          },
+          "viewer": {
+            "UserNS": 38000,
+            "SystemNS": 65000,
+            "WallNS": 201313291
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 5727000,
+            "SystemNS": 4132000,
+            "WallNS": 1201713000
+          },
+          "parent_generator": {
+            "UserNS": 1350000,
+            "SystemNS": 1185000,
+            "WallNS": 1201804459
+          },
+          "relay": {
+            "UserNS": 3692000,
+            "SystemNS": 2559000,
+            "WallNS": 1200997667
+          },
+          "viewer": {
+            "UserNS": 4257000,
+            "SystemNS": 3465000,
+            "WallNS": 1201024291
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 21290,
+          "scenario": "active_one",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 100263291,
+          "P95NS": 101093125,
+          "SealP50NS": 152625,
+          "SealP95NS": 478208,
+          "OpenP50NS": 220792,
+          "OpenP95NS": 623042,
+          "LatencyNS": [
+            100946333,
+            99197500,
+            100330083,
+            101093125,
+            98328625,
+            99727583,
+            100507459,
+            100588708,
+            98791917,
+            99984000,
+            100263291,
+            100267041
+          ],
+          "SealNS": [
+            168666,
+            128208,
+            152625,
+            275292,
+            154125,
+            146459,
+            146166,
+            478208,
+            166750,
+            127791,
+            155916,
+            120083
+          ],
+          "OpenNS": [
+            623042,
+            386583,
+            198000,
+            202333,
+            262875,
+            215292,
+            215875,
+            229000,
+            185834,
+            220792,
+            230459,
+            311541
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "active_multi_session",
+        "ParentPID": 39400,
+        "WorkerPIDs": {
+          "machine": 39419,
+          "relay": 39417,
+          "viewer": 39418
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1090000,
+            "SystemNS": 504000,
+            "WallNS": 2269625
+          },
+          "parent_generator": {
+            "UserNS": 577000,
+            "SystemNS": 2458000,
+            "WallNS": 48197083
+          },
+          "relay": {
+            "UserNS": 1314000,
+            "SystemNS": 694000,
+            "WallNS": 31775500
+          },
+          "viewer": {
+            "UserNS": 812000,
+            "SystemNS": 227000,
+            "WallNS": 16914125
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 125000,
+            "SystemNS": 269000,
+            "WallNS": 201447000
+          },
+          "parent_generator": {
+            "UserNS": 131000,
+            "SystemNS": 134000,
+            "WallNS": 201480500
+          },
+          "relay": {
+            "UserNS": 54000,
+            "SystemNS": 154000,
+            "WallNS": 201278958
+          },
+          "viewer": {
+            "UserNS": 37000,
+            "SystemNS": 59000,
+            "WallNS": 201357792
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 11930000,
+            "SystemNS": 14181000,
+            "WallNS": 3201157875
+          },
+          "parent_generator": {
+            "UserNS": 5762000,
+            "SystemNS": 5472000,
+            "WallNS": 3201155834
+          },
+          "relay": {
+            "UserNS": 4108000,
+            "SystemNS": 4403000,
+            "WallNS": 3201302000
+          },
+          "viewer": {
+            "UserNS": 10867000,
+            "SystemNS": 14135000,
+            "WallNS": 3201246416
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 56790,
+          "scenario": "active_multi_session",
+          "Sessions": 16,
+          "Viewers": 1,
+          "Operations": 32,
+          "Connections": 1,
+          "Acks": 32,
+          "Retries": 0,
+          "Deliveries": 32,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 56886,
+          "EnvelopeBytes": 55670,
+          "CiphertextBytes": 35980,
+          "PlaintextBytes": 35468,
+          "AckWSBytes": 2518,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 100019334,
+          "P95NS": 102200625,
+          "SealP50NS": 141042,
+          "SealP95NS": 388917,
+          "OpenP50NS": 208917,
+          "OpenP95NS": 555125,
+          "LatencyNS": [
+            101316084,
+            98564750,
+            101018916,
+            99905542,
+            99148167,
+            100737458,
+            100071750,
+            100082459,
+            100300042,
+            98646042,
+            100836250,
+            101443667,
+            98901459,
+            99555166,
+            100386375,
+            100470375,
+            99453292,
+            99130875,
+            101818416,
+            98552208,
+            100030333,
+            99888833,
+            99907334,
+            102200625,
+            102933833,
+            94931209,
+            100019334,
+            99341584,
+            100073417,
+            99819083,
+            100228166,
+            99871042
+          ],
+          "SealNS": [
+            213000,
+            81959,
+            129625,
+            133292,
+            130250,
+            136334,
+            179375,
+            132083,
+            357459,
+            130458,
+            216917,
+            160459,
+            538000,
+            143541,
+            132083,
+            94542,
+            388917,
+            149917,
+            140875,
+            143542,
+            140792,
+            133709,
+            80583,
+            147750,
+            141042,
+            310375,
+            134834,
+            204667,
+            143375,
+            167041,
+            132792,
+            175792
+          ],
+          "OpenNS": [
+            555125,
+            185625,
+            210792,
+            209875,
+            218792,
+            224375,
+            201459,
+            213083,
+            699375,
+            191708,
+            201875,
+            205625,
+            279375,
+            214666,
+            104292,
+            378708,
+            201667,
+            213333,
+            208542,
+            198333,
+            208167,
+            114458,
+            293458,
+            234083,
+            91791,
+            230750,
+            195750,
+            191166,
+            210167,
+            218375,
+            208917,
+            191166
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "independent_viewers",
+        "ParentPID": 39400,
+        "WorkerPIDs": {
+          "machine": 39439,
+          "relay": 39435,
+          "viewer": 39438
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1254000,
+            "SystemNS": 784000,
+            "WallNS": 3160708
+          },
+          "parent_generator": {
+            "UserNS": 668000,
+            "SystemNS": 3338000,
+            "WallNS": 65542167
+          },
+          "relay": {
+            "UserNS": 2036000,
+            "SystemNS": 1676000,
+            "WallNS": 49354792
+          },
+          "viewer": {
+            "UserNS": 1293000,
+            "SystemNS": 1183000,
+            "WallNS": 23422292
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 144000,
+            "SystemNS": 493000,
+            "WallNS": 200578333
+          },
+          "parent_generator": {
+            "UserNS": 133000,
+            "SystemNS": 288000,
+            "WallNS": 200620208
+          },
+          "relay": {
+            "UserNS": 87000,
+            "SystemNS": 353000,
+            "WallNS": 200410042
+          },
+          "viewer": {
+            "UserNS": 97000,
+            "SystemNS": 384000,
+            "WallNS": 200470875
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 4611000,
+            "SystemNS": 5955000,
+            "WallNS": 1601942917
+          },
+          "parent_generator": {
+            "UserNS": 1703000,
+            "SystemNS": 1907000,
+            "WallNS": 1601955750
+          },
+          "relay": {
+            "UserNS": 2395000,
+            "SystemNS": 2925000,
+            "WallNS": 1602113250
+          },
+          "viewer": {
+            "UserNS": 15337000,
+            "SystemNS": 12792000,
+            "WallNS": 1602027000
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 113560,
+          "scenario": "independent_viewers",
+          "Sessions": 4,
+          "Viewers": 4,
+          "Operations": 16,
+          "Connections": 1,
+          "Acks": 16,
+          "Retries": 0,
+          "Deliveries": 64,
+          "HTTPHandshakeBytes": 1563,
+          "PublishWSBytes": 28438,
+          "EnvelopeBytes": 27830,
+          "CiphertextBytes": 17980,
+          "PlaintextBytes": 17724,
+          "AckWSBytes": 1254,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 99918541,
+          "P95NS": 102496375,
+          "SealP50NS": 143542,
+          "SealP95NS": 270750,
+          "OpenP50NS": 182958,
+          "OpenP95NS": 525125,
+          "LatencyNS": [
+            102496375,
+            98727792,
+            99678625,
+            99918541,
+            100662292,
+            100443833,
+            99182125,
+            100684583,
+            99946833,
+            99871292,
+            99722083,
+            100075667,
+            100175916,
+            98963583,
+            101829500,
+            98817292
+          ],
+          "SealNS": [
+            166125,
+            151625,
+            180834,
+            143750,
+            140417,
+            116625,
+            79583,
+            131958,
+            134250,
+            148125,
+            141208,
+            160292,
+            270750,
+            143542,
+            124000,
+            158666
+          ],
+          "OpenNS": [
+            621833,
+            519875,
+            577375,
+            483834,
+            336250,
+            360875,
+            331125,
+            465958,
+            101125,
+            95958,
+            72750,
+            102250,
+            240375,
+            238083,
+            190958,
+            153333,
+            104917,
+            85125,
+            113708,
+            100708,
+            92708,
+            63042,
+            525125,
+            620750,
+            188584,
+            197125,
+            179375,
+            184917,
+            214334,
+            152959,
+            167084,
+            182958,
+            277834,
+            144000,
+            168041,
+            166958,
+            231583,
+            171375,
+            196709,
+            186958,
+            178375,
+            151209,
+            182042,
+            397958,
+            244625,
+            168333,
+            175792,
+            174833,
+            197291,
+            158750,
+            198167,
+            151375,
+            375125,
+            211667,
+            201208,
+            173708,
+            229875,
+            321250,
+            204708,
+            236375,
+            111459,
+            115167,
+            111042,
+            149625
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "reconnect_unacked",
+        "ParentPID": 39400,
+        "WorkerPIDs": {
+          "machine": 39462,
+          "relay": 39459,
+          "viewer": 39460
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1370000,
+            "SystemNS": 822000,
+            "WallNS": 3711875
+          },
+          "parent_generator": {
+            "UserNS": 849000,
+            "SystemNS": 3876000,
+            "WallNS": 70124959
+          },
+          "relay": {
+            "UserNS": 2464000,
+            "SystemNS": 1736000,
+            "WallNS": 48315083
+          },
+          "viewer": {
+            "UserNS": 965000,
+            "SystemNS": 417000,
+            "WallNS": 26625125
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 171000,
+            "SystemNS": 278000,
+            "WallNS": 201684375
+          },
+          "parent_generator": {
+            "UserNS": 151000,
+            "SystemNS": 249000,
+            "WallNS": 201750417
+          },
+          "relay": {
+            "UserNS": 135000,
+            "SystemNS": 404000,
+            "WallNS": 201576583
+          },
+          "viewer": {
+            "UserNS": 120000,
+            "SystemNS": 386000,
+            "WallNS": 201580458
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 4196000,
+            "SystemNS": 7534000,
+            "WallNS": 1456368375
+          },
+          "parent_generator": {
+            "UserNS": 1529000,
+            "SystemNS": 2158000,
+            "WallNS": 1456335125
+          },
+          "relay": {
+            "UserNS": 2033000,
+            "SystemNS": 3030000,
+            "WallNS": 1456259750
+          },
+          "viewer": {
+            "UserNS": 5188000,
+            "SystemNS": 7175000,
+            "WallNS": 1456456334
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 23064,
+          "scenario": "reconnect_unacked",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 12,
+          "Connections": 2,
+          "Acks": 12,
+          "Retries": 1,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 991,
+          "PublishWSBytes": 23103,
+          "EnvelopeBytes": 22609,
+          "CiphertextBytes": 14603,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 99867375,
+          "P95NS": 353375000,
+          "SealP50NS": 158458,
+          "SealP95NS": 14884334,
+          "OpenP50NS": 290375,
+          "OpenP95NS": 21670125,
+          "LatencyNS": [
+            353375000,
+            124308917,
+            78219625,
+            99867375,
+            98409000,
+            106689583,
+            93510333,
+            101060667,
+            99932042,
+            102098875,
+            98648625,
+            98795916
+          ],
+          "SealNS": [
+            203000,
+            87041,
+            14884334,
+            287625,
+            221250,
+            76333,
+            288542,
+            139583,
+            158458,
+            182500,
+            88375,
+            136875
+          ],
+          "OpenNS": [
+            760041,
+            329875,
+            21670125,
+            492000,
+            351709,
+            160666,
+            282958,
+            195833,
+            280792,
+            237334,
+            345125,
+            290375,
+            282458
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "ack_delay",
+        "ParentPID": 39400,
+        "WorkerPIDs": {
+          "machine": 39479,
+          "relay": 39476,
+          "viewer": 39477
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1379000,
+            "SystemNS": 1163000,
+            "WallNS": 3144875
+          },
+          "parent_generator": {
+            "UserNS": 717000,
+            "SystemNS": 3411000,
+            "WallNS": 63247750
+          },
+          "relay": {
+            "UserNS": 1821000,
+            "SystemNS": 1424000,
+            "WallNS": 43139208
+          },
+          "viewer": {
+            "UserNS": 1200000,
+            "SystemNS": 464000,
+            "WallNS": 22850750
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 148000,
+            "SystemNS": 353000,
+            "WallNS": 200644916
+          },
+          "parent_generator": {
+            "UserNS": 130000,
+            "SystemNS": 256000,
+            "WallNS": 200665458
+          },
+          "relay": {
+            "UserNS": 94000,
+            "SystemNS": 341000,
+            "WallNS": 200702125
+          },
+          "viewer": {
+            "UserNS": 93000,
+            "SystemNS": 352000,
+            "WallNS": 200655041
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 5761000,
+            "SystemNS": 4042000,
+            "WallNS": 1226746334
+          },
+          "parent_generator": {
+            "UserNS": 1268000,
+            "SystemNS": 1273000,
+            "WallNS": 1226751042
+          },
+          "relay": {
+            "UserNS": 2270000,
+            "SystemNS": 3431000,
+            "WallNS": 1226799708
+          },
+          "viewer": {
+            "UserNS": 4571000,
+            "SystemNS": 4992000,
+            "WallNS": 1226766750
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 21290,
+          "scenario": "ack_delay",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 100024084,
+          "P95NS": 126373583,
+          "SealP50NS": 175291,
+          "SealP95NS": 451125,
+          "OpenP50NS": 239375,
+          "OpenP95NS": 639084,
+          "LatencyNS": [
+            126373583,
+            100298167,
+            99750208,
+            99757584,
+            100784792,
+            99191667,
+            100455750,
+            99085000,
+            102304041,
+            100118959,
+            97772292,
+            100024084
+          ],
+          "SealNS": [
+            103833,
+            223167,
+            230125,
+            175291,
+            142292,
+            268958,
+            326000,
+            151083,
+            151958,
+            451125,
+            149916,
+            179500
+          ],
+          "OpenNS": [
+            639084,
+            212292,
+            186875,
+            239375,
+            210167,
+            337917,
+            218083,
+            240250,
+            400625,
+            316500,
+            251833,
+            189250
+          ]
+        }
+      },
+      {
+        "round": 3,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "initial_idle",
+        "ParentPID": 39544,
+        "WorkerPIDs": {
+          "machine": 39548,
+          "relay": 39545,
+          "viewer": 39547
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1212000,
+            "SystemNS": 846000,
+            "WallNS": 3039541
+          },
+          "parent_generator": {
+            "UserNS": 658000,
+            "SystemNS": 3143000,
+            "WallNS": 49860875
+          },
+          "relay": {
+            "UserNS": 1431000,
+            "SystemNS": 1057000,
+            "WallNS": 35481791
+          },
+          "viewer": {
+            "UserNS": 861000,
+            "SystemNS": 326000,
+            "WallNS": 18445375
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 159000,
+            "SystemNS": 445000,
+            "WallNS": 202299583
+          },
+          "parent_generator": {
+            "UserNS": 153000,
+            "SystemNS": 275000,
+            "WallNS": 202346000
+          },
+          "relay": {
+            "UserNS": 106000,
+            "SystemNS": 428000,
+            "WallNS": 202042125
+          },
+          "viewer": {
+            "UserNS": 98000,
+            "SystemNS": 402000,
+            "WallNS": 202113000
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 13000,
+            "SystemNS": 18000,
+            "WallNS": 168792
+          },
+          "parent_generator": {
+            "UserNS": 60000,
+            "SystemNS": 81000,
+            "WallNS": 143042
+          },
+          "relay": {
+            "UserNS": 20000,
+            "SystemNS": 49000,
+            "WallNS": 541833
+          },
+          "viewer": {
+            "UserNS": 16000,
+            "SystemNS": 24000,
+            "WallNS": 400708
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 0,
+          "scenario": "initial_idle",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 0,
+          "Connections": 1,
+          "Acks": 0,
+          "Retries": 0,
+          "Deliveries": 0,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 0,
+          "EnvelopeBytes": 0,
+          "CiphertextBytes": 0,
+          "PlaintextBytes": 0,
+          "AckWSBytes": 0,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 0,
+          "P95NS": 0,
+          "SealP50NS": 0,
+          "SealP95NS": 0,
+          "OpenP50NS": 0,
+          "OpenP95NS": 0,
+          "LatencyNS": null,
+          "SealNS": null,
+          "OpenNS": null
+        }
+      },
+      {
+        "round": 3,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "active_one",
+        "ParentPID": 39544,
+        "WorkerPIDs": {
+          "machine": 39551,
+          "relay": 39549,
+          "viewer": 39550
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1119000,
+            "SystemNS": 494000,
+            "WallNS": 2313542
+          },
+          "parent_generator": {
+            "UserNS": 629000,
+            "SystemNS": 3051000,
+            "WallNS": 51456666
+          },
+          "relay": {
+            "UserNS": 1363000,
+            "SystemNS": 740000,
+            "WallNS": 33809584
+          },
+          "viewer": {
+            "UserNS": 864000,
+            "SystemNS": 306000,
+            "WallNS": 18699834
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 113000,
+            "SystemNS": 143000,
+            "WallNS": 212557709
+          },
+          "parent_generator": {
+            "UserNS": 171000,
+            "SystemNS": 165000,
+            "WallNS": 212587208
+          },
+          "relay": {
+            "UserNS": 65000,
+            "SystemNS": 145000,
+            "WallNS": 211769875
+          },
+          "viewer": {
+            "UserNS": 29000,
+            "SystemNS": 38000,
+            "WallNS": 212424375
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 3547000,
+            "SystemNS": 3538000,
+            "WallNS": 1190039291
+          },
+          "parent_generator": {
+            "UserNS": 1334000,
+            "SystemNS": 1131000,
+            "WallNS": 1190167042
+          },
+          "relay": {
+            "UserNS": 1574000,
+            "SystemNS": 1181000,
+            "WallNS": 1190675417
+          },
+          "viewer": {
+            "UserNS": 4787000,
+            "SystemNS": 4484000,
+            "WallNS": 1190113375
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 21290,
+          "scenario": "active_one",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 99482084,
+          "P95NS": 102107667,
+          "SealP50NS": 144209,
+          "SealP95NS": 1008417,
+          "OpenP50NS": 229125,
+          "OpenP95NS": 958625,
+          "LatencyNS": [
+            91354333,
+            97990334,
+            101052333,
+            97792917,
+            100268875,
+            100837333,
+            102107667,
+            96576125,
+            102004125,
+            99208541,
+            100754583,
+            99482084
+          ],
+          "SealNS": [
+            98208,
+            121417,
+            198083,
+            144209,
+            1008417,
+            128167,
+            157958,
+            137500,
+            306166,
+            165166,
+            165333,
+            136417
+          ],
+          "OpenNS": [
+            958625,
+            227500,
+            229042,
+            231958,
+            252208,
+            430667,
+            303125,
+            195667,
+            278709,
+            219625,
+            229125,
+            221833
+          ]
+        }
+      },
+      {
+        "round": 3,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "active_multi_session",
+        "ParentPID": 39544,
+        "WorkerPIDs": {
+          "machine": 39554,
+          "relay": 39552,
+          "viewer": 39553
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1093000,
+            "SystemNS": 888000,
+            "WallNS": 2811791
+          },
+          "parent_generator": {
+            "UserNS": 460000,
+            "SystemNS": 1890000,
+            "WallNS": 44168709
+          },
+          "relay": {
+            "UserNS": 1318000,
+            "SystemNS": 1010000,
+            "WallNS": 31292625
+          },
+          "viewer": {
+            "UserNS": 829000,
+            "SystemNS": 623000,
+            "WallNS": 17961417
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 144000,
+            "SystemNS": 382000,
+            "WallNS": 201302917
+          },
+          "parent_generator": {
+            "UserNS": 133000,
+            "SystemNS": 161000,
+            "WallNS": 201316459
+          },
+          "relay": {
+            "UserNS": 92000,
+            "SystemNS": 371000,
+            "WallNS": 201274833
+          },
+          "viewer": {
+            "UserNS": 82000,
+            "SystemNS": 333000,
+            "WallNS": 201272666
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 12131000,
+            "SystemNS": 15256000,
+            "WallNS": 3200922417
+          },
+          "parent_generator": {
+            "UserNS": 5914000,
+            "SystemNS": 7795000,
+            "WallNS": 3200939584
+          },
+          "relay": {
+            "UserNS": 6127000,
+            "SystemNS": 5376000,
+            "WallNS": 3200921458
+          },
+          "viewer": {
+            "UserNS": 13120000,
+            "SystemNS": 15203000,
+            "WallNS": 3200929959
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 56790,
+          "scenario": "active_multi_session",
+          "Sessions": 16,
+          "Viewers": 1,
+          "Operations": 32,
+          "Connections": 1,
+          "Acks": 32,
+          "Retries": 0,
+          "Deliveries": 32,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 56886,
+          "EnvelopeBytes": 55670,
+          "CiphertextBytes": 35980,
+          "PlaintextBytes": 35468,
+          "AckWSBytes": 2518,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 99994667,
+          "P95NS": 101469583,
+          "SealP50NS": 152166,
+          "SealP95NS": 720125,
+          "OpenP50NS": 233333,
+          "OpenP95NS": 820667,
+          "LatencyNS": [
+            101059917,
+            100387166,
+            99451125,
+            99872417,
+            100414542,
+            99565750,
+            99947083,
+            99925792,
+            100009209,
+            99206042,
+            101469583,
+            98563583,
+            100520625,
+            100160208,
+            101258208,
+            98864709,
+            99171916,
+            100676583,
+            98988333,
+            107550083,
+            96086250,
+            96983208,
+            100452875,
+            99782250,
+            98797375,
+            99994667,
+            100402000,
+            100203750,
+            100310667,
+            100263375,
+            98733208,
+            100297333
+          ],
+          "SealNS": [
+            154417,
+            173125,
+            182375,
+            152250,
+            183542,
+            143125,
+            146250,
+            137792,
+            210959,
+            130708,
+            720125,
+            141000,
+            143208,
+            63000,
+            85833,
+            83500,
+            144792,
+            173000,
+            144667,
+            160417,
+            151083,
+            212750,
+            272584,
+            90375,
+            152333,
+            318167,
+            146166,
+            237792,
+            164125,
+            138084,
+            870916,
+            152166
+          ],
+          "OpenNS": [
+            758375,
+            230459,
+            188125,
+            210916,
+            820667,
+            193458,
+            185875,
+            200916,
+            186042,
+            290208,
+            1242458,
+            231584,
+            109458,
+            105292,
+            762917,
+            235417,
+            233333,
+            200084,
+            191417,
+            255250,
+            221292,
+            291125,
+            416375,
+            197375,
+            271375,
+            181834,
+            303667,
+            377834,
+            235750,
+            257750,
+            276375,
+            388167
+          ]
+        }
+      },
+      {
+        "round": 3,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "independent_viewers",
+        "ParentPID": 39544,
+        "WorkerPIDs": {
+          "machine": 39575,
+          "relay": 39571,
+          "viewer": 39572
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1292000,
+            "SystemNS": 755000,
+            "WallNS": 3765000
+          },
+          "parent_generator": {
+            "UserNS": 794000,
+            "SystemNS": 3362000,
+            "WallNS": 79181791
+          },
+          "relay": {
+            "UserNS": 2556000,
+            "SystemNS": 1663000,
+            "WallNS": 58938292
+          },
+          "viewer": {
+            "UserNS": 1156000,
+            "SystemNS": 819000,
+            "WallNS": 26931792
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 147000,
+            "SystemNS": 330000,
+            "WallNS": 201541708
+          },
+          "parent_generator": {
+            "UserNS": 138000,
+            "SystemNS": 234000,
+            "WallNS": 201586583
+          },
+          "relay": {
+            "UserNS": 108000,
+            "SystemNS": 365000,
+            "WallNS": 201462750
+          },
+          "viewer": {
+            "UserNS": 120000,
+            "SystemNS": 372000,
+            "WallNS": 201414708
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 6739000,
+            "SystemNS": 6851000,
+            "WallNS": 1600998750
+          },
+          "parent_generator": {
+            "UserNS": 1745000,
+            "SystemNS": 1749000,
+            "WallNS": 1600999875
+          },
+          "relay": {
+            "UserNS": 2372000,
+            "SystemNS": 2727000,
+            "WallNS": 1600994167
+          },
+          "viewer": {
+            "UserNS": 15743000,
+            "SystemNS": 9862000,
+            "WallNS": 1601161250
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 113560,
+          "scenario": "independent_viewers",
+          "Sessions": 4,
+          "Viewers": 4,
+          "Operations": 16,
+          "Connections": 1,
+          "Acks": 16,
+          "Retries": 0,
+          "Deliveries": 64,
+          "HTTPHandshakeBytes": 1563,
+          "PublishWSBytes": 28438,
+          "EnvelopeBytes": 27830,
+          "CiphertextBytes": 17980,
+          "PlaintextBytes": 17724,
+          "AckWSBytes": 1254,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 99903167,
+          "P95NS": 101615792,
+          "SealP50NS": 140334,
+          "SealP95NS": 601416,
+          "OpenP50NS": 182542,
+          "OpenP95NS": 1155292,
+          "LatencyNS": [
+            101590709,
+            98837291,
+            99903167,
+            100243375,
+            98849458,
+            100405917,
+            100439584,
+            100600500,
+            99267959,
+            100104958,
+            101615792,
+            99026708,
+            99720375,
+            98842417,
+            101000000,
+            99517166
+          ],
+          "SealNS": [
+            269000,
+            143583,
+            140334,
+            93417,
+            183000,
+            137541,
+            151500,
+            117875,
+            136125,
+            132625,
+            78875,
+            154333,
+            158834,
+            325666,
+            601416,
+            133875
+          ],
+          "OpenNS": [
+            1187458,
+            1137917,
+            1232666,
+            1336833,
+            107042,
+            91500,
+            109333,
+            137125,
+            126958,
+            69959,
+            91708,
+            134458,
+            660458,
+            466041,
+            1155292,
+            274625,
+            198542,
+            182083,
+            210667,
+            174833,
+            172625,
+            185500,
+            171209,
+            182542,
+            104875,
+            89417,
+            101834,
+            115792,
+            165959,
+            250208,
+            172958,
+            277791,
+            188625,
+            162292,
+            236542,
+            216084,
+            106375,
+            106792,
+            132333,
+            135000,
+            736083,
+            254416,
+            191542,
+            165083,
+            245458,
+            263125,
+            169458,
+            202667,
+            232916,
+            158292,
+            360541,
+            360125,
+            299291,
+            292125,
+            182417,
+            180209,
+            262584,
+            250625,
+            248875,
+            171708,
+            281250,
+            150833,
+            179709,
+            235041
+          ]
+        }
+      },
+      {
+        "round": 3,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "reconnect_unacked",
+        "ParentPID": 39544,
+        "WorkerPIDs": {
+          "machine": 39582,
+          "relay": 39580,
+          "viewer": 39581
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1192000,
+            "SystemNS": 788000,
+            "WallNS": 2630708
+          },
+          "parent_generator": {
+            "UserNS": 513000,
+            "SystemNS": 2355000,
+            "WallNS": 50364791
+          },
+          "relay": {
+            "UserNS": 1440000,
+            "SystemNS": 931000,
+            "WallNS": 33984208
+          },
+          "viewer": {
+            "UserNS": 988000,
+            "SystemNS": 255000,
+            "WallNS": 19137834
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 97000,
+            "SystemNS": 172000,
+            "WallNS": 201467959
+          },
+          "parent_generator": {
+            "UserNS": 129000,
+            "SystemNS": 172000,
+            "WallNS": 201534833
+          },
+          "relay": {
+            "UserNS": 95000,
+            "SystemNS": 393000,
+            "WallNS": 201319791
+          },
+          "viewer": {
+            "UserNS": 37000,
+            "SystemNS": 55000,
+            "WallNS": 201360750
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 5921000,
+            "SystemNS": 5646000,
+            "WallNS": 1453025167
+          },
+          "parent_generator": {
+            "UserNS": 1300000,
+            "SystemNS": 1253000,
+            "WallNS": 1453029583
+          },
+          "relay": {
+            "UserNS": 1836000,
+            "SystemNS": 1885000,
+            "WallNS": 1453196375
+          },
+          "viewer": {
+            "UserNS": 4757000,
+            "SystemNS": 5199000,
+            "WallNS": 1453157375
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 23064,
+          "scenario": "reconnect_unacked",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 12,
+          "Connections": 2,
+          "Acks": 12,
+          "Retries": 1,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 991,
+          "PublishWSBytes": 23103,
+          "EnvelopeBytes": 22609,
+          "CiphertextBytes": 14603,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 99874917,
+          "P95NS": 351324292,
+          "SealP50NS": 144833,
+          "SealP95NS": 351875,
+          "OpenP50NS": 213459,
+          "OpenP95NS": 613333,
+          "LatencyNS": [
+            351324292,
+            102393708,
+            99752833,
+            100302791,
+            99874917,
+            100290625,
+            99449375,
+            99656958,
+            100526167,
+            99728792,
+            100041667,
+            99114292
+          ],
+          "SealNS": [
+            218792,
+            83875,
+            150875,
+            135958,
+            247166,
+            144833,
+            137167,
+            134917,
+            170042,
+            162708,
+            131875,
+            351875
+          ],
+          "OpenNS": [
+            613333,
+            159417,
+            243417,
+            213459,
+            223041,
+            198667,
+            206667,
+            198625,
+            205375,
+            297166,
+            253042,
+            182792,
+            221000
+          ]
+        }
+      },
+      {
+        "round": 3,
+        "Arm": "isolated-processes-v1",
+        "Scenario": "ack_delay",
+        "ParentPID": 39544,
+        "WorkerPIDs": {
+          "machine": 39593,
+          "relay": 39591,
+          "viewer": 39592
+        },
+        "Init": {
+          "machine": {
+            "UserNS": 1006000,
+            "SystemNS": 499000,
+            "WallNS": 2210083
+          },
+          "parent_generator": {
+            "UserNS": 446000,
+            "SystemNS": 2057000,
+            "WallNS": 44447417
+          },
+          "relay": {
+            "UserNS": 1236000,
+            "SystemNS": 691000,
+            "WallNS": 30398000
+          },
+          "viewer": {
+            "UserNS": 757000,
+            "SystemNS": 240000,
+            "WallNS": 16351334
+          }
+        },
+        "Idle": {
+          "machine": {
+            "UserNS": 106000,
+            "SystemNS": 164000,
+            "WallNS": 201582792
+          },
+          "parent_generator": {
+            "UserNS": 135000,
+            "SystemNS": 142000,
+            "WallNS": 201660750
+          },
+          "relay": {
+            "UserNS": 69000,
+            "SystemNS": 168000,
+            "WallNS": 201369500
+          },
+          "viewer": {
+            "UserNS": 33000,
+            "SystemNS": 58000,
+            "WallNS": 201477250
+          }
+        },
+        "Active": {
+          "machine": {
+            "UserNS": 3581000,
+            "SystemNS": 3244000,
+            "WallNS": 1226153792
+          },
+          "parent_generator": {
+            "UserNS": 1190000,
+            "SystemNS": 1147000,
+            "WallNS": 1226156334
+          },
+          "relay": {
+            "UserNS": 2211000,
+            "SystemNS": 2825000,
+            "WallNS": 1226341083
+          },
+          "viewer": {
+            "UserNS": 4357000,
+            "SystemNS": 4439000,
+            "WallNS": 1226257333
+          }
+        },
+        "Result": {
+          "ViewerWSBytes": 21290,
+          "scenario": "ack_delay",
+          "Sessions": 1,
+          "Viewers": 1,
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "InitNS": 0,
+          "IdleNS": 0,
+          "IdleCPUNS": 0,
+          "ProcessCPUNS": 0,
+          "WallNS": 0,
+          "P50NS": 99927167,
+          "P95NS": 125033834,
+          "SealP50NS": 158250,
+          "SealP95NS": 930417,
+          "OpenP50NS": 224500,
+          "OpenP95NS": 793209,
+          "LatencyNS": [
+            125033834,
+            101148000,
+            99018084,
+            100559458,
+            99567833,
+            99927167,
+            100794875,
+            99514416,
+            99776750,
+            100263542,
+            98706833,
+            101230334
+          ],
+          "SealNS": [
+            260625,
+            930417,
+            170041,
+            208166,
+            149625,
+            158250,
+            161291,
+            156750,
+            150292,
+            80708,
+            170292,
+            124041
+          ],
+          "OpenNS": [
+            793209,
+            202959,
+            269458,
+            206791,
+            288292,
+            224500,
+            239125,
+            199750,
+            88833,
+            353625,
+            195917,
+            457292
+          ]
+        }
+      }
+    ]
+  },
+  "summary": {
+    "ack_delay": {
+      "isolated_active_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 5.761,
+            "p95": 5.832,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 4.042,
+            "p95": 5.005,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1226.153792,
+            "p95": 1226.746334,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 9.803,
+            "p95": 10.837,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 2.218,
+            "p95": 2.27,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 2.936,
+            "p95": 3.431,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1226.341083,
+            "p95": 1226.799708,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 5.154,
+            "p95": 5.701,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 4.492,
+            "p95": 4.571,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 4.992,
+            "p95": 5.874,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1226.257333,
+            "p95": 1226.76675,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 9.563,
+            "p95": 10.366,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 1.232,
+            "p95": 1.268,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 1.273,
+            "p95": 1.352,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1226.156334,
+            "p95": 1226.751042,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.541,
+            "p95": 2.584,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_idle_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 0.122,
+            "p95": 0.148,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.191,
+            "p95": 0.353,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.471417,
+            "p95": 201.582792,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.313,
+            "p95": 0.501,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 0.074,
+            "p95": 0.094,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.182,
+            "p95": 0.341,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.292625,
+            "p95": 201.3695,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.256,
+            "p95": 0.435,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.033,
+            "p95": 0.093,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.058,
+            "p95": 0.352,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.38675,
+            "p95": 201.47725,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.091,
+            "p95": 0.445,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.13,
+            "p95": 0.135,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.16,
+            "p95": 0.256,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.510584,
+            "p95": 201.66075,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.284,
+            "p95": 0.386,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_init_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 1.198,
+            "p95": 1.379,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.785,
+            "p95": 1.163,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 2.806583,
+            "p95": 3.144875,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 1.983,
+            "p95": 2.542,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 1.398,
+            "p95": 1.821,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.955,
+            "p95": 1.424,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 33.221916,
+            "p95": 43.139208,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.353,
+            "p95": 3.245,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.823,
+            "p95": 1.2,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.274,
+            "p95": 0.464,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 18.89025,
+            "p95": 22.85075,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 1.097,
+            "p95": 1.664,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.46,
+            "p95": 0.717,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 2.057,
+            "p95": 3.411,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 47.249459,
+            "p95": 63.24775,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.517,
+            "p95": 4.128,
+            "runs": 3
+          }
+        }
+      },
+      "combined_whole_process_cpu_ms": {
+        "median": 18.461,
+        "p95": 19.824,
+        "runs": 3
+      },
+      "combined_wall_ms": {
+        "median": 1226.518458,
+        "p95": 1227.348333,
+        "runs": 3
+      },
+      "isolated_latency_p50_ms": {
+        "median": 99.927167,
+        "p95": 100.024084,
+        "runs": 3
+      },
+      "isolated_latency_p95_ms": {
+        "median": 125.579834,
+        "p95": 126.373583,
+        "runs": 3
+      },
+      "counts": [
+        {
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "ViewerWSBytes": 21290
+        },
+        {
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "ViewerWSBytes": 21290
+        },
+        {
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "ViewerWSBytes": 21290
+        }
+      ]
+    },
+    "active_multi_session": {
+      "isolated_active_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 11.93,
+            "p95": 12.131,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 14.181,
+            "p95": 15.256,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 3201.148959,
+            "p95": 3201.157875,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 26.111,
+            "p95": 27.387,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 4.108,
+            "p95": 6.127,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 4.403,
+            "p95": 5.376,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 3201.239792,
+            "p95": 3201.302,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 8.511,
+            "p95": 11.503,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 12.488,
+            "p95": 13.12,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 14.635,
+            "p95": 15.203,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 3201.197958,
+            "p95": 3201.246416,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 27.123,
+            "p95": 28.323,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 5.762,
+            "p95": 5.914,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 6.049,
+            "p95": 7.795,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 3201.155834,
+            "p95": 3201.167916,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 11.234,
+            "p95": 13.709,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_idle_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 0.144,
+            "p95": 0.145,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.382,
+            "p95": 0.405,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.387209,
+            "p95": 201.447,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.526,
+            "p95": 0.55,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 0.092,
+            "p95": 0.103,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.338,
+            "p95": 0.371,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.278958,
+            "p95": 201.3875,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.441,
+            "p95": 0.463,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.037,
+            "p95": 0.082,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.059,
+            "p95": 0.333,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.357792,
+            "p95": 201.359375,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.096,
+            "p95": 0.415,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.131,
+            "p95": 0.133,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.161,
+            "p95": 0.231,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.410875,
+            "p95": 201.4805,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.294,
+            "p95": 0.351,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_init_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 1.093,
+            "p95": 1.279,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.832,
+            "p95": 0.888,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 2.811791,
+            "p95": 4.474542,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 1.981,
+            "p95": 2.111,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 1.318,
+            "p95": 1.545,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 1.01,
+            "p95": 1.217,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 31.7755,
+            "p95": 41.75925,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.328,
+            "p95": 2.762,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.829,
+            "p95": 0.956,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.623,
+            "p95": 0.653,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 17.961417,
+            "p95": 24.762,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 1.452,
+            "p95": 1.609,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.577,
+            "p95": 0.641,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 2.458,
+            "p95": 2.923,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 48.197083,
+            "p95": 57.992458,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 3.035,
+            "p95": 3.564,
+            "runs": 3
+          }
+        }
+      },
+      "combined_whole_process_cpu_ms": {
+        "median": 37.136,
+        "p95": 37.58,
+        "runs": 3
+      },
+      "combined_wall_ms": {
+        "median": 3201.111292,
+        "p95": 3202.292208,
+        "runs": 3
+      },
+      "isolated_latency_p50_ms": {
+        "median": 99.994667,
+        "p95": 100.019334,
+        "runs": 3
+      },
+      "isolated_latency_p95_ms": {
+        "median": 102.200625,
+        "p95": 102.912209,
+        "runs": 3
+      },
+      "counts": [
+        {
+          "Operations": 32,
+          "Connections": 1,
+          "Acks": 32,
+          "Retries": 0,
+          "Deliveries": 32,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 56886,
+          "EnvelopeBytes": 55670,
+          "CiphertextBytes": 35980,
+          "PlaintextBytes": 35468,
+          "AckWSBytes": 2518,
+          "ViewerWSBytes": 56790
+        },
+        {
+          "Operations": 32,
+          "Connections": 1,
+          "Acks": 32,
+          "Retries": 0,
+          "Deliveries": 32,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 56886,
+          "EnvelopeBytes": 55670,
+          "CiphertextBytes": 35980,
+          "PlaintextBytes": 35468,
+          "AckWSBytes": 2518,
+          "ViewerWSBytes": 56790
+        },
+        {
+          "Operations": 32,
+          "Connections": 1,
+          "Acks": 32,
+          "Retries": 0,
+          "Deliveries": 32,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 56886,
+          "EnvelopeBytes": 55670,
+          "CiphertextBytes": 35980,
+          "PlaintextBytes": 35468,
+          "AckWSBytes": 2518,
+          "ViewerWSBytes": 56790
+        }
+      ]
+    },
+    "active_one": {
+      "isolated_active_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 5.727,
+            "p95": 5.837,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 4.132,
+            "p95": 7.764,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1201.128834,
+            "p95": 1201.713,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 9.859,
+            "p95": 13.601,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 1.574,
+            "p95": 3.692,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 1.769,
+            "p95": 2.559,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1200.997667,
+            "p95": 1201.37875,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 3.34,
+            "p95": 6.251,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 4.705,
+            "p95": 4.787,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 4.484,
+            "p95": 5.36,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1201.024291,
+            "p95": 1201.332375,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 9.271,
+            "p95": 10.065,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 1.35,
+            "p95": 1.434,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 1.185,
+            "p95": 1.345,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1201.12875,
+            "p95": 1201.804459,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.535,
+            "p95": 2.779,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_idle_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 0.131,
+            "p95": 0.143,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.235,
+            "p95": 0.316,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.763458,
+            "p95": 212.557709,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.366,
+            "p95": 0.459,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 0.08,
+            "p95": 0.098,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.204,
+            "p95": 0.352,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.429,
+            "p95": 211.769875,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.284,
+            "p95": 0.45,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.038,
+            "p95": 0.116,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.065,
+            "p95": 0.43,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.592833,
+            "p95": 212.424375,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.103,
+            "p95": 0.546,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.136,
+            "p95": 0.171,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.202,
+            "p95": 0.235,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.823542,
+            "p95": 212.587208,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.337,
+            "p95": 0.371,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_init_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 1.119,
+            "p95": 1.234,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.596,
+            "p95": 0.675,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 2.450625,
+            "p95": 2.836584,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 1.629,
+            "p95": 1.909,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 1.363,
+            "p95": 1.543,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.778,
+            "p95": 1.03,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 33.809584,
+            "p95": 35.327083,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.103,
+            "p95": 2.573,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.864,
+            "p95": 1.017,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.306,
+            "p95": 0.812,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 18.699834,
+            "p95": 18.960625,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 1.17,
+            "p95": 1.829,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.629,
+            "p95": 0.653,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 2.916,
+            "p95": 3.051,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 51.189167,
+            "p95": 51.456666,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 3.569,
+            "p95": 3.68,
+            "runs": 3
+          }
+        }
+      },
+      "combined_whole_process_cpu_ms": {
+        "median": 11.242,
+        "p95": 16.927,
+        "runs": 3
+      },
+      "combined_wall_ms": {
+        "median": 1201.19375,
+        "p95": 1201.408083,
+        "runs": 3
+      },
+      "isolated_latency_p50_ms": {
+        "median": 100.144208,
+        "p95": 100.263291,
+        "runs": 3
+      },
+      "isolated_latency_p95_ms": {
+        "median": 101.358375,
+        "p95": 102.107667,
+        "runs": 3
+      },
+      "counts": [
+        {
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "ViewerWSBytes": 21290
+        },
+        {
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "ViewerWSBytes": 21290
+        },
+        {
+          "Operations": 12,
+          "Connections": 1,
+          "Acks": 12,
+          "Retries": 0,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 21326,
+          "EnvelopeBytes": 20870,
+          "CiphertextBytes": 13480,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "ViewerWSBytes": 21290
+        }
+      ]
+    },
+    "independent_viewers": {
+      "isolated_active_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 6.739,
+            "p95": 6.767,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 6.691,
+            "p95": 6.851,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1601.059875,
+            "p95": 1601.942917,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 13.458,
+            "p95": 13.59,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 2.384,
+            "p95": 2.395,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 2.727,
+            "p95": 2.925,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1601.419292,
+            "p95": 1602.11325,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 5.099,
+            "p95": 5.32,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 15.337,
+            "p95": 15.743,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 9.862,
+            "p95": 12.792,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1601.16125,
+            "p95": 1602.027,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 25.605,
+            "p95": 28.129,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 1.745,
+            "p95": 1.764,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 1.83,
+            "p95": 1.907,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1601.058,
+            "p95": 1601.95575,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 3.594,
+            "p95": 3.61,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_idle_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 0.144,
+            "p95": 0.147,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.33,
+            "p95": 0.493,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.541708,
+            "p95": 202.227666,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.477,
+            "p95": 0.637,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 0.092,
+            "p95": 0.108,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.353,
+            "p95": 0.365,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.46275,
+            "p95": 201.56825,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.44,
+            "p95": 0.473,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.097,
+            "p95": 0.12,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.372,
+            "p95": 0.384,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.414708,
+            "p95": 202.0,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.481,
+            "p95": 0.492,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.138,
+            "p95": 0.14,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.234,
+            "p95": 0.288,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.586583,
+            "p95": 202.306458,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.372,
+            "p95": 0.421,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_init_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 1.254,
+            "p95": 1.292,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.784,
+            "p95": 0.811,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 3.160708,
+            "p95": 3.765,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.047,
+            "p95": 2.063,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 2.036,
+            "p95": 2.556,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 1.663,
+            "p95": 1.676,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 49.354792,
+            "p95": 58.938292,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 3.712,
+            "p95": 4.219,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 1.156,
+            "p95": 1.293,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 1.153,
+            "p95": 1.183,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 23.422292,
+            "p95": 26.931792,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.269,
+            "p95": 2.476,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.727,
+            "p95": 0.794,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 3.338,
+            "p95": 3.362,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 65.542167,
+            "p95": 79.181791,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 4.006,
+            "p95": 4.156,
+            "runs": 3
+          }
+        }
+      },
+      "combined_whole_process_cpu_ms": {
+        "median": 32.326,
+        "p95": 33.031,
+        "runs": 3
+      },
+      "combined_wall_ms": {
+        "median": 1602.339208,
+        "p95": 1602.392542,
+        "runs": 3
+      },
+      "isolated_latency_p50_ms": {
+        "median": 99.918541,
+        "p95": 99.966,
+        "runs": 3
+      },
+      "isolated_latency_p95_ms": {
+        "median": 102.496375,
+        "p95": 108.07275,
+        "runs": 3
+      },
+      "counts": [
+        {
+          "Operations": 16,
+          "Connections": 1,
+          "Acks": 16,
+          "Retries": 0,
+          "Deliveries": 64,
+          "HTTPHandshakeBytes": 1563,
+          "PublishWSBytes": 28438,
+          "EnvelopeBytes": 27830,
+          "CiphertextBytes": 17980,
+          "PlaintextBytes": 17724,
+          "AckWSBytes": 1254,
+          "ViewerWSBytes": 113560
+        },
+        {
+          "Operations": 16,
+          "Connections": 1,
+          "Acks": 16,
+          "Retries": 0,
+          "Deliveries": 64,
+          "HTTPHandshakeBytes": 1563,
+          "PublishWSBytes": 28438,
+          "EnvelopeBytes": 27830,
+          "CiphertextBytes": 17980,
+          "PlaintextBytes": 17724,
+          "AckWSBytes": 1254,
+          "ViewerWSBytes": 113560
+        },
+        {
+          "Operations": 16,
+          "Connections": 1,
+          "Acks": 16,
+          "Retries": 0,
+          "Deliveries": 64,
+          "HTTPHandshakeBytes": 1563,
+          "PublishWSBytes": 28438,
+          "EnvelopeBytes": 27830,
+          "CiphertextBytes": 17980,
+          "PlaintextBytes": 17724,
+          "AckWSBytes": 1254,
+          "ViewerWSBytes": 113560
+        }
+      ]
+    },
+    "initial_idle": {
+      "isolated_active_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 0.025,
+            "p95": 0.029,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.056,
+            "p95": 0.065,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 0.192,
+            "p95": 0.542,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.081,
+            "p95": 0.094,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 0.02,
+            "p95": 0.035,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.049,
+            "p95": 0.068,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 0.541833,
+            "p95": 3.522708,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.069,
+            "p95": 0.103,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.016,
+            "p95": 0.043,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.027,
+            "p95": 0.089,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 0.400708,
+            "p95": 2.60825,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.043,
+            "p95": 0.132,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.06,
+            "p95": 0.079,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.09,
+            "p95": 0.11,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 0.174667,
+            "p95": 0.355125,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.15,
+            "p95": 0.189,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_idle_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 0.142,
+            "p95": 0.159,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.355,
+            "p95": 0.445,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 202.299583,
+            "p95": 204.445125,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.456,
+            "p95": 0.604,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 0.096,
+            "p95": 0.106,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.36,
+            "p95": 0.428,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.343458,
+            "p95": 202.042125,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.456,
+            "p95": 0.534,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.035,
+            "p95": 0.098,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.066,
+            "p95": 0.402,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.664292,
+            "p95": 202.113,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.101,
+            "p95": 0.5,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.153,
+            "p95": 0.184,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.225,
+            "p95": 0.275,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 202.346,
+            "p95": 204.699375,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.393,
+            "p95": 0.428,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_init_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 1.211,
+            "p95": 1.212,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.846,
+            "p95": 0.988,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 2.542333,
+            "p95": 3.039541,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.058,
+            "p95": 2.199,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 1.409,
+            "p95": 1.431,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.96,
+            "p95": 1.057,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 34.35675,
+            "p95": 35.481791,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.369,
+            "p95": 2.488,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.861,
+            "p95": 0.917,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.324,
+            "p95": 0.326,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 18.346042,
+            "p95": 18.445375,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 1.187,
+            "p95": 1.241,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.658,
+            "p95": 0.675,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 3.143,
+            "p95": 3.246,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 48.954834,
+            "p95": 49.860875,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 3.801,
+            "p95": 3.921,
+            "runs": 3
+          }
+        }
+      },
+      "combined_whole_process_cpu_ms": {
+        "median": 0.001,
+        "p95": 0.01,
+        "runs": 3
+      },
+      "combined_wall_ms": {
+        "median": 0.001875,
+        "p95": 0.015375,
+        "runs": 3
+      },
+      "isolated_latency_p50_ms": {
+        "median": 0.0,
+        "p95": 0.0,
+        "runs": 3
+      },
+      "isolated_latency_p95_ms": {
+        "median": 0.0,
+        "p95": 0.0,
+        "runs": 3
+      },
+      "counts": [
+        {
+          "Operations": 0,
+          "Connections": 1,
+          "Acks": 0,
+          "Retries": 0,
+          "Deliveries": 0,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 0,
+          "EnvelopeBytes": 0,
+          "CiphertextBytes": 0,
+          "PlaintextBytes": 0,
+          "AckWSBytes": 0,
+          "ViewerWSBytes": 0
+        },
+        {
+          "Operations": 0,
+          "Connections": 1,
+          "Acks": 0,
+          "Retries": 0,
+          "Deliveries": 0,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 0,
+          "EnvelopeBytes": 0,
+          "CiphertextBytes": 0,
+          "PlaintextBytes": 0,
+          "AckWSBytes": 0,
+          "ViewerWSBytes": 0
+        },
+        {
+          "Operations": 0,
+          "Connections": 1,
+          "Acks": 0,
+          "Retries": 0,
+          "Deliveries": 0,
+          "HTTPHandshakeBytes": 648,
+          "PublishWSBytes": 0,
+          "EnvelopeBytes": 0,
+          "CiphertextBytes": 0,
+          "PlaintextBytes": 0,
+          "AckWSBytes": 0,
+          "ViewerWSBytes": 0
+        }
+      ]
+    },
+    "reconnect_unacked": {
+      "isolated_active_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 4.196,
+            "p95": 5.921,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 5.646,
+            "p95": 7.534,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1453.279167,
+            "p95": 1456.368375,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 11.567,
+            "p95": 11.73,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 1.836,
+            "p95": 2.033,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 1.985,
+            "p95": 3.03,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1453.392833,
+            "p95": 1456.25975,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 3.721,
+            "p95": 5.063,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 4.757,
+            "p95": 5.188,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 5.199,
+            "p95": 7.175,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1453.327708,
+            "p95": 1456.456334,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 9.956,
+            "p95": 12.363,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 1.3,
+            "p95": 1.529,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 1.253,
+            "p95": 2.158,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 1453.275042,
+            "p95": 1456.335125,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.553,
+            "p95": 3.687,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_idle_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 0.097,
+            "p95": 0.171,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.172,
+            "p95": 0.278,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.467959,
+            "p95": 201.684375,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.269,
+            "p95": 0.449,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 0.095,
+            "p95": 0.135,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.393,
+            "p95": 0.404,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.319791,
+            "p95": 201.576583,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.488,
+            "p95": 0.539,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.087,
+            "p95": 0.12,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.383,
+            "p95": 0.386,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.36075,
+            "p95": 201.580458,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.47,
+            "p95": 0.506,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.145,
+            "p95": 0.151,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.249,
+            "p95": 0.276,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 201.534833,
+            "p95": 201.750417,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 0.4,
+            "p95": 0.421,
+            "runs": 3
+          }
+        }
+      },
+      "isolated_init_ms": {
+        "machine": {
+          "UserNS": {
+            "median": 1.192,
+            "p95": 1.37,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.788,
+            "p95": 0.822,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 3.155375,
+            "p95": 3.711875,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 1.98,
+            "p95": 2.192,
+            "runs": 3
+          }
+        },
+        "relay": {
+          "UserNS": {
+            "median": 1.463,
+            "p95": 2.464,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 1.139,
+            "p95": 1.736,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 44.127833,
+            "p95": 48.315083,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 2.602,
+            "p95": 4.2,
+            "runs": 3
+          }
+        },
+        "viewer": {
+          "UserNS": {
+            "median": 0.965,
+            "p95": 0.988,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 0.341,
+            "p95": 0.417,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 22.870625,
+            "p95": 26.625125,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 1.243,
+            "p95": 1.382,
+            "runs": 3
+          }
+        },
+        "parent_generator": {
+          "UserNS": {
+            "median": 0.715,
+            "p95": 0.849,
+            "runs": 3
+          },
+          "SystemNS": {
+            "median": 3.594,
+            "p95": 3.876,
+            "runs": 3
+          },
+          "WallNS": {
+            "median": 63.765542,
+            "p95": 70.124959,
+            "runs": 3
+          },
+          "CPU": {
+            "median": 4.309,
+            "p95": 4.725,
+            "runs": 3
+          }
+        }
+      },
+      "combined_whole_process_cpu_ms": {
+        "median": 14.299,
+        "p95": 15.663,
+        "runs": 3
+      },
+      "combined_wall_ms": {
+        "median": 1455.520292,
+        "p95": 1455.801542,
+        "runs": 3
+      },
+      "isolated_latency_p50_ms": {
+        "median": 99.874917,
+        "p95": 100.544875,
+        "runs": 3
+      },
+      "isolated_latency_p95_ms": {
+        "median": 351.689708,
+        "p95": 353.375,
+        "runs": 3
+      },
+      "counts": [
+        {
+          "Operations": 12,
+          "Connections": 2,
+          "Acks": 12,
+          "Retries": 1,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 991,
+          "PublishWSBytes": 23103,
+          "EnvelopeBytes": 22609,
+          "CiphertextBytes": 14603,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "ViewerWSBytes": 23064
+        },
+        {
+          "Operations": 12,
+          "Connections": 2,
+          "Acks": 12,
+          "Retries": 1,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 991,
+          "PublishWSBytes": 23103,
+          "EnvelopeBytes": 22609,
+          "CiphertextBytes": 14603,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "ViewerWSBytes": 23064
+        },
+        {
+          "Operations": 12,
+          "Connections": 2,
+          "Acks": 12,
+          "Retries": 1,
+          "Deliveries": 12,
+          "HTTPHandshakeBytes": 991,
+          "PublishWSBytes": 23103,
+          "EnvelopeBytes": 22609,
+          "CiphertextBytes": 14603,
+          "PlaintextBytes": 13288,
+          "AckWSBytes": 938,
+          "ViewerWSBytes": 23064
+        }
+      ]
+    }
+  }
+}

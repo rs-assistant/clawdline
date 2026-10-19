@@ -572,12 +572,30 @@ type wireIsolatedReply struct {
 	Sample wireIsolatedSample
 	Result wireBenchResult
 }
+
+// Worker stderr can still be copied after reply decoding fails.
+type wireBenchDiagnostics struct {
+	mu     sync.Mutex
+	buffer bytes.Buffer
+}
+
+func (b *wireBenchDiagnostics) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buffer.Write(p)
+}
+func (b *wireBenchDiagnostics) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buffer.String()
+}
+
 type wireIsolatedWorker struct {
 	cmd    *exec.Cmd
 	in     io.WriteCloser
 	enc    *json.Encoder
 	dec    *json.Decoder
-	stderr bytes.Buffer
+	stderr wireBenchDiagnostics
 }
 
 func wireIsolatedStart(t *testing.T, role string) *wireIsolatedWorker {
@@ -639,6 +657,18 @@ func TestWireEfficiencyWorker(t *testing.T) {
 	role := os.Getenv("CLAWDLINE_WIRE_WORKER")
 	if role == "" {
 		t.Skip("subprocess worker only")
+	}
+	if role == "malformed-diagnostics" {
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			for i := 0; i < 10000; i++ {
+				fmt.Fprintln(os.Stderr, "fixture worker diagnostic")
+			}
+		}()
+		fmt.Fprintln(os.Stdout, "invalid worker reply")
+		<-done
+		return
 	}
 	u0, s0 := wireBenchCPUParts(t)
 	wall0 := time.Now()
@@ -966,5 +996,17 @@ func TestWireEfficiencyIsolated(t *testing.T) {
 			}
 			t.Log("WIRE_ISOLATED_RESULT " + string(b))
 		})
+	}
+}
+
+// Exercise the actual os/exec stderr copier during a malformed reply.
+func TestWireEfficiencyMalformedWorkerDiagnostics(t *testing.T) {
+	w := wireIsolatedStart(t, "malformed-diagnostics")
+	var reply wireIsolatedReply
+	if err := w.dec.Decode(&reply); err == nil {
+		t.Fatal("malformed reply accepted")
+	}
+	for i := 0; i < 1000; i++ {
+		_ = w.stderr.String()
 	}
 }

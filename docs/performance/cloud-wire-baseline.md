@@ -100,3 +100,7 @@ The root moved getrusage into Unix-specific test support and made unsupported pl
 ## Independent review and measurement reliability
 
 An independent reviewer recomputed all 36 archived scenario rows (the original and root's three-round groups), found matching counts and percentiles, and judged this explicitly partial baseline safe to land. This was arithmetic and source review, not an independent transport rerun. Before integration the root addressed both non-blocking suggestions: final ACK accounting stays synchronized through the successful socket write and each scenario asserts its ACK count; viewer cleanup is registered before the first dial so partial setup is covered. A separate final three-round run validates the adjusted test. Earlier raw groups remain preserved and are not relabeled as measurements of this final source.
+
+## Follow-up CPU attribution
+
+The [isolated-process CPU experiment](cloud-wire-cpu.md) separates machine transport, fixture relay, viewer and generator costs. It adds attribution, not a production optimization or a speedup comparison with the combined-process subject.
