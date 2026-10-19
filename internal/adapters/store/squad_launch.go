@@ -398,16 +398,16 @@ func (s *Store) AuthenticateSquadActor(ctx context.Context, capability string) (
 	return actor, true, nil
 }
 
-// SquadHasLaunchForTerminal distinguishes a legacy Session from a squad
-// launch whose actor binding is still pending. Pending launches may not fall
-// back to legacy dispatch simply by omitting their capability.
-func (s *Store) SquadHasLaunchForTerminal(ctx context.Context, terminalID string) (bool, error) {
+// SquadHasLaunchForSession distinguishes an ordinary Session from a squad
+// launch on its terminal. A pending launch has no conversation identity yet,
+// so it blocks fallback; a bound launch belongs only to its conversation.
+func (s *Store) SquadHasLaunchForSession(ctx context.Context, terminalID, conversationID string) (bool, error) {
 	if terminalID == "" {
 		return false, nil
 	}
 	var exists int
 	err := s.rd.QueryRowContext(ctx, `SELECT 1 FROM squad_launches
-		WHERE terminal_id=? AND state IN ('pending','bound') LIMIT 1`, terminalID).Scan(&exists)
+		WHERE terminal_id=? AND (state='pending' OR (state='bound' AND conversation_id=?)) LIMIT 1`, terminalID, conversationID).Scan(&exists)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}

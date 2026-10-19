@@ -24,7 +24,7 @@ func (b *Broker) checkSquadDispatchActor(ctx context.Context, req DispatchReques
 		// A Session opened before squad snapshots, or without a role, has no
 		// capability. Preserve its existing dispatch route. A pending squad
 		// launch cannot use this compatibility path.
-		hasLaunch, err := b.Store.SquadHasLaunchForTerminal(ctx, rootTerminal)
+		hasLaunch, err := b.Store.SquadHasLaunchForSession(ctx, rootTerminal, record.Root.SessionID)
 		if err != nil {
 			return err
 		}
