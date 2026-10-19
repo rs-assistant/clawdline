@@ -216,3 +216,19 @@ For a machine that appears offline, inspect `clawdline cloud status` or the loca
 - The hosted console only carries operations present in the machine's advertised vocabulary. Version gaps can leave a request unsupported or waiting for its timeout; check both builds before assuming a feature is available.
 
 For the wider system layout, see [architecture.md](architecture.md). For user-facing setup and alternatives, see [remote access](user/remote-access.md). Historical Swift implementation details remain in dated records and the archive, not in this current overview.
+
+### Following model picker transitions
+
+A selected Session keeps its exact rich-row subscription after the first row arrives;
+list recovery must not unsubscribe that live view. Closing the view releases its hold.
+Opening Codex's model picker, answering its model step, and encountering an unread
+waiting menu also start a bounded read follow-up. The follow-up uses the registered
+transcript follow policy (two seconds initially, then four seconds, for at most ninety
+seconds), permits one read at a time, and pauses reads while the page is hidden.
+
+A successful read confirms a request, not the arrival of the next menu. The page follows
+until a different menu is observed, retaining Read again across a temporary idle gap.
+After the automatic window expires, the manual read remains available. Stale model
+options stay disabled during that gap, including after the ordinary press hold expires.
+No follow-up replays an answer key. Switching Session or execution cancels the old
+follow-up; ordinary unread questions stop following when the Session resumes.

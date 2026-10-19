@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { ClawdlineClient, FleetStore, RefusalError, TransportError, type FleetState } from "@clawdline/core"
+import { MENU_READ } from "./session/menu-follow.js"
 import { fleetTransport } from "./client.js"
 import {
   documentVisibility,
@@ -22,7 +23,12 @@ export function useFleet(client: ClawdlineClient): FleetState & { refresh: () =>
   const store = useMemo(() => new FleetStore(client, fleetTransport()), [client])
   useEffect(() => {
     void store.start()
-    return () => store.stop()
+    const readMenu = () => { void store.refresh() }
+    document.addEventListener(MENU_READ, readMenu)
+    return () => {
+      document.removeEventListener(MENU_READ, readMenu)
+      store.stop()
+    }
   }, [store])
   const state = useSyncExternalStore(
     (fn) => store.subscribe(fn),

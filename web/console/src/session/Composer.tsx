@@ -31,6 +31,7 @@ import { canOpenMachinePairing, openMachinePairing } from "../legacy/devices-bri
 import { watchMachinePaired } from "../cloud/pairing-completion.js"
 import { writeIsOff } from "./outcome.js"
 import { deliverUntilSeen, pendingSends } from "./send.js"
+import { MENU_FOLLOW } from "./menu-follow.js"
 import { Waiting } from "./Waiting.js"
 import { ImageMarkup } from "./ImageMarkup.js"
 import { ComposerBox } from "./ComposerBox.js"
@@ -497,7 +498,11 @@ export function Composer({
       // enough on its own to free the box when the first never arrives.
       const code = await deliverUntilSeen(pendingSends.add(row.id, said, pictures, Date.now()))
       if (writeIsOff(code)) setBlocked({ machine, code })
-      if (!code) onSent?.()
+      if (!code) {
+        if (said.trim() === "/model" && !pictures.length && row.assistant === "codex")
+          document.dispatchEvent(new CustomEvent(MENU_FOLLOW, { detail: row.id }))
+        onSent?.()
+      }
     } catch (err) {
       const code = err instanceof RefusalError ? err.code : "unexpected_error"
       if (writeIsOff(code)) setBlocked({ machine, code })
