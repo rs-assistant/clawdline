@@ -164,7 +164,7 @@ export function AdminGate({ declared }: { declared: string }) {
 
   useEffect(() => {
     document.title = navigable ? say("docTitlePage", { page: pageTitle }) : say("docTitle")
-  }, [navigable, pageTitle, say])
+  }, [navigable, pageTitle, say, locale])
 
   if (!navigable) {
     return (
