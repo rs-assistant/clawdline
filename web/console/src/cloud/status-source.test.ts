@@ -1019,3 +1019,19 @@ test("a direct list never carries the previous execution's assistant into a new 
   assert.equal(restarted.rows?.[0]?.assistant, undefined)
   assert.equal(calls.length, 2)
 })
+
+test("a Cloud presentation preserves a project's SVG and independent accent", async () => {
+  const { client } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
+  const icon = { accent: "#123456", cells: [], svg: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>' }
+  client.listPresentationsForMachine = async () => ({
+    at: Math.floor(Date.now() / 1000), complete: true,
+    sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "Vector project", icon,
+      status: { state: "idle", work_state: "ready" } }],
+  }) as never
+  const source = statusSource(() => client as never)
+  const signal = new AbortController().signal
+  assert.equal((await source.readMachine(machineID, signal)).kind, "ready")
+  const presentations = await source.readMachinePresentations?.(machineID, signal)
+  assert.deepEqual(presentations?.[0]?.icon, icon)
+})

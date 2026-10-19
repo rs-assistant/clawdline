@@ -356,10 +356,11 @@ Work through these four checks, skipping a check only when it genuinely does not
    with `clawdline project add <absolute-root>` and list again. This records a place from which a
    Session may start; it does not change the repository.
 2. **Name and icon.** Clawdline derives a stable icon when none is configured. If the person wants
-   a deliberate name or pixel mark, preserve every other entry in `~/.claude/project-icons.json`
+   a deliberate name, pixel mark or SVG, preserve every other entry in `~/.claude/project-icons.json`
    and edit only the longest-containing path for this Project. The format is documented in the
-   Clawdline repository's `docs/project-status.md`; the Projects page can also copy an existing
-   resolved icon without hand-editing JSON. A global user file is not repository content: show the
+   Clawdline repository's `docs/project-icons.md`: pixel grids are limited to 64×64 and SVGs
+   require a positive `viewBox`, static content and local references only (96 KiB maximum).
+   Both fit the existing icon slot without enlarging the layout. A global user file is not repository content: show the
    exact proposed entry before changing it when the request did not already authorize that edit.
 3. **Deploy and long work.** Clawdline only reads status receipts; it never runs a deploy. For a
    GitHub repository, a deploy receipt is

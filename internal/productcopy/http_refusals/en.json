@@ -1229,5 +1229,8 @@
   "http.ffd795cf51e7ebea": "place is board or backlog.",
   "http.ffed8239d8e297e0": "Supply the expected version and text content.",
   "http.8ff321b2a3251e41": "A withdrawal reason is required within the note text limit.",
-  "http.f0ef2e01b9a9a988": "This note is already closed; its existing outcome is preserved."
+  "http.f0ef2e01b9a9a988": "This note is already closed; its existing outcome is preserved.",
+  "http.c31ce37483923347": "an SVG icon needs an RGB accent and empty cells",
+  "http.1df66f20c4f7b5fc": "an SVG icon must be a bounded, static SVG with a positive viewBox and local references only",
+  "http.e34fa62ec75e26d8": "invalid project icon art"
 }

@@ -258,7 +258,7 @@ export const atMac = atMacOriginal as () => boolean
 // has not arrived, not that the browser should invent another identity.
 export const markForSession = (session: unknown, _projectKey?: string): (Icon & { generated?: boolean }) | null => {
   const row = session as { icon?: Icon | null } | null
-  return row?.icon?.cells?.length ? row.icon : null
+  return row?.icon && (row.icon.cells?.length || row.icon.svg) ? row.icon : null
 }
 export const projectLabel = projectLabelOriginal as (key: string | undefined) => string
 /** The "my messages" copy in the page's language, from that module's own table. */

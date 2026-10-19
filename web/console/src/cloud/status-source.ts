@@ -431,7 +431,8 @@ export function statusSource(current: () => StatusClient | null,
             icon: typeof icon?.accent === "string" && Array.isArray(icon.cells) &&
               icon.cells.every((line: unknown) => Array.isArray(line) &&
                 line.every((cell: unknown) => cell === null || typeof cell === "string"))
-              ? { accent: icon.accent, cells: icon.cells as ((string | null)[])[] } : undefined })
+              ? { accent: icon.accent, cells: icon.cells as ((string | null)[])[],
+                  svg: typeof icon.svg === "string" ? icon.svg : undefined } : undefined })
         }
         return result
       } catch { return null }

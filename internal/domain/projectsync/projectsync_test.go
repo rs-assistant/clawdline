@@ -167,3 +167,27 @@ func TestABuildCacheInsideASkillIsNotCarried(t *testing.T) {
 		}
 	}
 }
+
+func TestSVGProjectIconSurvivesSettingsAndMirrorStorage(t *testing.T) {
+	g := icon.Grid{Accent: "#123456", SVG: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>`}
+	entry := Entry{Repo: "github.com/o/shop", CloneURL: "git@github.com:o/shop.git", Icon: g}
+	if err := Check(entry, true); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	m, err := OpenMirror(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Put(Record{Repo: entry.Repo, Path: "/w/shop", Icon: entry.Icon}); err != nil {
+		t.Fatal(err)
+	}
+	again, err := OpenMirror(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, ok := again.Lookup("/w/shop/frontend")
+	if !ok || r.Icon.SVG != g.SVG || r.Icon.Accent != g.Accent {
+		t.Fatal("SVG project identity was lost during sync storage")
+	}
+}

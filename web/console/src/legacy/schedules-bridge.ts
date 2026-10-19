@@ -59,7 +59,7 @@ import {
    original's JSON objects, read the way its page reads them, and the page is
    the only reader. */
 
-export type ScheduleIcon = { cells?: unknown[]; accent?: string } | null | undefined
+export type ScheduleIcon = { cells?: unknown[]; accent?: string; svg?: string } | null | undefined
 
 /** `last_run` on a row and on a record. */
 export interface ScheduleLastRun {

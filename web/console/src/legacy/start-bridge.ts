@@ -35,7 +35,7 @@ import {
   sessionSelectionKey as sessionSelectionKeyOriginal,
 } from "./js/session/selection.js"
 
-export type StartIcon = { cells?: unknown[]; accent?: string } | null | undefined
+export type StartIcon = { cells?: unknown[]; accent?: string; svg?: string } | null | undefined
 
 export interface StartPlaceRow {
   id: string

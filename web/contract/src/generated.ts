@@ -3433,15 +3433,18 @@ export type HealthReason =
 export const HealthReasonValues: readonly HealthReason[] = ["broker_beat_stalled", "capacity_exhausted", "capacity_beat_stalled", "work_sweep_stalled"] as const
 
 /**
- * A project's mark: rows of `#RRGGBB`, with null for transparent. It is derived
- * from the project path and the machine's icon registry by the same rules the Swift
- * app uses, so both apps draw the same creature — a mark somebody recognises by
- * colour and shape is not recognisable if the second app draws it differently, and
- * near-identical is worse than obviously different.
+ * A project mark with an RGB accent and either bounded colour cells (null is
+ * transparent) or a self-contained static SVG with empty cells. Both render
+ * proportionally inside the existing icon slot.
  */
 export interface Icon {
   accent: string
   cells: ((string | null)[])[]
+
+  /**
+   * Optional self-contained SVG; cells is empty when present.
+   */
+  svg?: string
 }
 
 /**

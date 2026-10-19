@@ -323,9 +323,10 @@ curl --fail-with-body -sS -H @<(auth) "http://127.0.0.1:$PORT/v1/orchestrator/in
 1. **Project。** 執行 `clawdline project list`。清單沒有這個 checkout 時，用
    `clawdline project add <absolute-root>` 加入 repository root，再列一次。這只記錄能從哪裡開 Session，
    不會改 repository。
-2. **名稱與圖示。** 沒有設定時，Clawdline 會從路徑產生一個穩定圖示。使用者想指定名稱或像素圖示時，
+2. **名稱與圖示。** 沒有設定時，Clawdline 會從路徑產生一個穩定圖示。使用者想指定名稱、像素圖示或 SVG 時，
    保留 `~/.claude/project-icons.json` 裡的其他每一列，只修改這個 Project 最長相符路徑的那一列。格式在
-   Clawdline repository 的 `docs/project-status.md`；Projects 頁也能複製已解析好的圖示，不必手改 JSON。
+   Clawdline repository 的 `docs/project-icons.md`：像素格上限為 64×64；SVG 須有正尺寸的 `viewBox`，
+   只含靜態內容與內部參照，最多 96 KiB。兩者都會縮放進原有圖示框，不會撐大版面。
    全域使用者檔案不是 repository 內容；若原要求沒有授權修改，先把準備寫入的完整 entry 給使用者看。
 3. **Deploy 與長時間工作。** Clawdline 只讀狀態收據，從不執行 deploy。GitHub repository 的 deploy 收據
    是 `~/.claude/statusline-cache/ghrun-<owner>-<repo>.json`，owner 與 repo 取自 `origin`。已經知道 run

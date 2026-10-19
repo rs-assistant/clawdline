@@ -2939,14 +2939,15 @@ const (
 // HealthReasonValues is every value the contract allows, in contract order.
 var HealthReasonValues = []HealthReason{HealthReasonBrokerBeatStalled, HealthReasonCapacityExhausted, HealthReasonCapacityBeatStalled, HealthReasonWorkSweepStalled}
 
-// A project's mark: rows of `#RRGGBB`, with null for transparent. It is derived
-// from the project path and the machine's icon registry by the same rules the
-// Swift app uses, so both apps draw the same creature — a mark somebody
-// recognises by colour and shape is not recognisable if the second app draws it
-// differently, and near-identical is worse than obviously different.
+// A project mark with an RGB accent and either bounded colour cells (null is
+// transparent) or a self-contained static SVG with empty cells. Both render
+// proportionally inside the existing icon slot.
 type Icon struct {
 	Accent string      `json:"accent"`
 	Cells  [][]*string `json:"cells"`
+
+	// Optional self-contained SVG; cells is empty when present.
+	Svg string `json:"svg,omitempty"`
 }
 
 // How a running process was tied to the conversation it is having, or — when

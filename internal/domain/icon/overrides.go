@@ -20,9 +20,14 @@ var ErrIconChanged = errors.New("the project icon changed; reload before applyin
 var ErrIconCapacity = errors.New("the saved project icon registry is full")
 var hexColor = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
-// Validate accepts only a bounded raster of literal colours. No URLs, SVG,
-// source paths, labels or executable content travel with an icon.
+// Validate accepts a bounded colour grid or a self-contained SVG image.
 func Validate(g Grid) error {
+	if g.SVG != "" {
+		if !hexColor.MatchString(g.Accent) || len(g.Cells) != 0 {
+			return errors.New("an SVG icon needs an RGB accent and empty cells")
+		}
+		return validateSVG(g.SVG)
+	}
 	if !hexColor.MatchString(g.Accent) || len(g.Cells) == 0 || len(g.Cells) > MaxIconSide {
 		return errors.New("an icon needs an RGB accent and 1 to 64 rows")
 	}

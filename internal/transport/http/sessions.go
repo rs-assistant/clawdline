@@ -1173,10 +1173,14 @@ func wireAgentReading(reading session.AgentReading) *contract.SessionAgentReadin
 
 // wireIcon carries a mark across to the wire in the shape the console draws.
 func wireIcon(g icon.Grid) *contract.Icon {
-	if len(g.Cells) == 0 {
+	if len(g.Cells) == 0 && g.SVG == "" {
 		return nil
 	}
-	return &contract.Icon{Accent: g.Accent, Cells: g.Cells}
+	cells := g.Cells
+	if cells == nil {
+		cells = [][]*string{}
+	}
+	return &contract.Icon{Accent: g.Accent, Cells: cells, Svg: g.SVG}
 }
 
 // wireMover is the one place a mover crosses from the domain to the wire. It is
