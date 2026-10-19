@@ -144,7 +144,7 @@ at login, and a mascot in the notch.
 ## 6. Reach it from a phone
 
 Three ways, compared in [user/remote-access.md](user/remote-access.md): an SSH port forward, your
-own cloudflared tunnel with six-digit pairing (no account; a device paired that way can only read),
+own cloudflared tunnel with six-digit pairing (no account; a device paired that way can read and send, like every paired device),
 or Clawdline Cloud, below. When a device asks to pair over the tunnel, the code appears on this
 machine, in the macOS app or through `./bin/clawdline pair --watch`, and is never sent back to the
 device that asked.

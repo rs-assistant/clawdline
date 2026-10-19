@@ -146,7 +146,7 @@ func IsInside(path, base string) bool {
 // the only one writing in a session's working directory: this daemon dispatches
 // agents that work in those directories, and `ln -s ~ artifacts` would hand
 // every `.md`, `.markdown` and `.txt` within `MaximumDepth` of a home
-// directory to any paired device that may only read. So the floor: **a project
+// directory to any paired device. So the floor: **a project
 // root may point elsewhere, but not at somewhere that contains the person
 // asking.** A directory that holds the home directory, the session's own
 // working directory, or the whole filesystem is not "this project's

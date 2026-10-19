@@ -184,8 +184,8 @@ func init() {
 		// read-level: the Swift bridge lists exactly these three beside the
 		// two diagnostics words in `readLevelCommandTypes`. The write switch
 		// is about typing into somebody's session, and asking to be told when
-		// one needs an answer is the reading half arriving by another road —
-		// a phone paired read-only is the device this feature exists for.
+		// one needs an answer is the reading half arriving by another road,
+		// so a phone keeps its notifications with the switch off.
 		//
 		// Each carries `X-Clawdline-Actor: device` for the reason the schedule
 		// writes do, said for a different door: `/v1/push/unsubscribe` exempts

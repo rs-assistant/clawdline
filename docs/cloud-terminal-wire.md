@@ -259,7 +259,7 @@ What a trace deliberately leaves out: every address and port (a candidate's addr
 
 ## Required cross-component checks
 
-Use an authorized new viewer, a formerly read-only paired viewer, an unpaired viewer, and a revoked viewer. Verify their publish/subscribe matrix, pin/key mismatch, same-effect duplicate input, gap and full-queue refusal, host-applied/lost-receipt reconciliation, lost rekey acknowledgement, cache miss, slow socket, oversized frame, idle revocation, Cloud log/storage ciphertext-only canary, and an ordinary Agent Session send while terminal frames are flowing. The browser URL, account fixtures and origin permissions are preflight requirements before the comprehensive end-to-end round.
+Use an authorized new viewer, a viewer paired before every paired device received full access, an unpaired viewer, and a revoked viewer. Verify their publish/subscribe matrix, pin/key mismatch, same-effect duplicate input, gap and full-queue refusal, host-applied/lost-receipt reconciliation, lost rekey acknowledgement, cache miss, slow socket, oversized frame, idle revocation, Cloud log/storage ciphertext-only canary, and an ordinary Agent Session send while terminal frames are flowing. The browser URL, account fixtures and origin permissions are preflight requirements before the comprehensive end-to-end round.
 
 A list-only browser sends `release_connection` after its list receipt. The machine publishes the final keyed receipt, blocks further effects on that connection, and retires its relay registration when that receipt settles. The list can render without waiting for this cleanup receipt. This prevents repeated refreshes from occupying the per-viewer connection quota for the full key lifetime.
 
