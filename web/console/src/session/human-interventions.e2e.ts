@@ -293,12 +293,13 @@ function document(ui = "zh-Hant"): string {
 function fixture(): Server {
   let readAt: number | null = null
   let resolvedAt: number | null = null
+  let withdrawn = false
   let version = 1
   const eventClients = new Set<ServerResponse>()
   const publish = () => { for (const client of eventClients) client.write("event: sessions\ndata: " + JSON.stringify(snapshot()) + "\n\n") }
   return createServer((req, res) => {
     const path = new URL(req.url ?? "/", "http://fixture").pathname
-    if (path === "/__fixture/reset") { questionTool = ""; readAt = null; resolvedAt = null; version = 1; failReads = false; failActions = false; readDelay = 0; noteReads = 0; todoReads = 0; noteCount = 1; showOptions = true; singleOption = false; secretMode = false; handoffValues = []; handoffDelay = 0; failHandoff = false; listWaiting = false; listAttentionCount = 1; documentMode = "ready"; documentListMode = "ready"; documentReadDelay = 0; sendRequests = 0; sentTexts = []; sentBeforeResolve = []; failSends = false; sendDelay = 0; return json(res, 200, { ok: true }) }
+    if (path === "/__fixture/reset") { withdrawn = false; questionTool = ""; readAt = null; resolvedAt = null; version = 1; failReads = false; failActions = false; readDelay = 0; noteReads = 0; todoReads = 0; noteCount = 1; showOptions = true; singleOption = false; secretMode = false; handoffValues = []; handoffDelay = 0; failHandoff = false; listWaiting = false; listAttentionCount = 1; documentMode = "ready"; documentListMode = "ready"; documentReadDelay = 0; sendRequests = 0; sentTexts = []; sentBeforeResolve = []; failSends = false; sendDelay = 0; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/handoff-delay") { handoffDelay = 400; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/handoff-fail") { failHandoff = true; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/document-mode") { const mode = new URL(req.url ?? "/", "http://fixture").searchParams.get("value"); documentMode = mode === "refused" || mode === "keyed" ? mode : "ready"; return json(res, 200, { ok: true }) }
@@ -308,6 +309,7 @@ function fixture(): Server {
     if (path === "/__fixture/send-delay") { sendDelay = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("ms")) || 0; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/list-waiting") { listWaiting = new URL(req.url ?? "/", "http://fixture").searchParams.get("on") === "1"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/list-count") { listAttentionCount = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("value")); publish(); return json(res, 200, { ok: true }) }
+    if (path === "/__fixture/withdraw") { withdrawn = true; resolvedAt = now; listAttentionCount = 0; publish(); return json(res, 200, { ok: true }) }
     if (path === "/__fixture/quiet-resolve") { resolvedAt = now; listAttentionCount = 0; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/count") { noteCount = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("value")) || 1; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/options") { showOptions = new URL(req.url ?? "/", "http://fixture").searchParams.get("on") !== "0"; return json(res, 200, { ok: true }) }
@@ -368,7 +370,7 @@ function fixture(): Server {
         document_url: secretMode ? "" : origin + `/#document=1&machine=this-mac&session=${SESSION}&scope=project&path=demo.md`,
         detail: secretMode ? "" : ("The report is ready. Please review the proposed date and the linked evidence.\n").repeat(36), options: secretMode ? [] : showOptions ? [
           { label: "Tuesday", draft: "Tuesday works for me." }, ...singleOption ? [] : [{ label: "Wednesday", draft: "Wednesday works for me." }] ] : [],
-        created_at: now, read_at: readAt, resolved_at: resolvedAt, secret_received: secretMode && handoffValues.length > 0 && !resolvedAt, version }
+        created_at: now, withdrawn, resolution: withdrawn ? "The prerequisite is satisfied." : "", read_at: readAt, resolved_at: resolvedAt, secret_received: secretMode && handoffValues.length > 0 && !resolvedAt, version }
       if (req.method === "GET") {
         noteReads++
         const answer = () => failReads ? json(res, 503, { error: "read_failed" }) : json(res, 200, { ok: true, rows: Array.from({ length: noteCount }, (_, index) => ({ ...note, id: `10000000-0000-4000-8000-${String(32 + index).padStart(12, "0")}` })), pruned_resolved: 0 })
@@ -391,7 +393,7 @@ function fixture(): Server {
           if (body.expected_version !== version) return json(res, 409, { error: "version_conflict" })
           if (path.endsWith("/read")) readAt = now
           else if (path.endsWith("/resolve")) { sentBeforeResolve.push(sentTexts.length); readAt = now; resolvedAt = now; listAttentionCount = 0; publish() }
-          else if (path.endsWith("/reopen")) { resolvedAt = null; listAttentionCount = 1; publish() }
+          else if (path.endsWith("/reopen")) { withdrawn = false; resolvedAt = null; listAttentionCount = 1; publish() }
           else return json(res, 404, { error: "not_found" })
           version++
           return json(res, 200, { ok: true, note: { ...note, read_at: readAt, resolved_at: resolvedAt, version } })
@@ -1007,4 +1009,40 @@ test("async question options send once with context and preserve the composer's 
     await until(`!!document.querySelector('.askbox') && !document.querySelector('.async-question-option')`)
     assert.equal(sendRequests, 1)
   } finally { await browser.send("Target.closeTarget", { targetId }) }
+})
+
+
+test("an Agent-withdrawn Note keeps its reason without requesting a reply and can be reopened", async () => {
+ const { targetId } = await browser.send("Target.createTarget", {url:"about:blank"})
+ const { sessionId: id } = await browser.send("Target.attachToTarget", {targetId,flatten:true})
+ const run = async (expression: string) => {
+  const {result,exceptionDetails} = await browser.send("Runtime.evaluate", {expression,returnByValue:true,awaitPromise:true},id)
+  if (exceptionDetails) throw new Error(exceptionDetails.text)
+  return result.value
+ }
+ const until = async (expression: string) => {
+  const deadline=Date.now()+8000
+  while (!(await run(expression))) { if(Date.now()>deadline) assert.fail("UI did not reach "+expression); await new Promise(r=>setTimeout(r,50)) }
+ }
+ try {
+  await fetch(origin+"/__fixture/reset")
+  await browser.send("Page.enable",{},id); await browser.send("Runtime.enable",{},id)
+  await browser.send("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:2,mobile:true},id)
+  const mark=browser.loadCount; await browser.send("Page.navigate",{url:origin+"/#session="+SESSION},id); await browser.loaded(id,mark)
+  await until(`!!document.querySelector(".human-interventions-head")`)
+  await run(`document.querySelector(".human-interventions-head").click()`)
+  await until(`!!document.querySelector(".human-intervention-card")`)
+  await fetch(origin+"/__fixture/withdraw")
+  await until(`!!document.querySelector(".human-intervention-withdrawn")`)
+  await run(`document.querySelector(".human-interventions-recent").open=true`)
+  assert.match(await run(`document.querySelector(".human-intervention-stage").textContent`),/不再需要關注.*Agent/)
+  assert.match(await run(`document.querySelector(".human-intervention-withdrawal").textContent`),/The prerequisite is satisfied/)
+  assert.equal(await run(`!!document.querySelector(".human-intervention-option")`),false)
+  assert.equal(await run(`!!document.querySelector(".human-interventions-dot")`),false)
+  assert.equal(sendRequests,0)
+  await run(`document.querySelector(".human-intervention-reopen").click()`)
+  await until(`!!document.querySelector(".human-intervention-resolve")`)
+  assert.equal(await run(`!!document.querySelector(".human-intervention-withdrawn")`),false)
+  assert.equal(await run(`!!document.querySelector(".human-intervention-option")`),true)
+ } finally { await fetch(origin+"/__fixture/reset"); await browser.send("Target.closeTarget",{targetId}) }
 })

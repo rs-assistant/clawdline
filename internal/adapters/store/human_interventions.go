@@ -53,10 +53,20 @@ INSERT OR IGNORE INTO human_interventions_retention(singleton) VALUES (1);
 
 func openHumanInterventions(db *sql.DB) error {
 	_, err := db.Exec(humanInterventionSchema)
+	if err != nil {
+		return err
+	}
+	has, err := hasColumn(db, "human_interventions", "withdrawn")
+	if err != nil {
+		return err
+	}
+	if !has {
+		_, err = db.Exec(`ALTER TABLE human_interventions ADD COLUMN withdrawn INTEGER NOT NULL DEFAULT 0`)
+	}
 	return err
 }
 
-const humanInterventionColumns = `id,source_conversation,source_label,target_conversation,target_session,kind,title,summary,action,reason,detail,options,document_url,created_at,read_at,resolved_at,resolution,version`
+const humanInterventionColumns = `id,source_conversation,source_label,target_conversation,target_session,kind,title,summary,action,reason,detail,options,document_url,created_at,read_at,resolved_at,resolution,version,withdrawn`
 
 func scanHumanIntervention(row interface{ Scan(...any) error }) (work.HumanIntervention, error) {
 	var out work.HumanIntervention
@@ -65,7 +75,7 @@ func scanHumanIntervention(row interface{ Scan(...any) error }) (work.HumanInter
 	var read, resolved sql.NullInt64
 	err := row.Scan(&out.ID, &out.SourceConversation, &out.SourceLabel, &out.TargetConversation, &out.TargetSession,
 		&out.Kind, &out.Title, &out.Summary, &out.Action, &out.Reason, &out.Detail, &options, &out.DocumentURL,
-		&created, &read, &resolved, &out.Resolution, &out.Version)
+		&created, &read, &resolved, &out.Resolution, &out.Version, &out.Withdrawn)
 	if err != nil {
 		return out, err
 	}
@@ -115,9 +125,9 @@ func (t *WorkV2Tx) AddHumanIntervention(v work.HumanIntervention, at time.Time) 
 	if err != nil {
 		return err
 	}
-	_, err = t.tx.ExecContext(t.ctx, `INSERT INTO human_interventions (`+humanInterventionColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	_, err = t.tx.ExecContext(t.ctx, `INSERT INTO human_interventions (`+humanInterventionColumns+`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		v.ID, v.SourceConversation, v.SourceLabel, v.TargetConversation, v.TargetSession, v.Kind, v.Title, v.Summary, v.Action, v.Reason,
-		v.Detail, string(options), v.DocumentURL, v.CreatedAt.Unix(), nil, nil, "", 1)
+		v.Detail, string(options), v.DocumentURL, v.CreatedAt.Unix(), nil, nil, "", 1, false)
 	if err == nil {
 		t.wrote++
 	}
@@ -159,7 +169,7 @@ func (t *WorkV2Tx) PutHumanIntervention(prev, next work.HumanIntervention) error
 	if next.ResolvedAt != nil {
 		resolved = next.ResolvedAt.Unix()
 	}
-	res, err := t.tx.ExecContext(t.ctx, `UPDATE human_interventions SET read_at=?,resolved_at=?,resolution=?,version=version+1 WHERE id=? AND version=?`, read, resolved, next.Resolution, prev.ID, prev.Version)
+	res, err := t.tx.ExecContext(t.ctx, `UPDATE human_interventions SET read_at=?,resolved_at=?,resolution=?,withdrawn=?,version=version+1 WHERE id=? AND version=?`, read, resolved, next.Resolution, next.Withdrawn, prev.ID, prev.Version)
 	if err != nil {
 		return err
 	}
@@ -248,4 +258,22 @@ func (s *Store) OpenHumanInterventionCounts(ctx context.Context) (map[string]int
 		return nil, err
 	}
 	return counts, nil
+}
+
+// SourceHumanInterventions returns only notes authored by this Root, within the existing total retention bound.
+func (s *Store) SourceHumanInterventions(ctx context.Context, source string) ([]work.HumanIntervention, error) {
+	rows, err := s.rd.QueryContext(ctx, `SELECT `+humanInterventionColumns+` FROM human_interventions WHERE source_conversation=? ORDER BY created_at DESC,id LIMIT ?`, source, HumanInterventionsTotalLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []work.HumanIntervention{}
+	for rows.Next() {
+		v, err := scanHumanIntervention(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
 }

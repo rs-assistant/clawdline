@@ -268,5 +268,8 @@
   "image.failed": "clawdline image send：",
   "image.whoami_no_terminal": "clawdline image send：whoami 的回答沒有 terminal id。沒有送出任何東西。",
   "image.stored_shown": "已存好 %d 張圖，給 Session %s。它們會出現在這個 Session 之後第一則寫進紀錄的回覆底下，通常就是執行這個指令的那則訊息；回覆裡不需要寫任何東西。\n",
-  "image.check": "存好不等於看到：那則回覆寫出後，GET /v1/transcript?session=%s 會在它的 artifacts 裡列出這些圖。\n"
+  "image.check": "存好不等於看到：那則回覆寫出後，GET /v1/transcript?session=%s 會在它的 artifacts 裡列出這些圖。\n",
+  "note.live_root_required": "請用 --from 指定存活的 Root 對話。",
+  "note.withdraw_usage": "用法：clawdline note withdraw --id <便條 ID> --version <版本> --reason <撤回原因> [--from <對話 ID>] [--key k] [--port n]",
+  "note.manage_usage": "  clawdline note list [--from <對話 ID>] | clawdline note withdraw --id <便條 ID> --version <版本> --reason <撤回原因>"
 }

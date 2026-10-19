@@ -1227,6 +1227,14 @@ For a password, credential, or API key, use **Secret Handoff**. Create a `kind: 
 
 `kind` is `read`, `answer`, `action`, `report`, or `secret`; `title`, `summary`, `action`, and `reason` are required. An `answer` can offer two to four choices. Each `draft` is the suggested reply shown on its button. When the person taps it, the Console sends it right away as a conversation message to the note's Session, followed by a context line with the note ID, title, and action so the receiving Session knows which request the person answered; the context is not shown on the button. Only after the send succeeds does the note move to recently handled. If the send fails, the note stays pending and the attention control says the reply was not sent. `detail` can hold longer text. `document_url` can link to a real, readable Cloud document; verify the document route and file before posting it. Act on the conversation message that arrives, not on the note's state: a note the person marked handled by hand sent nothing. Use `--requested-by-person` only for an explicit request to create the note, not for a broader request to complete work. That flag keeps the note visible without sending a note push. If your work is actually blocked on the answer, record the waiting-user state; an agent-initiated note already sends the attention push, so do not duplicate it. A note does not wake an Agent.
 
+**Withdraw an obsolete Note**
+
+Run `clawdline note list` to read only Notes attributed to your live Root (including their IDs, versions and current outcomes). When your own open Note no longer needs attention, run:
+
+`clawdline note withdraw --id <note-id> --version <version> --reason "The prerequisite is now satisfied."`
+
+The reason is required. Use `--from <live-root-conversation>` only when the environment cannot identify your Root. The CLI prints an idempotency key; reuse it with `--key` after an uncertain result. A stale version returns `version_conflict`: reread before deciding to retry. Another source's Note returns `intervention_not_found`; an already closed Note returns `intervention_already_closed` and preserves its outcome. Withdrawal removes the attention dot and moves the Note to recent history, in gray with its reason and an Agent-withdrawn label. It is never a person's answer or approval. The person can reopen it. Do not withdraw another Root's Notes or pretend a named source is cryptographically isolated: the machine credential remains shared.
+
 ## 10. The board
 
 The board has three structures — board items, the Backlog, and each session's own to-do list — and

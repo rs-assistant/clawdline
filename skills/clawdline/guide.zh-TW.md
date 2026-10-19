@@ -1079,6 +1079,14 @@ clawdline note create --requested-by-person --body-file note.json
 
 `kind` 可為 `read`、`answer`、`action`、`report` 或 `secret`；`title`、`summary`、`action`、`reason` 必填。`answer` 可提供二至四個選項，每個選項的 `draft` 是按鈕顯示的建議回覆。使用者點一下，Console 就把它當成對話訊息直接送到便條所在的 Session，後面附上便條 ID、標題和待回覆事項，讓接收的 Session 知道使用者回答的是哪張便條；按鈕不顯示這段脈絡。送出成功後，便條才會移到最近已處理。送出失敗時，便條維持待處理，關注按鈕會說明回覆沒有送出。較長內容放 `detail`；`document_url` 可指向真正可讀的 Cloud 文件，建立便條前先驗證文件路徑與檔案。依實際收到的對話訊息行事，不看便條狀態：使用者手動標記已處理的便條，並沒有送出任何訊息。只有使用者明確要求建立便條時才用 `--requested-by-person`；泛稱「完成工作」不算明確要求。加上此旗標時便條仍會顯示，但不會送便條推播。若工作確實卡在答覆上，另記錄等待使用者的狀態；Agent 主動建立的便條已負責關注通知，別再重複送一則。便條不會喚醒 Agent。
 
+**撤回不再需要關注的便條**
+
+執行 `clawdline note list`，列出歸屬於自己存活 Root 的便條、ID、版本與目前狀態。自己留下的待處理便條已經不再需要關注時，執行：
+
+`clawdline note withdraw --id <便條ID> --version <版本> --reason "前置問題已解決，不再需要選擇。"`
+
+撤回原因必填。只有環境無法識別自己時才加 `--from <存活Root對話ID>`。結果不確定時，沿用 CLI 印出的冪等鍵加上 `--key` 重試。版本過期回傳 `version_conflict`，先重新讀取再判斷；其他來源的便條回傳 `intervention_not_found`；已結束的便條回傳 `intervention_already_closed`，保留原本結果。撤回會移除關注紅點，便條以灰色移到最近紀錄，顯示 Agent 已撤回與原因；這不代表使用者回答或批准。使用者可重新開啟。不要撤回其他 Root 的便條；機器憑證仍為共用，來源欄位不是密碼學上的 Session 隔離。
+
 ## 10. 看板
 
 看板有三種結構——看板項目、Backlog，以及每個 session 自己的待辦清單——而且**上面放什麼由人決定**。

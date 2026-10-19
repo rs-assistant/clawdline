@@ -26,6 +26,14 @@ func (s *Server) workV2Agent(w http.ResponseWriter, r *http.Request, parts []str
 		s.agentSessions(w, r, parts)
 		return
 	}
+	if len(parts) == 1 && parts[0] == "human-interventions" && r.Method == http.MethodGet {
+		s.agentManageHumanInterventions(w, r, "")
+		return
+	}
+	if len(parts) == 3 && parts[0] == "human-interventions" && workID(parts[1]) && parts[2] == "withdraw" && r.Method == http.MethodPost {
+		s.agentManageHumanInterventions(w, r, parts[1])
+		return
+	}
 	if len(parts) == 1 && parts[0] == "human-interventions" && r.Method == http.MethodPost {
 		s.agentCreateHumanIntervention(w, r)
 		return

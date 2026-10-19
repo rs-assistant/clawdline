@@ -268,5 +268,8 @@
   "image.failed": "clawdline image send:",
   "image.whoami_no_terminal": "clawdline image send: whoami answered without a terminal id. Nothing was sent.",
   "image.stored_shown": "Stored %d picture(s) for Session %s. They appear under the first reply this Session records after them, usually the message that ran this command; nothing has to be written into it.\n",
-  "image.check": "Stored is not seen: GET /v1/transcript?session=%s lists them in that reply's artifacts once it is written.\n"
+  "image.check": "Stored is not seen: GET /v1/transcript?session=%s lists them in that reply's artifacts once it is written.\n",
+  "note.live_root_required": "Name a live Root conversation with --from.",
+  "note.withdraw_usage": "usage: clawdline note withdraw --id <note id> --version <n> --reason <reason> [--from <conversation id>] [--key k] [--port n]",
+  "note.manage_usage": "  clawdline note list [--from <conversation id>] | clawdline note withdraw --id <note id> --version <n> --reason <reason>"
 }

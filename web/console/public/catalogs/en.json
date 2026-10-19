@@ -6874,5 +6874,9 @@
   "next.usageUnattributed": "Unattributed",
   "next.usageUnsupported": "Update this machine to read usage overview.",
   "next.usageRefresh": "Refresh",
-  "next.unifyVisibleTo": "What {assistant} can see"
+  "next.unifyVisibleTo": "What {assistant} can see",
+  "next.noteWithdrawn": "No longer needs attention · withdrawn by Agent",
+  "next.noteWithdrawalReason": "Withdrawal reason:",
+  "http.8ff321b2a3251e41": "A withdrawal reason is required within the note text limit.",
+  "http.f0ef2e01b9a9a988": "This note is already closed; its existing outcome is preserved."
 }

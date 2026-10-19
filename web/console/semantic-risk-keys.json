@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6874,
+  "englishKeys": 6878,
   "counts": {
-    "negation": 2069,
-    "state": 1136,
+    "negation": 2070,
+    "state": 1137,
     "permission": 416,
     "deletion": 178,
     "uncertainty": 191
   },
-  "unionCount": 3131,
+  "unionCount": 3133,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -1681,6 +1681,7 @@
       "next.msStepNoAnswer",
       "next.msTryBusy",
       "next.msTryOffline",
+      "next.noteWithdrawn",
       "next.noticeReminder",
       "next.olderLeftOut",
       "next.olderNotRead",
@@ -2572,6 +2573,7 @@
       "http.ec894e4936facd17",
       "http.ee71993f567fd4fe",
       "http.ef21e013a7e28737",
+      "http.f0ef2e01b9a9a988",
       "http.f3be726ce6d6fba0",
       "http.f4a2c2e826b8c2f8",
       "http.f60f0970ce218cea",
@@ -5297,6 +5299,7 @@
     "http.efc9a1b51b8e755e",
     "http.f04319c28c00907b",
     "http.f0eb186f67eb8211",
+    "http.f0ef2e01b9a9a988",
     "http.f0f2063a4e456e56",
     "http.f1c6ed5b1d93620a",
     "http.f22f0441d2c706f2",
@@ -6463,6 +6466,7 @@
     "next.msTabNameAccess",
     "next.msTryBusy",
     "next.msTryOffline",
+    "next.noteWithdrawn",
     "next.noticeReminder",
     "next.noticeReminderSay",
     "next.olderLeftOut",

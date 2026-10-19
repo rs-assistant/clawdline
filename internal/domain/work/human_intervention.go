@@ -22,6 +22,7 @@ type HumanIntervention struct {
 	CreatedAt          time.Time
 	ReadAt             *time.Time
 	ResolvedAt         *time.Time
+	Withdrawn          bool
 	Resolution         string
 	Version            int64
 }

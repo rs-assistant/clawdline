@@ -1226,5 +1226,7 @@
   "http.ff821b6116dd9e4a": "An item's phase is not edited; it moves through the item's own actions.",
   "http.ff9859775a615fc4": "This closure records why no delivery named this item — say what was done and where it landed. Without that it is a state change nobody can check later.",
   "http.ffd795cf51e7ebea": "place is board or backlog.",
-  "http.ffed8239d8e297e0": "Supply the expected version and text content."
+  "http.ffed8239d8e297e0": "Supply the expected version and text content.",
+  "http.8ff321b2a3251e41": "A withdrawal reason is required within the note text limit.",
+  "http.f0ef2e01b9a9a988": "This note is already closed; its existing outcome is preserved."
 }

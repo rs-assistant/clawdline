@@ -229,3 +229,89 @@ func TestAgentNoteRemainsReadableWhenPushFails(t *testing.T) {
 		t.Fatalf("note disappeared after push failure: %d %s", read.Code, read.Body)
 	}
 }
+
+func TestAgentWithdrawsOnlyOwnOpenNoteAndPersonCanReopen(t *testing.T) {
+	s, source, target := humanInterventionTestServer(t)
+	base := "/v1/work/v2/agent/human-interventions"
+	created := httptest.NewRecorder()
+	s.workV2Route(created, agentWorkV2Request(http.MethodPost, base, humanInterventionBody(source), "withdraw-create"))
+	var result struct {
+		Note humanInterventionWire `json:"note"`
+	}
+	if created.Code != 201 || json.Unmarshal(created.Body.Bytes(), &result) != nil {
+		t.Fatalf("create: %d %s", created.Code, created.Body)
+	}
+	id := result.Note.ID
+	post := func(from, reason string, version int64, key string) *httptest.ResponseRecorder {
+		t.Helper()
+		b, _ := json.Marshal(map[string]any{"source_conversation": from, "reason": reason, "expected_version": version})
+		r := httptest.NewRecorder()
+		s.workV2Route(r, agentWorkV2Request(http.MethodPost, base+"/"+id+"/withdraw", string(b), key))
+		return r
+	}
+	for _, tc := range []struct {
+		from, reason string
+		version      int64
+		key          string
+		status       int
+	}{
+		{target, "Obsolete", 1, "foreign-withdraw", 404},
+		{source, " ", 1, "empty-withdraw", 422},
+		{source, "Obsolete", 9, "stale-withdraw", 409},
+		{"10000000-0000-4000-8000-000000000099", "Obsolete", 1, "dead-withdraw", 404},
+	} {
+		if r := post(tc.from, tc.reason, tc.version, tc.key); r.Code != tc.status {
+			t.Fatalf("%s: %d %s", tc.key, r.Code, r.Body)
+		}
+	}
+	listed := httptest.NewRecorder()
+	s.workV2Route(listed, agentWorkV2Request(http.MethodGet, base+"?source_conversation="+source, "", ""))
+	var page struct {
+		Rows []humanInterventionWire `json:"rows"`
+	}
+	if listed.Code != 200 || json.Unmarshal(listed.Body.Bytes(), &page) != nil || len(page.Rows) != 1 || page.Rows[0].ID != id {
+		t.Fatalf("own list: %d %s", listed.Code, listed.Body)
+	}
+	other := httptest.NewRecorder()
+	s.workV2Route(other, agentWorkV2Request(http.MethodGet, base+"?source_conversation="+target, "", ""))
+	if other.Code != 200 || json.Unmarshal(other.Body.Bytes(), &page) != nil || len(page.Rows) != 0 {
+		t.Fatalf("other list: %d %s", other.Code, other.Body)
+	}
+	withdrawn := post(source, "The prerequisite is satisfied.", 1, "withdraw-once")
+	if withdrawn.Code != 200 || json.Unmarshal(withdrawn.Body.Bytes(), &result) != nil {
+		t.Fatalf("withdraw: %d %s", withdrawn.Code, withdrawn.Body)
+	}
+	if !result.Note.Withdrawn || result.Note.ResolvedAt == nil || result.Note.ReadAt != nil || result.Note.Resolution != "The prerequisite is satisfied." {
+		t.Fatalf("outcome: %+v", result.Note)
+	}
+	replay := post(source, "The prerequisite is satisfied.", 1, "withdraw-once")
+	if replay.Code != 200 || replay.Body.String() != withdrawn.Body.String() {
+		t.Fatalf("replay: %d %s", replay.Code, replay.Body)
+	}
+	if r := post(source, "Overwrite", result.Note.Version, "withdraw-closed"); r.Code != 422 {
+		t.Fatalf("closed: %d %s", r.Code, r.Body)
+	}
+	stored, err := s.store.HumanIntervention(context.Background(), id)
+	if err != nil || !stored.Withdrawn || stored.ResolvedAt == nil {
+		t.Fatalf("stored: %+v %v", stored, err)
+	}
+	attention, err := s.store.OpenHumanInterventionCounts(context.Background())
+	if err != nil || attention[target] != 0 {
+		t.Fatalf("attention: %v %v", attention, err)
+	}
+	personPath := "/v1/work/v2/human-interventions/conversation:" + target + "/" + id
+	reopened := httptest.NewRecorder()
+	s.workV2Route(reopened, personWorkV2Request(http.MethodPost, personPath+"/reopen", fmt.Sprintf(`{"expected_version":%d}`, result.Note.Version), "withdraw-reopen"))
+	result.Note = humanInterventionWire{}
+	if reopened.Code != 200 || json.Unmarshal(reopened.Body.Bytes(), &result) != nil || result.Note.Withdrawn || result.Note.ResolvedAt != nil || result.Note.Resolution != "" {
+		t.Fatalf("reopen: %d %s", reopened.Code, reopened.Body)
+	}
+	resolved := httptest.NewRecorder()
+	s.workV2Route(resolved, personWorkV2Request(http.MethodPost, personPath+"/resolve", fmt.Sprintf(`{"expected_version":%d,"resolution":"Person handled it"}`, result.Note.Version), "person-resolve"))
+	if resolved.Code != 200 || json.Unmarshal(resolved.Body.Bytes(), &result) != nil {
+		t.Fatalf("resolve: %d %s", resolved.Code, resolved.Body)
+	}
+	if r := post(source, "Overwrite", result.Note.Version, "withdraw-person-outcome"); r.Code != 422 {
+		t.Fatalf("person outcome: %d %s", r.Code, r.Body)
+	}
+}

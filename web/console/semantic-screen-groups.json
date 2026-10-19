@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6874,
-  "riskKeys": 3131,
-  "nonRiskCount": 3743,
+  "englishContentKeys": 6878,
+  "riskKeys": 3133,
+  "nonRiskCount": 3745,
   "groups": [
     {
       "name": "admin / other",
@@ -783,7 +783,7 @@
     },
     {
       "name": "http / other",
-      "count": 559,
+      "count": 560,
       "sources": [
         "internal/productcopy/http_refusals/en.json"
       ],
@@ -1096,6 +1096,7 @@
         "http.8ed2ff53105756e9",
         "http.8f2e79d03da33ea2",
         "http.8f8a1f7f27b9ea32",
+        "http.8ff321b2a3251e41",
         "http.9051a793d9ba886c",
         "http.919c31ef47b8d529",
         "http.92e339c128f665c3",
@@ -2370,7 +2371,7 @@
     },
     {
       "name": "next / other",
-      "count": 272,
+      "count": 273,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2479,6 +2480,7 @@
         "next.msTryingBody",
         "next.newBuild",
         "next.newBuildReload",
+        "next.noteWithdrawalReason",
         "next.noticeManyLeftovers",
         "next.noticeOneLeftover",
         "next.notificationNav",

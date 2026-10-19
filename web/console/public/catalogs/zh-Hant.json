@@ -6874,5 +6874,9 @@
   "next.usageUnattributed": "未歸屬",
   "next.usageUnsupported": "請更新這台機器以讀取使用概況。",
   "next.usageRefresh": "重新整理",
-  "next.unifyVisibleTo": "{assistant} 看得到的內容"
+  "next.unifyVisibleTo": "{assistant} 看得到的內容",
+  "next.noteWithdrawn": "不再需要關注 · Agent 已撤回",
+  "next.noteWithdrawalReason": "撤回原因：",
+  "http.8ff321b2a3251e41": "請填寫撤回原因，長度須在便條文字上限內。",
+  "http.f0ef2e01b9a9a988": "這張便條已結束，將保留原本的處理結果。"
 }
