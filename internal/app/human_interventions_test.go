@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,6 +29,29 @@ func TestHumanDocumentLocatorUsesRouteSessionAndMachine(t *testing.T) {
 	} {
 		if ValidateHumanDocumentURL(raw, machine, route) == nil {
 			t.Errorf("accepted %q", raw)
+		}
+	}
+}
+
+func TestHumanDocumentLocatorAcceptsHTMLWithoutRelaxingItsTarget(t *testing.T) {
+	const machine, route = "mac_example", "pane-17"
+	base := "https://app.clawdline.com/#document=1&machine=mac_example&session=pane-17&scope=project&path=report.html"
+	for _, raw := range []string{base, strings.Replace(base, "report.html", "report.HTML", 1),
+		strings.Replace(base, "scope=project", "scope=task&task=11111111-1111-4111-8111-111111111111", 1)} {
+		if err := ValidateHumanDocumentURL(raw, machine, route); err != nil {
+			t.Errorf("HTML locator rejected: %v", err)
+		}
+	}
+	for _, raw := range []string{
+		strings.Replace(base, "mac_example", "mac_other", 1),
+		strings.Replace(base, "pane-17", "pane-18", 1),
+		strings.Replace(base, "report.html", "../report.html", 1),
+		base + "&path=other.html",
+		strings.Replace(base, "report.html", "report.xhtml", 1),
+		strings.Replace(base, "report.html", "report.js", 1),
+	} {
+		if ValidateHumanDocumentURL(raw, machine, route) == nil {
+			t.Errorf("unsafe or unsupported HTML locator accepted: %q", raw)
 		}
 	}
 }
