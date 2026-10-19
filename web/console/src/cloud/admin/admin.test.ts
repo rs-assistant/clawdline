@@ -205,7 +205,7 @@ test("pure Workflow source formatting stays compatible while edited messages rem
 })
 
 test("each page has its own address, and an address names one page or none", () => {
-  assert.deepEqual(ADMIN_ROUTES.map(adminPath), ["/admin", "/admin/accounts", "/admin/promotions", "/admin/usage"])
+  assert.deepEqual(ADMIN_ROUTES.map(adminPath), ["/admin", "/admin/accounts", "/admin/promotions", "/admin/usage", "/admin/survey"])
   for (const route of ADMIN_ROUTES) assert.equal(adminRoute(adminPath(route)), route)
   assert.equal(adminRoute("/admin/"), "overview")
   assert.equal(adminRoute("/admin/promotions/"), "promotions")
