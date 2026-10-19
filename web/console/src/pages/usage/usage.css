@@ -6,7 +6,7 @@
 .usage-title-block { min-width: 0; }
 .usage-page .usage-refresh { flex: none; width: 40px; min-height: 40px; padding: 0; font-size: 20px; }
 .usage-filters { display: grid; grid-template-columns: minmax(0, 240px) max-content; align-items: end; gap: 12px; }
-.usage-filters label { display: grid; min-width: 0; gap: 5px; font-size: 11px; color: var(--dim); }
+.usage-filters .usage-project-filter { display: grid; min-width: 0; gap: 5px; font-size: 11px; color: var(--dim); }
 .usage-filters .usage-switch { white-space: nowrap; }
 .usage-page button, .usage-page select { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; min-height: 36px; padding: 6px 12px; font: inherit; font-size: 13px; }
 .usage-page select { min-width: 0; max-width: 100%; width: 100%; text-overflow: ellipsis; }
@@ -89,3 +89,10 @@
   .usage-duration-total { flex-shrink: 1; }
   .usage-chart-value { min-height: 58px; }
 }
+
+/* Keep the original filter grid and 36px control height at every breakpoint. */
+.usage-project-filter .project-picker { width: 100%; min-width: 0; }
+.usage-project-filter .project-picker-trigger { min-height: 36px; padding: 6px 12px; border-radius: 8px; }
+.usage-project-filter .project-picker-option { border: 0; background: transparent; }
+.usage-project-filter .project-picker-option:hover,
+.usage-project-filter .project-picker-option[aria-selected="true"] { background: var(--accent-in); }
