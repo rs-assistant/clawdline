@@ -214,7 +214,7 @@
       ],
       "decode": {"reply": "action", "fields": {"report": {"type": "any"}}}
     },
-    {"op": "direct-local-network-enable", "kind": "command", "write_gate": true, "console": "carried", "console_route": "cloud-client.js enableSameNetwork", "console_seam": "client", "local": {"method": "POST"}, "example": {"request": "req-local-network", "session": "__clawdline_machine__"}, "shapes": [{"body": ["request", "session"], "path": "/v1/cloud/direct/local-network", "local_body": ["enabled"]}], "decode": {"reply": "action", "fields": {}, "route": {"path": "/v1/cloud/direct/local-network", "body": {"fields": {"enabled": {"const": true}}}}}},
+    {"op": "direct-local-network-enable", "kind": "command", "write_gate": true, "console": "carried", "console_route": "cloud-client.js enableSameNetwork", "console_seam": "client", "local": {"method": "POST", "local_exemption": true}, "example": {"request": "req-local-network", "session": "__clawdline_machine__"}, "shapes": [{"body": ["request", "session"], "path": "/v1/cloud/direct/local-network", "local_body": ["enabled"]}], "decode": {"reply": "action", "fields": {}, "route": {"path": "/v1/cloud/direct/local-network", "body": {"fields": {"enabled": {"const": true}}}}}},
     {
       "op": "dismiss-restorable",
       "kind": "command",

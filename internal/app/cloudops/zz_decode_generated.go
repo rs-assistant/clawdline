@@ -487,6 +487,9 @@ func genDecodeDiagnosticsReport(b body) (plan, LocalRequest, bool) {
 }
 
 // genDecodeDirectLocalNetworkEnable is the `direct-local-network-enable` row's decode.
+//
+// Deliberately this machine (`local_exemption`): its route refuses every
+// caller but this machine's own token, which the in-process request carries.
 func genDecodeDirectLocalNetworkEnable(b body) (plan, LocalRequest, bool) {
 	if !b.hasOneOf(
 		[]string{"type", "request", "session"},

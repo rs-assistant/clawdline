@@ -547,9 +547,10 @@ roster 與寫入開關。`ctl/` 上舊形狀的 Session 內容讀取（`transcri
 拿掉 `Local` 與 machine 那道門，capability 保持 read、send 與 Admin，所以 Cloud viewer 可以管理
 board（開關 board、給或撤回 AI 閱讀同意），在本機網路配對的裝置沒有 Admin 則不行——這是刻意的
 （`internal/transport/http/board.go` 的 `boardViewer`）。不帶這個 header 的字就是這台 machine；
-其中只有 `pair-agent-start` 與 `pair-agent-status` 會到只有這台 machine 能用的路由
-（`requireLocal`），詞彙表把它們標成 `local_exemption`，
-`TestEveryLocalWordThatNeedsThisMachineSaysSo` 擋住任何沒有這個標記卻走到這種路由的新字。
+The machine-only routes (`requireLocal`) are reached by `pair-agent-start`,
+`pair-agent-status`, and the enable-only `direct-local-network-enable` operation.
+The vocabulary marks them `local_exemption`; `TestEveryLocalWordThatNeedsThisMachineSaysSo`
+refuses a new word that reaches such a route without stating that authority.
 
 `orch/<machine>` advertises `machine.read_content_v1: true` only when the read-only `r/` bridge is connected. An absent value means an older machine; the presence of `ss/` does not imply this capability. The `r/` body accepts pinned `info` with `parts: "full"`, `transcript` with `limit` from 1 to 1000 and optional positive `before`, `skills`, `image`, `git`, `git-diff`, `screen`, `agent`, `shell`, `documents`, and `document`. Every Session-scoped read requires `machine_id`, `session`, and a 32-character lowercase hexadecimal `expected_generation`; `machine_id` must match the channel target. The bridge gets `sender`, `seq`, and `ch` from the verified, decrypted envelope. It checks the current roster, signing key, local revocation, and `read_transcript` capability before the pinned local HTTP read and again before sealing the answer. The bridge repeats fresh execution admission after reading, so a reused Session ID cannot release old content. Other operations refuse with `read_only_channel`; a missing generation refuses with `execution_target_required`, and missing capability with `read_transcript_required`.
 
@@ -851,8 +852,9 @@ A row's `local` says who the local request runs as. `device: true` sends
 `X-Clawdline-Actor: device`, which takes away `Local` and the machine door and
 keeps the capabilities (§8.2). Without it the word runs as this machine, and
 `local_exemption: true` says so on purpose for a word whose route answers only
-this machine (`requireLocal`): today `pair-agent-start` and
-`pair-agent-status`. `TestEveryLocalWordThatNeedsThisMachineSaysSo`
+this machine (`requireLocal`): `pair-agent-start`, `pair-agent-status`, and
+`direct-local-network-enable`. The last is enable-only, requires operation permission,
+and preserves the relay for its setting receipt before the browser retries ICE. `TestEveryLocalWordThatNeedsThisMachineSaysSo`
 (`internal/transport/http`) asks every Local word's route as a device paired on
 this machine's own network would, and fails for an unflagged word that is
 refused there and for a flagged one that is not.
