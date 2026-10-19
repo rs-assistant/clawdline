@@ -11,8 +11,8 @@ On macOS 13 or later, or Linux, install Clawdline with the command on the [proje
 ## Start a conversation
 
 1. In a terminal on the same machine, run `tmux new -s work`, then run `claude` or `codex` inside that terminal. On macOS, an iTerm2 Session also appears without tmux.
-2. In Clawdline, open **Session 清單** (Sessions). Look for the new row under its project.
-3. Select the row to read the conversation. Send a short message in the box and press **送出** (Send).
+2. In Clawdline, open **Sessions**. Look for the new row under its project.
+3. Select the row to read the conversation. Send a short message in the box and press **Send**.
 
 **Success:** your message appears in the conversation, and the Session continues working. An Agent question appears as a choice card or an attention note; answer it in the Session. [Working with Sessions](sessions.md).
 

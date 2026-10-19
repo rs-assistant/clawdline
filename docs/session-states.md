@@ -40,20 +40,20 @@ of demands on a phone when not one of them needed anything.
 
 ## The `work_state` vocabulary
 
-For each state: what it means, what you do, and what a row looks like on a phone in Traditional
-Chinese (the first-class copy; every other language translates it).
+For each state: what it means, what you do, and an English example of the phone row.
+The original wording was authored in Traditional Chinese; the examples here are English translations.
 
-| state | icon | you should | zh-Hant row |
+| state | icon | you should | English row example |
 | --- | --- | --- | --- |
-| `waiting_you` | 🙋 | **Answer now.** A turn is stopped on you; every second unnoticed costs something. The only state that pushes or lights the row. | `🙋 在等你回答` |
-| `owed` (overlay) | 📥 | **You owe this line a decision.** Nothing is stopped; it ages, and the age is the risk. Never pushes. | `📥 欠一個決定 · 3d`（通常帶 session 自己的字句） |
-| `waiting_session` | ⏳ | **Do nothing — but if it stays, another session is stuck.** A broker-proved peer/file wait, your own live child, or a session's explicitly self-reported named handoff. It can wedge; you may have to go and unwedge it. | `⏳ 已完成，等待 Clawdfather 整合 · 自述` |
-| `holding` | 🔜 | **Do nothing; it moves by itself.** The mover is an event, a clock, or something the session started — never a person or a session. It cannot wedge. | `🔜 自行推進中 · 自述`（帶宣告的下一步） |
-| `working` | *(spinner)* | Nothing — it is executing now. The live line says what. | `▸ 正在編譯 Orchestrator.swift…` |
-| `ready` | 📭 | **You can hand this one work.** An invitation, almost always the session's own declaration, marked as such. | `📭 可接新工作 · 自述` |
-| `unknown` | *(none, on purpose)* | Nothing is being asked of you. The broker has no positive evidence — an absence, not a category. Giving an absence a symbol is how `needs_triage` came to read as a demand, so this one has no icon at all. | `狀態未知`（灰、斜體、安靜） |
-| `milestone_complete` | ✓ (one CSS check) | **Review and accept it.** Delivered on authenticated evidence; review or landing may remain. | `✓ 已交付，等待驗收` |
-| `work_complete` | ✓✓ (two CSS checks) | **That receipt's task or current-Session scope has landed.** This alone does not prove a root tab is safe to close — that is the separate [`closeability`](#the-fourth-projection-closeability) projection, and the `lost_if_closed` close gate still applies underneath it. | `✓✓ 已驗收完成` |
+| `waiting_you` | 🙋 | **Answer now.** A turn is stopped on you; every second unnoticed costs something. The only state that pushes or lights the row. | `🙋 Waiting for your answer` |
+| `owed` (overlay) | 📥 | **You owe this line a decision.** Nothing is stopped; it ages, and the age is the risk. Never pushes. | `📥 a decision is owed · 3d` (usually with the Session's own wording) |
+| `waiting_session` | ⏳ | **Do nothing — but if it stays, another session is stuck.** A broker-proved peer/file wait, your own live child, or a session's explicitly self-reported named handoff. It can wedge; you may have to go and unwedge it. | `⏳ Done, waiting for Clawdfather to integrate · self-reported` |
+| `holding` | 🔜 | **Do nothing; it moves by itself.** The mover is an event, a clock, or something the session started — never a person or a session. It cannot wedge. | `🔜 moving on its own · self-reported` (with the declared next step) |
+| `working` | *(spinner)* | Nothing — it is executing now. The live line says what. | `▸ Compiling Orchestrator.swift…` |
+| `ready` | 📭 | **You can hand this one work.** An invitation, almost always the session's own declaration, marked as such. | `📭 can take new work · self-reported` |
+| `unknown` | *(none, on purpose)* | Nothing is being asked of you. The broker has no positive evidence — an absence, not a category. Giving an absence a symbol is how `needs_triage` came to read as a demand, so this one has no icon at all. | `status unknown` (muted, italic, quiet) |
+| `milestone_complete` | ✓ (one CSS check) | **Review and accept it.** Delivered on authenticated evidence; review or landing may remain. | `✓ Delivered, awaiting review` |
+| `work_complete` | ✓✓ (two CSS checks) | **That receipt's task or current-Session scope has landed.** This alone does not prove a root tab is safe to close — that is the separate [`closeability`](#the-fourth-projection-closeability) projection, and the `lost_if_closed` close gate still applies underneath it. | `✓✓ Accepted and complete` |
 
 The icons are meaning, not severity: a raised hand asks, a tray holds what you owe, an hourglass
 is somebody else's time, an "up next" sign moves on its own, an open empty mailbox can receive.
@@ -72,7 +72,7 @@ So axis (a) is `work_state`, and axis (b) is the `owed` overlay:
 
 ```json
 "work_state": "working",
-"owed": { "note": "schedules 的取捨還是你的決定", "since": 1787640000,
+"owed": { "note": "The schedule trade-off still needs your decision", "since": 1787640000,
           "person_needed": true, "moved_by": "the user", "provenance": "self" }
 ```
 
@@ -87,7 +87,7 @@ is the failure this field exists to prevent.
 ## The fields beside the state
 
 - `work_provenance` — `broker` (projected from evidence) or `self` (the session's declared
-  claim). The row shows `自述` on self states, so a stated state can never dress as a proven one.
+  claim). The row shows `self-reported` on self states, so a stated state can never dress as a proven one.
 - `work_note` — one line, the session's own words: *"RootSession fix landed; no open child or
   wait; can take new work"*.
 - `waiting_for` — on a broker-decided `waiting_session` (own live work), the tasks that made it
@@ -105,8 +105,8 @@ is the failure this field exists to prevent.
 - `disposition` — unchanged: the receipt behind a check state, evidence-typed, never accepted
   back as truth.
 - `acceptance` (Go daemon, 2026-10-02) — present only beside a Session's own turn report
-  (`disposition.scope` `session`). A report says **本輪已回報** ("turn reported"); it says
-  **待驗收 · <item title>** only when one of that Session's Board items reached `deploying` or
+  (`disposition.scope` `session`). A report says **Turn reported**; it says
+  **Awaiting review · <item title>** only when one of that Session's Board items reached `deploying` or
   `done` and the person has not opened it since. A deploying item belongs to its owner; a done
   item, whose owner is released on closing, to the Session whose assignment was released with it.
   Opening the item's detail on the Board posts `POST /v1/work/v2/items/:id/seen` with the phase
@@ -124,7 +124,7 @@ The `self` half of provenance. Machine token, identity resolved from the live wa
 ```json
 { "state": "ready",
   "note": "fix landed; can take new work",
-  "owed": { "note": "schedules 的取捨還是你的決定", "moved_by": "the user" } }
+  "owed": { "note": "The schedule trade-off still needs your decision", "moved_by": "the user" } }
 ```
 
 - `state` may be **only** `ready`, `holding` or `waiting_session`. The last two require a note,
@@ -159,7 +159,7 @@ problem to report, not a threshold to tune.
 
 A quiet Session may also declare `waiting_session`, but only with all three pieces that make the
 handoff actionable: a `note` saying what is waiting, `moved_by` naming the other Session (normally
-its terminal-neutral id or `Clawdfather`), and `person_needed:false`. The row always says `自述`;
+its terminal-neutral id or `Clawdfather`), and `person_needed:false`. The row always says `self-reported`;
 it never dresses the declaration as a broker-proved file wait. A user decision is not this state:
 it belongs in the persistent `owed` overlay and triggers the separate attention contract.
 
@@ -187,11 +187,11 @@ nobody has paid. So closeability rides beside `work_state` and `owed` as a proje
 with three current values and one action each. `needs_attestation` is a retired Swift value; the
 Go daemon does not require a second declaration after recorded work is complete:
 
-| state | icon | you should | zh-Hant row |
+| state | icon | you should | English row example |
 | --- | --- | --- | --- |
-| `blocked` | 🔒 | **Do not close.** The broker sees one or more positive obligations, and the reasons name them. | `🔒 還有 2 項未了結` |
-| `safe` | 🔓 | **The close button may proceed.** The Session is idle, its exact identity and inventory are fresh, and its Board items, to-dos, broker obligations and self-declared debt are clear. | `🔓 可以安全關閉` |
-| `unknown` | *(none, on purpose)* | **Refresh or audit.** The evidence is stale, missing or ambiguous. It never renders as safe. | `無法判斷能否關閉`（灰、斜體） |
+| `blocked` | 🔒 | **Do not close.** The broker sees one or more positive obligations, and the reasons name them. | `🔒 2 obligations remain` |
+| `safe` | 🔓 | **The close button may proceed.** The Session is idle, its exact identity and inventory are fresh, and its Board items, to-dos, broker obligations and self-declared debt are clear. | `🔓 Safe to close` |
+| `unknown` | *(none, on purpose)* | **Refresh or audit.** The evidence is stale, missing or ambiguous. It never renders as safe. | `Closeability unknown` (muted, italic) |
 
 `unknown` deliberately outranks `blocked`. A stale or ambiguous source does not merely add a row
 to the obligation list — it makes that list's *completeness* unknown, and a reader handed an

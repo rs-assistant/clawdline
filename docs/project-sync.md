@@ -61,7 +61,7 @@ send.
 
 ### In the console
 
-Open the receiving machine in the hosted console, go to **Projects → 專案設定同步**, choose the
+Open the receiving machine in the hosted console, go to **Projects → Project settings sync**, choose the
 source machine, read its projects, pick the ones to mirror, and optionally allow cloning. After
 that, opening the Projects page on the mirror compares every mirrored project with its source's
 current revision and applies what changed. Nothing new is mirrored without a person choosing it.

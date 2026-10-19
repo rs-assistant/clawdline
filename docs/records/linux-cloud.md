@@ -215,8 +215,7 @@ the approval fails and nothing on the machine can tell: the terminal only ever s
 be watched at once, which is hard when they are in two places.
 
 **5. There is no way to remove a machine from the account afterwards.**
-`docs/cloud-cutover.md` step 2's rollback: *"帳號那一列目前沒有按鈕可刪（hosted console 沒有 machine
-撤銷介面）"*. The daemon has `RotateMachineKey` and `Machines`, and no revoke. On a free plan with
+`docs/cloud-cutover.md` step 2's rollback: *"The account row currently has no delete button (the hosted console has no machine-revocation interface)."* (translated). The daemon has `RotateMachineKey` and `Machines`, and no revoke. On a free plan with
 one slot, an enrolment that goes to the wrong machine is not reversible from the console.
 
 **6. Pairing is a second thing to carry, and its link is not a code.** After enrolment the phone
@@ -371,7 +370,7 @@ In order, and only the person can do 1 and 3:
    match what the machine prints.
 4. On the machine, if the phone is to act and not only watch: `clawdline cloud commands on`.
 5. Optionally, bring the projects over: in the hosted console, open this machine's **Projects**
-   page and use 專案設定同步 with the workstation as the source, or `clawdline project export` /
+   page and use Project settings sync with the workstation as the source, or `clawdline project export` /
    `import` by hand ([getting-started.md §7](../getting-started.md#7-bring-your-projects-to-another-machine)).
    Step 4 is what lets the console write them here.
 

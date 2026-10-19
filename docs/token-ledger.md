@@ -267,7 +267,7 @@ What the implementation settled (`UsageLedger.ForSession`, `ForTask`, `ForItem`)
   else is a 400 before it reaches a query or a file name.
 - **On a phone.** The hosted console asks the same three routes through Clawdline Cloud, as the words
   `usage.session`, `usage.task` and `usage.item` (`internal/app/cloudops/ops.go`,
-  `web/console/src/cloud/carry.ts`), so Session detail's 「Token 帳單」 and a Board item's bill read
+  `web/console/src/cloud/carry.ts`), so Session detail's “Token bill” and a Board item's bill read
   the same answer on a phone as on this machine's own network, reasons and refusals included. The
   bill's component does not know which: the seam turns `/v1/usage/…` into the word. `carry.test.ts`
   reads every `/v1/usage/…` path the console spells and fails on one that does not cross.

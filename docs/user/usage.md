@@ -5,11 +5,11 @@ how much each assistant account has left, and whether anything the daemon keeps 
 
 ## A session's context and tokens
 
-Open a session, then **⋯** → **Session 資訊** (session info). It shows the context in use against
+Open a session, then **⋯** → **Session info**. It shows the context in use against
 the model's window, token use (input, output, cache read, cache write) and, when the assistant
 reports them, plan limits with when they reset.
 
-Board cards and a session's to-dos carry a **Token 帳單** (token bill) as well
+Board cards and a session's to-dos carry a **Token bill** as well
 ([board.md](board.md)).
 
 ## What the tokens were spent on
@@ -45,7 +45,7 @@ not affected. To see whether a change paid off, compare tasks by the window they
 clawdline usage --compare-compaction --since 14d
 ```
 
-and keep the question open on the **驗收** (Verify) page ([board.md](board.md)).
+and keep the question open on the **Verify** page ([board.md](board.md)).
 
 ## How much each assistant has left
 
@@ -65,8 +65,7 @@ much quota is left is the one cost this reading must never have.
 **Claude Code hands those percentages to the stdin of whatever `statusLine.command` names in
 `~/.claude/settings.json`, and to nothing else.** Not the transcript, not a file, not an endpoint
 this daemon could call. With no status line configured they exist only for as long as the render
-that received them, and Clawdline has nothing to read. The corner then says `方案額度 未知`
-(plan limits unknown), and **Session 資訊** carries the sentence naming the file that is missing.
+that received them, and Clawdline has nothing to read. The corner then says `Plan limits unknown`, and **Session info** carries the sentence naming the file that is missing.
 
 So the numbers appear only if your status line writes
 `~/.claude/statusline-cache/rate-limits.json`. This is the ordinary state of a fresh **Linux**
@@ -96,7 +95,7 @@ rollouts.
 ## Capacity: is anything filling up
 
 Everything the daemon keeps has a limit — the log, the device list, push subscriptions, pictures,
-and more. **設定** (Settings) has a **容量** (capacity) block that lists every row that needs a
+and more. **Settings** has a **Capacity** block that lists every row that needs a
 look; each row reads OK, filling, nearly full, full, or not measured. It refreshes every 15
 seconds.
 

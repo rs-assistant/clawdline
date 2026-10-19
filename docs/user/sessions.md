@@ -13,25 +13,22 @@ project, stop the turn it is on, and close it safely.
 - Sessions are found in tmux on macOS and Linux, and in iTerm2 on macOS. Windows cannot list
   sessions yet ([platforms.md](platforms.md)).
 
-Labels below use Traditional Chinese examples with their English meaning; the console supports other interface languages.
+Labels below follow the English interface; the console also supports other languages.
 
 ## Read the list
 
-Open **Session 清單** (sessions). Each row is one session, marked with its project's pixel icon,
+Open **Sessions**. Each row is one session, marked with its project's pixel icon,
 its directory and its terminal.
 
 | On the row | Meaning |
 | --- | --- |
-| 🙋 **在等你回答** (waiting for you), row highlighted | The session asked a question or needs permission. These rows move to the top |
+| 🙋 **Waiting for your answer**, row highlighted | The session asked a question or needs permission. These rows move to the top |
 | A spinner | Working |
 | No state word | Idle |
-| 對話還沒開始 | The conversation has not started yet |
+| Conversation not started yet | The conversation has not started yet |
 | A note that the state could not be identified | Clawdline read the screen but could not tell the state. It says so instead of guessing idle |
 
-A second badge says where the work stands: **可接新工作** (can take new work), **自行推進中**
-(moving on its own), **欠一個決定** (a decision is owed), **已交付** (delivered) or **Clawdline
-已驗證落地** (landed, verified by Clawdline). A session's own claim is marked **自述**
-(self-reported). The header counts working, waiting and unreadable sessions.
+A second badge says where the work stands: **can take new work**, **moving on its own**, **a decision is owed**, **Delivered** or **Landed, verified by Clawdline**. A session's own claim is marked **self-reported**. The header counts working, waiting and unreadable sessions.
 
 Type in the filter box, or press `/`, to narrow the list by task, project or terminal. Esc clears
 it. A child session dispatched by another one is shown under its parent, marked └.
@@ -39,39 +36,39 @@ it. A child session dispatched by another one is shown under its parent, marked 
 ## Open a session
 
 Click a row. The detail shows the real transcript, read from what Claude Code or Codex wrote. Press
-`r` to reverse its order; **設定** (Settings) → **對話記錄** (transcript) sets the order for every
+`r` to reverse its order; **Settings** → **Transcript** sets the order for every
 session.
 
-The **⋯** menu (**Session 快捷動作**) holds the rest:
+The **⋯** menu (**Session actions**) holds the rest:
 
-- **Session 資訊** (session info): title and directory, **編輯 session 標題** (rename), context
-  use, token use, **切換模型** (switch model) and, when the assistant reports them, plan limits.
-- **即時畫面** (live screen): the terminal as it is right now.
-- **我傳出的訊息** (my messages), **常用句** (snippets), **Git** (changes, commit, push — commit and
+- **Session info**: title and directory, **Edit session title**, context
+  use, token use, **Switch model** and, when the assistant reports them, plan limits.
+- **Live screen**: the terminal as it is right now.
+- **My messages**, **Snippets**, **Git** (changes, commit, push — commit and
   push ask first).
-- **停止目前的工作（Esc）** and **關閉 session**, below.
+- **Stop current work (Esc)** and **Close session**, below.
 
 ## Answer and send
 
 - **When the session asks a question**, a card above the message box lists its options. Tap one:
   the choice goes to the session as key presses, as if you had pressed it in the terminal.
-- **To send text**, type in the message box and press **送出** (send), or Return. Shift-Return
+- **To send text**, type in the message box and press **Send**, or Return. Shift-Return
   starts a new line. On a touch screen, Return makes a new line and you send with the button.
-- **Pictures:** press **+** (**附一張圖**, attach a picture), paste one anywhere on the page, or drag
-  it onto the session. Tap the thumbnail to open **標記要修改的地方** (mark what to change) and circle
-  things with **紅筆** (red pen) before sending.
+- **Pictures:** press **+** (**Attach a picture**), paste one anywhere on the page, or drag
+  it onto the session. Tap the thumbnail to open **Mark what to change** and circle
+  things with **Red pen** before sending.
 - <a id="pictures-from-the-agent"></a>**Pictures from the Agent:** an Agent shows you a picture — a
   screenshot, a design, a chart — by running `clawdline image send <picture>` in its Session. The
   picture appears under the reply that sent it; open its thumbnail to inspect it. An Agent that has
-  loaded the Clawdline skill knows the command; asking for "the screenshot" or 「傳圖片給我」 is enough.
+  loaded the Clawdline skill knows the command; asking for "the screenshot" or "send me the picture" is enough.
   The picture is stored on the Session's machine for 24 hours; an expired one stays visible as an
   expired tile. A paired Cloud browser needs read permission. If an Agent says it sent one and you
   see nothing, see [Troubleshooting](troubleshooting.md#sessions).
   [How a picture finds its reply](../messages.md#pictures-a-session-shows-the-person).
-- **Snippets** (**常用句**) are text you send often. Create them with **新增常用句**, for this project
+- **Snippets** are text you send often. Create them with **New snippet**, for this project
   or every project. Pressing one only fills the box; you still send it.
 - **Workflows** hold a complete launch message. Open the Workflow tab, select one, then press
-  **Start Workflow**. The shipped **Zero-Based Review** (**歸零審查**) example reviews the current
+  **Start Workflow**. The shipped **Zero-Based Review** example reviews the current
   Project and is available in every Project. Its unedited text follows the interface language;
   you can edit or delete it like another Workflow. A deleted example stays deleted after restart.
 - **Skills:** type `/` (or `$` for Codex) as the whole message to list the session's skills and
@@ -82,11 +79,11 @@ The **⋯** menu (**Session 快捷動作**) holds the rest:
 ## Attention notes from Agents
 
 An Agent can leave a concrete request for you above a Session conversation: something to read,
-answer or do. Open the **關注** (attention) control in the Session header when it has a red dot.
+answer or do. Open the **Attention** control in the Session header when it has a red dot.
 The card explains the action and why the Agent needs you. With multiple suggested replies,
 tapping one sends that message to the Session and resolves the note after the send is accepted.
 With one suggestion or none, the button fills the message box; you can edit it and press
-**送出** yourself. You can also mark a note **移到已處理** (handled), which clears it without
+**Send** yourself. You can also mark a note **Move to handled**, which clears it without
 sending or approving anything. The Agent can continue unrelated work while the note waits.
 
 These notes are separate from a terminal permission prompt and from a Board decision with a
@@ -95,33 +92,33 @@ still needs a waiting state and an attention notification. [Human intervention n
 
 ## Dictate
 
-Press the microphone (**用說的寫一則訊息**, dictate a message), speak, and press it again
-(**停下來，轉成文字**) to turn it into text in the box. Transcription runs on the machine, not in a
+Press the microphone (**Dictate a message**), speak, and press it again
+(**Stop and transcribe**) to turn it into text in the box. Transcription runs on the machine, not in a
 cloud service, so the machine needs whisper.cpp's `whisper-cli` and one `ggml-*.bin` model, for
 example in `~/.cache/whisper`. Browsers only allow the microphone on a secure page: `127.0.0.1`,
 the tunnel's HTTPS address, or the hosted console.
 
 ## Start a session
 
-1. Press **+** (**開一個 session**, start a session) in the list header.
-2. Choose where under **要在哪裡開？** (where should it start). The list holds folders where Claude
+1. Press **+** (**Start a session**) in the list header.
+2. Choose where under **Where should it start?**. The list holds folders where Claude
    Code or Codex has run, folders of live sessions, and folders you added with
    `clawdline project add` ([projects.md](projects.md)).
-3. Choose **Claude Code** or **Codex** under **要用哪一個開？** (start with), or resume a past
-   conversation under **接續之前的** (pick up an earlier one).
+3. Choose **Claude Code** or **Codex** under **Start with**, or resume a past
+   conversation under **Pick up an earlier one**.
 
-**Check:** the sheet says **開好了。等它出現⋯** (started, waiting for it to appear) and the new
-session shows up in the list. With several machines on a Cloud account, **機器** (machine) chooses
+**Check:** the sheet says **Started. Waiting for it to appear…** and the new
+session shows up in the list. With several machines on a Cloud account, **Machine** chooses
 where it runs.
 
-You can also press the microphone in the header (**說要開什麼**, say what to start) and describe the
+You can also press the microphone in the header (**Say what to start**) and describe the
 task; Clawdline drafts the project, assistant, model and first message, and nothing starts until you
-press **開始** (start).
+press **Start**.
 
-**設定** (Settings) → **新 session 的預設設定** (defaults for new sessions) offers the models available to Codex and Claude Code
+**Settings** → **Defaults for new sessions** offers the models available to Codex and Claude Code
 as separate machine-wide pickers. The Claude Code choices follow that machine's installed `/model`
 catalog and account cache, including its versioned legacy choices, instead of a Clawdline-owned list.
-Choose **由助理決定** to leave that assistant in charge. The setting applies only when Clawdline
+Choose **Assistant default** to leave that assistant in charge. The setting applies only when Clawdline
 opens a new session without another model choice; a model chosen for one session still
 wins, a child agent may explicitly choose any admitted model for its own task, and resuming an
 existing conversation does not change its model.
@@ -142,22 +139,22 @@ Choose the reasoning level there; a model change is not finished merely by openi
 
 ## Stop the current turn
 
-**⋯** → **停止目前的工作（Esc）** sends Esc to the session's terminal. The session stops the turn it
+**⋯** → **Stop current work (Esc)** sends Esc to the session's terminal. The session stops the turn it
 is on once it reads the key; the conversation stays open. It works from a phone as well.
 
 ## Close a session
 
-**⋯** → **關閉 session**, or on a phone, swipe the row left and press **關閉 Session**. The dialog
+**⋯** → **Close session**, or on a phone, swipe the row left and press **Close Session**. The dialog
 first says whether closing is safe:
 
-- **可以安全關閉** (safe to close): the button reads **關閉 Session**. The assistant quits, then its
+- **Safe to close**: the button reads **Close Session**. The assistant quits, then its
   terminal tab closes.
 - An idle Session with complete identity evidence and no open Board item, to-do, child work, or
-  self-declared debt is **可以安全關閉** without an extra attestation.
-- **還有 N 項未了結** (N obligations remain): the session still owes a delivery, a landing or a
-  to-do. **回到 session 檢查** takes you back to look; **仍要關閉** (close anyway) closes it after
+  self-declared debt is **Safe to close** without an extra attestation.
+- **N obligations remain**: the session still owes a delivery, a landing or a
+  to-do. **Review session** takes you back to look; **Close anyway** closes it after
   a second, explicit press.
-- **無法判斷能否關閉** (closeability unknown): Clawdline cannot tell, and does not close it.
+- **Closeability unknown**: Clawdline cannot tell, and does not close it.
 
 Swiping never closes anything by itself; it opens the same dialog.
 

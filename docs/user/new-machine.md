@@ -62,7 +62,7 @@ that says it did. Collect everything that needs my hands into one message, and i
 on me and it cannot wait, send it with `clawdline notify` rather than only writing it here.
 ```
 
-## 中文版本
+## Traditional Chinese prompt
 
 ```text
 請幫我把另一台機器設定好，讓它能跟這一台一樣處理我的專案。
@@ -95,7 +95,7 @@ on me and it cannot wait, send it with `clawdline notify` rather than only writi
 
 ## How to tell it worked
 
-Open **專案** (Projects) on the new machine — through its own console, or by selecting it in the
+Open **Projects** on the new machine — through its own console, or by selecting it in the
 hosted console. Each project appears with the name and icon the source machine draws, and a
 mirrored skill is a real file in that checkout's `.claude/skills/`. The machine
 you already use owns later changes to those settings.

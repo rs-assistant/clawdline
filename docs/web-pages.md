@@ -291,7 +291,7 @@ none and the registry that does is swept), so what is drawn is the convention
 
 **Each card is headed by what the task was doing.** Until 2026-09-05 it was headed by the Feature's
 label, which is the *work line* a classifier grouped by: nine cards in a row read `Clawdfather —
-handoff 18bde7c3` and 「光看標題真的看不出來分別」. The heading is now the task's own stored title
+handoff 18bde7c3` and "the titles alone do not tell them apart" (translated). The heading is now the task's own stored title
 (`work` in the payload), and the label keeps its place one line down under a word saying which of
 the two it is. A task old enough for the registry to have swept it has no title anywhere, and then
 the label is the heading again rather than the card going blank.

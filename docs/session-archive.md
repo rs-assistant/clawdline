@@ -100,14 +100,14 @@ The bounds — 500 archived conversations and 20 per restore — are registered 
 ## The console
 
 - **The swipe.** A row that names its conversation (`sessionId`) swipes open to two 88px buttons,
-  封存 left of 關閉 (`session/swipe.ts` `actionWidth`, `session/swipe-archive.css`); a row without
-  one keeps the 126px close alone and draws no 封存. Neither button acts: each opens the
+  Archive left of Close (`session/swipe.ts` `actionWidth`, `session/swipe-archive.css`); a row without
+  one keeps the 126px close alone and draws no Archive. Neither button acts: each opens the
   confirmation.
 - **The confirmation** is the close's sheet with the kind `archive` (`overlays/action-confirm.ts`):
   the same work reminder, the same `close_blocked` reopen and forced second decision, sent to
   `POST /v1/sessions/{id}/archive`. It waits for the archive's own answer rather than the row
   leaving the list, because `archive_not_recorded` arrives after the close.
-- **The Archive page** (`pages/archive.tsx`, drawer row 封存) lists `GET /v1/sessions/archived`
+- **The Archive page** (`pages/archive.tsx`, drawer row Archive) lists `GET /v1/sessions/archived`
   with each entry's mark, title in the row's tint, folder, assistant, persona and when it was
   archived, and restores one conversation per press. An entry leaves when it opened or when the person confirms removing its archive record.
 - The three relay words are carried (`cloud/carry.ts`), wired in `cloud/relay-writer.ts`.

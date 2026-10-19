@@ -24,17 +24,17 @@ permission to change the machine's switches.
 - **iPhone and iPad:** iOS only notifies an app on the Home Screen. In Safari, use **Share → Add to
   Home Screen**, then open Clawdline from the Home Screen and subscribe there.
 
-Labels below use Traditional Chinese examples with their English meaning; the console supports other interface languages.
+Labels below follow the English interface; the console also supports other languages.
 
 ## Turn them on
 
-1. In the sidebar, open **通知** (Notifications).
-2. Press **開啟這台裝置的通知** (turn on on this device) and allow
+1. In the sidebar, open **Notifications**.
+2. Press **Turn on notifications on this device** and allow
    notifications when the browser asks.
-3. Press **送一則測試** (send a test).
+3. Press **Send a test**.
 
-**Check:** the page says **送出去了——馬上就會到這台裝置。** (sent) and the test notification
-arrives on this device.
+**Check:** the page says **Sent — it should arrive on this device in a moment.** The test
+notification arrives on this device.
 
 ## What you are told about
 
@@ -66,15 +66,15 @@ retained for compatibility but has no effect on notifications.
 
 ## Turn them off
 
-Press **關閉這台裝置的通知** under **通知** on the same device. To stop a browser from asking at all,
+Press **Turn off notifications on this device** under **Notifications** on the same device. To stop a browser from asking at all,
 change the site's notification permission in the browser's own settings.
 
 ## Troubleshooting
 
 | You see | Do this |
 | --- | --- |
-| **這個瀏覽器沒辦法顯示通知。** (this browser cannot show notifications) | The page is not secure, or this is iOS outside the Home Screen. See "Before you start" |
-| **這個網站的通知被擋掉了。** (notifications are blocked for this site) | Allow notifications for the site in the browser's settings |
+| **This browser cannot show notifications.** | The page is not secure, or this is iOS outside the Home Screen. See "Before you start" |
+| **Notifications are blocked for this site.** | Allow notifications for the site in the browser's settings |
 | The test says the machine has no subscription for this device | Turn notifications off and on again on that device |
 | Nothing arrives, but the test works | The session was answered within ten minutes, or the hourly limit was reached |
 

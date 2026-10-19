@@ -8,40 +8,39 @@ session's own to-dos; and keep a list of changes waiting to be verified on **Ver
 
 All of this is local and free. The Board is off until you turn it on.
 
-Labels below use Traditional Chinese examples with their English meaning; the console supports other interface languages.
+Labels below follow the English interface; the console also supports other languages.
 
 ## Turn the Board on
 
-1. Open **設定** (Settings).
-2. Find **啟用看板系統** (enable Project Board) and press the button so it reads **已啟用**
-   (enabled).
+1. Open **Settings**.
+2. Find **Enable Project Board** and press the button so it reads **Enabled**.
 
-**Check:** the block says **已儲存** (saved), and **看板** (Board) in the menu opens a board with
-**＋ 建立項目** (create item). Turning it
+**Check:** the block says **Saved**, and **Board** in the menu opens a board with
+**＋ Create item**. Turning it
 off again keeps the history.
 
 ## Put work on the Board
 
-1. Open **看板** and press **＋ 建立項目** (create item).
-2. In **建立看板項目**, choose the Project and the kind (**類型**):
-   - **Feature** and **Issue** go to **待指派** (unassigned) and can be assigned to a session.
-   - **Epic** is assignable like Feature and Issue; **Refactor** and **Plan** stay in **規劃區** (planning).
-3. Give it a title (**標題**), description (**描述**) and **驗收條件（Markdown）**. You can dictate the description and add
+1. Open **Board** and press **＋ Create item**.
+2. In **Create Board item**, choose the Project and the kind (**Type**):
+   - **Feature** and **Issue** go to **Unassigned** and can be assigned to a session.
+   - **Epic** is assignable like Feature and Issue; **Refactor** and **Plan** stay in **Planning**.
+3. Give it a title (**Title**), description (**Description**) and **Acceptance criteria (Markdown)**. You can dictate the description and add
    up to six reference pictures. If the description has two or more top-level list items, they
    become the item's steps when it is assigned.
-4. Press **建立**.
+4. Press **Create**.
 
 ## Assign it to a session
 
-On the card, either choose an existing session (**選擇既有 Session**) and press **指派**, or choose
-Claude or Codex and press **開新 … Session** to open a new one. **前往 Session** takes you to it, and
-**提醒 Session** reminds it of the item.
+On the card, either choose an existing session (**Choose existing Session**) and press **Assign**, or choose
+Claude or Codex and press **Start a new … Session** to open a new one. **Go to Session** takes you to it, and
+**Remind Session** reminds it of the item.
 
 From then on the session moves the item itself, and each move needs evidence:
 
-In the console's **設定 → 規劃與驗證 gate** block, planning is on by default and independent
-verification is off. The macOS app also shows the same pair in **Clawdline Next → 設定⋯ →
-派工作給別的 session**.
+In the console's **Settings → Planning and verification gates** block, planning is on by default and independent
+verification is off. The macOS app also shows the same pair in **Clawdline Next → Settings… →
+Dispatch work to other sessions**.
 The two values are captured on the item's first successful assignment in each cycle; changing the
 switches later affects future cycles. With planning on, Feature and Epic need observable acceptance
 criteria before implementation. An Epic needs a plan and independent review; a Feature needs those
@@ -51,48 +50,47 @@ detail shows
 bounded evidence or why a claim could not be verified. `NEEDS_WORK`, stale evidence, and technical
 failure never count as PASS. Escalations show whose decision it is; only a **waiting for you**
 decision exposes person controls. AI, person, and technical overrides are labeled as overrides.
-When evidence detail fills, use **驗證詳情容量與匯出** to download and verify the exact export, confirm
+When evidence detail fills, use **Verification detail capacity and export** to download and verify the exact export, confirm
 that it is saved, then clear eligible old detail. The latest state and lifetime counts remain.
 
 | Phase | On the card | The agent must show |
 | --- | --- | --- |
-| implementing | 實作 | — |
-| verifying | 驗證 | — |
-| merging | Merge 回 Git | how it was verified |
-| deploying | 部署 | a verified landing of the commit |
-| done | 已完成 | every step completed |
+| implementing | Implementation | — |
+| verifying | Verification | — |
+| merging | Merge into Git | how it was verified |
+| deploying | Deploy | a verified landing of the commit |
+| done | Done | every step completed |
 
-Each card carries a **Token 帳單** (token bill): what the work cost so far
+Each card carries a **Token bill**: what the work cost so far
 ([usage.md](usage.md)).
 
 **Epics and who made a card.** A card split out of an Epic names it under its summary as
-**↑ Epic〈title〉**, with **已完成** or **已取消** when the Epic is closed; pressing it opens the
-Epic's detail, and each row under **子項目** in an Epic's detail opens that child the same way.
-A card a session made rather than you carries an **Agent 建立** badge and a dashed top edge:
-either a session created it from one of your messages (**Session 依你 HH:MM 的訊息建立**), or the
-Epic's owning session split it out of the Epic (**由 Epic 的負責 Session 拆分建立**). Your own
+**↑ Epic〈title〉**, with **done** or **cancelled** when the Epic is closed; pressing it opens the
+Epic's detail, and each row under **Child items** in an Epic's detail opens that child the same way.
+A card a session made rather than you carries an **Agent-made** badge and a dashed top edge:
+either a session created it from one of your messages (**Created by a Session from your HH:MM message**), or the
+Epic's owning session split it out of the Epic (**Split out by the Epic's owner Session**). Your own
 items carry no badge.
 
-**Proposals.** A session can propose an item. **Agent 提案** uses plain language in a compact review
+**Proposals.** A session can propose an item. **Agent proposal** uses plain language in a compact review
 row: what the session proposes, why it should be done, its Project and source. Press
-**Explain / 詳細說明** to reveal **會改什麼** (what changes) and **完成後會看到什麼** (the observable
-result). Press **接受並建立** (accept) or **拒絕** (reject); nothing is accepted for you.
+**Explain** to reveal **What will change** and **What you will see when it is done**. Press **Accept and create** or **Reject**; nothing is accepted for you.
 
 **Questions.** When the owning session needs an answer, the question and its answer buttons appear
-inside that Board item's card under **需要你決定**. The item title and description stay beside the
+inside that Board item's card under **Needs your decision**. The item title and description stay beside the
 question, and the card says which answer becomes the default at the deadline. A new question cannot
 be created without an open item owned by that session.
 
 ## Session to-dos
 
-Open a session and use the **Session 待辦** (session to-dos) fold: it lists the Board items that session owns, the
+Open a session and use the **Session to-dos** fold: it lists the Board items that session owns, the
 ones it recently finished, and direct to-dos. Press **+** to add one. Press an empty checkbox to
 complete a direct to-do, or its checked checkbox to restore it as unfinished.
 
 A direct to-do is a pull queue for future work. Adding one records your intent without sending a
 conversation message or interrupting the current turn. The Session can pick it up when it next
 checks its work. An idle Session cannot poll its to-dos by itself: if you need it to act now, use
-**送出** (Send) in the conversation instead. Keep larger, independently tracked work on the Board.
+**Send** in the conversation instead. Keep larger, independently tracked work on the Board.
 
 A session adds its own to-dos only when you ask it to, with:
 
@@ -105,12 +103,12 @@ clawdline todo done <to-do id>
 ## Verify: changes waiting to be verified
 
 Some changes can only be judged later: lower a setting and see a week later whether it helped.
-**驗收** (Verify; its heading is **等待驗收**, waiting to be verified) keeps each such change with
-**為什麼** (why), **怎樣算成立** (what counts as it holding), **資料** (the data it is judged by),
-**紀錄** (notes) and **結論** (the verdict).
+**Verify** (headed **Waiting to be verified**) keeps each such change with
+**Why**, **What counts as it holding**, **Data**,
+**Notes** and **Verdicts**.
 
-- Mark each criterion **標為通過** (passed) or **標為未通過** (failed), add notes with **加入紀錄**,
-  and finish with **驗收通過** (accept) or **不通過** (reject); a reason is required.
+- Mark each criterion **Mark passed** or **Mark failed**, add notes with **Add note**,
+  and finish with **Accept** or **Reject**; a reason is required.
 - From a terminal or a session:
 
   ```sh

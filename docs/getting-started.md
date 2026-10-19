@@ -211,7 +211,7 @@ machine owns those settings; the others mirror them read-only. Projects are matc
 
 **Before you start**
 
-- Both machines run this version. An older one is listed with 「需要更新 Clawdline」 and cannot be
+- Both machines run this version. An older one is listed with “Clawdline needs an update” and cannot be
   chosen.
 - The browser is paired with both machines (section 6), and the receiving machine lets the browser
   act on it: `./bin/clawdline cloud commands on` there.
@@ -221,17 +221,17 @@ machine owns those settings; the others mirror them read-only. Projects are matc
 **Through Clawdline Cloud**
 
 1. In the hosted console, open the **receiving** machine and go to **Projects**.
-2. Open **專案設定同步** (project settings sync) and choose the source under **主要機器**.
-3. Press **讀取它的專案**, untick anything you do not want, and, if the receiving machine does not
+2. Open **Project settings sync** and choose the source under **Primary machine**.
+3. Press **Read its Projects**, untick anything you do not want, and, if the receiving machine does not
    have some of the repositories yet, tick the line that clones them. It names the directory they
    will go into: the one most of that machine's projects already sit in, or
    `CLAWDLINE_PROJECTS_ROOT` if you set it for the daemon.
-4. Press **同步所選的 N 個專案**. Each project reports what happened: files written, files kept
+4. Press **Sync the selected N projects**. Each project reports what happened: files written, files kept
    because they were edited on this machine, or a clone in progress.
 
 From then on, change a project's icon or skills on the source. Opening **Projects** on the
 receiving machine applies whatever changed there. To make a project the receiving machine's own
-again, press **改回本機設定** on its row.
+again, press **Switch back to local settings** on its row.
 
 **Without Cloud**
 

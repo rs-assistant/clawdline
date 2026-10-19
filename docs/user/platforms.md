@@ -21,7 +21,7 @@ Linux was measured on a headless Ubuntu 24.04 server, and the installer and upda
 
 The installer runs the daemon as a LaunchAgent, so it starts at login whether or not the app is
 open, and puts **Clawdline Next.app** in `~/Applications`. The app then shows that service's
-console and does not start a daemon of its own; its **開機時啟動** item turns the LaunchAgent's
+console and does not start a daemon of its own; its **Start at login** item turns the LaunchAgent's
 start-at-login on and off. Quitting the app leaves the service running.
 
 The app is signed ad hoc, not notarized: the installer downloads it with `curl`, which macOS does
@@ -49,8 +49,7 @@ What it adds:
 
 - **A menu bar item** (✳). It turns to the accent colour with a dot when a session is waiting for
   you, and shows a count when several are working. Its menu opens the console
-  window (**主頁／設定中心**), **開機時啟動** (start at login), **設定⋯** (settings) and **結束
-  Clawdline** (quit). The app's own menus are in Traditional Chinese.
+  window (**Home / Settings center**), **Start at login**, **Settings…** and **Quit Clawdline**. The app's own menus are in Traditional Chinese; the names here are English translations.
 - **A mascot in the notch**, on displays that have one. It can be turned off.
 - **A settings window** with tabs for general settings, remote access,
   dispatch, and Cloud pairing with a QR code.

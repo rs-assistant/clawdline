@@ -1,7 +1,7 @@
 # Keyboard shortcuts
 
 After this page you can move through the session list and a transcript without the mouse. Press
-`?` in the console to see the same list (the card is titled **鍵盤**, keyboard).
+`?` in the console to see the same list (the card is titled **Keyboard**).
 
 Shortcuts stand down while you are typing in a text box: anything you type there stays there.
 

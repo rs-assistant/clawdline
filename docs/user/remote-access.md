@@ -14,7 +14,7 @@ Your agents and code stay on your machine whichever way you choose.
 
 The daemon itself listens on `127.0.0.1` only. None of these opens a port on your network.
 
-Labels below use Traditional Chinese examples with their English meaning; the console supports other interface languages.
+Labels below follow the English interface; the console also supports other languages.
 
 ## A. Another computer, over SSH
 
@@ -39,13 +39,12 @@ installed on the machine. The daemon starts and stops it itself, and only when a
 
 1. **At least one device is already paired.** A browser signed in with `clawdline open` counts.
    Otherwise the tunnel would lead only to a locked door.
-2. **Remote access is on**: **讓瀏覽器或你的手機看得到你的 session** (let a browser or your phone see
-   your sessions).
-3. **The tunnel is on**: **從任何地方連到這台機器** (connect to this machine from anywhere), set to
-   **自動產生的網址** (an automatically generated `trycloudflare.com` address) or **我自己的網域**
-   (a named tunnel on your own domain, with its **主機名稱**, hostname).
+2. **Remote access is on**: **Let a browser or your phone view your sessions**.
+3. **The tunnel is on**: **Connect to this machine from anywhere**, set to
+   **Automatically generated URL** or **My own domain**
+   (a named tunnel on your own domain, with its **Hostname**).
 
-On a Mac, both switches are on the **遠端** (Remote) tab of the macOS app's settings window. Without
+On a Mac, both switches are on the **Remote** tab of the macOS app's settings window. Without
 the app, set them in `config.json` in the state directory and restart `serve`:
 
 ```json
@@ -59,17 +58,16 @@ Then:
 ./bin/clawdline pair --watch          # leave running: shows a code when a device asks
 ```
 
-1. Open the tunnel's address on your phone. The page says **這個瀏覽器還沒被放進來** (this browser
-   has not been let in yet).
-2. Name the device and press **要求配對** (ask to pair).
+1. Open the tunnel's address on your phone. The page says **This browser is not paired yet**.
+2. Name the device and press **Ask to pair**.
 3. A six-digit code appears on the machine — in `pair --watch`, or as an alert in the macOS app —
-   and never on the phone. Type it in and press **配對這台裝置** (pair this device) within two
+   and never on the phone. Type it in and press **Pair this device** within two
    minutes.
 
-**Check:** the phone shows **配對好了——這個瀏覽器進來了** (paired) and then the session list.
+**Check:** the phone shows **Paired — this browser is in** and then the session list.
 
 **Limits.** Asking to pair is limited to three requests every ten minutes, and five wrong codes end
-the attempt. **Undo:** set the tunnel to **關閉** (off), or `"remote_tunnel": "off"`.
+the attempt. **Undo:** set the tunnel to **Off**, or `"remote_tunnel": "off"`.
 
 ### Send from paired devices
 
@@ -84,10 +82,9 @@ switch (below).
 Browsers signed in with `clawdline open`, devices paired with a code, and devices signed in with the
 password are listed in two places. Only this machine's own key can see the list or revoke from it:
 
-- **The macOS app's window**, on the **裝置** (Devices) page, under **登入這台機器的裝置** (signed in
-  to this machine). Each device shows what it may do, when it signed in and when it was last used.
-  **撤銷** (revoke) asks first, naming the device, and only **確定撤銷** (revoke it) acts. The line
-  **這個視窗用的是這台機器自己的金鑰** says the window itself uses the machine's own key: that key is
+- **The macOS app's window**, on the **Devices** page, under **Signed in to this machine**. Each device shows what it may do, when it signed in and when it was last used.
+  **Revoke** asks first, naming the device, and only **Revoke it** acts. The line
+  **This window uses the machine's own key** says the window itself uses the machine's own key: that key is
   never in the list and cannot be revoked there.
 - **A terminal on the machine:**
 
@@ -96,9 +93,7 @@ password are listed in two places. Only this machine's own key can see the list 
   ./bin/clawdline devices revoke <device-id> # names the device and asks [y/N]; --yes skips the question
   ```
 
-A browser signed in as a device of its own is not shown the list. Its Devices page says **這個瀏覽器是以自己
-的裝置身分登入的** (this browser is signed in as a device of its own) and offers **登出這個瀏覽器** (sign
-this browser out), which asks first and then revokes that browser's own key.
+A browser signed in as a device of its own is not shown the list. Its Devices page says **This browser is signed in as its own device** and offers **Sign this browser out**, which asks first and then revokes that browser's own key.
 
 **Check:** a revoked device's next request is refused and it is back at the pairing page. When nothing
 else is signed in and no password is set, the tunnel in B closes by itself.
@@ -122,7 +117,7 @@ Cloud is a preview. The machine side has been tested against a local copy of the
 ./bin/clawdline cloud status          # the switch, the identity, the connection
 ```
 
-Sign in at app.clawdline.com with **用 GitHub 繼續** (continue with GitHub). `cloud login` waits up
+Sign in at app.clawdline.com with **Continue with GitHub**. `cloud login` waits up
 to ten minutes for you to approve the machine.
 
 ### Pair a browser or a phone
@@ -131,12 +126,11 @@ Any one of these:
 
 - **From the machine:** `./bin/clawdline cloud pair` prints a one-time link. Open it in a browser
   signed in to the same account.
-- **From the macOS app:** its settings window has **配對瀏覽器** (pair a browser) → **產生配對 QR**
-  (generate a pairing QR). **On an iPhone or iPad, first add app.clawdline.com to the Home Screen
+- **From the macOS app:** its settings window has **Pair browser** → **Create pairing QR code**. **On an iPhone or iPad, first add app.clawdline.com to the Home Screen
   (Safari → Share → Add to Home Screen), open it from there, sign in, and scan from inside it.** A
   pairing made in Safari does not carry over to the Home Screen app.
 - **From the browser, using a paired helper machine:** in the hosted console, press
-  **配對** (pair) on the target machine's row, choose a machine this browser is already
+  **Pair** on the target machine's row, choose a machine this browser is already
   paired with, then start its pairing assistant. The helper uses access it already
   has to reach the target. The card reports progress and the fingerprints to compare.
   The helper must be online and its Cloud command switch must be on.
@@ -167,7 +161,7 @@ Cloud command switch is on:
 
 ### Plans
 
-Clawdline Cloud has a Free plan and a Pro plan ($10 a month); the **方案** (Plan) page of the
+Clawdline Cloud has a Free plan and a Pro plan ($10 a month); the **Plan** page of the
 hosted console shows your plan and its limits. Everything on this machine without Cloud stays free
 and needs no account.
 

@@ -395,7 +395,7 @@ when `#mic` is disabled it has to give the real reason.
 
 **Which language whisper is given** — `implemented`. Whisper can detect a language and cannot choose a Chinese script: left to
 `-l auto` it writes Mandarin in Simplified, whatever the person reads. So `voice_language: auto` (the default, and what the voice
-tab calls 跟著 Clawdline) asks, and stops at the first answer: Clawdline's own `language` setting; then this machine; then the
+tab calls Follow Clawdline) asks, and stops at the first answer: Clawdline's own `language` setting; then this machine; then the
 catalog this daemon ships (`zh-Hant`, the language every page it serves is in when nothing narrows it). Only a Chinese answer
 decides `-l`; anything else leaves detection to whisper, and the script for Chinese is taken from the first Chinese entry on
 the same list — so Simplified is written only when something asked for it. The decision is the daemon's, made where whisper
@@ -750,8 +750,8 @@ from its own daemon (`POST /v1/cloud/pairing`, the one `clawdline cloud pair` pr
 it, and closes the card only when the two fingerprints the page shows equal the ones the daemon reports. Anything else
 leaves the manual pairing screen to the person, once per launch. Pairing the tab with **another** machine can be
 handed to this Mac's own assistant: the Cloud view alone registers a `clawdlinePairAgent` reply handler, answered only
-for the main frame of Cloud's origin, and the offer card then shows **交給這台 Mac 的 AI** as its primary, full-width
-button first under the lede, with the copy box folded under a closed 自己貼指令 disclosure. The shell
+for the main frame of Cloud's origin, and the offer card then shows **Give this to this Mac's AI** as its primary, full-width
+button first under the lede, with the copy box folded under a closed Paste it yourself disclosure. The shell
 asks in a native sheet naming the machine and showing the command; on yes it posts `POST /v1/cloud/pairing/agent`
 (local token only) with the offer, the machine id and its name. The daemon checks the offer as `/offer` does, the id
 against the Cloud's `mac_…` shape, cuts the name to one line, and — for another machine — admits a detached task
@@ -759,13 +759,13 @@ against the Cloud's `mac_…` shape, cuts the name to one line, and — for anot
 access this Mac already has, run `clawdline cloud pair -offer '<offer>'` there, change nothing else, report the
 fingerprint lines. The task starts in `<state>/pairing-agent/` (0700, empty, used for nothing else) — until 2026-09-27
 it was the home directory, and Claude Code sat on its workspace-trust dialog until the person found the tab. The
-daemon records Claude Code trust for exactly that folder (`projects.TrustClaudeProject`; the sheet's 開始 is the
+daemon records Claude Code trust for exactly that folder (`projects.TrustClaudeProject`; the sheet's Start is the
 consent) and Codex is answered per launch as every Codex child is; when the trust cannot be written the task still
 starts and the answer says `trust: "not_recorded"`, so the card warns that a terminal may be asking. While it runs the
 shell polls `GET /v1/cloud/pairing/agent/<task_id>` (local token only, kind `cloud-pairing` only, never the brief)
 every ~3 s until the task ends or the offer expires, and dispatches each change on the page as a
 `clawdline-pair-agent` event while the view is still on Cloud's origin; the card shows a spinner, the machine,
-the elapsed time and starting / terminal asking / connecting / done, and on failure the reason, 再試一次 and the
+the elapsed time and starting / terminal asking / connecting / done, and on failure the reason, Try again and the
 opened copy path. Success is still the offer run turning `paired`. When the id is this Mac's own, it completes the
 offer directly and starts nothing. The offer still travels over the person's own channel, never through Cloud;
 every other browser keeps the copy path.

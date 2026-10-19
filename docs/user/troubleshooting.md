@@ -30,7 +30,7 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:7727/     # 200 means 
 | `500 no_document` on `/` | `CLAWDLINE_NEXT_WEB` has no `index.html`: the console was not built, or is being rebuilt | `(cd web && npm install && npm run build)` |
 | The daemon exits with status 3 | Another process holds the port | `logs/daemon.log` names it: pid, command, since when, and whether it is a Clawdline daemon. Stop that process by its pid, or start this one with another `CLAWDLINE_NEXT_PORT` |
 | `the daemon did not answer` from the command line | Nothing is listening on that port, or the command line and the daemon use different ports | Start `serve`, or set the same `CLAWDLINE_NEXT_PORT` for both |
-| `501 not_implemented` on a `/v1/` route, or **需要更新** (*needs update*) beside a console feature | This machine's daemon is older than the console and does not have that route; the body names it | Update the machine ([updates.md](../updates.md)); the console's **前往設定更新** (*go to Settings to update*) link goes there |
+| `501 not_implemented` on a `/v1/` route, or **Needs update** beside a console feature | This machine's daemon is older than the console and does not have that route; the body names it | Update the machine ([updates.md](../updates.md)); the console's **Go to Settings to update** link goes there |
 
 ## Installing and updating
 
@@ -63,7 +63,7 @@ An update that does not come up healthy rolls back by itself; the console's Sett
 | You can read a session but cannot type into it | The sign-in or machine pairing may be missing, or that machine's Cloud command switch is off | Check the selected machine and pairing, then inspect `clawdline cloud status`; see [remote-access.md](remote-access.md) |
 | A state reads as unknown, not idle | The screen or transcript could not be read, and Clawdline does not guess | Open the session's screen; the state returns when the evidence does |
 | An Agent says it sent you a picture, and the conversation shows none | It stored the picture without naming its Session and put a `<clawdline-image id="…">` marker in its prose, which a model may keep only as a summary; or it used Claude Code's `SendUserFile`, which does not reach Clawdline | Ask it to run `clawdline image send <picture>` from that Session. The picture then appears under its reply with nothing written into it ([sessions.md](sessions.md#pictures-from-the-agent)) |
-| The Status Line's right edge says `方案額度 未知`, or a fresh Linux box never shows Claude's `5h`/`7d` | Claude Code hands those percentages to the stdin of `statusLine.command` and to nothing else, so with no status line configured nothing ever writes `~/.claude/statusline-cache/rate-limits.json` | Configure a status line that writes that file ([usage.md](usage.md)). **Session 資訊** names the missing file. Codex's weekly window is unaffected |
+| The Status Line's right edge says `Plan limits unknown`, or a fresh Linux box never shows Claude's `5h`/`7d` | Claude Code hands those percentages to the stdin of `statusLine.command` and to nothing else, so with no status line configured nothing ever writes `~/.claude/statusline-cache/rate-limits.json` | Configure a status line that writes that file ([usage.md](usage.md)). **Session info** names the missing file. Codex's weekly window is unaffected |
 
 ## Clawdline Cloud
 

@@ -168,3 +168,16 @@ complete frozen baseline and requires full English and Traditional Chinese
 parity. Subsequent deployments retain those requirements, validate every
 present translation, and report the remaining languages'
 coverage without blocking on new untranslated keys.
+
+## English documentation
+
+English READMEs, user pages, design notes and Agent guides use English interface labels and
+English examples. Look up the label in the shipped English catalog for that control; a Chinese
+label can map to different English words in different contexts. Do not insert a Chinese label
+followed by an English gloss, or leave a Chinese update note inside English prose.
+
+Keep non-English text when the document needs its exact bytes: a language-switch link, an
+explicitly labeled translated prompt or catalog field, a multilingual trigger phrase, a Unicode
+test, a link target, or quoted UI evidence in a localization incident. Explain those examples in
+English. Historical documents identified as Chinese in the document index are separate from the
+English guide.

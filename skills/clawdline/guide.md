@@ -1050,7 +1050,7 @@ unreachable) · `3` refused (dispatch_refused and its code, the URL unavailable,
 stopped waiting, with the last state seen. `--no-wait` prints the delivery id and returns after the
 `202`. Report the exit code and final line as they are: `2` means nothing ran, not that it failed.
 
-A scheduled task that reads data for something waiting to be verified (the sidebar's 驗收,
+A scheduled task that reads data for something waiting to be verified (the sidebar's Verify,
 docs/verifications.md) writes its readout as a note on that record with its own task secret — not
 the orchestrator token, which it should not hold:
 
@@ -1223,7 +1223,7 @@ clawdline note create --body-file note.json
 clawdline note create --requested-by-person --body-file note.json
 ```
 
-For a password, credential, or API key, use **Secret Handoff／機密交付**. Create a `kind: "secret"` Note with a non-secret title, action and reason. Put the exact credential name (such as "Production API key") in `summary`; it appears as the label immediately above the dedicated multi-line field. Leave `detail`, `options`, and `document_url` empty. The person pastes the value into that field, even for a one-line value. Never request it in a suggested reply, normal message, document, or command argument. After the person submits, the target Session may run `clawdline secret run <note-id> -- <command> [args...]`; the command receives the one-time value on standard input, and its output is suppressed. The value expires in 15 minutes or on daemon restart. A failed consumer still consumes it. Ask for a new handoff when needed, and never print the value or pipe it through a shell transcript. See `docs/secret-handoff.md` for the boundary and person-facing steps.
+For a password, credential, or API key, use **Secret Handoff**. Create a `kind: "secret"` Note with a non-secret title, action and reason. Put the exact credential name (such as "Production API key") in `summary`; it appears as the label immediately above the dedicated multi-line field. Leave `detail`, `options`, and `document_url` empty. The person pastes the value into that field, even for a one-line value. Never request it in a suggested reply, normal message, document, or command argument. After the person submits, the target Session may run `clawdline secret run <note-id> -- <command> [args...]`; the command receives the one-time value on standard input, and its output is suppressed. The value expires in 15 minutes or on daemon restart. A failed consumer still consumes it. Ask for a new handoff when needed, and never print the value or pipe it through a shell transcript. See `docs/secret-handoff.md` for the boundary and person-facing steps.
 
 `kind` is `read`, `answer`, `action`, `report`, or `secret`; `title`, `summary`, `action`, and `reason` are required. An `answer` can offer two to four choices. Each `draft` is the suggested reply shown on its button. When the person taps it, the Console sends it right away as a conversation message to the note's Session, followed by a context line with the note ID, title, and action so the receiving Session knows which request the person answered; the context is not shown on the button. Only after the send succeeds does the note move to recently handled. If the send fails, the note stays pending and the attention control says the reply was not sent. `detail` can hold longer text. `document_url` can link to a real, readable Cloud document; verify the document route and file before posting it. Act on the conversation message that arrives, not on the note's state: a note the person marked handled by hand sent nothing. Use `--requested-by-person` only for an explicit request to create the note, not for a broader request to complete work. That flag keeps the note visible without sending a note push. If your work is actually blocked on the answer, record the waiting-user state; an agent-initiated note already sends the attention push, so do not duplicate it. A note does not wake an Agent.
 
@@ -1400,7 +1400,7 @@ POST /v1/work/v2/agent/proposals     (Idempotency-Key required)
   they can notice, `description` says what changes, `reason` says why it is worth doing now, and
   `suggested_acceptance` says what they can observe when it is done. All four are required. Do not
   make unexplained acronyms, internal identifiers, code paths, or implementation jargon the main
-  explanation. The Board first shows title, source, and reason; **Explain / 詳細說明** expands what
+  explanation. The Board first shows title, source, and reason; **Explain / Details** expands what
   changes and what the person will see when it is done.
 - **To propose an item with steps**, write the list as two or more top-level Markdown list
   rows in `description`. When the person accepts and assigns the item, each row becomes one of its

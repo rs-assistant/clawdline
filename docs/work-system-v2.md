@@ -866,7 +866,7 @@ A proposal is also the fallback when a Session has no run to create an item unde
 person typed straight into the terminal, so the Session proposes and tells them to accept it here.
 
 It does not expire into acceptance, does not create a work item through a rule, and is never mixed
-with the Board count. The compact row shows the title, source, and reason; its **Explain / 詳細說明**
+with the Board count. The compact row shows the title, source, and reason; its **Explain / Details**
 control reveals what changes and the observable completion result. The person can preview and edit
 it before accepting. Acceptance creates one new item and links the proposal to it in one idempotent
 transaction. Rejection keeps provenance without creating work.

@@ -331,7 +331,7 @@ landing, timeout, task result, or direct-to-do read cannot create a proposal.
 ### WS2-P02 — Person previews and edits before acceptance
 
 The Console's compact row shows proposed kind, title, Project, source, and reason. An
-**Explain / 詳細說明** control reveals what changes and what the person can observe when it is done.
+**Explain / Details** control reveals what changes and what the person can observe when it is done.
 A person may edit the draft in the accept request. Acceptance creates exactly one `created` item with
 the accepted bytes and links the proposal atomically. It does not assign the proposing Session.
 
