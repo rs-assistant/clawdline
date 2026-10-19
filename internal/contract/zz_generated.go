@@ -6068,6 +6068,11 @@ type SettingsRequest struct {
 	// Empty, or a Claude Code model name used when a new Session does not name one.
 	ClaudeDefaultModel *string `json:"claude_default_model"`
 
+	// Only `false`: dismisses the retired Cloudflare tunnel notice by removing that
+	// tunnel's old keys from the file. The old keys themselves are refused as
+	// `retired_setting`.
+	CloudflareTunnelRetired *bool `json:"cloudflare_tunnel_retired"`
+
 	// Whether a new session is named by an assistant.
 	CodexAutoName *bool `json:"codex_auto_name"`
 
@@ -6180,12 +6185,6 @@ type SettingsRequest struct {
 	// Whether anything but this Mac may read the session list.
 	Remote *bool `json:"remote"`
 
-	// A hostname, or empty.
-	RemoteHostname *string `json:"remote_hostname"`
-
-	// `off` or `named`. A file that still holds the removed `quick` reads as `off`.
-	RemoteTunnel *string `json:"remote_tunnel"`
-
 	// Whether the bar comes back with the terminal.
 	ReopenOnReturn *bool `json:"reopen_on_return"`
 
@@ -6248,6 +6247,12 @@ type SettingsSnapshot struct {
 	// The model used for a new Claude Code session when that launch does not name one.
 	// Empty leaves the choice to Claude Code.
 	ClaudeDefaultModel *string `json:"claude_default_model"`
+
+	// True while the file still holds the built-in Cloudflare tunnel's settings
+	// (`remote_tunnel`, `remote_tunnel_name`, `remote_hostname`, `cloudflared_path`),
+	// removed on 2026-10-20. They start nothing; the settings page explains once, and
+	// writing `cloudflare_tunnel_retired: false` takes them out of the file.
+	CloudflareTunnelRetired bool `json:"cloudflare_tunnel_retired,omitempty"`
 
 	// Whether a new session is named by an assistant. The Swift app's spelling, kept
 	// so a line copied between the two files means the same thing.
@@ -6377,19 +6382,8 @@ type SettingsSnapshot struct {
 	// Notify when a Session waits for the person.
 	PushOnWaiting *bool `json:"push_on_waiting"`
 
-	// True while the file still holds `remote_tunnel: "quick"`, the address under
-	// trycloudflare.com that was removed. It is reported as `off` and starts nothing;
-	// the settings page explains once, and writing `remote_tunnel` clears it.
-	QuickTunnelRetired bool `json:"quick_tunnel_retired,omitempty"`
-
 	// Whether anything but this Mac may read the session list.
 	Remote *bool `json:"remote"`
-
-	// The hostname a named tunnel answers on.
-	RemoteHostname *string `json:"remote_hostname"`
-
-	// `off` or `named`. A file that still holds the removed `quick` reads as `off`.
-	RemoteTunnel *string `json:"remote_tunnel"`
 
 	// Whether the bar comes back with the terminal.
 	ReopenOnReturn *bool `json:"reopen_on_return"`
@@ -7568,69 +7562,6 @@ type TranscriptUnread struct {
 
 	// How much of the record's end one read looks at.
 	WindowBytes int64 `json:"windowBytes"`
-}
-
-// `off`, or `named`: the person's own tunnel (`remote_tunnel_name`) and
-// hostname (`remote_hostname`). A settings file that still holds the removed
-// `quick` reads as `off`.
-type TunnelMode string
-
-const (
-	TunnelModeOff   TunnelMode = "off"
-	TunnelModeNamed TunnelMode = "named"
-)
-
-// TunnelModeValues is every value the contract allows, in contract order.
-var TunnelModeValues = []TunnelMode{TunnelModeOff, TunnelModeNamed}
-
-// `off`; `starting`, launched or waiting to retry and not yet registered with
-// the edge; `up`; `failed`, with a reason — including a refusal to start.
-type TunnelState string
-
-const (
-	TunnelStateOff      TunnelState = "off"
-	TunnelStateStarting TunnelState = "starting"
-	TunnelStateUp       TunnelState = "up"
-	TunnelStateFailed   TunnelState = "failed"
-)
-
-// TunnelStateValues is every value the contract allows, in contract order.
-var TunnelStateValues = []TunnelState{TunnelStateOff, TunnelStateStarting, TunnelStateUp, TunnelStateFailed}
-
-// One reading of the tunnel.
-type TunnelStatus struct {
-	At int64 `json:"at"`
-
-	// Launches in a row that have died, while it is retrying; absent when none have.
-	Attempts int64 `json:"attempts,omitempty"`
-
-	// The cloudflared the next launch would run: `cloudflared_path` when it is set and
-	// executable, else where a package manager puts it, else PATH. Absent when there
-	// is none.
-	Binary string `json:"binary,omitempty"`
-
-	// When state, url or reason last moved.
-	Changed int64 `json:"changed"`
-
-	// The command line of the child that is running or was last started, binary first.
-	// It always carries `--config` and this daemon's own file, never the person's
-	// ~/.cloudflared/config.yml.
-	Command []string `json:"command,omitempty"`
-
-	// The configuration file cloudflared is pointed at, in this daemon's state
-	// directory.
-	Config    string     `json:"config"`
-	Installed bool       `json:"installed"`
-	Mode      TunnelMode `json:"mode"`
-
-	// Why it failed or refused, in the tunnel's own sentence. Present when state is
-	// failed.
-	Reason string      `json:"reason,omitempty"`
-	State  TunnelState `json:"state"`
-
-	// The address, once a connection to Cloudflare's edge is registered. Present when
-	// state is up.
-	URL string `json:"url,omitempty"`
 }
 
 // The last update of a release install, as the updater recorded it in the state

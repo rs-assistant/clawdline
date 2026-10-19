@@ -18,7 +18,6 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/devices"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
-	"github.com/sainteye/clawdline/internal/adapters/tunnel"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/auth"
@@ -45,8 +44,8 @@ import (
 //     plain text without asking; it cannot send application/json without the
 //     browser first asking this daemon, which does not answer yes.
 //
-// There is no exception for loopback. Through a tunnel every request comes
-// from 127.0.0.1, and a web page the person is visiting can reach a local port
+// There is no exception for loopback. Through Tailscale Serve every request
+// comes from 127.0.0.1, and a web page the person is visiting can reach a local port
 // too — with a DNS rebinding, as same-origin.
 
 const (
@@ -120,19 +119,12 @@ type gate struct {
 	// err is why the gate could not open. Every route behind it is then
 	// refused; an unreadable device file is never an empty one.
 	err error
-	// hostname is `remote_hostname` from this app's config.json: the named
-	// tunnel's name, which the Host check accepts besides loopback. The
-	// Origin check follows the Host that passed. It is read when the daemon
-	// starts and again every time the tunnel is applied (tunnel.go), through
-	// the same reading the tunnel's own ingress is written from, so a named
-	// tunnel and the gate in front of it never disagree about its name.
-	hostname atomic.Pointer[string]
 	// tailscale is `tailscale_hostname` while `remote` is on, and "" while it
 	// is off or the name is unset: the address Tailscale Serve proxies to
 	// this daemon's loopback port. Serve keeps running whatever this daemon
 	// says, so the switch is enforced here, on every request, and not by
-	// stopping anything. It is refreshed from the same readings as hostname
-	// and on every settings write that touches either key.
+	// stopping anything. It is read when the gate opens and again on every
+	// settings write that touches either key.
 	tailscale atomic.Pointer[string]
 	port      int
 	// dir is the state directory used by the gate and local adapters.
@@ -208,34 +200,12 @@ func openGate(cfg config.Config) *gate {
 		})
 	}
 	if v, err := nextconfig.Open(cfg.Dir).Read(); err == nil {
-		if h, ok := v.String("remote_hostname"); ok {
-			g.setHostname(h)
-		}
 		g.setTailscale(v)
 	}
 	// Paths only. Neither token is ever written to the log.
 	log.Printf("auth: local token at %s, orchestrator token at %s, audit at %s",
 		files.LocalTokenPath(), files.MachineTokenPath(), files.AuditPath())
 	return g
-}
-
-// setHostname takes `remote_hostname` as the file has it. A value that is not
-// a hostname admits no name at all: the Host check then answers loopback
-// only, which is what an unreadable setting should open.
-func (g *gate) setHostname(raw string) {
-	h, ok := tunnel.Hostname(raw)
-	if !ok {
-		h = ""
-	}
-	g.hostname.Store(&h)
-}
-
-// allowedHostname is the configured name the Host check accepts, or "".
-func (g *gate) allowedHostname() string {
-	if h := g.hostname.Load(); h != nil {
-		return *h
-	}
-	return ""
 }
 
 // setTailscale takes `tailscale_hostname` and `remote` from one reading of
@@ -601,7 +571,7 @@ func (g *gate) crossOriginRefusal(r *http.Request) string {
 	if isCrossSiteSubresource(r.Header) {
 		return "Cross-site requests are not answered."
 	}
-	if !isAllowedHost(r.Host, g.allowedHostname(), g.tailscaleHostname()) {
+	if !isAllowedHost(r.Host, g.tailscaleHostname()) {
 		return "Wrong host."
 	}
 	return ""
@@ -620,20 +590,17 @@ func isCrossSiteSubresource(h http.Header) bool {
 
 // isAllowedHost is the DNS-rebinding defence: rebinding changes what a name
 // resolves to, never the Host header, so a Host this daemon does not answer
-// to is refused before anything else is looked at. Every name besides
-// loopback is matched exactly: the named tunnel's, and the Tailscale name,
-// which is "" while remote access is off. No suffix is allowed — the quick
-// tunnel's `*.trycloudflare.com` went with it on 2026-10-19.
-func isAllowedHost(header, hostname, tailscale string) bool {
+// to is refused before anything else is looked at. Besides loopback the one
+// name is the Tailscale name, matched exactly, which is "" while remote access
+// is off. The Cloudflare tunnel's names went with it: `*.trycloudflare.com` on
+// 2026-10-19 and the named tunnel's `remote_hostname` on 2026-10-20.
+func isAllowedHost(header, tailscale string) bool {
 	host := hostOnly(header)
 	if host == "" {
 		return false
 	}
 	switch host {
 	case "127.0.0.1", "localhost", "::1":
-		return true
-	}
-	if hostname != "" && host == hostname {
 		return true
 	}
 	return tailscale != "" && host == tailscale
@@ -707,7 +674,7 @@ func sameOrigin(origin string, r *http.Request) bool {
 }
 
 // requestOrigin is how a browser spells the origin this request went to: the
-// scheme — https when the tunnel in front says so, since this daemon itself
+// scheme — https when the proxy in front (Tailscale Serve) says so, since this daemon itself
 // speaks only http — then the Host it asked for, with the port written out.
 // X-Forwarded-Proto cannot be set by a page elsewhere without asking first,
 // and a local caller who sets it is only describing its own request.

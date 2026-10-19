@@ -36,7 +36,7 @@ const (
 	PairingWindow   = 10 * time.Minute
 	PairingRequests = 3
 	// PasswordFailures is how many wrong passwords the password door takes in
-	// a PasswordWindow, from everybody together: through a tunnel every
+	// a PasswordWindow, from everybody together: through Tailscale Serve every
 	// request comes from 127.0.0.1, so there is nobody else to count them by.
 	// A check under way counts against it until it is known to have passed,
 	// which is also what bounds how many can wait for their turn.
@@ -275,10 +275,8 @@ func (a *Authority) copyDevices() map[string]Device {
 }
 
 // IsConfigured is true when a person has set this up: a paired device or a
-// password. The local token does not count — if it did, merely starting the
-// daemon would satisfy the interlock that keeps a tunnel closed until somebody
-// has decided to be reachable. No tunnel exists in this daemon yet; this is the
-// predicate it will ask.
+// password. The local token does not count: merely starting the daemon is not
+// somebody deciding to be reachable. The devices route reports it.
 func (a *Authority) IsConfigured() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()

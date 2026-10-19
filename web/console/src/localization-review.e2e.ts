@@ -286,7 +286,7 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
               assert.ok((await page.locator('.cap-rows').innerText()).includes('Synthetic review evidence'))
             }
             if (surface.action === 'machine-remote') {
-              await Promise.all([page.waitForResponse((res: any) => res.url().endsWith('/v1/tunnel') && res.status() === 200), page.getByRole('tab').nth(2).click()])
+              await Promise.all([page.waitForResponse((res: any) => res.url().endsWith('/v1/cloud/status') && res.status() === 200), page.getByRole('tab').nth(2).click()])
               await page.locator('#sw-pane-2').waitFor()
             }
             if (surface.action === 'devices-loaded') {
