@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6859,
+  "englishContentKeys": 6860,
   "riskKeys": 3130,
-  "nonRiskCount": 3729,
+  "nonRiskCount": 3730,
   "groups": [
     {
       "name": "admin / other",
@@ -2369,7 +2369,7 @@
     },
     {
       "name": "next / other",
-      "count": 271,
+      "count": 272,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2561,6 +2561,7 @@
         "next.transcriptRetryEarlier",
         "next.transcriptRetrying",
         "next.transcriptTechnicalDetails",
+        "next.unifyVisibleTo",
         "next.updateApplyOlder",
         "next.updateAuto",
         "next.updateAutoBeta",

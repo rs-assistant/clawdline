@@ -6859,5 +6859,6 @@
   "next.usageUnattributed": "Sem atribuição",
   "next.usageUnsupported": "Atualize esta máquina para ler a visão geral de uso.",
   "next.usageRefresh": "Atualizar",
-  "next.usageSampleOne": "{count} amostra"
+  "next.usageSampleOne": "{count} amostra",
+  "next.unifyVisibleTo": "O que {assistant} pode ver"
 }

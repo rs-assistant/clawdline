@@ -6859,5 +6859,6 @@
   "next.usageTokens": "Token 用量",
   "next.usageUnattributed": "未歸屬",
   "next.usageUnsupported": "請更新這台機器以讀取使用概況。",
-  "next.usageRefresh": "重新整理"
+  "next.usageRefresh": "重新整理",
+  "next.unifyVisibleTo": "{assistant} 看得到的內容"
 }

@@ -6859,5 +6859,6 @@
   "next.usageUnattributed": "未分類",
   "next.usageUnsupported": "使用状況の概要を読み取るには、このマシンを更新してください。",
   "next.usageRefresh": "更新",
-  "next.usageSampleOne": "{count} サンプル"
+  "next.usageSampleOne": "{count} サンプル",
+  "next.unifyVisibleTo": "{assistant} が参照できる内容"
 }

@@ -6859,5 +6859,6 @@
   "next.usageUnattributed": "미분류",
   "next.usageUnsupported": "사용량 개요를 읽으려면 이 기기를 업데이트하세요.",
   "next.usageRefresh": "새로고침",
-  "next.usageSampleOne": "표본 {count}개"
+  "next.usageSampleOne": "표본 {count}개",
+  "next.unifyVisibleTo": "{assistant}에서 볼 수 있는 내용"
 }

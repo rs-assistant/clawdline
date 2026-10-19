@@ -6859,5 +6859,6 @@
   "next.usageTokens": "Utilisation des jetons",
   "next.usageUnattributed": "Non attribuée",
   "next.usageUnsupported": "Mettez cette machine à jour pour lire la vue d’ensemble de l’utilisation.",
-  "next.usageRefresh": "Actualiser"
+  "next.usageRefresh": "Actualiser",
+  "next.unifyVisibleTo": "Ce que {assistant} peut voir"
 }

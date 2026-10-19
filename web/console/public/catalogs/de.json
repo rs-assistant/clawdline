@@ -6859,5 +6859,6 @@
   "next.usageTokens": "Token-Nutzung",
   "next.usageUnattributed": "Nicht zugeordnet",
   "next.usageUnsupported": "Aktualisieren Sie diesen Rechner, um die Nutzungsübersicht zu lesen.",
-  "next.usageRefresh": "Aktualisieren"
+  "next.usageRefresh": "Aktualisieren",
+  "next.unifyVisibleTo": "Was {assistant} sehen kann"
 }

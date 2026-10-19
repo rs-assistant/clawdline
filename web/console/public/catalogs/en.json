@@ -6859,5 +6859,6 @@
   "next.usageTokens": "Token usage",
   "next.usageUnattributed": "Unattributed",
   "next.usageUnsupported": "Update this machine to read usage overview.",
-  "next.usageRefresh": "Refresh"
+  "next.usageRefresh": "Refresh",
+  "next.unifyVisibleTo": "What {assistant} can see"
 }
