@@ -8,7 +8,7 @@ import type { MachineSessionProjection, SessionContent, SessionDestination, Mach
 // @ts-expect-error -- Node's type-stripping runner loads the source in its focused test.
 import { destinationAvailable, destinationKey } from "./all-machine-sessions.ts"
 // @ts-expect-error -- Node's type-stripping runner loads the source in its focused test.
-import { record, STATUS_FRESH_MS, statusGapTarget, statusInventoryIDs, statusPassTransition, statusProjection } from "./status-projection.ts"
+import { descriptorParents, record, STATUS_FRESH_MS, statusGapTarget, statusInventoryIDs, statusPassTransition, statusProjection } from "./status-projection.ts"
 import type { CloudClientHandle } from "./copied.js"
 
 type StatusClient = CloudClientHandle & {
@@ -106,7 +106,7 @@ export const STATUS_MARKER_RETRY_MS = 60_000
 type DirectList = { projection: Extract<MachineSessionProjection, { kind: "ready" }>; reply: Record<string, unknown> }
 
 /** A pinned machine reply is a complete, authenticated fallback while ss/ replays a missing row. */
-function directList(machineID: string, reply: unknown, nowMs: number, inventoryIDs: readonly string[] | null,
+function directList(client: StatusClient, machineID: string, reply: unknown, nowMs: number, inventoryIDs: readonly string[] | null,
   held: MachineSessionProjection): DirectList | null {
   const body = record(reply)
   if (!body || (body.complete !== true && body.complete !== false) || !Number.isFinite(body.at) ||
@@ -119,6 +119,7 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
     !["working", "waiting", "idle", "unknown"].includes(String(record(row.status)?.state)))) return null
   const ids = sessions.map((row: Record<string, unknown> | null) => String(row!.id))
   if (new Set(ids).size !== ids.length) return null
+  const taskParents = descriptorParents(client, machineID, ids, nowMs)
   const byConversation = new Map<string, string | null>()
   for (const row of sessions) {
     const conversation = record(row!.status)?.sessionId
@@ -143,7 +144,8 @@ function directList(machineID: string, reply: unknown, nowMs: number, inventoryI
       const ownerConversation = record(status.epic_parent)?.owner_session_id
       const listedParent = typeof status.parent_session_id === "string" && ids.includes(status.parent_session_id) &&
         status.parent_session_id !== row!.id ? status.parent_session_id : null
-      const parentSessionID = listedParent ?? (typeof ownerConversation === "string" ? byConversation.get(ownerConversation) : null)
+      const parentSessionID = listedParent ?? taskParents.get(String(row!.id)) ??
+        (typeof ownerConversation === "string" ? byConversation.get(ownerConversation) : null)
       const before = known.get(String(row!.id) + "\u0000" + String(row!.execution_generation))
       const menu = record(status.menu)
       const options = menu?.options
@@ -268,7 +270,7 @@ export function statusSource(current: () => StatusClient | null,
         const failures = cached?.client === client ? cached.failures : 0
         const promise = client.listPresentationsForMachine(machineID, new AbortController().signal)
           .then((reply) => {
-            const value = directList(machineID, reply, client.now?.() ?? Date.now(),
+            const value = directList(client, machineID, reply, client.now?.() ?? Date.now(),
               statusInventoryIDs(client, machineID, client.now?.() ?? Date.now()), statusProjection(client, machineID))
             if (!value) reportListFailure(client, machineID, reason, "invalid_reply",
               (client.now?.() ?? Date.now()) - started, failures + 1)
