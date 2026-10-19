@@ -5,13 +5,13 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/sainteye/clawdline/internal/adapters/projects"
 	"github.com/sainteye/clawdline/internal/adapters/squadfiles"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 )
 
 // checkSquadDispatchActor ties an automatic assignment to the bound root
-// terminal, provider conversation, and Project scope before opening a child.
+// terminal and provider conversation before opening a child. The target Project
+// may differ from the actor's launch snapshot.
 func (b *Broker) checkSquadDispatchActor(ctx context.Context, req DispatchRequest, record Record, rootTerminal string) error {
 	if !b.SquadActorRequired || record.Root == nil || req.Respawn != nil || req.Schedule != nil || req.InternalGate {
 		return nil
@@ -46,10 +46,6 @@ func (b *Broker) checkSquadDispatchActor(ctx context.Context, req DispatchReques
 	}
 	if !bound || actor.TerminalID != rootTerminal || actor.ConversationID != record.Root.SessionID {
 		return refuse(http.StatusForbidden, "session_actor_required", "This dispatch needs the current root Session's squad capability.")
-	}
-	rootScope, ok := projects.ResolveScope(record.Root.ProjectDir)
-	if !ok || rootScope.ID != actor.ScopeID {
-		return refuse(http.StatusForbidden, "session_scope_mismatch", "The root Session's Project does not match its role snapshot.")
 	}
 	if record.Persona != "" && (actor.DefinitionID == "clawdline.persona.product-manager" || actor.DefinitionID == "clawdline.persona.architect") {
 		if b.SquadAutoAssignable == nil {
