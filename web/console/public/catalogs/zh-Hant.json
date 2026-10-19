@@ -3286,7 +3286,7 @@
   "next.cloudDeviceKindAndroid": "Android",
   "next.cloudDeviceKindBrowser": "瀏覽器",
   "next.cloudDeviceKindIOS": "iPhone 或 iPad",
-  "next.cloudDeviceLimit": "{tier} 方案最多 {limit} 台。移除一台，這個瀏覽器就會登入。",
+  "next.cloudDeviceLimit": "這個帳號的觀看裝置已經有 {limit} 台，是 {tier} 方案的上限。移除一台不再用的裝置，這個瀏覽器就會接著登入。",
   "next.cloudDeviceLimitContinue": "再登入一次",
   "next.cloudDeviceLimitEmpty": "Clawdline Cloud 說這個帳號沒有使用中的觀看裝置，這裡沒有可以移除的。可能剛好空出一個名額，請再登入一次。",
   "next.cloudDeviceLimitLoading": "正在讀這個帳號的觀看裝置…",

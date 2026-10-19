@@ -473,7 +473,8 @@ const words = {
     devicesPairHelp: "Press Pair: this page gives you a complete instruction to paste into an AI agent that can operate that machine.",
     cloudDeviceLimitTitle: "Devices full {limit} / {limit}",
     cloudDeviceLimitTitleNoCount: "Devices full",
-    cloudDeviceLimit: "The {tier} plan allows {limit}. Remove one and this browser signs in.",
+    cloudDeviceLimit:
+      "This account already has {limit} viewer devices, the most the {tier} plan allows. Remove one you no longer use and this browser carries on signing in.",
     cloudDeviceLimitNoTier: "Your plan allows {limit}. Remove one and this browser signs in.",
     cloudDeviceLimitNoCount: "Remove one and this browser signs in.",
     cloudDeviceOrder: "Unused longest at the top",
@@ -2060,7 +2061,7 @@ const words = {
     devicesPairHelp: "按「配對」，這一頁會產生完整指示，讓你直接貼給能操作那台機器的 AI Agent。",
     cloudDeviceLimitTitle: "裝置已滿 {limit} / {limit}",
     cloudDeviceLimitTitleNoCount: "裝置已滿",
-    cloudDeviceLimit: "{tier} 方案最多 {limit} 台。移除一台，這個瀏覽器就會登入。",
+    cloudDeviceLimit: "這個帳號的觀看裝置已經有 {limit} 台，是 {tier} 方案的上限。移除一台不再用的裝置，這個瀏覽器就會接著登入。",
     cloudDeviceLimitNoTier: "目前方案最多 {limit} 台。移除一台，這個瀏覽器就會登入。",
     cloudDeviceLimitNoCount: "移除一台，這個瀏覽器就會登入。",
     cloudDeviceOrder: "依上次使用，最久的在上面",

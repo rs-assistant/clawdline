@@ -3286,7 +3286,7 @@
   "next.cloudDeviceKindAndroid": "Android",
   "next.cloudDeviceKindBrowser": "Browser",
   "next.cloudDeviceKindIOS": "iPhone or iPad",
-  "next.cloudDeviceLimit": "The {tier} plan allows {limit}. Remove one and this browser signs in.",
+  "next.cloudDeviceLimit": "This account already has {limit} viewer devices, the most the {tier} plan allows. Remove one you no longer use and this browser carries on signing in.",
   "next.cloudDeviceLimitContinue": "Try signing in again",
   "next.cloudDeviceLimitEmpty": "Clawdline Cloud lists no active viewer device on this account, so there is nothing to remove here. A slot may have just been freed: try signing in again.",
   "next.cloudDeviceLimitLoading": "Reading the viewer devices on this account…",

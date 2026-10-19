@@ -2,7 +2,7 @@
   "version": 1,
   "englishKeys": 6255,
   "counts": {
-    "negation": 1966,
+    "negation": 1967,
     "state": 1100,
     "permission": 387,
     "deletion": 167,
@@ -1442,6 +1442,7 @@
       "next.cloudCarrierRelayMachineOff",
       "next.cloudCarrierRelayNotOpen",
       "next.cloudCarrierUnknown",
+      "next.cloudDeviceLimit",
       "next.cloudDeviceLimitEmpty",
       "next.cloudDeviceListFailed",
       "next.cloudDeviceListFailedShort",

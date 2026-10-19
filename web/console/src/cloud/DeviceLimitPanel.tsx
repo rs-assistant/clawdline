@@ -3,7 +3,6 @@ import { nextWord } from "../next-strings.js"
 import { focusModalContainer } from "../modal-focus.js"
 import {
   DeviceLimitRun,
-  knownTier,
   type DeviceLimitFailure,
   type DeviceLimitState,
   type RecoveryDevice,
@@ -47,16 +46,13 @@ export function DeviceLimitPanel(props: {
     if (asking) focusModalContainer(askDialog.current)
   }, [asking])
 
-  const shownTier = state.phase === "listed" ? state.tier : knownTier(tier)
   const shownLimit = state.phase === "listed" ? state.limit : limit
   const title =
     shownLimit === null ? nextWord("cloudDeviceLimitTitleNoCount") : nextWord("cloudDeviceLimitTitle", { limit: shownLimit })
-  const lede =
-    shownLimit === null
-      ? nextWord("cloudDeviceLimitNoCount")
-      : shownTier
-        ? nextWord("cloudDeviceLimit", { limit: shownLimit, tier: planName(shownTier) })
-        : nextWord("cloudDeviceLimitNoTier", { limit: shownLimit })
+  // The plan's name is not shown: free and Pro both allow five viewer devices
+  // (Cloud's `domain/entitlements.ts`), so "the Pro plan allows 5" reads as
+  // if the five came with Pro.
+  const lede = shownLimit === null ? nextWord("cloudDeviceLimitNoCount") : nextWord("cloudDeviceLimitNoTier", { limit: shownLimit })
   const signIn = (
     <button className="go" type="button" id="cloud-device-sign-in" onClick={() => session && location.assign(session.signInURL())}>
       {signInLabel}
@@ -223,11 +219,6 @@ function DeviceIcon(props: { kind: string }) {
       )}
     </svg>
   )
-}
-
-/** The plan as the control plane names it, with a capital: `pro` reads as Pro. */
-function planName(tier: string): string {
-  return tier.charAt(0).toLocaleUpperCase() + tier.slice(1)
 }
 
 /**
