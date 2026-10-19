@@ -255,6 +255,14 @@ export class StatusCloudClient extends CatalogCloudClient {
   }
 
   disableClassicSessionView() {
+    const channel = this.classicSessionChannel
+    this.classicSessionChannel = null
+    if (channel && this.subscriptionHolds) {
+      const holds = (this.subscriptionHolds.get(channel) || 0) - 1
+      if (holds > 0) this.subscriptionHolds.set(channel, holds)
+      else this.subscriptionHolds.delete(channel)
+      this._releaseClassicRead(channel)
+    }
     for (const [channel, timer] of this.classicSessionReads) {
       this.clearTimeout(timer)
       this._releaseClassicRead(channel)
@@ -312,6 +320,15 @@ export class StatusCloudClient extends CatalogCloudClient {
       if (!status || status.snapshot_generation !== marker.snapshot_generation ||
         !GENERATION.test(status.execution_generation)) continue
       const channel = "s/" + channelSegment(machine) + "/" + channelSegment(id)
+      // The selected Session is a live view, not a one-shot list recovery.
+      // Keep its channel after the first row, including when the row was
+      // already held before the detail opened. Otherwise the model picker
+      // and its Effort successor can be published to an unsubscribed page.
+      if (this.classicSessionTarget === id && this.subscriptionHolds && this.classicSessionChannel !== channel) {
+        this.subscriptionHolds.set(channel, (this.subscriptionHolds.get(channel) || 0) + 1)
+        this.classicSessionChannel = channel
+        this.subscribe([channel])
+      }
       const held = this.sessionSnapshots.get(machine + "\u0000" + id)
       if (held?.execution_generation === status.execution_generation) continue
       if (this.classicSessionReads.has(channel) ||

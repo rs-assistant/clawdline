@@ -5,6 +5,8 @@ import * as L from "../legacy/bridge.js"
 import { askInterrupt } from "../legacy/screen-bridge.js"
 import { menuKey, pressKey, rereadSession, waitingHTML, type KeyFailure } from "../legacy/waiting-bridge.js"
 import { nextWord } from "../next-strings.js"
+import { MenuFollow, MENU_FOLLOW } from "./menu-follow.js"
+import { FOLLOW_MS } from "./transcript-follow.js"
 import { menuFingerprint } from "./fingerprint.js"
 import { outcomeOf } from "./outcome.js"
 import { PressHolds } from "./press-holds.js"
@@ -74,6 +76,7 @@ const PRESS_SHOWN_MS = 150
  */
 export function Waiting({ row, write, onScreen }: { row: SessionRow | null; write: boolean; onScreen?: () => void }) {
   const box = useRef<HTMLDivElement>(null)
+  const follow = useRef(new MenuFollow())
   const state = useRef<CardState>({ drawn: null, answered: null, folded: null, reread: null })
   const current = useRef<{ row: SessionRow | null; write: boolean; onScreen?: () => void }>({ row, write, onScreen })
   current.current = { row, write, onScreen }
@@ -83,6 +86,8 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
     if (!el) return
     const st = state.current
     const open = current.current.row
+    follow.current.observe(open?.id, open?.execution_generation, open?.state === "waiting" && open.menu?.options?.length ? menuKey(open.menu) : "", Date.now(), open?.state === "waiting")
+    const following = !!follow.current.active
     const key = open ? open.id : null
     const menu: SessionMenu | null = open && open.state === "waiting" && open.menu ? open.menu : null
     let rows: SessionMenuOption[] | null = menu && menu.options && menu.options.length ? menu.options : null
@@ -92,17 +97,18 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
     if (!question.trim()) question = ""
     // Given up after ten seconds: past that, the session still waiting is not
     // the answer's own gap, and the honest fallback beats a dead menu.
-    if (st.answered && (!open || st.answered.key !== key || open.state !== "waiting" || Date.now() - st.answered.at > 10000)) {
+    if (st.answered && (!open || st.answered.key !== key || (!following && open.state !== "waiting") || Date.now() - st.answered.at > 10000)) {
       st.answered = null
     }
-    if (st.reread && (!open || st.reread.key !== key || open.state !== "waiting")) st.reread = null
+    if (st.reread && (!open || st.reread.key !== key || open.state !== "waiting" && !following)) st.reread = null
     if (st.folded && (!open || st.folded.key !== key || open.state !== "waiting")) st.folded = null
     // A press is held until the question it answered has gone — the session
     // moved on, or asks something else — or for ten seconds after the machine
     // said yes, the same allowance `answered` has (`press-holds.ts`).
     const press = open ? holds.current(open.id, menuKey(menu), open.state === "waiting", Date.now()) : null
     const folded = !!(st.folded && st.folded.menu === menuKey(menu))
-    const sent = !rows && !!st.answered
+    const sent = !!st.answered && (following || !rows) ||
+      following && follow.current.active?.before === menuKey(menu) && !!follow.current.active?.before
     if (sent && st.answered) {
       rows = st.answered.rows
       submit = st.answered.submit
@@ -110,7 +116,7 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
       steps = st.answered.steps
     }
     const want =
-      !open || open.state !== "waiting"
+      !open || open.state !== "waiting" && !following
         ? ""
         : waitingHTML({
             folded,
@@ -138,7 +144,7 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
             screenOff: !current.current.onScreen,
             cancel: current.current.write,
             screen: open.screen_reading ?? null,
-            arriving: open.closeability?.source?.provenance === "pinned_list" ||
+            arriving: following && !follow.current.expired(Date.now()) || open.closeability?.source?.provenance === "pinned_list" ||
               (open as { menu_arriving?: unknown }).menu_arriving === true,
             inferred: !sent && menu?.source === "transcript",
           })
@@ -161,6 +167,12 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
 
   useLayoutEffect(render)
 
+  // An unread waiting menu needs an actual read, even if no further event arrives.
+  const missing = row?.state === "waiting" && !row.menu?.options?.length
+  useEffect(() => {
+    if (missing && row && !follow.current.active) follow.current.start(row.id, row.execution_generation, "", Date.now(), false)
+  }, [row?.id, row?.execution_generation, missing])
+
   useEffect(() => {
     const el = box.current
     if (!el) return
@@ -168,6 +180,28 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
       state.current.drawn = null
       render()
     }
+    const tick = () => {
+      render()
+      if (state.current.reread?.busy) return
+      void follow.current.read(Date.now(), document.visibilityState !== "hidden", async (id) => {
+        const ask = { key: id, busy: true, done: false }
+        state.current.reread = ask
+        redraw()
+        try {
+          await rereadSession(id)
+          ask.done = true
+        } finally { ask.busy = false }
+      }, redraw)
+    }
+    const start = (ev: Event) => {
+      const open = current.current.row
+      if (!open || (ev as CustomEvent<string>).detail !== open.id) return
+      follow.current.start(open.id, open.execution_generation, "", Date.now())
+      tick()
+    }
+    const timer = setInterval(tick, FOLLOW_MS)
+    document.addEventListener(MENU_FOLLOW, start)
+    document.addEventListener("visibilitychange", tick)
     const click = (ev: MouseEvent) => {
       const target = ev.target as Element | null
       if (!target?.closest) return
@@ -258,6 +292,12 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
           .then(() => {
             // Still held — the question has not gone yet — and now saying so.
             holds.settled(press, Date.now())
+            const stillOpen = current.current.row
+            if (stillOpen?.id === asked && (open.menu?.question === "Select Model and Effort" ||
+              /^More reasoning/.test(open.menu?.options?.find((option) => String(option.n) === pressed)?.label ?? ""))) {
+              follow.current.start(asked, stillOpen.execution_generation, menuKey(open.menu), Date.now())
+              tick()
+            }
             redraw()
             if (current.current.row?.id === asked) toast(ticks ? nextWord("menuTicked") : T.webMenuSent)
           })
@@ -295,7 +335,11 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
         const asked = open.id
         askInterrupt(asked).then(
           () => {
-            if (current.current.row?.id === asked) toast(nextWord("menuCancelSent"))
+            if (current.current.row?.id === asked) {
+              follow.current.active = null
+              redraw()
+              toast(nextWord("menuCancelSent"))
+            }
           },
           (err: unknown) => {
             cancel.disabled = false
@@ -306,7 +350,13 @@ export function Waiting({ row, write, onScreen }: { row: SessionRow | null; writ
       }
     }
     el.addEventListener("click", click)
-    return () => el.removeEventListener("click", click)
+    return () => {
+      el.removeEventListener("click", click)
+      document.removeEventListener(MENU_FOLLOW, start)
+      document.removeEventListener("visibilitychange", tick)
+      clearInterval(timer)
+      follow.current.active = null
+    }
     // `render` reads everything through refs, so the listener is bound once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

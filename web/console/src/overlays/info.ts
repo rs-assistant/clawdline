@@ -1,4 +1,5 @@
 import type { ProjectLink, SessionInfo, SessionLimits, SessionModel } from "@clawdline/contract"
+import { MENU_FOLLOW } from "../session/menu-follow.js"
 import { client } from "../client.js"
 import * as L from "../legacy/bridge.js"
 import { smartTitle as requestSmartTitle } from "../legacy/command-bridge.js"
@@ -761,7 +762,9 @@ export const Info = {
     const id = forId
     if (!id || data?.session?.assistant !== "codex" || !canOpenCodexPicker()) return
     Info.close()
-    client.send(id, "/model", pressKey("model-picker")).catch((e) => toast(why(e)))
+    client.send(id, "/model", pressKey("model-picker")).then(() => {
+      if (host.openId() === id) document.dispatchEvent(new CustomEvent(MENU_FOLLOW, { detail: id }))
+    }).catch((e) => toast(why(e)))
   },
 
   editTitle(): void {

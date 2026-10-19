@@ -81,6 +81,9 @@ const ROWS = [
   row(ITERM, "Charlie in iTerm", "iterm", "10000000-0000-4000-8000-000000000003"),
   row(LEGACY, "Delta from an old link", "tmux", "10000000-0000-4000-8000-000000000004"),
 ]
+let modelMenuScenario: { stage: "missing" | "models" | "gap" | "effort"; looks: number; keys: number; failed: boolean; readyAt: number } | null = null
+const picker = (question: string, labels: string[]) => ({ question,
+  options: labels.map((label, i) => ({ n: i + 1, label, can: true, selected: i === 0 })) })
 let currentClaudeModel = "claude-opus-5-5"
 
 // ---- the stand-in daemon
@@ -173,7 +176,12 @@ function snapshot() {
       generation,
       provenance: "fixture",
     },
-    sessions: ROWS,
+    sessions: ROWS.map((row) => !modelMenuScenario || row.id !== TMUX ? row : {
+      ...row, assistant: "codex", isClaude: false,
+      state: modelMenuScenario.stage === "gap" ? "idle" : "waiting",
+      menu: modelMenuScenario.stage === "models" ? picker("Select Model and Effort", ["Model Alpha", "Model Beta"]) :
+        modelMenuScenario.stage === "effort" ? picker("Select Reasoning Level for Model Alpha", ["Low", "High"]) : null,
+    }),
   }
 }
 
@@ -227,6 +235,18 @@ function daemon(): Server {
       return json(res, 200, JSON.parse(readFileSync(file, "utf8")))
     }
     if (path === "/v1/sessions") {
+      if (modelMenuScenario && url.searchParams.get("look") === TMUX) {
+        modelMenuScenario.looks++
+        if (modelMenuScenario.stage === "missing" && modelMenuScenario.looks >= 2) modelMenuScenario.stage = "models"
+        if (modelMenuScenario.stage === "gap") {
+          if (!modelMenuScenario.failed) {
+            modelMenuScenario.failed = true
+            return json(res, 503, { error: { code: "screen_read_unavailable", message: "Try reading again." } })
+          }
+          if (Date.now() < modelMenuScenario.readyAt) return json(res, 200, snapshot())
+          modelMenuScenario.stage = "effort"
+        }
+      }
       if (heldSessions) return void heldSessions.push(() => json(res, 200, snapshot()))
       return json(res, 200, snapshot())
     }
@@ -245,6 +265,12 @@ function daemon(): Server {
         return json(res, 200, machineSettings)
       }, () => json(res, 400, { error: "bad_request", detail: "That is not JSON." }))
       return
+    }
+    if (modelMenuScenario && path === "/v1/sessions/" + encodeURIComponent(TMUX) + "/key" && req.method === "POST") {
+      modelMenuScenario.keys++
+      modelMenuScenario.stage = "gap"
+      modelMenuScenario.readyAt = Date.now() + 12_000
+      return json(res, 200, { ok: true, id: TMUX, action: "keyed" })
     }
     const info = /^\/v1\/sessions\/([^/]+)\/info$/.exec(path)
     if (info && req.method === "GET") {
@@ -2526,3 +2552,32 @@ test("phone: an empty Session picker adds and removes a Project in edit mode", (
     assert.equal(projectAdds, beforeAdds + 1)
     assert.equal(projectRemoves, beforeRemoves + 1)
   }))
+
+
+test("phone: model choices and Effort recover without another press or leaving the Session", async () => {
+  modelMenuScenario = { stage: "missing", looks: 0, keys: 0, failed: false, readyAt: 0 }
+  try {
+    await inTab(PHONE, async (tab) => {
+      await tab.go("/" + FRAGMENT[TMUX])
+      await tab.until("the Session opens", (state) => state.open === TMUX)
+      const waitFor = async (expression: string) => await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 20000
+        const check = () => (${expression}) ? resolve(true) : Date.now() < deadline ? setTimeout(check, 30) : reject(new Error("menu did not arrive: " + document.getElementById("waiting")?.textContent))
+        check()
+      })`)
+      await waitFor(`document.querySelector('#waiting .question')?.textContent === 'Select Model and Effort'`)
+      await tab.run(`document.querySelector('#waiting [data-key="1"]').click()`)
+      await waitFor(`document.querySelector('#waiting [data-refresh]') && !document.getElementById('waiting').hidden`)
+      await tab.run(`new Promise((resolve) => setTimeout(resolve, 11000))`)
+      assert.equal(await tab.run(`!document.getElementById('waiting').hidden && !!document.querySelector('#waiting [data-refresh]')`), true)
+      assert.equal(await tab.run(`[...document.querySelectorAll('#waiting [data-key]')].every((button) => button.disabled)`), true,
+        "a late Effort menu cannot reopen stale model buttons after the press hold expires")
+      await waitFor(`document.querySelector('#waiting .question')?.textContent === 'Select Reasoning Level for Model Alpha'`)
+      assert.equal(modelMenuScenario?.keys, 1, "recovery never answers the model a second time")
+      assert.equal(modelMenuScenario?.failed, true, "one failed read was injected")
+      await tab.until("the same Session remains open", (state) => state.open === TMUX)
+      assert.equal(await tab.run(`!!document.querySelector('#waiting [data-refresh]')`), true)
+      assert.equal(await tab.run(`document.querySelector('#waiting [data-key="1"]').disabled`), false)
+    })
+  } finally { modelMenuScenario = null }
+})
