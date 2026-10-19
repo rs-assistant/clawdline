@@ -30,3 +30,8 @@ export function waitingForWords(row: Partial<SessionRow>, word: typeof nextWord)
     : word("sessionWaitingOnWork", { work: list })
   return { text, title: names.join("\n"), covered: false }
 }
+
+/** Queued callbacks have not started their command and are not running shells. */
+export function runningShellCount(row: Partial<SessionRow>): number {
+  return (row.shells ?? []).filter((shell) => shell.state !== "queued").length
+}

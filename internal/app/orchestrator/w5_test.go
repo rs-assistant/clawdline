@@ -452,3 +452,51 @@ func TestTheHouseRulesAreProjectedAndTheLocalOneIsNeverWritten(t *testing.T) {
 		t.Fatalf("something was written into the legacy directory: %v", err)
 	}
 }
+
+func TestCallbackSlotChangesSignalButRetriesAndRenewalsDoNot(t *testing.T) {
+	b, ctx := newTestBroker(t)
+	signals := 0
+	b.TaskListChanged = func() { signals++ }
+	ask(t, b, ctx, LeaseRequest{Resource: ResourceCompile, RequestID: askA})
+	req := LeaseRequest{Resource: ResourceCompile, RequestID: askB, CallbackTaskID: "c6000001-0000-4000-8000-000000000001"}
+	if a := ask(t, b, ctx, req); a.State != "queued" || signals != 1 {
+		t.Fatalf("queued: %+v, signals %d", a, signals)
+	}
+	ask(t, b, ctx, req)
+	if signals != 1 {
+		t.Fatalf("retry emitted %d signals", signals)
+	}
+	if _, err := b.Release(ctx, LeaseOwner{Resource: ResourceCompile, RequestID: askA}); err != nil {
+		t.Fatal(err)
+	}
+	held := ask(t, b, ctx, req)
+	if held.State != "granted" || signals != 2 {
+		t.Fatalf("grant: %+v signals %d", held, signals)
+	}
+	owner := LeaseOwner{Resource: ResourceCompile, RequestID: askB, Phase: "running"}
+	if _, err := b.Renew(ctx, owner); err != nil {
+		t.Fatal(err)
+	}
+	if signals != 3 {
+		t.Fatalf("running emitted %d signals", signals)
+	}
+	if _, err := b.Renew(ctx, owner); err != nil {
+		t.Fatal(err)
+	}
+	if signals != 3 {
+		t.Fatalf("unchanged renewal emitted %d signals", signals)
+	}
+	if _, err := b.Release(ctx, owner); err != nil {
+		t.Fatal(err)
+	}
+	if signals != 4 {
+		t.Fatalf("release emitted %d signals", signals)
+	}
+	// Refused writes must not announce a transition.
+	if _, err := b.Renew(ctx, owner); err == nil {
+		t.Fatal("renew after release succeeded")
+	}
+	if signals != 4 {
+		t.Fatalf("refusal emitted %d signals", signals)
+	}
+}

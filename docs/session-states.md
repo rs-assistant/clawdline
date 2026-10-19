@@ -90,8 +90,8 @@ is the failure this field exists to prevent.
   claim). The row shows `self-reported` on self states, so a stated state can never dress as a proven one.
 - `work_note` — one line, the session's own words: *"RootSession fix landed; no open child or
   wait; can take new work"*.
-- `waiting_for` — on a broker-decided `waiting_session` (own live work), the tasks that made it
-  wait, collected by the same pass that decided the state: a dispatched child by its Session
+- `waiting_for` — live broker work owned by the Session, independently of its terminal state.
+  A working, waiting-for-you or unknown terminal still carries its outstanding work. The same pass collects the work and decides the state: a dispatched child by its Session
   name, a heavy callback by its command and whether it holds the compile slot or is queued,
   anything else by its title. At most eight; `waiting_for_omitted` counts the rest. Every list
   draws the ⏳ line from this field alone (`session/waiting-for.ts`), never from a task
@@ -222,3 +222,10 @@ and never will. So `POST /v1/sessions/:id/end` computes the list at its end of t
 refuses (`409 would_lose_work`, with the list) unless the request carries `accept_loss: true` —
 which the web page sends only after showing that list in the close confirmation. A close with
 nothing at stake stays one press.
+
+Queue changes do not change the terminal or closeability state. Lists show the broker's
+outstanding work beside that state, including beside an unreadable terminal, and exclude
+queued callbacks from the running-shell count. Task writes and meaningful callback compile-slot
+transitions nudge the Cloud publisher through its existing coalesced settle lane; unchanged
+lease renewals do not. The normal polling pass remains the recovery path. A publication nudge
+is not proof that a viewer received or observed the update.

@@ -2,7 +2,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see order.test.ts.
-import { waitingForWords } from "./waiting-for.ts"
+import { waitingForWords, runningShellCount } from "./waiting-for.ts"
 // @ts-expect-error -- a `.ts` path, for node; see order.test.ts.
 import { nextWord } from "../next-strings.ts"
 // @ts-expect-error -- a `.ts` path, for node; see order.test.ts.
@@ -34,4 +34,18 @@ test("the running heavy command its 🏗️ marker already shows is not said twi
 
 test("a row with nothing named says nothing, and the list falls back to its generic wait", () => {
   assert.deepEqual(waitingForWords({}, nextWord), { text: "", title: "", covered: false })
+})
+
+for (const state of ["working", "unknown", "waiting", "idle"] as const) {
+  test(`a ${state} terminal still names its queued broker command`, () => {
+    const row = { state, waiting_for: [{ task_id: "q", kind: "heavy", label: "go test ./...", phase: "queued" }] }
+    assert.equal(waitingForWords(row, nextWord).text, "等待：go test ./...（排隊中）")
+  })
+}
+
+test("queued callbacks do not count as running shells; ordinary shells remain counted", () => {
+  const queued = { id: "q", at: 1, state: "queued", kind: "callback" }
+  assert.equal(runningShellCount({ shells: [queued] }), 0)
+  assert.equal(runningShellCount({ shells: [queued, { id: "s", at: 1 }, { ...queued, id: "r", state: "running" }] }), 2)
+  assert.equal(runningShellCount({ shells: [{ ...queued, state: "running" }] }), 1)
 })
