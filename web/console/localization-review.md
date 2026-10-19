@@ -56,6 +56,39 @@ Use `--fault reject-catalog --locales zh-Hant --surfaces settings` for a deliber
 
 ## Independent reviewer workflow
 
+### Loaded Project integration preview and Session Git diff
+
+Run `--surfaces project-unify-preview,session-git-diff --locales en,zh-Hant --widths 390,1280,320`
+for the focused 12-cell review. The Project cell opens the real Project settings and its
+integration preview, requiring two planned actions, the synthetic skill and the `@AGENTS.md`
+edit. The Session cell opens the real actions menu, its additional commands, the Git panel,
+and the changed README, requiring the returned patch text. Neither cell applies, commits or pushes.
+
+The synthetic GET allowlist now includes `/v1/projects/review-project/unify`,
+`/v1/sessions/review-session/git`, and `/v1/sessions/review-session/git/diff?path=README.md`.
+Their bodies follow `ProjectUnifyPlan`, `GitReply` and `GitDiffReply` in the generated contract,
+and the wrapping/query conventions in `internal/transport/http/project_unify.go` and `git.go`.
+The plan contains rules, a skill link, exact before/after text and a conflict; Git contains a
+changed file and an unstaged unified patch. Missing diff paths return 400; unchanged paths
+return 404. Writes still pass through the existing mutation refusal before these GET handlers.
+
+Focused result JSON retains actual response bodies in `readings`, including exact patch text,
+and requires successful consumer GETs in the actor-scoped route log. Existing DOM, PNG, locale,
+runtime-error and viewport checks also apply. Use `--fault unify-empty --surfaces project-unify-preview`
+to remove actions, skills and conflicts from the dependency response: the cell must fail with
+`Expected synthetic unify actions`. `--fault git-empty --surfaces session-git-diff` removes
+changed files and must prevent opening the expected README. These are dependency-level negative
+controls, not changes to the candidate, DOM or renderer. They do not count as accepted cells.
+
+When another review owns a dirty candidate checkout, do not build its current files or change
+its process. Export the exact candidate with `git archive` into task-owned temporary storage,
+use existing dependencies read-only, and build that exported source through `tools/heavy.sh`.
+Archive builds have no Git metadata: record the archive commit and catalog hashes explicitly
+in a synthetic reuse manifest, and bind new owned origins. The manifest is build provenance
+supplied by the operator, not independent proof from the reuse mode. Never represent an archive
+as a clean working-tree check, or reuse another reviewer's occupied ports. Preserve sources,
+commands, generated contract checks and hashes with the evidence before temporary storage is removed.
+
 Keep one server running and share its manifest with the coordinating local reviewer sessions. Each reviewer uses a separate browser context and selects their language in `/settings.html` on each origin they review; App and Cloud have separate browser preferences. They then visit stable App fragments or Cloud routes below. State is cookie-scoped; independent contexts do not alter one another. Set a state by visiting `<origin>/__review/state?state=empty`, then return to the desired page. A direct URL can carry `?review_state=signed-out` before its fragment. The manifest includes stable URLs. `/__review/requests` lists synthetic route requests and states. Unknown API routes return `review_route_unsupported`; product mutations return `review_mutation_unsupported`, never invented successful writes. Synthetic authentication POST and the explicitly bounded recovery-device DELETE described below are the only supported product-protocol writes.
 
 | Surface | App address or Cloud route | Matrix ID |

@@ -108,6 +108,33 @@ export function reviewWorkItem() {
     steps: [{ id: 'review-step', title: '核對合成資料與實際畫面', done: false, position: 0, created_by: 'synthetic-review', completed_by: '', completed_at: null, version: 1 }] }
 }
 
+/** ProjectUnifyPlan, matching project_unify.go and the real preview consumer. */
+export function reviewUnifyPlan() {
+  return { status: 'drifting', version: 'synthetic-plan-1', links_available: true,
+    rules: { agents: 'present', claude: 'present', claude_imports_agents: false,
+      claude_only_files: [], claude_only_lines: ['Synthetic assistant-only instruction.'],
+      now: { claude: ['CLAUDE.md'], codex: ['AGENTS.md'] },
+      after: { claude: ['CLAUDE.md', 'AGENTS.md'], codex: ['AGENTS.md'] } },
+    skills: [{ name: 'synthetic-review', place: 'agents', linked: false, copy: false,
+      now: { claude: false, codex: true }, after: { claude: true, codex: true }, action: 'skill_link' }],
+    actions: [{ kind: 'rules_add_import', paths: ['CLAUDE.md'], description: 'Add the shared rules import.',
+      edits: [{ path: 'CLAUDE.md', before: 'Synthetic assistant-only instruction.\n', after: '@AGENTS.md\nSynthetic assistant-only instruction.\n' }] },
+      { kind: 'skill_link', paths: ['.claude/skills/synthetic-review'], link_target: '../../.agents/skills/synthetic-review',
+        description: 'Share the synthetic review skill.', edits: [] }],
+    conflicts: [{ kind: 'claude_only_lines', path: 'CLAUDE.md', detail: 'Synthetic assistant-only instruction.' }] }
+}
+
+/** GitReply and GitDiffReply, matching git.go; no filesystem reads. */
+export function reviewGit() {
+  return { git: { branch: 'synthetic-review', head: '1234567890abcdef', ahead: 1, behind: 0, clean: false,
+    files: [{ path: 'README.md', from: null, kind: 'modified', staged: false, unstaged: true, additions: 1, deletions: 1 }] } }
+}
+
+export function reviewGitDiff() {
+  return { diff: { path: 'README.md', kind: 'modified', patches: [{ scope: 'unstaged',
+    unifiedDiff: 'diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-Synthetic previous text\n+Synthetic reviewed text\n' }] } }
+}
+
 export function reviewCapacity() {
   return { counting_since: 1768470000, beat: { running: true, stalled: false, tick_seconds: 60, passes: 2, event_errors: 0, at: 1768478400 }, entries: [
     { name: 'Synthetic review evidence', class: 'evidence', unit: 'rows', used: 24, limit: 100, ratio: .24, state: 'ok', warn_at: .8,
@@ -255,6 +282,13 @@ export async function serveReview(options) {
           }
         }
         if (request.method !== 'GET') return json(response, 405, { error: { code: 'review_mutation_unsupported', message: 'This fixture does not persist product mutations.' } })
+        if (path === '/v1/projects/review-project/unify') return url.search ? json(response, 400, { error: 'bad_request' }) : json(response, 200, reviewUnifyPlan())
+        if (path === `/v1/sessions/${REVIEW_SESSION}/git`) return json(response, 200, reviewGit())
+        if (path === `/v1/sessions/${REVIEW_SESSION}/git/diff`) {
+          if (!url.searchParams.get('path')) return json(response, 400, { error: 'bad_request' })
+          if (url.searchParams.get('path') !== 'README.md') return json(response, 404, { error: 'git_file_not_changed' })
+          return json(response, 200, reviewGitDiff())
+        }
         if (path === '/v1/devices') return json(response, 200, { devices: [{ id: 'review-viewer', caps: ['read', 'send_prompt'] }] })
         if (path === '/v1/machines') return json(response, 200, { machines: [] })
         if (path === '/su/v1/operations/overview') {

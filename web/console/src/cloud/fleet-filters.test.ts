@@ -29,3 +29,17 @@ test("idle shows only a current idle state", () => {
   assert.equal(matchesFleetFilter({ ...row, freshness: "stale" }, "idle"), false)
   assert.equal(matchesFleetFilter({ ...row, state: "working" }, "idle"), false)
 })
+
+
+test("background shells move quiet Sessions from idle to working", () => {
+  const active = { shells: [{ id: "build", at: 1 }] }
+  for (const state of ["idle", "waiting", "unknown"]) {
+    const quiet = { ...row, state }
+    assert.equal(matchesFleetFilter(quiet, "working", active), true)
+    assert.equal(matchesFleetFilter(quiet, "idle", active), false)
+    assert.equal(matchesFleetFilter({ ...quiet, freshness: "stale" }, "working", active), false)
+  }
+  assert.equal(matchesFleetFilter(row, "working", { shells: [] }), false)
+  assert.equal(matchesFleetFilter(row, "idle", { shells: [] }), true)
+  assert.equal(matchesFleetFilter({ ...row, waitingForReply: true }, "attention", active), true)
+})

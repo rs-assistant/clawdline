@@ -12,6 +12,8 @@ type Surface = { id: string; origin: 'app' | 'cloud'; path: string; state: Revie
 type ReviewManifest = { repo: string; out: string; appOrigin: string; cloudOrigin: string; synthetic: boolean; unsupported: string[] }
 
 export const REVIEW_SURFACES: Surface[] = [
+  { id: 'project-unify-preview', origin: 'app', path: '/#page=projects', state: 'ready', ready: '.project-row-settings', action: 'project-unify-preview' },
+  { id: 'session-git-diff', origin: 'app', path: '/#session=review-session', state: 'ready', ready: '#detail-actions-trigger', action: 'session-git-diff' },
   ...['ready', 'usage-partial', 'empty', 'failed', 'offline'].map(state => ({ id: 'usage-' + state, origin: 'app' as const, path: '/#page=usage', state: state as ReviewState,
     ready: state === 'failed' || state === 'offline' ? '#usage [role="alert"]' : '#usage .usage-totals', action: state === 'ready' ? 'usage-controls' : undefined })),
   ...['device-limit', 'device-list-failed', 'device-ticket-expired', 'device-revoke-expired'].map(state => ({ id: state, origin: 'cloud' as const, path: '/', state: state as ReviewState,
@@ -84,7 +86,7 @@ const results: Record<string, unknown>[] = []
 const repeat = Number(values.repeat || env.REVIEW_REPEAT || 1)
 assert.ok(Number.isInteger(repeat) && repeat >= 1 && repeat <= 10, 'Repeat must be 1..10')
 const fault = values.fault || ''
-assert.ok(['', 'reject-catalog', 'key-id', 'usage-empty'].includes(fault), 'Unknown negative control')
+assert.ok(['', 'reject-catalog', 'key-id', 'usage-empty', 'git-empty', 'unify-empty'].includes(fault), 'Unknown negative control')
 
 /** Geometry candidates are evidence for review, not a semantic overlap oracle. */
 export async function reviewDOM(page: any, keys: string[]) {
@@ -157,7 +159,13 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
             data.totals.parts = { input: 0, cache_read: 0, cache_write: 0, output: 0 }
             await route.fulfill({ response, json: data })
           })
-          if (fault && fault !== 'usage-empty') await context.route(/\/(?:v1\/strings\?|catalogs\/)/, async (route: any) => {
+          if (fault === 'git-empty') await context.route('**/v1/sessions/review-session/git', (route: any) => route.fulfill({ json: { git: { branch: 'synthetic-review', head: '', ahead: 0, behind: 0, clean: true, files: [] } } }))
+          if (fault === 'unify-empty') await context.route('**/v1/projects/review-project/unify', async (route: any) => {
+            const response = await route.fetch(); const plan = await response.json()
+            plan.actions = []; plan.skills = []; plan.conflicts = []
+            await route.fulfill({ response, json: plan })
+          })
+          if (['reject-catalog', 'key-id'].includes(fault)) await context.route(/\/(?:v1\/strings\?|catalogs\/)/, async (route: any) => {
             if (new URL(route.request().url()).hostname !== '127.0.0.1') return route.abort('blockedbyclient')
             const response = await route.fetch()
             const catalog = await response.json()
@@ -170,6 +178,13 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
           const actor = randomUUID()
           await context.addCookies([{ name: 'review_actor', value: actor, url: manifest.appOrigin }])
           const errors: string[] = []
+          const readings: { url: string; status: number; body: unknown }[] = []
+          const readingTasks: Promise<void>[] = []
+          page.on('response', (response: any) => {
+            if (/\/v1\/(projects\/review-project\/unify|sessions\/review-session\/git)(?:\?|\/|$)/.test(response.url())) {
+              readingTasks.push(response.json().then((body: unknown) => { readings.push({ url: response.url(), status: response.status(), body }) }))
+            }
+          })
           page.on('pageerror', (error: Error) => errors.push(error.stack || String(error)))
           const stem = `${locale}-${width}-${surface.id}-${iteration}`
           const result: Record<string, unknown> = { locale, width, surface: surface.id, iteration, fault, url: '', errors, status: 'failed' }
@@ -194,7 +209,17 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
             if (surface.action === 'usage-controls') {
               assert.equal(await page.locator('#usage .usage-chart-control').count(), 2, 'Both daily charts loaded real data')
               assert.equal(await page.locator('#usage .usage-parts > div').count(), 4, 'Cache categories loaded')
-              await Promise.all([page.waitForResponse((res: any) => res.url().includes('/v1/usage/overview') && res.url().includes('project=review-project-b') && res.status() === 200), page.locator('.usage-project-filter select').selectOption('review-project-b')])
+              const nativeProjectSelect = page.locator('.usage-project-filter select')
+              if (await nativeProjectSelect.count()) {
+                await Promise.all([page.waitForResponse((res: any) => res.url().includes('/v1/usage/overview') && res.url().includes('project=review-project-b') && res.status() === 200), nativeProjectSelect.selectOption('review-project-b')])
+              } else {
+                await page.locator('.usage-project-filter .project-picker-trigger').click()
+                const menu = page.locator('.usage-project-filter [role="listbox"]')
+                await menu.waitFor()
+                const box = await menu.boundingBox()
+                assert.ok(box && box.x >= 0 && box.x + box.width <= width + 1, 'Usage project menu remains inside the viewport')
+                await Promise.all([page.waitForResponse((res: any) => res.url().includes('/v1/usage/overview') && res.url().includes('project=review-project-b') && res.status() === 200), menu.getByRole('option', { name: 'Synthetic project Beta' }).click()])
+              }
               await page.locator('.usage-filters .usage-switch button').last().click()
               await page.locator('.usage-body[aria-busy="false"]').waitFor()
               assert.equal(await page.locator('.usage-chart-control').first().getAttribute('aria-valuemax'), '28')
@@ -202,6 +227,23 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
               await page.locator('.usage-chart-control').first().focus()
               await page.keyboard.press('End')
               assert.equal(await page.locator('.usage-chart-control').first().getAttribute('aria-valuenow'), '28')
+            }
+            if (surface.action === 'project-unify-preview') {
+              await page.locator('.project-row-settings').first().click()
+              await page.locator('.project-unify-buttons button[aria-haspopup="dialog"]').click()
+              await page.locator('.project-unify-dialog[open]').waitFor()
+              assert.equal(await page.locator('.project-unify-dialog .project-unify-action').count(), 2, 'Expected synthetic unify actions')
+              assert.ok((await page.locator('.project-unify-dialog').innerText()).includes('synthetic-review'), 'Expected synthetic skill in preview')
+              assert.ok((await page.locator('.project-unify-dialog').innerText()).includes('@AGENTS.md'), 'Expected import diff in preview')
+            }
+            if (surface.action === 'session-git-diff') {
+              await page.locator('#detail-actions-trigger').click()
+              await page.locator('#session-more').click()
+              await page.locator('#session-git').click()
+              await page.locator('.git-file-toggle[data-git-path="README.md"]').click()
+              await page.locator('.git-diff').waitFor()
+              assert.ok((await page.locator('#git-body').innerText()).includes('synthetic-review'))
+              assert.ok((await page.locator('.git-diff').innerText()).includes('Synthetic reviewed text'), 'Expected synthetic diff data')
             }
             if (surface.state === 'device-limit' || surface.state === 'device-revoke-expired') {
               assert.equal(await page.locator('#cloud-devices > li').count(), 5)
@@ -365,11 +407,19 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
             result.status = 'passed'
           } catch (error) { result.failure = String(error) }
           finally {
+            await Promise.all(readingTasks)
+            result.readings = readings
             await page.screenshot({ path: join(output, stem + '.png'), fullPage: true, animations: 'disabled' }).catch((error: Error) => { result.captureError = String(error) })
             if (!result.dom) result.dom = await reviewDOM(page, Object.keys(english)).catch(() => null)
             const origin = surface.origin === 'app' ? manifest.appOrigin : manifest.cloudOrigin
             const answer = await context.request.get(origin + '/__review/requests?actor=' + actor).then((res: any) => res.json()).catch(() => ({ requests: [] }))
             result.requests = answer.requests
+            if (['project-unify-preview', 'session-git-diff'].includes(surface.id) && result.status === 'passed') {
+              const expected = surface.id === 'project-unify-preview' ? ['/v1/projects/review-project/unify'] : ['/v1/sessions/review-session/git', '/v1/sessions/review-session/git/diff']
+              if (!expected.every(path => answer.requests.some((row: any) => row.method === 'GET' && row.path === path && row.status === 200))) {
+                result.status = 'failed'; result.failure = 'Expected successful real consumer GET requests'
+              }
+            }
             result.unsupportedRoutes = answer.requests.filter((request: any) => request.status === 404 || request.status === 405).map((request: any) => request.method + ' ' + request.path)
             await writeFile(join(output, stem + '.json'), JSON.stringify(result, null, 2) + '\n')
             results.push(result)
