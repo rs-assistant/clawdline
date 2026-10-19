@@ -394,11 +394,11 @@ func shapeImage(p plan, res LocalResponse) (json.RawMessage, Refusal) {
 	}), Refusal{}
 }
 
-// shapeDocument puts only inert UTF-8 text inside the encrypted answer, with a
+// shapeDocument puts supported UTF-8 documents inside the encrypted answer, with a
 // count the browser rechecks.
 func shapeDocument(p plan, res LocalResponse) (json.RawMessage, Refusal) {
 	switch res.ContentType {
-	case "text/markdown; charset=utf-8", "text/plain; charset=utf-8":
+	case "text/markdown; charset=utf-8", "text/plain; charset=utf-8", "text/html; charset=utf-8":
 	default:
 		return nil, Refusal{Status: 415, Code: "document_media_type_unsupported",
 			Message: "That file is not an inert Markdown or text document.", fixedCopy: true, Layer: layerRoute}

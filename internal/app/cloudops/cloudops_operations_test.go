@@ -345,9 +345,9 @@ func TestAMalformedBodyIsRefusedWhereItSafelyNames(t *testing.T) {
 			"scope": "project", "task": "", "path": "../secrets.md"},
 		code: "malformed_read", published: true,
 	}, {
-		name: "a document that is not inert text",
+		name: "a document outside the supported formats",
 		body: map[string]any{"type": "document", "session": pane, "request": "req",
-			"scope": "project", "task": "", "path": "index.html"},
+			"scope": "project", "task": "", "path": "index.xhtml"},
 		code: "malformed_read", published: true,
 	}, {
 		name: "a Project file read cannot name a path",
@@ -674,8 +674,8 @@ func TestADocumentCrossesOnlyAsInertText(t *testing.T) {
 	if body["data"] != base64.StdEncoding.EncodeToString([]byte("# report\n")) {
 		t.Fatalf("the text did not cross: %v", body["data"])
 	}
-	if answer := ask(&router{body: "<p>", media: "text/html; charset=utf-8"}); answer.Code != "document_media_type_unsupported" {
-		t.Fatalf("HTML crossed: %+v", answer)
+	if answer := ask(&router{body: "<p>", media: "application/xhtml+xml"}); answer.Code != "document_media_type_unsupported" {
+		t.Fatalf("an unsupported media type crossed: %+v", answer)
 	}
 	if answer := ask(&router{body: "\xff\xfe", media: "text/plain; charset=utf-8"}); answer.Code != "document_not_utf8" {
 		t.Fatalf("bytes that are not text crossed: %+v", answer)

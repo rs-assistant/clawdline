@@ -133,7 +133,7 @@ func printable(value string) bool {
 func documentPath(value any) (string, bool) {
 	path, ok := value.(string)
 	if !ok || path == "" || len(path) > 512 || strings.HasPrefix(path, "/") ||
-		strings.ContainsRune(path, 0) || !printable(path) {
+		strings.ContainsRune(path, 0) || strings.Contains(path, `\`) || !printable(path) {
 		return "", false
 	}
 	parts := strings.Split(path, "/")
@@ -146,7 +146,7 @@ func documentPath(value any) (string, bool) {
 		}
 	}
 	switch strings.ToLower(extensionOf(parts[len(parts)-1])) {
-	case "md", "markdown", "txt":
+	case "md", "markdown", "txt", "html":
 		return path, true
 	}
 	return "", false
