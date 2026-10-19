@@ -38,10 +38,11 @@ func unpack(archive, dir string) (err error) {
 	tr := tar.NewReader(gz)
 	var entries int
 	var total int64
+	var links []string
 	for {
 		h, err := tr.Next()
 		if errors.Is(err, io.EOF) {
-			return nil
+			return checkUnpackedLinks(dir, links)
 		}
 		if err != nil {
 			return fail(CodeArchiveUnsafe, "reading %s: %v", filepath.Base(archive), err)
@@ -68,10 +69,12 @@ func unpack(archive, dir string) (err error) {
 				return err
 			}
 		case tar.TypeReg:
-			total += h.Size
-			if h.Size < 0 || total > maxUnpackedBytes {
+			// Compare before adding: a huge declared size can overflow total
+			// and otherwise bypass the unpacked-byte limit.
+			if h.Size < 0 || h.Size > maxUnpackedBytes-total {
 				return fail(CodeArchiveUnsafe, "%s unpacks to more than %d bytes", filepath.Base(archive), int64(maxUnpackedBytes))
 			}
+			total += h.Size
 			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 				return err
 			}
@@ -103,10 +106,28 @@ func unpack(archive, dir string) (err error) {
 			if err := os.Symlink(link, target); err != nil {
 				return fail(CodeArchiveUnsafe, "entry %q: %v", h.Name, err)
 			}
+			links = append(links, name)
 		default:
 			return fail(CodeArchiveUnsafe, "entry %q is a %q, which a release does not carry", h.Name, string(h.Typeflag))
 		}
 	}
+}
+
+// Validate after every entry exists: a forward link can change how a later
+// link's ".." resolves. Root follows the actual chain without ever reading
+// outside dir. Keep internal dangling links, as before.
+func checkUnpackedLinks(dir string, links []string) error {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	for _, name := range links {
+		if _, err := root.Stat(filepath.FromSlash(name)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fail(CodeArchiveUnsafe, "symlink %q cannot resolve inside the release directory: %v", name, err)
+		}
+	}
+	return nil
 }
 
 // insideName cleans an archive name and says whether it stays inside the
