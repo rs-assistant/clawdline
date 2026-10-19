@@ -101,3 +101,86 @@
   .page-settings .settings-tabs { gap: 18px; }
   #settings #settings-close { width: 100%; }
 }
+
+/* One row rhythm across browser controls and the embedded machine controls.
+   Multi-control groups keep their own layout and wrap as a group when needed. */
+#settings .settings-column > .block {
+  margin: 0;
+  padding: 12px 0;
+  border-bottom: 0;
+}
+#settings .settings-control-heading,
+#settings .ui-language-control,
+#settings .settings-model-field {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+#settings .settings-control-heading > b,
+#settings .ui-language-label,
+#settings .settings-model-label {
+  flex: 1 1 100px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+#settings .settings-control-heading > .row {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+#settings .settings-control-heading + .say {
+  margin: 6px 0 0;
+}
+#settings .ui-language-control > .choice-menu,
+#settings .settings-model-field > .choice-menu {
+  flex: 0 1 206px;
+  width: 206px;
+  max-width: 100%;
+  margin-left: auto;
+}
+#settings .ui-language-hint,
+#settings .ui-language-warning,
+#settings .ui-language-status {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+#settings .ui-language-hint { color: var(--dim); }
+#settings .ui-language-status:empty { display: none; }
+#settings .survey-settings {
+  margin: 0 0 12px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+#settings .settings-model-field { padding: 8px 0; margin: 0; }
+#settings .settings-model-field + .settings-model-field {
+  border-top: 1px solid var(--line);
+}
+#settings .sw-window.embedded {
+  --sw-label: var(--ink);
+  --sw-faint: var(--dim);
+  --sw-hairline: var(--line);
+}
+#settings .sw-window.embedded .sw-row-label,
+#settings .sw-window.embedded .sw-block-label { font-size: 13px; font-weight: 500; }
+#settings .sw-window.embedded .sw-hint,
+#settings .sw-window.embedded .sw-explain p {
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+#settings .sw-window.embedded .sw-chip,
+#settings .choice-menu-option { font-size: 12.5px; }
+
+#settings .choice-menu-trigger {
+  min-height: 32px;
+  height: auto;
+  font-size: 12.5px;
+}
+#settings .sw-window.embedded .choice-menu.compact {
+  width: 206px;
+  max-width: 100%;
+}
