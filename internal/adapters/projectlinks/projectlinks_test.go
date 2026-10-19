@@ -574,3 +574,35 @@ func TestARunningDeployNobodyRewroteIsNotDrawnAsRunning(t *testing.T) {
 		t.Fatal("an old ok is still drawn")
 	}
 }
+
+func TestPublicWebsiteDoesNotRequireALocalPort(t *testing.T) {
+	for _, tc := range []struct {
+		url   string
+		local bool
+	}{
+		{"https://console.example.com/admin", false},
+		{"http://127.0.0.1:7337/", true},
+		{"http://localhost:7337/", true},
+		{"http://[::1]:7337/", true},
+	} {
+		t.Run(tc.url, func(t *testing.T) {
+			r, _ := reader(t, remote{err: git.ErrNotRepository}, 1000)
+			root := t.TempDir()
+			write(t, root, ".devstack.json", map[string]any{"version": 1, "processes": []any{map[string]any{"name": "guide", "url": tc.url}}})
+			rows := r.Read(context.Background(), root).Links
+			if len(rows) != 1 {
+				t.Fatalf("wanted one link: %+v", rows)
+			}
+			row := rows[0]
+			if row.Local != tc.local || row.URL != tc.url || row.State != "" {
+				t.Fatalf("wrong address or unmeasured state: %+v", row)
+			}
+			if !tc.local && (row.Kind != "site" || row.UnknownReason != "") {
+				t.Fatalf("public link needs neither local port nor local-network warning: %+v", row)
+			}
+			if tc.local && row.UnknownReason != "nothing_declared" {
+				t.Fatalf("local server still explains missing probe: %+v", row)
+			}
+		})
+	}
+}
