@@ -66,6 +66,10 @@ Keep one server running and share its manifest with the coordinating local revie
 | Actual transcript checklist | Same Session address | `session-plan-card` |
 | Browser Settings | App `/#page=settings` | `settings` |
 | Machine Settings window | App `/settings.html` | `machine-settings` |
+| Expanded machine language menu | App `/settings.html`, open language control | `machine-language-menu` |
+| Voice settings with complete synthetic language/setup contracts | App `/settings.html`, second tab | `machine-voice` |
+| Expanded Cloud pairing instructions | Cloud `/`, pairing state, open pairing | `cloud-pairing-open` |
+| Unknown delivery action after synthetic write refusal | App Session, submit authored sample | `send-unknown` |
 | Workflow | App `/#page=workflow` | `workflow` |
 | Workflow editor | Same address, open the authored Workflow | `workflow-editor` |
 | Notifications | App `/#page=notifications` | `notifications` |
@@ -101,3 +105,5 @@ This mode deliberately uses synthetic icons and versions, puts every role into o
 The real shared Cloud console and machine selector are not yet reachable in this fixture: `CloudViewerSession.connect()` requires an account content key, authenticated relay challenge, and encrypted inventories before CloudGate draws them. Existing write-path unit seams accept transport objects but are not a browser injection point. This harness stops at the genuine pairing gate. A complete extension must implement a synthetic signed/encrypted relay peer using the existing wire protocol, with task-owned keys and no production component changes. Do not substitute a local App screenshot for shared Cloud acceptance.
 
 Page-shell capture alone does not establish loaded-data or modal coverage. The named deep cells actually open Workflow editor, Board creation modal, Projects file viewer, transcript plan card, document detail, role selection, and Squad role/Skill details through the real interface. Inspect their screenshots and route logs. Document share remains unavailable on a local App as production intends. Promotion management has an empty synthetic campaign response; issuance/revocation and redemption submission are not exercised. Unsupported endpoints are reported explicitly. Native shell settings controls render their normal browser-unavailable state; an actual native shell bridge is outside this fixture. External billing/OAuth links are blocked by the automated browser, and are never followed as part of this review.
+
+The focused regression surfaces assert that compact language menus remain within the viewport, all five phone Settings tabs occupy readable text columns, and the unknown-delivery action stays on one line. Voice responses include the full language and setup contracts with explicitly synthetic executable/model paths; no microphone, installation or download is exercised.

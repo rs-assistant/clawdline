@@ -17,6 +17,10 @@ export const REVIEW_SURFACES: Surface[] = [
   { id: 'session-detail-composer', origin: 'app', path: '/#session=review-session', state: 'ready', ready: '#composer' },
   { id: 'session-plan-card', origin: 'app', path: '/#session=review-session', state: 'ready', ready: '.plan-card' },
   ...['settings', 'workflow', 'notifications', 'work', 'projects', 'plan', 'documents'].map(id => ({ id, origin: 'app' as const, path: '/#page=' + id, state: 'ready' as const, ready: `[data-page-view="${id}"]:not([hidden])` })),
+  { id: 'machine-language-menu', origin: 'app', path: '/settings.html', state: 'ready', ready: '[role="tablist"]', action: 'machine-language-menu' },
+  { id: 'machine-voice', origin: 'app', path: '/settings.html', state: 'ready', ready: '[role="tablist"]', action: 'machine-voice' },
+  { id: 'cloud-pairing-open', origin: 'cloud', path: '/', state: 'pairing', ready: '#cloud-pair-start', action: 'cloud-pairing-open' },
+  { id: 'send-unknown', origin: 'app', path: '/#session=review-session', state: 'ready', ready: '#composer', action: 'send-unknown' },
   { id: 'machine-settings', origin: 'app', path: '/settings.html', state: 'ready', ready: '[role="tablist"]' },
   { id: 'workflow-editor', origin: 'app', path: '/#page=workflow', state: 'ready', ready: '.workflow-primary', action: 'workflow-editor' },
   { id: 'board-modal', origin: 'app', path: '/#page=work', state: 'ready', ready: '#work .work-head-tools button', action: 'board-modal' },
@@ -169,6 +173,32 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
             await page.waitForFunction(() => !document.documentElement.classList.contains('booting'))
             if (surface.id === 'workflow') await page.locator('.workflow-list-card,.workflow-empty').first().waitFor({ state: 'visible' })
             if (surface.id === 'work') await page.locator('#work .work-empty,#work .work-card').first().waitFor({ state: 'visible' })
+            if (surface.action === 'machine-language-menu') {
+              await page.locator('#settings-window-ui-language').click()
+              const menu = page.getByRole('listbox')
+              await menu.waitFor({ state: 'visible' })
+              const box = await menu.boundingBox()
+              assert.ok(box && box.x >= 0 && box.x + box.width <= width, 'Expanded language menu stays inside the viewport')
+            }
+            if (surface.action === 'machine-voice') {
+              await page.getByRole('tab').nth(1).click()
+              await page.locator('.sw-voice-paths').first().waitFor({ state: 'visible' })
+            }
+            if (surface.action === 'cloud-pairing-open') {
+              await page.locator('#cloud-pair-start').click()
+              await page.locator('#cloud-pair-title').waitFor({ state: 'visible' })
+            }
+            if (surface.action === 'send-unknown') {
+              await page.locator('#msg').fill('Synthetic review input')
+              await page.locator('#send').click()
+              const action = page.locator('.entry.pending[data-send="unknown"] [data-pending-look]')
+              await action.waitFor({ state: 'visible' })
+              const lines = await action.evaluate((node: Element) => {
+                const range = document.createRange(); range.selectNodeContents(node)
+                return range.getClientRects().length
+              })
+              assert.equal(lines, 1, 'Unknown-delivery action remains on one readable line')
+            }
             if (surface.action === 'demo') {
               await page.locator('.adm-demo-control button').click()
               await page.locator('.adm-demo-active').waitFor({ state: 'visible' })
