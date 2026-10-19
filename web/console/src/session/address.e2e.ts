@@ -777,6 +777,7 @@ test("localization batch renders Sessions and Settings without page overflow", a
         const expectedMissing = process.env.CLAWDLINE_ALLOW_PARTIAL === "1"
           ? Object.keys(reference).filter((key) => !Object.hasOwn(selected, key)).length : 0
         assert.deepEqual(locale, { lang: tag, missing: String(expectedMissing), booting: false })
+        assert.ok((await tab.run(`document.getElementById("counts")?.textContent ?? ""`)).includes(selected["literal.1b40e6344265"]), `${tag} Session summary uses the selected catalog`)
         const assertPageFits = async (page: string) => {
           const bounds = await tab.run(`({ width: innerWidth,
             page: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) })`)
