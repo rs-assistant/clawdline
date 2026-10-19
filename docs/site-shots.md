@@ -60,3 +60,16 @@ website repository) names each number under the picture and in its lightbox, in 
 Look at all sixteen pictures. A fold caught mid-animation, a callout around nothing, a name cut short
 in the header, or a label in the wrong language is a capture to fix here, not a picture to
 publish.
+
+## The GitHub README walkthrough
+
+The two `docs/assets/cloud-sessions-demo-*.gif` files are illustrated examples, not console
+recordings. Their shared source is `docs/assets/cloud-sessions-demo.html`. Each shows the same
+three-step story: open a waiting Session, see a small dashboard design sent by the Agent, and
+send feedback asking for a larger button. The image stays a thumbnail throughout.
+
+To recapture, open the HTML with `?lang=en&step=0` (or `lang=zh-Hant`, steps 0–2) at
+390 × 560 CSS pixels and device scale 2. Capture each state after fonts and layout settle, then
+encode a looping GIF with frame durations of 2, 3 and 3 seconds. Both READMEs display it at
+320 pixels wide. Keep the example label and the README descriptions explicit that this is an
+illustration.
