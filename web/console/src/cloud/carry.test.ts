@@ -785,9 +785,9 @@ test("full browser machine settings stay on the local console", () => {
 
 
 test("usage overview query carries only a real period and one unmodified opaque project", () => {
-  assert.deepEqual(usageOverviewQuery(new URLSearchParams()), { days: 7 })
-  assert.deepEqual(usageOverviewQuery(new URLSearchParams("days=28&project=a%2Fb%26c")), { days: 28, project: "a/b&c" })
-  assert.deepEqual(usageOverviewQuery(new URLSearchParams("days=7&project=")), { days: 7 })
+  assert.deepEqual(usageOverviewQuery(new URLSearchParams()), { days: "7" })
+  assert.deepEqual(usageOverviewQuery(new URLSearchParams("days=28&project=a%2Fb%26c")), { days: "28", project: "a/b&c" })
+  assert.deepEqual(usageOverviewQuery(new URLSearchParams("days=7&project=")), { days: "7" })
   for (const query of ["days=", "days=7.0", "days=-7", "days=28&days=28", "project=a&project=", "machine=b", "project=%1F"]) {
     assert.equal(usageOverviewQuery(new URLSearchParams(query)), null, query)
   }

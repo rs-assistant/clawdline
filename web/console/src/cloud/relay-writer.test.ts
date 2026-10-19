@@ -2496,7 +2496,7 @@ test("usage overview carries a validated period and opaque project to the select
   assert.equal(writeRoute("GET", "/v1/usage/overview/more"), null)
   const response = await reader.fetch("/v1/usage/overview?days=28&project=opaque%2Fproject%26one")
   assert.equal(response.status, 200)
-  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "usage.overview", { days: 28, project: "opaque/project&one" }, "read"])
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "usage.overview", { days: "28", project: "opaque/project&one" }, "read"])
   const count = client.calls.length
   for (const query of ["days=8", "days=07", "days=7&days=28", "project=a&project=b", "project=%00", "since=1", "machine=other"]) {
     assert.equal((await reader.fetch("/v1/usage/overview?" + query)).status, 400, query)
@@ -2511,8 +2511,24 @@ test("usage overview also reads without the writer adapter and stays on its sele
   plain.attach(client)
   const response = await plain.fetch("/v1/usage/overview?days=7")
   assert.equal(response.status, 200)
-  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-b", "usage.overview", { days: 7 }, "read"])
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-b", "usage.overview", { days: "7" }, "read"])
   const count = client.calls.length
   assert.equal((await plain.fetch("/v1/usage/overview?days=28&project=a&project=b")).status, 400)
   assert.equal(client.calls.length, count)
+})
+
+test("usage overview browser bodies match the fixtures accepted by the daemon decoder", async () => {
+  const fixtures = JSON.parse(readFileSync(new URL("../../../../internal/app/cloudops/testdata/usage-overview-browser.json", import.meta.url), "utf8")) as { query: string; body: Record<string, string> }[]
+  for (const writer of [true, false]) {
+    const client = new FakeClient()
+    const reader = writer ? seam(client).reader : new RelayReader("mac-b")
+    if (!writer) reader.attach(client)
+    for (const fixture of fixtures) {
+      const response = await reader.fetch("/v1/usage/overview?" + fixture.query)
+      assert.equal(response.status, 200)
+      const call = client.calls.pop()
+      assert.equal(call?.[2], "usage.overview")
+      assert.deepEqual(JSON.parse(JSON.stringify(call?.[3])), fixture.body, "browser wire must be accepted by the real daemon fixture")
+    }
+  }
 })

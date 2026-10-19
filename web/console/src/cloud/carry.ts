@@ -54,7 +54,7 @@ export type CarriedWord = keyof typeof CARRIED
 export type { CloudWord }
 
 /** The overview carries exactly one period and one opaque project, never arbitrary query fields. */
-export function usageOverviewQuery(params: URLSearchParams): { days: 7 | 28; project?: string } | null {
+export function usageOverviewQuery(params: URLSearchParams): { days: "7" | "28"; project?: string } | null {
   const seen = new Set<string>()
   for (const [key] of params) {
     if ((key !== "days" && key !== "project") || seen.has(key)) return null
@@ -64,7 +64,7 @@ export function usageOverviewQuery(params: URLSearchParams): { days: 7 | 28; pro
   const project = params.get("project") ?? ""
   if (days !== "7" && days !== "28") return null
   if (/[\u0000-\u001f\u007f]/u.test(project)) return null
-  return { days: days === "7" ? 7 : 28, ...(project ? { project } : {}) }
+  return { days, ...(project ? { project } : {}) }
 }
 
 /**

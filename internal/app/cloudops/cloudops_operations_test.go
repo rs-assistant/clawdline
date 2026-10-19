@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -1952,5 +1953,35 @@ func TestSessionsSnapshotNamesThePassItsMarkerCarried(t *testing.T) {
 	got, _ := json.Marshal(answerOf(t, answer)["body"])
 	if string(got) != `{"complete":true,"sessions":["%19"],"snapshot_generation":"`+pass+`"}` {
 		t.Fatalf("the answer said %s", got)
+	}
+}
+
+func TestUsageOverviewAcceptsTheBrowserWireFixtures(t *testing.T) {
+	raw, err := os.ReadFile("testdata/usage-overview-browser.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixtures []struct {
+		Query string         `json:"query"`
+		Body  map[string]any `json:"body"`
+	}
+	if err := json.Unmarshal(raw, &fixtures); err != nil {
+		t.Fatal(err)
+	}
+	for _, fixture := range fixtures {
+		body := map[string]any{"type": "usage.overview", "session": MachineReplySession, "request": "req-browser"}
+		for key, value := range fixture.Body {
+			body[key] = value
+		}
+		r := &router{}
+		answer := open(r).Handle(context.Background(), request(t, ClassCtl, body))
+		if answer.Status != 200 || len(r.seen) != 1 || r.last().Path != "/v1/usage/overview" {
+			t.Fatalf("browser body refused: %+v %v", answer, r.seen)
+		}
+		for key, value := range fixture.Body {
+			if r.last().Query[key] != value {
+				t.Fatalf("lost query %s", key)
+			}
+		}
 	}
 }
