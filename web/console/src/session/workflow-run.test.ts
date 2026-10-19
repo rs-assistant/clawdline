@@ -4,6 +4,10 @@ import assert from "node:assert/strict"
 import { workflowRunOf, workflowTodoText } from "./workflow-run.ts"
 // @ts-expect-error Node's strip-types test runner needs the source extension.
 import { localizedWorkflow } from "../workflow-words.ts"
+// @ts-expect-error Node's strip-types test runner needs the source extension.
+import { activateCatalog, resetCatalogForTest } from "../catalog.ts"
+import english from "../../public/catalogs/en.json" with { type: "json" }
+import traditionalChinese from "../../public/catalogs/zh-Hant.json" with { type: "json" }
 import type { Snippet } from "../legacy/snippets-bridge.js"
 
 const ID = "00000000-0000-4000-8000-000000000041"
@@ -27,15 +31,17 @@ test("the shipped global Workflow follows the UI language until edited", () => {
   const prior = globalThis.document
   try {
     globalThis.document = { documentElement: { lang: "zh-Hant-TW" } } as Document
+    activateCatalog(traditionalChinese, "zh-Hant")
     const zh = localizedWorkflow(row)
     assert.equal(zh.title, "歸零審查")
     assert.match(zh.body, /每項結論都要附上證據/)
     assert.doesNotMatch(zh.body, /唯讀/)
     globalThis.document = { documentElement: { lang: "en" } } as Document
+    activateCatalog(english, "en")
     const en = localizedWorkflow(row)
     assert.equal(en.title, "Zero-Based Review")
     assert.match(en.body, /Require evidence for every finding/)
     assert.deepEqual(localizedWorkflow({ ...row, builtin: undefined, title: "My review" }),
       { ...row, builtin: undefined, title: "My review" })
-  } finally { globalThis.document = prior }
+  } finally { resetCatalogForTest(); globalThis.document = prior }
 })

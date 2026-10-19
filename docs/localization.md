@@ -93,6 +93,13 @@ and bundle catalog as the local console. Both set `lang` and `dir` to the
 catalog actually displayed; neither guesses the document language from an
 unfulfilled preference.
 
+The standalone Cloud operations page uses the same browser preference and
+validated catalog as the console. It keeps its boot cover until the selected
+catalog is active, including when no machine is paired. Operations, Workflow,
+notifications, dispatch rules, and transcript plan headings use catalog keys;
+their English and Traditional Chinese source tables are checked against the
+public catalogs. User-edited Workflow messages and dispatch rules remain data.
+
 `GET /v1/strings` without `lang` returns English. With a supported tag it
 returns that catalog, which may omit new keys after the initial complete
 release. The client fills missing secondary-language keys from English. A

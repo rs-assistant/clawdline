@@ -2,10 +2,18 @@
 // `node --experimental-strip-types --test web/console/src/cloud/admin/admin.test.ts`.
 import { test } from "node:test"
 import assert from "node:assert/strict"
+import { readFileSync } from "node:fs"
+import english from "../../../public/catalogs/en.json" with { type: "json" }
+// @ts-expect-error -- Node runs this source test directly.
+import { resetCatalogForTest, type CatalogTag } from "../../catalog.ts"
+// @ts-expect-error -- Node runs this source test directly.
+import { localizedWorkflow, workflowWord, workflowWordFor } from "../../workflow-words.ts"
+// @ts-expect-error -- Node runs this source test directly.
+import { dictationStatus } from "../../pages/settings/window/copy.ts"
 // @ts-expect-error -- a `.ts` path, for node; see cloud/forget.test.ts.
 import { completeDays, loadOverview, parseOverview, trend } from "./api.ts"
 // @ts-expect-error -- a `.ts` path, for node.
-import { ADMIN_ROUTES, adminLocale, adminPath, adminRoute, adminWords, type AdminWord } from "./words.ts"
+import { ADMIN_ROUTES, adminPath, adminRoute, adminWords, bootAdminCatalog, type AdminWord } from "./words.ts"
 // @ts-expect-error -- a `.ts` path, for node.
 import { demoOverview } from "./demo.ts"
 
@@ -118,13 +126,82 @@ test("a refusal, a failure and a bad body are told apart, and none of them is da
   assert.deepEqual(await loadOverview(answer(200, async () => ({ schema: "nope" })), "x"), { kind: "failed", code: "shape:schema", status: 200 })
 })
 
-test("Traditional Chinese preferences read Taiwan copy; every other language reads English", () => {
-  assert.equal(adminLocale(["zh-TW"]), "zh-TW")
-  assert.equal(adminLocale(["zh-Hant-HK", "en"]), "zh-TW")
-  assert.equal(adminLocale(["ja-JP", "zh-TW"]), "zh-TW")
-  assert.equal(adminLocale(["fr-FR"]), "en")
-  assert.equal(adminLocale(["en-GB", "zh-TW"]), "en")
+test("the source formatter retains named placeholders and Taiwan copy", () => {
   assert.equal(adminWords("zh-TW")("campaignsCapped", { shown: 50, total: 51 }), "共 51 個活動，只顯示最新的 50 個。")
+})
+
+test("standalone operations honors all nine saved languages without a paired machine", async () => {
+  const originals = new Map(["document", "navigator", "localStorage"].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
+  try {
+    Object.defineProperty(globalThis, "document", { configurable: true, value: { documentElement: { lang: "en", dir: "ltr", setAttribute() {} } } })
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: { languages: ["zh-TW"], language: "zh-TW" } })
+    for (const tag of ["en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"] as const) {
+      resetCatalogForTest()
+      const catalog = JSON.parse(readFileSync(new URL(`../../../public/catalogs/${tag}.json`, import.meta.url), "utf8"))
+      Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem(key: string) {
+        assert.equal(key, "ui_language")
+        return tag
+      } } })
+      const urls: string[] = []
+      const selected = await bootAdminCatalog({ build: "immutable build", strings: {} }, "https://example.test/admin/accounts", async (url: string | URL | Request) => {
+        urls.push(String(url))
+        return new Response(JSON.stringify(catalog))
+      })
+      assert.equal(selected, tag)
+      assert.equal(document.documentElement.lang, tag)
+      assert.deepEqual(urls, tag === "en" ? [] : [`/app/immutable%20build/catalogs/${tag}.json`])
+      const say = adminWords()
+      assert.equal(say("title"), catalog["admin.title"] ?? english["admin.title"])
+      assert.equal(say("campaignsCapped", { shown: 50, total: 51 }),
+        (catalog["admin.campaignsCapped"] ?? english["admin.campaignsCapped"]).replace("{shown}", "50").replace("{total}", "51"))
+      assert.equal(workflowWord("zeroReviewTitle"), catalog["workflow.zeroReviewTitle"] ?? english["workflow.zeroReviewTitle"])
+      assert.equal(workflowWord("skillPrompt", { name: "My Skill / 自訂" }),
+        (catalog["workflow.skillPrompt"] ?? english["workflow.skillPrompt"]).replace("{name}", "My Skill / 自訂"))
+      assert.equal(dictationStatus({ kind: "noModel" }), catalog["settings.dictationNoModel"] ?? english["settings.dictationNoModel"])
+      assert.equal(dictationStatus({ kind: "unavailable" }), catalog["settings.dictationNoWhisper"] ?? english["settings.dictationNoWhisper"])
+      assert.equal(dictationStatus({ kind: "ready", model: "my-model" }), catalog["template.7646119625b7"].replace("{arg0}", "my-model"))
+    }
+  } finally {
+    resetCatalogForTest()
+    for (const [key, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor)
+      else Reflect.deleteProperty(globalThis, key)
+    }
+  }
+})
+
+test("operations waits for catalog validation and a broken translation falls back atomically", async () => {
+  const originals = new Map(["document", "navigator", "localStorage"].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]))
+  try {
+    Object.defineProperty(globalThis, "document", { configurable: true, value: { documentElement: { lang: "en", dir: "ltr", setAttribute() {} } } })
+    Object.defineProperty(globalThis, "navigator", { configurable: true, value: { languages: ["en"], language: "en" } })
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: () => "ja" } })
+    resetCatalogForTest()
+    let release!: (response: Response) => void
+    const response = new Promise<Response>((resolve) => { release = resolve })
+    let ready = false
+    const boot = bootAdminCatalog(null, "https://example.test/", () => response).then((tag: CatalogTag) => { ready = true; return tag })
+    await Promise.resolve()
+    assert.equal(ready, false)
+    release(new Response(JSON.stringify({ ...english, lang: "ja", "admin.title": "運用", "admin.generated": "更新 {wrong}" })))
+    assert.equal(await boot, "en")
+    assert.equal(document.documentElement.lang, "en")
+    assert.equal(adminWords()("title"), "Operations")
+    assert.equal(adminWords()("generated", { time: "12:30" }), "Updated 12:30 UTC")
+  } finally {
+    resetCatalogForTest()
+    for (const [key, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor)
+      else Reflect.deleteProperty(globalThis, key)
+    }
+  }
+})
+
+test("pure Workflow source formatting stays compatible while edited messages remain data", () => {
+  assert.equal(workflowWordFor("zh-Hant", "skillPrompt", { name: "ctx" }), "請執行「ctx」Skill，依照其中流程完成工作並回報結果。")
+  assert.equal(workflowWordFor("fr", "workflow"), "Workflow")
+  const edited = { id: "review", title: "My review", body: "Keep my words.", scope: "workflow" as const, position: 1, created_at: 1, updated_at: 1 }
+  assert.equal(localizedWorkflow(edited), edited)
 })
 
 test("each page has its own address, and an address names one page or none", () => {
