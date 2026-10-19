@@ -6194,6 +6194,9 @@ type SettingsRequest struct {
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
 
+	// A full Tailscale name ending in `.ts.net`, or empty.
+	TailscaleHostname *string `json:"tailscale_hostname"`
+
 	// `auto`, `iterm`, `iterm_native` or `tmux`.
 	Terminal *string `json:"terminal"`
 
@@ -6391,6 +6394,10 @@ type SettingsSnapshot struct {
 
 	// Have a model write the sentence a notification carries.
 	SmartNotifications *bool `json:"smart_notifications"`
+
+	// This machine's full Tailscale name (`<machine>.<tailnet>.ts.net`) that Tailscale
+	// Serve answers on; accepted only while `remote` is on.
+	TailscaleHostname *string `json:"tailscale_hostname"`
 
 	// Where a new session opens: `auto`, `iterm`, `iterm_native` or `tmux`. With tmux
 	// installed, `auto` and `iterm` run the session in tmux and show it in an iTerm2

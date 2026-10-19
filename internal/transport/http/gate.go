@@ -122,7 +122,14 @@ type gate struct {
 	// the same reading the tunnel's own ingress is written from, so a named
 	// tunnel and the gate in front of it never disagree about its name.
 	hostname atomic.Pointer[string]
-	port     int
+	// tailscale is `tailscale_hostname` while `remote` is on, and "" while it
+	// is off or the name is unset: the address Tailscale Serve proxies to
+	// this daemon's loopback port. Serve keeps running whatever this daemon
+	// says, so the switch is enforced here, on every request, and not by
+	// stopping anything. It is refreshed from the same readings as hostname
+	// and on every settings write that touches either key.
+	tailscale atomic.Pointer[string]
+	port      int
 	// dir is the state directory used by the gate and local adapters.
 	dir string
 
@@ -199,6 +206,7 @@ func openGate(cfg config.Config) *gate {
 		if h, ok := v.String("remote_hostname"); ok {
 			g.setHostname(h)
 		}
+		g.setTailscale(v)
 	}
 	// Paths only. Neither token is ever written to the log.
 	log.Printf("auth: local token at %s, orchestrator token at %s, audit at %s",
@@ -223,6 +231,35 @@ func (g *gate) allowedHostname() string {
 		return *h
 	}
 	return ""
+}
+
+// setTailscale takes `tailscale_hostname` and `remote` from one reading of
+// the settings. The name admits requests only while remote access is on, and
+// a value that is not a Tailscale name admits nothing.
+func (g *gate) setTailscale(v nextconfig.Values) {
+	h, _ := v.String("tailscale_hostname")
+	remote, _ := v.Bool("remote")
+	if !remote || !nextconfig.ValidTailscaleHostname(h) {
+		h = ""
+	}
+	g.tailscale.Store(&h)
+}
+
+// tailscaleHostname is the Tailscale name the Host check accepts now, or "".
+func (g *gate) tailscaleHostname() string {
+	if h := g.tailscale.Load(); h != nil {
+		return *h
+	}
+	return ""
+}
+
+// viaTailscale is whether this request named the Tailscale address. Serve
+// connects from loopback with the Host the phone asked for, so the Host is
+// the only thing that tells it from a request made on this machine. It can
+// only narrow: a local caller who spells that Host is judged as a device.
+func (g *gate) viaTailscale(r *http.Request) bool {
+	name := g.tailscaleHostname()
+	return name != "" && hostOnly(r.Host) == name
 }
 
 // access is what the gate learned about a request, for the handlers behind it.
@@ -270,7 +307,10 @@ func (g *gate) wrap(next http.Handler) http.Handler {
 			return
 		}
 		p := routePath(r)
-		device := judgedAsDevice(r)
+		// A request through Tailscale Serve arrives from loopback like the
+		// shell's own, and is a paired device's all the same: neither this
+		// machine's local-token exemptions nor the orchestrator door apply.
+		device := judgedAsDevice(r) || g.viaTailscale(r)
 		machine := machineScoped(p) && !device &&
 			g.verifyMachine(r.Header.Get(machineHeader))
 		verdict := g.permission(r)
@@ -556,7 +596,7 @@ func (g *gate) crossOriginRefusal(r *http.Request) string {
 	if isCrossSiteSubresource(r.Header) {
 		return "Cross-site requests are not answered."
 	}
-	if !isAllowedHost(r.Host, g.allowedHostname()) {
+	if !isAllowedHost(r.Host, g.allowedHostname(), g.tailscaleHostname()) {
 		return "Wrong host."
 	}
 	return ""
@@ -578,16 +618,11 @@ func isCrossSiteSubresource(h http.Header) bool {
 // to is refused before anything else is looked at. A quick tunnel's name is
 // generated per run, so its whole suffix is allowed; rebinding needs the
 // attacker to control that DNS answer, and those answers are Cloudflare's.
-func isAllowedHost(header, hostname string) bool {
-	host := strings.ToLower(strings.TrimSpace(header))
-	if strings.HasPrefix(host, "[") {
-		end := strings.Index(host, "]")
-		if end < 0 {
-			return false
-		}
-		host = host[1:end]
-	} else if i := strings.LastIndex(host, ":"); i >= 0 {
-		host = host[:i]
+// The Tailscale name is matched exactly, and is "" while remote access is off.
+func isAllowedHost(header, hostname, tailscale string) bool {
+	host := hostOnly(header)
+	if host == "" {
+		return false
 	}
 	switch host {
 	case "127.0.0.1", "localhost", "::1":
@@ -596,7 +631,27 @@ func isAllowedHost(header, hostname string) bool {
 	if hostname != "" && host == hostname {
 		return true
 	}
+	if tailscale != "" && host == tailscale {
+		return true
+	}
 	return strings.HasSuffix(host, ".trycloudflare.com")
+}
+
+// hostOnly is a Host header's name, lowercase, without its port or IPv6
+// brackets; "" when the brackets do not close.
+func hostOnly(header string) string {
+	host := strings.ToLower(strings.TrimSpace(header))
+	if strings.HasPrefix(host, "[") {
+		end := strings.Index(host, "]")
+		if end < 0 {
+			return ""
+		}
+		return host[1:end]
+	}
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		host = host[:i]
+	}
+	return host
 }
 
 // isChange is every method but the two that only read.

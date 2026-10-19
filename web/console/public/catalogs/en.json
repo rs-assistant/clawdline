@@ -4835,6 +4835,8 @@
   "settings.voiceModelPaths": "Model search paths",
   "settings.dictationNoModel": "Voice: Apple only — whisper-cli is installed, but no model is available",
   "settings.dictationNoWhisper": "Voice: Apple only — whisper-cli is not installed",
+  "settings.settingsTailscaleHostname": "Tailscale address",
+  "settings.settingsTailscaleHint": "When this machine and your phone are on the same tailnet, run tailscale serve --bg 7727 on this machine and enter its full name here, such as my-machine.your-tailnet.ts.net. It answers only while the switch above is on, and a device still pairs before it sees anything. Serve stays private to your tailnet; Funnel would make the address public, so do not use it.",
   "template.00ac5e87de81": "Handbook was not saved: {arg0}",
   "template.029ac348ef8a": "From Board item #{arg0}",
   "template.0452d5f2c3a3": "Completed {arg0}",

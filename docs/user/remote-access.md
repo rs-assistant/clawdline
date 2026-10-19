@@ -9,10 +9,12 @@ Your agents and code stay on your machine whichever way you choose.
 | Way | Account | Reaches | What it can do | State |
 | --- | --- | --- | --- | --- |
 | A. SSH port forward | None | Another computer you can SSH from | Read and send | Works |
-| B. Your own cloudflared tunnel | None | Any browser, including a phone | Read and send after pairing | Built; the real Cloudflare leg has not been tested end to end |
-| C. Clawdline Cloud | Clawdline account (GitHub sign-in) | Any browser, including a phone; several machines | Read and act on paired machines while their Cloud commands are on | Preview |
+| B. Tailscale Serve | A Tailscale account, signed in on both ends | Devices on your own tailnet, including a phone | Read and send after pairing | Built; real-device verification pending |
+| C. Your own cloudflared tunnel | None | Any browser, including a phone | Read and send after pairing | Built; the real Cloudflare leg has not been tested end to end |
+| D. Clawdline Cloud | Clawdline account (GitHub sign-in) | Any browser, including a phone; several machines | Read and act on paired machines while their Cloud commands are on | Preview |
 
 The daemon itself listens on `127.0.0.1` only. None of these opens a port on your network.
+Every paired device has full access, read and send; there is no read-only device.
 
 Labels below follow the English interface; the console also supports other languages.
 
@@ -32,7 +34,51 @@ password until it has been used.
 revoke the browser (see [Signed-in devices](#see-and-revoke-devices-signed-in-directly)): each
 `clawdline open` creates a device of its own, and it stays signed in until it is revoked.
 
-## B. A phone, through your own cloudflared tunnel
+## B. A phone on your tailnet, through Tailscale Serve
+
+**Real-device verification pending.** The daemon side is tested; a phone on a real tailnet has not
+yet been run through these steps.
+
+[Tailscale Serve](https://tailscale.com/kb/1312/serve) gives this machine an HTTPS address that only
+devices on your own tailnet can open, and passes each request to the daemon on `127.0.0.1:7727`.
+Clawdline does not sign anybody in with their Tailscale identity and does not manage Tailscale
+accounts or keys: a phone that reaches the address still pairs with a six-digit code, as through a
+tunnel.
+
+1. **Install Tailscale and sign in on both ends**, this machine and the phone, with the same
+   tailnet.
+2. **In the Tailscale admin console, turn on MagicDNS and HTTPS certificates** (DNS page). Serve
+   needs both to answer on `https://<machine>.<tailnet>.ts.net`.
+3. **On this machine, start Serve in the background:**
+
+   ```sh
+   tailscale serve --bg 7727
+   tailscale serve status        # prints the https://<machine>.<tailnet>.ts.net address
+   ```
+
+4. **Tell Clawdline that address.** Turn on **Let a browser or your phone view your sessions**, and
+   enter the full name, without `https://`, in **Tailscale address** on the same tab. Without the
+   app, set both in `config.json` in the state directory and restart `serve`:
+
+   ```json
+   { "remote": true, "tailscale_hostname": "my-machine.your-tailnet.ts.net" }
+   ```
+
+   The daemon answers that name only while both are set. Turning the switch off, or clearing the
+   name, refuses the address on its next request even while Serve still runs.
+5. **Pair the phone**: keep `./bin/clawdline pair --watch` running on this machine (or keep the
+   macOS app open), open the address on the phone, name the device, press **Ask to pair**, and type
+   the six-digit code that appears on this machine.
+
+**Serve, not Funnel.** Serve is private to your tailnet. `tailscale funnel` publishes the same
+address to the whole internet; it is not recommended, and nothing in Clawdline needs it.
+
+**Check:** the phone shows **Paired — this browser is in** and then the session list.
+**Undo:** `tailscale serve --https=443 off` (or `tailscale serve reset`) stops Serve; clear
+**Tailscale address**; revoke the phone (see
+[Signed-in devices](#see-and-revoke-devices-signed-in-directly)).
+
+## C. A phone, through your own cloudflared tunnel
 
 You need [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
 installed on the machine. The daemon starts and stops it itself, and only when all three hold:
@@ -96,11 +142,11 @@ password are listed in two places. Only this machine's own key can see the list 
 A browser signed in as a device of its own is not shown the list. Its Devices page says **This browser is signed in as its own device** and offers **Sign this browser out**, which asks first and then revokes that browser's own key.
 
 **Check:** a revoked device's next request is refused and it is back at the pairing page. When nothing
-else is signed in and no password is set, the tunnel in B closes by itself.
+else is signed in and no password is set, the tunnel in C closes by itself.
 
-These are not the browsers Clawdline Cloud relays for; those are `clawdline cloud devices` (C below).
+These are not the browsers Clawdline Cloud relays for; those are `clawdline cloud devices` (D below).
 
-## C. Clawdline Cloud
+## D. Clawdline Cloud
 
 Clawdline Cloud is off by default. When on, the machine keeps an outbound connection to
 app.clawdline.com that carries only end-to-end encrypted envelopes: the service passes them along
@@ -167,6 +213,8 @@ and needs no account.
 
 ## Troubleshooting
 
+- **The Tailscale address answers "Wrong host."**: the name in **Tailscale address** does not
+  match the one `tailscale serve status` prints, or remote access is off.
 - **`clawdline tunnel` shows a reason instead of an address**: it names which of the three
   conditions is missing, or says cloudflared is not installed.
 - **The Cloud line stays off**: `./bin/clawdline cloud status` says why. A broken Cloud setting

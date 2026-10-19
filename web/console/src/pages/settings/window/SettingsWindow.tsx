@@ -1165,6 +1165,17 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
           <Row label={W.settingsRemoteServe} hint={W.settingsRemoteHint} first>
             <Switch label={W.settingsRemoteServe} on={!!now("remote")} onChange={flip("remote")} />
           </Row>
+          <Row label={W.settingsTailscaleHostname} hint={W.settingsTailscaleHint}>
+            <MemoField
+              label={W.settingsTailscaleHostname}
+              value={String(now("tailscale_hostname"))}
+              example="my-machine.your-tailnet.ts.net"
+              onCommit={(value) => {
+                if (value === String(reading(snapshotRef.current, "tailscale_hostname"))) return
+                void change({ tailscale_hostname: value })
+              }}
+            />
+          </Row>
         </div>
         <div className="sw-column">
           {!embedded && cloud !== undefined && cloud !== null && cloudSetupBlock()}

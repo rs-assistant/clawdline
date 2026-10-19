@@ -82,6 +82,7 @@ func (s *Server) tunnelInputs() (tunnel.Inputs, bool) {
 	in.Binary, _ = v.String("cloudflared_path")
 	in.Remote, _ = v.Bool("remote")
 	g.setHostname(in.Hostname)
+	g.setTailscale(v)
 	return in, true
 }
 

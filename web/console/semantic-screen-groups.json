@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6878,
-  "riskKeys": 3133,
-  "nonRiskCount": 3745,
+  "englishContentKeys": 6880,
+  "riskKeys": 3134,
+  "nonRiskCount": 3746,
   "groups": [
     {
       "name": "admin / other",
@@ -3571,7 +3571,7 @@
     },
     {
       "name": "settings / other",
-      "count": 126,
+      "count": 127,
       "sources": [
         "src/pages/settings/window/copy.ts"
       ],
@@ -3653,6 +3653,7 @@
         "settings.settingsSmartNotifications",
         "settings.settingsStateHook",
         "settings.settingsStop",
+        "settings.settingsTailscaleHostname",
         "settings.settingsTerminal",
         "settings.settingsTextSize",
         "settings.settingsTitle",

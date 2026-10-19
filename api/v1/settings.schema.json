@@ -170,6 +170,11 @@
           "nullable": true,
           "type": "string"
         },
+        "tailscale_hostname": {
+          "description": "This machine's full Tailscale name (`<machine>.<tailnet>.ts.net`) that Tailscale Serve answers on; accepted only while `remote` is on.",
+          "nullable": true,
+          "type": "string"
+        },
         "push_on_delivery": {
           "description": "Notify when a session reports a delivery.",
           "nullable": true,
@@ -417,6 +422,11 @@
         },
         "remote_hostname": {
           "description": "A hostname, or empty.",
+          "nullable": true,
+          "type": "string"
+        },
+        "tailscale_hostname": {
+          "description": "A full Tailscale name ending in `.ts.net`, or empty.",
           "nullable": true,
           "type": "string"
         },

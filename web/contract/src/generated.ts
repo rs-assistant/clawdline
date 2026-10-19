@@ -7464,6 +7464,11 @@ export interface SettingsRequest {
   smart_notifications: boolean | null
 
   /**
+   * A full Tailscale name ending in `.ts.net`, or empty.
+   */
+  tailscale_hostname: string | null
+
+  /**
    * `auto`, `iterm`, `iterm_native` or `tmux`.
    */
   terminal: string | null
@@ -7775,6 +7780,12 @@ export interface SettingsSnapshot {
    * Have a model write the sentence a notification carries.
    */
   smart_notifications: boolean | null
+
+  /**
+   * This machine's full Tailscale name (`<machine>.<tailnet>.ts.net`) that
+   * Tailscale Serve answers on; accepted only while `remote` is on.
+   */
+  tailscale_hostname: string | null
 
   /**
    * Where a new session opens: `auto`, `iterm`, `iterm_native` or `tmux`. With tmux

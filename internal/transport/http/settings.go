@@ -29,7 +29,7 @@ var browserSettings = map[string]bool{
 	"language": true, "terminal": true,
 	"mascot": true, "notch": true, "voice_language": true,
 	"codex_auto_name": true, "auto_name_assistant": true,
-	"remote": true, "remote_tunnel": true, "remote_hostname": true,
+	"remote": true, "remote_tunnel": true, "remote_hostname": true, "tailscale_hostname": true,
 	"push_on_delivery": true, "push_on_fanout": true,
 	"smart_notifications": true, "push_on_deploy": true,
 	"push_on_waiting": true, "push_on_board_decision": true, "push_on_board_done": true,
@@ -142,6 +142,11 @@ func (s *Server) settingsRoute(w http.ResponseWriter, r *http.Request) {
 		// moment they are written, as the Swift app's did on its reload.
 		if tunnelSettingChanged(changes) {
 			s.applyTunnel()
+		}
+		// The Tailscale address follows `remote` and its own name from this
+		// very write, so turning either off refuses the next request.
+		if tailscaleSettingChanged(changes) {
+			s.gate().setTailscale(v)
 		}
 		if _, changed := changes["iterm_scan"]; changed {
 			applyITermScan(v)
@@ -380,6 +385,14 @@ func tunnelSettingChanged(changes map[string]any) bool {
 		}
 	}
 	return false
+}
+
+// tailscaleSettingChanged is whether a write touched what the gate admits the
+// Tailscale address on.
+func tailscaleSettingChanged(changes map[string]any) bool {
+	_, remote := changes["remote"]
+	_, name := changes["tailscale_hostname"]
+	return remote || name
 }
 
 // settingsChanges turns a request body into the keys to write.
