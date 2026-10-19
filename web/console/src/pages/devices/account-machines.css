@@ -7,14 +7,15 @@
   --am-no-lo: #c86a4a;
   --am-panel: #141418;
 }
-.account-machines { display: grid; gap: 12px; }
+.account-machines { display: grid; gap: 12px; margin-top: 18px; }
 
 /* The copied cards and their two status lines stay out of the way on the hosted console. */
 #devices[data-account-list] #devices-status,
 #devices[data-account-list] #devices-roster-status,
 #devices[data-account-list] #devices-roster-retry,
 #devices[data-account-list] #devices-empty,
-#devices[data-account-list] #devices-rows { display: none; }
+#devices[data-account-list] #devices-rows,
+#devices[data-account-list] #devices-close { display: none; }
 
 .am-quiet, .am-told { margin: 0; color: var(--dim); font-size: 14px; }
 .am-told { color: var(--ink); }
@@ -36,7 +37,8 @@
   width: 40px; height: 40px; flex: none; border-radius: 12px; background: var(--card-hi);
   display: flex; align-items: center; justify-content: center; color: var(--ink);
 }
-.am-icon .cloud-machine-platform-icon, .am-icon svg { width: 22px; height: 22px; display: block; }
+.am-icon .cloud-machine-platform-icon { width: 100%; height: 100%; }
+.am-icon .cloud-machine-platform-icon svg { width: 22px; height: 22px; display: block; }
 .am-row-text { min-width: 0; flex: 1; display: grid; gap: 2px; }
 .am-name { font-size: 16px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .am-meta { margin: 0; display: flex; align-items: center; gap: 6px; color: var(--dim); font-size: 13px; flex-wrap: wrap; }
@@ -89,7 +91,10 @@
 .am-lane { display: flex; align-items: center; gap: 6px; color: var(--faint); font-size: 12px; }
 .am-lane-k { width: 40px; flex: none; }
 .am-node { width: 28px; height: 28px; flex: none; border-radius: 8px; background: #24242a; color: var(--dim); display: flex; align-items: center; justify-content: center; }
-.am-node .cloud-machine-platform-icon, .am-node svg { width: 15px; height: 15px; display: block; }
+/* The platform icon's own rule draws a 40px tinted tile with a 23px glyph; inside a lane node
+   it is only the glyph, centred and in the node's colour. */
+.am-node .cloud-machine-platform-icon { width: 100%; height: 100%; background: none; border-radius: 0; color: inherit; }
+.am-node .cloud-machine-platform-icon svg, .am-node > svg { width: 15px; height: 15px; display: block; }
 .am-ln { flex: 1; height: 2px; background: #33333a; border-radius: 1px; }
 .am-lane.on .am-lane-k { color: var(--ink); font-weight: 600; }
 .am-lane.on .am-ln { background: #8a8a93; }
