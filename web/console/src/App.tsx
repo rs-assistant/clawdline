@@ -947,15 +947,20 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
           className="brand"
           id="brand"
           type="button"
-          aria-label={T.webMenu}
-          title={T.webMenu}
+          aria-label={nextWord(menu ? "sidebarHide" : "sidebarShow")}
           aria-controls="sidebar"
           aria-expanded={menu}
           ref={brandRef}
           onClick={() => (menu ? closeMenu() : setMenu(true))}
         >
-          <canvas id="brand-mark" width={0} height={0} ref={markRef} />
+          <span className="brand-handle" aria-hidden="true">
+            <canvas id="brand-mark" width={0} height={0} ref={markRef} />
+            <svg className="brand-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <path d="m6 4 4 4-4 4" />
+            </svg>
+          </span>
           <b>clawdline</b>
+          <span className="brand-tooltip" aria-hidden="true">{nextWord(menu ? "sidebarHide" : "sidebarShow")}</span>
         </button>
         {!hideSessionCounts && <Counts
           reading={sessionCountState(fleet)}

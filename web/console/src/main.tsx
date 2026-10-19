@@ -41,6 +41,7 @@ import "./side-border-overrides.css"
 
 import "./shell.css"
 import "./sidebar-scroll.css"
+import "./brand-handle.css"
 import "./font-scale.css"
 
 import { restoreFontScale } from "./font-scale.js"

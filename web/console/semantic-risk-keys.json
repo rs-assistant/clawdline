@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6888,
+  "englishKeys": 6890,
   "counts": {
     "negation": 2071,
-    "state": 1137,
+    "state": 1138,
     "permission": 419,
     "deletion": 178,
     "uncertainty": 191
   },
-  "unionCount": 3137,
+  "unionCount": 3138,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -2990,6 +2990,7 @@
       "next.sessionWaitingOnWork",
       "next.sessionsListWaitHint",
       "next.sessionsMachineOfflineLine",
+      "next.sidebarShow",
       "next.signedInCapsSendTerminal",
       "next.signedInLede",
       "next.signedInRevokeAsk",
@@ -6598,6 +6599,7 @@
     "next.sessionsListWaitHint",
     "next.sessionsMachineOfflineHint",
     "next.sessionsMachineOfflineLine",
+    "next.sidebarShow",
     "next.sidebarVersionUnknown",
     "next.signedInCapsSendTerminal",
     "next.signedInFailed",

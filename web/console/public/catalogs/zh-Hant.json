@@ -4575,6 +4575,8 @@
   "next.msForgetKeeps": "機器上的 Session 與檔案不受影響，照樣在跑。",
   "next.msForgetConfirm": "輸入機器名稱以確認",
   "next.msForgetGo": "移除",
+  "next.sidebarShow": "開啟側邊欄",
+  "next.sidebarHide": "收合側邊欄",
   "projects.activityInProgress": "{n} 項進行中",
   "projects.activityLastKnown": "上次紀錄：{n}",
   "projects.activityNone": "目前無進行中項目",
