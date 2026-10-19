@@ -697,7 +697,7 @@
     padding: 8px 12px;
   }
   .sw-strip-mark {
-    grid-row: 1 / span 2;
+    grid-row: 1 / span 3;
     margin-right: 0;
   }
   .sw-tab {

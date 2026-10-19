@@ -774,6 +774,72 @@ let origin: string
 const DESK = { width: 1280, height: 800, mobile: false }
 const PHONE = { width: 390, height: 844, mobile: true }
 
+test("localization batch renders Sessions and Settings without page overflow", async () => {
+  const supported = ["en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"]
+  const requested = process.env.CLAWDLINE_LOCALES?.split(",") ?? supported
+  for (const tag of requested) {
+    assert.ok(supported.includes(tag), `unsupported evidence locale ${tag}`)
+    for (const [sizeName, size] of [["desktop", DESK], ["phone", PHONE]] as const) {
+      await inTab(size, async (tab) => {
+        await tab.go("/")
+        await tab.run(`localStorage.setItem("ui_language", ${JSON.stringify(tag)})`)
+        await tab.reload()
+        await tab.until(`${tag} Sessions arrive`, (seen) => seen.rows === ROWS.length)
+        const locale = await tab.run(`({ lang: document.documentElement.lang,
+          missing: document.documentElement.getAttribute("data-i18n-missing"),
+          booting: document.documentElement.classList.contains("booting") })`)
+        // Progress captures may precede a new source family's catch-up. The
+        // default acceptance run still requires every current key.
+        const reference = JSON.parse(readFileSync(join(dist, "catalogs", "en.json"), "utf8"))
+        const selected = JSON.parse(readFileSync(join(dist, "catalogs", `${tag}.json`), "utf8"))
+        const expectedMissing = process.env.CLAWDLINE_ALLOW_PARTIAL === "1"
+          ? Object.keys(reference).filter((key) => !Object.hasOwn(selected, key)).length : 0
+        assert.deepEqual(locale, { lang: tag, missing: String(expectedMissing), booting: false })
+        assert.ok((await tab.run(`document.getElementById("counts")?.textContent ?? ""`)).includes(selected["literal.1b40e6344265"]), `${tag} Session summary uses the selected catalog`)
+        const assertPageFits = async (page: string) => {
+          const bounds = await tab.run(`({ width: innerWidth,
+            page: Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) })`)
+          assert.ok(bounds.page <= bounds.width + 1, `${tag} ${sizeName} ${page} overflows: ${JSON.stringify(bounds)}`)
+        }
+        await assertPageFits("Sessions")
+        if (shots) {
+          mkdirSync(shots, { recursive: true })
+          await tab.shot(`${tag}-${sizeName}-sessions`)
+        }
+        await tab.run(`location.hash = "page=settings"`)
+        await tab.run(`new Promise((resolve, reject) => {
+          const deadline = Date.now() + 5000
+          const wait = () => document.getElementById("settings-ui-language-select")?.offsetWidth
+            ? resolve(true) : Date.now() < deadline ? setTimeout(wait, 50) : reject(new Error("Settings did not open"))
+          wait()
+        })`)
+        const expected = JSON.parse(readFileSync(join(dist, "catalogs", `${tag}.json`), "utf8"))["ui.language"]
+        assert.equal(await tab.run(`document.getElementById("settings-ui-language-select")?.getAttribute("aria-label")`), expected)
+        await assertPageFits("Settings")
+        if (shots) await tab.shot(`${tag}-${sizeName}-settings`)
+      })
+    }
+  }
+})
+
+test("redemption copy waits for the selected catalog on a cold Plan page", async () => {
+  for (const tag of ["en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"]) {
+    await inTab(PHONE, async (tab) => {
+      await tab.go("/")
+      await tab.run(`localStorage.setItem("ui_language", ${JSON.stringify(tag)}); location.hash = "page=plan"`)
+      await tab.reload()
+      const selected = JSON.parse(readFileSync(join(dist, "catalogs", `${tag}.json`), "utf8"))
+      const deadline = Date.now() + 5000
+      while (await tab.run(`document.getElementById("plan-promo-title")?.textContent`) !== selected["promo.title"]) {
+        if (Date.now() > deadline) assert.fail(`${tag} cold Plan redemption did not use its catalog`)
+        await new Promise(resolve => setTimeout(resolve, 30))
+      }
+      assert.equal(await tab.run(`document.getElementById("plan-promo-label")?.textContent`), selected["promo.label"])
+      assert.equal(await tab.run(`document.getElementById("plan-promo-message")?.textContent`), selected["promo.elsewhere"])
+    })
+  }
+})
+
 before(async () => {
   assert.ok(existsSync(join(dist, "index.html")), "no built console at " + dist + "; run `npm run build` in web first")
   assert.ok(existsSync(chrome), "no Chrome at " + chrome + "; set CHROME")
@@ -841,7 +907,7 @@ test("browser language selector survives reload and a broken catalog falls back 
     const assertVisibleLocale = async (tag: string) => {
       const expected = JSON.parse(readFileSync(join(dist, "catalogs", `${tag}.json`), "utf8"))["ui.language"]
       const seen = await tab.run(`(() => {
-        const label = document.querySelector('label[for="settings-ui-language-select"]')
+        const label = document.querySelector('#settings-ui-language .ui-language-label')
         return { text: label?.textContent, lang: label?.lang, dir: document.documentElement.dir,
           missing: document.documentElement.getAttribute('data-i18n-missing') }
       })()`)
@@ -851,8 +917,14 @@ test("browser language selector survives reload and a broken catalog falls back 
     const select = async (tag: string) => {
       await tab.run(`(() => {
         const input = document.getElementById("settings-ui-language-select")
-        input.value = ${JSON.stringify(tag)}
-        input.dispatchEvent(new Event("change", { bubbles: true }))
+        input.click()
+      })()`)
+      await tab.run(`(() => {
+        const names = { en: "English", "zh-Hant": "繁體中文", ja: "日本語", "zh-Hans": "简体中文", ko: "한국어", es: "Español", "pt-BR": "Português (Brasil)", fr: "Français", de: "Deutsch" }
+        const option = [...document.querySelectorAll('#settings-ui-language [role="option"]')]
+          .find((item) => item.querySelector('.choice-menu-text')?.textContent === names[${JSON.stringify(tag)}])
+        if (!option) throw new Error("language option is missing")
+        option.click()
       })()`)
       const until = Date.now() + 5000
       for (;;) {
@@ -874,7 +946,7 @@ test("browser language selector survives reload and a broken catalog falls back 
     }
     await assertVisibleLocale("zh-Hant")
     for (const tag of ["ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de", "en"] as const) {
-      await tab.run(`localStorage.setItem("ui_language", ${JSON.stringify(tag)})`)
+      await select(tag)
       await tab.reload()
       const until = Date.now() + 5000
       for (;;) {

@@ -1,22 +1,14 @@
-/*
- * The operations pages' addresses and own words, in the two languages every product change
- * carries (docs/localization.md). The page stands outside the console, before
- * any catalog is loaded, so it holds a small table of its own; every other
- * language reads the English one.
- *
- * Nothing is imported at run time, so `node --test` loads it as it is.
- */
+/* Operations source copy and routes. The validated public catalog supplies displayed copy. */
+// @ts-expect-error -- Node's strip-types tests import this module directly.
+import { bootCatalog, catalogWord } from "../../catalog.ts"
+// @ts-expect-error -- Node's strip-types tests import this module directly.
+import { catalogURL, type StringsConfig } from "../strings.ts"
 
 export type AdminLocale = "en" | "zh-TW"
 
-/** Taiwan Traditional Chinese for any Traditional Chinese preference; English for the rest. */
-export function adminLocale(languages: readonly string[]): AdminLocale {
-  for (const raw of languages) {
-    const tag = raw.toLowerCase()
-    if (tag === "zh-tw" || tag === "zh-hk" || tag === "zh-mo" || tag.startsWith("zh-hant")) return "zh-TW"
-    if (tag === "en" || tag.startsWith("en-")) return "en"
-  }
-  return "en"
+/** Catalog loading needs only the public build declaration, never a paired machine. */
+export function bootAdminCatalog(config: StringsConfig | null, baseURI: string, get: typeof fetch = fetch) {
+  return bootCatalog((tag) => catalogURL(config ?? { build: "", strings: {} }, tag, baseURI), get)
 }
 
 /* ---- the pages and their addresses --------------------------------------- */
@@ -704,9 +696,9 @@ const TABLES: Record<AdminLocale, Record<AdminWord, string>> = { en, "zh-TW": zh
 
 export type Say = (key: AdminWord, values?: Record<string, string | number>) => string
 
-/** The sentence for `key` in `locale`, with `{name}` placeholders filled. */
-export function adminWords(locale: AdminLocale): Say {
-  const table = TABLES[locale]
+/** Runtime copy uses the active catalog; an explicit source locale supports pure source checks. */
+export function adminWords(locale?: AdminLocale): Say {
+  const table = locale ? TABLES[locale] : null
   return (key, values) =>
-    table[key].replace(/\{(\w+)\}/g, (whole, name: string) => (values && name in values ? String(values[name]) : whole))
+    (table ? table[key] : catalogWord("admin", key)).replace(/\{(\w+)\}/g, (whole, name: string) => (values && name in values ? String(values[name]) : whole))
 }

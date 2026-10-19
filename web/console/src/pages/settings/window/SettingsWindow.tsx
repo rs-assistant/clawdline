@@ -386,7 +386,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     ...(VOICE_ENABLED ? [W.settingsVoice] : []),
     W.settingsRemote,
     W.settingsOrchestrator,
-    /^zh(?:-|$)/i.test(document.documentElement.lang) ? "派工規則" : "Dispatch rules",
+    catalogWord("dispatchPolicy", "navTitle"),
     ...(HOOKS_ENABLED ? [W.settingsHooks] : []),
   ]
 

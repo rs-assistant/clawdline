@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { chooseTransport, cloudViewerDeviceMetadata, newCloudSession, readCloudConfig, type CloudConfig, type EnsuredSession } from "../copied.js"
 import { DeviceLimitPanel } from "../DeviceLimitPanel.js"
-import { bootCatalog } from "../../catalog.js"
-import { catalogURL } from "../strings.js"
+import { currentCatalogTag } from "../../catalog.js"
 import { AccountsPage, OverviewPage, RouteLink, UsagePage, type Go } from "./AdminDashboard.js"
 import { PromoManagement } from "./PromoManagement.js"
 import { DemoPromotions } from "./DemoPromotions.js"
 import { demoOverview } from "./demo.js"
 import { mayLeaveCode } from "./navigation-guard.js"
 import { loadOverview, type Overview } from "./api.js"
-import { ADMIN_ROUTES, adminLocale, adminPath, adminRoute, adminWords, type AdminRoute, type Say } from "./words.js"
+import { ADMIN_ROUTES, adminPath, adminRoute, adminWords, bootAdminCatalog, type AdminRoute, type Say } from "./words.js"
 import "./admin.css"
 import { BRAND_MARK } from "../../brand-mark.js"
 
@@ -54,8 +53,8 @@ function failureCode(error: unknown): string {
 
 export function AdminGate({ declared }: { declared: string }) {
   const config = useMemo(() => configFrom(declared), [declared])
-  const locale = useMemo(() => adminLocale(navigator.languages?.length ? navigator.languages : [navigator.language]), [])
-  const say: Say = useMemo(() => adminWords(locale), [locale])
+  const [locale, setLocale] = useState(currentCatalogTag())
+  const say = useMemo(() => adminWords(), [])
   const [phase, setPhase] = useState<Phase>(config ? { kind: "checking" } : { kind: "misdeclared" })
   const [catalogReady, setCatalogReady] = useState(false)
   const [demo, setDemo] = useState(false)
@@ -63,22 +62,19 @@ export function AdminGate({ declared }: { declared: string }) {
   const session = useRef<SessionHandle | null>(null)
   const generation = useRef(0)
 
-  useEffect(() => {
-    document.documentElement.lang = locale
-    document.documentElement.dir = "ltr"
-    document.documentElement.classList.remove("booting")
-  }, [locale, say])
+  useLayoutEffect(() => {
+    if (catalogReady) document.documentElement.classList.remove("booting")
+  }, [catalogReady])
 
   useEffect(() => {
-    if (!config) return
     let active = true
-    void bootCatalog((tag) => catalogURL(config, tag, document.baseURI)).finally(() => {
+    void bootAdminCatalog(config, document.baseURI).then((selected) => {
       if (!active) return
-      document.documentElement.lang = locale
+      setLocale(selected)
       setCatalogReady(true)
     })
     return () => { active = false }
-  }, [config, locale])
+  }, [config])
 
   const fetchOverview = useCallback(async (keep: Overview | null) => {
     if (!config) return
@@ -168,7 +164,7 @@ export function AdminGate({ declared }: { declared: string }) {
 
   useEffect(() => {
     document.title = navigable ? say("docTitlePage", { page: pageTitle }) : say("docTitle")
-  }, [navigable, pageTitle, say])
+  }, [navigable, pageTitle, say, locale])
 
   if (!navigable) {
     return (

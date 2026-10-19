@@ -15,7 +15,9 @@
 
 /* `.composer .waiting .go`: the small rounded button a card above the box
    already offers, less its top margin, since this one sits in a row. */
+.entry.pending .pending-state > span { min-width: 0; overflow-wrap: anywhere; }
 .entry.pending .pending-state .go {
+    flex: 0 0 auto; white-space: nowrap;
     border: 1px solid var(--line); border-radius: 999px;
     background: var(--card); color: var(--dim);
     font-size: 11.5px; padding: 4px 10px;
@@ -36,6 +38,7 @@
 
 /* `.composer .waiting .title .dismiss`: that card's close button, less the float. */
 .entry.pending .pending-state .dismiss {
+    flex: 0 0 auto;
     padding: 2px 7px;
     color: var(--faint); font-size: 15px; line-height: 1;
     border-radius: 6px;

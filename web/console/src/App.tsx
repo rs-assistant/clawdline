@@ -80,7 +80,7 @@ const PAGES: { id: Page; nav: string; icon: SidebarIconName; key?: string; text?
   { id: "sessions", nav: "nav-sessions", icon: "sessions", key: "webSessions", ready: true },
   { id: "projects", nav: "nav-projects", icon: "projects", key: "webProjects", ready: false },
   { id: "usage", nav: "nav-usage", icon: "usage", ready: false },
-  { id: "workflow", nav: "nav-workflow", icon: "workflow", text: "Workflow", ready: false },
+  { id: "workflow", nav: "nav-workflow", icon: "workflow", ready: false },
   { id: "plan", nav: "nav-plan", icon: "plan", key: "webPlan", ready: false },
   { id: "devices", nav: "nav-devices", icon: "devices", key: "webDevices", ready: false },
   { id: "notifications", nav: "nav-notifications", icon: "notifications", ready: false },
@@ -934,7 +934,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
       title={tooOldTitle(p.id)}
     >
       <SidebarIcon name={p.icon} />
-      {p.id === "usage" ? nextWord("usageOverview") : p.id === "notifications" ? nextWord("notificationNav") : p.key ? T[p.key] : p.text}
+      {p.id === "usage" ? nextWord("usageOverview") : p.id === "notifications" ? nextWord("notificationNav") : p.id === "workflow" ? catalogWord("workflow", "workflow") : p.key ? T[p.key] : p.text}
       {tooOldMark(p.id)}
     </button>
   )

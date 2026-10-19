@@ -250,7 +250,7 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
       if (!live) return
       if (!workflowSourceMatches({ source }, answer.file)) { setWorkflowSourceStatus("unavailable"); return }
       setWorkflowPreview({ id: currentWorkflow.id, name: workflowSourceTitle(answer.file), version: answer.version,
-        body: workflowSourceText(answer.file, document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en").body })
+        body: workflowSourceText(answer.file).body })
       setWorkflowSourceStatus("ready")
     }).catch(() => { if (live) setWorkflowSourceStatus("unavailable") })
     return () => { live = false }
@@ -271,8 +271,7 @@ function Sheet({ row, steward, onClose }: { row: SessionRow; steward: boolean; o
         if (!workflowSourceMatches({ source }, answer.file)) {
           setWorkflowError(W("sourceStartUnavailable")); launching.current = false; setStartingWorkflow(false); return
         }
-        launchBody = workflowSourceText(answer.file,
-          document.documentElement.lang.toLowerCase().startsWith("zh-hant") ? "zh-Hant" : "en").body
+        launchBody = workflowSourceText(answer.file).body
         if (!workflowPreview || workflowPreview.id !== currentWorkflow.id || workflowPreview.body !== launchBody ||
             workflowPreview.name !== workflowSourceTitle(answer.file) || workflowPreview.version !== answer.version) {
           setWorkflowPreview({ id: currentWorkflow.id, name: workflowSourceTitle(answer.file), version: answer.version, body: launchBody })

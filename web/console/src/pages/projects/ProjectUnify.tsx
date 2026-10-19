@@ -1,3 +1,4 @@
+import { nextWord } from "../../next-strings.js"
 import { catalogFormat } from "../../catalog.js"
 import { catalogWord } from "../../catalog.js"
 import { showModalWithoutChoice } from "../../modal-focus.js"
@@ -38,7 +39,7 @@ type Stopped ={ ran: ProjectUnifyAction[]; failed?: ProjectUnifyAction; reason: 
 function Columns({ columns }: { columns: SeenColumn[] }) {
   return <div className="project-unify-columns">
     {columns.map(column => <section key={column.assistant} className="project-unify-column" aria-labelledby={`project-unify-col-${column.assistant}`}>
-      <h4 id={`project-unify-col-${column.assistant}`}>{column.title} {catalogWord("inline", "da38f5af745f")}</h4>
+      <h4 id={`project-unify-col-${column.assistant}`}>{nextWord("unifyVisibleTo", { assistant: column.title })}</h4>
       <ul>
         {column.rows.length === 0 && <li className="project-unify-empty">{catalogWord("inline", "dca1ae03a159")}</li>}
         {column.rows.map(row => <li key={row.key} className={`project-unify-seen is-${row.mark}`}>
