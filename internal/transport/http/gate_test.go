@@ -92,6 +92,8 @@ func refusalCode(rec *httptest.ResponseRecorder) string {
 // body or none.
 func TestGateChangeChecks(t *testing.T) {
 	f, h := newGateFixture(t)
+	// The named tunnel's hostname, as `remote_hostname` sets it.
+	f.g.setHostname("box.example.com")
 	const board = `{"operation":"note","requestId":"r","expectedRevision":0,"actor":"t"}`
 	cookie := "clawdline-next=" + f.send
 	here := "http://127.0.0.1:7757"
@@ -182,17 +184,20 @@ func TestGateChangeChecks(t *testing.T) {
 			call{path: "/v1/board", host: "[::1]:7757", body: board, headers: map[string]string{
 				"Origin": "http://[::1]:7757", "Cookie": cookie, "Content-Type": "application/json"}}, 200},
 		{"through a tunnel",
-			call{path: "/v1/board", host: "abc.trycloudflare.com", body: board, headers: map[string]string{
-				"Origin": "https://abc.trycloudflare.com", "X-Forwarded-Proto": "https", "Cookie": cookie, "Content-Type": "application/json"}}, 200},
+			call{path: "/v1/board", host: "box.example.com", body: board, headers: map[string]string{
+				"Origin": "https://box.example.com", "X-Forwarded-Proto": "https", "Cookie": cookie, "Content-Type": "application/json"}}, 200},
 		{"through a tunnel, the default port written out",
-			call{path: "/v1/board", host: "abc.trycloudflare.com", body: board, headers: map[string]string{
-				"Origin": "https://ABC.trycloudflare.com:443", "X-Forwarded-Proto": "https", "Cookie": cookie, "Content-Type": "application/json"}}, 200},
-		{"through a tunnel, another quick tunnel's page",
-			call{path: "/v1/board", host: "abc.trycloudflare.com", body: board, headers: map[string]string{
-				"Origin": "https://evil.trycloudflare.com", "X-Forwarded-Proto": "https", "Cookie": cookie, "Content-Type": "application/json"}}, 403},
+			call{path: "/v1/board", host: "box.example.com", body: board, headers: map[string]string{
+				"Origin": "https://BOX.example.com:443", "X-Forwarded-Proto": "https", "Cookie": cookie, "Content-Type": "application/json"}}, 200},
+		{"through a tunnel, another page under the same domain",
+			call{path: "/v1/board", host: "box.example.com", body: board, headers: map[string]string{
+				"Origin": "https://evil.example.com", "X-Forwarded-Proto": "https", "Cookie": cookie, "Content-Type": "application/json"}}, 403},
 		{"through a tunnel, an http page",
+			call{path: "/v1/board", host: "box.example.com", body: board, headers: map[string]string{
+				"Origin": "http://box.example.com", "X-Forwarded-Proto": "https", "Cookie": cookie, "Content-Type": "application/json"}}, 403},
+		{"the removed quick tunnel's suffix is somebody else's",
 			call{path: "/v1/board", host: "abc.trycloudflare.com", body: board, headers: map[string]string{
-				"Origin": "http://abc.trycloudflare.com", "X-Forwarded-Proto": "https", "Cookie": cookie, "Content-Type": "application/json"}}, 403},
+				"Origin": "https://abc.trycloudflare.com", "X-Forwarded-Proto": "https", "Cookie": cookie, "Content-Type": "application/json"}}, 403},
 	} {
 		rec := tc.call.do(h)
 		if rec.Code != tc.want {

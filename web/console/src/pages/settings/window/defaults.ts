@@ -40,6 +40,7 @@ export const DEFAULTS = {
   remote: false,
   remote_tunnel: "off",
   remote_hostname: "",
+  tailscale_hostname: "",
   push_on_delivery: true,
   push_on_fanout: true,
   smart_notifications: false,

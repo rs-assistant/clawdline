@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6885,
+  "englishKeys": 6888,
   "counts": {
-    "negation": 2071,
-    "state": 1137,
+    "negation": 2073,
+    "state": 1138,
     "permission": 419,
     "deletion": 178,
     "uncertainty": 191
   },
-  "unionCount": 3137,
+  "unionCount": 3139,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -1941,7 +1941,9 @@
       "settings.settingsRemoteHint",
       "settings.settingsSessionTerminalHint",
       "settings.settingsStateHookHint",
+      "settings.settingsTailscaleHint",
       "settings.settingsTunnelHint",
+      "settings.settingsTunnelQuickRetired",
       "settings.settingsVoiceLanguageHint",
       "settings.voiceBinaryHint",
       "settings.voiceLanguageDetectBare",
@@ -3100,6 +3102,7 @@
       "settings.settingsSessionTerminal",
       "settings.settingsSessionTerminalHint",
       "settings.settingsSmartNotificationsHint",
+      "settings.settingsTunnelQuickRetired",
       "settings.settingsVoiceLanguageHint",
       "settings.voiceInstallingModel",
       "settings.webCloudManagedElsewhere",
@@ -6890,7 +6893,9 @@
     "settings.settingsSessionTerminalHint",
     "settings.settingsSmartNotificationsHint",
     "settings.settingsStateHookHint",
+    "settings.settingsTailscaleHint",
     "settings.settingsTunnelHint",
+    "settings.settingsTunnelQuickRetired",
     "settings.settingsVoiceLanguageHint",
     "settings.voiceBinaryHint",
     "settings.voiceInstallingModel",

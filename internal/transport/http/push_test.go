@@ -377,7 +377,7 @@ func TestTheShellsTypesAreRegistered(t *testing.T) {
 func TestABrowserOnThisMachinesOwnNetworkKeepsItsOwnOrigin(t *testing.T) {
 	for _, origin := range []string{
 		"http://127.0.0.1:7727",
-		"https://calm-river-1234.trycloudflare.com",
+		"https://machine.tailnet-example.ts.net",
 		// No Origin at all is no origin stored, which is what keeps an old row
 		// on the service worker's payload rather than a guessed address.
 		"",

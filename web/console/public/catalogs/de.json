@@ -4107,7 +4107,6 @@
   "settings.settingsTunnelHint": "cloudflared verbindet sich von dieser Maschine nach außen - keine Portweiterleitung und nichts hört auf Ihr Netzwerk. Es beginnt erst, nachdem ein Gerät gepaart wurde, denn hinter dem Tunnel befinden sich alle Repository-Namen und Arbeitstitel auf dieser Maschine.",
   "settings.settingsTunnelHostname": "Hostname",
   "settings.settingsTunnelNamed": "Meine eigene Domain",
-  "settings.settingsTunnelQuick": "Automatisch generierte URL",
   "settings.settingsVoice": "Spracheingabe",
   "settings.settingsVoiceLanguage": "Erkennungssprache",
   "settings.settingsVoiceLanguageFollow": "Clawdline-Einstellung übernehmen",

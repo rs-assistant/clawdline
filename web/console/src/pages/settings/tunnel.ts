@@ -6,10 +6,10 @@ import { remoteReading, type MachineOnly } from "./remote-reading.ts"
 /**
  * `/v1/tunnel`, what this daemon's cloudflared is doing (api/v1/tunnel.schema.json).
  *
- * Behind **this machine's own token**, like the Cloud line's status and for a
- * sharper reason: while a quick tunnel is up, its address is the access. So a
- * paired phone reading this window gets a refusal, and the card says it could
- * not read rather than drawing a tunnel that is off.
+ * Behind **this machine's own token**, like the Cloud line's status: it names
+ * the binary, the command line and the state directory. So a paired phone
+ * reading this window gets a refusal, and the card says it could not read
+ * rather than drawing a tunnel that is off.
  *
  * A refusal is null rather than a throw, as `readCloudStatus` answers it.
  */

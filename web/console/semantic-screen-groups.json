@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6885,
-  "riskKeys": 3137,
-  "nonRiskCount": 3748,
+  "englishContentKeys": 6888,
+  "riskKeys": 3139,
+  "nonRiskCount": 3749,
   "groups": [
     {
       "name": "admin / other",
@@ -3574,7 +3574,7 @@
     },
     {
       "name": "settings / other",
-      "count": 126,
+      "count": 127,
       "sources": [
         "src/pages/settings/window/copy.ts"
       ],
@@ -3656,6 +3656,7 @@
         "settings.settingsSmartNotifications",
         "settings.settingsStateHook",
         "settings.settingsStop",
+        "settings.settingsTailscaleHostname",
         "settings.settingsTerminal",
         "settings.settingsTextSize",
         "settings.settingsTitle",
@@ -3663,7 +3664,7 @@
         "settings.settingsTunnel",
         "settings.settingsTunnelHostname",
         "settings.settingsTunnelNamed",
-        "settings.settingsTunnelQuick",
+        "settings.settingsTunnelQuickRetiredDone",
         "settings.settingsVoice",
         "settings.settingsVoiceLanguage",
         "settings.settingsVoiceLanguageFollow",

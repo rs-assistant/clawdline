@@ -109,17 +109,18 @@ focus、git、image、places、resume、schedule、screen、shell、skills、sni
   撤銷到沒有裝置時，正在跑的 tunnel 會被關掉。另外 `remote`（「讓瀏覽器或你的手機看得到你的 session」）
   關著也拒絕：Swift 的理由（本機 server 沒開）在這裡不成立，保留的理由是它是使用者對「可被這台機器以外連到」
   的同意。
-- **兩種模式**：`quick`（`--url http://127.0.0.1:<port>`，位址從 banner 讀，等到第一條連線註冊才公布）與
-  `named`（`run <remote_tunnel_name>`，位址是 `https://<remote_hostname>`，YAML 裡只有這一條 ingress
-  加上 404）。所有來自設定的值在 YAML 裡都是雙引號字串，名稱與 hostname 另有格式檢查。
-- **看得見**：`GET /v1/tunnel`（只有本機 token；quick tunnel 的位址本身就是通行證）、`clawdline tunnel`、
+- **只剩 `named` 一種模式**（`run <remote_tunnel_name>`，位址是 `https://<remote_hostname>`，YAML 裡
+  只有這一條 ingress 加上 404）。`quick`（`*.trycloudflare.com` 的臨時位址）在 2026-10-19 移除：
+  設定檔裡還寫著 `quick` 時讀成 `off`、不啟動任何東西，設定頁顯示一次說明（建議改用 Tailscale Serve
+  或 Clawdline Cloud）；`/v1/settings` 不再接受它，閘門也不再放行 `*.trycloudflare.com`。所有來自設定的值在 YAML 裡都是雙引號字串，名稱與 hostname 另有格式檢查。
+- **看得見**：`GET /v1/tunnel`（只有本機 token：它列出 binary、命令列與狀態目錄）、`clawdline tunnel`、
   設定視窗「遠端」分頁 hostname 下方的卡片（off／…／位址／原因，字照 `Settings.swift` 的 `refreshTunnel`）。
 - **閘門的 hostname 跟著同一次讀取更新**，named tunnel 改了 hostname 不必重啟 daemon。
 - **不留孤兒**：SIGINT／SIGTERM 時先收掉 cloudflared 再把訊號照原樣重拋；SIGKILL 接不到，所以子行程的 pid
   記在 `cloudflared.pid`，下次啟動時只有在該 pid 的命令列確實帶著這個目錄的 `--config` 時才停掉它，
   讀不到行程表就什麼都不做。
 - 已知沒做：真的 cloudflared 連到 Cloudflare 的那一段沒有實測（驗收只到「被正確呼叫、參數正確」與真 binary
-  的 `--help` 認得這些參數）；Windows 上不收孤兒（沒有 `ps`）；`quick` 位址會寫進 daemon log 一次（同 Swift）。
+  的 `--help` 認得這些參數）；Windows 上不收孤兒（沒有 `ps`）。
 
 ## 終端機：誰能看、誰能打字（2026-09-29）
 

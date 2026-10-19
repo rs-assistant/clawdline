@@ -1165,6 +1165,17 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
           <Row label={W.settingsRemoteServe} hint={W.settingsRemoteHint} first>
             <Switch label={W.settingsRemoteServe} on={!!now("remote")} onChange={flip("remote")} />
           </Row>
+          <Row label={W.settingsTailscaleHostname} hint={W.settingsTailscaleHint}>
+            <MemoField
+              label={W.settingsTailscaleHostname}
+              value={String(now("tailscale_hostname"))}
+              example="my-machine.your-tailnet.ts.net"
+              onCommit={(value) => {
+                if (value === String(reading(snapshotRef.current, "tailscale_hostname"))) return
+                void change({ tailscale_hostname: value })
+              }}
+            />
+          </Row>
         </div>
         <div className="sw-column">
           {!embedded && cloud !== undefined && cloud !== null && cloudSetupBlock()}
@@ -1181,12 +1192,19 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
               value={String(now("remote_tunnel"))}
               options={[
                 { label: W.settingsOff, value: "off" },
-                { label: W.settingsTunnelQuick, value: "quick" },
                 { label: W.settingsTunnelNamed, value: "named" },
               ]}
               onPick={pick("remote_tunnel")}
             />
           </Row>
+          {snapshot?.quick_tunnel_retired ? (
+            <Block>
+              {/* Shown until the tunnel setting is written once: the file still
+                  says `quick`, which now starts nothing and reads as off. */}
+              <Note dot="warn">{W.settingsTunnelQuickRetired}</Note>
+              <Chip onClick={() => void change({ remote_tunnel: "off" })}>{W.settingsTunnelQuickRetiredDone}</Chip>
+            </Block>
+          ) : null}
           <Row label={W.settingsTunnelHostname}>
             <MemoField
               label={W.settingsTunnelHostname}

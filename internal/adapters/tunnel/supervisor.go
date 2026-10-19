@@ -33,8 +33,7 @@ const (
 type Status struct {
 	Phase Phase
 	Mode  Mode
-	// URL is the address, once a connection to the edge is registered; a
-	// quick tunnel's is its secret.
+	// URL is the address, once a connection to the edge is registered.
 	URL string
 	// Reason is why it failed, when it did.
 	Reason string
@@ -107,10 +106,8 @@ const (
 //     obvious version and was wrong there: a stop followed by a start cleared
 //     the flag before the old child's exit was seen, and the corpse of the
 //     tunnel stopped on purpose was charged as a crash of the new one.
-//   - A quick tunnel's banner is remembered and published only when a
-//     connection is registered: the banner comes about a second before the
-//     address can carry anything, and an address that 404s reads as a broken
-//     feature.
+//   - The address is published only when a connection is registered: an
+//     address that cannot carry anything yet reads as a broken feature.
 //   - The address is logged once. The Swift app kept every address it had ever
 //     logged in a set that only grew; this keeps the last.
 //   - A tunnel that outlives its daemon is the worst kind of leak. The Swift
@@ -131,7 +128,6 @@ type Supervisor struct {
 	failures   int
 	startedAt  time.Time
 	retry      *time.Timer
-	pendingURL string
 	complaint  string
 	loggedURL  string
 }
@@ -322,7 +318,6 @@ func (s *Supervisor) launch(plan Plan, credentials string) {
 	p := plan
 	s.running = &p
 	s.startedAt = s.opts.Now()
-	s.pendingURL = ""
 	s.complaint = ""
 	s.status.Command = append([]string{plan.Binary}, args...)
 	s.writePID(cmd.Process.Pid)
@@ -389,30 +384,16 @@ func (s *Supervisor) consider(line string, stamp int) {
 		s.opts.Log("tunnel: %s", c)
 	}
 	plan := *s.running
-	if plan.Mode == Quick {
-		if url := QuickURL(line); url != "" {
-			s.pendingURL = url
-		}
-	}
 	location, ok := RegisteredConnection(line)
-	if !ok {
+	if !ok || plan.Mode != Named {
 		return
 	}
-	switch plan.Mode {
-	case Quick:
-		if s.pendingURL == "" {
-			return
-		}
-		s.announce(s.pendingURL, location)
-	case Named:
-		s.announce("https://"+plan.Hostname, location)
-	}
+	s.announce("https://"+plan.Hostname, location)
 }
 
-// announce publishes the address, and logs it once: a quick tunnel's address
-// exists nowhere else, so the log may be the only copy there ever was — and
-// the log is also what people attach to bug reports, so a reconnection gets a
-// line with the secret part taken out.
+// announce publishes the address, and logs it once in full. The log is also
+// what people attach to bug reports, so a reconnection gets a line with the
+// machine's own name taken out.
 func (s *Supervisor) announce(url, location string) {
 	s.set(PhaseUp, s.running.Mode, url, "")
 	if url != s.loggedURL {
@@ -486,7 +467,6 @@ func (s *Supervisor) halt() {
 	// wanted.
 	s.generation++
 	s.running = nil
-	s.pendingURL = ""
 	s.startedAt = time.Time{}
 	s.status.Attempts = 0
 	c := s.child

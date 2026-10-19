@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "keys": [
     "bar.hintFullscreen",
     "bar.hintKeys",
@@ -4043,7 +4043,6 @@
     "settings.settingsTunnelHint",
     "settings.settingsTunnelHostname",
     "settings.settingsTunnelNamed",
-    "settings.settingsTunnelQuick",
     "settings.settingsVoice",
     "settings.settingsVoiceLanguage",
     "settings.settingsVoiceLanguageFollow",
