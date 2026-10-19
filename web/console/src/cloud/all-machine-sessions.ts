@@ -42,6 +42,18 @@ export interface MachineListPresentation extends SessionListPresentation {
   projection?: ProjectedSession
 }
 
+/** Retain display facts only from the same execution's keyed list cache. */
+export function mergeListPresentation(row: SessionListPresentation,
+  previous?: SessionListPresentation): SessionListPresentation {
+  return {
+    title: row.title,
+    assistant: row.assistant ?? previous?.assistant,
+    icon: row.icon ?? previous?.icon, cwd: row.cwd ?? previous?.cwd,
+    status: row.status ?? previous?.status,
+    observedAt: row.status ? row.observedAt : previous?.observedAt,
+  }
+}
+
 /** A status projection contains no name; never present its routing id as one. */
 export function fleetRowTitle(row: ProjectedSession, presentation: SessionListPresentation | undefined,
   unavailableWord: string, confirmedTitle?: string): string {

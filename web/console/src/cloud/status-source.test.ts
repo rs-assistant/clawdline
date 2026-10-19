@@ -970,3 +970,52 @@ test("execution recovery bypasses a fresh retained old generation and subsequent
   assert.equal(next.rows?.[0].destination.executionGeneration, newer)
   assert.equal(calls.filter((call) => call.startsWith("sessions.list:")).length, 1)
 })
+
+for (const assistant of ["codex", "claude", undefined, "unsupported"]) {
+  test(`a direct list preserves only a recognized assistant (${assistant}) without extra reads`, async () => {
+    const { client, calls } = clientFixture()
+    client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
+    client.listPresentationsForMachine = async (machine: string) => {
+      calls.push("sessions.list:" + machine)
+      return { at: Math.floor(Date.now() / 1000), complete: true,
+        sessions: [{ id: sessionID, execution_generation: executionGeneration, title: "Named work", assistant,
+          status: { state: "idle", work_state: "ready" } }] } as never
+    }
+    const source = statusSource(() => client as never)
+    const signal = new AbortController().signal
+    const first = await source.readMachine(machineID, signal)
+    const second = await source.readMachine(machineID, signal)
+    const presentations = await source.readMachinePresentations?.(machineID, signal)
+    const expected = assistant === "claude" || assistant === "codex" ? assistant : undefined
+    assert.equal(first.kind, "ready")
+    assert.equal(first.rows?.[0]?.assistant, expected)
+    assert.equal(second.rows?.[0]?.assistant, expected)
+    assert.equal(presentations?.[0]?.assistant, expected)
+    assert.deepEqual(calls, ["sessions.list:" + machineID])
+  })
+}
+
+test("a direct list never carries the previous execution's assistant into a new one", async () => {
+  const { client, calls } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, inventory]))
+  let now = Date.now()
+  client.now = () => now
+  let generation = executionGeneration
+  let assistant: string | undefined = "codex"
+  client.listPresentationsForMachine = async (machine: string) => {
+    calls.push("sessions.list:" + machine)
+    return { at: Math.floor(now / 1000), complete: true,
+      sessions: [{ id: sessionID, execution_generation: generation, title: "Named work", assistant,
+        status: { state: "idle", work_state: "ready" } }] } as never
+  }
+  const source = statusSource(() => client as never)
+  const signal = new AbortController().signal
+  assert.equal((await source.readMachine(machineID, signal)).rows?.[0]?.assistant, "codex")
+  generation = "f".repeat(32)
+  assistant = undefined
+  now += 60_001
+  const restarted = await source.readMachine(machineID, signal)
+  assert.equal(restarted.rows?.[0]?.destination.executionGeneration, generation)
+  assert.equal(restarted.rows?.[0]?.assistant, undefined)
+  assert.equal(calls.length, 2)
+})

@@ -127,3 +127,28 @@ func TestTheCloseRouteIsGivenRoomForTheWholeLadder(t *testing.T) {
 		t.Fatalf("a close has %s, which is no more than an ordinary action", closeBudget)
 	}
 }
+
+func TestUnknownWorkCanBeOverriddenOnlyAgainstAFreshOwnedTerminal(t *testing.T) {
+	c := contract.Closeability{State: contract.CloseabilityStateUnknown, Version: "current",
+		Source: contract.CloseSource{Freshness: "current"}, Reasons: []contract.CloseReason{{Code: "own_records_unreadable", Kind: "evidence"}}}
+	for _, tc := range []struct {
+		version string
+		force   bool
+		want    bool
+		code    string
+	}{
+		{"current", false, false, "close_blocked"},
+		{"current", true, true, ""},
+		{"old", true, false, "close_not_proven"},
+		{"", true, false, "close_not_proven"},
+	} {
+		allowed, code := closeEvidenceDecision(c, tc.version, tc.force, false)
+		if allowed != tc.want || code != tc.code {
+			t.Fatalf("%+v: allowed=%v code=%s", tc, allowed, code)
+		}
+	}
+	c.Reasons = append(c.Reasons, contract.CloseReason{Code: "session_inventory_stale", Kind: "evidence"})
+	if allowed, _ := closeEvidenceDecision(c, c.Version, true, false); allowed {
+		t.Fatal("a failed inventory cannot be overridden")
+	}
+}

@@ -105,17 +105,18 @@ func (s *Server) sessions(w http.ResponseWriter, r *http.Request) {
 			WaitingForOmitted int64                        `json:"waiting_for_omitted,omitempty"`
 		}
 		type presentation struct {
-			ID                  string         `json:"id"`
-			Title               string         `json:"title"`
-			CWD                 string         `json:"cwd,omitempty"`
-			ProjectKey          string         `json:"project_key,omitempty"`
-			Icon                *contract.Icon `json:"icon,omitempty"`
-			ExecutionGeneration string         `json:"execution_generation,omitempty"`
-			Status              status         `json:"status"`
+			Assistant           contract.Assistant `json:"assistant,omitempty"`
+			ID                  string             `json:"id"`
+			Title               string             `json:"title"`
+			CWD                 string             `json:"cwd,omitempty"`
+			ProjectKey          string             `json:"project_key,omitempty"`
+			Icon                *contract.Icon     `json:"icon,omitempty"`
+			ExecutionGeneration string             `json:"execution_generation,omitempty"`
+			Status              status             `json:"status"`
 		}
 		rows := make([]presentation, 0, len(snapshot.Sessions))
 		for _, row := range snapshot.Sessions {
-			rows = append(rows, presentation{ID: row.ID, Title: row.Label, CWD: row.CWD, ProjectKey: row.ProjectKey,
+			rows = append(rows, presentation{Assistant: row.Assistant, ID: row.ID, Title: row.Label, CWD: row.CWD, ProjectKey: row.ProjectKey,
 				Icon: row.Icon, ExecutionGeneration: row.ExecutionGeneration,
 				Status: status{SessionID: row.SessionID, EpicParent: row.EpicParent, Persona: row.Persona, State: row.State, WorkState: row.WorkState, WorkNote: row.WorkNote,
 					WorkProvenance: row.WorkProvenance, WorkMovedBy: row.WorkMovedBy,

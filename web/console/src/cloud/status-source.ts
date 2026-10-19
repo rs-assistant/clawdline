@@ -154,6 +154,7 @@ function directList(client: StatusClient, machineID: string, reply: unknown, now
           status.screen_reading === "unavailable" && menu?.source === "transcript")
       return { destination: { machineID, sessionID: String(row!.id),
         executionGeneration: String(row!.execution_generation) }, state: String(status.state),
+      assistant: row!.assistant === "claude" || row!.assistant === "codex" ? row!.assistant : before?.assistant,
       parentSessionID: parentSessionID && parentSessionID !== row!.id ? parentSessionID : before?.parentSessionID,
       machineScope: status.machine_scope === true || before?.machineScope === true,
       coordinatorBound: status.coordinator_bound === true || before?.coordinatorBound === true,

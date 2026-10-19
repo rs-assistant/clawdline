@@ -91,7 +91,6 @@ func TestARefusedCloseArchivesNothing(t *testing.T) {
 	}{
 		{"blocked", func(context.Context) ([]task.Obligation, error) { return owedByIt, nil }, nil, false, "close_blocked"},
 		{"unknown", func(context.Context) ([]task.Obligation, error) { return nil, errors.New("no broker") }, nil, false, "closeability_unknown"},
-		{"unknown, forced", func(context.Context) ([]task.Obligation, error) { return nil, errors.New("no broker") }, nil, true, "closeability_unknown"},
 		{"terminal refused", nil, terminal.StillRunning{Why: "it did not leave"}, false, "close_assistant_running"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -275,5 +274,18 @@ func TestAnArchivedConversationOffThePastListStillResumes(t *testing.T) {
 	missing := "0f1e2d3c-0000-4000-8000-000000000999"
 	if _, err := s.ResumeRecorded(ctx, place, missing, "claude", ""); !errors.As(err, &refusal) || refusal.Code != "not_found" {
 		t.Fatalf("a conversation with no transcript: %v", err)
+	}
+}
+
+func TestPersonCanForceArchiveDespiteUnreadableWork(t *testing.T) {
+	clock := time.Unix(90_000, 0)
+	h := &closeHost{conversation: "conv-1"}
+	a, st := archiveUnder(t, h, &clock)
+	a.Owed = func(context.Context) ([]task.Obligation, error) { return nil, errors.New("no broker") }
+	if _, _, err := a.Archive(context.Background(), "%1", true); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.calls) != 1 || len(archivedRows(t, st)) != 1 {
+		t.Fatal("the confirmed close must close and record once")
 	}
 }

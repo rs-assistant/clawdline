@@ -682,9 +682,8 @@ func (a Actions) Interrupt(ctx context.Context, id string) (session.Session, err
 // The precondition is the same projection the fleet list draws, asked of the
 // same function, so a row that reads `safe` closes and a row that reads
 // `blocked` refuses with the very reasons it was showing. `force` exists
-// because a person may know something the obligations do not, but it cannot
-// override `unknown`: overriding a refusal is a decision, and there is nothing
-// to decide about when the list could not be read.
+// because a person may choose to close despite unfinished or unreadable work.
+// The transport pins that decision to a fresh terminal inventory and version.
 func (a Actions) Close(ctx context.Context, id string, force bool) (session.Session, error) {
 	return a.ClosePinned(ctx, id, force, 0, time.Time{})
 }
@@ -707,9 +706,11 @@ func (a Actions) ClosePinned(ctx context.Context, id string, force bool, pid int
 	c := task.Closeability(s.ID, owed, owedErr)
 	switch c.State {
 	case task.CloseUnknown:
-		return s, Refusal{
-			Code:   "closeability_unknown",
-			Detail: "what this session owes could not be read, and an unreadable list is not an empty one",
+		if !force {
+			return s, Refusal{
+				Code:   "closeability_unknown",
+				Detail: "what this session owes could not be read, and an unreadable list is not an empty one",
+			}
 		}
 	case task.CloseBlocked:
 		if !force {
