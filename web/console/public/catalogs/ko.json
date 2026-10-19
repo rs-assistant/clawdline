@@ -3512,7 +3512,7 @@
   "next.menuUnreadHow": "*메시지를 보내도 이 질문에 답한 것이 아닙니다.* 실시간 화면에서 질문을 확인하거나 메뉴를 취소하세요(기기에서 Esc를 누르는 것과 같습니다). 그런 다음 메시지 입력란에 답변을 입력하세요.",
   "next.menuUnreadSay": "Claude Code가 해당 기기에 메뉴를 표시하고 있지만 Clawdline에서 화면의 선택지를 읽지 못했습니다.",
   "next.menuUnverified": "이 기기는 아직 Clawdline Cloud를 통해 답변이 어느 질문에 해당하는지 확인할 수 없습니다. 해당 기기에서 직접 메뉴에 답하세요.",
-  "next.newBuild": "새로운 Clawdline가 서비스되고 있습니다. 이 페이지는 여전히 오래된 것입니다.",
+  "next.newBuild": "인터페이스가 업데이트되었습니다. 새로고침하여 최신 버전을 사용하세요.",
   "next.newBuildReload": "새로고침",
   "next.noticeManyLeftovers": "완료하지 못한 일이 {n}개 남았습니다.",
   "next.noticeOneLeftover": "완료하지 못한 일이 {n}개 남았습니다.",

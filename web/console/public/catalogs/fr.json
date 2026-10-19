@@ -3512,7 +3512,7 @@
   "next.menuUnreadHow": "*L'envoi d'un message ne répondra pas.* Ouvrez l'écran en direct pour voir ce qu'il demande, ou annulez le menu (comme si vous appuyez sur l'Esc) et puis dites votre réponse dans la boîte de message.",
   "next.menuUnreadSay": "Claude Code affiche un menu sur cette machine, et Clawdline ne pouvait pas lire ses choix à partir de l'écran.",
   "next.menuUnverified": "Cette machine ne peut pas encore vérifier via Clawdline Cloud à quelle question correspond une réponse. Répondez aux menus directement sur la machine.",
-  "next.newBuild": "Une version plus récente de Clawdline est servie. Cette page affiche encore l’ancienne version.",
+  "next.newBuild": "L’interface a été mise à jour. Rechargez la page pour utiliser la dernière version.",
   "next.newBuildReload": "Recharger",
   "next.noticeManyLeftovers": "Travaux non terminés : {n}.",
   "next.noticeOneLeftover": "Travail non terminé : {n}.",

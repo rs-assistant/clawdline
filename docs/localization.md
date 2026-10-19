@@ -161,6 +161,36 @@ the one `en.json` serves; `--write` adds what is missing and resynchronises
 English. It runs inside `npm run check`. The other seven languages keep falling
 back to English by design and are not checked by it.
 
+## Bundled role and Skill display metadata
+
+Bundled role names and summaries and bundled Skill names and purposes are product copy.
+`src/builtin-display-source.json` records their English and Traditional Chinese source values.
+`tools/check-builtin-display.mjs`, called by the source-catalog check, compares that manifest and
+the primary catalogs with the role Markdown frontmatter and the domain Skill table.
+
+`src/builtin-display.ts` translates only recognized built-in identifiers whose complete English
+name and summary/purpose pair matches the recorded source. Unknown identifiers and edited
+metadata keep their wire values. The display helper does not rewrite wire objects, instruction
+bodies, handbooks, immutable versions or source files. Custom and historical authored content
+remains data. The helper may display an unchanged built-in metadata pair in the active language
+without changing its stored snapshot.
+
+## Browser acceptance beyond catalog coverage
+
+A complete key set does not prove that a control uses the catalog, that a translation still
+matches the current flow, or that an expanded child control fits. Bind the redemption form only
+after locale boot; exercise cold navigation as well as in-app arrival. Review the actual labels,
+long tab names, menus, dialogs, empty/error states and recovery actions at phone and desktop
+widths. A document without horizontal overflow can still contain overlapping or clipped controls.
+
+The opt-in browser harness is documented in `web/console/localization-review.md`. It builds the
+actual App and hosted entry points with explicit synthetic dependencies and captures independent
+screenshots, rendered text, errors and geometry for each cell. Fixture contract failures are
+reported separately from product defects. A successful capture is not language approval.
+Synthetic origins do not establish production Cloud acceptance; authenticated relay, account,
+pairing and billing boundaries require their own evidence. Keep the candidate commit and catalog
+hashes with every review, and recheck only the affected states after a correction.
+
 ## Delivery checks
 
 The Console and daemon/CLI inventories must each enumerate the source of every

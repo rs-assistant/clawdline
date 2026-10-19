@@ -7,11 +7,23 @@ import { resolve, join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { randomUUID } from 'node:crypto'
 
-type ReviewState = 'ready' | 'empty' | 'failed' | 'offline' | 'signed-out' | 'forbidden' | 'pairing' | 'stale'
+type ReviewState = 'ready' | 'empty' | 'failed' | 'offline' | 'signed-out' | 'forbidden' | 'pairing' | 'stale' | 'usage-partial' | 'device-limit' | 'device-list-failed' | 'device-ticket-expired' | 'device-revoke-expired'
 type Surface = { id: string; origin: 'app' | 'cloud'; path: string; state: ReviewState; ready: string; action?: string }
 type ReviewManifest = { repo: string; out: string; appOrigin: string; cloudOrigin: string; synthetic: boolean; unsupported: string[] }
 
 export const REVIEW_SURFACES: Surface[] = [
+  ...['ready', 'usage-partial', 'empty', 'failed', 'offline'].map(state => ({ id: 'usage-' + state, origin: 'app' as const, path: '/#page=usage', state: state as ReviewState,
+    ready: state === 'failed' || state === 'offline' ? '#usage [role="alert"]' : '#usage .usage-totals', action: state === 'ready' ? 'usage-controls' : undefined })),
+  ...['device-limit', 'device-list-failed', 'device-ticket-expired', 'device-revoke-expired'].map(state => ({ id: state, origin: 'cloud' as const, path: '/', state: state as ReviewState,
+    ready: state === 'device-list-failed' || state === 'device-ticket-expired' ? '.cloud-device-failure' : '#cloud-devices', action: state === 'device-revoke-expired' ? 'device-revoke-expired' : undefined })),
+  { id: 'device-recent-confirm', origin: 'cloud', path: '/', state: 'device-limit', ready: '#cloud-devices', action: 'device-recent-confirm' },
+  { id: 'device-remove-oldest', origin: 'cloud', path: '/', state: 'device-limit', ready: '#cloud-devices', action: 'device-remove-oldest' },
+  { id: 'board-detail', origin: 'app', path: '/#page=work', state: 'ready', ready: '.work-card-summary', action: 'board-detail' },
+  { id: 'board-edit', origin: 'app', path: '/#page=work', state: 'ready', ready: '.work-card-summary', action: 'board-edit' },
+  { id: 'dispatch-policy', origin: 'app', path: '/settings.html', state: 'ready', ready: '[role="tablist"]', action: 'dispatch-policy' },
+  { id: 'capacity-loaded', origin: 'app', path: '/#page=settings', state: 'ready', ready: '#settings [role="tablist"]', action: 'capacity-loaded' },
+  { id: 'machine-remote', origin: 'app', path: '/settings.html', state: 'ready', ready: '[role="tablist"]', action: 'machine-remote' },
+  { id: 'devices-loaded', origin: 'app', path: '/#page=devices', state: 'ready', ready: '#devices .device-card', action: 'devices-loaded' },
   { id: 'sessions', origin: 'app', path: '/', state: 'ready', ready: '#rows > .row' },
   { id: 'navigation', origin: 'app', path: '/', state: 'ready', ready: '#brand', action: 'navigation' },
   { id: 'session-detail-composer', origin: 'app', path: '/#session=review-session', state: 'ready', ready: '#composer' },
@@ -72,7 +84,7 @@ const results: Record<string, unknown>[] = []
 const repeat = Number(values.repeat || env.REVIEW_REPEAT || 1)
 assert.ok(Number.isInteger(repeat) && repeat >= 1 && repeat <= 10, 'Repeat must be 1..10')
 const fault = values.fault || ''
-assert.ok(['', 'reject-catalog', 'key-id'].includes(fault), 'Unknown negative control')
+assert.ok(['', 'reject-catalog', 'key-id', 'usage-empty'].includes(fault), 'Unknown negative control')
 
 /** Geometry candidates are evidence for review, not a semantic overlap oracle. */
 export async function reviewDOM(page: any, keys: string[]) {
@@ -139,7 +151,13 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
             const url = new URL(route.request().url())
             return url.hostname === '127.0.0.1' || ['data:', 'blob:'].includes(url.protocol) ? route.continue() : route.abort('blockedbyclient')
           })
-          if (fault) await context.route(/\/(?:v1\/strings\?|catalogs\/)/, async (route: any) => {
+          if (fault === 'usage-empty') await context.route('**/v1/usage/overview?*', async (route: any) => {
+            const response = await route.fetch()
+            const data = await response.json()
+            data.totals.parts = { input: 0, cache_read: 0, cache_write: 0, output: 0 }
+            await route.fulfill({ response, json: data })
+          })
+          if (fault && fault !== 'usage-empty') await context.route(/\/(?:v1\/strings\?|catalogs\/)/, async (route: any) => {
             if (new URL(route.request().url()).hostname !== '127.0.0.1') return route.abort('blockedbyclient')
             const response = await route.fetch()
             const catalog = await response.json()
@@ -173,6 +191,68 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
             await page.waitForFunction(() => !document.documentElement.classList.contains('booting'))
             if (surface.id === 'workflow') await page.locator('.workflow-list-card,.workflow-empty').first().waitFor({ state: 'visible' })
             if (surface.id === 'work') await page.locator('#work .work-empty,#work .work-card').first().waitFor({ state: 'visible' })
+            if (surface.action === 'usage-controls') {
+              assert.equal(await page.locator('#usage .usage-chart-control').count(), 2, 'Both daily charts loaded real data')
+              assert.equal(await page.locator('#usage .usage-parts > div').count(), 4, 'Cache categories loaded')
+              await Promise.all([page.waitForResponse((res: any) => res.url().includes('/v1/usage/overview') && res.url().includes('project=review-project-b') && res.status() === 200), page.locator('.usage-project-filter select').selectOption('review-project-b')])
+              await page.locator('.usage-filters .usage-switch button').last().click()
+              await page.locator('.usage-body[aria-busy="false"]').waitFor()
+              assert.equal(await page.locator('.usage-chart-control').first().getAttribute('aria-valuemax'), '28')
+              await page.locator('.usage-chart-head .usage-switch button').last().click()
+              await page.locator('.usage-chart-control').first().focus()
+              await page.keyboard.press('End')
+              assert.equal(await page.locator('.usage-chart-control').first().getAttribute('aria-valuenow'), '28')
+            }
+            if (surface.state === 'device-limit' || surface.state === 'device-revoke-expired') {
+              assert.equal(await page.locator('#cloud-devices > li').count(), 5)
+              assert.equal(await page.locator('#cloud-devices > li').first().getAttribute('data-device'), 'review-oldest', 'Real renderer sorts oldest first')
+            }
+            if (surface.action === 'device-recent-confirm') {
+              await page.locator('[data-device="review-current"] .cloud-device-remove').click()
+              await page.locator('.cloud-device-ask[role="alertdialog"]').waitFor()
+            }
+            if (surface.action === 'device-remove-oldest' || surface.action === 'device-revoke-expired') {
+              const answer = page.waitForResponse((res: any) => res.request().method() === 'DELETE' && res.url().includes('/v1/auth/recovery/devices/review-oldest'))
+              await page.locator('[data-device="review-oldest"] .cloud-device-remove').click()
+              const response = await answer
+              assert.equal(response.status(), surface.action === 'device-revoke-expired' ? 401 : 200)
+              result.mutation = { status: response.status(), body: await response.json(), synthetic: true }
+              if (surface.action === 'device-revoke-expired') await page.locator('#cloud-device-sign-in').waitFor()
+              else await page.locator('[data-cloud-screen="pairing"]').waitFor()
+            }
+            if (surface.action === 'board-detail' || surface.action === 'board-edit') {
+              await page.locator('.work-card-summary').first().click()
+              await page.locator('.work-detail-modal[role="dialog"],.work-item-modal[role="dialog"],.work-created-modal[role="dialog"]').first().waitFor()
+              assert.ok((await page.locator('.work-item-detail-modal').innerText()).includes('合成審查項目'))
+              if (surface.action === 'board-edit') {
+                await page.locator('.work-item-detail-modal .work-card-controls button').filter({ hasText: catalog['inline.e0d4485966bd'] }).click()
+                await page.locator('.work-edit-modal input').waitFor()
+                assert.equal(await page.locator('.work-edit-modal input').inputValue(), '合成審查項目：驗證有資料畫面')
+              }
+            }
+            if (surface.action === 'dispatch-policy') {
+              await page.getByRole('tab').last().click()
+              await page.locator('.sw-policy textarea:not([disabled])').waitFor()
+              assert.ok((await page.locator('.sw-policy textarea').inputValue()).includes('Synthetic local additions'))
+              await page.locator('.sw-policy summary').click()
+              assert.ok((await page.locator('.sw-policy pre').innerText()).includes('Synthetic dispatch rules'))
+            }
+            if (surface.action === 'capacity-loaded') {
+              await page.locator('#settings [role="tab"]').nth(2).click()
+              await page.locator('#settings-capacity-all').click()
+              await page.locator('.cap-rows').waitFor()
+              assert.ok((await page.locator('.cap-rows').innerText()).includes('Synthetic review evidence'))
+            }
+            if (surface.action === 'machine-remote') {
+              await Promise.all([page.waitForResponse((res: any) => res.url().endsWith('/v1/tunnel') && res.status() === 200), page.getByRole('tab').nth(2).click()])
+              await page.locator('#sw-pane-2').waitFor()
+            }
+            if (surface.action === 'devices-loaded') {
+              const diagnostics = await context.request.get(manifest.appOrigin + '/v1/diagnostics')
+              assert.equal(diagnostics.status(), 200)
+              assert.equal((await diagnostics.json()).platform.os, 'linux')
+              assert.equal(await page.locator('#devices-rows .device-card').count(), 1)
+            }
             if (surface.action === 'machine-language-menu') {
               await page.locator('#settings-window-ui-language').click()
               const menu = page.getByRole('listbox')
@@ -268,6 +348,11 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
               assert.ok(tabs.length >= 5 && tabs.every((tab: { width: number; right: number }) => tab.width > 22 && tab.right <= width), 'All settings tabs need readable text columns')
             }
             await page.evaluate(() => document.fonts.ready)
+            if (surface.id.startsWith('usage-') && !['failed', 'offline'].includes(surface.state)) {
+              await page.locator('#usage .usage-duration').scrollIntoViewIfNeeded()
+              await page.screenshot({ path: join(output, stem + '-duration.png'), animations: 'disabled' })
+              await page.locator('#usage-title').scrollIntoViewIfNeeded()
+            }
             result.observedURL = page.url()
             const dom = await reviewDOM(page, Object.keys(english))
             result.dom = dom

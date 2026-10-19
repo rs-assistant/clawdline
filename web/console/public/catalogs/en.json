@@ -3708,7 +3708,7 @@
   "next.menuUnreadHow": "*Sending a message will not answer it.* Open the live screen to see what it asks, or cancel the menu (the same as pressing Esc there) and then say your answer in the message box.",
   "next.menuUnreadSay": "Claude Code is showing a menu on that machine, and Clawdline could not read its choices from the screen.",
   "next.menuUnverified": "This machine cannot check which question an answer is for over Clawdline Cloud, so menus are answered on the machine itself.",
-  "next.newBuild": "A newer Clawdline is being served. This page is still the older one.",
+  "next.newBuild": "The interface has been updated. Reload to use the latest version.",
   "next.newBuildReload": "Reload",
   "next.noticeManyLeftovers": "It left {n} things undone.",
   "next.noticeOneLeftover": "It left {n} thing undone.",

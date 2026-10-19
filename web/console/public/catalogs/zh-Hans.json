@@ -3512,7 +3512,7 @@
   "next.menuUnreadHow": "*直接送消息不会回答它。*打开即时画面看它在问什么，或取消这个菜单（等于在那台机器上按 Esc），再用下面的输入框说你的答案。",
   "next.menuUnreadSay": "Claude Code 正在那台机器上显示一个菜单，Clawdline 没能从画面读出它的选项。",
   "next.menuUnverified": "这台机器经由 Clawdline Cloud 还无法确认答案对应哪一题，请直接到那台机器上作答。",
-  "next.newBuild": "已经有新版的 Clawdline，这个页面还是旧的那一份。",
+  "next.newBuild": "界面已更新，重新加载即可使用。",
   "next.newBuildReload": "重新加载",
   "next.noticeManyLeftovers": "有 {n} 项没完成。",
   "next.noticeOneLeftover": "有 {n} 项没完成。",

@@ -3512,7 +3512,7 @@
   "next.menuUnreadHow": "*メッセージを送信しても、この質問への回答にはなりません。* 実行中の画面を開いて質問を確認するか、メニューを取り消してください（マシン上で Esc を押すのと同じです）。その後メッセージ欄に回答を入力してください。",
   "next.menuUnreadSay": "そのマシンの Claude Code にメニューが表示されていますが、Clawdline は画面から選択肢を読み取れませんでした。",
   "next.menuUnverified": "このマシンでは Clawdline Cloud 経由で回答がどの質問に対応するか確認できません。そのため、メニューにはマシン上で回答してください。",
-  "next.newBuild": "新しいバージョンの Clawdline が配信されています。このページはまだ古いバージョンです。",
+  "next.newBuild": "インターフェースが更新されました。再読み込みすると最新版を使用できます。",
   "next.newBuildReload": "リロード",
   "next.noticeManyLeftovers": "未完了の項目が {n} 件残っています。",
   "next.noticeOneLeftover": "未完了の項目が {n} 件残っています。",
