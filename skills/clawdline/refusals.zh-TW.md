@@ -222,6 +222,7 @@
 | `skill_source_missing` | `internal/transport/http/squad_skill_sources.go` |
 | `skill_unreadable` | `internal/transport/http/skill_install.go` |
 | `snapshot_not_found` | `internal/transport/http/squad.go` |
+| `squad_auto_dispatch_disabled` | `internal/transport/http/squad.go` |
 | `store_busy` | `internal/transport/http/receipts.go`, `internal/transport/http/verify.go` |
 | `store_unavailable` | `internal/transport/http/auth.go`, `internal/transport/http/gate.go`, `internal/transport/http/push.go`, `internal/transport/http/receipts.go`, `internal/transport/http/runs.go`, `internal/transport/http/session_archive.go`, `internal/transport/http/session_restore.go`, `internal/transport/http/squad_actor.go`, `internal/transport/http/squad_events.go`, `internal/transport/http/usage.go`, `internal/transport/http/verify.go`, `internal/transport/http/work.go`, `internal/transport/http/work_v2.go`, `internal/transport/http/work_v2_reference_images.go` |
 | `store_unreadable` | `internal/transport/http/obligations.go`, `internal/transport/http/schedules.go`, `internal/transport/http/snippets.go`, `internal/transport/http/squad.go`, `internal/transport/http/tasks.go` |

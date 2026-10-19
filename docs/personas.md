@@ -152,6 +152,14 @@ share one can export a squad package and review its contents and license before 
 exactly one catalog entry names it. It only suggests a choice: no kind gives a persona to
 anything.
 
+The Squad page has one machine-wide switch, "Automatically choose roles for Child Sessions."
+It defaults on and is stored with this machine's global Squad settings. When off, automatic
+candidate reads and Agent child dispatches naming a role receive
+`squad_auto_dispatch_disabled`; dispatches without a role continue. This applies across Projects
+and does not alter already running Sessions. The person's explicit role choices in Session start
+and Board assignment remain available. Per-role auto-assignment eligibility remains a separate
+setting and is retained while the machine switch is off.
+
 Every persona has a pixel bot. It is eight columns by seven rows, in the same `Icon` shape a
 project's mark uses (`common.schema.json`), and it is defined in `icons.go`.
 

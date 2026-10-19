@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6194,
-  "riskKeys": 2951,
-  "nonRiskCount": 3243,
+  "englishContentKeys": 6199,
+  "riskKeys": 2952,
+  "nonRiskCount": 3247,
   "groups": [
     {
       "name": "bar / other",
@@ -3369,11 +3369,15 @@
     },
     {
       "name": "squad / other",
-      "count": 1,
+      "count": 5,
       "sources": [
         "src/pages/Squad.tsx"
       ],
       "keys": [
+        "squad.autoDispatchTitle",
+        "squad.machineSetting",
+        "squad.off",
+        "squad.on",
         "squad.scrollHint"
       ]
     },

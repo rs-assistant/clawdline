@@ -44,6 +44,7 @@ func TestSquadDispatchRequiresBoundActorAndHonorsDisabledRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	b := &Broker{Store: st, SquadActorRequired: true,
+		SquadAutoDispatchEnabled: func(context.Context) (bool, error) { return true, nil },
 		SquadAutoAssignable: func(_ context.Context, persona, path string) (bool, error) {
 			if persona != "frontend" || path != project {
 				t.Fatalf("unexpected candidate: %q %q", persona, path)
@@ -66,6 +67,9 @@ func TestSquadDispatchRequiresBoundActorAndHonorsDisabledRole(t *testing.T) {
 	check(launch.ActorCapability, "terminal-b", "conversation-a", "session_actor_required")
 	check(launch.ActorCapability, "terminal-a", "conversation-b", "session_actor_required")
 	check(launch.ActorCapability, "terminal-a", "conversation-a", "persona_disabled_for_auto_assignment")
+	b.SquadAutoDispatchEnabled = func(context.Context) (bool, error) { return false, nil }
+	check(launch.ActorCapability, "terminal-a", "conversation-a", "squad_auto_dispatch_disabled")
+	b.SquadAutoDispatchEnabled = func(context.Context) (bool, error) { return true, nil }
 
 	record.Persona = ""
 	record.Root.SessionID = "conversation-a"

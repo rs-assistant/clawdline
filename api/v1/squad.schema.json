@@ -407,6 +407,8 @@
         "scope_kind",
         "motion",
         "motion_settings_version",
+        "auto_dispatch",
+        "auto_dispatch_version",
         "personas"
       ],
       "properties": {
@@ -430,6 +432,8 @@
         "motion_settings_version": {
           "type": "integer"
         },
+        "auto_dispatch": { "$ref": "#/$defs/SquadFieldBool" },
+        "auto_dispatch_version": { "type": "integer" },
         "personas": {
           "type": "array",
           "items": {
@@ -528,8 +532,7 @@
     "SquadMotionRequest": {
       "type": "object",
       "required": [
-        "expected_version",
-        "motion"
+        "expected_version"
       ],
       "properties": {
         "place_id": {
@@ -541,7 +544,8 @@
         "expected_version": {
           "type": "integer"
         },
-        "motion": { "$ref": "#/$defs/SquadInputBool" }
+        "motion": { "$ref": "#/$defs/SquadInputBool" },
+        "auto_dispatch": { "$ref": "#/$defs/SquadInputBool" }
       }
     },
     "SquadWriteReply": {

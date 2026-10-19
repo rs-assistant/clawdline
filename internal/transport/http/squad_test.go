@@ -323,6 +323,49 @@ func TestSquadEffectiveSettingsAcrossProjectsAndPatch(t *testing.T) {
 	}
 }
 
+func TestSquadMachineAutoDispatchSettingPersistsAcrossProjects(t *testing.T) {
+	f := newSquadFixture(t)
+	read := func(path string) contract.SquadEffectiveSettings {
+		t.Helper()
+		status, raw := f.ask("GET", path, f.reader, "", "")
+		var value contract.SquadEffectiveSettings
+		if status != 200 || json.Unmarshal([]byte(raw), &value) != nil {
+			t.Fatalf("read %s: %d %s", path, status, raw)
+		}
+		return value
+	}
+	if initial := read("/v1/squad/settings"); !initial.AutoDispatch.Value || initial.AutoDispatchVersion != 0 {
+		t.Fatalf("default = %+v", initial.AutoDispatch)
+	}
+	write := `{"expected_version":0,"auto_dispatch":{"present":true,"value":false}}`
+	if status, raw := f.ask("PUT", "/v1/squad/motion", f.local, write, "machine-off"); status != 200 || !strings.Contains(raw, `"version":1`) {
+		t.Fatalf("disable = %d %s", status, raw)
+	}
+	for _, path := range []string{"/v1/squad/settings", "/v1/squad/settings?place_id=a", "/v1/squad/settings?place_id=b"} {
+		value := read(path)
+		if value.AutoDispatch.Value || value.AutoDispatchVersion != 1 || !value.Motion.Value {
+			t.Fatalf("setting %s = %+v", path, value)
+		}
+	}
+	if status, raw := f.ask("PUT", "/v1/squad/motion", f.local, write, "machine-stale"); status != 409 || !strings.Contains(raw, `"current_version":1`) {
+		t.Fatalf("stale = %d %s", status, raw)
+	}
+	if status, raw := f.ask("PUT", "/v1/squad/motion", f.local,
+		`{"expected_version":1,"motion":{"present":true,"value":false}}`, "motion-global"); status != 200 {
+		t.Fatalf("motion = %d %s", status, raw)
+	}
+	if value := read("/v1/squad/settings"); value.AutoDispatch.Value || value.Motion.Value {
+		t.Fatalf("motion erased machine setting: %+v", value)
+	}
+	if status, raw := f.ask("PUT", "/v1/squad/motion", f.local,
+		`{"expected_version":2,"auto_dispatch":{"present":true,"value":true}}`, "machine-on"); status != 200 {
+		t.Fatalf("enable = %d %s", status, raw)
+	}
+	if value := read("/v1/squad/settings"); !value.AutoDispatch.Value || value.Motion.Value {
+		t.Fatalf("enable erased motion: %+v", value)
+	}
+}
+
 func TestSquadScopesIncludeProjectsBeforeTheyHaveSettings(t *testing.T) {
 	f := newSquadFixture(t)
 	status, raw := f.ask("GET", "/v1/squad/scopes", f.reader, "", "")

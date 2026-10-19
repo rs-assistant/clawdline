@@ -46,6 +46,7 @@ let globalAutoAssign = true
 let globalAutoVersion = 0
 let globalMotion = true
 let globalMotionVersion = 1
+let globalAutoDispatch = true
 let globalSkillChoices = definitions[0].skills.map((choice) => ({ ...choice }))
 let projectSkillChoices: typeof globalSkillChoices | null = null
 let refuseNextSkillWrite = false
@@ -60,6 +61,8 @@ function settings(scope: string) {
   return {
     scope_id: scope, scope_kind: project ? "repo" : "global", motion: field(globalMotion, "global", globalMotionVersion),
     motion_settings_version: project ? 0 : globalMotionVersion,
+    auto_dispatch: field(globalAutoDispatch, "global", globalMotionVersion),
+    auto_dispatch_version: globalMotionVersion,
     personas: definitions.map((row, index) => ({
       definition_id: row.definition_id, settings_version: project && scope === "project-a" && index === 0 ? projectAVersion : index === 0 && !project ? globalAutoVersion : 0,
       handbook: index === 0 && scope === "project-a" ? field(projectAText, "project", projectAVersion) : field("全域手冊", "global", 1),
@@ -186,8 +189,9 @@ function fixture(): Server {
       const chunks: Buffer[] = []
       req.on("data", (chunk) => chunks.push(chunk))
       req.on("end", () => {
-        const body = JSON.parse(Buffer.concat(chunks).toString() || "{}") as { motion?: { value?: boolean } }
-        globalMotion = !!body.motion?.value
+        const body = JSON.parse(Buffer.concat(chunks).toString() || "{}") as { motion?: { value?: boolean }; auto_dispatch?: { value?: boolean } }
+        if (body.motion) globalMotion = !!body.motion.value
+        if (body.auto_dispatch) globalAutoDispatch = !!body.auto_dispatch.value
         globalMotionVersion++
         json(res, 200, { scope_id: "global", version: globalMotionVersion })
       })
@@ -655,6 +659,20 @@ test("real keys operate the roster, skill, dialog and named switches", async () 
       assert.equal(await evaluate('document.activeElement === document.querySelector("#squad .squad-pack-actions button")'), true)
     })
     await tab(1440, 900, async (evaluate, _shot, { press, axName }) => {
+      const machine = '#squad .squad-machine-toggle input'
+      assert.equal(await evaluate(`document.querySelector(${JSON.stringify(machine)}).checked`), true)
+      await evaluate(`document.querySelector(${JSON.stringify(machine)}).focus()`)
+      await press(" ")
+      const machineDeadline = Date.now() + 5_000
+      while (await evaluate(`document.querySelector(${JSON.stringify(machine)}).checked`)) {
+        if (Date.now() > machineDeadline) throw new Error("machine role dispatch did not turn off")
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      while (await evaluate(`document.querySelector(${JSON.stringify(machine)}).disabled`)) {
+        if (Date.now() > machineDeadline) throw new Error("machine role dispatch save did not settle")
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      }
+      assert.match(await axName(machine), /自動為 Child Session 選擇角色/)
       await evaluate('document.querySelector("#squad .squad-persona-card").focus()')
       await press("Enter")
       const assignment = '#squad .squad-switch input[aria-label^="允許管理 agent 自動指派"]'
