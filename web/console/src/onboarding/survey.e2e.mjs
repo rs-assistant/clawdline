@@ -54,7 +54,7 @@ test("bilingual desktop/mobile survey, settings edits, local consent and lost-re
   let vite, browser
   assert.ok(!existsSync(fixture) && !existsSync(entry), "fixture paths must be task-owned")
   try {
-    writeFileSync(fixture, '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#171614;color:#f2efea;font-family:system-ui;padding:24px;box-sizing:border-box}*{box-sizing:border-box}</style></head><body><div id="root"></div><script type="module" src="/survey-fixture.tsx"></script></body></html>')
+    writeFileSync(fixture, '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui;padding:24px;box-sizing:border-box}*{box-sizing:border-box}</style></head><body><div id="root"></div><script type="module" src="/survey-fixture.tsx"></script></body></html>')
     writeFileSync(entry, `import React from 'react';import {createRoot} from 'react-dom/client';import {bootCatalog} from './src/catalog';import {SurveyStatistics} from './src/onboarding/Statistics';import {SurveyCoordinator,SurveySettingsLink} from './src/onboarding/Survey';import './src/legacy/tokens.css';import './src/legacy/base.css';import './src/legacy/sheets.css';import './src/legacy/pages.css';import './src/legacy/responsive.css';import './src/shell.css';import {page as settingsPage} from './src/pages/settings';import {loadStrings} from './src/legacy/bridge';
 const p=new URLSearchParams(location.search);localStorage.setItem('ui_language',p.get('lang')||'en');
 await bootCatalog(tag=>'/catalogs/'+tag+'.json');await loadStrings(async()=>({}));const Settings=settingsPage.Component;

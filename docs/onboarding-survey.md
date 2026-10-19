@@ -3,7 +3,9 @@
 Clawdline asks three optional questions: the main reason for using the product, current AI
 tools (multiple choice), and discovery source. English and Taiwan Traditional Chinese ship
 together; other interface languages use the English fallback. The form starts with no choices
-selected. A single dark card follows the console's warm orange accent and warm neutral surfaces.
+selected. A single dark card uses the console's existing background, card, text and warm orange accent
+tokens. The survey and statistics selectors share one centred chevron while retaining native
+select interaction.
 
 ## Entry and consent
 
