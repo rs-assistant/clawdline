@@ -7,23 +7,37 @@
 .top .brand:hover,
 .top .brand:active { background: transparent; }
 .brand-handle {
+    position: relative;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
+    justify-content: flex-start;
+    width: 62px;
     min-height: 36px;
     padding: 0 8px;
     border: 1px solid var(--line);
     border-radius: 9px;
     background: var(--card);
 }
+.brand-handle canvas {
+    transition: transform 240ms cubic-bezier(.2, .7, .2, 1);
+}
+.brand[aria-expanded="true"] .brand-handle canvas { transform: translateX(20px); }
 .brand-chevron {
+    position: absolute;
+    left: 8px;
+    top: 50%;
     width: 14px;
     height: 14px;
     flex: 0 0 auto;
     color: var(--dim);
+    opacity: 0;
+    transform: translate(-4px, -50%);
+    transition: opacity 180ms ease, transform 240ms cubic-bezier(.2, .7, .2, 1);
 }
-.brand[aria-expanded="true"] .brand-chevron { transform: rotate(180deg); }
+.brand[aria-expanded="true"] .brand-chevron {
+    opacity: 1;
+    transform: translate(0, -50%);
+}
 .brand:hover .brand-handle,
 .brand:focus-visible .brand-handle,
 .brand[aria-expanded="true"] .brand-handle {
@@ -50,4 +64,8 @@
 .brand:focus-visible .brand-tooltip { display: block; }
 @media (hover: none) {
     .brand:hover:not(:focus-visible) .brand-tooltip { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .brand-handle canvas,
+    .brand-chevron { transition: none; }
 }

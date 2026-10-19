@@ -956,7 +956,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
           <span className="brand-handle" aria-hidden="true">
             <canvas id="brand-mark" width={0} height={0} ref={markRef} />
             <svg className="brand-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
-              <path d="m6 4 4 4-4 4" />
+              <path d="m10 4-4 4 4 4" />
             </svg>
           </span>
           <b>clawdline</b>
