@@ -1455,6 +1455,20 @@
     "Note": true
   },
   {
+    "Name": "usage.daily_days",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "usage.daily_rows",
+    "Known": true
+  },
+  {
+    "Name": "usage.overview_tasks",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "usage.work_cursor_queue",
     "Known": true
   },

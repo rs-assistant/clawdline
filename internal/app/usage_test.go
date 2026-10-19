@@ -405,7 +405,7 @@ func TestALookBackWindowLeavesOlderTranscriptsAlone(t *testing.T) {
 	old := h.session("old")
 	h.write(old, said("Look."), call("m1", 1000, 0, 10))
 	h.write(h.session("new"), said("Look."), call("n1", 1000, 0, 10))
-	long := time.Now().Add(-30 * 24 * time.Hour)
+	long := time.Now().Add(-h.u.window() - 24*time.Hour)
 	if err := os.Chtimes(old, long, long); err != nil {
 		t.Fatal(err)
 	}

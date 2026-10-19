@@ -8076,6 +8076,78 @@ type UsageNamedSize struct {
 	Tokens float64 `json:"tokens"`
 }
 
+type UsageOverview struct {
+	At             int64                        `json:"at"`
+	Coverage       UsageOverviewCoverage        `json:"coverage"`
+	Daily          []UsageOverviewDay           `json:"daily"`
+	Days           int64                        `json:"days"`
+	PreviousDaily  []UsageOverviewDay           `json:"previous_daily"`
+	PreviousSince  int64                        `json:"previous_since"`
+	PreviousTotals UsageOverviewTotals          `json:"previous_totals"`
+	PreviousUntil  int64                        `json:"previous_until"`
+	Project        string                       `json:"project"`
+	ProjectOptions []UsageOverviewProjectOption `json:"project_options"`
+	Projects       []UsageOverviewProject       `json:"projects"`
+	Since          int64                        `json:"since"`
+	Timezone       string                       `json:"timezone"`
+	Totals         UsageOverviewTotals          `json:"totals"`
+	Until          int64                        `json:"until"`
+}
+
+type UsageOverviewCoverage struct {
+	HistoryFrom   int64                      `json:"history_from"`
+	SessionsRead  int64                      `json:"sessions_read"`
+	SessionsTotal int64                      `json:"sessions_total"`
+	State         UsageOverviewCoverageState `json:"state"`
+	Truncated     bool                       `json:"truncated"`
+}
+
+type UsageOverviewCoverageState string
+
+const (
+	UsageOverviewCoverageStateMissing  UsageOverviewCoverageState = "missing"
+	UsageOverviewCoverageStatePartial  UsageOverviewCoverageState = "partial"
+	UsageOverviewCoverageStateComplete UsageOverviewCoverageState = "complete"
+)
+
+// UsageOverviewCoverageStateValues is every value the contract allows, in contract order.
+var UsageOverviewCoverageStateValues = []UsageOverviewCoverageState{UsageOverviewCoverageStateMissing, UsageOverviewCoverageStatePartial, UsageOverviewCoverageStateComplete}
+
+type UsageOverviewDay struct {
+	Coverage              UsageOverviewCoverageState `json:"coverage"`
+	Date                  string                     `json:"date"`
+	Dispatches            int64                      `json:"dispatches"`
+	DurationMedianSeconds *float64                   `json:"duration_median_seconds"`
+	DurationSamples       int64                      `json:"duration_samples"`
+	Tokens                *float64                   `json:"tokens"`
+}
+
+type UsageOverviewParts struct {
+	CacheRead  float64 `json:"cache_read"`
+	CacheWrite float64 `json:"cache_write"`
+	Input      float64 `json:"input"`
+	Output     float64 `json:"output"`
+}
+
+type UsageOverviewProject struct {
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	Tokens float64 `json:"tokens"`
+}
+
+type UsageOverviewProjectOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type UsageOverviewTotals struct {
+	Dispatches            int64              `json:"dispatches"`
+	DurationMedianSeconds *float64           `json:"duration_median_seconds"`
+	DurationSamples       int64              `json:"duration_samples"`
+	Parts                 UsageOverviewParts `json:"parts"`
+	Tokens                *float64           `json:"tokens"`
+}
+
 // Why a reading is not current. `not_yet_read`: the ledger has no reading of it
 // yet. `transcript_missing`: it was read before and its transcript is gone; the
 // totals are that reading's. `transcript_unreadable`: its transcript is there

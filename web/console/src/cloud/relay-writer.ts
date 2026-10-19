@@ -31,6 +31,8 @@
 //
 // Nothing is imported at run time, so `node --test` loads it as it is.
 import type { CarriedWord } from "./carry.js"
+// @ts-expect-error -- Node loads the source extension in focused behavior tests.
+import { usageOverviewQuery } from "./carry.ts"
 import type { CloudIdentity, CloudReadClient, CloudRow, SeamRow } from "./relay-reader.js"
 import { authenticatedRefusalKey } from "./refusal-client.js"
 // @ts-expect-error -- Node's strip-types runner loads this source in its test suite.
@@ -281,6 +283,7 @@ export type WriteRoute =
   | { op: "work-v2-image"; word: Carried<"work.v2.image">; artifact: string }
   | { op: "usage"; word: Carried<"usage.session" | "usage.task" | "usage.item">; id: string }
   | { op: "usage-compare"; word: Carried<"usage.compare-compaction" | "usage.compare-handoff" | "usage.work-units"> }
+  | { op: "usage-overview"; word: Carried<"usage.overview"> }
   | { op: "usage-work-samples"; word: Carried<"usage.work-samples"> }
   | { op: "capacity"; word: Carried<"capacity"> }
   | { op: "default-models"; word: Carried<"default-models"> }
@@ -457,6 +460,7 @@ export const CARRIED_READS: ReadonlySet<WriteRoute["op"]> = new Set<WriteRoute["
   "voice-source",
   "work-v2-image",
   "usage-compare",
+  "usage-overview",
   "usage-work-samples",
   "usage",
   "capacity",
@@ -508,6 +512,7 @@ export function writeRoute(method: string, path: string): WriteRoute | null {
     // channel as `work.v2.item` is answered, so a Session's bill is not asked
     // under the session's identity: the conversation is the ledger's key, and
     // this page may hold no row for a child's conversation at all.
+    if (head === "usage" && a === "overview" && segments.length === 2) return { op: "usage-overview", word: "usage.overview" }
     if (head === "usage" && a === "compare-compaction" && segments.length === 2) {
       return { op: "usage-compare", word: "usage.compare-compaction" }
     }
@@ -930,6 +935,7 @@ function spellingOf(route: WriteRoute): Spelling {
     // (internal/transport/http/usage.go), and the bill's reader takes it.
     case "usage":
     case "usage-compare":
+    case "usage-overview":
     case "usage-work-samples":
     // `/v1/verifications*` refuses with `writeRefusal`, flat
     // (internal/transport/http/verify.go), and `pages/verify/api.ts` reads it.
@@ -1505,6 +1511,12 @@ export class RelayWriter {
           body.since = value
         }
         return client._machineRequest(this.host.machine, route.word, body, "read")
+      }
+      case "usage-overview": {
+        const body = usageOverviewQuery(url.searchParams)
+        if (!body) throw failure("invalid_query", "Usage overview accepts days=7 or days=28 and one project.", 400)
+        if (typeof client._machineRequest !== "function") throw failure("cloud_not_carried", route.word, 501)
+        return client._machineRequest(this.host.machine, route.word, body, "read", undefined, { signal: init?.signal ?? undefined })
       }
       case "usage-work-samples": {
         if (typeof client._machineRequest !== "function") {

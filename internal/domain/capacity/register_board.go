@@ -4,7 +4,7 @@ package capacity
 // planreview.*, proposals.*, run.* and usage.*: the Board's own small rows
 // beside the work items.
 func boardBounds() []Entry {
-	return []Entry{
+	return append(usageOverviewBounds(), []Entry{
 		{
 			// The board commands' (actor, requestId) receipts (limits N24):
 			// the store's receipt table, scope `board`, since the board's
@@ -111,5 +111,5 @@ func boardBounds() []Entry {
 			EvictedBy: Daemon,
 			Sources:   []string{"internal/adapters/store.DecisionOpenLimit"},
 		},
-	}
+	}...)
 }

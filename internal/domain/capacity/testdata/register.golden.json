@@ -5901,6 +5901,66 @@
   },
   {
     "Register": "daemon",
+    "Name": "usage.daily_days",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 57,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/transcript.DailyDayLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "usage.daily_rows",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 50000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.UsageDailyRowLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "usage.overview_tasks",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 10000,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/store.UsageOverviewTaskLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "usage.work_cursor_queue",
     "Class": "buffer",
     "Unit": "rows",

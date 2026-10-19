@@ -174,6 +174,7 @@ export const CARRIED = {
   // --compare-handoff` does.
   "usage.compare-handoff": "GET /v1/usage/compare-handoff[?since=]",
   "usage.item": "GET /v1/usage/items/{id}",
+  "usage.overview": "GET /v1/usage/overview[?days=&project=]",
   "usage.session": "GET /v1/usage/sessions/{conversation}",
   "usage.task": "GET /v1/usage/tasks/{id}",
   // The raw samples a before/after report is folded from (docs/token-ledger.md
