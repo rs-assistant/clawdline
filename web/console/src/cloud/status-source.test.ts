@@ -283,6 +283,22 @@ test("a cold pinned list retains an Epic child's visible parent", async () => {
   assert.equal(reading.rows?.find((row) => row.destination.sessionID === "child")?.parentSessionID, "root")
 })
 
+test("a cold pinned list retains a task child's listed parent without ss status", async () => {
+  const { client } = clientFixture()
+  client.statusSnapshots.delete(JSON.stringify([machineID, sessionID]))
+  const original = client.listPresentationsForMachine
+  client.listPresentationsForMachine = async (machine) => {
+    const reply = await original(machine)
+    const base = reply.sessions[0]
+    return { ...reply, sessions: [
+      { ...base, id: "root", title: "Root", status: { ...base.status, state: "idle" } },
+      { ...base, id: "child", title: "Child", status: { ...base.status, state: "idle", parent_session_id: "root" } },
+    ] }
+  }
+  const reading = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(reading.rows?.find((row) => row.destination.sessionID === "child")?.parentSessionID, "root")
+})
+
 test("a pinned list during stale status replay retains the same execution's task parent", async () => {
   const { client, row } = clientFixture()
   Object.assign(row, { parent_session_id: "root" })

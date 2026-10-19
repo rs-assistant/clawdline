@@ -272,7 +272,7 @@ Two things follow, and the second is the reason to do it this way:
 | `index.html` | the mark comes out of `#detail-info` into `#detail-snippets`. |
 | `app/css/detail.css` | the two buttons read as one block; the new button gets its 44px box and its no-mark placeholder. |
 | `app/js/view/transcript.js` | `renderDetailHead` sets `disabled`, `title` and `aria-label` on the new button the way it does for the two it already owns. |
-| `app/js/net/live.js` | `snippets()`, `createSnippet()`, `updateSnippet()`, `deleteSnippet()`, `orderSnippets()`, on `LocalClient`. **Not** added to `ClawdlineClient.methods` in `net/client.js`, which is the contract every transport must satisfy. ⚠ This row said `net/client.js`; that file is the contract, and the direct transport is `net/live.js`. |
+| `app/js/net/live.js` | `snippets()`, `createSnippet()`, `updateSnippet()`, `deleteSnippet()`, `orderSnippets()`, on `LocalClient`. At the time, these methods were not added to the `ClawdlineClient.methods` compatibility list in `net/client.js`; that unused list has since been removed. ⚠ This row originally said `net/client.js`; the direct transport was `net/live.js`. |
 | `app/js/net/cloud-client.js` | `snippets()` from published rows plus four machine-routed mutation commands. |
 | `app/js/net/mock.js` | a fixture: a couple of global snippets and one project-scoped, so `?mock=1` exercises the sheet, the grouping and the empty state without a Mac. |
 | `app/js/view/project-mark.js` | new, and not in this table until the correction round. `generatedMark(key)` and `markForSession(session, projectKey)` — the mark a project has until somebody draws it one. Pure, importable into a bare Node process, and read by `Tests/web-snippets.mjs`. |
