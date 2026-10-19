@@ -232,7 +232,6 @@
   "http.306e1ff5baba8f00": "persona 必須是以下其中之一：architect、backend、frontend、minimal-change、code-reviewer、reality-checker、security、technical-writer、seo、content-writer、ai-search、social-media、instagram、email、growth、pr、product-manager、sprint-prioritizer、feedback-synthesizer、trend-researcher、ux-researcher、test-automation、accessibility、performance、api-tester、evidence-collector、sre、devops、incident-commander、finops、secrets、ui-designer、ux-architect、brand-guardian、ui-finish-gate、image-prompt、pricing、customer-success、support、analytics、devrel、privacy、zero-review-lead",
   "http.30c507fd89347154": "Session 不會等待自己。",
   "http.314803a5b2bfc3b0": "圖片須以 GET 讀取。",
-  "http.3173e3f0ec56a918": "tunnel 須以 GET 讀取，並在設定中開啟或關閉。",
   "http.3204a7d685b1b418": "參考圖片須以 POST 新增。",
   "http.320c2f5b0da7bc3d": "必須提供 claims：列出這項任務可寫入、位於 project_dir 下的相對路徑。知道檔名時請列出檔案；不知道時請列出目錄；若任務不寫入任何內容，請傳送 \"claims\": []。隔離任務也要宣告相同清單：其租用會在私人檢出目錄中解除，但路徑仍保留為落地時的寫入範圍。不要列入儲存庫防護機制替你改寫的內容，例如逐步收緊的行數；那屬於負責落地變更的人員，不屬於這項任務的租用範圍。",
   "http.321ad5182d86b760": "沒有該名稱的 Session。",

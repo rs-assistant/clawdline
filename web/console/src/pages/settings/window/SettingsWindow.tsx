@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { SettingsSnapshot, TunnelStatus, VoiceLanguage, VoiceSetup } from "@clawdline/contract"
+import type { SettingsSnapshot, VoiceLanguage, VoiceSetup } from "@clawdline/contract"
 import {
   defaultModelOptions,
   readBrowserSettings,
@@ -30,7 +30,6 @@ import {
 } from "../cloud.js"
 import { directLocalNetworkShown } from "../direct-local.js"
 import { DEFAULTS, reading, type SettingKey } from "./defaults.js"
-import { readTunnelStatus } from "../tunnel.js"
 import { installVoiceModel, readVoiceLanguage, readVoiceSetup } from "../voice.js"
 import {
   APP_EVENT,
@@ -111,19 +110,13 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   const [cloudLogin, setCloudLogin] = useState<CloudLogin | null>(null)
   const [cloudSetupBusy, setCloudSetupBusy] = useState(false)
   const [cloudSetupSaid, setCloudSetupSaid] = useState("")
-  // The tunnel's own reading, the same three ways: not asked, refused, an answer.
-  const [tunnel, setTunnel] = useState<TunnelStatus | null | undefined>(undefined)
-  // Whether the Remote tab's readings were refused because only this machine's
-  // own token may read them (cloud.ts MACHINE_ONLY). Then both cards say where
-  // Cloud and the tunnel are managed, once, instead of a read failure each.
+  // Whether the Remote tab's reading was refused because only this machine's
+  // own token may read it (cloud.ts MACHINE_ONLY). Then the card says where
+  // Cloud is managed instead of a read failure.
   const [remoteMachineOnly, setRemoteMachineOnly] = useState(false)
   const takeCloud = (answer: CloudStatus | MachineOnly | null) => {
     setRemoteMachineOnly(answer === MACHINE_ONLY)
     setCloud(answer === MACHINE_ONLY ? null : answer)
-  }
-  const takeTunnel = (answer: TunnelStatus | MachineOnly | null) => {
-    setRemoteMachineOnly(answer === MACHINE_ONLY)
-    setTunnel(answer === MACHINE_ONLY ? null : answer)
   }
   // Where the voice language landed, asked of the daemon while the voice tab is
   // open and again after every write — the General tab's language moves it too.
@@ -232,26 +225,6 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
     return () => { live = false; if (timer) clearInterval(timer) }
   }, [tab, cloudLogin?.phase, remoteTab, embedded])
 
-  // The tunnel's reading, while the same tab is open. The Swift window asked
-  // its tunnel once a second, because "starting" turns into an address on its
-  // own; this asks every second and a half while it is starting and every five
-  // seconds otherwise, and nothing once the tab is left.
-  useEffect(() => {
-    if (tab !== remoteTab || embedded) return
-    let live = true
-    const pass = () => {
-      void readTunnelStatus().then((answer) => {
-        if (live) takeTunnel(answer)
-      })
-    }
-    pass()
-    const timer = setInterval(pass, tunnel?.state === "starting" ? 1_500 : 5_000)
-    return () => {
-      live = false
-      clearInterval(timer)
-    }
-  }, [tab, tunnel?.state, embedded, remoteTab])
-
   /**
    * Write, then tell the shell. The Swift app's `apply()`: save the file and
    * post `clawdlineConfigChanged`, and let the one place that re-applies things
@@ -271,11 +244,6 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
       })
       ask({ kind: "changed" })
       if (embedded && ("notch" in keys || "mascot" in keys)) askShell("changed")
-      // A Remote-tab switch moves the tunnel at once (the daemon applies it
-      // on the write); the card asks again rather than waiting its turn.
-      if (!embedded && ("remote" in keys || "remote_tunnel" in keys || "remote_hostname" in keys)) {
-        void readTunnelStatus().then(takeTunnel)
-      }
       return answer
     } catch (error) {
       setDraft((prior) => {
@@ -807,7 +775,7 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
    * daemon has no Cloud line at all; the switch is on and the line is up, in
    * which case the fingerprint is here to be read back to somebody; or this
    * caller may not ask, which is what a paired phone reading this window over
-   * a tunnel gets, and which is the honest card rather than an empty one.
+   * Tailscale Serve gets, and which is the honest card rather than an empty one.
    *
    * There is no switch here. Turning Cloud on is `clawdline cloud on`, which
    * writes `cloud_enabled` in the same file — deliberately not a control in
@@ -1176,6 +1144,14 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
               }}
             />
           </Row>
+          {snapshot?.cloudflare_tunnel_retired ? (
+            <Block>
+              {/* Shown while the file still holds the removed Cloudflare
+                  tunnel's settings; "Got it" takes them out of the file. */}
+              <Note dot="warn">{W.settingsCloudflareRetired}</Note>
+              <Chip onClick={() => void change({ cloudflare_tunnel_retired: false })}>{W.settingsCloudflareRetiredDone}</Chip>
+            </Block>
+          ) : null}
         </div>
         <div className="sw-column">
           {!embedded && cloud !== undefined && cloud !== null && cloudSetupBlock()}
@@ -1186,86 +1162,8 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
             </Block>
           )}
           {!embedded && cloudPairingBlock()}
-          <Row label={W.settingsTunnel} hint={W.settingsTunnelHint} first>
-            <PopUp
-              label={W.settingsTunnel}
-              value={String(now("remote_tunnel"))}
-              options={[
-                { label: W.settingsOff, value: "off" },
-                { label: W.settingsTunnelNamed, value: "named" },
-              ]}
-              onPick={pick("remote_tunnel")}
-            />
-          </Row>
-          {snapshot?.quick_tunnel_retired ? (
-            <Block>
-              {/* Shown until the tunnel setting is written once: the file still
-                  says `quick`, which now starts nothing and reads as off. */}
-              <Note dot="warn">{W.settingsTunnelQuickRetired}</Note>
-              <Chip onClick={() => void change({ remote_tunnel: "off" })}>{W.settingsTunnelQuickRetiredDone}</Chip>
-            </Block>
-          ) : null}
-          <Row label={W.settingsTunnelHostname}>
-            <MemoField
-              label={W.settingsTunnelHostname}
-              value={String(now("remote_hostname"))}
-              example="clawdline.example.com"
-              onCommit={(value) => {
-                if (value === String(reading(snapshotRef.current, "remote_hostname"))) return
-                void change({ remote_hostname: value })
-              }}
-            />
-          </Row>
-          {!embedded && tunnelBlock()}
         </div>
       </>
-    )
-  }
-
-  /**
-   * What the tunnel is doing, in the words the tunnel itself used
-   * (`Settings.swift` `refreshTunnel`). Its failures are sentences meant for a
-   * person — "pair a device first" — and passing them through unchanged is
-   * better than a generic "could not start": the useful part of each is the
-   * specific thing to go and do. The two literals are that function's own.
-   */
-  function tunnelBlock() {
-    if (tunnel === undefined) return null
-    if (tunnel === null) {
-      // Refused for the same reason as the Cloud card, which already says where
-      // both are managed; a second copy of that sentence would say nothing new.
-      if (remoteMachineOnly) return null
-      return (
-        <Block>
-          <Note dot="idle">{W.webCloudStatusReadFailed}</Note>
-        </Block>
-      )
-    }
-    let text = ""
-    let dot: "idle" | "warn" | "live" = "idle"
-    switch (tunnel.state) {
-      case "off":
-        text = tunnel.installed ? "" : "cloudflared is not installed."
-        break
-      case "starting":
-        text = "…"
-        break
-      case "up":
-        text = tunnel.url ?? ""
-        dot = "live"
-        break
-      case "failed":
-        text = tunnel.reason ?? ""
-        dot = "warn"
-        break
-    }
-    if (!text) return null
-    return (
-      <Block>
-        <Note dot={dot} mono>
-          {text}
-        </Note>
-      </Block>
     )
   }
 

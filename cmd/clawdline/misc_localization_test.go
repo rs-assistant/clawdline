@@ -10,8 +10,8 @@ import (
 
 func TestMiscCatalogShipsCompleteNineLanguageBaseline(t *testing.T) {
 	bundle := cliCatalogGroups["misc"]
-	if len(bundle.baseline) != 217 {
-		t.Fatalf("misc initial baseline has %d keys, expected 217", len(bundle.baseline))
+	if len(bundle.baseline) != 205 {
+		t.Fatalf("misc initial baseline has %d keys, expected 205", len(bundle.baseline))
 	}
 	for _, language := range []string{"en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"} {
 		translated, total := cliCatalogCoverage("misc", language)

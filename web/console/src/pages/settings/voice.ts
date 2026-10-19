@@ -16,7 +16,7 @@ const setupFailures: VoiceSetupFailures = {
  *
  * The decision is the daemon's, made from its own settings file and its own
  * machine, because that is where whisper runs; this page only says it back.
- * A failure is null rather than a throw, as `readTunnelStatus` answers one: the
+ * A failure is null rather than a throw, as `readCloudStatus` answers one: the
  * picker still works without the sentence under it.
  */
 export async function readVoiceLanguage(): Promise<VoiceLanguage | null> {
