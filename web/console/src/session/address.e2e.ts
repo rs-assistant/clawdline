@@ -130,6 +130,7 @@ let namingAssistant = "claude"
 let smartTitleNamedBy = ""
 let interruptRequests: { id: string; key: string }[] = []
 let requestedPaths: string[] = []
+let untrustedContent = ""
 let refusedCatalog: string | null = null
 let failPlacesOnRequest = 0
 // The machine's persona catalog, as many roles as the daemon compiles in and
@@ -526,7 +527,11 @@ function daemon(): Server {
       return // held open, as the daemon's stream is
     }
     if (path === "/v1/transcript") {
-      return json(res, 200, { entries: [], evidence: "process", id: url.searchParams.get("session"), signature: "fixture" })
+      return json(res, 200, { entries: untrustedContent ? [{ role: "assistant", text: untrustedContent, at: 1 }] : [], evidence: "process", id: url.searchParams.get("session"), signature: "fixture" })
+    }
+    if (path === "/v1/sessions/" + encodeURIComponent(TMUX) + "/documents/project/security.md") {
+      res.writeHead(200, { "content-type": "text/markdown; charset=utf-8" })
+      return res.end(untrustedContent)
     }
     if (path.startsWith("/v1/")) return json(res, 404, { error: { code: "not_found", message: path } })
     if (path === "/") {
@@ -874,7 +879,7 @@ before(async () => {
 after(async () => {
   browser?.close()
   // Its profile is removed below, and Chrome writes to it until it has gone.
-  if (browserProcess && browserProcess.exitCode === null) {
+  if (browserProcess && browserProcess.exitCode === null && browserProcess.signalCode === null) {
     const gone = new Promise((ok) => browserProcess.once("exit", ok))
     browserProcess.kill()
     await gone
@@ -883,6 +888,69 @@ after(async () => {
   server?.closeAllConnections()
   await new Promise<void>((ok) => (server ? server.close(() => ok()) : ok()))
   if (profile) rmSync(profile, { recursive: true, force: true, maxRetries: 5 })
+})
+
+test("untrusted transcript and document Markdown stays inert in the browser", async () => {
+  untrustedContent = [
+    "Security boundary marker",
+    '<img src=x onerror="globalThis.securityExecuted=true">',
+    '<svg onload="globalThis.securityExecuted=true"></svg>',
+    "[script](javascript:globalThis.securityExecuted=true)",
+    "[encoded](jav&#x61;script:alert(1))",
+    "[document](data:text/html,hello)",
+    '[safe](https://example.invalid/?a=1&b="quoted")',
+    "[mail](mailto:fixture@example.invalid)",
+    "**https://example.invalid/bold**",
+    '`<t0><0><img onerror="globalThis.securityExecuted=true">`',
+    "```html\n<script>globalThis.securityExecuted=true</script>\n```",
+    "| Name | Value |\n| --- | --- |\n| <img src=x onerror=alert(1)> | **safe** |",
+  ].join("\n\n")
+  try {
+    // A fresh tab per address: the two differ only in their fragment, and a
+    // fragment-only navigation fires no load event.
+    for (const [address, selector] of [
+      ["/" + FRAGMENT[TMUX], "#tx"],
+      ["/#document=1&machine=this-mac&session=" + escapedPane(801) + "&scope=project&path=security.md", "#document-body"],
+    ]) {
+      await inTab(DESK, async (tab) => {
+        await tab.go(address)
+        await tab.run(`new Promise((resolve, reject) => {
+          const deadline = Date.now() + 5000
+          const read = () => {
+            const body = document.querySelector(${JSON.stringify(selector)})
+            if (body?.textContent?.includes("Security boundary marker")) return resolve(true)
+            if (Date.now() > deadline) return reject(new Error("security fixture did not render: " + document.body.textContent))
+            setTimeout(read, 25)
+          }
+          read()
+        })`)
+        const seen = await tab.run(`(() => {
+          const body = document.querySelector(${JSON.stringify(selector)})
+          return {
+            executed: globalThis.securityExecuted === true,
+            active: body.querySelectorAll("script, img, iframe, object, embed, [onerror], [onload]").length,
+            links: [...body.querySelectorAll("a[href]")].map(a => ({ href: a.href, target: a.target, rel: a.rel })),
+            text: body.textContent,
+            copied: body.querySelector("[data-code-copy]")?.getAttribute("data-code-copy"),
+          }
+        })()`)
+        assert.equal(seen.executed, false, selector)
+        assert.equal(seen.active, 0, selector)
+        assert.match(seen.text, /<img src=x onerror=/)
+        assert.equal(seen.copied, "<script>globalThis.securityExecuted=true</script>")
+        assert.ok(seen.links.some((link: { href: string }) => link.href === "https://example.invalid/bold"))
+        assert.ok(seen.links.some((link: { href: string }) => link.href === "mailto:fixture@example.invalid"))
+        for (const link of seen.links) {
+          assert.match(link.href, /^(https?:\/\/|mailto:)/i)
+          assert.equal(link.target, "_blank")
+          assert.match(link.rel, /noopener/)
+          assert.match(link.rel, /noreferrer/)
+        }
+      })
+    }
+  } finally {
+    untrustedContent = ""
+  }
 })
 
 test("desk: opening a session writes it into the address, and a reload comes back to it", () =>
