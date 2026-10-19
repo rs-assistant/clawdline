@@ -7,10 +7,28 @@ export const STATUS_FRESH_MS = 300_000
 type Held = { identity: { machine: string; session: string }; payload: unknown; observedAt: number; sequence: number }
 export interface StatusProjectionClient {
   statusSnapshots?: ReadonlyMap<string, unknown>
+  orchestratorSnapshots?: ReadonlyMap<string, unknown>
 }
 
 export function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null
+}
+
+/** The same signed machine descriptor already supplies task roots to the single-machine list. */
+function descriptorParents(client: StatusProjectionClient, machine: string, ids: readonly string[], nowMs: number): Map<string, string> {
+  const snapshot = record(client.orchestratorSnapshots?.get(machine))
+  if (!snapshot || !Number.isFinite(snapshot.at) || Math.abs(nowMs - Number(snapshot.at) * 1000) > STATUS_FRESH_MS ||
+    !Array.isArray(snapshot.tasks)) return new Map()
+  const visible = new Set(ids)
+  const parents = new Map<string, string>()
+  for (const value of snapshot.tasks) {
+    const task = record(value)
+    const child = record(task?.child)?.terminalId
+    const root = record(task?.root)?.terminalId
+    if (typeof child === "string" && typeof root === "string" && child !== root &&
+      visible.has(child) && visible.has(root)) parents.set(child, root)
+  }
+  return parents
 }
 
 function held(client: StatusProjectionClient, machine: string, session: string): Held | undefined {
@@ -38,6 +56,7 @@ export function statusProjection(client: StatusProjectionClient | null, machine:
   // Its rows cannot authorize fresh content reads or changing operations.
   let stale = outsideFreshWindow(Number(marker.at) * 1000, nowMs)
   const rows: ProjectedSession[] = []
+  const taskParents = descriptorParents(client, machine, ids as string[], nowMs)
   let unknownTargets = 0
   // A gap makes the set uncertain, not each row: the rows that did arrive are
   // still the newest word on their own Session. They go back as `latest`, so a
@@ -71,7 +90,7 @@ export function statusProjection(client: StatusProjectionClient | null, machine:
       assistant: data.assistant === "claude" || data.assistant === "codex" ? data.assistant : undefined,
       backend: data.backend === "tmux" || data.backend === "iterm" || data.backend === "ps" ? data.backend : undefined,
       parentSessionID: typeof data.parent_session_id === "string" && data.parent_session_id !== session
-        ? data.parent_session_id : undefined,
+        ? data.parent_session_id : taskParents.get(session),
       machineScope: data.machine_scope === true,
       coordinatorBound: data.coordinator_bound === true,
       state: String(data.state),
