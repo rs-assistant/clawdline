@@ -1,4 +1,3 @@
-import { SESSION_READ } from "../onboarding/Survey.js"
 import { catalogWord } from "../catalog.js"
 import {
   useCallback,
@@ -194,9 +193,6 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
   fast.current = !agentId && followingNow({ following, newestSendAt, now: Date.now() })
   const poll = usePoll<TranscriptPage>(read, pace, agentId ? {} : { backoff: BACKOFF })
   const { data, error } = poll
-  useEffect(() => {
-    if (data && !error && !agentId) dispatchEvent(new Event(SESSION_READ))
-  }, [id, data, error, agentId])
   // The row says the record grew, or the session changed what it is doing:
   // read what was appended now, and once more a little after the last such
   // change, because the row's time is in whole seconds.

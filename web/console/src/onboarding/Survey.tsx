@@ -4,7 +4,6 @@ import { LOCAL_KEY, OPEN_SURVEY, REASONS, SOURCES, TOOLS, readLocal, surveyReque
 import { surveyWord as w, type SurveyWord } from "./words.js"
 import "./survey.css"
 
-export const SESSION_READ = "clawdline:session-read"
 const INITIAL: SurveyState = { version: 1, revision: 0, status: "new", answers: null }
 const EMPTY: Answers = { reason: "", tools: [], source: "" }
 
@@ -74,7 +73,6 @@ export function SurveyCoordinator({ account, eligible = false, productVersion = 
   const local = useRef<LocalSurvey | null>(null)
   const [build, setBuild] = useState(productVersion)
   const [state, setState] = useState<SurveyState>(INITIAL)
-  const [invite, setInvite] = useState(false)
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -104,12 +102,6 @@ export function SurveyCoordinator({ account, eligible = false, productVersion = 
     }).catch(() => { /* Survey availability must never block the console. Settings offers a retry. */ })
     return () => controller.abort()
   }, [account?.id, origin, eligible])
-  useEffect(() => {
-    if (account) return
-    const onRead = () => { if (local.current && !local.current.dismissed && local.current.state.status !== "submitted") setInvite(true) }
-    addEventListener(SESSION_READ, onRead)
-    return () => removeEventListener(SESSION_READ, onRead)
-  }, [account?.id])
   const readCloud = async () => {
     const controller = new AbortController(); request.current?.abort(); request.current = controller
     setBusy(true); setError(null)
@@ -158,7 +150,7 @@ export function SurveyCoordinator({ account, eligible = false, productVersion = 
   }, [open, productVersion])
   function metadata() { return { locale: currentCatalogTag(), entry, product_version: build } }
   const dismiss = () => {
-    request.current?.abort(); setBusy(false); setOpen(false); setInvite(false); setNotice(null)
+    request.current?.abort(); setBusy(false); setOpen(false); setNotice(null)
     if (account && state.status !== "submitted") {
       void surveyRequest(origin, path, { body: { version: 1, revision: state.revision, action: "skip", meta: metadata() }, key: crypto.randomUUID() }).then(saved => { if (active.current) setState(saved) }).catch(() => {})
     } else if (local.current) {
@@ -180,7 +172,7 @@ export function SurveyCoordinator({ account, eligible = false, productVersion = 
     try {
       const saved = await surveyRequest(origin, path, { ...attempt, local: !account, signal: controller.signal })
       if (controller.signal.aborted || !active.current) return
-      setState(saved); setOpen(false); setInvite(false); setNotice(w("thanks")); pending.current = null
+      setState(saved); setOpen(false); setNotice(w("thanks")); pending.current = null
       if (local.current) { local.current.state = saved; local.current.dismissed = true; local.current.submittedAt ??= new Date().toISOString(); delete local.current.pending; persist() }
     } catch (err) {
       if (!controller.signal.aborted && active.current) {
@@ -190,7 +182,6 @@ export function SurveyCoordinator({ account, eligible = false, productVersion = 
     } finally { if (!controller.signal.aborted && active.current) setBusy(false) }
   }
   return <>
-    {invite && !open ? <aside className="survey-invite" aria-label={w("inviteTitle")}><div><strong>{w("inviteTitle")}</strong><p>{w("inviteBody")}</p></div><button type="button" onClick={() => { setEntry("onboarding"); setError(null); setOpen(true) }}>{w("open")}</button><button type="button" onClick={dismiss}>{w("dismiss")}</button></aside> : null}
     {notice ? <div className="survey-notice" role="status"><span>{notice}</span><button type="button" onClick={() => setNotice(null)}>{w("close")}</button></div> : null}
     <dialog ref={dialog} className="survey-dialog" aria-labelledby="survey-title" onCancel={e => { e.preventDefault(); dismiss() }}>
       {open ? <SurveyForm initial={state.answers ?? (validAnswers(pending.current?.body.answers) ? pending.current!.body.answers as Answers : null)} local={!account} busy={busy} error={error} onSubmit={submit} onClose={dismiss} onReload={() => {
