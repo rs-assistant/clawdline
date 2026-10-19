@@ -1,3 +1,4 @@
+import { ProjectPicker } from "../../ui/ProjectPicker.js"
 import { catalogFormat } from "../../catalog.js"
 import { focusModalContainer } from "../../modal-focus.js"
 import { catalogWord, catalogWordLanguage } from "../../catalog.js"
@@ -1523,59 +1524,6 @@ function WorkReferenceImage({ item, image, busy, run }: {
   </figure>
 }
 
-function ProjectPicker({ places, value, onChange, onOpen, allowAll = false }: {
-  places: ProjectPlace[]
-  value: string
-  onChange: (id: string) => void
-  onOpen?: () => Promise<void>
-  allowAll?: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const root = useRef<HTMLDivElement>(null)
-  const selected = places.find((place) => place.id === value)
-  useEffect(() => {
-    if (!open) return
-    const closeOutside = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false)
-    }
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false)
-    }
-    document.addEventListener("pointerdown", closeOutside)
-    document.addEventListener("keydown", closeOnEscape)
-    return () => {
-      document.removeEventListener("pointerdown", closeOutside)
-      document.removeEventListener("keydown", closeOnEscape)
-    }
-  }, [open])
-  const choose = (id: string) => { onChange(id); setOpen(false) }
-  const toggle = () => {
-    const opening = !open
-    setOpen(opening)
-    if (!opening || !onOpen) return
-    setRefreshing(true)
-    void onOpen().catch(() => {}).finally(() => setRefreshing(false))
-  }
-  return <div className="work-project-picker" ref={root}>
-    <button className="work-project-trigger" type="button" aria-label={catalogWord("inline", "985959785319")} aria-haspopup="listbox"
-      aria-expanded={open} onClick={toggle}>
-      {selected ? <Mark icon={selected.icon as SessionRow["icon"]} cellPx={3} /> : <span className="work-project-placeholder" aria-hidden="true">▦</span>}
-      <span>{selected?.label || (allowAll ? catalogWord("literal", "b2ee45d95857") : catalogWord("literal", "ef8fe1c8ac54"))}</span>
-      <span className="work-project-chevron" aria-hidden="true">⌄</span>
-    </button>
-    {open && <div className="work-project-menu" role="listbox" aria-label={catalogWord("inline", "985959785319")}>
-      {allowAll && <button type="button" role="option" aria-selected={!value} className="work-project-option"
-        onClick={() => choose("")}><span className="work-project-placeholder" aria-hidden="true">▦</span><span>{catalogWord("inline", "24926b27517e")}</span></button>}
-      {places.map((place) => <button type="button" role="option" aria-selected={place.id === value}
-        className="work-project-option" key={place.id} onClick={() => choose(place.id)}>
-        <Mark icon={place.icon as SessionRow["icon"]} cellPx={3} /><span>{place.label}</span>
-        {place.id === value && <span className="work-project-check"><WorkIcon name="check" /></span>}
-      </button>)}
-      {!places.length && <p className="work-project-empty">{refreshing ? catalogWord("literal", "eec20299e1b1") : catalogWord("literal", "dc9a2139ef07")}</p>}
-    </div>}
-  </div>
-}
 
 function NewWorkModal({ places, initialProject, initialDraft, busy, failure, onRefreshPlaces, onClose, onCreate }: { places: ProjectPlace[]; initialProject: string; initialDraft: NewWorkItemDraft; busy: boolean; failure: string; onRefreshPlaces: () => Promise<void>; onClose: () => void; onCreate: (body: Parameters<typeof createWorkV2>[0], images: File[], decisionKey: string) => void }) {
   const [projectID, setProjectID] = useState(initialDraft.projectID || initialProject)

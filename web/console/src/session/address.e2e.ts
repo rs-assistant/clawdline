@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 // The open session in the address, through a real browser and real URLs:
 //
 //   (cd web && npm run build)
@@ -222,11 +223,28 @@ function document(): string {
   return html.replace("<!-- clawdline:strings -->", slot).replace("<!-- clawdline:cloud -->", "")
 }
 
+const usageFixtureID = (path: string) => createHash("sha256").update(path).digest("hex")
+const usagePickerOptions = [
+  { id: usageFixtureID("/tmp/fixture"), name: "fixture" },
+  { id: usageFixtureID("/tmp/other/fixture"), name: "fixture" },
+  ...Array.from({ length: 16 }, (_, i) => ({ id: usageFixtureID("/tmp/history-" + i), name: "Historical project with a very long name " + i })),
+  { id: "unattributed", name: "unattributed" },
+]
+let usagePickerQueries: URLSearchParams[] = []
+
 function daemon(): Server {
   return createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://fixture")
     const path = url.pathname
     requestedPaths.push(`${req.method} ${path}`)
+    if (path === "/v1/usage/overview") {
+      usagePickerQueries.push(url.searchParams)
+      const totals = { tokens: 1200, dispatches: 2, duration_samples: 1, duration_median_seconds: 60,
+        parts: { input: 400, output: 400, cache_read: 200, cache_write: 200 } }
+      return json(res, 200, { days: Number(url.searchParams.get("days") || 7), project: url.searchParams.get("project") || "", timezone: "UTC",
+        daily: [{ date: "2026-10-12", ...totals, coverage: "complete" }], previous_daily: [], totals, previous_totals: totals,
+        coverage: { state: "complete", sessions_read: 1, sessions_total: 1 }, projects: [], project_options: usagePickerOptions })
+    }
     if (path === "/v1/strings") {
       const tag = url.searchParams.get("lang") || "en"
       if (tag === refusedCatalog) return json(res, 200, { lang: tag, dir: "ltr", broken: "not a catalog" })
@@ -669,7 +687,7 @@ class Tab {
   async press(key: string, code = key): Promise<void> {
     const virtual = key === "Tab" ? 9 : key === "Enter" ? 13 : 0
     const event = { key, code, windowsVirtualKeyCode: virtual, nativeVirtualKeyCode: virtual }
-    await this.b.send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...event }, this.session)
+    await this.b.send("Input.dispatchKeyEvent", { type: key === "Enter" ? "keyDown" : "rawKeyDown", text: key === "Enter" ? "\r" : undefined, ...event }, this.session)
     await this.b.send("Input.dispatchKeyEvent", { type: "keyUp", ...event }, this.session)
   }
 
@@ -1991,11 +2009,11 @@ test("phone: a spoken Board item is prefilled but not created until confirmation
       const deadline = Date.now() + 5000
       const read = () => {
         const modal = document.querySelector(".work-new-modal")
-        const project = modal?.querySelector(".work-project-trigger")
+        const project = modal?.querySelector(".project-picker-trigger")
         if (modal && project?.textContent?.includes("Example project")) return resolve({
           heading: modal.querySelector("h2")?.textContent,
           note: modal.querySelector(".work-note")?.textContent,
-          project: project.querySelector("span:not(.work-project-chevron)")?.textContent,
+          project: project.querySelector("span:not(.project-picker-chevron)")?.textContent,
           title: modal.querySelector("input.work-input")?.value,
           description: modal.querySelector("textarea")?.value,
           kind: modal.querySelector('.work-kind-option[aria-pressed="true"] b')?.textContent,
@@ -2053,9 +2071,9 @@ test("phone: reopening an empty Project picker reads the Projects again", () =>
     })`)
     const recovered = await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 5000
-      document.querySelector(".work-new-modal .work-project-trigger").click()
+      document.querySelector(".work-new-modal .project-picker-trigger").click()
       const read = () => {
-        const option = document.querySelector(".work-new-modal .work-project-option")
+        const option = document.querySelector(".work-new-modal .project-picker-option")
         if (option) return resolve(option.textContent)
         if (Date.now() >= deadline) return reject(new Error("opening the empty Project picker did not read again"))
         setTimeout(read, 25)
@@ -2063,8 +2081,8 @@ test("phone: reopening an empty Project picker reads the Projects again", () =>
       read()
     })`)
     assert.match(String(recovered), /Example project/)
-    await tab.run(`document.querySelector(".work-new-modal .work-project-trigger").click()`)
-    await tab.run(`document.querySelector(".work-new-modal .work-project-trigger").click()`)
+    await tab.run(`document.querySelector(".work-new-modal .project-picker-trigger").click()`)
+    await tab.run(`document.querySelector(".work-new-modal .project-picker-trigger").click()`)
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 5000
       const read = () => {
@@ -2128,10 +2146,10 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
     await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 5000
       const choose = () => {
-        const trigger = document.querySelector(".work-new-modal .work-project-trigger")
+        const trigger = document.querySelector(".work-new-modal .project-picker-trigger")
         if (trigger) {
           trigger.click()
-          const option = document.querySelector(".work-new-modal .work-project-option")
+          const option = document.querySelector(".work-new-modal .project-picker-option")
           if (option) { option.click(); return resolve(true) }
         }
         if (Date.now() >= deadline) return reject(new Error("the Board item modal did not load its Project"))
@@ -2201,7 +2219,7 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
             actionsUseChips: [...card.querySelectorAll(".work-assignment-action")].every((button) =>
               button.classList.contains("chip") && getComputedStyle(button).backgroundColor ===
                 getComputedStyle(card.querySelector(".work-persona-ai-button")).backgroundColor),
-            focus: document.activeElement?.getAttribute("aria-label"),
+            focus: document.activeElement === modal,
             progressBeforeStart: !!card.querySelector(".work-milestones"),
             sessionsPage: !document.getElementById("app").hidden,
             boardPage: !document.getElementById("work").hidden,
@@ -2225,7 +2243,7 @@ test("phone and desktop: the Board shortcut keeps a new item open for assignment
       paths: ["指派給既有 Session", "開啟新 Session"],
       actions: ["開新 Codex Session"],
       actionsUseChips: true,
-      focus: "關閉",
+      focus: true,
       progressBeforeStart: false,
       sessionsPage: true,
       boardPage: false,
@@ -2581,3 +2599,125 @@ test("phone: model choices and Effort recover without another press or leaving t
     })
   } finally { modelMenuScenario = null }
 })
+
+for (const size of [DESK, PHONE, { width: 320, height: 640, mobile: true }]) {
+  test(`shared usage picker keeps its filter layout and exact project identity at ${size.width}px`, async () => {
+    usagePickerQueries = []
+    await inTab(size, async tab => {
+      await tab.go("/#page=usage")
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const read = () => {
+          if (document.querySelector('#usage:not([hidden]) .project-picker-trigger') && !document.querySelector('#usage .usage-state')) return resolve(true)
+          if (Date.now() > deadline) return reject(new Error('usage did not load'))
+          setTimeout(read, 25)
+        }; read()
+      })`)
+      const layout = await tab.run(`(() => {
+        const filter = document.querySelector('.usage-project-filter')
+        const picker = filter.querySelector('.project-picker')
+        const rect = el => { const r = el.getBoundingClientRect(); return [r.x,r.y,r.width,r.height] }
+        const before = [rect(filter), rect(picker), rect(document.querySelector('.usage-filters > .usage-switch'))]
+        const native = document.createElement('select'); native.innerHTML = '<option>All projects</option>'
+        picker.replaceWith(native)
+        const original = [rect(filter), rect(native), rect(document.querySelector('.usage-filters > .usage-switch'))]
+        native.replaceWith(picker)
+        return { before, original, overflow: document.documentElement.scrollWidth > innerWidth }
+      })()`)
+      assert.deepEqual(layout.before, layout.original, "filter, period buttons and control retain their native-select geometry")
+      assert.equal(layout.overflow, false)
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      const menu = await tab.run(`(() => {
+        const menu = document.querySelector('#usage [role="listbox"]')
+        const options = [...menu.querySelectorAll('[role="option"]')]
+        const r = menu.getBoundingClientRect()
+        return { count: options.length, icons: options.map(o => !!o.querySelector('canvas')), scrolls: menu.scrollHeight > menu.clientHeight,
+          fits: r.left >= 0 && r.right <= innerWidth, focused: document.activeElement === options[0] }
+      })()`)
+      assert.equal(menu.count, usagePickerOptions.length + 1)
+      assert.deepEqual(menu.icons.slice(1, 3), [true, false], "same basenames do not borrow each other's icon")
+      assert.equal(menu.scrolls, true)
+      assert.equal(menu.fits, true)
+      assert.equal(menu.focused, true)
+      const readsBeforeSameSelection = usagePickerQueries.length
+      await tab.press("Enter")
+      assert.equal(await tab.run(`!!document.querySelector('#usage .usage-state')`), false, 'choosing the current filter keeps its data visible')
+      assert.equal(usagePickerQueries.length, readsBeforeSameSelection)
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      await tab.press("ArrowDown")
+      assert.equal(await tab.run(`document.activeElement === document.querySelectorAll('#usage [role="option"]')[1]`), true, "ArrowDown focuses the first project")
+      await tab.press("Enter")
+      await tab.run(`new Promise(resolve => setTimeout(resolve, 100))`)
+      assert.equal(usagePickerQueries.at(-1)?.get("project"), usagePickerOptions[0].id)
+      assert.equal(await tab.run(`!!document.querySelector('#usage .project-picker-trigger canvas')`), true)
+      assert.equal(await tab.run(`document.activeElement === document.querySelector('#usage .project-picker-trigger')`), true)
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      await tab.press("Escape")
+      assert.equal(await tab.run(`!!document.querySelector('#usage [role="listbox"]')`), false)
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      await tab.press("End")
+      await tab.press("Enter")
+      await tab.run(`new Promise(resolve => setTimeout(resolve, 100))`)
+      assert.equal(usagePickerQueries.at(-1)?.get("project"), "unattributed")
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      await tab.press("Home")
+      await tab.press("Enter")
+      await tab.run(`new Promise(resolve => setTimeout(resolve, 100))`)
+      assert.equal(usagePickerQueries.at(-1)?.has("project"), false)
+      await tab.run(`document.querySelector('#usage .usage-switch button:last-child').click()`)
+      await tab.run(`new Promise(resolve => setTimeout(resolve, 100))`)
+      assert.equal(usagePickerQueries.at(-1)?.get("days"), "28")
+      await tab.run(`document.querySelector('#usage .project-picker-trigger').click()`)
+      await tab.run(`document.querySelector('#usage h1').dispatchEvent(new PointerEvent('pointerdown', {bubbles: true}))`)
+      assert.equal(await tab.run(`!!document.querySelector('#usage [role="listbox"]')`), false)
+      await tab.shot('usage-project-picker-' + size.width)
+    })
+  })
+}
+
+for (const size of [DESK, { width: 640, height: 844, mobile: true }, PHONE, { width: 320, height: 640, mobile: true }]) {
+  test(`shared Board picker preserves control dimensions at ${size.width}px`, async () => {
+    await inTab(size, async tab => {
+      await tab.go("/#page=work")
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const read = () => {
+          if (document.querySelector('#work:not([hidden]) .work-plan-toggle')?.textContent === '顯示 Plan') return resolve(true)
+          if (Date.now() > deadline) return reject(new Error('work board did not arrive'))
+          setTimeout(read,25)
+        }; read()
+      })`)
+      const selector = '.project-picker, .work-project-picker'
+      const measure = `(() => {
+        const bar = document.querySelector('.work-filter-bar')
+        const picker = bar.querySelector(${JSON.stringify(selector)})
+        const rect = el => { const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height] }
+        return { bar: rect(bar), picker: rect(picker), trigger: rect(picker.querySelector('button')), controls: rect(document.querySelector('.work-filter-controls')) }
+      })()`
+      const before = await tab.run(measure)
+      assert.equal(before.picker[2], Math.min(360, before.bar[2]))
+      assert.equal(before.trigger[3], 38)
+      await tab.run(`document.querySelector('.work-filter-bar').querySelector(${JSON.stringify(selector)}).querySelector('button').click()`)
+      assert.deepEqual(await tab.run(measure), before, 'opening the menu does not move the board controls')
+      await tab.press('Escape')
+      await tab.run(`document.getElementById('work-create-go').click()`)
+      const modal = await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const read = () => {
+          const field = document.querySelector('.work-new-modal .work-modal-field')
+          const picker = field?.querySelector(${JSON.stringify(selector)})
+          if (picker) {
+            const r = picker.getBoundingClientRect(), f = field.getBoundingClientRect()
+            return resolve({ width: r.width, fieldWidth: f.width, x: r.x, height: r.height, fits: r.left >= 0 && r.right <= innerWidth })
+          }
+          if (Date.now() > deadline) return reject(new Error('create picker did not arrive'))
+          setTimeout(read,25)
+        }; read()
+      })`)
+      assert.equal(modal.width, modal.fieldWidth)
+      assert.equal(modal.height, 38)
+      assert.equal(modal.fits, true)
+      if (process.env.CLAWDLINE_PICKER_LAYOUT) console.log('picker-layout ' + JSON.stringify({ width: size.width, before, modal }))
+    })
+  })
+}

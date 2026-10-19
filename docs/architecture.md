@@ -297,6 +297,14 @@ The web side is three npm workspaces:
 | `web/core` | the API client, refusals, the fleet store and its ordering rules | no DOM, no React, nothing bundler-specific |
 | `web/console` | the React DOM screens | both of the above |
 
+`web/console/src/ui/ProjectPicker.tsx` is the shared project selection control used by
+the work board (including its create sheet) and usage overview. It accepts caller-owned IDs,
+labels and marks; callers retain their surrounding layout and control dimensions. The control
+owns its non-native menu, keyboard navigation, dismissal and optional refresh on opening.
+Usage options remain ledger-owned, including historical and unattributed projects. Their marks
+are matched to places by SHA-256 of the exact path, as in `overviewProject`, never by basename;
+missing places or an unavailable decorative mark read leave filtering usable with placeholders.
+
 `core` asks its host for two things: `fetch`, and a stream transport. That split exists so a
 future React Native app can reuse everything below the screens ([plan.md](plan.md) §3.1).
 

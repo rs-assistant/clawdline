@@ -1,4 +1,7 @@
-import { useEffect, useId, useRef, useState } from "react"
+import { ProjectPicker } from "../../ui/ProjectPicker.js"
+import { readProjectPlaces, type ProjectPlace } from "../work/api.js"
+import { usageProjectOptions } from "./project-options.js"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { onMachineChanged } from "../../cloud/machine-switch.js"
 import { scheduleFleet } from "../../cloud/schedule-machines.js"
 import { readUsageOverview, UsageReadError, type UsageOverview } from "./api.js"
@@ -19,6 +22,7 @@ export default function UsageOverviewPage({ shown }: { shown: boolean }) {
   const [days, setDays] = useState<7 | 28>(7)
   const [project, setProject] = useState("")
   const [options, setOptions] = useState<UsageOverview["project_options"]>([])
+  const [places, setPlaces] = useState<ProjectPlace[]>([])
   const [metric, setMetric] = useState<UsageMetric>("tokens")
   const [read, setRead] = useState<ReadState>({ state: "loading" })
   const [revision, setRevision] = useState(0)
@@ -27,9 +31,16 @@ export default function UsageOverviewPage({ shown }: { shown: boolean }) {
   const [visible, setVisible] = useState(() => !document.hidden)
 
   useEffect(() => {
-    const changed = () => { scope.current.cancel(); setRead({ state: "loading" }); setProject(""); setOptions([]); setRevision(n => n + 1) }
+    const changed = () => { scope.current.cancel(); setRead({ state: "loading" }); setProject(""); setOptions([]); setPlaces([]); setRevision(n => n + 1) }
     return onMachineChanged(changed)
   }, [])
+  useEffect(() => {
+    if (!shown) return
+    let current = true
+    // refusal-ok: Project marks are optional decoration; usage options and filtering remain available with placeholder marks.
+    void readProjectPlaces().then(page => { if (current) setPlaces(page.places) }).catch(() => { if (current) setPlaces([]) })
+    return () => { current = false }
+  }, [shown, revision])
   useEffect(() => {
     const changed = () => setVisible(!document.hidden)
     document.addEventListener("visibilitychange", changed)
@@ -49,6 +60,8 @@ export default function UsageOverviewPage({ shown }: { shown: boolean }) {
     return () => request.cancel()
   }, [days, project, revision, shown, visible])
 
+  const unattributed = w("usageUnattributed")
+  const pickerOptions = useMemo(() => usageProjectOptions(options, places, unattributed), [options, places, unattributed])
   const data = read.state === "ready" ? read.data : null
   const fleet = scheduleFleet()
   const machine = fleet?.machines.find(m => m.id === fleet.current)?.name ?? w("usageThisMachine")
@@ -59,10 +72,11 @@ export default function UsageOverviewPage({ shown }: { shown: boolean }) {
       </div>
         <button className="usage-refresh" type="button" aria-label={w("usageRefresh")} title={w("usageRefresh")} onClick={() => setRevision(n => n + 1)}>↻</button></div>
       <div className="usage-filters">
-        <label className="usage-project-filter"><span className="usage-filter-label">{w("usageProject")}</span><select value={project} onChange={event => { scope.current.cancel(); setRead({ state: "loading" }); setProject(event.target.value) }}>
-          <option value="">{w("usageAllProjects")}</option>
-          {options.map(option => <option key={option.id} value={option.id}>{option.id === "unattributed" ? w("usageUnattributed") : option.name}</option>)}
-        </select></label>
+        <div className="usage-project-filter"><span className="usage-filter-label">{w("usageProject")}</span>
+          <ProjectPicker places={pickerOptions} value={project}
+            label={w("usageProject")} allLabel={w("usageAllProjects")} allowAll
+            onChange={value => { if (value === project) return; scope.current.cancel(); setRead({ state: "loading" }); setProject(value) }} />
+        </div>
         <div className="usage-switch" role="group" aria-label={w("usagePeriod")}>{([7, 28] as const).map(period => <button key={period} type="button" aria-pressed={days === period} onClick={() => { if (days !== period) { scope.current.cancel(); setRead({ state: "loading" }); setDays(period) } }}>{w("usageDays", { days: period })}</button>)}</div>
       </div></header>
       <div className="usage-body" aria-busy={read.state === "loading"}>
