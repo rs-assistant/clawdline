@@ -7,9 +7,9 @@
 
 **With Clawdline Cloud, see Claude Code and Codex Sessions across your machines in one phone list, then open one to reply or leave a to-do.**
 
-A short illustrated walkthrough: open a Session, see an image from your Agent, and reply with feedback.
+One continuous recording of the real console with sample data:
 
-<img src="docs/assets/cloud-sessions-demo-en.gif" width="320" alt="Three steps in Clawdline: open a waiting Session, view a small dashboard design image sent by Codex, and reply: Please make the button larger.">
+<img src="docs/assets/cloud-sessions-demo-en.gif" width="390" alt="A continuous phone recording of the real console: open a dashboard review from the multi-machine Session list, see a small design image sent by Codex, expand the to-dos and send Make the New project button larger, then see its sent receipt.">
 
 [Herdr](https://github.com/herdrdev/herdr/blob/master/docs/versions/0.9.1/website/src/content/docs/connecting-machines.mdx) also lists agents across SSH machines in one TUI; [T3 Code](https://github.com/pingdotgg/t3code/blob/main/docs/user/remote-access.md) connects to multiple environments. Clawdline Cloud groups them in a phone browser list and opens their conversations, to-dos, and images there.
 

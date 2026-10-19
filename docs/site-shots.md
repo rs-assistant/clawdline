@@ -61,15 +61,20 @@ Look at all sixteen pictures. A fold caught mid-animation, a callout around noth
 in the header, or a label in the wrong language is a capture to fix here, not a picture to
 publish.
 
-## The GitHub README walkthrough
+## The GitHub README recording
 
-The two `docs/assets/cloud-sessions-demo-*.gif` files are illustrated examples, not console
-recordings. Their shared source is `docs/assets/cloud-sessions-demo.html`. Each shows the same
-three-step story: open a waiting Session, see a small dashboard design sent by the Agent, and
-send feedback asking for a larger button. The image stays a thumbnail throughout.
+The two `docs/assets/cloud-sessions-demo-*.gif` files record the real React console with
+sample data supplied by a stand-in daemon. They keep the original multi-machine Session list
+and detail components. A continuous capture runs throughout opening the waiting Session,
+expanding its to-dos, and sending a request to make the New project button larger. The actual
+Send button reaches the stand-in daemon and the console displays its sent receipt.
 
-To recapture, open the HTML with `?lang=en&step=0` (or `lang=zh-Hant`, steps 0–2) at
-390 × 560 CSS pixels and device scale 2. Capture each state after fonts and layout settle, then
-encode a looping GIF with frame durations of 2, 3 and 3 seconds. Both READMEs display it at
-320 pixels wide. Keep the example label and the README descriptions explicit that this is an
-illustration.
+The attached image is a browser-rendered dashboard design from
+`docs/assets/dashboard-preview.html`, in English or Taiwan Traditional Chinese via
+`?lang=en` or `?lang=zh-Hant`. Its 720 × 240 shape keeps it short inside the console's normal
+image tile. The recording never opens the full-screen image viewer.
+
+Capture the console at 390 × 844 CSS pixels, device scale 2, approximately ten frames per
+second. Keep capturing during the actions and retain each frame's elapsed time when encoding
+the GIF. Both READMEs display the recording at 390 pixels wide. Do not replace the console
+with drawn screens, title cards or a slide sequence.
