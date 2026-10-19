@@ -70,7 +70,7 @@ test("no access, a named refusal, a network failure and a bad body are told apar
 
 test("every write is a POST with its Idempotency-Key and the body the server checks", async () => {
   const seen: Seen[] = []
-  const input = { name: "Launch", not_before: "2026-10-01T00:00:00.000Z", expires_at: "2026-11-01T00:00:00.000Z", redemption_limit: 10, conflict_policy: "reject" as const }
+  const input = { name: "Launch", not_before: "2026-10-01T00:00:00.000Z", expires_at: "2026-11-01T00:00:00.000Z", redemption_limit: 10, duration_calendar_months: 3 as const, conflict_policy: "reject" as const }
   const made = await createCampaign(fake(201, { campaign: raw(), replay: false }, seen), API, input, "k1")
   assert.equal(made.kind, "ready")
   assert.equal(seen[0].url, API + "/su/v1/promo/campaigns")
@@ -107,13 +107,13 @@ test("an issue hands back its plaintext once; a replay has none, and a fresh iss
 
 test("a draft is checked as the server checks it, and every bad field is named", () => {
   const now = Date.parse("2026-10-18T00:00:00Z")
-  const ok = checkCampaignDraft({ name: "  Launch ", notBefore: "2026-10-18T00:00:00Z", expiresAt: "2026-11-18T00:00:00Z", redemptionLimit: "25" }, now)
-  assert.deepEqual(ok, { ok: true, input: { name: "Launch", not_before: "2026-10-18T00:00:00.000Z", expires_at: "2026-11-18T00:00:00.000Z", redemption_limit: 25, conflict_policy: "reject" } })
-  const bad = checkCampaignDraft({ name: "", notBefore: "", expiresAt: "2026-10-17T00:00:00Z", redemptionLimit: "2.5" }, now)
+  const ok = checkCampaignDraft({ name: "  Launch ", notBefore: "2026-10-18T00:00:00Z", expiresAt: "2026-11-18T00:00:00Z", redemptionLimit: "25", durationCalendarMonths: "12" }, now)
+  assert.deepEqual(ok, { ok: true, input: { name: "Launch", not_before: "2026-10-18T00:00:00.000Z", expires_at: "2026-11-18T00:00:00.000Z", redemption_limit: 25, duration_calendar_months: 12, conflict_policy: "reject" } })
+  const bad = checkCampaignDraft({ name: "", notBefore: "", expiresAt: "2026-10-17T00:00:00Z", redemptionLimit: "2.5", durationCalendarMonths: "3" }, now)
   assert.deepEqual(bad, { ok: false, problems: { name: "name_missing", notBefore: "start_missing", expiresAt: "end_in_past", redemptionLimit: "limit_not_whole" } })
-  const long = checkCampaignDraft({ name: "x".repeat(121), notBefore: "2026-10-18T00:00:00Z", expiresAt: "2027-10-20T00:00:00Z", redemptionLimit: "1000001" }, now)
+  const long = checkCampaignDraft({ name: "x".repeat(121), notBefore: "2026-10-18T00:00:00Z", expiresAt: "2027-10-20T00:00:00Z", redemptionLimit: "1000001", durationCalendarMonths: "3" }, now)
   assert.deepEqual(long, { ok: false, problems: { name: "name_too_long", expiresAt: "window_too_long", redemptionLimit: "limit_too_large" } })
-  const backwards = checkCampaignDraft({ name: "a", notBefore: "2026-11-01T00:00:00Z", expiresAt: "2026-10-20T00:00:00Z", redemptionLimit: "1" }, now)
+  const backwards = checkCampaignDraft({ name: "a", notBefore: "2026-11-01T00:00:00Z", expiresAt: "2026-10-20T00:00:00Z", redemptionLimit: "1", durationCalendarMonths: "3" }, now)
   assert.deepEqual(backwards, { ok: false, problems: { expiresAt: "end_before_start" } })
   assert.equal(checkCodeLimit("3", 10), 3)
   assert.equal(checkCodeLimit("11", 10), "limit_too_large")

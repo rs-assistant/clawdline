@@ -273,6 +273,7 @@ export interface CampaignDraft {
   notBefore: string
   expiresAt: string
   redemptionLimit: string
+  durationCalendarMonths: "3" | "12"
 }
 
 export type DraftProblem =
@@ -286,6 +287,7 @@ export interface CampaignInput {
   not_before: string
   expires_at: string
   redemption_limit: number
+  duration_calendar_months: 3 | 12
   /** The only policy the service accepts at launch: an account with a paid plan cannot redeem. */
   conflict_policy: "reject"
 }
@@ -329,6 +331,7 @@ export function checkCampaignDraft(draft: CampaignDraft, now: number):
       not_before: new Date(start).toISOString(),
       expires_at: new Date(end).toISOString(),
       redemption_limit: limit,
+      duration_calendar_months: Number(draft.durationCalendarMonths) as 3 | 12,
       conflict_policy: "reject",
     },
   }

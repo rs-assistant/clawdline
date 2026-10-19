@@ -68,7 +68,7 @@ export async function redeemPromo(apiOrigin: string, code: string, storage: Stor
 
 export function promoWords(language: string) {
   return /^(zh-hant|zh-tw)/i.test(language) ? {
-    title: "兌換 Pro 三個月", label: "官方兌換碼", action: "兌換", working: "正在確認兌換碼…",
+    title: "兌換 Cloud Pro 禮遇", label: "官方兌換碼", action: "兌換", working: "正在確認兌換碼…",
     success: (date: string) => `Pro 已啟用，有效至 ${date}。`,
     rejected: "此兌換碼無法使用；請確認代碼與活動期限。",
     signedOut: "請先登入，再回到這裡兌換。", rateLimited: "嘗試次數過多，請稍後再試。",
@@ -76,7 +76,7 @@ export function promoWords(language: string) {
     unavailable: "暫時無法確認兌換結果，請稍後重試。",
     elsewhere: "請在 Clawdline Cloud 兌換此代碼。",
   } : {
-    title: "Redeem three months of Pro", label: "Official redemption code", action: "Redeem", working: "Checking your code…",
+    title: "Redeem a Cloud Pro offer", label: "Official redemption code", action: "Redeem", working: "Checking your code…",
     success: (date: string) => `Pro is active until ${date}.`,
     rejected: "This code cannot be redeemed. Check the code and campaign dates.",
     signedOut: "Sign in, then return here to redeem.", rateLimited: "Too many attempts. Try again later.",
