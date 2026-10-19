@@ -43,7 +43,7 @@ func TestMachineListUsesTheSingleMachineSnapshotAndItsRowStatus(t *testing.T) {
 	}
 	row := payload.Sessions[0]
 	status, _ := row["status"].(map[string]any)
-	if row["id"] != "%41" || row["title"] == nil || row["title"] == "" || row["line"] != nil ||
+	if row["assistant"] != "codex" || row["id"] != "%41" || row["title"] == nil || row["title"] == "" || row["line"] != nil ||
 		row["menu"] != nil || row["agents"] != nil || row["shells"] != nil {
 		t.Fatalf("machine list leaked content or lost identity: %v", row)
 	}
@@ -65,13 +65,14 @@ func TestMachineListNamesTheMachineWorkspaceSession(t *testing.T) {
 	s.sessions(rec, httptest.NewRequest(http.MethodGet, "/v1/sessions?parts=list", nil))
 	var payload struct {
 		Sessions []struct {
-			Status map[string]any `json:"status"`
+			Assistant string         `json:"assistant"`
+			Status    map[string]any `json:"status"`
 		} `json:"sessions"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil || len(payload.Sessions) != 1 {
 		t.Fatalf("machine list payload: %v %s", err, rec.Body)
 	}
-	if payload.Sessions[0].Status["machine_scope"] != true {
+	if payload.Sessions[0].Assistant != "claude" || payload.Sessions[0].Status["machine_scope"] != true {
 		t.Fatalf("machine list lost the Clawdfather's scope: %s", rec.Body)
 	}
 }
