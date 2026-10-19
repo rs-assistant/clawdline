@@ -76,9 +76,8 @@ function promoHref(campaign: string | null): string {
   return adminPath("promotions") + (campaign ? "?campaign=" + encodeURIComponent(campaign) : "")
 }
 
-function publicCampaignPage(code: string, locale: string): string {
-  const path = locale === "zh-TW" ? "/zh-TW/redeem/" : "/redeem/"
-  return `https://clawdline.com${path}#code=${encodeURIComponent(code)}`
+function publicCampaignPage(code: string): string {
+  return `https://clawdline.com/redeem/#code=${encodeURIComponent(code)}`
 }
 
 export function PromoManagement({ overview, apiOrigin, say, locale, search, go, onChanged, onLostAccess }: {
@@ -573,7 +572,7 @@ function CampaignDetail({ id, row, full, apiOrigin, say, locale, n, go, notice, 
           <div className="adm-campaign-pages">
             <span>{say("campaignPublicPages")}</span>
             {publicCodes.map((code) => (
-              <a key={code} href={publicCampaignPage(code, locale)} target="_blank" rel="noopener noreferrer" className="adm-crumb">
+              <a key={code} href={publicCampaignPage(code)} target="_blank" rel="noopener noreferrer" className="adm-crumb">
                 {say("campaignViewPage", { code })}<span aria-hidden="true"> ↗</span>
               </a>
             ))}
