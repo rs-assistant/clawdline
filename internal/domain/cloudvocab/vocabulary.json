@@ -514,7 +514,7 @@
       "console": "carried",
       "console_route": "POST /v1/cloud/pairing/agent",
       "console_seam": "reader",
-      "local": {"method": "POST", "headers": ["Idempotency-Key"]},
+      "local": {"method": "POST", "local_exemption": true, "headers": ["Idempotency-Key"]},
       "example": {"machine_id": "mac_target", "machine_name": "Target", "offer": "opaque", "request": "req-pair-agent-start", "session": "__clawdline_machine__"},
       "shapes": [
         {"body": ["machine_id", "machine_name", "offer", "request", "session"], "path": "/v1/cloud/pairing/agent", "local_body": ["machine_id", "machine_name", "offer"]}
@@ -528,7 +528,7 @@
       "console": "carried",
       "console_route": "GET /v1/cloud/pairing/agent/{task}",
       "console_seam": "reader",
-      "local": {"method": "GET"},
+      "local": {"method": "GET", "local_exemption": true},
       "example": {"request": "req-pair-status", "session": "__clawdline_machine__", "task_id": "7a000000-0000-4000-8000-000000000001"},
       "shapes": [
         {"body": ["request", "session", "task_id"], "path": "/v1/cloud/pairing/agent/{task_id}"}
