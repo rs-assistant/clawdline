@@ -69,11 +69,11 @@ test("a secondary catalog owns the frame and code-only sentence while ref and ac
       ref: { sender: "web_fixture", seq: 123 },
       acknowledge: () => { acknowledged++ },
     })
-    assert.equal(sentence, `${japanese["legacy.webFailForbidden"]}（Source unconfirmed · forbidden · fixture·123）`)
+    assert.equal(sentence, `${japanese["legacy.webFailForbidden"]}（${japanese["legacy.webFailOriginUnknown"]} · forbidden · fixture·123）`)
     assert.equal(acknowledged, 1)
 
     const wire = failureSentence({ code: "unknown_wire_code", detail: "Raw producer detail." })
-    assert.equal(wire, "Raw producer detail.（Source unconfirmed · unknown_wire_code）")
+    assert.equal(wire, `Raw producer detail.（${japanese["legacy.webFailOriginUnknown"]} · unknown_wire_code）`)
     assert.notEqual(english["legacy.webFailWithTag"], japanese["legacy.webFailWithTag"])
   } finally {
     resetCatalogForTest()
