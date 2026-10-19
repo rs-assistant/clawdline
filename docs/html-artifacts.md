@@ -10,6 +10,8 @@ The console sanitizes received HTML again with pinned DOMPurify and renders it i
 
 A new console with an older daemon cannot read HTML. An older console rejects the new MIME value conservatively; it does not gain HTML rendering. Deploy the console before enabling the daemon format. Existing Markdown and text continue to work. Rollback the console and daemon independently to compatible versions, retaining the report file for a later read.
 
+Canonical HTML document locators are also accepted by Notes. Their machine, route Session, scope and relative-path checks remain the same as for Markdown and text; the Note links to the existing isolated document viewer. Other formats such as XHTML and JavaScript remain unsupported.
+
 ## Verification and measurements
 
 The local browser fixture uses the real renderer and a real HTTP collector, in Chromium and WebKit at 390 and 1280 CSS pixels. It checks the report tables and native expansion, then attempts scripts, parent DOM access, navigation, popups and resource loads. The collector received zero requests. Chromium reports CSS attempts as failed with `csp`; a browser request event alone is not evidence of a request reaching a server.

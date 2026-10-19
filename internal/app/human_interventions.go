@@ -120,7 +120,7 @@ func ValidateHumanDocumentURL(raw, machine, session string) error {
 		}
 	}
 	switch strings.ToLower(path.Ext(file)) {
-	case ".md", ".markdown", ".txt":
+	case ".md", ".markdown", ".txt", ".html":
 	default:
 		return humanInterventionError("document_url_invalid", "The document must be a supported text file.")
 	}
