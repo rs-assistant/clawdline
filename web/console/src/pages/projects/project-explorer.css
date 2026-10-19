@@ -23,7 +23,7 @@
 .project-explorer-nav [role="alert"], .project-explorer-preview [role="alert"] { color: var(--bad); }
 .project-explorer-preview { padding: 16px; overflow: hidden; }
 .project-explorer-hint { margin: 0; color: var(--dim); font-size: 13px; }
-.project-explorer-preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.project-explorer-preview-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .project-explorer-preview-head h4 { margin: 0 0 5px; font-size: 16px; overflow-wrap: anywhere; }
 .project-explorer-preview-head h4:focus { outline: none; }
 .project-explorer-preview-head code { color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
@@ -39,3 +39,6 @@
   .project-explorer-preview-head button { min-height: 44px; }
   .project-explorer-text { max-height: 46vh; }
 }
+
+.project-explorer-preview-head > div { flex: 1 1 9rem; min-width: 0; }
+.project-explorer-preview-head button { max-width: 100%; }
