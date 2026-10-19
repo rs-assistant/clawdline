@@ -15,7 +15,7 @@ export function record(value: unknown): Record<string, unknown> | null {
 }
 
 /** The same signed machine descriptor already supplies task roots to the single-machine list. */
-function descriptorParents(client: StatusProjectionClient, machine: string, ids: readonly string[], nowMs: number): Map<string, string> {
+export function descriptorParents(client: StatusProjectionClient, machine: string, ids: readonly string[], nowMs: number): Map<string, string> {
   const snapshot = record(client.orchestratorSnapshots?.get(machine))
   if (!snapshot || !Number.isFinite(snapshot.at) || Math.abs(nowMs - Number(snapshot.at) * 1000) > STATUS_FRESH_MS ||
     !Array.isArray(snapshot.tasks)) return new Map()
