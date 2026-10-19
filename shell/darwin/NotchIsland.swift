@@ -324,6 +324,11 @@ final class NotchIsland: NSObject, WKScriptMessageHandler {
         mode = .hidden
     }
 
+    func languageChanged() {
+        view?.toolTip = tip(for: mode)
+        hideTip()
+    }
+
     // MARK: - What to show
 
     private var waiting: [IslandSession] { rows.filter { $0.state == "waiting" } }

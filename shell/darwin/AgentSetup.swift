@@ -9,20 +9,42 @@ final class AgentSetupWindowController: NSObject, NSWindowDelegate {
 
     private var window: NSWindow?
     private var status: NSTextField!
+    private var intro: NSTextField!
     private var output: NSTextField!
     private var installButton: NSButton!
     private var signInButton: NSButton!
     private var cancelButton: NSButton!
+    private var guideButton: NSButton!
+    private var checkButton: NSButton!
     private var codex: URL?
     private var loginTask: Process?
     private var busy = false
     private var loginCancelled = false
     private var openedLoginPage = false
     private var onChange: (() -> Void)?
+    private typealias Message = (en: String, tw: String)
+    private var statusMessage: Message?
+    private var outputMessage: Message?
 
     private static func t(_ en: String, _ tw: String) -> String {
-        let tag = Locale.preferredLanguages.first?.lowercased() ?? ""
-        return tag.hasPrefix("zh-hant") || tag.hasPrefix("zh-tw") ? tw : en
+        let key = "agentSetup." + en
+        let value = ShellLanguage.word(key)
+        return value == key ? (ShellLanguage.tag == "zh-Hant" ? tw : en) : value
+    }
+
+    func languageChanged() {
+        guard window != nil else { return }
+        window?.title = Self.t("AI tool setup", "AI 工具設定")
+        intro.stringValue = Self.t(
+            "Clawdline is installed. Choose Codex or Claude Code, then sign in with your own account before starting a Session.",
+            "Clawdline 已安裝。請選擇 Codex 或 Claude Code，並以自己的帳號登入，再開始 Session。")
+        installButton.title = Self.t("Install Codex", "安裝 Codex")
+        signInButton.title = Self.t("Sign in to Codex", "登入 Codex")
+        cancelButton.title = Self.t("Cancel sign-in", "取消登入")
+        guideButton.title = Self.t("Claude Code guide", "Claude Code 指引")
+        checkButton.title = Self.t("Check again", "重新檢查")
+        refresh(statusMessage)
+        if let outputMessage { output.stringValue = Self.t(outputMessage.en, outputMessage.tw) }
     }
 
     private static func tool(_ name: String) -> URL? {
@@ -46,9 +68,11 @@ final class AgentSetupWindowController: NSObject, NSWindowDelegate {
     }
 
     private func build() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 345),
-                              styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 720, height: 470),
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                              backing: .buffered, defer: false)
         window.title = Self.t("AI tool setup", "AI 工具設定")
+        window.minSize = NSSize(width: 680, height: 420)
         window.isReleasedWhenClosed = false
         window.delegate = self
         let root = NSStackView()
@@ -64,7 +88,7 @@ final class AgentSetupWindowController: NSObject, NSWindowDelegate {
             root.topAnchor.constraint(equalTo: window.contentView!.topAnchor),
             root.bottomAnchor.constraint(equalTo: window.contentView!.bottomAnchor),
         ])
-        let intro = NSTextField(wrappingLabelWithString: Self.t(
+        intro = NSTextField(wrappingLabelWithString: Self.t(
             "Clawdline is installed. Choose Codex or Claude Code, then sign in with your own account before starting a Session.",
             "Clawdline 已安裝。請選擇 Codex 或 Claude Code，並以自己的帳號登入，再開始 Session。"))
         root.addArrangedSubview(intro)
@@ -94,18 +118,19 @@ final class AgentSetupWindowController: NSObject, NSWindowDelegate {
         installButton = button(primary, Self.t("Install Codex", "安裝 Codex"), #selector(installCodex))
         signInButton = button(primary, Self.t("Sign in to Codex", "登入 Codex"), #selector(signInCodex))
         cancelButton = button(primary, Self.t("Cancel sign-in", "取消登入"), #selector(cancelSignIn))
-        _ = button(secondary, Self.t("Claude Code guide", "Claude Code 指引"), #selector(openClaudeGuide))
-        _ = button(secondary, Self.t("Check again", "重新檢查"), #selector(checkAgain))
+        guideButton = button(secondary, Self.t("Claude Code guide", "Claude Code 指引"), #selector(openClaudeGuide))
+        checkButton = button(secondary, Self.t("Check again", "重新檢查"), #selector(checkAgain))
         actions.addArrangedSubview(primary)
         actions.addArrangedSubview(secondary)
         root.addArrangedSubview(actions)
         self.window = window
     }
 
-    private func refresh(_ message: String? = nil) {
+    private func refresh(_ message: Message? = nil) {
+        statusMessage = message
         codex = Self.tool("codex")
         let claude = Self.tool("claude")
-        status.stringValue = message ?? (codex != nil
+        status.stringValue = message.map { Self.t($0.en, $0.tw) } ?? (codex != nil
             ? Self.t("Codex found. Sign in if needed, then return to the Session picker and retry.",
                      "已找到 Codex。若尚未登入，請先登入，再回到 Session 選擇畫面重試。")
             : claude != nil
@@ -120,7 +145,7 @@ final class AgentSetupWindowController: NSObject, NSWindowDelegate {
         cancelButton.isHidden = loginTask == nil
     }
 
-    @objc private func checkAgain() { refresh(); output.stringValue = ""; onChange?() }
+    @objc private func checkAgain() { refresh(); outputMessage = nil; output.stringValue = ""; onChange?() }
 
     @objc private func openClaudeGuide() {
         NSWorkspace.shared.open(URL(string: "https://code.claude.com/docs/en/setup")!)
@@ -137,8 +162,9 @@ final class AgentSetupWindowController: NSObject, NSWindowDelegate {
         alert.addButton(withTitle: Self.t("Cancel", "取消"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         busy = true
-        status.stringValue = Self.t("Downloading and verifying Codex…", "正在下載並核對 Codex……")
-        refresh(status.stringValue)
+        outputMessage = nil
+        output.stringValue = ""
+        refresh(("Downloading and verifying Codex…", "正在下載並核對 Codex……"))
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let result: Result<Void, Error>
             do { try CodexInstaller.install(); result = .success(()) }
@@ -148,14 +174,17 @@ final class AgentSetupWindowController: NSObject, NSWindowDelegate {
                 self.busy = false
                 switch result {
                 case .success:
-                    self.output.stringValue = Self.t("Codex installed. Sign in, then retry the Session.",
-                                                    "Codex 已安裝。請先登入，再重試開始 Session。")
+                    let message: Message = ("Codex installed. Sign in, then retry the Session.",
+                                            "Codex 已安裝。請先登入，再重試開始 Session。")
+                    self.outputMessage = message
+                    self.output.stringValue = Self.t(message.en, message.tw)
                     self.refresh()
                     self.onChange?()
                 case .failure(let error):
+                    self.outputMessage = nil
                     self.output.stringValue = error.localizedDescription
-                    self.refresh(Self.t("Codex installation did not finish. Read the reason below and try again.",
-                                        "Codex 安裝未完成。請閱讀下方原因後重試。"))
+                    self.refresh(("Codex installation did not finish. Read the reason below and try again.",
+                                  "Codex 安裝未完成。請閱讀下方原因後重試。"))
                 }
             }
         }
@@ -183,15 +212,17 @@ final class AgentSetupWindowController: NSObject, NSWindowDelegate {
         loginCancelled = false
         openedLoginPage = false
         busy = true
+        outputMessage = nil
         output.stringValue = ""
-        refresh(Self.t("Wait for the one-time code, then finish in your browser.",
-                       "請等候一次性代碼，再到瀏覽器完成登入。"))
+        refresh(("Wait for the one-time code, then finish in your browser.",
+                 "請等候一次性代碼，再到瀏覽器完成登入。"))
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             if data.isEmpty { handle.readabilityHandler = nil; return }
             let chunk = String(data: data, encoding: .utf8) ?? ""
             DispatchQueue.main.async {
                 guard let self else { return }
+                self.outputMessage = nil
                 self.output.stringValue += chunk.replacingOccurrences(of: "\u{001B}\\[[0-9;]*m", with: "", options: .regularExpression)
                 if !self.openedLoginPage && self.output.stringValue.contains("https://auth.openai.com/codex/device") {
                     self.openedLoginPage = true
@@ -207,11 +238,11 @@ final class AgentSetupWindowController: NSObject, NSWindowDelegate {
                 self.busy = false
                 let signedIn = task.terminationReason == .exit && task.terminationStatus == 0
                     && CodexInstaller.isSignedIn(codex)
-                self.refresh(self.loginCancelled ? Self.t("Sign-in cancelled. You can try again.", "登入已取消，可再次嘗試。")
-                    : signedIn ? Self.t("Codex sign-in verified. Return to the Session picker and retry.",
-                                        "已確認 Codex 登入成功。請回到 Session 選擇畫面重試。")
-                    : Self.t("Codex sign-in was not verified. Check the code and try again.",
-                             "無法確認 Codex 已登入。請檢查代碼後重試。"))
+                self.refresh(self.loginCancelled ? ("Sign-in cancelled. You can try again.", "登入已取消，可再次嘗試。")
+                    : signedIn ? ("Codex sign-in verified. Return to the Session picker and retry.",
+                                  "已確認 Codex 登入成功。請回到 Session 選擇畫面重試。")
+                    : ("Codex sign-in was not verified. Check the code and try again.",
+                       "無法確認 Codex 已登入。請檢查代碼後重試。"))
                 if signedIn { self.onChange?() }
             }
         }

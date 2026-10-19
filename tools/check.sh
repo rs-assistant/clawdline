@@ -198,6 +198,7 @@ check "machine-word delta guard" bash tools/test-machine-words-changes.sh
 check "heavy handoff capability" bash tools/test-heavy-handoff.sh
 if [ "$(uname -s)" = Darwin ]; then
   check "Swift staged app watcher" sh tools/test-staged-app-watcher.sh
+  check "Swift native shell language" sh tools/test-shell-language.sh
 fi
 fi
 if [ "$web" = yes ]; then
