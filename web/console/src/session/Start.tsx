@@ -104,6 +104,9 @@ let pasts: PastRow[] | null = null
 /** The past list was asked for and not read: it is not empty, it is unknown, and the sheet must not say "no records". */
 let pastsUnread = false
 let capped = false
+let pastCursor = ""
+let pastFailed = false
+let pastGeneration = 0
 let reading = false
 let wait: { id: string; from: string | null; late: boolean; eager: boolean; place: Place } | null = null
 let detached: string | null = null
@@ -267,6 +270,7 @@ function ownWhy(e: Failure, reading?: "past"): string {
   if (code === "coordinator_session_exists") return nextWord("machineSessionExists")
   if (code === "machine_workspace_invalid") return nextWord("machineWorkspaceInvalid")
   if (code === "coordinator_store_invalid") return nextWord("machineRoleInvalid")
+  if (code === "codex_unavailable") return nextWord("startPastUnavailable")
   if (code === "not_found") return T().webStartGone
   if (e && e.app && code === "terminal_closed") return L.fillString(T().webStartTerminalClosed, { app: e.app })
   if (code === "terminal_unsupported") return T().webStartTerminalUnsupported
@@ -629,7 +633,7 @@ function drawPast(list: HTMLElement, box: HTMLInputElement): void {
         : pastsUnread
           ? ""
           : pasts && !pasts.length
-            ? T().webResumeEmpty
+            ? pastCursor ? nextWord("startPastFiltered") : T().webResumeEmpty
             : T().webResumePick,
   )
   const loadingPast = reading && !pasts
@@ -685,7 +689,18 @@ function drawPast(list: HTMLElement, box: HTMLInputElement): void {
     list.appendChild(li)
   })
 
-  if (capped && all.length) {
+  if (pastCursor || pastFailed) {
+    const li = document.createElement("li")
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "place"
+    button.disabled = reading || !!pressing || !!wait
+    button.textContent = reading ? T().webLoading : pastFailed ? nextWord("usageRetry") : nextWord("startPastMore")
+    button.onclick = () => readPast(pastCursor)
+    li.appendChild(button)
+    list.appendChild(li)
+  }
+  if (capped && !pastCursor && all.length) {
     const note = document.createElement("li")
     note.className = "note"
     note.setAttribute("role", "status")
@@ -727,6 +742,8 @@ function load(background = false): void {
 }
 
 function enter(place: Place): void {
+  pastGeneration += 1
+  reading = false
   at = place
   pasts = null
   pastsUnread = false
@@ -734,33 +751,55 @@ function enter(place: Place): void {
   find = ""
   el<HTMLInputElement>("start-filter").value = ""
   said("")
+  pastCursor = ""
+  pastFailed = false
+  readPast("")
+}
+
+function readPast(cursor: string): void {
+  if (!at || reading) return
+  const place = at
+  const assistant = with_
+  const generation = ++pastGeneration
+  pastFailed = false
+  said("")
   reading = true
   draw()
-  asked(() => api.pastSessions(place.id, with_))
+  asked(() => api.pastSessions(place.id, assistant, cursor || undefined))
     .then((d) => {
-      if (!at || at.id !== place.id) return
-      pasts = (d && d.sessions) || []
+      if (generation !== pastGeneration || !at || at.id !== place.id) return
+      const rows = (d && d.sessions) || []
+      const byID = new Map((cursor ? pasts || [] : []).map((row) => [row.id, row]))
+      rows.forEach((row) => byID.set(row.id, row))
+      pasts = Array.from(byID.values())
       pastsUnread = false
-      capped = !!(d && d.more)
+      pastCursor = d?.next_cursor || ""
+      capped = !!d?.more
     })
     .catch((e: Failure) => {
-      if (!at || at.id !== place.id) return
+      if (generation !== pastGeneration || !at || at.id !== place.id) return
       pastsUnread = !pasts
       pasts = pasts || []
+      pastFailed = true
       if (e && e.code === "not_found") {
         leave()
         places = null
         load()
+        return
       }
       said(why(e, "past"), e)
     })
     .then(() => {
+      if (generation !== pastGeneration) return
       reading = false
       draw()
     })
 }
 
 function leave(): void {
+  pastGeneration += 1
+  pastCursor = ""
+  pastFailed = false
   at = null
   resumeAs = ""
   pasts = null

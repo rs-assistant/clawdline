@@ -142,7 +142,7 @@ internal/adapters/limits.rolloutTailLimit # read: the tail of one Codex rollout,
 internal/adapters/machineusage.maxDepth # parameter: how far one process's parent chain is walked to find its session; a chain is as deep as the process tree, and the bound only stops a cycle read while a pid is being reused
 internal/adapters/machineusage.maxInterval # parameter: how old the dashboard's previous reading may be before a CPU share is measured over a fresh half second instead; nothing is kept past one previous sample
 internal/adapters/projects.changedPathLimit # page: changed paths in one project row
-internal/adapters/projects.codexThreadList:chan(16) # lane: lines from one codex app-server read
+internal/adapters/projects.codexRequest:chan(16) # lane: lines from one codex app-server read
 internal/adapters/projects.dirtyPathLimit # page: dirty paths in one project row
 internal/adapters/projects.package:chan(2) # lane: codex app-server readers, two at a time
 internal/adapters/projects.projectCacheLimit # store: the project reading cache, 32 rows, the least recently written let go (limits N18, cache class); already bounded, and not registered by C2

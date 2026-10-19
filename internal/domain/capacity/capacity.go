@@ -413,6 +413,7 @@ const (
 	// reading cheap.
 	SessionsAgentRows = "sessions.agent_rows"
 	// The waited-on tasks one Session row names (transport/http/session_wait_targets.go).
+	SessionCodexPastPage  = "session.codex_past_page"
 	SessionWaitingFor     = "session.waiting_for"
 	CacheBackgroundAgents = "cache.background_agents"
 	// SessionsShellOutputBytes is the most of one background command's

@@ -13,6 +13,9 @@ import { catalogWord } from "./catalog.ts"
 
 const words = {
   en: {
+    startPastMore: "Load older sessions",
+    startPastFiltered: "This page has no resumable sessions. Load older sessions to continue.",
+    startPastUnavailable: "Codex history could not be read. Retry the request.",
     usageOverview: "Usage overview",
     usageRefresh: "Refresh",
     usageTokens: "Token usage",
@@ -1672,6 +1675,9 @@ const words = {
     signedInCapsSendTerminal: "Read, send and open a shell",
   },
   "zh-Hant": {
+    startPastMore: "載入較早的 session",
+    startPastFiltered: "這一頁沒有可接續的 session，請載入較早的紀錄。",
+    startPastUnavailable: "無法讀取 Codex 歷史紀錄，請重試。",
     usageOverview: "使用概況",
     usageRefresh: "重新整理",
     usageTokens: "Token 用量",

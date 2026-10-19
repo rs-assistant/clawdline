@@ -11,6 +11,9 @@ import (
 // (capacity.AreaOf), one reading per row.
 func (s *Server) sessionCapacityMeasures() map[string]func() capacity.Reading {
 	return map[string]func() capacity.Reading{
+		capacity.SessionCodexPastPage: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-provider-page guard; no retained buffer"}
+		},
 		capacity.SecretHandoffBytes: func() capacity.Reading {
 			if s.secretHandoffs == nil {
 				return capacity.Reading{Known: true, Note: "no handoff service attached"}

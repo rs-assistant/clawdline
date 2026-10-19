@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6973,
-  "riskKeys": 3155,
-  "nonRiskCount": 3818,
+  "englishContentKeys": 6978,
+  "riskKeys": 3159,
+  "nonRiskCount": 3819,
   "groups": [
     {
       "name": "admin / other",
@@ -2376,7 +2376,7 @@
     },
     {
       "name": "next / other",
-      "count": 277,
+      "count": 278,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2555,6 +2555,7 @@
         "next.smartTitleConfirmTitle",
         "next.smartTitleWorking",
         "next.stackStatusNotRun",
+        "next.startPastMore",
         "next.startProgressDone",
         "next.startProgressHint",
         "next.startProgressOpen",

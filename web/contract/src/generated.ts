@@ -4232,8 +4232,9 @@ export interface PastSession {
 
 /**
  * GET /v1/places/{id}/sessions[/{assistant}]: what that assistant has recorded in
- * the place, newest first, at most two hundred. Dispatched children and `-p` runs
- * are not conversations and are left out.
+ * the place, newest first. Codex returns one provider page of twenty with an opaque
+ * next_cursor; other assistants return at most two hundred. Dispatched children and
+ * `-p` runs are not conversations and are left out.
  */
 export interface PastSessionList {
   assistant: string
@@ -4243,6 +4244,11 @@ export interface PastSessionList {
    * The list stopped at its cap and there were more.
    */
   more: boolean
+
+  /**
+   * Opaque continuation for the next Codex page; omitted at the end.
+   */
+  next_cursor?: string
   place: string
   sessions: PastSession[]
 }
@@ -4330,8 +4336,9 @@ export interface PersonaSuggestionRequest {
 }
 
 /**
- * A refusal from the start, resume and history routes: not_found, forbidden,
- * bad_request, invalid_launch, terminal_closed, terminal_unsupported,
+ * A refusal from the start, resume and history routes: codex_unavailable (503;
+ * provider read failed, retryable and never evidence of absence), not_found,
+ * forbidden, bad_request, invalid_launch, terminal_closed, terminal_unsupported,
  * terminal_io_failed, iterm_attention_required, capability_unavailable,
  * terminal_busy, unknown_persona (a start or resume ending `/as/{persona}` that
  * names no persona in GET /v1/personas).
