@@ -101,6 +101,11 @@ func judgedAsDevice(r *http.Request) bool {
 // notThisMachine is the verdict as a request that named an actor is judged by:
 // the same device, the same capabilities, and not this machine. It only ever
 // removes: a verdict that was not `Local` comes back unchanged.
+//
+// The capabilities stay as they are, deliberately. An in-process Cloud request
+// carries this machine's own token, so a Cloud viewer keeps read, send and
+// Admin; Admin is what lets it manage the board (boardViewer), which a device
+// paired on this machine's own network may not.
 func notThisMachine(v auth.Verdict) auth.Verdict {
 	v.Local = false
 	return v

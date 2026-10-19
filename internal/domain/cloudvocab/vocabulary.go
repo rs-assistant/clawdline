@@ -102,6 +102,13 @@ type Local struct {
 	// Device is whether the request runs as the paired device
 	// (`X-Clawdline-Actor: device`) rather than as the machine.
 	Device bool `json:"device,omitempty"`
+	// LocalExemption is a word that deliberately runs as this machine on a
+	// route that refuses anybody else (`requireLocal`). The in-process Cloud
+	// request carries this machine's own token, so such a word lends a
+	// viewer this machine's own exemption; the flag is the table saying that
+	// on purpose. internal/transport/http's guard refuses a Local word that
+	// reaches such a route without it, and a flagged word whose route does not.
+	LocalExemption bool `json:"local_exemption,omitempty"`
 	// Headers are the other headers the route itself sets.
 	Headers []string `json:"headers,omitempty"`
 }
@@ -218,6 +225,11 @@ func validate(ops []Operation) error {
 			}
 		default:
 			return fmt.Errorf("cloudvocab: %s has console %q", o.Op, o.Console)
+		}
+		// The header can only take authority away, so a word sent as the
+		// device cannot also be wearing this machine's exemption.
+		if o.Local != nil && o.Local.Device && o.Local.LocalExemption {
+			return fmt.Errorf("cloudvocab: %s runs as the device and claims this machine's exemption", o.Op)
 		}
 		if o.ConsoleParsedAs != "" && o.ConsoleSeam != Writer {
 			return fmt.Errorf("cloudvocab: %s names a parsed word outside the writer", o.Op)

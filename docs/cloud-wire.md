@@ -523,15 +523,33 @@ header 的 `alg` 必須是 `EdDSA` 或 `ES256`；`none` 與所有 HMAC 在看 pa
 | capability | 誰執行 | 打開什麼 |
 |---|---|---|
 | `read_sessions` | relay，收的時候 | 預設接收 `ss/` 與 `orch/` 狀態快照 |
-| `read_transcript` | relay，發 `r/` 與收內容時；machine 在 `r/` 回答前及封裝前再查 | 明確訂閱的完整 `s/`、`t/` 與 `ho/`，以及唯讀 `r/` 請求 |
-| `send_prompt` | relay，發與收；**Mac 自己的 admission 仍然另外算** | 發 `ctl/`（兩種 class）、收 `ctlr/` |
-| `start_session` | **只有 Mac**（它在 `ct` 裡面） | relay 看不到的東西 |
+| `read_transcript` | relay，發 `r/` 與收內容時；machine **只在 `r/`** 回答前及封裝前再查 | 明確訂閱的完整 `s/`、`t/` 與 `ho/`，以及唯讀 `r/` 請求 |
+| `send_prompt` | **只有 relay**，發與收 | 發 `ctl/`（兩種 class）、收 `ctlr/` |
+| `start_session` | **沒有人執行**：relay 看不到 `ct` 裡面，machine 也不查 | 沒有 |
 
 來源：`PROTOCOL.md:322-343`。一份 receive policy 同時決定 subscribe、fan-out 與 realign，
 被收窄的裝置會寫一行 `capability_refused`（只記 device、connection、channel kind、path 與需要的
 capability，**不記 channel 名字**）。
 
 **Machine 不受 capability 管**：它發自己的狀態、收寄給它的 `ctl/` 與依角色收 `ho/`。
+
+**Machine 實際查什麼（2026-10-19）。** 每台裝置都有完整權限，沒有唯讀裝置：每個 Cloud viewer 都持有
+上表四個 capability，所以 machine 不在 `ctl/` 上區分 viewer 的 capability，以上表格只描述 relay 的
+閘門。`ctl/` 上的請求，machine 依序只查：channel 是不是自己的、字在不在詞彙表裡、寄件者在不在帳號
+roster 上且沒被撤銷、簽章金鑰與 roster（及本機 pin）一致、`cloud_commands` 寫入開關（讀取與
+read-level 字不查），以及 Session 動作的 execution 收據與各字自己的 guard
+（`internal/transport/cloud/link.go` 的 `authority`、`internal/app/cloudops/cloudops.go`）。
+`start_session` 在 machine 上沒有任何檢查：`start`、`resume`、`restore-*`、`pair-agent-start` 只需要
+roster 與寫入開關。`ctl/` 上舊形狀的 Session 內容讀取（`transcript`、`info`、`screen`、`git` 等）
+也不查 `read_transcript`；只有 `r/` 這條內容軌道會在讀之前與封裝之前再查一次。
+
+通過之後，請求以這台 machine 自己的 local token 進本機路由。帶 `X-Clawdline-Actor: device` 的字只
+拿掉 `Local` 與 machine 那道門，capability 保持 read、send 與 Admin，所以 Cloud viewer 可以管理
+board（開關 board、給或撤回 AI 閱讀同意），在本機網路配對的裝置沒有 Admin 則不行——這是刻意的
+（`internal/transport/http/board.go` 的 `boardViewer`）。不帶這個 header 的字就是這台 machine；
+其中只有 `pair-agent-start` 與 `pair-agent-status` 會到只有這台 machine 能用的路由
+（`requireLocal`），詞彙表把它們標成 `local_exemption`，
+`TestEveryLocalWordThatNeedsThisMachineSaysSo` 擋住任何沒有這個標記卻走到這種路由的新字。
 
 `orch/<machine>` advertises `machine.read_content_v1: true` only when the read-only `r/` bridge is connected. An absent value means an older machine; the presence of `ss/` does not imply this capability. The `r/` body accepts pinned `info` with `parts: "full"`, `transcript` with `limit` from 1 to 1000 and optional positive `before`, `skills`, `image`, `git`, `git-diff`, `screen`, `agent`, `shell`, `documents`, and `document`. Every Session-scoped read requires `machine_id`, `session`, and a 32-character lowercase hexadecimal `expected_generation`; `machine_id` must match the channel target. The bridge gets `sender`, `seq`, and `ch` from the verified, decrypted envelope. It checks the current roster, signing key, local revocation, and `read_transcript` capability before the pinned local HTTP read and again before sealing the answer. The bridge repeats fresh execution admission after reading, so a reused Session ID cannot release old content. Other operations refuse with `read_only_channel`; a missing generation refuses with `execution_target_required`, and missing capability with `read_transcript_required`.
 
@@ -828,6 +846,16 @@ to change what a word accepts, and the decompressed diff is the review. A limit
 the table copies from a Go constant names it under `copies`, and
 `TestCopiedLimitsAreTheirConstants` holds the two equal. The wrapper rules are
 held to the bridge by `TestTheTableStatesTheBridgesWrapperRules`.
+
+A row's `local` says who the local request runs as. `device: true` sends
+`X-Clawdline-Actor: device`, which takes away `Local` and the machine door and
+keeps the capabilities (§8.2). Without it the word runs as this machine, and
+`local_exemption: true` says so on purpose for a word whose route answers only
+this machine (`requireLocal`): today `pair-agent-start` and
+`pair-agent-status`. `TestEveryLocalWordThatNeedsThisMachineSaysSo`
+(`internal/transport/http`) asks every Local word's route as a device paired on
+this machine's own network would, and fails for an unflagged word that is
+refused there and for a flagged one that is not.
 
 The same row says what the hosted console does with the word: `console` is
 `carried`, `deferred` or `no_machine_route`; a carried row names its

@@ -893,6 +893,9 @@ func genDecodeNotificationSettingsUpdate(b body) (plan, LocalRequest, bool) {
 }
 
 // genDecodePairAgentStart is the `pair-agent-start` row's decode.
+//
+// Deliberately this machine (`local_exemption`): its route refuses every
+// caller but this machine's own token, which the in-process request carries.
 func genDecodePairAgentStart(b body) (plan, LocalRequest, bool) {
 	if !b.hasOneOf(
 		[]string{"type", "machine_id", "machine_name", "offer", "request", "session"},
@@ -923,6 +926,9 @@ func genDecodePairAgentStart(b body) (plan, LocalRequest, bool) {
 }
 
 // genDecodePairAgentStatus is the `pair-agent-status` row's decode.
+//
+// Deliberately this machine (`local_exemption`): its route refuses every
+// caller but this machine's own token, which the in-process request carries.
 func genDecodePairAgentStatus(b body) (plan, LocalRequest, bool) {
 	if !b.hasOneOf(
 		[]string{"type", "request", "session", "task_id"},
