@@ -77,6 +77,7 @@ function promoHref(campaign: string | null): string {
 }
 
 function publicCampaignPage(code: string): string {
+  if (code === "BUILD-TOGETHER-100") return "https://clawdline.com/friends/"
   return `https://clawdline.com/redeem/?lang=en#code=${encodeURIComponent(code)}`
 }
 
