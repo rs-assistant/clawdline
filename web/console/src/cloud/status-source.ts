@@ -230,7 +230,7 @@ export function statusSource(current: () => StatusClient | null,
     promise?: Promise<DirectList | null> }>()
   const imageSignals = new Map<string, AbortController>()
   const visibleArtifacts = new Map<string, Set<string>>()
-  const readMachine = async (machineID: string, signal: AbortSignal): Promise<MachineSessionProjection> => {
+  const readMachine = async (machineID: string, signal: AbortSignal, fresh = false): Promise<MachineSessionProjection> => {
     const client = current()
     if (!client || client.ready === false) return { kind: "unavailable", reason: "unknown" }
     if (client !== attemptedClient) {
@@ -256,17 +256,25 @@ export function statusSource(current: () => StatusClient | null,
     if (signal.aborted) return projection
     if (roster?.machines.find((entry) => entry.id === machineID)?.freshness === "stale")
       return retainedStatus(projection, "stale")
+    // Recovery must ask the machine even when the retained set looks fresh:
+    // a push and its old status pass can agree with each other and both be old.
+    const cachedDirect = directLists.get(machineID)
+    if (!fresh && cachedDirect?.value && cachedDirect.client === client &&
+      cachedDirect.until > (client.now?.() ?? Date.now()) &&
+      cachedDirect.value.projection.observedAt > (projection.observedAt ?? 0) &&
+      roster?.machines.some((machine) => machine.id === machineID && machine.freshness === "current"))
+      return cachedDirect.value.projection
     // The roster can arrive before orch/ advertises the reader. One bounded
     // authenticated attempt is safe: an older machine refuses sessions.list,
     // while waiting for the descriptor can hold a cold browser for a minute.
-    if (projection.kind === "unavailable" &&
-      (projection.reason === "unknown" || projection.reason === "event_gap" || projection.reason === "stale") &&
+    if ((fresh || projection.kind === "unavailable" &&
+      (projection.reason === "unknown" || projection.reason === "event_gap" || projection.reason === "stale")) &&
       client.listPresentationsForMachine && pinnedReadSupport(client, machineID) !== "no" && !signal.aborted) {
       const now = client.now?.() ?? Date.now()
       let cached = directLists.get(machineID)
-      if (!cached || cached.client !== client || cached.until <= now) {
+      if (fresh || !cached || cached.client !== client || cached.until <= now) {
         const started = now
-        const reason = projection.reason
+        const reason = projection.kind === "unavailable" ? projection.reason : "stale"
         const failures = cached?.client === client ? cached.failures : 0
         const promise = client.listPresentationsForMachine(machineID, new AbortController().signal)
           .then((reply) => {
@@ -300,6 +308,7 @@ export function statusSource(current: () => StatusClient | null,
         if (answer.machines.some((machine) => machine.id === machineID && machine.freshness === "current"))
           return direct.projection
       }
+      if (fresh) return { kind: "unavailable", reason: "unknown" }
       projection = statusProjection(client, machineID)
       if (projection.kind === "unavailable" && projection.reason === "stale")
         projection = { ...projection, retryAt: cached.until }

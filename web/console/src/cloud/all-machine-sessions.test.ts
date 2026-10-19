@@ -5,7 +5,7 @@ import {
   afterEventGap, checkedProjection, destinationAvailable, destinationFragment, destinationFromFragment,
   displayedPresentationStatus, fleetRowTitle, identifyOpenedFleetRow, withConfirmedFleetTitle,
   destinationKey, prependOlderPage, projectionRefreshAt, settleProjection, SessionDetailCache, shownDestinationKeys,
-  supersedingDestination,
+  SessionExecutionRecovery, supersedingDestination,
   type MachineSessionProjection, type ProjectedSession,
 // @ts-expect-error -- node's type-stripping runner resolves the source .ts file.
 } from "./all-machine-sessions.ts"
@@ -260,4 +260,83 @@ test("nothing is followed when the Session is gone, unproven, or ambiguous", () 
   assert.equal(supersedingDestination(old.destination, undefined), null)
   // Never across machines, even with the same Session id.
   assert.equal(supersedingDestination(old.destination, ready("machine/b", [row("machine/b", "%14", "8")])), null)
+})
+
+
+test("a push to an old execution follows the current row once, sharing concurrent failures", async () => {
+  const recovery = new SessionExecutionRecovery()
+  let selected = row("machine/a", "%14", "7").destination
+  const original = selected
+  const next = row("machine/a", "%14", "8")
+  let finish!: (projection: MachineSessionProjection) => void
+  let reads = 0
+  const read = () => { reads++; return new Promise<MachineSessionProjection>((resolve) => { finish = resolve }) }
+  const adopt = (target: typeof selected) => { selected = target }
+  const first = recovery.recover(original, read, () => selected, adopt)
+  assert.equal(await recovery.recover(original, read, () => selected, adopt), false)
+  finish(ready("machine/a", [next]))
+  assert.equal(await first, true)
+  assert.deepEqual(selected, next.destination)
+  assert.equal(reads, 1)
+  assert.equal(await recovery.recover(selected, read, () => selected, adopt), false,
+    "a second replacement cannot turn one opening into a recovery loop")
+  recovery.reset()
+  assert.equal(await recovery.recover(selected, async () => ready("machine/a", [row("machine/a", "%14", "9")]),
+    () => selected, adopt), true, "a deliberate opening can recover again")
+})
+
+test("automatic recovery stops on missing, stale, ambiguous, offline and other-machine rows", async () => {
+  const original = row("machine/a", "%14", "7").destination
+  const next = row("machine/a", "%14", "8")
+  for (const projection of [ready("machine/a", []),
+    ready("machine/a", [{ ...next, freshness: "stale" }]),
+    ready("machine/a", [next, row("machine/a", "%14", "9")]),
+    ready("machine/b", [row("machine/b", "%14", "8")]),
+    { kind: "unavailable", reason: "offline" } as MachineSessionProjection]) {
+    const recovery = new SessionExecutionRecovery()
+    let adopted = false
+    const read = async () => projection
+    assert.equal(await recovery.recover(original, read, () => original, () => { adopted = true }), false)
+    assert.equal(adopted, false)
+    assert.equal(await recovery.recover(original, read, () => original, () => { adopted = true }), false)
+  }
+})
+
+test("late recovery cannot replace another selection, a closed page or a new opening", async () => {
+  const original = row("machine/a", "%14", "7").destination
+  for (const action of ["navigate", "close", "reopen", "disconnect"]) {
+    const recovery = new SessionExecutionRecovery()
+    let selected: typeof original | null = original
+    let finish!: (projection: MachineSessionProjection) => void
+    let adopted = false
+    const result = recovery.recover(original, () => new Promise((resolve) => { finish = resolve }),
+      () => selected, () => { adopted = true })
+    if (action === "navigate") selected = row("machine/b", "%14", "7").destination
+    else if (action === "reopen") recovery.reset()
+    else selected = null
+    finish(ready("machine/a", [row("machine/a", "%14", "8")]))
+    assert.equal(await result, false, action)
+    assert.equal(adopted, false, action)
+  }
+})
+
+test("a failed recovery query settles without retrying or adopting", async () => {
+  const recovery = new SessionExecutionRecovery()
+  const original = row("machine/a", "%14", "7").destination
+  let asks = 0
+  const read = async (): Promise<MachineSessionProjection> => { asks++; throw new Error("offline") }
+  const adopt = () => { throw new Error("must not adopt") }
+  assert.equal(await recovery.recover(original, read, () => original, adopt), false)
+  assert.equal(await recovery.recover(original, read, () => original, adopt), false)
+  assert.equal(asks, 1)
+})
+
+
+test("a refreshed list can restore the same execution after a stale status refusal", async () => {
+  const recovery = new SessionExecutionRecovery()
+  const target = row("machine/a", "%14", "7")
+  let adopted = 0
+  assert.equal(await recovery.recover(target.destination, async () => ready("machine/a", [target]),
+    () => target.destination, () => { adopted++ }), true)
+  assert.equal(adopted, 1)
 })

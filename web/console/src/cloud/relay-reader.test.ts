@@ -2121,3 +2121,19 @@ test("health says a version is still coming until the machine's descriptor arriv
   const none = await body<{ version?: string; version_pending?: boolean }>(await r.fetch("/v1/health"))
   assert.equal(none.version_pending, undefined, "a descriptor without a version is not pending")
 })
+
+
+test("a transcript generation refusal requests recovery without needing a diagnostic recorder", async () => {
+  const client = new FakeClient()
+  const now = 1_000_000
+  client.statusSnapshots = markerOnly("mac-a", "c".repeat(32), now / 1000, "s1")
+  client.recoverStatusRow = async () => false
+  const recoveries: string[] = []
+  const r = new RelayReader("mac-a", { classicStatus: true, now: () => now,
+    onExecutionChanged: (machine, session) => { recoveries.push(machine + "/" + session) } })
+  r.attach(client)
+  const response = await r.fetch("/v1/transcript?session=s1&limit=200")
+  assert.equal(response.status, 409)
+  assert.deepEqual(recoveries, ["mac-a/s1"])
+  assert.deepEqual(client.pinnedReads, [], "the old execution is never read as a substitute")
+})

@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6199,
+  "englishKeys": 6201,
   "counts": {
-    "negation": 1959,
+    "negation": 1961,
     "state": 1099,
     "permission": 386,
     "deletion": 162,
     "uncertainty": 177
   },
-  "unionCount": 2952,
+  "unionCount": 2954,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -139,6 +139,8 @@
       "capacityRow.cloud.viewer_events_seen_batches.what",
       "capacityRow.console.direct_history_hours.full",
       "capacityRow.console.direct_history_machines.full",
+      "capacityRow.console.execution_recovery_attempts.full",
+      "capacityRow.console.execution_recovery_attempts.what",
       "capacityRow.console.health_live_seconds.full",
       "capacityRow.console.opened_row_quiet_seconds.full",
       "capacityRow.console.opened_row_restate_seconds.full",
@@ -3967,6 +3969,8 @@
     "capacityRow.console.direct_history_hours.full",
     "capacityRow.console.direct_history_hours.what",
     "capacityRow.console.direct_history_machines.full",
+    "capacityRow.console.execution_recovery_attempts.full",
+    "capacityRow.console.execution_recovery_attempts.what",
     "capacityRow.console.health_live_seconds.full",
     "capacityRow.console.health_live_seconds.what",
     "capacityRow.console.machine_list_poll_seconds.what",
