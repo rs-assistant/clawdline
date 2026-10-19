@@ -645,7 +645,7 @@ func (s *Spool) SendNext() Disposition {
 	s.collectLocked(now)
 	s.normalizeReadyLocked(now)
 
-	sequences := s.sortedSequencesLocked()
+	sequences := s.sortedLiveSequencesLocked()
 
 	inflightRows, inflightBytes := 0, 0
 	lowestSent := uint64(0)
@@ -712,7 +712,7 @@ func (s *Spool) InFlight() []uint64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []uint64
-	for _, seq := range s.sortedSequencesLocked() {
+	for _, seq := range s.sortedLiveSequencesLocked() {
 		if s.rows[seq].State == SpoolSent {
 			out = append(out, seq)
 		}
@@ -767,7 +767,7 @@ func (s *Spool) BurnExpired() []uint64 {
 	defer s.mu.Unlock()
 	now := s.now()
 	var burned []uint64
-	for _, seq := range s.sortedSequencesLocked() {
+	for _, seq := range s.sortedLiveSequencesLocked() {
 		row := s.rows[seq]
 		if row.State != SpoolSent || now.Before(row.AttemptEnd) {
 			continue
@@ -842,7 +842,7 @@ func (s *Spool) Rows() int {
 func (s *Spool) normalizeReadyLocked(now time.Time) {
 	// Highest sequence wins per (channel, recipient).
 	keep := map[string]uint64{}
-	sequences := s.sortedSequencesLocked()
+	sequences := s.sortedLiveSequencesLocked()
 	for _, seq := range sequences {
 		row := s.rows[seq]
 		if row.State != SpoolReady || !row.Channel.IsLatestValue() {
@@ -1043,10 +1043,14 @@ func (s *Spool) RefusalReading() capacity.Reading {
 		Note:     fmt.Sprintf("the fullest of %d channel(s) with a refusal owed", len(perChannel))}
 }
 
-func (s *Spool) sortedSequencesLocked() []uint64 {
-	out := make([]uint64, 0, len(s.rows))
-	for seq := range s.rows {
-		out = append(out, seq)
+func (s *Spool) sortedLiveSequencesLocked() []uint64 {
+	// Receipts stay in rows for late-ack correlation, but never send again.
+	// Grow with live work rather than allocating for the retained receipts.
+	var out []uint64
+	for seq, row := range s.rows {
+		if !row.State.IsTerminal() {
+			out = append(out, seq)
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
