@@ -4575,6 +4575,8 @@
   "next.msForgetKeeps": "Its Sessions and files on the machine are untouched and keep running.",
   "next.msForgetConfirm": "Type the machine's name to confirm",
   "next.msForgetGo": "Remove",
+  "next.sidebarShow": "Open sidebar",
+  "next.sidebarHide": "Hide sidebar",
   "projects.activityInProgress": "{n} in progress",
   "projects.activityLastKnown": "Last known: {n}",
   "projects.activityNone": "None in progress",

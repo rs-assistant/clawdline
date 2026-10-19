@@ -52,6 +52,8 @@ const words = {
     usageDurationDefinition: "Successful tasks: started to finished",
     usageTokenIncludesCache: "Tokens include cache reads and writes",
 
+    sidebarShow: "Open sidebar",
+    sidebarHide: "Hide sidebar",
     sidebarMain: "Main",
     sidebarWork: "Work",
     sidebarManage: "Manage",
@@ -1709,6 +1711,8 @@ const words = {
     usageDurationDefinition: "成功任務：開始至完成",
     usageTokenIncludesCache: "Token 包含快取讀取與寫入",
 
+    sidebarShow: "開啟側邊欄",
+    sidebarHide: "收合側邊欄",
     sidebarMain: "主要",
     sidebarWork: "工作",
     sidebarManage: "管理",
