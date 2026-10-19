@@ -9,7 +9,7 @@ Your agents and code stay on your machine whichever way you choose.
 | Way | Account | Reaches | What it can do | State |
 | --- | --- | --- | --- | --- |
 | A. SSH port forward | None | Another computer you can SSH from | Read and send | Works |
-| B. Tailscale Serve | A Tailscale account, signed in on both ends | Devices on your own tailnet, including a phone | Read and send after pairing | Built; real-device verification pending |
+| B. Tailscale Serve | A Tailscale account, signed in on both ends | Devices on your own tailnet, including a phone | Read and send after pairing | Built; verified over a real tailnet |
 | C. Your own cloudflared tunnel | Cloudflare, with your own domain | Any browser, including a phone | Read and send after pairing | Built; the real Cloudflare leg has not been tested end to end |
 | D. Clawdline Cloud | Clawdline account (GitHub sign-in) | Any browser, including a phone; several machines | Read and act on paired machines while their Cloud commands are on | Preview |
 
@@ -36,8 +36,9 @@ revoke the browser (see [Signed-in devices](#see-and-revoke-devices-signed-in-di
 
 ## B. A phone on your tailnet, through Tailscale Serve
 
-**Real-device verification pending.** The daemon side is tested; a phone on a real tailnet has not
-yet been run through these steps.
+Verified on 2026-10-20 over a real tailnet, with Serve's own certificate: the address opens the
+pairing page, an unpaired client is refused Sessions, a paired client reads and sends, and revoking
+it refuses its next request. The client was a Tailscale node, not yet a phone app.
 
 [Tailscale Serve](https://tailscale.com/kb/1312/serve) gives this machine an HTTPS address that only
 devices on your own tailnet can open, and passes each request to the daemon on `127.0.0.1:7727`.

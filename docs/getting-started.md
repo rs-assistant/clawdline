@@ -152,7 +152,7 @@ or through `./bin/clawdline pair --watch`, and is never sent back to the device 
 
 ### Through Tailscale Serve (optional)
 
-Real-device verification pending. With Tailscale installed and signed in on this machine and the
+With Tailscale installed and signed in on this machine and the
 phone, and MagicDNS and HTTPS certificates turned on for the tailnet:
 
 ```sh
