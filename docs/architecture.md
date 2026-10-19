@@ -315,3 +315,15 @@ keyboard, secret storage and the desktop. Each of those is a port with a per-pla
 and a platform that cannot do something says so by name instead of pretending.
 [cross-platform.md](cross-platform.md) goes feature by feature and records what each platform
 shows when it cannot.
+
+### Settings navigation
+
+The local console settings page has one tablist for browser, work, status, general
+machine settings, voice, remote access, session dispatch and dispatch rules. Machine
+panes share one mounted `SettingsWindow` with a controlled stable pane name; switching
+machine panes preserves drafts and in-flight writes. Leaving the machine settings
+unmounts the window so background reads and listeners stop. Its embedded mode still uses the browser
+settings API and excludes privileged Cloud sign-in, pairing and tunnel management.
+Cloud browsers expose only browser, work and status. The standalone `settings.html`
+window retains its own navigation and machine-authorized controls. Update deep links
+continue to open the status pane.
