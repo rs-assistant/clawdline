@@ -27,7 +27,8 @@ func fixture(t *testing.T) (dir, root string) {
 	write(t, filepath.Join(root, "plan.txt"), "plan")
 	write(t, filepath.Join(root, "sub", "deep.markdown"), "deep")
 	write(t, filepath.Join(root, ".hidden.md"), "hidden")
-	write(t, filepath.Join(root, "program.html"), "<script>")
+	write(t, filepath.Join(root, "program.html"), staticHTMLFixture)
+	write(t, filepath.Join(root, "program.js"), "script")
 	write(t, filepath.Join(dir, "secret.md"), "not yours")
 	return dir, ProjectRoot(dir, false)
 }
@@ -41,7 +42,7 @@ func write(t *testing.T, path, body string) {
 
 func TestFileServesWhatIsInTheRoot(t *testing.T) {
 	_, root := fixture(t)
-	for _, name := range []string{"notes.md", "plan.txt", "sub/deep.markdown"} {
+	for _, name := range []string{"notes.md", "plan.txt", "sub/deep.markdown", "program.html"} {
 		located, err := File(root, name)
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
@@ -67,7 +68,7 @@ func TestFileRefusesEverythingOutsideTheRoot(t *testing.T) {
 		"",
 		"sub//deep.markdown",
 		".hidden.md",
-		"program.html",
+		"program.js",
 		"a/b/c/d/e/f/g.md",
 		strings.Repeat("a", 520) + ".md",
 		"notes.md\x00.txt",
@@ -217,8 +218,8 @@ func TestWalkOffersOnlyWhatTheReadServes(t *testing.T) {
 	if cut.Any() {
 		t.Fatalf("a folder of three documents reads as cut: %+v", cut)
 	}
-	if len(found) != 3 {
-		t.Fatalf("expected the three readable documents, got %d: %v", len(found), found)
+	if len(found) != 4 {
+		t.Fatalf("expected the four readable documents, got %d: %v", len(found), found)
 	}
 	for _, row := range found {
 		if _, err := File(root, row.Path); err != nil {

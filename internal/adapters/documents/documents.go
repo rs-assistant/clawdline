@@ -1,5 +1,5 @@
-// Package documents publishes the Markdown and text files a project and its
-// tasks wrote down, and refuses everything else.
+// Package documents publishes Markdown, text and sanitized static HTML files
+// from an authorized project or task root.
 //
 // It is a port of the Swift app's `ProjectDocuments` (Sources/ProjectArtifact.swift),
 // rule for rule, because this is a route that reads files off this machine's
@@ -10,8 +10,8 @@
 //
 // The boundary, in the original's own words: a name that arrives from a device
 // may only choose *within* a root this code computed, the root is settled
-// before the name is looked at, the file must be one of three extensions that
-// carry no active content, and it must be under the size cap.
+// before the name is looked at, the file must have an allowed extension, and
+// it must be under the size cap. HTML is sanitized before it leaves Read.
 //
 // What that premise does not cover is stated there too and is inherited here:
 // somebody who can also *write* inside a root is not bounded by it (a hard link
@@ -28,12 +28,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
-// Text, and nothing a browser will execute. HTML is deliberately absent: a
-// directory anybody may drop a file into is not a place to serve a program
-// from.
-var readableExtensions = map[string]bool{"md": true, "markdown": true, "txt": true}
+// HTML is served only after static allowlist sanitization by Read.
+var readableExtensions = map[string]bool{"md": true, "markdown": true, "txt": true, "html": true}
 
 const (
 	// MaximumBytes is `document-links.js`'s DOCUMENT_MAX_BYTES as well: the
@@ -300,12 +299,27 @@ func Read(root, name string) (Located, string, []byte, error) {
 	if err != nil {
 		return Located{}, "", nil, NotFound
 	}
+	if len(body) > MaximumBytes {
+		return Located{}, "", nil, TooLarge
+	}
+	if extensionOf(located.Path) == "html" {
+		if !utf8.Valid(body) {
+			return Located{}, "", nil, NotFound
+		}
+		body = sanitizeHTML(body)
+		if len(body) > MaximumBytes {
+			return Located{}, "", nil, TooLarge
+		}
+		located.Bytes = int64(len(body))
+	}
 	return located, MediaType(located.Path), body, nil
 }
 
-// MediaType is the original's one-line choice: `txt` is plain, and the other
-// two are Markdown. Both are the exact strings `document-links.js` accepts.
+// MediaType names the supported formats with exact UTF-8 MIME strings.
 func MediaType(path string) string {
+	if extensionOf(path) == "html" {
+		return "text/html; charset=utf-8"
+	}
 	if extensionOf(path) == "txt" {
 		return "text/plain; charset=utf-8"
 	}

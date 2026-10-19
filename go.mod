@@ -3,6 +3,8 @@ module github.com/sainteye/clawdline
 go 1.25.0
 
 require (
+	github.com/aymerick/douceur v0.2.0
+	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/pion/ice/v4 v4.4.4
 	github.com/pion/webrtc/v4 v4.2.22
 	golang.org/x/sys v0.47.0
@@ -12,6 +14,7 @@ require (
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/css v1.0.1 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pion/datachannel v1.6.3 // indirect
