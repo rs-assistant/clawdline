@@ -30,6 +30,7 @@ function clientFixture() {
   const client = {
     ready: true,
     statusSnapshots,
+    orchestratorSnapshots: new Map<string, unknown>(),
     machineOffline: new Map<string, { until: number }>(),
     now: () => Date.now(),
     readContentCapabilities: new Map([[machineID, { at, supported: true }]]),
@@ -87,6 +88,46 @@ test("a status row event names the Session whose list title should refresh", () 
   emit({ type: "session_status", identity: { machine: machineID, session: sessionID } })
   assert.deepEqual(events, [{ machineID, sessionID, kind: "changed" }])
   stop()
+})
+
+test("a task descriptor arriving after status regroups the fleet without opening a Session", async () => {
+  const { client, row, emit } = clientFixture()
+  const marker = client.statusSnapshots.get(JSON.stringify([machineID, inventory])) as { payload: { inventory: { sessions: string[] } } }
+  marker.payload.inventory.sessions.push("root")
+  client.statusSnapshots.set(JSON.stringify([machineID, "root"]), {
+    identity: { machine: machineID, session: "root" }, payload: { ...row, session_id: "root" },
+    observedAt: row.projected_at, sequence: 3,
+  })
+  const source = statusSource(() => client as never)
+  const before = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(before.rows?.find((r) => r.destination.sessionID === sessionID)?.parentSessionID, undefined)
+  const events: unknown[] = []
+  const stop = source.subscribe((event) => events.push(event))
+  client.orchestratorSnapshots.set(machineID, { at: row.projected_at, tasks: [
+    { child: { terminalId: sessionID }, root: { terminalId: "root" } },
+  ] })
+  emit({ type: "orchestrator", machine: machineID })
+  assert.deepEqual(events, [{ machineID, kind: "access_changed" }])
+  for (let refresh = 0; refresh < 3; refresh++) {
+    const after = await source.readMachine(machineID, new AbortController().signal)
+    assert.equal(after.rows?.find((r) => r.destination.sessionID === sessionID)?.parentSessionID, "root")
+  }
+  stop()
+})
+
+test("a cold pinned list uses task roots when its real display status omits ancestry", async () => {
+  const { client, row } = clientFixture()
+  client.statusSnapshots.clear()
+  client.orchestratorSnapshots.set(machineID, { at: row.projected_at, tasks: [
+    { child: { terminalId: sessionID }, root: { terminalId: "root" } },
+  ] })
+  const original = client.listPresentationsForMachine
+  client.listPresentationsForMachine = async (machine) => {
+    const reply = await original(machine)
+    return { ...reply, sessions: [...reply.sessions, { ...reply.sessions[0], id: "root", title: "Root" }] }
+  }
+  const reading = await statusSource(() => client as never).readMachine(machineID, new AbortController().signal)
+  assert.equal(reading.rows?.find((r) => r.destination.sessionID === sessionID)?.parentSessionID, "root")
 })
 
 test("a renewed client keeps the Session list hearing new Sessions", () => {
