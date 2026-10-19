@@ -259,10 +259,12 @@ func (r *wireBenchRelay) serve(w http.ResponseWriter, req *http.Request) {
 		time.Sleep(r.delay)
 		ack := adaptercloud.AckFrame{Type: "ack", Ch: env.Ch, Seq: env.Seq, Fanout: len(viewers), Status: adaptercloud.AckDelivered}
 		ab, _ := json.Marshal(ack)
+		// Settlement may race the socket writer; hold accounting until it finishes.
+		r.mu.Lock()
 		if p.send(ack) != nil {
+			r.mu.Unlock()
 			return
 		}
-		r.mu.Lock()
 		r.acks++
 		r.ackBytes += int64(len(ab) + 2)
 		r.mu.Unlock()
@@ -319,6 +321,12 @@ func TestWireEfficiencyBaseline(t *testing.T) {
 			var opens []int64
 			var viewerWG sync.WaitGroup
 			var clients []*adaptercloud.Conn
+			defer func() {
+				for _, c := range clients {
+					_ = c.Close()
+				}
+				viewerWG.Wait()
+			}()
 			for i := 0; i < s.viewers; i++ {
 				c, e := adaptercloud.Dial(url+"?role=viewer", adaptercloud.DialOptions{NetDial: r.dial})
 				if e != nil {
@@ -377,12 +385,6 @@ func TestWireEfficiencyBaseline(t *testing.T) {
 					}
 				}()
 			}
-			defer func() {
-				for _, c := range clients {
-					_ = c.Close()
-				}
-				viewerWG.Wait()
-			}()
 			// Wait for the server-side viewer inventory; client upgrade completion alone
 			// does not prove the handler has registered that viewer.
 			deadline := time.Now().Add(5 * time.Second)
@@ -474,6 +476,9 @@ func TestWireEfficiencyBaseline(t *testing.T) {
 			result.SealP95NS = wireBenchPercentile(result.SealNS, 95)
 			result.OpenP50NS = wireBenchPercentile(result.OpenNS, 50)
 			result.OpenP95NS = wireBenchPercentile(result.OpenNS, 95)
+			if result.Acks != s.ops {
+				t.Fatalf("ack count %d want %d", result.Acks, s.ops)
+			}
 			if result.Deliveries != s.ops*s.viewers {
 				t.Fatalf("deliveries %d", result.Deliveries)
 			}

@@ -96,3 +96,7 @@ Only the declared new test file is changed. Root must commit: CHILD.md explicitl
 ## Root portability correction
 
 The root moved getrusage into Unix-specific test support and made unsupported platforms skip only the opt-in timing path. Sampling errors now fail explicitly. The original three-round record predates this test-only portability change; a separate root rerun and gate verify the corrected source. No parser or production logic changed. The combined process CPU remains a measurement gap, not daemon-only CPU.
+
+## Independent review and measurement reliability
+
+An independent reviewer recomputed all 36 archived scenario rows (the original and root's three-round groups), found matching counts and percentiles, and judged this explicitly partial baseline safe to land. This was arithmetic and source review, not an independent transport rerun. Before integration the root addressed both non-blocking suggestions: final ACK accounting stays synchronized through the successful socket write and each scenario asserts its ACK count; viewer cleanup is registered before the first dial so partial setup is covered. A separate final three-round run validates the adjusted test. Earlier raw groups remain preserved and are not relabeled as measurements of this final source.
