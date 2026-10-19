@@ -53,21 +53,28 @@ function errorFrom(result, fallbackCode, fallbackMessage) {
     );
 }
 
-export function planSimulationWords(language) {
-    return String(language || "").toLowerCase() === "zh-tw" ? {
-        title: "超級使用者方案模擬", actual: "實際方案", effective: "生效方案",
-        source: "覆寫來源", actualEvaluated: "實際方案評估時間",
-        set: "覆寫設定時間", cleared: "覆寫清除時間",
-        evaluated: "生效評估時間", expires: "覆寫到期時間",
-        actualMode: "實際", freeMode: "免費", proMode: "專業版",
-        failed: "Clawdline 無法變更此方案模擬。"
-    } : {
-        title: "SuperUser plan simulation", actual: "Actual tier", effective: "Effective tier",
-        source: "Override source", actualEvaluated: "Actual evaluated at",
-        set: "Override set at", cleared: "Override cleared at", evaluated: "Effective evaluated at",
-        expires: "Override expires at", actualMode: "Actual", freeMode: "Free",
-        proMode: "Pro", failed: "Clawdline could not change this plan simulation."
-    };
+const simulationEn = {
+    title: "SuperUser plan simulation", actual: "Actual tier", effective: "Effective tier",
+    source: "Override source", actualEvaluated: "Actual evaluated at",
+    set: "Override set at", cleared: "Override cleared at", evaluated: "Effective evaluated at",
+    expires: "Override expires at", actualMode: "Actual", freeMode: "Free",
+    proMode: "Pro", failed: "Clawdline could not change this plan simulation."
+};
+const simulationZh = {
+    title: "超級使用者方案模擬", actual: "實際方案", effective: "生效方案",
+    source: "覆寫來源", actualEvaluated: "實際方案評估時間",
+    set: "覆寫設定時間", cleared: "覆寫清除時間",
+    evaluated: "生效評估時間", expires: "覆寫到期時間",
+    actualMode: "實際", freeMode: "免費", proMode: "專業版",
+    failed: "Clawdline 無法變更此方案模擬。"
+};
+export const planSimulationSourceWords = { en: simulationEn, "zh-Hant": simulationZh };
+
+/** The console supplies its validated active catalog; pure billing tests use the source copy. */
+export function planSimulationWords(language, lookup) {
+    const source = /^zh-(?:hant|tw)(?:-|$)/i.test(String(language || "")) ? simulationZh : simulationEn;
+    if (typeof lookup !== "function") return source;
+    return Object.fromEntries(Object.keys(simulationEn).map(function (key) { return [key, lookup(key)]; }));
 }
 
 export function createBillingClient(options) {

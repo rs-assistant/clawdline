@@ -59,6 +59,7 @@ const workflow = table("src/workflow-words.ts", "export { words as sourceWords }
 const notifications = table("src/pages/notifications.tsx", "export { notificationsWords as sourceWords }", "en", ["notificationsEn", "notificationsZh", "notificationsWords"]).sourceWords
 const dispatchPolicy = table("src/pages/settings/window/DispatchPolicyPane.tsx", "export { dispatchPolicyWords as sourceWords }", "en", ["dispatchPolicyEn", "dispatchPolicyZh", "dispatchPolicyWords"]).sourceWords
 const promo = table("src/pages/plan/promo.ts", "export { promoSourceWords as sourceWords }", "en", ["promoEn", "promoZh", "promoSourceWords"]).sourceWords
+const planSimulation = table("src/legacy/js/net/billing.js", "export { planSimulationSourceWords as sourceWords }", "en", ["simulationEn", "simulationZh", "planSimulationSourceWords"]).sourceWords
 const transcript = table("src/session/Transcript.tsx", "export { planWords as sourceWords }", "en", ["planWords"]).sourceWords
 
 // `english: false` where the table's "English" column is already translated
@@ -66,6 +67,7 @@ const transcript = table("src/session/Transcript.tsx", "export { planWords as so
 // is required there, never the value.
 const domains = [
   { name: "promo", en: promo.en, zh: promo["zh-Hant"], english: true },
+  { name: "planSimulation", en: planSimulation.en, zh: planSimulation["zh-Hant"], english: true },
   { name: "next", en: next.en, zh: next["zh-Hant"], english: true },
   { name: "work", en: work.en, zh: work["zh-Hant"], english: true },
   { name: "verify", en: verify.en, zh: verify["zh-Hant"], english: true },

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6860,
-  "riskKeys": 3130,
-  "nonRiskCount": 3730,
+  "englishContentKeys": 6873,
+  "riskKeys": 3131,
+  "nonRiskCount": 3742,
   "groups": [
     {
       "name": "admin / other",
@@ -2986,6 +2986,27 @@
         "plan.proBilling",
         "plan.push",
         "plan.recommended"
+      ]
+    },
+    {
+      "name": "planSimulation / other",
+      "count": 12,
+      "sources": [
+        "src/legacy/js/net/billing.js"
+      ],
+      "keys": [
+        "planSimulation.actual",
+        "planSimulation.actualEvaluated",
+        "planSimulation.actualMode",
+        "planSimulation.cleared",
+        "planSimulation.effective",
+        "planSimulation.evaluated",
+        "planSimulation.expires",
+        "planSimulation.freeMode",
+        "planSimulation.proMode",
+        "planSimulation.set",
+        "planSimulation.source",
+        "planSimulation.title"
       ]
     },
     {

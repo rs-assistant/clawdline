@@ -28,10 +28,10 @@
 import { T, fill } from "../core/i18n.js";
 import { planSimulationWords } from "../net/billing.js";
 
-function simulationWords() {
+function simulationWords(lookup) {
     var language = globalThis.document && globalThis.document.documentElement
         ? globalThis.document.documentElement.lang : "";
-    return planSimulationWords(language);
+    return planSimulationWords(language, lookup);
 }
 
 /** How a limit reads when the plan sets none. Not "unlimited": the relay still has ceilings,
@@ -59,9 +59,9 @@ export function planRows(entitlements) {
     ];
 }
 
-export function planSimulationRows(value) {
+export function planSimulationRows(value, lookup) {
     if (!value) return [];
-    var words = simulationWords();
+    var words = simulationWords(lookup);
     return [
         [words.actual, tierName(value.actual_tier)],
         [words.effective, tierName(value.effective_tier)],
@@ -125,6 +125,7 @@ export function isPaidTier(tier) {
 export function bindPlanPage(elements, seams) {
     seams = seams || {};
     var billing = seams.billing || null;
+    var simulationWord = seams.simulationWord;
     var signInURL = typeof seams.signInURL === "function" ? seams.signInURL : function () { return ""; };
     var navigate = seams.navigate || function (url) { globalThis.location.assign(url); };
     var later = seams.setTimeout || function (fn, ms) { return setTimeout(fn, ms); };
@@ -200,7 +201,7 @@ export function bindPlanPage(elements, seams) {
         if (!value || !list || !list.ownerDocument) return;
         panel.dataset.revision = String(value.revision);
         while (list.firstChild) list.removeChild(list.firstChild);
-        planSimulationRows(value).forEach(function (row) {
+        planSimulationRows(value, simulationWord).forEach(function (row) {
             var term = list.ownerDocument.createElement("dt");
             var answer = list.ownerDocument.createElement("dd");
             term.textContent = row[0]; answer.textContent = row[1];
@@ -237,7 +238,7 @@ export function bindPlanPage(elements, seams) {
         text("plan-signin", T.webPlanSignIn);
         text("plan-retry", T.webPlanRetry);
         text("plan-recheck", T.webPlanRecheck);
-        var simulation = simulationWords();
+        var simulation = simulationWords(simulationWord);
         text("plan-simulation-title", simulation.title);
         text("plan-simulation-actual", simulation.actualMode);
         text("plan-simulation-free", simulation.freeMode);
@@ -347,7 +348,7 @@ export function bindPlanPage(elements, seams) {
             if (panel) panel.dataset.revision = String(answer.revision);
             drawSimulation(answer);
             return load();
-        }, function () { trouble(simulationWords().failed); });
+        }, function () { trouble(simulationWords(simulationWord).failed); });
     }
 
     /* ==========================================================================

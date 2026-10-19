@@ -13,6 +13,7 @@ for (const file of ["literal-inventory.json", "visible-inventory.json", "templat
 }
 const namedSources = {
   promo: "src/pages/plan/promo.ts",
+  planSimulation: "src/legacy/js/net/billing.js",
   builtinPersona: "src/builtin-display-source.json", builtinSkill: "src/builtin-display-source.json",
   admin: "src/cloud/admin/words.ts", workflow: "src/workflow-words.ts",
   notifications: "src/pages/notifications.tsx", dispatchPolicy: "src/pages/settings/window/DispatchPolicyPane.tsx",

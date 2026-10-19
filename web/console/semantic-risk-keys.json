@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6860,
+  "englishKeys": 6873,
   "counts": {
-    "negation": 2068,
+    "negation": 2069,
     "state": 1136,
     "permission": 416,
     "deletion": 178,
     "uncertainty": 191
   },
-  "unionCount": 3130,
+  "unionCount": 3131,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -1888,6 +1888,7 @@
       "notifications.push_on_schedule_failure",
       "notifications.smart_notificationsHint",
       "plan.fine",
+      "planSimulation.failed",
       "projects.activityNone",
       "projects.emptyAdd",
       "projects.folderAddFailed",
@@ -6789,6 +6790,7 @@
     "plan.machinesOne",
     "plan.proPitch",
     "plan.webhooks",
+    "planSimulation.failed",
     "projects.activityNone",
     "projects.editDone",
     "projects.emptyAdd",

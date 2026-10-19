@@ -15,6 +15,8 @@
 // - The two plan cards (`pages/plan/offers.ts`) are painted from the module's state.
 import { bindPlanPage as bindPlanPageOriginal } from "./js/view/plan.js"
 import { createBillingClient } from "./js/net/billing.js"
+// @ts-expect-error -- Node's strip-types tests import this bridge directly.
+import { catalogWord } from "../catalog.ts"
 // @ts-expect-error -- Node's strip-types test runner needs the source extension.
 import { paintOffers, type Entitlements } from "../pages/plan/offers.ts"
 
@@ -85,6 +87,7 @@ export function bindPlan(doc: Document, apiOrigin: string | null = null): PlanPa
     elements,
     {
       billing,
+      simulationWord: (key: string) => catalogWord("planSimulation", key),
       signInURL: () => apiOrigin
         ? `${apiOrigin}/v1/auth/oauth/start?return_to=${encodeURIComponent(location.origin + "/#page=plan")}`
         : "",
