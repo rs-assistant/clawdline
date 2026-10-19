@@ -14,6 +14,7 @@ import (
 	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
 	"github.com/sainteye/clawdline/internal/adapters/cloudkeys"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
+	"github.com/sainteye/clawdline/internal/app/cloudops"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/domain/auth"
 )
@@ -262,5 +263,38 @@ func TestCloudLoginDenialKeepsItsCodeAndCanStartAgain(t *testing.T) {
 	rec = onboardingRequest(t, s, s.cloudLoginRoute, http.MethodPost, "/v1/cloud/login", "", true)
 	if rec.Code != http.StatusOK || starts != 2 || !strings.Contains(rec.Body.String(), `"phase":"waiting"`) {
 		t.Fatalf("denied login could not retry: starts=%d %d %s", starts, rec.Code, rec.Body)
+	}
+}
+
+func TestCloudViewerEnablesSameNetworkWithoutLosingItsReceipt(t *testing.T) {
+	h := newPushStandIn(t)
+	h.bridge.AllowCommands = func() bool { return true }
+	file := nextconfig.Open(h.server.cfg.Dir)
+	if _, err := file.Set(map[string]any{adaptercloud.KeyEnabled: true, adaptercloud.KeyCommands: true}); err != nil {
+		t.Fatal(err)
+	}
+	reloads := 0
+	h.server.SetCloudReload(func() error { reloads++; return nil })
+	for seq := uint64(1); seq <= 2; seq++ {
+		a, payload := h.ask(t, seq, map[string]any{"type": "direct-local-network-enable", "session": cloudops.MachineReplySession, "request": fmt.Sprintf("enable-%d", seq)})
+		if !a.OK() || !strings.Contains(string(a.Payload), `"direct_local_network":true`) {
+			t.Fatalf("enable receipt: %+v, %+v", a, payload)
+		}
+	}
+	settings, err := adaptercloud.ReadSettings(file)
+	if err != nil || !settings.DirectLocalNetwork || !settings.Commands || !settings.TerminalDirect || reloads != 0 {
+		t.Fatalf("settings %+v, reloads %d, err %v", settings, reloads, err)
+	}
+	if _, err := file.Set(map[string]any{adaptercloud.KeyCommands: false, adaptercloud.KeyDirectLocalNetwork: false}); err != nil {
+		t.Fatal(err)
+	}
+	// The route rechecks the persisted write switch even after bridge admission.
+	a, _ := h.ask(t, 3, map[string]any{"type": "direct-local-network-enable", "session": cloudops.MachineReplySession, "request": "blocked"})
+	if a.Status != http.StatusForbidden {
+		t.Fatalf("disabled operation gate: %+v", a)
+	}
+	settings, _ = adaptercloud.ReadSettings(file)
+	if settings.DirectLocalNetwork {
+		t.Fatal("disabled operations changed the policy")
 	}
 }

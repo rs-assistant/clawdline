@@ -1985,3 +1985,28 @@ func TestUsageOverviewAcceptsTheBrowserWireFixtures(t *testing.T) {
 		}
 	}
 }
+
+func TestSameNetworkEnableIsNarrowAndRequiresOperationPermission(t *testing.T) {
+	r := &router{}
+	body := map[string]any{"type": "direct-local-network-enable", "session": MachineReplySession, "request": "req-local"}
+	b := open(r)
+	answer := b.Handle(context.Background(), request(t, ClassCtl, body))
+	if !answer.OK() || len(r.seen) != 1 {
+		t.Fatalf("answer %+v, routes %+v", answer, r.seen)
+	}
+	got := r.last()
+	if got.Method != "POST" || got.Path != "/v1/cloud/direct/local-network" || string(got.Body) != `{"enabled":true}` {
+		t.Fatalf("unexpected enable route: %+v", got)
+	}
+	for _, extra := range []string{"enabled", "path", "settings"} {
+		body[extra] = false
+		if a := b.Handle(context.Background(), request(t, ClassCtl, body)); a.OK() {
+			t.Fatalf("accepted extra field %s", extra)
+		}
+		delete(body, extra)
+	}
+	closed := Bridge{MachineID: "mac-01", Router: r, AllowCommands: func() bool { return false }}
+	if a := closed.Handle(context.Background(), request(t, ClassCtl, body)); a.OK() {
+		t.Fatal("enabled with operations forbidden")
+	}
+}

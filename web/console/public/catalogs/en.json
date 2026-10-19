@@ -1,4 +1,5 @@
 {
+  "http.84cc28107e831259": "This machine must allow Cloud operations and direct connections to enable same-network connections.",
   "bar.hintFullscreen": "Full screen",
   "bar.hintKeys": "Keyboard shortcut",
   "bar.hintList": "List",
@@ -4529,6 +4530,12 @@
   "next.msHistoryStart": "24 h ago",
   "next.msHistoryNow": "Now",
   "next.msHistoryHour": "{time}: {ok} opened, {failed} did not",
+  "next.msSameNetworkTitle": "Possibly on the same network",
+  "next.msSameNetworkHint": "Both ends have the same public IP. Enable same-network connections to try the local path. You may need to allow Local Network access on {machine}.",
+  "next.msSameNetworkEnable": "Enable same-network connections",
+  "next.msSameNetworkSaving": "Enabling…",
+  "next.msSameNetworkFailed": "The machine did not confirm the setting. Please try again.",
+  "next.msSameNetworkEnabled": "Same-network connections are enabled. If asked, allow Local Network access on {machine}. The connection result is shown separately.",
   "next.msTryNow": "Try direct now",
   "next.msTrying": "Trying direct…",
   "next.msTryingBody": "This takes a few seconds; the relay keeps working meanwhile.",

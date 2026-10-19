@@ -1031,6 +1031,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         if (!current?.tryDirect) return { kind: "unsupported" }
         return current.tryDirect(machine)
       },
+      sameNetworkAvailable: (machine) => client.current?.sameNetworkAvailable?.(machine) === true,
+      enableSameNetwork: async (machine) => {
+        const current = client.current
+        if (!current?.enableSameNetwork) throw new Error("unsupported")
+        await current.enableSameNetwork(machine)
+      },
       rename: async (machine, name) => (await renameRef.current(machine, name)) ?? busy,
       forget: async (machine) => (await forgetRef.current(machine)) ?? busy,
       pair: (id) => {

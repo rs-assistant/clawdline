@@ -18,6 +18,7 @@ var generatedDecoders = map[string]genDecoder{
 	"default-models-update":              genDecodeDefaultModelsUpdate,
 	"diagnostics.events":                 genDecodeDiagnosticsEvents,
 	"diagnostics.report":                 genDecodeDiagnosticsReport,
+	"direct-local-network-enable":        genDecodeDirectLocalNetworkEnable,
 	"dismiss-restorable":                 genDecodeDismissRestorable,
 	"documents":                          genDecodeDocuments,
 	"end":                                genDecodeEnd,
@@ -483,6 +484,23 @@ func genDecodeDiagnosticsReport(b body) (plan, LocalRequest, bool) {
 		return plan{}, LocalRequest{}, false
 	}
 	return p, LocalRequest{}, true
+}
+
+// genDecodeDirectLocalNetworkEnable is the `direct-local-network-enable` row's decode.
+func genDecodeDirectLocalNetworkEnable(b body) (plan, LocalRequest, bool) {
+	if !b.hasOneOf(
+		[]string{"type", "request", "session"},
+	) {
+		return plan{}, LocalRequest{}, false
+	}
+	p, ok := actionPlan(b, false)
+	if !ok {
+		return plan{}, LocalRequest{}, false
+	}
+	path := "/v1/cloud/direct/local-network"
+	req := LocalRequest{Method: "POST", Path: path}
+	req.Body = b.genFields(map[string]genValue{"enabled": genValue{constant: true}})
+	return p, req, true
 }
 
 // genDecodeDismissRestorable is the `dismiss-restorable` row's decode.

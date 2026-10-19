@@ -1437,7 +1437,7 @@ func (l *Link) Status() Status {
 	out := Status{
 		Enabled:            l.settings.Enabled,
 		TerminalDirect:     l.settings.TerminalDirect,
-		DirectLocalNetwork: l.settings.DirectLocalNetwork,
+		DirectLocalNetwork: l.directLocalNetworkEnabled(),
 		State:              l.state,
 		RelayURL:           l.settings.RelayURL,
 		APIBase:            l.settings.APIBase,

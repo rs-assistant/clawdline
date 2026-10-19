@@ -430,6 +430,19 @@ export class StatusCloudClient extends CatalogCloudClient {
     return carrier.tryNow()
   }
 
+  sameNetworkAvailable(machine) {
+    const descriptor = this.machineDescriptor(machine)?.machine
+    return this.allowWrites === true && descriptor?.commands?.includes("direct-local-network-enable") === true &&
+      descriptor.operation_allowed === true && this._carrierFor(machine)?.canEnableSameNetwork === true
+  }
+
+  async enableSameNetwork(machine) {
+    const result = await this._machineRequestAs(crypto.randomUUID(), machine,
+      "direct-local-network-enable", {}, "action")
+    if (result?.direct_local_network !== true) throw refused("bad_response", "The machine did not confirm the setting.")
+    this._carrierFor(machine)?.sameNetworkEnabled()
+  }
+
   /** The carrier for this machine, or null when this page has none to offer. */
   _carrierFor(machine) {
     if (!this.directCarriers || typeof machine !== "string" || !machine) return null
@@ -537,7 +550,8 @@ export class StatusCloudClient extends CatalogCloudClient {
       !answer.sdp_sealed || answer.carrier !== offer.connection) {
       throw refused("carrier_bad_answer", "this machine's carrier answer is not usable")
     }
-    return { sdpSealed: answer.sdp_sealed, directReceipts: answer.direct_receipts === true }
+    return { sdpSealed: answer.sdp_sealed, directReceipts: answer.direct_receipts === true,
+      directLocalNetwork: typeof answer.direct_local_network === "boolean" ? answer.direct_local_network : undefined }
   }
 
   /** Seals and signs the `termi` offer. The frozen sealer validates only ctl/, so sign the renamed bytes. */

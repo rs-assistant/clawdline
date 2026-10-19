@@ -1,4 +1,5 @@
 {
+  "http.84cc28107e831259": "這台機器必須允許 Cloud 操作並開啟直連，才能啟用同網路直連。",
   "bar.hintFullscreen": "全螢幕",
   "bar.hintKeys": "快速鍵",
   "bar.hintList": "清單",
@@ -4529,6 +4530,12 @@
   "next.msHistoryStart": "24 小時前",
   "next.msHistoryNow": "現在",
   "next.msHistoryHour": "{time}：接上 {ok} 次、沒打通 {failed} 次",
+  "next.msSameNetworkTitle": "可能在同一網路",
+  "next.msSameNetworkHint": "兩端的公網 IP 相同，可以啟用同網路直連，嘗試區網路徑。啟用後，可能需要在 {machine} 允許「區域網路」存取。",
+  "next.msSameNetworkEnable": "啟用同網路直連",
+  "next.msSameNetworkSaving": "正在啟用…",
+  "next.msSameNetworkFailed": "尚未收到機器確認設定成功，請再試一次。",
+  "next.msSameNetworkEnabled": "已啟用同網路直連。若 {machine} 出現提示，請允許「區域網路」存取。連線是否成功會另行顯示。",
   "next.msTryNow": "現在試一次直連",
   "next.msTrying": "正在嘗試直連…",
   "next.msTryingBody": "需要幾秒鐘；這段時間仍走中繼。",

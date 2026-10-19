@@ -34,6 +34,7 @@ export const CARRIED = {
   // anything once a row is recorded (`cloud-viewer-events.js`); a failed
   // carried read is one (`cloud.read.failed`, `relay-reader.ts`).
   "diagnostics.events": "cloud-client.js _deliverViewerEvents (after a recorded failure)",
+  "direct-local-network-enable": "cloud-client.js enableSameNetwork",
   "dismiss-restorable": "POST /v1/sessions/restorable/dismiss",
   document: "GET /v1/sessions/{id}/documents/{scope}/{path}",
   documents: "GET /v1/sessions/{id}/documents",
