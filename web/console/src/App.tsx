@@ -961,6 +961,9 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
             <svg className="brand-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
               <path d="m10 4-4 4 4 4" />
             </svg>
+            <svg className="brand-chevron brand-chevron-open" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" focusable="false">
+              <path d="m6 4 4 4-4 4" />
+            </svg>
           </span>
           <b>clawdline</b>
           <span className="brand-tooltip" aria-hidden="true">{nextWord(menu ? "sidebarHide" : "sidebarShow")}</span>
