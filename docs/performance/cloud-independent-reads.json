@@ -1,0 +1,2151 @@
+{
+  "observations": 309,
+  "summary": [
+    {
+      "key": "independent/1/1/cold-open",
+      "runs": 5,
+      "callerMsMedian": 5.778625000000147,
+      "callerMsP95": 7.518208999999956,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        11155,
+        1110,
+        813,
+        922,
+        745
+      ]
+    },
+    {
+      "key": "independent/1/1/warm-unchanged",
+      "runs": 5,
+      "callerMsMedian": 0.23087499999996908,
+      "callerMsP95": 0.28016700000000583,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        870,
+        246,
+        492,
+        297,
+        339
+      ]
+    },
+    {
+      "key": "independent/1/1/data-changed",
+      "runs": 5,
+      "callerMsMedian": 5.327209000000039,
+      "callerMsP95": 7.956207999999833,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        6121,
+        1114,
+        841,
+        1008,
+        1199
+      ]
+    },
+    {
+      "key": "independent/1/1/reconnect-attach",
+      "runs": 5,
+      "callerMsMedian": 0.24700000000007094,
+      "callerMsP95": 0.3667080000000169,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        1196,
+        384,
+        267,
+        273,
+        473
+      ]
+    },
+    {
+      "key": "independent/1/1/reconnect-new-reader",
+      "runs": 5,
+      "callerMsMedian": 6.09658300000001,
+      "callerMsP95": 6.5325410000000375,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        5276,
+        1055,
+        694,
+        948,
+        777
+      ]
+    },
+    {
+      "key": "independent/1/1/unchanged-after-ceiling",
+      "runs": 5,
+      "callerMsMedian": 5.332166000000029,
+      "callerMsP95": 5.910624999999982,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        1309,
+        827,
+        666,
+        878,
+        1009
+      ]
+    },
+    {
+      "key": "independent/1/1/fresh-no-store",
+      "runs": 5,
+      "callerMsMedian": 5.568958000000066,
+      "callerMsP95": 7.6929589999999735,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        963,
+        1194,
+        783,
+        1032,
+        1328
+      ]
+    },
+    {
+      "key": "independent/1/1/different-cursors",
+      "runs": 5,
+      "callerMsMedian": 2.232291000000032,
+      "callerMsP95": 3.2955409999999574,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        12911,
+        13817,
+        14723,
+        15629,
+        16535
+      ],
+      "nodeCPUus": [
+        10264,
+        678,
+        427,
+        1134,
+        648
+      ]
+    },
+    {
+      "key": "independent/1/1/different-limits",
+      "runs": 5,
+      "callerMsMedian": 0.24512500000003,
+      "callerMsP95": 0.44708300000002055,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        460,
+        932,
+        204,
+        273,
+        560
+      ]
+    },
+    {
+      "key": "independent/1/1/invalid-cursor",
+      "runs": 5,
+      "callerMsMedian": 0.06416600000011385,
+      "callerMsP95": 0.24287500000002638,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        256,
+        84,
+        47,
+        62,
+        77
+      ]
+    },
+    {
+      "key": "independent/1/1/unsupported-after",
+      "runs": 5,
+      "callerMsMedian": 0.06579099999999016,
+      "callerMsP95": 0.13091700000006767,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        296,
+        54,
+        79,
+        43,
+        78
+      ]
+    },
+    {
+      "key": "independent/1/1/focus-command",
+      "runs": 5,
+      "callerMsMedian": 0.7816659999998592,
+      "callerMsP95": 2.102958000000058,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        81,
+        81,
+        81,
+        81,
+        81
+      ],
+      "nodeCPUus": [
+        1819,
+        647,
+        275,
+        426,
+        565
+      ]
+    },
+    {
+      "key": "independent/1/1/after-focus",
+      "runs": 5,
+      "callerMsMedian": 0.19279200000005403,
+      "callerMsP95": 0.20624999999995453,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        309,
+        226,
+        242,
+        274,
+        265
+      ]
+    },
+    {
+      "key": "independent/1/1/already-aborted-warm",
+      "runs": 5,
+      "callerMsMedian": 0.20825000000002092,
+      "callerMsP95": 0.3244999999999436,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        269,
+        459,
+        202,
+        282,
+        222
+      ]
+    },
+    {
+      "key": "independent/1/1/abort-during-fresh-read",
+      "runs": 5,
+      "callerMsMedian": 5.119625000000042,
+      "callerMsP95": 6.2380829999999605,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        1668,
+        1426,
+        579,
+        957,
+        1152
+      ]
+    },
+    {
+      "key": "independent/1/1/send-command",
+      "runs": 5,
+      "callerMsMedian": 2.7473329999997986,
+      "callerMsP95": 3.006208000000015,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        93,
+        93,
+        93,
+        93,
+        93
+      ],
+      "nodeCPUus": [
+        1012,
+        859,
+        512,
+        468,
+        505
+      ]
+    },
+    {
+      "key": "independent/1/1/after-send-fresh",
+      "runs": 5,
+      "callerMsMedian": 5.684790999999905,
+      "callerMsP95": 9.016208000000006,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        1051,
+        1254,
+        974,
+        913,
+        1218
+      ]
+    },
+    {
+      "key": "independent/1/1/after-send-immediate-poll",
+      "runs": 5,
+      "callerMsMedian": 0.18908399999997982,
+      "callerMsP95": 0.31762499999990723,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        255,
+        234,
+        232,
+        256,
+        410
+      ]
+    },
+    {
+      "key": "independent/1/1/after-send-4s-poll",
+      "runs": 5,
+      "callerMsMedian": 5.224375000000009,
+      "callerMsP95": 7.368332999999893,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        895,
+        2301,
+        793,
+        816,
+        1030
+      ]
+    },
+    {
+      "key": "independent/2/2/cold-open",
+      "runs": 5,
+      "callerMsMedian": 6.116833000000042,
+      "callerMsP95": 7.2925840000000335,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        121870,
+        121870,
+        121870,
+        121870,
+        121870
+      ],
+      "nodeCPUus": [
+        2305,
+        1402,
+        1566,
+        2218,
+        1416
+      ]
+    },
+    {
+      "key": "independent/2/2/warm-unchanged",
+      "runs": 5,
+      "callerMsMedian": 0.34625000000005457,
+      "callerMsP95": 0.6392499999999472,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        435,
+        406,
+        594,
+        548,
+        496
+      ]
+    },
+    {
+      "key": "independent/2/2/data-changed",
+      "runs": 5,
+      "callerMsMedian": 6.124667000000045,
+      "callerMsP95": 9.42995800000017,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        121870,
+        121870,
+        121870,
+        121870,
+        121870
+      ],
+      "nodeCPUus": [
+        1623,
+        2017,
+        1409,
+        1668,
+        1601
+      ]
+    },
+    {
+      "key": "independent/2/2/reconnect-attach",
+      "runs": 5,
+      "callerMsMedian": 0.33037500000000364,
+      "callerMsP95": 0.41174999999998363,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        729,
+        650,
+        404,
+        530,
+        398
+      ]
+    },
+    {
+      "key": "independent/2/2/reconnect-new-reader",
+      "runs": 5,
+      "callerMsMedian": 6.004707999999937,
+      "callerMsP95": 7.963166999999885,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        121870,
+        121870,
+        121870,
+        121870,
+        121870
+      ],
+      "nodeCPUus": [
+        1713,
+        1888,
+        1574,
+        1399,
+        1907
+      ]
+    },
+    {
+      "key": "independent/2/2/unchanged-after-ceiling",
+      "runs": 5,
+      "callerMsMedian": 6.541791000000103,
+      "callerMsP95": 8.238000000000056,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        121870,
+        121870,
+        121870,
+        121870,
+        121870
+      ],
+      "nodeCPUus": [
+        1735,
+        1878,
+        1684,
+        1514,
+        1467
+      ]
+    },
+    {
+      "key": "independent/2/2/fresh-no-store",
+      "runs": 5,
+      "callerMsMedian": 6.115542000000005,
+      "callerMsP95": 9.044083,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        121870,
+        121870,
+        121870,
+        121870,
+        121870
+      ],
+      "nodeCPUus": [
+        1767,
+        1417,
+        1273,
+        2050,
+        1440
+      ]
+    },
+    {
+      "key": "independent/2/2/different-cursors",
+      "runs": 5,
+      "callerMsMedian": 1.9078750000001037,
+      "callerMsP95": 3.08725000000004,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        13739,
+        14645,
+        15551,
+        16457,
+        17363
+      ],
+      "nodeCPUus": [
+        1243,
+        1201,
+        1132,
+        1256,
+        1052
+      ]
+    },
+    {
+      "key": "independent/2/2/different-limits",
+      "runs": 5,
+      "callerMsMedian": 0.32054199999993216,
+      "callerMsP95": 0.7101659999998446,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        407,
+        430,
+        405,
+        825,
+        580
+      ]
+    },
+    {
+      "key": "independent/2/2/invalid-cursor",
+      "runs": 5,
+      "callerMsMedian": 0.056207999999969616,
+      "callerMsP95": 0.15541700000017045,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        76,
+        148,
+        78,
+        99,
+        205
+      ]
+    },
+    {
+      "key": "independent/2/2/unsupported-after",
+      "runs": 5,
+      "callerMsMedian": 0.04762499999992542,
+      "callerMsP95": 0.12029099999995196,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        85,
+        77,
+        53,
+        84,
+        138
+      ]
+    },
+    {
+      "key": "independent/2/2/focus-command",
+      "runs": 5,
+      "callerMsMedian": 0.7600000000001046,
+      "callerMsP95": 1.3404590000000098,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        162,
+        162,
+        162,
+        162,
+        162
+      ],
+      "nodeCPUus": [
+        798,
+        638,
+        1795,
+        574,
+        789
+      ]
+    },
+    {
+      "key": "independent/2/2/after-focus",
+      "runs": 5,
+      "callerMsMedian": 0.3224999999999909,
+      "callerMsP95": 0.3746249999999236,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        374,
+        548,
+        453,
+        366,
+        503
+      ]
+    },
+    {
+      "key": "independent/2/2/already-aborted-warm",
+      "runs": 5,
+      "callerMsMedian": 0.31208299999980227,
+      "callerMsP95": 0.36725000000001273,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        400,
+        467,
+        458,
+        419,
+        415
+      ]
+    },
+    {
+      "key": "independent/2/2/abort-during-fresh-read",
+      "runs": 5,
+      "callerMsMedian": 7.421500000000151,
+      "callerMsP95": 11.051375000000007,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        121870,
+        121870,
+        121870,
+        121870,
+        121870
+      ],
+      "nodeCPUus": [
+        1422,
+        1875,
+        14863,
+        1531,
+        1141
+      ]
+    },
+    {
+      "key": "independent/2/2/send-command",
+      "runs": 5,
+      "callerMsMedian": 3.374500000000012,
+      "callerMsP95": 9.93249999999989,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        186,
+        186,
+        186,
+        186,
+        186
+      ],
+      "nodeCPUus": [
+        930,
+        1702,
+        3520,
+        1412,
+        1097
+      ]
+    },
+    {
+      "key": "independent/2/2/after-send-fresh",
+      "runs": 5,
+      "callerMsMedian": 6.8344999999999345,
+      "callerMsP95": 8.628124999999727,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        121870,
+        121870,
+        121870,
+        121870,
+        121870
+      ],
+      "nodeCPUus": [
+        1242,
+        1616,
+        1423,
+        1283,
+        1580
+      ]
+    },
+    {
+      "key": "independent/2/2/after-send-immediate-poll",
+      "runs": 5,
+      "callerMsMedian": 0.3133749999999509,
+      "callerMsP95": 0.3456670000000486,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        397,
+        590,
+        403,
+        403,
+        440
+      ]
+    },
+    {
+      "key": "independent/2/2/after-send-4s-poll",
+      "runs": 5,
+      "callerMsMedian": 6.124875000000202,
+      "callerMsP95": 10.146375000000262,
+      "clientAsk": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "machineRoute": [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "answerPayloadBytes": [
+        121870,
+        121870,
+        121870,
+        121870,
+        121870
+      ],
+      "nodeCPUus": [
+        2070,
+        1305,
+        1558,
+        2026,
+        3024
+      ]
+    },
+    {
+      "key": "independent/4/4/cold-open",
+      "runs": 5,
+      "callerMsMedian": 8.523416999999881,
+      "callerMsP95": 17.28212500000018,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        243740,
+        243740,
+        243740,
+        243740,
+        243740
+      ],
+      "nodeCPUus": [
+        2920,
+        2520,
+        3602,
+        2392,
+        2733
+      ]
+    },
+    {
+      "key": "independent/4/4/warm-unchanged",
+      "runs": 5,
+      "callerMsMedian": 0.6498749999999518,
+      "callerMsP95": 2.232665999999881,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        926,
+        1070,
+        724,
+        881,
+        1987
+      ]
+    },
+    {
+      "key": "independent/4/4/data-changed",
+      "runs": 5,
+      "callerMsMedian": 7.857332999999926,
+      "callerMsP95": 13.087207999999919,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        243740,
+        243740,
+        243740,
+        243740,
+        243740
+      ],
+      "nodeCPUus": [
+        4262,
+        2294,
+        2509,
+        2593,
+        14130
+      ]
+    },
+    {
+      "key": "independent/4/4/reconnect-attach",
+      "runs": 5,
+      "callerMsMedian": 0.6173329999999169,
+      "callerMsP95": 0.7644580000001042,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        713,
+        757,
+        1180,
+        889,
+        745
+      ]
+    },
+    {
+      "key": "independent/4/4/reconnect-new-reader",
+      "runs": 5,
+      "callerMsMedian": 7.640333000000055,
+      "callerMsP95": 14.659750000000258,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        243740,
+        243740,
+        243740,
+        243740,
+        243740
+      ],
+      "nodeCPUus": [
+        3157,
+        6379,
+        2912,
+        3242,
+        3496
+      ]
+    },
+    {
+      "key": "independent/4/4/unchanged-after-ceiling",
+      "runs": 5,
+      "callerMsMedian": 8.146334000000024,
+      "callerMsP95": 16.034625000000233,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        243740,
+        243740,
+        243740,
+        243740,
+        243740
+      ],
+      "nodeCPUus": [
+        2812,
+        2412,
+        2888,
+        2254,
+        2934
+      ]
+    },
+    {
+      "key": "independent/4/4/fresh-no-store",
+      "runs": 5,
+      "callerMsMedian": 7.774916000000076,
+      "callerMsP95": 9.307624999999916,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        243740,
+        243740,
+        243740,
+        243740,
+        243740
+      ],
+      "nodeCPUus": [
+        2807,
+        2152,
+        3012,
+        2413,
+        2367
+      ]
+    },
+    {
+      "key": "independent/4/4/different-cursors",
+      "runs": 5,
+      "callerMsMedian": 2.180166999999983,
+      "callerMsP95": 3.1423749999999018,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        28082,
+        29894,
+        31706,
+        33518,
+        35330
+      ],
+      "nodeCPUus": [
+        1615,
+        1369,
+        1471,
+        1946,
+        2152
+      ]
+    },
+    {
+      "key": "independent/4/4/different-limits",
+      "runs": 5,
+      "callerMsMedian": 0.5879169999998339,
+      "callerMsP95": 0.6681659999999283,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        763,
+        767,
+        767,
+        776,
+        974
+      ]
+    },
+    {
+      "key": "independent/4/4/invalid-cursor",
+      "runs": 5,
+      "callerMsMedian": 0.06908300000009149,
+      "callerMsP95": 0.1576670000000604,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        170,
+        120,
+        204,
+        130,
+        133
+      ]
+    },
+    {
+      "key": "independent/4/4/unsupported-after",
+      "runs": 5,
+      "callerMsMedian": 0.05329199999982848,
+      "callerMsP95": 0.10516599999982645,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        175,
+        110,
+        116,
+        90,
+        73
+      ]
+    },
+    {
+      "key": "independent/4/4/focus-command",
+      "runs": 5,
+      "callerMsMedian": 1.0790000000000646,
+      "callerMsP95": 1.4161250000001928,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        324,
+        324,
+        324,
+        324,
+        324
+      ],
+      "nodeCPUus": [
+        1430,
+        1814,
+        970,
+        747,
+        1080
+      ]
+    },
+    {
+      "key": "independent/4/4/after-focus",
+      "runs": 5,
+      "callerMsMedian": 0.6156670000000304,
+      "callerMsP95": 0.8629580000000487,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        853,
+        898,
+        1132,
+        711,
+        721
+      ]
+    },
+    {
+      "key": "independent/4/4/already-aborted-warm",
+      "runs": 5,
+      "callerMsMedian": 0.6115410000002157,
+      "callerMsP95": 0.6990829999999733,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        1266,
+        761,
+        824,
+        1590,
+        779
+      ]
+    },
+    {
+      "key": "independent/4/4/abort-during-fresh-read",
+      "runs": 5,
+      "callerMsMedian": 8.987957999999935,
+      "callerMsP95": 14.169874999999593,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        243740,
+        243740,
+        243740,
+        243740,
+        243740
+      ],
+      "nodeCPUus": [
+        3939,
+        3282,
+        2519,
+        1868,
+        4372
+      ]
+    },
+    {
+      "key": "independent/4/4/send-command",
+      "runs": 5,
+      "callerMsMedian": 4.342958999999951,
+      "callerMsP95": 5.464750000000095,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        372,
+        372,
+        372,
+        372,
+        372
+      ],
+      "nodeCPUus": [
+        1385,
+        1977,
+        1195,
+        1422,
+        1332
+      ]
+    },
+    {
+      "key": "independent/4/4/after-send-fresh",
+      "runs": 5,
+      "callerMsMedian": 7.735000000000127,
+      "callerMsP95": 12.479499999999916,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        243740,
+        243740,
+        243740,
+        243740,
+        243740
+      ],
+      "nodeCPUus": [
+        3259,
+        1854,
+        2658,
+        2114,
+        3127
+      ]
+    },
+    {
+      "key": "independent/4/4/after-send-immediate-poll",
+      "runs": 5,
+      "callerMsMedian": 0.6361660000000029,
+      "callerMsP95": 0.79037500000004,
+      "clientAsk": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "machineRoute": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "answerPayloadBytes": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "nodeCPUus": [
+        939,
+        836,
+        1607,
+        747,
+        701
+      ]
+    },
+    {
+      "key": "independent/4/4/after-send-4s-poll",
+      "runs": 5,
+      "callerMsMedian": 7.792291999999861,
+      "callerMsP95": 15.065917000000354,
+      "clientAsk": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "machineRoute": [
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "answerPayloadBytes": [
+        243740,
+        243740,
+        243740,
+        243740,
+        243740
+      ],
+      "nodeCPUus": [
+        3711,
+        2875,
+        6298,
+        2543,
+        3694
+      ]
+    },
+    {
+      "key": "shared-reader/1/2/same-tick-cold",
+      "runs": 5,
+      "callerMsMedian": 5.736124999999902,
+      "callerMsP95": 6.692792000000054,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        1207,
+        1090,
+        1445,
+        745,
+        855
+      ]
+    },
+    {
+      "key": "shared-reader/1/2/established-inflight",
+      "runs": 5,
+      "callerMsMedian": 0.45354199999997036,
+      "callerMsP95": 10.841874999999618,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        1085,
+        916,
+        997,
+        1334,
+        1400
+      ]
+    },
+    {
+      "key": "shared-reader/1/4/same-tick-cold",
+      "runs": 5,
+      "callerMsMedian": 6.5873750000000655,
+      "callerMsP95": 8.314000000000306,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        1407,
+        1503,
+        1189,
+        1242,
+        2548
+      ]
+    },
+    {
+      "key": "shared-reader/1/4/established-inflight",
+      "runs": 5,
+      "callerMsMedian": 0.7140830000000733,
+      "callerMsP95": 7.793333999999959,
+      "clientAsk": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "machineRoute": [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "answerPayloadBytes": [
+        60935,
+        60935,
+        60935,
+        60935,
+        60935
+      ],
+      "nodeCPUus": [
+        3355,
+        1387,
+        1958,
+        1226,
+        2044
+      ]
+    },
+    {
+      "key": "authority/1/1/prime-before-revoke",
+      "runs": 1,
+      "callerMsMedian": 10.226166999999805,
+      "callerMsP95": 10.226166999999805,
+      "clientAsk": [
+        1
+      ],
+      "machineRoute": [
+        1
+      ],
+      "answerPayloadBytes": [
+        60935
+      ],
+      "nodeCPUus": [
+        1115
+      ]
+    },
+    {
+      "key": "authority/1/1/revoked-warm-cache",
+      "runs": 1,
+      "callerMsMedian": 0.21020799999996598,
+      "callerMsP95": 0.21020799999996598,
+      "clientAsk": [
+        0
+      ],
+      "machineRoute": [
+        0
+      ],
+      "answerPayloadBytes": [
+        0
+      ],
+      "nodeCPUus": [
+        295
+      ]
+    },
+    {
+      "key": "authority/1/1/revoked-fresh",
+      "runs": 1,
+      "callerMsMedian": 21.67599999999993,
+      "callerMsP95": 21.67599999999993,
+      "clientAsk": [
+        1
+      ],
+      "machineRoute": [
+        0
+      ],
+      "answerPayloadBytes": [
+        267
+      ],
+      "nodeCPUus": [
+        1829
+      ]
+    },
+    {
+      "key": "authority/1/1/wrong-generation-fresh",
+      "runs": 1,
+      "callerMsMedian": 2.543167000000267,
+      "callerMsP95": 2.543167000000267,
+      "clientAsk": [
+        1
+      ],
+      "machineRoute": [
+        1
+      ],
+      "answerPayloadBytes": [
+        289
+      ],
+      "nodeCPUus": [
+        1220
+      ]
+    }
+  ]
+}

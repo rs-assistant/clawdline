@@ -34,6 +34,8 @@ The hosted Console's **Cross-machine access** sidebar page lists the machines an
 
 Measured internal queue costs and the unchanged delivery contract are recorded in [live spool sorting](performance/cloud-spool-sorting.md).
 
+The [independent-reader baseline](performance/cloud-independent-reads.md) separates per-viewer reads from same-reader coalescing and documents its local-only measurement boundary.
+
 ## Publications, reads and commands
 
 The publisher sends a machine descriptor on `orch/<machine>`, one complete row per session on `s/<machine>/<session>`, a content-free status projection on `ss/<machine>/<session>`, and an inventory marker after the rows. It polls the daemon's local routes, skips unchanged session content row by row on both channels, and periodically restates values so an idle machine does not appear stale. A `sessions.snapshot` request can ask the machine to restate rows after a reconnect. The publisher preserves previously known rows when a partial local scan cannot prove they disappeared. The descriptor includes the supported command words. See [`publish.go`](../internal/transport/cloud/publish.go) for current timing, freshness and inventory rules.
