@@ -23,10 +23,7 @@ function hexContrast(a: string, b: string) {
   return (light + 0.05) / (dark + 0.05)
 }
 
-test("the Project picker draws each Project mark in its trigger and menu", () => {
-  assert.match(source, /function ProjectPicker/)
-  assert.match(source, /places\.map[\s\S]*<Mark icon=\{place\.icon/)
-})
+// Project picker interaction and marks are checked in the shared picker browser test.
 
 test("work kinds are an explained icon list instead of a select", () => {
   for (const kind of ["Feature", "Issue", "Epic", "Refactor", "Plan"]) assert.match(source, new RegExp(`label: "${kind}"`))

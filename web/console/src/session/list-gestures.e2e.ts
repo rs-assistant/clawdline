@@ -2995,7 +2995,7 @@ test("a Project-page Board address selects and reads that Project", () =>
     const selected = await tab.run(`new Promise((resolve, reject) => {
       const deadline = Date.now() + 8000
       const read = () => {
-        const text = document.querySelector('.work-project-trigger')?.textContent || ''
+        const text = document.querySelector('.project-picker-trigger')?.textContent || ''
         if (text.includes('Clawdline')) return resolve(text)
         if (Date.now() >= deadline) return reject(new Error('the Project-scoped Board did not arrive: ' + text))
         setTimeout(read, 25)
