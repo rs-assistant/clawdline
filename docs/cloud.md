@@ -40,6 +40,18 @@ The publisher sends a machine descriptor on `orch/<machine>`, one complete row p
 
 **The status row a read is pinned to is asked for too.** Before a pinned read is sent, the page checks this machine's `ss/` marker and that Session's own status row, and refuses the read itself when they do not agree; the refusal names which check failed (`pinnedSession`). One of those conditions is not a disagreement at all: `no_row`, the marker listing the Session while its row is not held, is a row the relay retains and the page can ask for, exactly as the list already asks for one that a gap in its own pass left out. It now does, once, and pins again; a row that still does not come is the refusal it always was. Measured on one machine's log for 2026-10-11, that condition was the commonest read failure of the day — 23 of them, each shown to the person as an execution that was no longer current, when nothing had changed but this page's hold on one retained row.
 
+**An expired push destination recovers in place.** A transcript generation refusal or a detail
+reported as changed asks the original machine for a fresh authenticated Session list, even if the
+retained status set still looks current. The page follows only one unique, current row for the
+same machine and Session; it can also reread the same execution when the problem was stale
+status. Both readers share one automatic attempt per user opening
+(`console.execution_recovery_attempts`). Navigation, closure, reconnection and a newer opening
+invalidate a late recovery. Missing, ambiguous or unavailable rows retain the existing failure
+and manual action. The URL is updated to the verified execution; detail state is rebuilt, while
+only unsent editor text and attached images cross that boundary. Messages, answers and close
+operations are never replayed automatically. The existing `cloud.read.failed` diagnostic retains
+the original refusal condition.
+
 `ss/` contains only machine and terminal ids, `execution_generation`, `snapshot_generation`, assistant, backend, state, source provenance and observation time, freshness, scan completeness, projection time, last record movement time, the registered no-movement threshold, and narrow acceptance, attention, close-blocked, or failed-agent facts. `completed_unconfirmed` requires an unviewed Board item in phase `done`; a `deploying` item is not called complete. `close_blocked` is a measured true or false only with current closeability evidence. `failed_agent_count` is a measured count, including zero, only with a complete, untruncated provider-native agent reading. Absence means unknown; neither field asserts that the Session's work failed. It contains no label, transcript, screen, menu, shell, Git data, working directory, or content-derived summary. Record movement means new bytes in the assistant's own record; it is not a claim of task progress. A carried row without a fresh source loses its execution generation and these status facts. The old `s/` publication remains for compatibility; it still contains the full row and must retain content-level authorization. The private relay's compatible `ss/` support is deployed. The hosted console must adopt `ss/` for the list before the relay's prepared `s/` restriction to `read_transcript` can deploy. The public daemon alone cannot enforce those relay capabilities.
 
 `waiting_for_reply` is a positive signal only when a current waiting row has an actual menu with options: either the screen was captured, or the registry wait and the transcript prove that one AskUserQuestion remains open while the screen is unavailable. The status copies none of the menu text. A waiting state or `work_person_needed` alone does not establish an open question; an absent signal means unknown.

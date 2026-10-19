@@ -1868,6 +1868,24 @@
   },
   {
     "Register": "daemon",
+    "Name": "console.execution_recovery_attempts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "sender",
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
     "Name": "console.health_live_seconds",
     "Class": "cache",
     "Unit": "seconds",

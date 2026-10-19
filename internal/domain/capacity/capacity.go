@@ -478,6 +478,7 @@ const (
 	ConsoleTranscriptBackoffSeconds   = "console.transcript_backoff_seconds"
 	ConsoleRelayTranscriptExpectReask = "console.relay_transcript_expect_reask_seconds"
 	ConsoleRelayFeatureWait           = "console.relay_feature_wait_seconds"
+	ConsoleExecutionRecoveryAttempts  = "console.execution_recovery_attempts"
 	ConsoleStatusGapRetry             = "console.status_gap_retry_seconds"
 	ConsolePersonaRetry               = "console.persona_retry_seconds"
 	ConsoleStatusMarkerRetry          = "console.status_marker_retry_seconds"

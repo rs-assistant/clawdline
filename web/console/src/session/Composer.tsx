@@ -81,6 +81,8 @@ import "./voice-source.css"
  * `useKeyboardBar` below is still a local rendering of `input/edges.js`, which
  * is not among the copied modules.
  */
+export type ComposerDraftHandoff = { current: { text: string; images: string[] } | null }
+
 export function Composer({
   row,
   onDid,
@@ -89,7 +91,9 @@ export function Composer({
   restoredDraft,
   suggestedDraft,
   remote,
+  draftHandoff,
 }: {
+  draftHandoff?: ComposerDraftHandoff
   row: SessionRow | null
   onDid: () => void
   /** After a delivered send; nothing when left out (`Detail`'s `onSent`). */
@@ -168,6 +172,24 @@ export function Composer({
     // The menu was about the session that was open; `session/open.js` closes it.
     setSkills({ shown: false, matches: [], selected: 0 })
   }, [openId])
+
+  // The detail is remounted for a new execution to discard old questions
+  // and confirmations. Only its unsent editor contents cross that boundary.
+  useLayoutEffect(() => {
+    if (!draftHandoff) return
+    const editor = msg.current
+    return () => {
+      draftHandoff.current = { text: editor?.innerText ?? "", images: Shots.urls().slice() }
+    }
+  }, [draftHandoff])
+  useEffect(() => {
+    const draft = draftHandoff?.current
+    if (!draft || !msg.current) return
+    msg.current.textContent = draft.text
+    setText(draft.text)
+    Shots.restore(draft.images)
+    draftHandoff.current = null
+  }, [draftHandoff])
 
   useEffect(() => {
     const draft = remote?.restoreDraft

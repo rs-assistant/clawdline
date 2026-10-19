@@ -4,6 +4,14 @@ package capacity
 func consoleBounds() []Entry {
 	return []Entry{
 		{
+			// Both opened-detail readers share one automatic recovery per
+			// user opening (SessionExecutionRecovery). At the limit the
+			// existing failure and manual recovery action remain visible.
+			Name: ConsoleExecutionRecoveryAttempts, Class: Buffer, Unit: Rows,
+			Limit: 1, AtLimit: Refuse,
+			Told: []Channel{Sender, Diagnostics}, EvictedBy: Daemon,
+		},
+		{
 			// The transcript pane reads the whole newest page at least this
 			// often (SAFETY_MS); between, it reads only what was appended, when
 			// the session row says the record grew. Past it the held page

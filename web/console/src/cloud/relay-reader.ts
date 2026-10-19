@@ -577,6 +577,7 @@ function recordHeaderRead(row: HeaderReadDiagnostic): void {
 }
 
 export interface RelayReaderOptions {
+  onExecutionChanged?: (machineID: string, sessionID: string) => void
   now?: () => number
   /** The interface's words for `GET /v1/strings`; the build's static catalog. */
   strings?: () => Promise<Record<string, string>>
@@ -2331,7 +2332,9 @@ export class RelayReader {
         if (await this.askForStatusRow(session, signal)) return this.pinnedSession(session)
       }
       if (condition !== "pass_mismatch") {
-        if (["no_marker", "no_row", "marker_stale", "row_stale", "observed_stale"].includes(String(condition))) {
+        {
+          // A verified machine list can repair an older retained status set.
+          // It must still name the exact execution the person is reading.
           const resolved = await this.options.resolveSession?.(this.machine, session)
           if (resolved && !signal?.aborted) {
             const intended = this.options.fleetTarget?.()
@@ -2781,6 +2784,9 @@ export class RelayReader {
    * the page itself stopped waiting for is not a failure and is not recorded.
    */
   private reportReadFailure(read: { word: string; session: string | null; machine?: string }, started: number, error: unknown, answer: Response | null): void {
+    if ((error as { code?: unknown } | null)?.code === "execution_generation_changed" && read.session) {
+      this.options.onExecutionChanged?.(read.machine ?? this.machine, read.session)
+    }
     try {
       const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>, key?: string): unknown } } | null)?.viewerEvents
       if (typeof log?.record !== "function") return

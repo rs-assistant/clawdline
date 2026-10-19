@@ -949,3 +949,24 @@ test("a direct list names the Clawdfather without any held status row", async ()
   assert.equal(reading.rows?.[0]?.machineScope, true)
   assert.equal(reading.rows?.[0]?.coordinatorBound, true)
 })
+
+
+test("execution recovery bypasses a fresh retained old generation and subsequent reads use the verified replacement", async () => {
+  const { client, calls } = clientFixture()
+  const newer = "b".repeat(32)
+  client.listPresentationsForMachine = async (machine: string) => {
+    calls.push("sessions.list:" + machine)
+    return { at: Math.floor(Date.now() / 1000), complete: true, sessions: [{ id: sessionID,
+      execution_generation: newer, title: "Current", assistant: "claude",
+      status: { state: "idle", work_state: "ready", work_note: "", work_provenance: "self", persona: "product-manager" } }] }
+  }
+  const source = statusSource(() => client as never)
+  const before = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(before.rows?.[0].destination.executionGeneration, executionGeneration)
+  const recovered = await source.readMachine(machineID, new AbortController().signal, true)
+  assert.equal(recovered.kind, "ready")
+  assert.equal(recovered.rows?.[0].destination.executionGeneration, newer)
+  const next = await source.readMachine(machineID, new AbortController().signal)
+  assert.equal(next.rows?.[0].destination.executionGeneration, newer)
+  assert.equal(calls.filter((call) => call.startsWith("sessions.list:")).length, 1)
+})
