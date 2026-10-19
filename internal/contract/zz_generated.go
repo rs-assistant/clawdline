@@ -5808,11 +5808,11 @@ type SessionRow struct {
 	State  SessionState    `json:"state"`
 	TTY    string          `json:"tty,omitempty"`
 
-	// The live broker work that makes a broker-projected `waiting_session` row wait,
-	// collected by the same pass that decided the state. Present only on such rows; at
-	// most `session.waiting_for` entries, with `waiting_for_omitted` counting the
-	// rest. Both Cloud list scopes and the local list describe a wait from this field
-	// alone.
+	// The live broker work owned by this Session, collected by the same pass that
+	// decided the work state. Independent of the terminal state, so working and
+	// unknown rows can also name outstanding work; at most `session.waiting_for`
+	// entries, with `waiting_for_omitted` counting the rest. Both Cloud list scopes
+	// and the local list describe a wait from this field alone.
 	WaitingFor []SessionWaitTarget `json:"waiting_for,omitempty"`
 
 	// Live waited-on tasks left out of `waiting_for` by its bound.

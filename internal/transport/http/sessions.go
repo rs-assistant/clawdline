@@ -418,7 +418,7 @@ func (s *Server) sessionsPayloadRead(ctx context.Context, inv session.Inventory,
 		})
 		// Every list reads what a Session waits for from the row, never from a
 		// task collection of its own: the Cloud lists do not have one.
-		if row.WorkState == contract.WorkStateWaitingSession && row.WorkProvenance == contract.WorkProvenanceBroker {
+		if len(row.waiting) > 0 {
 			row.WaitingFor, row.WaitingForOmitted = s.waitTargets(records, row.waiting, labels, heavyPlaces)
 		}
 		if attentionErr == nil && item.ConversationID != "" && conversationMatches[item.ConversationID] == 1 &&

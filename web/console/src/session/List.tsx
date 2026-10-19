@@ -8,7 +8,7 @@ import { detailSessionName, projectedSessionIdentity, sessionCoordinatorBound, s
 import { requestConfirm } from "../overlays/events.js"
 import { ACTION_WIDTH, actionWidth, archivable, revealFor, richSessionSwipeActions, swipes, type Reveal } from "./swipe.js"
 import { conversationNotStarted } from "./readiness.js"
-import { waitingForWords } from "./waiting-for.js"
+import { waitingForWords, runningShellCount } from "./waiting-for.js"
 import { retainedStateWords, sessionReadingChinese } from "../session-reading.js"
 import { rowPersonaLine } from "../personas.js"
 import { usePersonas } from "./PersonaBot.js"
@@ -149,7 +149,7 @@ function stateLine(row: SessionRow): { html: string; shape: string } {
   const callbackSaid = row.heavy_work
     ? `<span class="session-callback-active" title="${L.escapeHTML(callbackDetail)}"><span aria-hidden="true">🏗️</span><span class="session-callback-label">${L.escapeHTML(row.heavy_work.reason || callbackLabel)}</span>${L.workState(row).state === "working" ? "" : '<canvas class="spin" aria-hidden="true"></canvas>'}</span>`
     : ""
-  const n = row.shells?.length ?? 0
+  const n = runningShellCount(row)
   const shellsSaid = n
     ? `<span class="shells">${L.escapeHTML(n === 1 ? T.sessionShellOne : L.fillString(T.sessionShellMany, { n }))}</span>`
     : ""
@@ -186,6 +186,9 @@ function stateLine(row: SessionRow): { html: string; shape: string } {
   const brokerWait = row.state === "idle" && row.work_state === "waiting_session" && row.work_provenance !== "self"
   const work = brokerWait ? { state: "waiting_session" } : L.workState(row)
   const waitingFor = waitingForWords(row, nextWord)
+  if (waitingFor.text) {
+    peerSaid += `<span class="coordination-wait" title="${L.escapeHTML(waitingFor.title)}">${L.glyphHTML("⏳", waitingFor.text)}</span>`
+  }
   if (work.state === "waiting_session" && !peerSaid) {
     if (row.work_provenance === "self" && row.work_note && row.work_moved_by && row.work_person_needed === false) {
       const declaredTitle = row.work_moved_by + " · " + row.work_note

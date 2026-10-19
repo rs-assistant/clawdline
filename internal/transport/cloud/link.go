@@ -788,6 +788,7 @@ func (l *Link) wire() error {
 		Transport: l.relay,
 		Log:       opts.Log,
 	}
+	l.mu.Lock()
 	l.publisher = &Publisher{
 		MachineID:     identity.MachineID,
 		MachineName:   machineName(identity, settings, HostName(), runtime.GOOS),
@@ -811,6 +812,7 @@ func (l *Link) wire() error {
 		Publish:       l.relay.Publish,
 		Log:           opts.Log,
 	}
+	l.mu.Unlock()
 	// The publisher hears every viewer the relay hears from, which is how a
 	// viewer that arrived after this machine's last change gets the current
 	// state instead of waiting for the heartbeat (`Publisher.Seen`).
@@ -859,9 +861,18 @@ func machineName(identity adaptercloud.Identity, settings adaptercloud.Settings,
 
 // TaskListChanged is `http.CloudTaskLine`: this machine has written a task
 // row, so the list a viewer reads off the machine descriptor is not what the
-// publisher last projected. It records the fact and returns — the publisher's
-// own pass is what reads and publishes, at the cadence it always had.
-func (l *Link) TaskListChanged() { l.taskListMoved.Store(true) }
+// publisher last projected. Reuse the coalesced settle lane so the Session
+// queue change is read fresh without waiting for the five-second poll.
+// No viewers means no additional inventory work.
+func (l *Link) TaskListChanged() {
+	l.taskListMoved.Store(true)
+	l.mu.Lock()
+	publisher := l.publisher
+	l.mu.Unlock()
+	if publisher != nil && publisher.Watched() {
+		publisher.Settle()
+	}
+}
 
 // takeTaskListMoved answers whether a task row was written since it was last
 // asked, and clears the fact. Only the publisher's pass asks.
