@@ -104,16 +104,15 @@ func TestAReportNeverTravelsOverCloud(t *testing.T) {
 	}
 }
 
-// The tunnel's requests come from 127.0.0.1 with the tunnel's name as Host;
-// a request from elsewhere has a peer that is not loopback.
-func TestAReportIsRefusedThroughTheTunnelAndFromElsewhere(t *testing.T) {
+// Tailscale Serve's requests come from 127.0.0.1 with the tailnet name as
+// Host; a request from elsewhere has a peer that is not loopback.
+func TestAReportIsRefusedThroughTailscaleAndFromElsewhere(t *testing.T) {
 	_, handler, local, _ := turnReportServer(t)
 	for name, edit := range map[string]func(*http.Request){
-		"named tunnel":      func(r *http.Request) { r.Host = "box.example.com" },
-		"Tailscale Serve":   func(r *http.Request) { r.Host = "machine.tailnet-example.ts.net" },
-		"cloudflare header": func(r *http.Request) { r.Header.Set("Cf-Connecting-Ip", "198.51.100.7") },
-		"another machine":   func(r *http.Request) { r.RemoteAddr = "192.0.2.1:52000" },
-		"no peer":           func(r *http.Request) { r.RemoteAddr = "" },
+		"another name":    func(r *http.Request) { r.Host = "box.example.com" },
+		"Tailscale Serve": func(r *http.Request) { r.Host = "machine.tailnet-example.ts.net" },
+		"another machine": func(r *http.Request) { r.RemoteAddr = "192.0.2.1:52000" },
+		"no peer":         func(r *http.Request) { r.RemoteAddr = "" },
 	} {
 		rec := getReport(handler, local, "/reports/"+reportID, edit)
 		if rec.Code == http.StatusOK || strings.Contains(rec.Body.String(), "clawdline report") {

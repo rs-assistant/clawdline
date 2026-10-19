@@ -249,7 +249,6 @@ All of these were called on the box and answered without a stack trace:
 - **iTerm2** simply is not in the backend list, and `clawdline type <tty> …` answers
   `no backend for iterm` rather than pretending.
 - **HEIC** → `415 unsupported_image`, "One file was not a supported decodable raster image."
-- **cloudflared** → `/v1/tunnel` reports `installed: false`, `state: off`.
 - **Voice** → the 16 kHz rule is stated in full rather than quietly resampling.
 - **Sessions with no record** carry `evidence: "none"` and a note, never a zero pretending to be an
   answer.
@@ -418,4 +417,4 @@ section with a `+` that leads nowhere.
 Desktop Linux (GNOME/Wayland) — this machine is headless, so the hotkey portal, Secret Service,
 `org.freedesktop.Notifications`, the tray and a real browser launch are all untested. Whisper
 end-to-end (no binary, no model on the box). Reboot survival. Ten-minute SSE soak. Layout at
-760px. `cloudflared` with the binary present.
+760px.

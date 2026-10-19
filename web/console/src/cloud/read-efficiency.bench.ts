@@ -31,7 +31,9 @@ const ready = join(work, "ready")
 await rm(ready, { force: true })
 const state = join(work, "empty-state")
 await mkdir(state, { recursive: true })
-const child = spawn(binary, ["-test.run=^TestServeCloudReadEfficiency$", "-test.v", "-test.timeout=6m"], {
+const cpuArm = process.env.CLAWDLINE_READ_BENCH_CPU_ARM
+const serverArgs = ["-test.run=^TestServeCloudReadEfficiency$", "-test.v", "-test.timeout=6m"]
+const child = spawn(cpuArm ? "/usr/bin/time" : binary, cpuArm ? ["-p", "-o", join(out, "go.time"), binary, ...serverArgs] : serverArgs, {
   env: { ...process.env, CLAWDLINE_READ_BENCH_READY: ready, CLAWDLINE_NEXT_DIR: state, TMPDIR: work },
   stdio: ["ignore", "pipe", "pipe"],
 })
@@ -191,6 +193,66 @@ async function phase(round: number, arm: string, viewers: Viewer[], callers: num
   return pages
 }
 
+// Each invocation owns one server so /usr/bin/time reports that server alone.
+// Rebuilding readers every batch forces actual routes without artificial waits.
+async function cpuLoad(arm: string, outputDirectory: string) {
+  const independent = arm === "idle" ? 0 : arm === "shared4" ? 1 : Number(arm)
+  const callers = arm === "shared4" ? 4 : independent
+  const batches = Number(process.env.CLAWDLINE_READ_BENCH_BATCHES ?? "1000")
+  assert.ok(arm === "idle" || ["1", "2", "4", "shared4"].includes(arm))
+  assert.ok(Number.isSafeInteger(batches) && batches > 0)
+  const startupCPU = process.cpuUsage()
+  const startupAt = performance.now()
+  // Same initialized server and fixture in idle; no transcript warmup or read.
+  const initialRoutes = (await routes()).length
+  assert.equal(initialRoutes, 0)
+  const before = process.cpuUsage()
+  const started = performance.now()
+  const batchMs: number[] = []
+  let successfulCallerReads = 0, successfulRouteReads = 0, payloadBytes = 0, requestBytes = 0, httpBodyBytes = 0
+  assert.equal((await fetch(base + "/profile?on=1", { method: "POST" })).status, 200)
+  for (let batch = 0; arm !== "idle" && batch < batches; batch++) {
+    const vs = Array.from({ length: independent }, viewer)
+    const at = performance.now()
+    const pages = await Promise.all(Array.from({ length: callers }, async (_, i) => {
+      const response = await vs[i % independent].reader.fetch("/v1/transcript?session=" + encodeURIComponent(fixture.session))
+      assert.equal(response.status, 200)
+      const page = await response.json() as Page
+      assert.equal(page.id, fixture.session)
+      assert.equal(page.entries?.length, 200)
+      assert.ok(page.entries?.at(-1)?.text?.startsWith("synthetic turn 0240 "))
+      return page
+    }))
+    assert.ok(pages.every((p) => p.signature === pages[0].signature))
+    batchMs.push(performance.now() - at)
+    successfulCallerReads += callers
+    assert.equal(asks.length, independent, "each cold independent reader routes exactly once")
+    for (const ask of asks) {
+      assert.equal(ask.status, 200)
+      successfulRouteReads++
+      payloadBytes += ask.answerPayloadBytes
+      requestBytes += ask.requestBytes
+      httpBodyBytes += ask.httpBodyBytes
+    }
+    asks.length = 0
+  }
+  const elapsedMs = performance.now() - started
+  const nodeCPU = process.cpuUsage(before)
+  assert.equal((await fetch(base + "/profile?on=0", { method: "POST" })).status, 200)
+  const routed = await routes()
+  assert.equal(routed.length, successfulRouteReads)
+  const percentile = (xs: number[], p: number) => xs.length ? [...xs].sort((a, b) => a-b)[Math.ceil(xs.length*p)-1] : 0
+  const data = { schema: 1, arm, batches: arm === "idle" ? 0 : batches, callersPerBatch: callers,
+    readersPerBatch: independent, denominator: process.env.CLAWDLINE_READ_BENCH_DENOMINATOR,
+    round: Number(process.env.CLAWDLINE_READ_BENCH_ROUND), fixture, initialRoutes,
+    successfulCallerReads, successfulRouteReads, machineRoutes: routed.length, payloadBytes, requestBytes, httpBodyBytes,
+    elapsedMs, batchMs, batchMedianMs: percentile(batchMs, .5), batchP95Ms: percentile(batchMs, .95),
+    nodeCPU, nodeStartupSnapshot: startupCPU, readyToLoadMs: started-startupAt,
+    node: process.version, measuredAt: new Date().toISOString() }
+  await writeFile(join(outputDirectory, "cpu-load.json"), JSON.stringify(data, null, 2)+"\n")
+  console.log(JSON.stringify({arm, batches, successfulCallerReads, successfulRouteReads, elapsedMs, nodeCPU}))
+}
+
 try {
   for (let i = 0; i < 400; i++) {
     if (child.exitCode !== null) throw new Error(serverOutput)
@@ -198,122 +260,126 @@ try {
   }
   if (!base.startsWith("http://127.0.0.1:") || base.endsWith(":7727")) throw new Error("No isolated server: " + serverOutput)
   fixture = await (await fetch(base + "/fixture")).json() as Fixture
-  // Warm the Go parser and Node HTTP machinery once, outside measured arms.
-  await viewer().client.transcript({ machine: "mac_a", session: fixture.session })
-  for (let round = 1; round <= 5; round++) {
-    for (const count of [1, 2, 4]) {
-      const vs = Array.from({ length: count }, viewer)
-      const cold = await phase(round, "independent", vs, count, "cold-open")
-      now += 4_000
-      const warm = await phase(round, "independent", vs, count, "warm-unchanged")
-      assert.deepEqual(warm.map((p) => p.signature), cold.map((p) => p.signature))
+  if (cpuArm) {
+    await cpuLoad(cpuArm, out)
+  } else {
+    // Warm the Go parser and Node HTTP machinery once, outside measured arms.
+    await viewer().client.transcript({ machine: "mac_a", session: fixture.session })
+    for (let round = 1; round <= 5; round++) {
+      for (const count of [1, 2, 4]) {
+        const vs = Array.from({ length: count }, viewer)
+        const cold = await phase(round, "independent", vs, count, "cold-open")
+        now += 4_000
+        const warm = await phase(round, "independent", vs, count, "warm-unchanged")
+        assert.deepEqual(warm.map((p) => p.signature), cold.map((p) => p.signature))
+        fixture = await (await fetch(base + "/fixture", { method: "POST" })).json() as Fixture
+        const changed = await phase(round, "independent", vs, count, "data-changed")
+        assert.notEqual(changed[0].signature, cold[0].signature)
+        // Client replacement is what attach actually does; a new reader is a separate cold-cache arm.
+        for (const v of vs) { v.client = new ReadBenchClient("bench" + String(++nextClient).padStart(8, "0")); v.reader.attach(v.client) }
+        await phase(round, "independent", vs, count, "reconnect-attach")
+        await phase(round, "independent", Array.from({ length: count }, viewer), count, "reconnect-new-reader")
+        now += 31_000
+        await phase(round, "independent", vs, count, "unchanged-after-ceiling")
+        const current = await phase(round, "independent", vs, count, "fresh-no-store", { init: { cache: "no-store" } })
+        const cursor = current[0].nextBefore
+        assert.ok(cursor && cursor > 0, "fixture must exercise a real older page")
+        await phase(round, "independent", vs, count, "different-cursors", { query: (i) => "&before=" + (i % 2 ? 1 : cursor) })
+        await phase(round, "independent", vs, count, "different-limits", { query: (i) => "&limit=" + (i % 2 ? 100 : 200) })
+        await phase(round, "independent", vs, count, "invalid-cursor", { query: () => "&before=-1", expected: 400 })
+        await phase(round, "independent", vs, count, "unsupported-after", { query: () => "&after=1", expected: 501 })
+        await phase(round, "independent", vs, count, "focus-command", { path: "/v1/sessions/" + encodeURIComponent(fixture.session) + "/focus", init: { method: "POST", body: "{}" } })
+        await phase(round, "independent", vs, count, "after-focus")
+        const ac = new AbortController(); ac.abort()
+        // Record observed cancellation semantics rather than inventing a cancellable relay.
+        await phase(round, "independent", vs, count, "already-aborted-warm", { init: { signal: ac.signal } })
+        const during = new AbortController()
+        await phase(round, "independent", vs, count, "abort-during-fresh-read", {
+          init: { signal: during.signal, cache: "no-store" }, abortAfterAsk: during })
+        await phase(round, "independent", vs, count, "send-command", {
+          path: "/v1/sessions/" + encodeURIComponent(fixture.session) + "/send",
+          init: { method: "POST", body: JSON.stringify({ text: "synthetic command" }), headers: { "Idempotency-Key": `bench-send-${round}-${count}` } } })
+        await phase(round, "independent", vs, count, "after-send-fresh")
+        await phase(round, "independent", vs, count, "after-send-immediate-poll")
+        now += 4_000
+        await phase(round, "independent", vs, count, "after-send-4s-poll")
+      }
+      for (const count of [2, 4]) {
+        await phase(round, "shared-reader", [viewer()], count, "same-tick-cold")
+        await phase(round, "shared-reader", [viewer()], count, "established-inflight", { inflight: true })
+      }
+    }
+    const freshRaces: unknown[] = []
+    for (let round = 1; round <= 3; round++) {
+      const v = viewer()
+      let release!: () => void
+      let arrived!: () => void
+      const atPayload = new Promise<void>((resolve) => { arrived = resolve })
+      v.client.returnGate = new Promise<void>((resolve) => { release = resolve })
+      v.client.payloadReady = arrived
+      const before = asks.length
+      const routeBefore = (await routes()).length
+      const started = performance.now()
+      const path = "/v1/transcript?session=" + encodeURIComponent(fixture.session)
+      const old = v.reader.fetch(path)
+      await atPayload
+      const sent = await v.reader.fetch("/v1/sessions/" + encodeURIComponent(fixture.session) + "/send", {
+        method: "POST", body: JSON.stringify({ text: "synthetic fresh race" }),
+        headers: { "Idempotency-Key": `fresh-race-${round}` } })
+      assert.equal(sent.status, 200)
       fixture = await (await fetch(base + "/fixture", { method: "POST" })).json() as Fixture
-      const changed = await phase(round, "independent", vs, count, "data-changed")
-      assert.notEqual(changed[0].signature, cold[0].signature)
-      // Client replacement is what attach actually does; a new reader is a separate cold-cache arm.
-      for (const v of vs) { v.client = new ReadBenchClient("bench" + String(++nextClient).padStart(8, "0")); v.reader.attach(v.client) }
-      await phase(round, "independent", vs, count, "reconnect-attach")
-      await phase(round, "independent", Array.from({ length: count }, viewer), count, "reconnect-new-reader")
-      now += 31_000
-      await phase(round, "independent", vs, count, "unchanged-after-ceiling")
-      const current = await phase(round, "independent", vs, count, "fresh-no-store", { init: { cache: "no-store" } })
-      const cursor = current[0].nextBefore
-      assert.ok(cursor && cursor > 0, "fixture must exercise a real older page")
-      await phase(round, "independent", vs, count, "different-cursors", { query: (i) => "&before=" + (i % 2 ? 1 : cursor) })
-      await phase(round, "independent", vs, count, "different-limits", { query: (i) => "&limit=" + (i % 2 ? 100 : 200) })
-      await phase(round, "independent", vs, count, "invalid-cursor", { query: () => "&before=-1", expected: 400 })
-      await phase(round, "independent", vs, count, "unsupported-after", { query: () => "&after=1", expected: 501 })
-      await phase(round, "independent", vs, count, "focus-command", { path: "/v1/sessions/" + encodeURIComponent(fixture.session) + "/focus", init: { method: "POST", body: "{}" } })
-      await phase(round, "independent", vs, count, "after-focus")
-      const ac = new AbortController(); ac.abort()
-      // Record observed cancellation semantics rather than inventing a cancellable relay.
-      await phase(round, "independent", vs, count, "already-aborted-warm", { init: { signal: ac.signal } })
-      const during = new AbortController()
-      await phase(round, "independent", vs, count, "abort-during-fresh-read", {
-        init: { signal: during.signal, cache: "no-store" }, abortAfterAsk: during })
-      await phase(round, "independent", vs, count, "send-command", {
-        path: "/v1/sessions/" + encodeURIComponent(fixture.session) + "/send",
-        init: { method: "POST", body: JSON.stringify({ text: "synthetic command" }), headers: { "Idempotency-Key": `bench-send-${round}-${count}` } } })
-      await phase(round, "independent", vs, count, "after-send-fresh")
-      await phase(round, "independent", vs, count, "after-send-immediate-poll")
-      now += 4_000
-      await phase(round, "independent", vs, count, "after-send-4s-poll")
+      const fresh = v.reader.fetch(path, { cache: "no-store" })
+      release()
+      const oldPage = await (await old).json() as Page
+      const newPage = await (await fresh).json() as Page
+      assert.notEqual(newPage.signature, oldPage.signature)
+      assert.ok(newPage.entries?.at(-1)?.text?.includes(String(fixture.version).padStart(4, "0")))
+      freshRaces.push({ round, oldSignature: oldPage.signature, newSignature: newPage.signature,
+        asks: asks.slice(before), routes: (await routes()).slice(routeBefore), ms: performance.now() - started, correct: true })
     }
-    for (const count of [2, 4]) {
-      await phase(round, "shared-reader", [viewer()], count, "same-tick-cold")
-      await phase(round, "shared-reader", [viewer()], count, "established-inflight", { inflight: true })
+    const security = viewer()
+    await phase(0, "authority", [security], 1, "prime-before-revoke")
+    await fetch(base + "/revoke?on=1", { method: "POST" })
+    await phase(0, "authority", [security], 1, "revoked-warm-cache")
+    await phase(0, "authority", [security], 1, "revoked-fresh", { init: { cache: "no-store" }, expected: 403 })
+    await fetch(base + "/revoke?on=0", { method: "POST" })
+    const generation = fixture.generation
+    fixture = { ...fixture, generation: "00000000000000000000000000000000" }
+    await phase(0, "authority", [viewer()], 1, "wrong-generation-fresh", { init: { cache: "no-store" }, expected: 409 })
+    fixture = { ...fixture, generation }
+    assert.notEqual(fixture.session, "%99", "the missing-session control must differ from the fixture")
+    const identityChecks: unknown[] = []
+    for (const [name, identity, expected] of [
+      ["wrong-machine", { machine: "other_machine", session: fixture.session }, "wrong_machine"],
+      ["missing-session", { machine: "mac_a", session: "%99" }, "execution_target_missing"],
+    ] as const) {
+      const before = (await routes()).length
+      let code = "unexpected_success"
+      try { await viewer().client.transcript(identity) } catch (error) { code = String((error as { code?: unknown }).code) }
+      assert.equal(code, expected)
+      identityChecks.push({ name, code, machineRoutes: (await routes()).length - before })
     }
+    const percentile = (values: number[], p: number) => [...values].sort((a, b) => a - b)[Math.ceil(values.length * p) - 1]
+    const groups = new Map<string, Observation[]>()
+    for (const row of observations) {
+      const key = `${row.arm}/${row.clients}/${row.callers}/${row.phase}`
+      groups.set(key, [...groups.get(key) ?? [], row])
+    }
+    const summary = [...groups].map(([key, rows]) => ({ key, runs: rows.length,
+      callerMsMedian: percentile(rows.flatMap((r) => r.callerMs), .5), callerMsP95: percentile(rows.flatMap((r) => r.callerMs), .95),
+      clientAsk: rows.map((r) => r.clientAsk), machineRoute: rows.map((r) => r.machineRoute),
+      answerPayloadBytes: rows.map((r) => r.answerPayloadBytes), nodeCPUus: rows.map((r) => r.nodeCPUus) }))
+    await writeFile(join(out, "raw.json"), JSON.stringify({ schema: 1, measuredAt: new Date().toISOString(), node: process.version,
+      platform: process.platform, arch: process.arch, rounds: 5, observations, summary, identityChecks, freshRaces,
+      boundaries: ["Node transport clients, not browser contexts", "real cloudops and transcriptRoute/parser/store",
+        "synthetic terminal inventory and authority", "plaintext HTTP loopback; no relay, sealing, TLS, external API or production data",
+        "Node CPU only; Go CPU and encrypted frame bytes unavailable", "simulated freshness clock, real request durations"] }, null, 2) + "\n")
+    console.log(JSON.stringify({ observations: observations.length, summary }, null, 2))
   }
-  const freshRaces: unknown[] = []
-  for (let round = 1; round <= 3; round++) {
-    const v = viewer()
-    let release!: () => void
-    let arrived!: () => void
-    const atPayload = new Promise<void>((resolve) => { arrived = resolve })
-    v.client.returnGate = new Promise<void>((resolve) => { release = resolve })
-    v.client.payloadReady = arrived
-    const before = asks.length
-    const routeBefore = (await routes()).length
-    const started = performance.now()
-    const path = "/v1/transcript?session=" + encodeURIComponent(fixture.session)
-    const old = v.reader.fetch(path)
-    await atPayload
-    const sent = await v.reader.fetch("/v1/sessions/" + encodeURIComponent(fixture.session) + "/send", {
-      method: "POST", body: JSON.stringify({ text: "synthetic fresh race" }),
-      headers: { "Idempotency-Key": `fresh-race-${round}` } })
-    assert.equal(sent.status, 200)
-    fixture = await (await fetch(base + "/fixture", { method: "POST" })).json() as Fixture
-    const fresh = v.reader.fetch(path, { cache: "no-store" })
-    release()
-    const oldPage = await (await old).json() as Page
-    const newPage = await (await fresh).json() as Page
-    assert.notEqual(newPage.signature, oldPage.signature)
-    assert.ok(newPage.entries?.at(-1)?.text?.includes(String(fixture.version).padStart(4, "0")))
-    freshRaces.push({ round, oldSignature: oldPage.signature, newSignature: newPage.signature,
-      asks: asks.slice(before), routes: (await routes()).slice(routeBefore), ms: performance.now() - started, correct: true })
-  }
-  const security = viewer()
-  await phase(0, "authority", [security], 1, "prime-before-revoke")
-  await fetch(base + "/revoke?on=1", { method: "POST" })
-  await phase(0, "authority", [security], 1, "revoked-warm-cache")
-  await phase(0, "authority", [security], 1, "revoked-fresh", { init: { cache: "no-store" }, expected: 403 })
-  await fetch(base + "/revoke?on=0", { method: "POST" })
-  const generation = fixture.generation
-  fixture = { ...fixture, generation: "00000000000000000000000000000000" }
-  await phase(0, "authority", [viewer()], 1, "wrong-generation-fresh", { init: { cache: "no-store" }, expected: 409 })
-  fixture = { ...fixture, generation }
-  assert.notEqual(fixture.session, "%99", "the missing-session control must differ from the fixture")
-  const identityChecks: unknown[] = []
-  for (const [name, identity, expected] of [
-    ["wrong-machine", { machine: "other_machine", session: fixture.session }, "wrong_machine"],
-    ["missing-session", { machine: "mac_a", session: "%99" }, "execution_target_missing"],
-  ] as const) {
-    const before = (await routes()).length
-    let code = "unexpected_success"
-    try { await viewer().client.transcript(identity) } catch (error) { code = String((error as { code?: unknown }).code) }
-    assert.equal(code, expected)
-    identityChecks.push({ name, code, machineRoutes: (await routes()).length - before })
-  }
-  const percentile = (values: number[], p: number) => [...values].sort((a, b) => a - b)[Math.ceil(values.length * p) - 1]
-  const groups = new Map<string, Observation[]>()
-  for (const row of observations) {
-    const key = `${row.arm}/${row.clients}/${row.callers}/${row.phase}`
-    groups.set(key, [...groups.get(key) ?? [], row])
-  }
-  const summary = [...groups].map(([key, rows]) => ({ key, runs: rows.length,
-    callerMsMedian: percentile(rows.flatMap((r) => r.callerMs), .5), callerMsP95: percentile(rows.flatMap((r) => r.callerMs), .95),
-    clientAsk: rows.map((r) => r.clientAsk), machineRoute: rows.map((r) => r.machineRoute),
-    answerPayloadBytes: rows.map((r) => r.answerPayloadBytes), nodeCPUus: rows.map((r) => r.nodeCPUus) }))
-  await writeFile(join(out, "raw.json"), JSON.stringify({ schema: 1, measuredAt: new Date().toISOString(), node: process.version,
-    platform: process.platform, arch: process.arch, rounds: 5, observations, summary, identityChecks, freshRaces,
-    boundaries: ["Node transport clients, not browser contexts", "real cloudops and transcriptRoute/parser/store",
-      "synthetic terminal inventory and authority", "plaintext HTTP loopback; no relay, sealing, TLS, external API or production data",
-      "Node CPU only; Go CPU and encrypted frame bytes unavailable", "simulated freshness clock, real request durations"] }, null, 2) + "\n")
-  console.log(JSON.stringify({ observations: observations.length, summary }, null, 2))
 } finally {
   await writeFile(join(out, "partial-observations.json"), JSON.stringify(observations, null, 2) + "\n")
   if (base) await fetch(base + "/stop", { method: "POST" }).catch(() => {})
-  const code = await Promise.race([exited, delay(5_000).then(() => { child.kill("SIGTERM"); return -1 })])
+  const code = await Promise.race([exited, delay(5_000, undefined, { ref: false }).then(() => { child.kill("SIGTERM"); return -1 })])
   await writeFile(join(out, "go-server.log"), serverOutput)
   if (code !== 0) throw new Error("Isolated Go test failed: " + code + "\n" + serverOutput)
 }

@@ -221,8 +221,8 @@ key 的拼法、值的範圍都跟舊 app 的 `Config` 一樣，所以一行從�
   `voice_engine`, `voice_settle_seconds`, and `voice_stop_seconds` do not affect transcription,
   so the Voice tab omits those controls. It offers the effective `voice_language`, the resolved
   recognition language, and the shell's Whisper status.
-- **遠端那一頁的開關與通道**——`remote`、`remote_write`、四個推播開關、`remote_tunnel`、
-  `remote_hostname` 都寫得進檔案；tunnel 本身、已配對裝置清單、Cloud 登入卡片沒有後端，所以沒有畫。
+- **遠端那一頁的開關**——`remote`、`remote_write`、四個推播開關、`tailscale_hostname` 都寫得進檔案；
+  內建的 Cloudflare 通道已於 2026-10-20 移除，舊設定只會顯示一次說明。
 - **Dispatch rules** have their own tab. The shipped base is read-only and the person's local
   additions are editable. `/v1/settings/dispatch-policy` requires this machine's identity and
   a read version before saving, so a stale page cannot overwrite an external edit. Schedules

@@ -543,11 +543,6 @@
     },
     {
       "method": "*",
-      "pattern": "/v1/tunnel",
-      "guide": "cloud"
-    },
-    {
-      "method": "*",
       "pattern": "/v1/update",
       "guide": "connect"
     },

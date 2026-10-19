@@ -2,10 +2,10 @@
 // for. It is a port of the Swift app's Sources/RemoteAuth.swift, rule for rule;
 // where it differs, the difference is written beside it.
 //
-// **The thing to understand before reading any of this: once a tunnel is
-// running, every request arrives from 127.0.0.1.** cloudflared connects to the
-// local port like any other program on the machine, so a phone in another
-// country and a curl in another terminal have the same socket address.
+// **The thing to understand before reading any of this: through a proxy such
+// as Tailscale Serve, every request arrives from 127.0.0.1.** The proxy
+// connects to the local port like any other program on the machine, so a phone
+// on the tailnet and a curl in another terminal have the same socket address.
 // Loopback is therefore not an authorisation signal, and there is no exception
 // for it anywhere in this package.
 //
@@ -107,8 +107,8 @@ type Device struct {
 	Approved bool
 	// Local is the one this machine made for itself, so that a script or the
 	// shell running as this user can talk to the daemon. It counts for
-	// authentication and not for the tunnel interlock: a token this app wrote
-	// for its own use is not somebody deciding to be reachable.
+	// authentication and not for IsConfigured: a token this app wrote for its
+	// own use is not somebody deciding to be reachable.
 	Local bool
 }
 

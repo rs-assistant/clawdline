@@ -54,7 +54,7 @@ func writeRemoteSettings(t *testing.T, h http.Handler, local string, keys map[st
 
 // A phone on the tailnet reaches this machine through Serve's address only
 // while remote access is on and the name is set, pairs exactly as it would
-// through a tunnel, and is a paired device there — never this machine.
+// at the desk, and is a paired device there — never this machine.
 func TestTailscaleServeAddressIsARemoteDoor(t *testing.T) {
 	p := shellPane("")
 	s, h, local, machine := wholeServer(t, p, p)
@@ -88,7 +88,7 @@ func TestTailscaleServeAddressIsARemoteDoor(t *testing.T) {
 	// This machine's own credentials do not travel: through Serve every
 	// request comes from loopback, and the Host is what says it came from
 	// the tailnet.
-	if rec := serve(h, tailscaleRequest(http.MethodGet, "/v1/tunnel", "", map[string]string{
+	if rec := serve(h, tailscaleRequest(http.MethodGet, "/v1/auth/devices", "", map[string]string{
 		"Authorization": "Bearer " + local})); rec.Code != http.StatusForbidden {
 		t.Fatalf("the local token through Tailscale read a local-only route: %d %s", rec.Code, rec.Body)
 	}

@@ -468,9 +468,6 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/cloud/pairing/agent/"}, s.cloudPairingAgentTaskRoute},
 		{Route{"*", "/v1/cloud/devices/revoke"}, s.cloudDeviceRoute},
 		{Route{"*", "/v1/cloud/keys/rotate"}, s.cloudRotateRoute},
-		// The account-free way in from outside: what this daemon's cloudflared is
-		// doing (tunnel.go). This machine's own token only.
-		{Route{"*", "/v1/tunnel"}, s.tunnelRoute},
 		{Route{"*", "/v1/sessions"}, s.sessions},
 		// Everything under a session id is about that session: its info, which is
 		// a read, and otherwise an action on it. One handler rather than a route
@@ -835,9 +832,7 @@ func (s *Server) notImplemented(w http.ResponseWriter, r *http.Request) { writeN
 // Listen binds the daemon's address, and is the first thing `serve` does.
 //
 // Binding used to be the last. Everything before it had already run: the
-// broker's beat, the cloud line, the tunnel's Reclaim — which stops whatever
-// cloudflared the state directory's pid file names, the running daemon's own
-// included — and a `listening` line in the shared log from a daemon that was
+// broker's beat, the cloud line, and a `listening` line in the shared log from a daemon that was
 // about to fail to listen. On 2026-09-21 that line was written at 10:52:13 by a
 // daemon that never held the port. A daemon that cannot have the port now
 // finds out before it has done anything else.

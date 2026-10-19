@@ -167,7 +167,7 @@ The "Today" column is clawdline-go on macOS (master `d40545e`).
 | Local authentication gate | File token + cookie | ✅ | ✅ | ⚠️ the same permission problem as §3.3 | — | — |
 | `clawdline open` opening a browser | `open`/`xdg-open`/`rundll32` | ✅ written for all three | ✅ no effect when headless → `--print` | ✅ | Headless: `--print` prints the URL (implemented) | — |
 | Six-digit pairing | Printed by the CLI | ✅ | ✅ | ✅ | Platforms without a shell use the CLI anyway (`remote.md` §5 says so) | — |
-| tunnel | cloudflared, brought by the user | ❌ not done | ✅ official binaries exist | ✅ official binaries exist | — | M |
+| Remote access | SSH port forward, Tailscale Serve, or Cloud; the built-in cloudflared tunnel was removed on 2026-10-20 | ✅ | ✅ | ✅ | — | — |
 | Cloud bridge | PROTOCOL.md | ❌ not done | ✅ pure network | ✅ pure network | — | L |
 | Reading the old Swift app's store | `~/.config/clawdline` | ➖ no longer read (2026-10-17, `docs/cutover.md` §3) | Not read | Not read | The crown, task chips and delivery checks come from this daemon's own records on every platform | — |
 | Reading transcripts / plan quotas | `~/.claude`, `~/.codex` | ✅ | ✅ same paths | ✅ `%USERPROFILE%` | — | — |
@@ -1021,7 +1021,6 @@ For each item: **call the matching API and see that it returns a named error; op
 | whisper's three states | Not installed → `ErrNoBinary`; installed without a model → `ErrNoModel`; both → it really transcribes known content |
 | The secure context for recording | Works from `127.0.0.1`; from a LAN IP it must give the real reason |
 | git panel | Changes show on a **disposable** repository; on Windows, `\r` doesn't misalign the diff |
-| cloudflared | Refused by name when not installed; starts when installed (optional) |
 
 ### L5 — Front end (both machines)
 

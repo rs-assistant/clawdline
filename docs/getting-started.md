@@ -143,10 +143,10 @@ at login, and a mascot in the notch.
 
 ## 6. Reach it from a phone
 
-Four ways, compared in [user/remote-access.md](user/remote-access.md): an SSH port forward,
-Tailscale Serve on your own tailnet, your own cloudflared tunnel on your own domain, or Clawdline
-Cloud, below. The automatically generated `trycloudflare.com` address is no longer offered. Over
-Serve and over a tunnel a device pairs with a six-digit code, and like every paired device it can
+Three ways, compared in [user/remote-access.md](user/remote-access.md): an SSH port forward,
+Tailscale Serve on your own tailnet, or Clawdline Cloud, below. Clawdline no longer runs a
+Cloudflare tunnel of its own; an old setting for one starts nothing, and the **Remote** tab says
+so once. Over Serve a device pairs with a six-digit code, and like every paired device it can
 then read and send. When a device asks to pair, the code appears on this machine, in the macOS app
 or through `./bin/clawdline pair --watch`, and is never sent back to the device that asked.
 

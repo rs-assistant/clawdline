@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6978,
-  "riskKeys": 3156,
-  "nonRiskCount": 3822,
+  "englishContentKeys": 6973,
+  "riskKeys": 3155,
+  "nonRiskCount": 3818,
   "groups": [
     {
       "name": "admin / other",
@@ -786,7 +786,7 @@
     },
     {
       "name": "http / other",
-      "count": 563,
+      "count": 562,
       "sources": [
         "internal/productcopy/http_refusals/en.json"
       ],
@@ -887,7 +887,6 @@
         "http.2f2bdc3865ac0b95",
         "http.306e1ff5baba8f00",
         "http.314803a5b2bfc3b0",
-        "http.3173e3f0ec56a918",
         "http.3204a7d685b1b418",
         "http.32a3b0c1ae85abed",
         "http.330c7c2eae86e133",
@@ -3581,7 +3580,7 @@
     },
     {
       "name": "settings / other",
-      "count": 127,
+      "count": 124,
       "sources": [
         "src/pages/settings/window/copy.ts"
       ],
@@ -3610,6 +3609,7 @@
         "settings.settingsBar",
         "settings.settingsBlur",
         "settings.settingsClaudeDefaultModel",
+        "settings.settingsCloudflareRetiredDone",
         "settings.settingsCodexAutoName",
         "settings.settingsCodexDefaultEffort",
         "settings.settingsCodexDefaultModel",
@@ -3668,10 +3668,6 @@
         "settings.settingsTextSize",
         "settings.settingsTitle",
         "settings.settingsTranscript",
-        "settings.settingsTunnel",
-        "settings.settingsTunnelHostname",
-        "settings.settingsTunnelNamed",
-        "settings.settingsTunnelQuickRetiredDone",
         "settings.settingsVoice",
         "settings.settingsVoiceLanguage",
         "settings.settingsVoiceLanguageFollow",

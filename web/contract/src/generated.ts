@@ -7260,6 +7260,13 @@ export interface SettingsRequest {
   claude_default_model: string | null
 
   /**
+   * Only `false`: dismisses the retired Cloudflare tunnel notice by removing that
+   * tunnel's old keys from the file. The old keys themselves are refused as
+   * `retired_setting`.
+   */
+  cloudflare_tunnel_retired: boolean | null
+
+  /**
    * Whether a new session is named by an assistant.
    */
   codex_auto_name: boolean | null
@@ -7442,16 +7449,6 @@ export interface SettingsRequest {
   remote: boolean | null
 
   /**
-   * A hostname, or empty.
-   */
-  remote_hostname: string | null
-
-  /**
-   * `off` or `named`. A file that still holds the removed `quick` reads as `off`.
-   */
-  remote_tunnel: string | null
-
-  /**
    * Whether the bar comes back with the terminal.
    */
   reopen_on_return: boolean | null
@@ -7549,6 +7546,14 @@ export interface SettingsSnapshot {
    * one. Empty leaves the choice to Claude Code.
    */
   claude_default_model: string | null
+
+  /**
+   * True while the file still holds the built-in Cloudflare tunnel's settings
+   * (`remote_tunnel`, `remote_tunnel_name`, `remote_hostname`, `cloudflared_path`),
+   * removed on 2026-10-20. They start nothing; the settings page explains once, and
+   * writing `cloudflare_tunnel_retired: false` takes them out of the file.
+   */
+  cloudflare_tunnel_retired?: boolean
 
   /**
    * Whether a new session is named by an assistant. The Swift app's spelling, kept
@@ -7754,26 +7759,9 @@ export interface SettingsSnapshot {
   push_on_waiting: boolean | null
 
   /**
-   * True while the file still holds `remote_tunnel: "quick"`, the address under
-   * trycloudflare.com that was removed. It is reported as `off` and starts nothing;
-   * the settings page explains once, and writing `remote_tunnel` clears it.
-   */
-  quick_tunnel_retired?: boolean
-
-  /**
    * Whether anything but this Mac may read the session list.
    */
   remote: boolean | null
-
-  /**
-   * The hostname a named tunnel answers on.
-   */
-  remote_hostname: string | null
-
-  /**
-   * `off` or `named`. A file that still holds the removed `quick` reads as `off`.
-   */
-  remote_tunnel: string | null
 
   /**
    * Whether the bar comes back with the terminal.
@@ -9190,81 +9178,6 @@ export interface TranscriptUnread {
    * How much of the record's end one read looks at.
    */
   windowBytes: number
-}
-
-/**
- * `off`, or `named`: the person's own tunnel (`remote_tunnel_name`) and hostname
- * (`remote_hostname`). A settings file that still holds the removed `quick` reads
- * as `off`.
- */
-export type TunnelMode =
-    "off"
-  | "named"
-
-export const TunnelModeValues: readonly TunnelMode[] = ["off", "named"] as const
-
-/**
- * `off`; `starting`, launched or waiting to retry and not yet registered with the
- * edge; `up`; `failed`, with a reason — including a refusal to start.
- */
-export type TunnelState =
-    "off"
-  | "starting"
-  | "up"
-  | "failed"
-
-export const TunnelStateValues: readonly TunnelState[] = ["off", "starting", "up", "failed"] as const
-
-/**
- * One reading of the tunnel.
- */
-export interface TunnelStatus {
-  at: number
-
-  /**
-   * Launches in a row that have died, while it is retrying; absent when none have.
-   */
-  attempts?: number
-
-  /**
-   * The cloudflared the next launch would run: `cloudflared_path` when it is set
-   * and executable, else where a package manager puts it, else PATH. Absent when
-   * there is none.
-   */
-  binary?: string
-
-  /**
-   * When state, url or reason last moved.
-   */
-  changed: number
-
-  /**
-   * The command line of the child that is running or was last started, binary
-   * first. It always carries `--config` and this daemon's own file, never the
-   * person's ~/.cloudflared/config.yml.
-   */
-  command?: string[]
-
-  /**
-   * The configuration file cloudflared is pointed at, in this daemon's state
-   * directory.
-   */
-  config: string
-  installed: boolean
-  mode: TunnelMode
-
-  /**
-   * Why it failed or refused, in the tunnel's own sentence. Present when state is
-   * failed.
-   */
-  reason?: string
-  state: TunnelState
-
-  /**
-   * The address, once a connection to Cloudflare's edge is registered. Present when
-   * state is up.
-   */
-  url?: string
 }
 
 /**

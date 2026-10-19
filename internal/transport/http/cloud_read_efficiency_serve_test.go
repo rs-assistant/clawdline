@@ -3,18 +3,22 @@ package http
 import (
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/pprof"
+	"runtime/trace"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/ownrecords"
+	"github.com/sainteye/clawdline/internal/adapters/transcript"
 	"github.com/sainteye/clawdline/internal/app"
 	"github.com/sainteye/clawdline/internal/app/cloudops"
 	"github.com/sainteye/clawdline/internal/app/ports"
@@ -31,7 +35,16 @@ func TestServeCloudReadEfficiency(t *testing.T) {
 	if ready == "" {
 		t.Skip("set CLAWDLINE_READ_BENCH_READY to a task-owned ready file")
 	}
-	item, path, _ := recordSession(t)
+	item, _, _ := recordSession(t)
+	// Stable synthetic path keeps serialized payload size fixed across arms.
+	home := filepath.Join(filepath.Dir(ready), "fixture-home")
+	t.Setenv("HOME", home)
+	item.CWD = filepath.Join(home, "code", "app")
+	item.ConversationID = "11111111-1111-4111-8111-111111111111"
+	path := transcript.ClaudePath(home, item.CWD, item.ConversationID)
+	if err := os.RemoveAll(home); err != nil {
+		t.Fatal(err)
+	}
 	p := waitingPane(item.ID, "")
 	p.s = item
 	p.s.Backend = session.BackendTmux
@@ -73,6 +86,11 @@ func TestServeCloudReadEfficiency(t *testing.T) {
 		}
 	}
 	appendTurns(240)
+	fixtureBytes, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixtureHash := fmt.Sprintf("%x", sha256.Sum256(fixtureBytes))
 	var mu sync.Mutex
 	var routes []map[string]any
 	revoked := false
@@ -112,6 +130,52 @@ func TestServeCloudReadEfficiency(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(v)
 	}
 	mux := http.NewServeMux()
+	// Profile only the requested load interval, excluding fixture construction.
+	var cpuFile, traceFile *os.File
+	mux.HandleFunc("/profile", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("on") == "1" {
+			if path := os.Getenv("CLAWDLINE_READ_BENCH_CPU_PROFILE"); path != "" {
+				var err error
+				cpuFile, err = os.Create(path)
+				if err != nil {
+					t.Error(err)
+					http.Error(w, "profile create failed", 500)
+					return
+				}
+				if err := pprof.StartCPUProfile(cpuFile); err != nil {
+					t.Error(err)
+					http.Error(w, "profile start failed", 500)
+					return
+				}
+			}
+			if path := os.Getenv("CLAWDLINE_READ_BENCH_TRACE"); path != "" {
+				var err error
+				traceFile, err = os.Create(path)
+				if err != nil {
+					t.Error(err)
+					http.Error(w, "trace create failed", 500)
+					return
+				}
+				if err := trace.Start(traceFile); err != nil {
+					t.Error(err)
+					http.Error(w, "trace start failed", 500)
+					return
+				}
+			}
+		} else {
+			if traceFile != nil {
+				trace.Stop()
+				_ = traceFile.Close()
+				traceFile = nil
+			}
+			if cpuFile != nil {
+				pprof.StopCPUProfile()
+				_ = cpuFile.Close()
+				cpuFile = nil
+			}
+		}
+		reply(w, map[string]any{"ok": true})
+	})
 	mux.HandleFunc("/command", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Sender string         `json:"sender"`
@@ -136,7 +200,7 @@ func TestServeCloudReadEfficiency(t *testing.T) {
 		if r.Method == "POST" {
 			appendTurns(1)
 		}
-		reply(w, map[string]any{"version": version, "generation": gen, "session": item.ID})
+		reply(w, map[string]any{"version": version, "generation": gen, "session": item.ID, "sha256": fixtureHash, "initialBytes": len(fixtureBytes)})
 	})
 	mux.HandleFunc("/routes", func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()

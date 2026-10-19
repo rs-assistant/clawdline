@@ -23,9 +23,9 @@ import (
 //     link, a page without the generator's mark, or anything else is not found.
 //   - A Cloud viewer's request, answered in process, is refused: the report
 //     never travels over the Cloud line.
-//   - So is any request whose Host is not a loopback name, which is how the
-//     tunnel's requests arrive, and any that did not come over a loopback
-//     socket.
+//   - So is any request whose Host is not a loopback name, which is how
+//     Tailscale Serve's requests arrive, and any that did not come over a
+//     loopback socket.
 //   - The gate in front still wants a device's credential, as for every other
 //     route that names a repository's contents.
 //   - The answer carries its own Content-Security-Policy: a sandbox with
@@ -42,7 +42,7 @@ func (s *Server) reportRoute(w http.ResponseWriter, r *http.Request) {
 			"a turn's report is opened on this machine, never through Clawdline Cloud")
 		return
 	}
-	if !loopbackHost(r.Host) || !loopbackPeer(r.RemoteAddr) || r.Header.Get("Cf-Connecting-Ip") != "" {
+	if !loopbackHost(r.Host) || !loopbackPeer(r.RemoteAddr) {
 		writeRefusal(w, http.StatusForbidden, "report_local_only",
 			"a turn's report is opened from a browser on this machine, at 127.0.0.1")
 		return
@@ -75,7 +75,7 @@ const reportPolicy = "sandbox allow-scripts; default-src 'none'; script-src 'uns
 	"style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
 // loopbackHost is a Host header naming this machine by a loopback name, with
-// any port. A tunnel's name, or a configured remote hostname, is not one.
+// any port. The Tailscale name is not one.
 func loopbackHost(header string) bool {
 	host := strings.ToLower(strings.TrimSpace(header))
 	if h, _, err := net.SplitHostPort(host); err == nil {
