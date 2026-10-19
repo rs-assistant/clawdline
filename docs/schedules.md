@@ -233,6 +233,13 @@ binding) is sent to the machine the row was listed on (`?machine=`, `relay-write
 A console with one machine — the daemon's own page, or an account with one machine — draws no machine
 column and no machine field, and sends what it sent before.
 
+A refresh preserves each machine's last rows until that machine answers, including with an empty list.
+An `unanswered` entry is a failed read even when the list endpoint resolves successfully. A Session
+answer permits one recovery read per failed machine per regular refresh cycle, including before the
+first schedule answer; repeated Session updates cannot create an unbounded retry loop. Returning to a
+visible page retries a failed reading immediately. Optional project-label reads from an older refresh
+cannot overwrite a newer inventory reading.
+
 **Creating.** The form has a Machine field, defaulting to the header's machine; the project list is the
 chosen machine's `GET /v1/places`. The create is routed by the place id, which names its machine.
 

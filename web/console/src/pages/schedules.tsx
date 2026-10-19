@@ -10,6 +10,7 @@ import { historyRecordFor, shouldOpenHistory } from "../schedule-history-open.js
 import { CHECK_ICON, COPY_ICON, maskedWebhookURL } from "../schedule-webhook-url.js"
 import { runScheduleWithForce } from "../schedule-force-run.js"
 import { laneOnScreen, laneOwesRead } from "./schedules-lane.js"
+import { ScheduleRecovery, retainScheduleRows } from "./schedules-recovery.js"
 import "../schedule-errors.css"
 import {
   createPlacesCache,
@@ -330,8 +331,7 @@ const Schedules = (() => {
   let lastAnswerMachines = ""
   let readState: "loading" | "ready" | "failed" = "loading"
   let answerVersion = 0
-  const readyMachines = new Set<string>()
-  const retriedMissing = new Set<string>()
+  const recovery = new ScheduleRecovery()
   const machineKey = () => scheduleFleet()?.machines.map((machine) => machine.id).join(" ") ?? ""
   const paintReadState = () => {
     const state = document.getElementById("schedules-state")
@@ -403,6 +403,7 @@ const Schedules = (() => {
    */
   function look(): void {
     if (!laneOwesRead({ pageHidden: pageHidden(), lastRefreshAt, now: Date.now(), everyMs: LANE_MS, onScreen: sectionOnScreen })) return
+    recovery.begin()
     refresh()
   }
 
@@ -411,6 +412,7 @@ const Schedules = (() => {
     const fleet = scheduleFleet()
     if (choosesMachine(fleet)) { refreshFleet(fleet); return }
     inFlight = true
+    answerVersion++
     lastRefreshAt = Date.now()
     const requestedMachines = machineKey()
     if (!lastAnswer) { readState = "loading"; paintReadState() }
@@ -428,6 +430,7 @@ const Schedules = (() => {
         // inventory unknown: the same as a refusal, below. With several, it is
         // one named group and the rest still draw.
         if (unanswered.length && !choosesMachine(scheduleFleet())) throw new Error("schedule inventory unanswered")
+        recovery.answered(scheduleFleet()?.current || "")
         rememberScheduleOwners(schedules)
         lastAnswer = { schedules: schedules.map((schedule) => {
             const project = schedule && schedule.id ? projectBySchedule[schedule.id] : undefined
@@ -453,6 +456,7 @@ const Schedules = (() => {
         }).catch(() => { /* Optional project labels do not invalidate the schedule inventory. */ })
       })
       .catch(() => {
+        recovery.missed(scheduleFleet()?.current || "")
         // **Nothing is drawn from here, and that is the point.** A refusal —
         // the relay seam's `cloud_read_unavailable` and
         // `cloud_schedules_unpublished`, a machine that did not answer the
@@ -476,15 +480,17 @@ const Schedules = (() => {
   /** Each machine paints when it answers; a slow peer does not hold the other groups. */
   function refreshFleet(fleet: NonNullable<ReturnType<typeof scheduleFleet>>): void {
     inFlight = true
+    answerVersion++
     lastRefreshAt = Date.now()
     const requestedMachines = machineKey()
+    const previous = lastAnswer?.schedules ?? []
     const pending = new Set(fleet.machines.map((machine) => machine.id))
     const answers = new Map<string, ScheduleListRow[]>()
     const failures = new Map<string, NonNullable<ScheduleList["unanswered"]>[number]>()
     let at = 0
     const paint = () => {
       if (requestedMachines !== machineKey()) return
-      const schedules = [...answers.values()].flat()
+      const schedules = retainScheduleRows(previous, answers)
       const unanswered = [
         ...fleet.machines.filter((machine) => pending.has(machine.id)).map((machine) =>
           ({ machine: machine.id, code: "loading" })),
@@ -497,7 +503,7 @@ const Schedules = (() => {
           return project ? { ...schedule, project } : schedule
         }), at, unanswered }
         lastAnswerMachines = requestedMachines
-        readState = pending.size ? "loading" : "ready"
+        readState = pending.size ? "loading" : failures.size ? "failed" : "ready"
         renderSchedules(lastAnswer.schedules, at, unanswered)
       } else if (!lastAnswer) {
         readState = pending.size ? "loading" : "failed"
@@ -513,13 +519,17 @@ const Schedules = (() => {
       try {
         const data = await scheduleApi.schedules(machine.id)
         if (requestedMachines !== machineKey()) return
+        const missing = data.unanswered?.find((row) => row.machine === machine.id)
+        if (missing) throw { code: missing.code || "cloud_read_unavailable" }
         answers.set(machine.id, (data.schedules ?? []).filter((row) => row.machine === machine.id))
+        recovery.answered(machine.id)
         at = Math.max(at, data.at ?? 0)
         // An answer is proof the machine is reachable now; without this, a Mac
         // that was offline when the page opened and came back would still be
         // called offline the next time a read times out.
         noteScheduleMachineAnswered(machine.id)
       } catch (error) {
+        recovery.missed(machine.id)
         failures.set(machine.id, { machine: machine.id,
           code: typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
             ? error.code : "cloud_read_unavailable" })
@@ -547,11 +557,8 @@ const Schedules = (() => {
   }
 
   function retryReadyMissing(): void {
-    if (inFlight || !lastAnswer || !arrivedFlag) return
-    const missing = lastAnswer.unanswered.flatMap(({ machine }) =>
-      machine && readyMachines.has(machine) && !retriedMissing.has(machine) ? [machine] : [])
-    if (!missing.length) return
-    for (const machine of missing) retriedMissing.add(machine)
+    if (inFlight || !arrivedFlag || pageHidden() || !sectionOnScreen()) return
+    if (!recovery.takeRetry()) return
     refresh()
   }
 
@@ -574,6 +581,7 @@ const Schedules = (() => {
         return
       }
       if (lane === null) lane = setInterval(look, LANE_MS)
+      if (readState === "failed") lastRefreshAt = null
       look()
     })
     // The phone's one screen at a time is in the address and in the history
@@ -587,7 +595,7 @@ const Schedules = (() => {
 
   return {
     machineReady(machine: string): void {
-      readyMachines.add(machine)
+      recovery.machineReady(machine)
       retryReadyMissing()
     },
     /** Read again now: a read already in the air cannot contain the row just made, so it lands first. */
@@ -622,7 +630,7 @@ const Schedules = (() => {
         const next = machineKey()
         if (next === machines) return
         machines = next
-        retriedMissing.clear()
+        recovery.reset()
         answerVersion++
         lastAnswer = null
         readState = "loading"
