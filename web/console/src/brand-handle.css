@@ -1,0 +1,53 @@
+/* The mascot is a visible drawer handle; the wordmark keeps its existing hit area. */
+.top .brand {
+    position: relative;
+    min-height: 44px;
+    padding-block: 0;
+}
+.top .brand:hover,
+.top .brand:active { background: transparent; }
+.brand-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 8px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--card);
+}
+.brand-chevron {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 auto;
+    color: var(--dim);
+}
+.brand[aria-expanded="true"] .brand-chevron { transform: rotate(180deg); }
+.brand:hover .brand-handle,
+.brand:focus-visible .brand-handle,
+.brand[aria-expanded="true"] .brand-handle {
+    background: var(--card-hi);
+    border-color: var(--accent-ed);
+}
+.brand:active .brand-handle { background: var(--line); }
+.brand-tooltip {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--card);
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+    pointer-events: none;
+    display: none;
+}
+.brand:hover .brand-tooltip,
+.brand:focus-visible .brand-tooltip { display: block; }
+@media (hover: none) {
+    .brand:hover:not(:focus-visible) .brand-tooltip { display: none; }
+}
