@@ -46,11 +46,28 @@
 // the console and `node --test` read this file as it is.
 
 // @ts-expect-error -- Node's strip-types test runner needs the source extension.
-import { CARRIED, DEFERRED, NO_MACHINE_ROUTE } from "./carry-generated.ts"
-import type { CloudWord } from "./carry-generated.js"
+import { CARRIED as GENERATED_CARRIED, DEFERRED, NO_MACHINE_ROUTE } from "./carry-generated.ts"
+import type { CloudWord as GeneratedCloudWord } from "./carry-generated.js"
 
-export { CARRIED, DEFERRED, NO_MACHINE_ROUTE }
-export type { CarriedWord, CloudWord } from "./carry-generated.js"
+// Integration regenerates this row from the backend vocabulary; keep this view independently checkable.
+export const CARRIED = { ...GENERATED_CARRIED, "usage.overview": "GET /v1/usage/overview?days=&project=" } as const
+export { DEFERRED, NO_MACHINE_ROUTE }
+export type CarriedWord = keyof typeof CARRIED
+export type CloudWord = GeneratedCloudWord | "usage.overview"
+
+/** The overview carries exactly one period and one opaque project, never arbitrary query fields. */
+export function usageOverviewQuery(params: URLSearchParams): { days: 7 | 28; project?: string } | null {
+  const seen = new Set<string>()
+  for (const [key] of params) {
+    if ((key !== "days" && key !== "project") || seen.has(key)) return null
+    seen.add(key)
+  }
+  const days = params.get("days") ?? "7"
+  const project = params.get("project") ?? ""
+  if (days !== "7" && days !== "28") return null
+  if (/[\u0000-\u001f\u007f]/u.test(project)) return null
+  return { days: days === "7" ? 7 : 28, ...(project ? { project } : {}) }
+}
 
 /**
  * The deferred words a screen in this console already asks for.

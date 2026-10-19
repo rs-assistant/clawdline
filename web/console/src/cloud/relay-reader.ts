@@ -23,6 +23,8 @@
 // little of it this file reads, so the rules here run under `node --test`
 // without a page (`relay-reader.test.ts`).
 import type { CarriedWord, CarryTable } from "./carry.js"
+// @ts-expect-error -- Node loads the source extension in focused behavior tests.
+import { usageOverviewQuery } from "./carry.ts"
 import type { Health, SessionRow, SessionsSnapshot, TaskList, TaskRow, TranscriptPage } from "@clawdline/contract"
 import type { StreamHandle, StreamHandlers, StreamTransport } from "@clawdline/core"
 import type { CloudWriteClient, WriteHost, WriteRoute } from "./relay-writer.js"
@@ -1011,6 +1013,11 @@ export class RelayReader {
         return await this.machineRead(init?.signal, method, path, "work.v2.item", { id: workItem })
       }
       switch (path) {
+        case "/v1/usage/overview": {
+          const body = usageOverviewQuery(url.searchParams)
+          if (!body) return this.refuse(method, path, 400, "invalid_query", "Usage overview accepts days=7 or days=28 and one project.")
+          return await this.machineRead(init?.signal, method, path, "usage.overview", body)
+        }
         case "/v1/squad/catalog":
           this.only(url, path)
           return await this.machineRead(init?.signal, method, path, "squad.catalog", {})

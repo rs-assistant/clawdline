@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6199,
+  "englishKeys": 6234,
   "counts": {
-    "negation": 1959,
-    "state": 1099,
+    "negation": 1962,
+    "state": 1100,
     "permission": 386,
     "deletion": 162,
-    "uncertainty": 177
+    "uncertainty": 178
   },
-  "unionCount": 2952,
+  "unionCount": 2957,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1795,6 +1795,9 @@
       "next.updateSourceCheckout",
       "next.updateSourceDeploy",
       "next.updateStagedApp",
+      "next.usageEmpty",
+      "next.usageFailed",
+      "next.usageMissing",
       "next.voiceInstallPromptLater",
       "next.voiceInstallPromptNoBinary",
       "next.voiceInstallPromptNoModel",
@@ -2930,6 +2933,7 @@
       "next.updateIsAvailable",
       "next.updateRunning",
       "next.updateStripOpen",
+      "next.usageDurationDefinition",
       "next.voiceInstallPromptDone",
       "next.voiceInstallPromptNoBinary",
       "next.voiceInstallPromptRemoteHelp",
@@ -3782,6 +3786,7 @@
       "next.stacksTruncated",
       "next.terminalKeysNotSentUnknown",
       "next.updateUnknownVersion",
+      "next.usageNoValue",
       "projects.setupUnifyUnreadable",
       "projects.setupUnifyUnsupported",
       "projects.statusBoardUnavailable",
@@ -6428,6 +6433,11 @@
     "next.updateStagedApp",
     "next.updateStripOpen",
     "next.updateUnknownVersion",
+    "next.usageDurationDefinition",
+    "next.usageEmpty",
+    "next.usageFailed",
+    "next.usageMissing",
+    "next.usageNoValue",
     "next.voiceInstallPromptDone",
     "next.voiceInstallPromptLater",
     "next.voiceInstallPromptNoBinary",
