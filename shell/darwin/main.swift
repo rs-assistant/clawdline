@@ -440,8 +440,8 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
 
     // The daemon this shell started is this shell's to stop, and it is waited
     // for. A quit that returns first races the next launch: `quit` and then
-    // `open` start a new daemon while the old one is still taking its tunnel
-    // down, and the new one finds the port held. Only that one daemon, by its
+    // `open` start a new daemon while the old one is still shutting down,
+    // and the new one finds the port held. Only that one daemon, by its
     // pid — Daemon.swift says why none other.
     func applicationWillTerminate(_ note: Notification) {
         pairing.stop()

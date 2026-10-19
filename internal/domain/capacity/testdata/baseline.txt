@@ -156,10 +156,6 @@ internal/adapters/transcript.ledgerLineLimit # read: one transcript line the tok
 internal/adapters/transcript.maxShellID # admission: the longest background command id a route may name before it is refused as not found; Claude Code's are nine letters and digits (limits N50)
 internal/adapters/transcript.recordReadLimit # read: the tail of one transcript (limits N17)
 internal/adapters/transcript.statusCacheLimit # read: Claude Code's own per-session status-line cache, where the context reading gets its exact window and the session's cost; a fixed handful of fields rewritten in place, so nothing accumulates behind it and past this it is not read at all (limits N17, the transcript read family)
-internal/adapters/tunnel.attemptLimit # parameter: launches of cloudflared in a row that may die before the tunnel gives up and says so on /v1/tunnel
-internal/adapters/tunnel.complaintLimit # page: one cloudflared complaint, cut to 200 bytes on a character, for the settings card
-internal/adapters/tunnel.lineLimit # read: one line of cloudflared's output; a longer run without a newline is dropped whole and logged
-internal/adapters/tunnel.nameLimit # admission: a hand-edited remote_tunnel_name, refused by name past it
 internal/app/cloudops.cloudEnvelopeCiphertextLimit # admission: one Cloud answer's ciphertext
 internal/app/orchestrator.(*Broker).SubscribeProgress:chan(64) # store: a progress subscriber's buffer (limits N19 buffer class, C3)
 internal/app/orchestrator.MilestoneSummaryLimit # admission: the most bytes a milestone handoff's summary may have; a longer one is a 422 bad_milestone_summary and nothing opens (limits N76)

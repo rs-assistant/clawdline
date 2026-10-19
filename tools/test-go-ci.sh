@@ -56,9 +56,6 @@ check_test cmd/clawdline/portheld_test.go \
 check_test internal/adapters/process/holder_unix_test.go \
   TestTheSystemNamesThisProcessAsTheListener \
   "requires the host process table to identify and timestamp the test process"
-check_test internal/adapters/tunnel/supervisor_test.go \
-  TestReclaim \
-  "requires the host process table to prove a live child command before signalling it"
 check_test internal/adapters/terminal/iterm_seal_darwin_test.go \
   TestTheRealListingCarriesWhateverItCouldNotRead \
   "requires both the live process table and an iTerm2 Apple Event"

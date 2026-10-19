@@ -10,12 +10,10 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/store"
@@ -195,8 +193,6 @@ func main() {
 		cloudCommand(os.Args[2:])
 	case "remote":
 		remoteCommand(os.Args[2:])
-	case "tunnel":
-		tunnelCommand(os.Args[2:])
 	case "board":
 		boardCommand(os.Args[2:])
 	case "project":
@@ -255,10 +251,9 @@ func serve() {
 		os.Exit(1)
 	}
 	// The port before anything else is done. Everything below writes: the
-	// stable binary, the store, the broker's beat, the cloud line, the tunnel's
-	// Reclaim — which stops the cloudflared this state directory's pid file
-	// names, whoever started it. A daemon that loses the port to another one
-	// over the same directory must not have done any of that first.
+	// stable binary, the store, the broker's beat, the cloud line. A daemon
+	// that loses the port to another one over the same directory must not
+	// have done any of that first.
 	ln, err := httptransport.Listen(cfg)
 	if err != nil {
 		refuseHeldPort(cfg.Host, cfg.Port, err)
@@ -304,34 +299,9 @@ func serve() {
 	// once (docs/verifications.md "The first one").
 	srv.StartVerifications(context.Background())
 	startCloudLine(context.Background(), cfg, srv)
-	// The account-free tunnel, if the settings ask for one and something is
-	// paired: a cloudflared an earlier run left behind is stopped first.
-	srv.StartTunnel()
-	stopTunnelOnSignal(srv)
 	if err := srv.Serve(ln); err != nil {
 		refuseToServe(1, err.Error())
 	}
-}
-
-// stopTunnelOnSignal takes cloudflared down before the daemon goes, then lets
-// the signal do what it would have done. Without this an interrupt or a
-// SIGTERM ends the daemon at once and leaves its tunnel up: a public address
-// that nothing on screen admits to. A SIGKILL cannot be caught, which is what
-// the tunnel's pid file and Reclaim are for.
-func stopTunnelOnSignal(srv *httptransport.Server) {
-	caught := make(chan os.Signal, 1)
-	signal.Notify(caught, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		sig := <-caught
-		srv.StopTunnel()
-		signal.Reset(os.Interrupt, syscall.SIGTERM)
-		if p, err := os.FindProcess(os.Getpid()); err == nil && p.Signal(sig) == nil {
-			// Give the re-raised signal a moment to land; the exit status is
-			// then the one the sender expected.
-			time.Sleep(time.Second)
-		}
-		os.Exit(1)
-	}()
 }
 
 // startCloudLine brings up the line to app.clawdline.com, if the settings say
@@ -530,7 +500,7 @@ func terminalCommand(op string, args []string) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_usage_with_memory", "usage: clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|tunnel|cloud|board|project|memory|task|webhook|setup|update|version>"))
+	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_usage_with_memory", "usage: clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|cloud|board|project|memory|task|webhook|setup|update|version>"))
 	fmt.Fprintln(os.Stderr, "  "+cliCopy("core", "language_option", cliLanguageOptionEnglish))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_guide_topic_guide_list_the_agent", "  guide [topic] | guide -list   the agent guide this build carries; no daemon needed"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_skill_dual_install", "  skill <install|uninstall>     put this build's skill stub in ~/.claude/skills/clawdline and ~/.agents/skills/clawdline, or put back what was there"))
@@ -560,7 +530,6 @@ func usage() {
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_open_print_sign_a_browser_in", "  open [--print]   sign a browser in with permission to read and send"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_pair_watch_show_the_code_when", "  pair [--watch]            show the code when a device asks to pair"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_devices_revoke_id_the_browsers_and", "  devices [revoke <id>]     the browsers and devices signed in to this machine directly; revoke one"))
-	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_tunnel_json_what_the_cloudflared_tunnel", "  tunnel [--json]           what the cloudflared tunnel is doing; remote_tunnel in the settings turns it on"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_cloud_status_on_off_login_connect", "  cloud <status|on|off|login|connect>   the line to app.clawdline.com; off by default"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_remote_agent_tasks", "  remote <machines|dispatch|show|send|finish|ack|retry>   work with a paired Agent on another machine"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_board_tracks_rows_json_the_old", "  board tracks [--rows] [--json]   the old cards on the three tracks, read-only"))
