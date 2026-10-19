@@ -1,3 +1,4 @@
+import { SurveyCoordinator } from "../onboarding/Survey.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import type { SessionRow } from "@clawdline/contract"
@@ -1810,6 +1811,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [fleetScope, fleetTarget && destinationKey(fleetTarget), fleetProjectionRevision])
   return (
     <>
+      {words && who && transport.kind === "cloud" ? <SurveyCoordinator key={who.account}
+        account={{ id: who.account, apiOrigin: transport.config.apiOrigin }}
+        eligible={!pairing && !asking && !naming && (screen.at === "machines" || screen.at === "console")}
+        productVersion={transport.config.build || "unknown"} /> : null}
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
           <App key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}

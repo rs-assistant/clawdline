@@ -65,7 +65,9 @@ const transcript = table("src/session/Transcript.tsx", "export { planWords as so
 // `english: false` where the table's "English" column is already translated
 // copy (settings carries Chinese, the bar one word for both), so only the key
 // is required there, never the value.
+const survey = table("src/onboarding/words.ts", "export { surveyEn as en, surveyZh as zh }", "en", ["surveyEn", "surveyZh"])
 const domains = [
+  { name: "survey", en: survey.en, zh: survey.zh, english: true },
   { name: "promo", en: promo.en, zh: promo["zh-Hant"], english: true },
   { name: "planSimulation", en: planSimulation.en, zh: planSimulation["zh-Hant"], english: true },
   { name: "next", en: next.en, zh: next["zh-Hant"], english: true },

@@ -1,3 +1,4 @@
+import { SurveyStatistics } from "../../onboarding/Statistics.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { chooseTransport, cloudViewerDeviceMetadata, newCloudSession, readCloudConfig, type CloudConfig, type EnsuredSession } from "../copied.js"
 import { DeviceLimitPanel } from "../DeviceLimitPanel.js"
@@ -210,6 +211,7 @@ export function AdminGate({ declared }: { declared: string }) {
             </p>
           ) : null}
           {route === "overview" ? <OverviewPage overview={demo ? sample : phase.overview} say={say} locale={locale} go={go} /> : null}
+          {route === "survey" && config ? <SurveyStatistics apiOrigin={config.apiOrigin} demo={demo} refreshToken={phase.overview.generated_at} /> : null}
           {route === "accounts" ? <AccountsPage overview={demo ? sample : phase.overview} say={say} locale={locale} go={go} /> : null}
           {route === "usage" ? <UsagePage overview={demo ? sample : phase.overview} say={say} locale={locale} go={go} /> : null}
           {route === "promotions" && demo ? <DemoPromotions overview={sample} say={say} locale={locale} /> : null}
