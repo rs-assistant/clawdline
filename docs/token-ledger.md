@@ -513,7 +513,7 @@ frozen under another version.
 The Usage overview page reads `/v1/usage/overview` locally and `usage.overview`
 through Cloud for the explicitly selected machine. It shows the last 7 or 28
 complete local calendar days and the preceding equal period. Today is excluded.
-Dispatch counts follow task creation dates; successful-task elapsed medians follow
+Dispatch counts exclude background command callbacks and follow agent-task creation dates; successful-task elapsed medians follow
 completion dates and measure spawned-to-finished time, with sample counts.
 
 Daily tokens come from provider event timestamps, not transcript modification

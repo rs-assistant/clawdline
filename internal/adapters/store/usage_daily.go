@@ -151,7 +151,7 @@ type UsageOverviewTask struct {
 
 // UsageOverviewTasks projects only timing and outcome fields: no task text.
 func (s *Store) UsageOverviewTasks(ctx context.Context, since, until time.Time) ([]UsageOverviewTask, error) {
-	rows, err := s.rd.QueryContext(ctx, `SELECT COALESCE(NULLIF(repository,''),project),created_at,json_object('spawned_at',json_extract(record,'$.spawned_at'),'finished_at',json_extract(record,'$.finished_at'),'result',json_object('status',json_extract(record,'$.result.status'))) FROM broker_tasks WHERE (created_at>=? AND created_at<?) OR (unixepoch(json_extract(record,'$.finished_at'))>=? AND unixepoch(json_extract(record,'$.finished_at'))<?) ORDER BY created_at DESC,id LIMIT ?`, since.Unix(), until.Unix(), since.Unix(), until.Unix(), UsageOverviewTaskLimit)
+	rows, err := s.rd.QueryContext(ctx, `SELECT COALESCE(NULLIF(repository,''),project),created_at,json_object('spawned_at',json_extract(record,'$.spawned_at'),'finished_at',json_extract(record,'$.finished_at'),'result',json_object('status',json_extract(record,'$.result.status'))) FROM broker_tasks WHERE COALESCE(json_extract(record,'$.kind'),'')<>'callback' AND ((created_at>=? AND created_at<?) OR (unixepoch(json_extract(record,'$.finished_at'))>=? AND unixepoch(json_extract(record,'$.finished_at'))<?)) ORDER BY created_at DESC,id LIMIT ?`, since.Unix(), until.Unix(), since.Unix(), until.Unix(), UsageOverviewTaskLimit)
 	if err != nil {
 		return nil, err
 	}

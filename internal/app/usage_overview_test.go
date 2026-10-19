@@ -192,3 +192,26 @@ func TestOverviewIncludesWorkCreatedBeforeTheWindowAndCompletedInsideIt(t *testi
 		t.Fatalf("completion cohort: %+v", got)
 	}
 }
+
+func TestOverviewCountsAgentDispatchesWithoutBackgroundCallbacks(t *testing.T) {
+	h := newUsageHarness(t)
+	now := time.Date(2026, 10, 19, 12, 0, 0, 0, time.Local)
+	h.u.Now = func() time.Time { return now }
+	at := now.AddDate(0, 0, -1)
+	for _, kind := range []string{"callback", "implementation"} {
+		raw, err := json.Marshal(orchestrator.Record{Kind: kind, SpawnedAt: at, FinishedAt: at.Add(10 * time.Minute), Result: &taskdir.Result{Status: "success"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := h.store.SaveBrokerTask(context.Background(), store.BrokerRow{ID: kind, Project: "example", Assistant: "claude", State: "success", CreatedAt: at, UpdatedAt: at, Record: raw}, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := h.u.Overview(context.Background(), 7, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Totals.Dispatches != 1 || got.Totals.DurationSamples != 1 || got.Daily[6].Dispatches != 1 || got.Daily[6].DurationSamples != 1 {
+		t.Fatalf("background callbacks are not agent dispatches: totals=%+v day=%+v", got.Totals, got.Daily[6])
+	}
+}
