@@ -40,7 +40,7 @@
   "documents.copied": "Link copied.",
   "documents.copy": "Copy link",
   "documents.copyUnavailableError": "This browser cannot copy the document link.",
-  "documents.empty": "No Markdown or text documents are available to show for this Session.",
+  "documents.empty": "No Markdown, text or HTML documents are available to show for this Session.",
   "documents.invalidLinkError": "Invalid document link.",
   "documents.listBack": "‹ Documents",
   "documents.listProjectMeta": "Project · {arg0} bytes",

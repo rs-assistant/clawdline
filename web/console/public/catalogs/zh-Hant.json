@@ -40,7 +40,7 @@
   "documents.copied": "連結已複製。",
   "documents.copy": "複製連結",
   "documents.copyUnavailableError": "此瀏覽器無法複製文件連結。",
-  "documents.empty": "目前沒有可顯示的 Markdown 或文字文件。",
+  "documents.empty": "目前沒有可顯示的 Markdown、文字或 HTML 文件。",
   "documents.invalidLinkError": "文件連結無效。",
   "documents.listBack": "‹ 文件",
   "documents.listProjectMeta": "專案 · {arg0} 位元組",

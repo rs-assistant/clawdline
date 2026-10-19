@@ -1,20 +1,20 @@
 import {
     documentShareURL, normalizeDocumentIdentity, normalizeDocumentLocator, shareDocument
 } from "../net/document-links.js";
-import { documentBodyHTML } from "./document-render.js";
+import { renderDocumentBody } from "./document-render.js";
 import { failureSentence } from "../core/failure-text.js";
 
 function words(language) {
     var zh = /^zh(?:-|$)/i.test(language || "");
     return zh ? {
         title: "文件", menu: "文件", back: "‹ 工作階段", loading: "正在讀取文件…",
-        connecting: "正在等待加密連線…", empty: "這個工作階段沒有可讀的 Markdown 或文字文件。",
+        connecting: "正在等待加密連線…", empty: "這個工作階段沒有可讀的 Markdown、文字或 HTML 文件。",
         project: "專案", task: "任務", share: "分享", copy: "複製連結", copied: "連結已複製。",
         shared: "已開啟分享選單。", list: "‹ 文件", bytes: "位元組"
     } : {
         title: "Documents", menu: "Documents", back: "‹ Sessions", loading: "Loading documents…",
         connecting: "Waiting for the encrypted connection…",
-        empty: "This session has no readable Markdown or text documents.",
+        empty: "This session has no readable Markdown, text or HTML documents.",
         project: "Project", task: "Task", share: "Share", copy: "Copy link", copied: "Link copied.",
         shared: "Share sheet opened.", list: "‹ Documents", bytes: "bytes"
     };
@@ -145,7 +145,7 @@ export function bindDocumentsPage(elements, services) {
         elements.documentTitle.textContent = displayTitle || titleFor(value);
         elements.meta.textContent = (value.scope === "task" ? w.task : w.project) + " · " +
             value.path + " · " + value.byte_count.toLocaleString() + " " + w.bytes;
-        elements.body.innerHTML = documentBodyHTML(value);
+        renderDocumentBody(elements.body, value);
         shareURL = null;
         var shareFailure = null;
         try {

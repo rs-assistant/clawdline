@@ -57,7 +57,7 @@ export function adaptDocumentsCopy(page: HTMLElement, source: {
       const ordinary: Record<string, string> = {
         "Loading documents…": "loading",
         "Waiting for the encrypted connection…": "connecting",
-        "This session has no readable Markdown or text documents.": "empty",
+        "This session has no readable Markdown, text or HTML documents.": "empty",
         "Link copied.": "copied",
         "Share sheet opened.": "shared",
       }

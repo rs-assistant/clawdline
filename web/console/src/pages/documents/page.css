@@ -6,3 +6,5 @@
    size the pinned rule gave it inside the head. */
 .documents-page .documents-head.page-bar { gap: 8px; }
 .documents-page .documents-title { margin: 4px 0 0; font-size: clamp(24px, 5vw, 34px); }
+
+.document-html-preview { display: block; width: 100%; height: 75vh; height: 75dvh; min-height: 360px; border: 0; background: var(--bg, #151515); }

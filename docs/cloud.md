@@ -244,3 +244,5 @@ After the automatic window expires, the manual read remains available. Stale mod
 options stay disabled during that gap, including after the ordinary press hold expires.
 No follow-up replays an answer key. Switching Session or execution cancels the old
 follow-up; ordinary unread questions stop following when the Session resumes.
+
+The [static HTML report reader](html-artifacts.md) describes the document format, isolation, compatibility and measurement boundary for self-contained artifacts.
