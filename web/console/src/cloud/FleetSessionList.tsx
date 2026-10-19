@@ -10,7 +10,7 @@ import type { OrderHold } from "../session/order.js"
 import { SessionToolbar } from "../session/SessionToolbar.js"
 import { ScheduleSection, scheduleMachineReady } from "../pages/schedules.js"
 import { destinationKey, displayedPresentationStatus, fleetRowTitle, presentationPass, projectionRefreshAt, settleProjection,
-  shownDestinationKeys,
+  shownDestinationKeys, mergeListPresentation,
   type MachineSessionProjection, type ProjectionProblem, type SessionDestination,
   type SessionListPresentation, type SessionProjectionSource, type FleetMachine,
   type ProjectedSession } from "./all-machine-sessions.js"
@@ -255,10 +255,8 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
             const key = destinationKey(row.destination)
             const previous = presentations.current.get(key)
             presentations.current.set(key, {
-              machineID, sessionID: row.destination.sessionID, pass, title: row.title,
-              icon: row.icon ?? previous?.icon, cwd: row.cwd ?? previous?.cwd,
-              status: row.status ?? previous?.status,
-              observedAt: row.status ? row.observedAt : previous?.observedAt,
+              machineID, sessionID: row.destination.sessionID, pass,
+              ...mergeListPresentation(row, previous),
             })
           }
           const expected = readings[machineID]

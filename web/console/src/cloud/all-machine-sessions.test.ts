@@ -3,7 +3,7 @@ import test from "node:test"
 import type { SessionRow } from "@clawdline/contract"
 import {
   afterEventGap, checkedProjection, destinationAvailable, destinationFragment, destinationFromFragment,
-  displayedPresentationStatus, fleetRowTitle, identifyOpenedFleetRow, withConfirmedFleetTitle,
+  displayedPresentationStatus, fleetRowTitle, mergeListPresentation, identifyOpenedFleetRow, withConfirmedFleetTitle,
   destinationKey, prependOlderPage, projectionRefreshAt, settleProjection, SessionDetailCache, shownDestinationKeys,
   SessionExecutionRecovery, supersedingDestination,
   type MachineSessionProjection, type ProjectedSession,
@@ -340,3 +340,16 @@ test("a refreshed list can restore the same execution after a stale status refus
     () => target.destination, () => { adopted++ }), true)
   assert.equal(adopted, 1)
 })
+
+for (const assistant of ["codex", "claude"] as const) {
+  test(`the fleet presentation cache keeps ${assistant} through partial display updates`, () => {
+    const first = mergeListPresentation({ title: "Named work", assistant })
+    assert.equal(first.assistant, assistant)
+    const partial = mergeListPresentation({ title: "Renamed work" }, first)
+    assert.equal(partial.assistant, assistant)
+    assert.equal(partial.title, "Renamed work")
+    assert.equal(mergeListPresentation({ title: "Known work", assistant },
+      { title: "Earlier", assistant: assistant === "codex" ? "claude" : "codex" }).assistant, assistant)
+    assert.equal(mergeListPresentation({ title: "Unknown work" }).assistant, undefined)
+  })
+}
