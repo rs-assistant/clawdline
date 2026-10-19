@@ -250,7 +250,8 @@ type Patch struct {
 }
 
 type MotionOverride struct {
-	Motion *bool `json:"motion"`
+	Motion       *bool `json:"motion"`
+	AutoDispatch *bool `json:"auto_dispatch,omitempty"`
 }
 
 type Field[T any] struct {
@@ -275,6 +276,8 @@ type Effective struct {
 	ScopeKind             string             `json:"scope_kind"`
 	Motion                Field[bool]        `json:"motion"`
 	MotionSettingsVersion int64              `json:"motion_settings_version"`
+	AutoDispatch          Field[bool]        `json:"auto_dispatch"`
+	AutoDispatchVersion   int64              `json:"auto_dispatch_version"`
 	Personas              []EffectivePersona `json:"personas"`
 }
 

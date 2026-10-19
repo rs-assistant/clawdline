@@ -25,7 +25,8 @@ export interface WireEffectivePersona {
 }
 export interface WireSettings {
   scope_id: string; scope_kind: "global" | "repo" | "place"; place_id?: string
-  motion: WireField<boolean>; motion_settings_version: number; personas: WireEffectivePersona[]
+  motion: WireField<boolean>; motion_settings_version: number
+  auto_dispatch?: WireField<boolean>; auto_dispatch_version?: number; personas: WireEffectivePersona[]
 }
 
 function name(words: WireNames): string { return currentCatalogTag() === "zh-Hant" ? words["zh-Hant"] || words.en : words.en || words["zh-Hant"] }
@@ -78,6 +79,9 @@ export function squadView(
     })), sessions,
     motion: effective(current.motion, global.motion.value),
     motionSettingsVersion: current.motion_settings_version,
+    autoDispatch: effective(global.auto_dispatch ?? { value: true, source: "default", present: false, version: 0 }, true),
+    autoDispatchVersion: global.auto_dispatch_version ?? 0,
+    autoDispatchSupported: !!global.auto_dispatch,
     catalogVersion: catalog.catalog_version, canWrite, partial: false,
   }
 }

@@ -6597,6 +6597,8 @@ type SquadEffectivePersona struct {
 }
 
 type SquadEffectiveSettings struct {
+	AutoDispatch          SquadFieldBool          `json:"auto_dispatch"`
+	AutoDispatchVersion   int64                   `json:"auto_dispatch_version"`
 	Motion                SquadFieldBool          `json:"motion"`
 	MotionSettingsVersion int64                   `json:"motion_settings_version"`
 	Personas              []SquadEffectivePersona `json:"personas"`
@@ -6685,10 +6687,11 @@ type SquadInputText struct {
 }
 
 type SquadMotionRequest struct {
-	ExpectedVersion int64          `json:"expected_version"`
-	Motion          SquadInputBool `json:"motion"`
-	PlaceID         string         `json:"place_id,omitempty"`
-	ScopeID         string         `json:"scope_id,omitempty"`
+	AutoDispatch    *SquadInputBool `json:"auto_dispatch,omitempty"`
+	ExpectedVersion int64           `json:"expected_version"`
+	Motion          *SquadInputBool `json:"motion,omitempty"`
+	PlaceID         string          `json:"place_id,omitempty"`
+	ScopeID         string          `json:"scope_id,omitempty"`
 }
 
 type SquadNames struct {

@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6194,
+  "englishKeys": 6199,
   "counts": {
-    "negation": 1958,
+    "negation": 1959,
     "state": 1099,
     "permission": 386,
     "deletion": 162,
     "uncertainty": 177
   },
-  "unionCount": 2951,
+  "unionCount": 2952,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -1865,6 +1865,7 @@
       "settings.webCloudStatusReadFailed",
       "settings.webFailMacWritesOff",
       "settings.webRemoteMachineOnly",
+      "squad.autoDispatchDescription",
       "template.00ac5e87de81",
       "template.0e6efad65a6c",
       "template.0efa5a61894d",
@@ -6568,6 +6569,7 @@
     "settings.webCloudStatusToken",
     "settings.webFailMacWritesOff",
     "settings.webRemoteMachineOnly",
+    "squad.autoDispatchDescription",
     "template.00ac5e87de81",
     "template.0452d5f2c3a3",
     "template.08166fe2eeb1",

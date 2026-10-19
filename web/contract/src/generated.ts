@@ -8029,6 +8029,8 @@ export interface SquadEffectivePersona {
 }
 
 export interface SquadEffectiveSettings {
+  auto_dispatch: SquadFieldBool
+  auto_dispatch_version: number
   motion: SquadFieldBool
   motion_settings_version: number
   personas: SquadEffectivePersona[]
@@ -8117,8 +8119,9 @@ export interface SquadInputText {
 }
 
 export interface SquadMotionRequest {
+  auto_dispatch?: SquadInputBool
   expected_version: number
-  motion: SquadInputBool
+  motion?: SquadInputBool
   place_id?: string
   scope_id?: string
 }

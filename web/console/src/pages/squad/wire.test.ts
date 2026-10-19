@@ -46,8 +46,17 @@ test("project handbook keeps global text beside an explicit empty override", () 
   assert.equal(view.personas[0].handbook.source, "project")
   assert.equal(view.personas[0].settingsVersion, 7)
   assert.equal(view.motionSettingsVersion, 4)
+  assert.equal(view.autoDispatchSupported, false)
   assert.equal(view.personas[0].skills[0].body, "Complete skill body")
   assert.equal(view.teams[0].name, "新團隊")
+})
+
+test("machine role dispatch stays global while a Project is selected", () => {
+  const global = { ...settings("global", field("")), auto_dispatch: field(false, "global", 6), auto_dispatch_version: 6 }
+  const view = squadView(catalog, global, settings("project-a", field("")), [], [], true)
+  assert.equal(view.autoDispatchSupported, true)
+  assert.equal(view.autoDispatch.value, false)
+  assert.equal(view.autoDispatchVersion, 6)
 })
 
 test("a different Project inherits global text without the first Project's override", () => {

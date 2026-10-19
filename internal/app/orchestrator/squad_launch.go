@@ -16,6 +16,18 @@ func (b *Broker) checkSquadDispatchActor(ctx context.Context, req DispatchReques
 	if !b.SquadActorRequired || record.Root == nil || req.Respawn != nil || req.Schedule != nil || req.InternalGate {
 		return nil
 	}
+	if record.Persona != "" {
+		if b.SquadAutoDispatchEnabled == nil {
+			return refuse(http.StatusServiceUnavailable, "squad_policy_unavailable", "Machine role dispatch setting is unavailable.")
+		}
+		enabled, err := b.SquadAutoDispatchEnabled(ctx)
+		if err != nil {
+			return err
+		}
+		if !enabled {
+			return refuse(http.StatusConflict, "squad_auto_dispatch_disabled", "Automatic role selection is off on this machine.")
+		}
+	}
 	actor, bound, err := b.Store.AuthenticateSquadActor(ctx, req.ActorCapability)
 	if err != nil {
 		return err

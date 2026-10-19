@@ -411,6 +411,17 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
     finally { setBusy("") }
   }
 
+  const saveAutoDispatch = async (value: boolean) => {
+    if (!data) return
+    const requestScope = scope
+    setBusy("autoDispatch"); setNotice({ text: catalogWord("literal", "70a7ff14d82d") })
+    try {
+      await api.saveAutoDispatch(value, data.autoDispatchVersion)
+      if (currentScope.current === requestScope) { await load(requestScope); setNotice({ text: catalogWord("literal", "d294b20a8375") }) }
+    } catch (error) { if (currentScope.current === requestScope) setNotice({ text: catalogFormat("template", "dad86b25350d", [errorDetail(error)]), error: true }) }
+    finally { setBusy("") }
+  }
+
   const restoreToggle = async (kind: "enabled" | "motion") => {
     if (!data || (kind === "enabled" && !persona)) return
     const requestScope = scope
@@ -719,6 +730,14 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
       {reading.kind === "error" && <div className="squad-error" role="alert"><h2>{readErrorTitle(reading.code)}</h2><p>{reading.detail}</p><button type="button" onClick={() => void load(scope)}>{catalogWord("inline", "07244b042280")}</button></div>}
       {data?.partial && <div className="squad-notice" role="status">{catalogWord("inline", "08228e7394ef")}<button type="button" onClick={() => void load(scope)}>{catalogWord("inline", "07244b042280")}</button></div>}
       {data && !data.canWrite && <p className="squad-notice" role="status">{catalogWord("inline", "7bdb8640f903")}</p>}
+      {data?.autoDispatchSupported && <section className="squad-machine-setting" aria-labelledby="squad-auto-dispatch-title">
+        <div><span className="squad-machine-setting-eyebrow">{catalogWord("squad", "machineSetting")}</span>
+          <h2 id="squad-auto-dispatch-title">{catalogWord("squad", "autoDispatchTitle")}</h2>
+          <p>{catalogWord("squad", "autoDispatchDescription")}</p></div>
+        <label className="squad-machine-toggle"><input type="checkbox" checked={data.autoDispatch.value} disabled={!canWrite || !!busy}
+          aria-label={catalogWord("squad", "autoDispatchTitle")} onChange={(event) => void saveAutoDispatch(event.target.checked)} />
+          <span>{data.autoDispatch.value ? catalogWord("squad", "on") : catalogWord("squad", "off")}</span></label>
+      </section>}
       {data && <div className="squad-layout" data-mobile-view={mobileView}>
         <aside className="squad-rail" aria-labelledby="squad-teams-title"><div className="squad-panel-head"><h2 id="squad-teams-title">{catalogWord("inline", "d13ccaf2da5f")}</h2><span>{catalogFormat("count", "squadGroups", [data.teams.length])}</span></div>
           <div className="squad-teams" role="group" aria-label={catalogWord("inline", "7a889ffdecb5")}><button type="button" aria-pressed={!team} onClick={() => setTeam("")}>{catalogWord("inline", "2878fe586472")} <small>{data.personas.length}</small></button>

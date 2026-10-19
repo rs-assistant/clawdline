@@ -19,6 +19,15 @@
 .squad-notice { min-height: 32px; padding: 8px 12px; margin: 0 0 14px; border: 1px solid var(--accent-ed); border-radius: 9px; background: var(--accent-in); font-size: 13px; }
 .squad-notice[data-error] { border-color: var(--warn); color: var(--ink); }
 .squad-notice button { min-height: 32px; margin-left: 8px; padding: 4px 9px; font-size: 12px; }
+.squad-machine-setting { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 20px; padding: 19px 21px; border: 1px solid var(--accent-ed); border-radius: var(--radius); background: var(--card-hi); }
+.squad-machine-setting h2 { margin: 4px 0 7px; font-size: 19px; }
+.squad-machine-setting p { margin: 0; color: var(--dim); font-size: 13px; }
+.squad-machine-setting-eyebrow { color: var(--accent); font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+.squad-machine-toggle { display: flex; align-items: center; gap: 9px; flex: none; min-height: 44px; font-size: 13px; cursor: pointer; }
+.squad-machine-toggle input { position: relative; width: 44px; height: 26px; margin: 0; appearance: none; border-radius: 20px; background: var(--line); cursor: pointer; }
+.squad-machine-toggle input:checked { background: var(--accent); }
+.squad-machine-toggle input::before { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--card); transition: transform .16s ease; }
+.squad-machine-toggle input:checked::before { transform: translateX(18px); }
 .squad-layout { display: grid; grid-template-columns: minmax(208px, 248px) minmax(300px, 1fr) minmax(380px, 1.13fr); align-items: start; gap: 16px; }
 .squad-rail, .squad-detail { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
 .squad-rail { padding: 18px; }
@@ -191,6 +200,9 @@
   .squad-detail { grid-column: 2; }
 }
 @media (max-width: 760px) {
+  .squad-machine-setting { align-items: flex-start; gap: 12px; padding: 15px; }
+  .squad-machine-setting h2 { font-size: 16px; }
+  .squad-machine-setting p { font-size: 12px; }
   .squad-wrap { padding: 18px 12px calc(40px + var(--indicator)); }
   .squad-header { align-items: stretch; flex-direction: column; }
   .squad-header h1 { font-size: 28px; }
