@@ -28,6 +28,9 @@ func ParseVersion(s string) (Version, error) {
 	}
 	var n [3]int
 	for i, p := range parts {
+		if p == "" || strings.Trim(p, "0123456789") != "" {
+			return bad()
+		}
 		v, err := strconv.Atoi(p)
 		if err != nil || v < 0 || (len(p) > 1 && p[0] == '0') {
 			return bad()
@@ -35,6 +38,12 @@ func ParseVersion(s string) (Version, error) {
 		n[i] = v
 	}
 	if strings.Contains(s, "-") && pre == "" {
+		return bad()
+	}
+	// Versions become release directory names and URL path segments. A
+	// prerelease may contain SemVer identifier characters, never separators,
+	// escapes, query strings or control characters.
+	if strings.Trim(pre, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.-") != "" {
 		return bad()
 	}
 	return Version{Major: n[0], Minor: n[1], Patch: n[2], Pre: pre}, nil
