@@ -77,7 +77,7 @@ function promoHref(campaign: string | null): string {
 }
 
 function publicCampaignPage(code: string): string {
-  return `https://clawdline.com/redeem/#code=${encodeURIComponent(code)}`
+  return `https://clawdline.com/redeem/?lang=en#code=${encodeURIComponent(code)}`
 }
 
 export function PromoManagement({ overview, apiOrigin, say, locale, search, go, onChanged, onLostAccess }: {
