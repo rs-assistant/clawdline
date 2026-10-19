@@ -337,6 +337,25 @@ func closeEvidenceDecision(c contract.Closeability, expected string, force, proc
 		}
 		return true, ""
 	}
+	// A person may override unreadable work records, but only for an owned
+	// terminal in a fresh inventory and the exact reading they confirmed.
+	if !processOnly && c.State == contract.CloseabilityStateUnknown && c.Source.Freshness == "current" {
+		inventoryOK := true
+		for _, reason := range c.Reasons {
+			if reason.Code == "session_inventory_stale" || reason.Code == "session_inventory_missing" {
+				inventoryOK = false
+			}
+		}
+		if inventoryOK {
+			if expected == "" || c.Version == "" || expected != c.Version {
+				return false, "close_not_proven"
+			}
+			if force {
+				return true, ""
+			}
+			return false, "close_blocked"
+		}
+	}
 	// A failed fresh scan is a retryable inability to verify, regardless of
 	// the version the last successful list advertised. Do not imply that the
 	// Session itself changed when only the inventory reader failed.

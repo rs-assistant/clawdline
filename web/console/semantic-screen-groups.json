@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6873,
+  "englishContentKeys": 6874,
   "riskKeys": 3131,
-  "nonRiskCount": 3742,
+  "nonRiskCount": 3743,
   "groups": [
     {
       "name": "admin / other",
@@ -2314,7 +2314,7 @@
     },
     {
       "name": "next / end",
-      "count": 11,
+      "count": 12,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2326,6 +2326,7 @@
         "next.endWorkChecking",
         "next.endWorkClose",
         "next.endWorkConfirmClose",
+        "next.endWorkForceClose",
         "next.endWorkOpenHeading",
         "next.endWorkSafeToClose",
         "next.endWorkTodoLabel",
