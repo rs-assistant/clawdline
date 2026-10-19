@@ -9783,6 +9783,75 @@ export interface UsageNamedSize {
   tokens: number
 }
 
+export interface UsageOverview {
+  at: number
+  coverage: UsageOverviewCoverage
+  daily: UsageOverviewDay[]
+  days: number
+  previous_daily: UsageOverviewDay[]
+  previous_since: number
+  previous_totals: UsageOverviewTotals
+  previous_until: number
+  project: string
+  project_options: UsageOverviewProjectOption[]
+  projects: UsageOverviewProject[]
+  since: number
+  timezone: string
+  totals: UsageOverviewTotals
+  until: number
+}
+
+export interface UsageOverviewCoverage {
+  history_from: number
+  sessions_read: number
+  sessions_total: number
+  state: UsageOverviewCoverageState
+  tasks_truncated?: boolean
+  truncated: boolean
+}
+
+export type UsageOverviewCoverageState =
+    "missing"
+  | "partial"
+  | "complete"
+
+export const UsageOverviewCoverageStateValues: readonly UsageOverviewCoverageState[] = ["missing", "partial", "complete"] as const
+
+export interface UsageOverviewDay {
+  coverage: UsageOverviewCoverageState
+  date: string
+  dispatches: number
+  duration_median_seconds: number | null
+  duration_samples: number
+  tokens: number | null
+}
+
+export interface UsageOverviewParts {
+  cache_read: number
+  cache_write: number
+  input: number
+  output: number
+}
+
+export interface UsageOverviewProject {
+  id: string
+  name: string
+  tokens: number
+}
+
+export interface UsageOverviewProjectOption {
+  id: string
+  name: string
+}
+
+export interface UsageOverviewTotals {
+  dispatches: number
+  duration_median_seconds: number | null
+  duration_samples: number
+  parts: UsageOverviewParts
+  tokens: number | null
+}
+
 /**
  * Why a reading is not current. `not_yet_read`: the ledger has no reading of it
  * yet. `transcript_missing`: it was read before and its transcript is gone; the

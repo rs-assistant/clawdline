@@ -2436,6 +2436,7 @@ test("every read the writer carries is one it waits for", () => {
     ["/v1/work/v2/images/a1", "work-v2-image"],
     ["/v1/usage/compare-compaction", "usage-compare"],
     ["/v1/usage/compare-handoff", "usage-compare"],
+    ["/v1/usage/overview", "usage-overview"],
     ["/v1/usage/work-samples", "usage-work-samples"],
     ["/v1/usage/sessions/s1", "usage"],
     ["/v1/capacity", "capacity"],
@@ -2484,4 +2485,50 @@ test("a phone edits a custom notification rule on the chosen machine", async () 
   assert.equal((await reader.fetch("/v1/notification-rules", post({ action: "create", rule }))).status, 200)
   assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "notification-rules-update", { changes: { action: "create", rule } }, "action"])
   assert.equal((await reader.fetch("/v1/notification-rules?all=1")).status, 501)
+})
+
+
+test("usage overview carries a validated period and opaque project to the selected machine", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  assert.equal(writeRoute("GET", "/v1/usage/overview")?.word, "usage.overview")
+  assert.equal(writeRoute("POST", "/v1/usage/overview"), null)
+  assert.equal(writeRoute("GET", "/v1/usage/overview/more"), null)
+  const response = await reader.fetch("/v1/usage/overview?days=28&project=opaque%2Fproject%26one")
+  assert.equal(response.status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "usage.overview", { days: "28", project: "opaque/project&one" }, "read"])
+  const count = client.calls.length
+  for (const query of ["days=8", "days=07", "days=7&days=28", "project=a&project=b", "project=%00", "since=1", "machine=other"]) {
+    assert.equal((await reader.fetch("/v1/usage/overview?" + query)).status, 400, query)
+  }
+  assert.equal(client.calls.length, count, "invalid queries never reach the machine")
+})
+
+
+test("usage overview also reads without the writer adapter and stays on its selected machine", async () => {
+  const client = new FakeClient()
+  const plain = new RelayReader("mac-b")
+  plain.attach(client)
+  const response = await plain.fetch("/v1/usage/overview?days=7")
+  assert.equal(response.status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-b", "usage.overview", { days: "7" }, "read"])
+  const count = client.calls.length
+  assert.equal((await plain.fetch("/v1/usage/overview?days=28&project=a&project=b")).status, 400)
+  assert.equal(client.calls.length, count)
+})
+
+test("usage overview browser bodies match the fixtures accepted by the daemon decoder", async () => {
+  const fixtures = JSON.parse(readFileSync(new URL("../../../../internal/app/cloudops/testdata/usage-overview-browser.json", import.meta.url), "utf8")) as { query: string; body: Record<string, string> }[]
+  for (const writer of [true, false]) {
+    const client = new FakeClient()
+    const reader = writer ? seam(client).reader : new RelayReader("mac-b")
+    if (!writer) reader.attach(client)
+    for (const fixture of fixtures) {
+      const response = await reader.fetch("/v1/usage/overview?" + fixture.query)
+      assert.equal(response.status, 200)
+      const call = client.calls.pop()
+      assert.equal(call?.[2], "usage.overview")
+      assert.deepEqual(JSON.parse(JSON.stringify(call?.[3])), fixture.body, "browser wire must be accepted by the real daemon fixture")
+    }
+  }
 })

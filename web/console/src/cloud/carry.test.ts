@@ -14,7 +14,7 @@ import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { SessionInfo } from "@clawdline/contract"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
-import { ANSWERED_HERE, CARRIED, CARRY_TABLE, DEFERRED, DEFERRED_ASKED, MACHINE_ONLY, NO_MACHINE_ROUTE, machineOnly, notCarriedDetail, uncarried, uncarriedWordOf, words } from "./carry.ts"
+import { ANSWERED_HERE, CARRIED, CARRY_TABLE, DEFERRED, DEFERRED_ASKED, MACHINE_ONLY, NO_MACHINE_ROUTE, usageOverviewQuery, machineOnly, notCarriedDetail, uncarried, uncarriedWordOf, words } from "./carry.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { RelayReader, type CloudIdentity, type CloudRow, type CloudSessions } from "./relay-reader.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
@@ -318,7 +318,8 @@ test("one word, one list, and every route names a word the table carries", () =>
   // An opened waiting Session's one row, asked when its question has not come.
   assert.ok("sessions.row" in CARRIED)
   assert.ok("session-snippets" in CARRIED)
-  assert.equal(Object.keys(CARRIED).length, 160)
+  assert.ok("usage.overview" in CARRIED)
+  assert.equal(Object.keys(CARRIED).length, 161)
 })
 
 test("the Cloud coordination panel reads current leases, waits and pauses from its selected machine", async () => {
@@ -780,4 +781,14 @@ test("full browser machine settings stay on the local console", () => {
   assert.match(api, /"\/v1\/settings\/browser"/)
   assert.equal(writeRoute("GET", "/v1/settings/browser"), null)
   assert.equal(writeRoute("POST", "/v1/settings/browser"), null)
+})
+
+
+test("usage overview query carries only a real period and one unmodified opaque project", () => {
+  assert.deepEqual(usageOverviewQuery(new URLSearchParams()), { days: "7" })
+  assert.deepEqual(usageOverviewQuery(new URLSearchParams("days=28&project=a%2Fb%26c")), { days: "28", project: "a/b&c" })
+  assert.deepEqual(usageOverviewQuery(new URLSearchParams("days=7&project=")), { days: "7" })
+  for (const query of ["days=", "days=7.0", "days=-7", "days=28&days=28", "project=a&project=", "machine=b", "project=%1F"]) {
+    assert.equal(usageOverviewQuery(new URLSearchParams(query)), null, query)
+  }
 })

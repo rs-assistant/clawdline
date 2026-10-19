@@ -66,7 +66,7 @@ import {
  * stylesheet is that app's. The drawer is `input/sidebar.js` and the page
  * switch is `core/pages.js`, rule for rule.
  */
-type Page = "sessions" | "devices" | "projects" | "workflow" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
+type Page = "usage" | "sessions" | "devices" | "projects" | "workflow" | "plan" | "settings" | "notifications" | "work" | "verify" | "archive" | "squad" | "documents" | "peer-access"
 
 /** What became of a session the address asked for: see `openAsked`. */
 type Asked = "none" | "waiting" | "opened" | "gone"
@@ -79,6 +79,7 @@ type Asked = "none" | "waiting" | "opened" | "gone"
 const PAGES: { id: Page; nav: string; icon: SidebarIconName; key?: string; text?: string; ready: boolean }[] = [
   { id: "sessions", nav: "nav-sessions", icon: "sessions", key: "webSessions", ready: true },
   { id: "projects", nav: "nav-projects", icon: "projects", key: "webProjects", ready: false },
+  { id: "usage", nav: "nav-usage", icon: "usage", ready: false },
   { id: "workflow", nav: "nav-workflow", icon: "workflow", ready: false },
   { id: "plan", nav: "nav-plan", icon: "plan", key: "webPlan", ready: false },
   { id: "devices", nav: "nav-devices", icon: "devices", key: "webDevices", ready: false },
@@ -933,7 +934,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
       title={tooOldTitle(p.id)}
     >
       <SidebarIcon name={p.icon} />
-      {p.id === "notifications" ? nextWord("notificationNav") : p.id === "workflow" ? catalogWord("workflow", "workflow") : p.key ? T[p.key] : p.text}
+      {p.id === "usage" ? nextWord("usageOverview") : p.id === "notifications" ? nextWord("notificationNav") : p.id === "workflow" ? catalogWord("workflow", "workflow") : p.key ? T[p.key] : p.text}
       {tooOldMark(p.id)}
     </button>
   )
@@ -995,7 +996,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         <div className="sidebar-panel" id="sidebar-panel">
           <section className="sidebar-group" aria-label={nextWord("sidebarMain")}>
             <h2>{nextWord("sidebarMain")}</h2>
-            {sidebarPages.filter((p) => p.id === "sessions" || p.id === "projects").map(sidebarPage)}
+            {sidebarPages.filter((p) => p.id === "sessions" || p.id === "projects" || p.id === "usage").map(sidebarPage)}
             <button
               className="sidebar-item"
               id="nav-archive"

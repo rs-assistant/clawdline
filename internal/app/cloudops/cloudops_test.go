@@ -454,6 +454,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		session: machine, name: "read:req-usage-session",
 		method: "GET", path: "/v1/usage/sessions/c0ffee00-0000-4000-8000-000000000005",
 	}, {
+		word:    "usage.overview",
+		body:    map[string]any{"type": "usage.overview", "session": machine, "request": "req-overview", "days": "28", "project": "unattributed"},
+		session: machine, name: "read:req-overview",
+		method: "GET", path: "/v1/usage/overview", query: map[string]string{"days": "28", "project": "unattributed"},
+	}, {
 		word: "usage.task",
 		body: map[string]any{"type": "usage.task", "session": machine,
 			"request": "req-usage-task", "id": taskID},

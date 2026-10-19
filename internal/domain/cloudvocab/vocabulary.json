@@ -1755,6 +1755,23 @@
       "decode": {"reply": "machine", "fields": {"id": {"type": "string", "checks": ["usage_id"]}}, "route": {"path": "/v1/usage/items/{id}"}}
     },
     {
+      "op": "usage.overview",
+      "kind": "read",
+      "write_gate": false,
+      "console": "carried",
+      "console_route": "GET /v1/usage/overview[?days=&project=]",
+      "console_seam": "writer",
+      "local": {"method": "GET"},
+      "example": {"request": "req", "session": "__clawdline_machine__", "days": "7", "project": "unattributed"},
+      "shapes": [
+        {"body": ["request", "session"], "path": "/v1/usage/overview"},
+        {"body": ["days", "request", "session"], "path": "/v1/usage/overview", "query": ["days"]},
+        {"body": ["project", "request", "session"], "path": "/v1/usage/overview", "query": ["project"]},
+        {"body": ["days", "project", "request", "session"], "path": "/v1/usage/overview", "query": ["days", "project"]}
+      ],
+      "decode": {"reply": "machine", "fields": {"days": {"type": "string"}, "project": {"type": "string"}}, "route": {"path": "/v1/usage/overview", "query": {"days": {"from": "days"}, "project": {"from": "project"}}}}
+    },
+    {
       "op": "usage.session",
       "kind": "read",
       "write_gate": false,

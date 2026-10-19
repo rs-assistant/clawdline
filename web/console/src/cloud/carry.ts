@@ -50,7 +50,22 @@ import { CARRIED, DEFERRED, NO_MACHINE_ROUTE } from "./carry-generated.ts"
 import type { CloudWord } from "./carry-generated.js"
 
 export { CARRIED, DEFERRED, NO_MACHINE_ROUTE }
-export type { CarriedWord, CloudWord } from "./carry-generated.js"
+export type CarriedWord = keyof typeof CARRIED
+export type { CloudWord }
+
+/** The overview carries exactly one period and one opaque project, never arbitrary query fields. */
+export function usageOverviewQuery(params: URLSearchParams): { days: "7" | "28"; project?: string } | null {
+  const seen = new Set<string>()
+  for (const [key] of params) {
+    if ((key !== "days" && key !== "project") || seen.has(key)) return null
+    seen.add(key)
+  }
+  const days = params.get("days") ?? "7"
+  const project = params.get("project") ?? ""
+  if (days !== "7" && days !== "28") return null
+  if (/[\u0000-\u001f\u007f]/u.test(project)) return null
+  return { days, ...(project ? { project } : {}) }
+}
 
 /**
  * The deferred words a screen in this console already asks for.

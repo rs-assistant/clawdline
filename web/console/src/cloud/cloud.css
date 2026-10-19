@@ -462,25 +462,39 @@
 .cloud-pair-ask .buttons .chip { min-width: 88px; padding: 8px 14px; text-align: center; }
 #cloud-pair-start { margin-top: 14px; }
 
-/* The viewer-device limit (`DeviceLimitPanel.tsx`): the devices using the
-   account's slots, each with Remove and its in-card question. */
-.cloud-devices { list-style: none; margin: 14px 0 0 0; padding: 0; display: grid; gap: 8px; }
+/* The viewer-device limit (`DeviceLimitPanel.tsx`): a short title, the
+   devices unused longest first with the first one marked, and an in-card
+   question only for a device used in the last day. */
+.cloud-device-title { margin: 0 0 6px 0; color: var(--ink); font-size: 20px; font-weight: 650; }
+.cloud-device-order { margin: 16px 0 0 0; color: var(--dim); font-size: 12px; }
+.cloud-devices { list-style: none; margin: 8px 0 0 0; padding: 0; display: grid; gap: 8px; }
 .cloud-devices li {
-    display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center;
-    padding: 10px 12px; background: var(--card-hi); border: 1px solid var(--line); border-radius: 10px;
+    display: grid; grid-template-columns: auto 1fr auto; gap: 0 12px; align-items: center;
+    min-height: 60px; box-sizing: border-box; padding: 8px 8px 8px 14px;
+    background: var(--card-hi); border: 1px solid var(--line); border-radius: 12px;
 }
-.cloud-device-name { color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
-.cloud-device-facts { grid-column: 1; color: var(--dim); font-size: 12px; }
-.cloud-devices .cloud-device-remove { grid-column: 2; grid-row: 1 / span 2; padding: 6px 12px; }
+.cloud-devices li.oldest { background: #2a1f1a; border-color: #6b3f2c; }
+.cloud-device-icon { color: var(--dim); }
+.cloud-devices li.oldest .cloud-device-icon { color: #e8a184; }
+.cloud-device-text { display: grid; gap: 2px; min-width: 0; }
+.cloud-device-name { color: var(--ink); font-size: 15px; overflow-wrap: anywhere; }
+.cloud-device-facts { color: var(--dim); font-size: 13px; }
+.cloud-devices li.oldest .cloud-device-facts { color: #f0b49b; }
+.cloud-devices .cloud-device-remove { min-width: 64px; min-height: 44px; padding: 6px 12px; text-align: center; }
 .cloud-devices .cloud-device-remove:hover:not(:disabled) { background: #2f2322; color: #f0b6a2; border-color: #57362e; }
+.cloud-devices li.oldest .cloud-device-remove { background: #d97757; border-color: #d97757; color: #1a0f0a; font-weight: 600; }
+.cloud-devices li.oldest .cloud-device-remove:hover:not(:disabled) { background: #e08a6c; border-color: #e08a6c; color: #1a0f0a; }
 .cloud-devices .cloud-device-remove:disabled { opacity: 0.4; cursor: default; }
-.cloud-devices > li > .say { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: 12px; }
+.cloud-devices > li > .say { margin: 0; font-size: 12px; }
 .cloud-device-ask { grid-column: 1 / -1; }
-.cloud-device-ask .say { margin: 10px 0 0 0; color: var(--dim); font-size: 12.5px; line-height: 1.55; }
-.cloud-device-ask .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-.cloud-device-ask .buttons .chip { min-width: 88px; padding: 8px 14px; text-align: center; }
+.cloud-device-ask .say { margin: 10px 0 0 0; color: #f2d79b; font-size: 13.5px; line-height: 1.55; }
+.cloud-device-ask .buttons { display: flex; gap: 8px; margin-top: 12px; }
+.cloud-device-ask .buttons .chip { flex: 1; min-height: 44px; padding: 8px 14px; text-align: center; }
 .cloud-device-ask .confirm-go { border-color: #57362e; color: #e09985; }
 .cloud-device-ask .confirm-go:hover:not(:disabled) { background: #2f2322; color: #f0b6a2; }
+.cloud-device-failure { margin-top: 12px; }
+.cloud-device-failure .say { margin: 0; }
+.cloud-device-code { margin: 2px 0 0 0; color: var(--dim); font-size: 12px; }
 .cloud-device-limit .go { margin-top: 14px; }
 .cloud-detail-problem { margin: 24px; color: var(--dim); line-height: 1.5; }
 .cloud-detail-problem p { margin: 0; }

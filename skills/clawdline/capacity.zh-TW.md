@@ -305,6 +305,9 @@
 | `update.build_body_bytes` | 4096 | `bytes` | `refuse` | `diagnostics` | — |
 | `update.fetch_timeout_seconds` | 10 | `seconds` | `evict_oldest` | `diagnostics` | — |
 | `update.refresh_seconds` | 1800 | `seconds` | `evict_oldest` | `diagnostics` | — |
+| `usage.daily_days` | 57 | `rows` | `evict_oldest` | `diagnostics, sender` | — |
+| `usage.daily_rows` | 50000 | `rows` | `evict_oldest` | `diagnostics, sender` | — |
+| `usage.overview_tasks` | 10000 | `rows` | `evict_oldest` | `diagnostics, sender` | — |
 | `usage.work_cursor_queue` | 1024 | `rows` | `refuse` | `diagnostics, log` | — |
 | `usage.work_cursor_rows` | 50000 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `usage.work_units_per_answer` | 500 | `rows` | `evict_oldest` | `diagnostics, sender` | — |

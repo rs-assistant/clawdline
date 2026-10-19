@@ -114,6 +114,7 @@ var generatedDecoders = map[string]genDecoder{
 	"usage.compare-compaction":           genDecodeUsageCompareCompaction,
 	"usage.compare-handoff":              genDecodeUsageCompareHandoff,
 	"usage.item":                         genDecodeUsageItem,
+	"usage.overview":                     genDecodeUsageOverview,
 	"usage.session":                      genDecodeUsageSession,
 	"usage.task":                         genDecodeUsageTask,
 	"usage.work-samples":                 genDecodeUsageWorkSamples,
@@ -2543,6 +2544,32 @@ func genDecodeUsageItem(b body) (plan, LocalRequest, bool) {
 	}
 	path := "/v1/usage/items/" + segment(genText(b["id"]))
 	req := LocalRequest{Method: "GET", Path: path}
+	return p, req, true
+}
+
+// genDecodeUsageOverview is the `usage.overview` row's decode.
+func genDecodeUsageOverview(b body) (plan, LocalRequest, bool) {
+	if !b.hasOneOf(
+		[]string{"type", "request", "session"},
+		[]string{"type", "days", "request", "session"},
+		[]string{"type", "project", "request", "session"},
+		[]string{"type", "days", "project", "request", "session"},
+	) {
+		return plan{}, LocalRequest{}, false
+	}
+	if !b.genValid("days", genRule{kind: "string"}) {
+		return plan{}, LocalRequest{}, false
+	}
+	if !b.genValid("project", genRule{kind: "string"}) {
+		return plan{}, LocalRequest{}, false
+	}
+	p, ok := machinePlan(b)
+	if !ok {
+		return plan{}, LocalRequest{}, false
+	}
+	path := "/v1/usage/overview"
+	req := LocalRequest{Method: "GET", Path: path}
+	req.Query = b.genQuery(map[string]genValue{"days": genValue{from: "days"}, "project": genValue{from: "project"}})
 	return p, req, true
 }
 

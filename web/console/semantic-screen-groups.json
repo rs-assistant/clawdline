@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6804,
-  "riskKeys": 3117,
-  "nonRiskCount": 3687,
+  "englishContentKeys": 6858,
+  "riskKeys": 3130,
+  "nonRiskCount": 3728,
   "groups": [
     {
       "name": "admin / other",
@@ -267,7 +267,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 143,
+      "count": 146,
       "sources": [
         null
       ],
@@ -400,6 +400,9 @@
         "capacityRow.terminal.streams.what",
         "capacityRow.terminal.viewers.what",
         "capacityRow.update.fetch_timeout_seconds.full",
+        "capacityRow.usage.daily_days.what",
+        "capacityRow.usage.daily_rows.what",
+        "capacityRow.usage.overview_tasks.what",
         "capacityRow.usage.work_units_per_answer.what",
         "capacityRow.work.digests.what",
         "capacityRow.work.image_bytes.what",
@@ -780,7 +783,7 @@
     },
     {
       "name": "http / other",
-      "count": 557,
+      "count": 559,
       "sources": [
         "internal/productcopy/http_refusals/en.json"
       ],
@@ -1112,6 +1115,7 @@
         "http.9a8e16f2158697c9",
         "http.9aa9fbc599eaf924",
         "http.9b364f75d3c70a26",
+        "http.9bcb3b53981a1ac2",
         "http.9bcf10c099d3535f",
         "http.9c15ed81764c0fb4",
         "http.9c33c5bd0c7f833e",
@@ -1317,6 +1321,7 @@
         "http.f5b9f9444ae33085",
         "http.f624e423d221bf78",
         "http.f75713e89f9307e5",
+        "http.f7d20a8803f71e7d",
         "http.f81797aebf2597fd",
         "http.f99b89f4d5f80622",
         "http.f9eef542df793588",
@@ -2061,7 +2066,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 218,
+      "count": 223,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2143,11 +2148,16 @@
         "next.cloudConnecting",
         "next.cloudCurrentMachine",
         "next.cloudDeviceAdded",
+        "next.cloudDeviceCode",
         "next.cloudDeviceKindAndroid",
         "next.cloudDeviceKindBrowser",
         "next.cloudDeviceKindIOS",
         "next.cloudDeviceLimitContinue",
         "next.cloudDeviceLimitLoading",
+        "next.cloudDeviceLimitTitle",
+        "next.cloudDeviceLimitTitleNoCount",
+        "next.cloudDeviceOldest",
+        "next.cloudDeviceOrder",
         "next.cloudDeviceRemoveCancel",
         "next.cloudDeviceSeen",
         "next.cloudFleetUpdateNotice",
@@ -2359,7 +2369,7 @@
     },
     {
       "name": "next / other",
-      "count": 239,
+      "count": 270,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2600,6 +2610,37 @@
         "next.updateTitle",
         "next.updateToVersion",
         "next.updateVerifying",
+        "next.usageAllProjects",
+        "next.usageCacheRead",
+        "next.usageCacheWrite",
+        "next.usageChartHelp",
+        "next.usageComposition",
+        "next.usageCurrent",
+        "next.usageDays",
+        "next.usageDuration",
+        "next.usageDurationCaption",
+        "next.usageInput",
+        "next.usageLoading",
+        "next.usageMinutes",
+        "next.usageOffline",
+        "next.usageOutput",
+        "next.usageOverview",
+        "next.usagePartial",
+        "next.usagePeriod",
+        "next.usagePrevious",
+        "next.usageProject",
+        "next.usageProjects",
+        "next.usageReadCoverage",
+        "next.usageRefresh",
+        "next.usageRetry",
+        "next.usageSamples",
+        "next.usageTaskUnit",
+        "next.usageTasks",
+        "next.usageThisMachine",
+        "next.usageTokenIncludesCache",
+        "next.usageTokens",
+        "next.usageUnattributed",
+        "next.usageUnsupported",
         "next.voiceInstallPromptSetUp",
         "next.voiceInstallPromptTitle",
         "next.worktreeRemoveClose"

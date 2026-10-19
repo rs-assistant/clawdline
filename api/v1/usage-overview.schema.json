@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "usage-overview.schema.json",
+  "title": "Usage overview",
+  "$defs": {
+    "UsageOverviewParts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input",
+        "cache_read",
+        "cache_write",
+        "output"
+      ],
+      "properties": {
+        "input": {
+          "type": "number"
+        },
+        "cache_read": {
+          "type": "number"
+        },
+        "cache_write": {
+          "type": "number"
+        },
+        "output": {
+          "type": "number"
+        }
+      }
+    },
+    "UsageOverviewCoverageState": {
+      "type": "string",
+      "enum": [
+        "missing",
+        "partial",
+        "complete"
+      ]
+    },
+    "UsageOverviewTotals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dispatches",
+        "duration_samples",
+        "parts"
+      ],
+      "properties": {
+        "tokens": {
+          "type": "number",
+          "nullable": true
+        },
+        "dispatches": {
+          "type": "integer"
+        },
+        "duration_median_seconds": {
+          "type": "number",
+          "nullable": true
+        },
+        "duration_samples": {
+          "type": "integer"
+        },
+        "parts": {
+          "$ref": "#/$defs/UsageOverviewParts"
+        }
+      }
+    },
+    "UsageOverviewDay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "date",
+        "dispatches",
+        "duration_samples",
+        "coverage"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "tokens": {
+          "type": "number",
+          "nullable": true
+        },
+        "dispatches": {
+          "type": "integer"
+        },
+        "duration_median_seconds": {
+          "type": "number",
+          "nullable": true
+        },
+        "duration_samples": {
+          "type": "integer"
+        },
+        "coverage": {
+          "$ref": "#/$defs/UsageOverviewCoverageState"
+        }
+      }
+    },
+    "UsageOverviewProject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "tokens"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tokens": {
+          "type": "number"
+        }
+      }
+    },
+    "UsageOverviewProjectOption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "UsageOverviewCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "sessions_read",
+        "sessions_total",
+        "history_from",
+        "truncated"
+      ],
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/UsageOverviewCoverageState"
+        },
+        "sessions_read": {
+          "type": "integer"
+        },
+        "sessions_total": {
+          "type": "integer"
+        },
+        "history_from": {
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "tasks_truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "UsageOverview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "at",
+        "days",
+        "timezone",
+        "since",
+        "until",
+        "previous_since",
+        "previous_until",
+        "project",
+        "totals",
+        "previous_totals",
+        "daily",
+        "previous_daily",
+        "projects",
+        "project_options",
+        "coverage"
+      ],
+      "properties": {
+        "at": {
+          "type": "integer"
+        },
+        "days": {
+          "type": "integer"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "since": {
+          "type": "integer"
+        },
+        "until": {
+          "type": "integer"
+        },
+        "previous_since": {
+          "type": "integer"
+        },
+        "previous_until": {
+          "type": "integer"
+        },
+        "project": {
+          "type": "string"
+        },
+        "totals": {
+          "$ref": "#/$defs/UsageOverviewTotals"
+        },
+        "previous_totals": {
+          "$ref": "#/$defs/UsageOverviewTotals"
+        },
+        "daily": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UsageOverviewDay"
+          }
+        },
+        "previous_daily": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UsageOverviewDay"
+          }
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UsageOverviewProject"
+          }
+        },
+        "project_options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/UsageOverviewProjectOption"
+          }
+        },
+        "coverage": {
+          "$ref": "#/$defs/UsageOverviewCoverage"
+        }
+      }
+    }
+  }
+}

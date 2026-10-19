@@ -42,7 +42,26 @@ export function cloudViewerDeviceMetadata(scope) {
         return { kind: "ios", name: "iPad" };
     }
     if (/Android/i.test(platform + " " + userAgent)) return { kind: "android", name: "Android device" };
-    return { kind: "browser", name: "Web browser" };
+    var browser = browserName(userAgent);
+    var system = systemName(platform + " " + userAgent);
+    return { kind: "browser", name: browser && system ? browser + " · " + system : "Web browser" };
+}
+
+/** The browser's family only; the version and the rest of the user agent stay here. */
+function browserName(userAgent) {
+    if (/Edg\//.test(userAgent)) return "Edge";
+    if (/Firefox\/|FxiOS\//.test(userAgent)) return "Firefox";
+    if (/Chrome\/|CriOS\//.test(userAgent)) return "Chrome";
+    if (/Safari\//.test(userAgent)) return "Safari";
+    return "";
+}
+
+function systemName(text) {
+    if (/CrOS/.test(text)) return "ChromeOS";
+    if (/Mac/.test(text)) return "macOS";
+    if (/Win/.test(text)) return "Windows";
+    if (/Linux/.test(text)) return "Linux";
+    return "";
 }
 
 function pairingError(code, message) {

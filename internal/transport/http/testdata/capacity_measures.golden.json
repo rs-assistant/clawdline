@@ -455,6 +455,11 @@
     "Note": true
   },
   {
+    "Name": "console.execution_recovery_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.health_live_seconds",
     "Known": true,
     "Note": true
@@ -1451,6 +1456,20 @@
   },
   {
     "Name": "update.refresh_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "usage.daily_days",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "usage.daily_rows",
+    "Known": true
+  },
+  {
+    "Name": "usage.overview_tasks",
     "Known": true,
     "Note": true
   },
