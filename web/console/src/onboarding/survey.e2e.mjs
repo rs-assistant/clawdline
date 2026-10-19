@@ -55,10 +55,10 @@ test("bilingual desktop/mobile survey, settings edits, local consent and lost-re
   assert.ok(!existsSync(fixture) && !existsSync(entry), "fixture paths must be task-owned")
   try {
     writeFileSync(fixture, '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:#171614;color:#f2efea;font-family:system-ui;padding:24px;box-sizing:border-box}*{box-sizing:border-box}</style></head><body><div id="root"></div><script type="module" src="/survey-fixture.tsx"></script></body></html>')
-    writeFileSync(entry, `import React,{useEffect} from 'react';import {createRoot} from 'react-dom/client';import {bootCatalog} from './src/catalog';import {SurveyStatistics} from './src/onboarding/Statistics';import {SurveyCoordinator,SurveySettingsLink,SESSION_READ} from './src/onboarding/Survey';import './src/legacy/tokens.css';
+    writeFileSync(entry, `import React from 'react';import {createRoot} from 'react-dom/client';import {bootCatalog} from './src/catalog';import {SurveyStatistics} from './src/onboarding/Statistics';import {SurveyCoordinator,SurveySettingsLink} from './src/onboarding/Survey';import './src/legacy/tokens.css';import './src/legacy/base.css';import './src/legacy/sheets.css';import './src/legacy/pages.css';import './src/legacy/responsive.css';import './src/shell.css';import {page as settingsPage} from './src/pages/settings';import {loadStrings} from './src/legacy/bridge';
 const p=new URLSearchParams(location.search);localStorage.setItem('ui_language',p.get('lang')||'en');
-await bootCatalog(tag=>'/catalogs/'+tag+'.json');
-function Fixture(){useEffect(()=>{dispatchEvent(new Event(SESSION_READ))},[]);return p.has('stats')?<SurveyStatistics apiOrigin="${apiOrigin}"/>:<><SurveySettingsLink/><SurveyCoordinator productVersion="fixture-v1" localApiOrigin="${apiOrigin}" account={p.has('cloud')?{id:'fixture-account',apiOrigin:'${apiOrigin}'}:undefined} eligible={p.has('cloud')}/></>};createRoot(document.getElementById('root')!).render(<Fixture/>);`)
+await bootCatalog(tag=>'/catalogs/'+tag+'.json');await loadStrings(async()=>({}));const Settings=settingsPage.Component;
+function Fixture(){return p.has('stats')?<SurveyStatistics apiOrigin="${apiOrigin}"/>:<>{p.has('settings')?<Settings shown={true}/>:<SurveySettingsLink/>}<SurveyCoordinator productVersion="fixture-v1" localApiOrigin="${apiOrigin}" account={p.has('cloud')?{id:'fixture-account',apiOrigin:'${apiOrigin}'}:undefined} eligible={p.has('cloud')}/></>};createRoot(document.getElementById('root')!).render(<Fixture/>);`)
     vite = spawn(process.execPath, [resolve(root, "web/node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", "0"], { cwd: resolve(root, "web/console"), stdio: ["ignore", "pipe", "pipe"] })
     const origin = await new Promise((yes, no) => {
       const listen = chunk => { const match = String(chunk).match(/http:\/\/127\.0\.0\.1:\d+/); if (match) yes(match[0]) }
@@ -90,9 +90,8 @@ function Fixture(){useEffect(()=>{dispatchEvent(new Event(SESSION_READ))},[]);re
     await page.getByRole("status").filter({ hasText: "Thank you" }).waitFor(); assert.equal(cloud.answers.reason, "agents")
     const localPage = await browser.newPage()
     await localPage.goto(origin + "/survey-fixture.html")
-    await localPage.getByRole("button", { name: "Take the survey" }).waitFor()
+    assert.equal(await localPage.locator(".survey-invite").count(), 0, "local conversations have no survey invitation")
     const before = requests.length
-    await localPage.getByRole("button", { name: "Not now" }).click()
     await localPage.getByRole("button", { name: "Review or update your answers" }).click()
     await fill(localPage)
     assert.equal(requests.length, before, "local display, dismissal and editing send no API requests")
@@ -128,6 +127,21 @@ function Fixture(){useEffect(()=>{dispatchEvent(new Event(SESSION_READ))},[]);re
     await statsPage.locator(".survey-metrics").waitFor()
     assert.match(await statsPage.locator(".survey-stats").innerText(), /Sample: 1 respondents/)
     assert.equal(await statsPage.locator(".survey-chart").count(), 5)
+    if (process.env.CLAWDLINE_SHOTS) {
+      for (const lang of ["en", "zh-Hant"]) {
+        const settings = await browser.newPage({viewport:{width:1440,height:1080}})
+        await settings.goto(origin + "/survey-fixture.html?settings=1&lang=" + lang)
+        await settings.locator(".survey-settings button").waitFor()
+        await settings.screenshot({path:resolve(process.env.CLAWDLINE_SHOTS, `settings-entry-${lang}.png`)})
+        await settings.locator(".survey-settings button").click()
+        await settings.locator("dialog[open]").waitFor()
+        await settings.screenshot({path:resolve(process.env.CLAWDLINE_SHOTS, `settings-form-${lang}.png`)})
+        await settings.locator(".survey-tools summary").click()
+        await settings.screenshot({path:resolve(process.env.CLAWDLINE_SHOTS, `tools-expanded-${lang}.png`)})
+        await settings.close()
+      }
+      await statsPage.screenshot({path:resolve(process.env.CLAWDLINE_SHOTS,"statistics-en.png")})
+    }
     failStats = true
     await statsPage.getByRole("button", {name:"Apply filters"}).click()
     await statsPage.getByRole("alert").waitFor()
@@ -139,7 +153,7 @@ function Fixture(){useEffect(()=>{dispatchEvent(new Event(SESSION_READ))},[]);re
       try {
         const tab = await safari.newPage({ viewport: { width: 390, height: 844 } })
         await tab.goto(origin + "/survey-fixture.html?lang=zh-Hant")
-        await tab.getByRole("button", { name: "填寫問卷", exact: true }).click()
+        await tab.locator(".survey-settings button").click()
         await tab.locator("dialog[open]").waitFor(); await fill(tab)
         await tab.getByRole("button", { name: "送出並繼續", exact: true }).click()
         await tab.getByRole("status").filter({ hasText: "你的回答已儲存" }).waitFor()

@@ -18,17 +18,16 @@
 .survey-tool-options label:hover { background: #39332c; border-radius: 4px; }
 .survey-tool-options input { accent-color: var(--accent); flex: none; width: 16px; height: 16px; }
 .survey-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 30px; }
-.survey-submit, .survey-secondary, .survey-invite button, .survey-notice button { min-height: 42px; border-radius: 7px; padding: 10px 16px; font: inherit; cursor: pointer; }
+.survey-submit, .survey-secondary, .survey-notice button { min-height: 42px; border-radius: 7px; padding: 10px 16px; font: inherit; cursor: pointer; }
 .survey-submit { color: #17110e; background: #e79b76; border: 1px solid #e79b76; font-weight: 600; }
 .survey-submit:hover { background: #f0ac8a; }
-.survey-secondary, .survey-invite button, .survey-notice button { background: transparent; color: inherit; border: 1px solid #504a42; }
-.survey-card :focus-visible, .survey-settings :focus-visible, .survey-invite :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.survey-secondary, .survey-notice button { background: transparent; color: inherit; border: 1px solid #504a42; }
+.survey-card :focus-visible, .survey-settings :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .survey-card button:disabled { opacity: .55; cursor: default; }
 .survey-privacy { margin: 27px 0 0; color: #b6afa4; font-size: 12px; line-height: 1.75; }
 .survey-privacy a { color: #d4c0ad; text-underline-offset: 3px; }
 .survey-error { color: #f2b798; font-size: 14px; line-height: 1.5; }
-.survey-invite, .survey-notice { position: fixed; z-index: 100; inset-inline: 20px; bottom: calc(20px + var(--indicator, 0px)); margin-inline: auto; width: fit-content; max-width: calc(100vw - 40px); box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px; background: #292520; color: #f2efea; border: 1px solid #504a42; border-radius: 12px; box-shadow: 0 8px 32px #0005; }
-.survey-invite p { color: #b6afa4; margin: 5px 0 0; font-size: 13px; }
+.survey-notice { position: fixed; z-index: 100; inset-inline: 20px; bottom: calc(20px + var(--indicator, 0px)); margin-inline: auto; width: fit-content; max-width: calc(100vw - 40px); box-sizing: border-box; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 18px; background: #292520; color: #f2efea; border: 1px solid #504a42; border-radius: 12px; box-shadow: 0 8px 32px #0005; }
 .survey-settings { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0; }
 @media (max-width: 600px) {
   .survey-card { padding: 28px 22px; }
