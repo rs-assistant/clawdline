@@ -292,32 +292,34 @@ function SettingsPage({ shown }: { shown: boolean }) {
         </div>
 
         <div className="block">
-          <b id="settings-notify-title">{T.webSettingsNotify}</b>
+          <div className="settings-control-heading">
+            <b id="settings-notify-title">{T.webSettingsNotify}</b>
+            <div className="row">
+              {(push.state === "off" || push.state === "on") && <Switch
+                id="settings-notify-go"
+                labelledBy="settings-notify-title"
+                describedBy="settings-notify-say"
+                on={push.state === "on"}
+                stateText={push.state === "on" ? catalogWord("literal", "09b410f51b19") : catalogWord("literal", "862364ba6811")}
+                disabled={push.busy}
+                onToggle={togglePush}
+              />}
+              {/* Only offered where there is something subscribed for it to reach. */}
+              <button
+                className="chip"
+                id="settings-notify-test"
+                type="button"
+                hidden={push.state !== "on"}
+                disabled={push.testing}
+                onClick={pressTest}
+              >
+                {push.testing ? T.webSending : T.webNotifyTest}
+              </button>
+            </div>
+          </div>
           <p className="say" id="settings-notify-say">
             {notifySay(T, push.state)}
           </p>
-          <div className="row">
-            {(push.state === "off" || push.state === "on") && <Switch
-              id="settings-notify-go"
-              labelledBy="settings-notify-title"
-              describedBy="settings-notify-say"
-              on={push.state === "on"}
-              stateText={push.state === "on" ? catalogWord("literal", "09b410f51b19") : catalogWord("literal", "862364ba6811")}
-              disabled={push.busy}
-              onToggle={togglePush}
-            />}
-            {/* Only offered where there is something subscribed for it to reach. */}
-            <button
-              className="chip"
-              id="settings-notify-test"
-              type="button"
-              hidden={push.state !== "on"}
-              disabled={push.testing}
-              onClick={pressTest}
-            >
-              {push.testing ? T.webSending : T.webNotifyTest}
-            </button>
-          </div>
           <p
             className={push.saidCalm ? "said calm" : "said"}
             id="settings-notify-said"
@@ -329,46 +331,48 @@ function SettingsPage({ shown }: { shown: boolean }) {
         </div>
 
         <div className="block" id="settings-font-scale">
-          <b id="settings-font-scale-title">{nextWord("fontScaleTitle")}</b>
+          <div className="settings-control-heading">
+            <b id="settings-font-scale-title">{nextWord("fontScaleTitle")}</b>
+            <div className="row font-scale-row" role="group" aria-labelledby="settings-font-scale-title">
+              <button
+                className="chip font-scale-button"
+                id="settings-font-scale-smaller"
+                type="button"
+                aria-label={nextWord("fontScaleSmaller")}
+                title={nextWord("fontScaleSmaller")}
+                disabled={fontScale.percent === FONT_SCALE_STEPS[0]}
+                onClick={() => adjustFontScale(-1)}
+              >
+                −
+              </button>
+              <output className="font-scale-value" aria-live="polite" aria-atomic="true">
+                {fontScale.percent}%
+              </output>
+              <button
+                className="chip font-scale-button"
+                id="settings-font-scale-larger"
+                type="button"
+                aria-label={nextWord("fontScaleLarger")}
+                title={nextWord("fontScaleLarger")}
+                disabled={fontScale.percent === FONT_SCALE_STEPS[FONT_SCALE_STEPS.length - 1]}
+                onClick={() => adjustFontScale(1)}
+              >
+                +
+              </button>
+              <button
+                className="chip font-scale-reset"
+                id="settings-font-scale-reset"
+                type="button"
+                disabled={fontScale.percent === DEFAULT_FONT_SCALE}
+                onClick={() => chooseFontScale(DEFAULT_FONT_SCALE)}
+              >
+                {nextWord("fontScaleReset")}
+              </button>
+            </div>
+          </div>
           <p className="say" id="settings-font-scale-say">
             {nextWord("fontScaleHint")}
           </p>
-          <div className="row font-scale-row" role="group" aria-labelledby="settings-font-scale-title">
-            <button
-              className="chip font-scale-button"
-              id="settings-font-scale-smaller"
-              type="button"
-              aria-label={nextWord("fontScaleSmaller")}
-              title={nextWord("fontScaleSmaller")}
-              disabled={fontScale.percent === FONT_SCALE_STEPS[0]}
-              onClick={() => adjustFontScale(-1)}
-            >
-              −
-            </button>
-            <output className="font-scale-value" aria-live="polite" aria-atomic="true">
-              {fontScale.percent}%
-            </output>
-            <button
-              className="chip font-scale-button"
-              id="settings-font-scale-larger"
-              type="button"
-              aria-label={nextWord("fontScaleLarger")}
-              title={nextWord("fontScaleLarger")}
-              disabled={fontScale.percent === FONT_SCALE_STEPS[FONT_SCALE_STEPS.length - 1]}
-              onClick={() => adjustFontScale(1)}
-            >
-              +
-            </button>
-            <button
-              className="chip font-scale-reset"
-              id="settings-font-scale-reset"
-              type="button"
-              disabled={fontScale.percent === DEFAULT_FONT_SCALE}
-              onClick={() => chooseFontScale(DEFAULT_FONT_SCALE)}
-            >
-              {nextWord("fontScaleReset")}
-            </button>
-          </div>
           <p className="said" role="status" aria-live="polite">
             {fontScale.storageAvailable ? "" : nextWord("fontScaleNotRemembered")}
           </p>
@@ -378,59 +382,63 @@ function SettingsPage({ shown }: { shown: boolean }) {
             <div className="settings-column">
 
         <div className="block">
-          <b id="settings-assistant-icons-title">{T.webSettingsAssistantIcons}</b>
+          <div className="settings-control-heading">
+            <b id="settings-assistant-icons-title">{T.webSettingsAssistantIcons}</b>
+            <div className="row">
+              <button
+                className={entered && icons ? "chip assistant-icon-setting on" : "chip assistant-icon-setting"}
+                id="settings-assistant-icons"
+                type="button"
+                aria-pressed={entered ? (icons ? "true" : "false") : "true"}
+                onClick={toggleIcons}
+              >
+                <span
+                  className="marks"
+                  id="settings-assistant-icons-marks"
+                  aria-hidden="true"
+                  dangerouslySetInnerHTML={{
+                    __html: entered ? L.assistantLogoHTML("claude") + L.assistantLogoHTML("codex") : "",
+                  }}
+                />
+                <span id="settings-assistant-icons-label">{T.webSettingsAssistantIconsShow}</span>
+              </button>
+            </div>
+          </div>
           <p
             className="say"
             id="settings-assistant-icons-say"
             dangerouslySetInnerHTML={{ __html: L.wordsHTML(T.webSettingsAssistantIconsSay) }}
           />
-          <div className="row">
-            <button
-              className={entered && icons ? "chip assistant-icon-setting on" : "chip assistant-icon-setting"}
-              id="settings-assistant-icons"
-              type="button"
-              aria-pressed={entered ? (icons ? "true" : "false") : "true"}
-              onClick={toggleIcons}
-            >
-              <span
-                className="marks"
-                id="settings-assistant-icons-marks"
-                aria-hidden="true"
-                dangerouslySetInnerHTML={{
-                  __html: entered ? L.assistantLogoHTML("claude") + L.assistantLogoHTML("codex") : "",
-                }}
-              />
-              <span id="settings-assistant-icons-label">{T.webSettingsAssistantIconsShow}</span>
-            </button>
-          </div>
         </div>
 
         <div className="block">
-          <b id="settings-order-title">{T.webSettingsOrder}</b>
-          <p className="say" id="settings-order-say" dangerouslySetInnerHTML={{ __html: L.wordsHTML(T.webSettingsOrderSay) }} />
-          <div className="row">
-            <button
-              className={entered && newest ? "chip on" : "chip"}
-              id="settings-order"
-              type="button"
-              title={T.webOrderTip}
-              onClick={toggleOrder}
-            >
-              <svg className="ico arrow" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
-                <path
-                  d="M7 2.4v9.2M3.6 8.2 7 11.6l3.4-3.4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                ></path>
-              </svg>
-              <span id="settings-order-label">
-                {entered ? (newest ? T.webOrderNewest : T.webOrderOldest) : ""}
-              </span>
-            </button>
+          <div className="settings-control-heading">
+            <b id="settings-order-title">{T.webSettingsOrder}</b>
+            <div className="row">
+              <button
+                className={entered && newest ? "chip on" : "chip"}
+                id="settings-order"
+                type="button"
+                title={T.webOrderTip}
+                onClick={toggleOrder}
+              >
+                <svg className="ico arrow" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+                  <path
+                    d="M7 2.4v9.2M3.6 8.2 7 11.6l3.4-3.4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  ></path>
+                </svg>
+                <span id="settings-order-label">
+                  {entered ? (newest ? T.webOrderNewest : T.webOrderOldest) : ""}
+                </span>
+              </button>
+            </div>
           </div>
+          <p className="say" id="settings-order-say" dangerouslySetInnerHTML={{ __html: L.wordsHTML(T.webSettingsOrderSay) }} />
         </div>
 
             </div>
