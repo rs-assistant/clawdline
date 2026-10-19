@@ -4490,6 +4490,7 @@
   "next.terminalNoticeProjectsTitle": "讀不到這台機器的專案清單",
   "next.terminalNoticeFailedTitle": "讀不到 {machine} 的終端",
   "next.terminalNoticeFailedBody": "那台機器沒有給出可用的回應。",
+  "next.codexAsyncChoiceHint": "點選選項即可送出答案，也可以直接在對話中回覆。",
   "projects.activityInProgress": "{n} 項進行中",
   "projects.activityLastKnown": "上次紀錄：{n}",
   "projects.activityNone": "目前無進行中項目",

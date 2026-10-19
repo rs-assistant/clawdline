@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6111,
+  "englishKeys": 6112,
   "counts": {
     "negation": 1935,
     "state": 1091,
-    "permission": 377,
+    "permission": 378,
     "deletion": 160,
     "uncertainty": 177
   },
-  "unionCount": 2916,
+  "unionCount": 2917,
   "categories": {
     "negation": [
       "bar.noSession",
@@ -3326,6 +3326,7 @@
       "next.cloudTerminalPermissionConnectionFailed",
       "next.cloudTerminalPermissionDeviceMissing",
       "next.cloudTerminalPermissionTitle",
+      "next.codexAsyncChoiceHint",
       "next.devicesPairHelp",
       "next.firstSessionAgentMacHint",
       "next.firstSessionAgentOtherHint",
@@ -5968,6 +5969,7 @@
     "next.cloudTerminalPermissionDeviceMissing",
     "next.cloudTerminalPermissionTitle",
     "next.codexAsyncAnswerHint",
+    "next.codexAsyncChoiceHint",
     "next.defaultModelInvalid",
     "next.defaultModelsFailed",
     "next.defaultModelsHint",

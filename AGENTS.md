@@ -225,9 +225,10 @@ The incident behind each of these is in `docs/working-rules.md`.
 
 For a concrete choice the person must make, read `clawdline guide note`, create one `answer` Note
 with complete suggested replies, then ask briefly in chat and wait for the person's sent message.
-Ask each question in one place: a question already put through the assistant's own question screen
-(Claude Code's `AskUserQuestion`, Codex's built-in prompt) gets no Note as well, or the person
-answers it twice.
+For Codex's non-blocking `request_user_input_async`, also create one answer Note with the same
+question and complete replies so the person can return to it later. A blocking question screen
+(Claude Code's `AskUserQuestion`, or a blocking Codex prompt) needs no duplicate Note. Suggested
+or preselected options are not answers; wait for the person's sent message.
 
 ## The single pages
 

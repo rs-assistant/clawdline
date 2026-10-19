@@ -42,6 +42,7 @@ let listAttentionCount = 1
 let documentMode: "ready" | "refused" | "keyed" = "ready"
 let documentListMode: "ready" | "empty" | "starting" = "ready"
 let documentReadDelay = 0
+let questionTool = ""
 const row = {
   id: SESSION, label: "Delivery Session", backend: "owned", state: "idle", work_state: "ready",
   evidence: "process", assistant: "codex", sessionId: CONVERSATION, cwd: "/tmp/fixture",
@@ -297,7 +298,7 @@ function fixture(): Server {
   const publish = () => { for (const client of eventClients) client.write("event: sessions\ndata: " + JSON.stringify(snapshot()) + "\n\n") }
   return createServer((req, res) => {
     const path = new URL(req.url ?? "/", "http://fixture").pathname
-    if (path === "/__fixture/reset") { readAt = null; resolvedAt = null; version = 1; failReads = false; failActions = false; readDelay = 0; noteReads = 0; todoReads = 0; noteCount = 1; showOptions = true; singleOption = false; secretMode = false; handoffValues = []; handoffDelay = 0; failHandoff = false; listWaiting = false; listAttentionCount = 1; documentMode = "ready"; documentListMode = "ready"; documentReadDelay = 0; sendRequests = 0; sentTexts = []; sentBeforeResolve = []; failSends = false; sendDelay = 0; return json(res, 200, { ok: true }) }
+    if (path === "/__fixture/reset") { questionTool = ""; readAt = null; resolvedAt = null; version = 1; failReads = false; failActions = false; readDelay = 0; noteReads = 0; todoReads = 0; noteCount = 1; showOptions = true; singleOption = false; secretMode = false; handoffValues = []; handoffDelay = 0; failHandoff = false; listWaiting = false; listAttentionCount = 1; documentMode = "ready"; documentListMode = "ready"; documentReadDelay = 0; sendRequests = 0; sentTexts = []; sentBeforeResolve = []; failSends = false; sendDelay = 0; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/handoff-delay") { handoffDelay = 400; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/handoff-fail") { failHandoff = true; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/document-mode") { const mode = new URL(req.url ?? "/", "http://fixture").searchParams.get("value"); documentMode = mode === "refused" || mode === "keyed" ? mode : "ready"; return json(res, 200, { ok: true }) }
@@ -328,7 +329,9 @@ function fixture(): Server {
       res.on("close", () => eventClients.delete(res))
       return
     }
-    if (path === "/v1/transcript") return json(res, 200, { entries: [], evidence: "process", id: SESSION, signature: "fixture" })
+    if (path === "/__fixture/question") { questionTool = new URL(req.url ?? "/", "http://fixture").searchParams.get("tool") || ""; return json(res, 200, {}) }
+    if (path === "/v1/transcript") return json(res, 200, { entries: questionTool ? [{ role: "tool", tool: questionTool,
+      text: "\u0001ask\u0001" + JSON.stringify([{ q: "Choose a release day", o: [{ l: "Tuesday", d: "Recommended" }, { l: "Wednesday" }] }]), at: now }] : [], evidence: "transcript", id: SESSION, signature: "fixture" })
     if (path === `/v1/sessions/${SESSION}/documents`) {
       if (documentListMode === "starting") return json(res, 503, { error: "cloud_starting", detail: "The encrypted connection is starting." })
       if (documentListMode === "empty") return json(res, 200, { documents: [] })
@@ -466,12 +469,15 @@ before(async () => {
   browser = await Browser.connect(endpoint)
 })
 after(async () => {
-  browser?.close()
-  if (browserProcess && browserProcess.exitCode === null) {
-    const gone = new Promise((ok) => browserProcess.once("exit", ok))
+  const gone = browserProcess && browserProcess.exitCode === null && browserProcess.signalCode === null
+    ? new Promise<void>((ok) => browserProcess.once("exit", () => ok())) : Promise.resolve()
+  if (browser) await browser.send("Browser.close").catch(() => {})
+  await Promise.race([gone, new Promise((ok) => setTimeout(ok, 5000))])
+  if (browserProcess && browserProcess.exitCode === null && browserProcess.signalCode === null) {
     browserProcess.kill()
-    await Promise.race([gone, new Promise((ok) => setTimeout(ok, 5000))])
+    await gone
   }
+  browser?.close()
   server?.closeAllConnections(); await new Promise<void>((ok) => server ? server.close(() => ok()) : ok())
   if (profile) rmSync(profile, { recursive: true, force: true, maxRetries: 5 })
 })
@@ -961,5 +967,44 @@ test("an English phone header keeps the Session's name and names its machine but
     const { nodes } = await browser.send("Accessibility.getFullAXTree", {}, id)
     assert.ok(nodes.some((node: any) => node.role?.value === "button" && node.name?.value === "Show on this machine"), "the icon-only button keeps its name")
     assert.equal(await run(`document.documentElement.scrollWidth <= 390`), true)
+  } finally { await browser.send("Target.closeTarget", { targetId }) }
+})
+
+
+test("async question options send once with context and preserve the composer's draft", async () => {
+  const { targetId } = await browser.send("Target.createTarget", { url: "about:blank" })
+  const { sessionId: id } = await browser.send("Target.attachToTarget", { targetId, flatten: true })
+  const run = async (expression: string) => {
+    const { result, exceptionDetails } = await browser.send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true }, id)
+    if (exceptionDetails) throw new Error(exceptionDetails.exception?.description ?? exceptionDetails.text)
+    return result.value
+  }
+  const until = async (expression: string) => {
+    const deadline = Date.now() + 8000
+    while (!(await run(expression))) {
+      if (Date.now() > deadline) assert.fail("question did not settle: " + expression)
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+  }
+  try {
+    await fetch(origin + "/__fixture/reset")
+    await fetch(origin + "/__fixture/question?tool=request_user_input_async")
+    await fetch(origin + "/__fixture/send-delay?ms=400")
+    await browser.send("Page.enable", {}, id); await browser.send("Runtime.enable", {}, id)
+    await browser.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }, id)
+    const mark = browser.loadCount; await browser.send("Page.navigate", { url: origin + "/#session=" + SESSION }, id); await browser.loaded(id, mark)
+    await until(`document.querySelectorAll('.async-question-option').length === 2 && !!document.querySelector('#msg')`)
+    await run(`document.querySelector('#msg').textContent = 'Keep this draft'; document.querySelectorAll('.async-question-option')[1].click(); document.querySelectorAll('.async-question-option')[0].click()`)
+    await until(`Array.from(document.querySelectorAll('.async-question-option')).every(b => b.disabled)`)
+    await until(`document.querySelector('.async-question [role=status]')?.textContent`)
+    assert.equal(sendRequests, 1)
+    assert.deepEqual(sentTexts, ["Choose a release day\n\nWednesday"])
+    assert.equal(await run(`document.querySelector('#msg').textContent`), "Keep this draft")
+    assert.equal(await run(`document.documentElement.scrollWidth <= 390`), true)
+    // Blocking Claude questions keep their terminal picker, without message buttons.
+    await fetch(origin + "/__fixture/question?tool=AskUserQuestion")
+    await browser.send("Page.reload", {}, id)
+    await until(`!!document.querySelector('.askbox') && !document.querySelector('.async-question-option')`)
+    assert.equal(sendRequests, 1)
   } finally { await browser.send("Target.closeTarget", { targetId }) }
 })
