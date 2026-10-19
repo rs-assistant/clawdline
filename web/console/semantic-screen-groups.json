@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6246,
-  "riskKeys": 2963,
-  "nonRiskCount": 3283,
+  "englishContentKeys": 6255,
+  "riskKeys": 2967,
+  "nonRiskCount": 3288,
   "groups": [
     {
       "name": "bar / other",
@@ -1823,7 +1823,7 @@
     },
     {
       "name": "next / cloud",
-      "count": 218,
+      "count": 223,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -1905,11 +1905,16 @@
         "next.cloudConnecting",
         "next.cloudCurrentMachine",
         "next.cloudDeviceAdded",
+        "next.cloudDeviceCode",
         "next.cloudDeviceKindAndroid",
         "next.cloudDeviceKindBrowser",
         "next.cloudDeviceKindIOS",
         "next.cloudDeviceLimitContinue",
         "next.cloudDeviceLimitLoading",
+        "next.cloudDeviceLimitTitle",
+        "next.cloudDeviceLimitTitleNoCount",
+        "next.cloudDeviceOldest",
+        "next.cloudDeviceOrder",
         "next.cloudDeviceRemoveCancel",
         "next.cloudDeviceSeen",
         "next.cloudFleetUpdateNotice",
