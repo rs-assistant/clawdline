@@ -3,7 +3,9 @@
 Clawdline asks three optional questions: the main reason for using the product, current AI
 tools (multiple choice), and discovery source. English and Taiwan Traditional Chinese ship
 together; other interface languages use the English fallback. The form starts with no choices
-selected. A single dark card follows the console's warm orange accent and warm neutral surfaces.
+selected. A single dark card uses the console's existing background, card, text and warm orange accent
+tokens. The survey and statistics selectors share one centred chevron while retaining native
+select interaction.
 
 ## Entry and consent
 
@@ -12,7 +14,8 @@ console is available, outside an active pairing or machine confirmation sheet. A
 have submitted or skipped are not prompted again on another device. Existing accounts without
 a survey record receive the same one-time invitation after this feature ships.
 
-The local console offers a nonmodal invitation after a Session transcript is successfully read.
+The local console has no invitation in or below a Session conversation. Its survey is available
+only from Settings.
 It remembers a random respondent id, display/skip timestamps, answers and unresolved submission
 in this browser's storage. It sends nothing to Cloud when displaying or dismissing the invitation.
 Only the explicit Submit action uploads answers, the random id, language, entry and console build
@@ -21,7 +24,7 @@ still submit, but cannot retain their identity across reloads. Clearing site dat
 respondent. This is a browser sample, not a count of people or installations.
 
 Settings → browser preferences → Usage preferences reopens the questionnaire for review or
-editing. Both entry paths explain the collection before submission. No project path, source
+editing. The Cloud onboarding and Settings entry paths explain the collection before submission. No project path, source
 code, terminal text or Session conversation is included. Cloud answers are associated with the
 signed-in account; the local random id is hashed by the API and never returned in statistics.
 The optional survey does not enable background product telemetry.
@@ -81,5 +84,4 @@ not-started exclusivity; submit, retry a lost receipt with the same key, reload,
 open another browser on the same account, skip, and verify the backend's statistics. Cover
 unauthorized reads, bad origins, invalid payloads, concurrent edits, unavailable storage/network,
 and a failed statistics query. Mongo tests compare the database aggregation to the in-memory
-adapter and verify atomic revision updates. A local-only invitation must produce no Cloud request
-until Submit. Production rollout must deploy the additive API before the hosted console.
+adapter and verify atomic revision updates. Opening the local Settings form must produce no Cloud request until Submit. Production rollout must deploy the additive API before the hosted console.

@@ -16,3 +16,5 @@
 .survey-bar { display: block; height: 4px; background: var(--line); margin-top: 8px; }
 .survey-bar > span { display: block; height: 100%; background: var(--accent); }
 @media (max-width: 600px) { .survey-filters label { flex: 1 1 140px; } .survey-filters input, .survey-filters select { width: 100%; } .survey-chart { padding: 14px; } }
+
+.survey-filters select { appearance: none; -webkit-appearance: none; padding-inline-end: 36px; background-image: var(--survey-chevron); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px 16px; }
