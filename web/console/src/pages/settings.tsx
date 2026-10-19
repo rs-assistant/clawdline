@@ -461,7 +461,7 @@ function SettingsPage({ shown }: { shown: boolean }) {
         <div className="settings-pane" id="settings-pane-2" role="tabpanel" aria-labelledby="settings-tab-2" hidden={tab !== 2}>
           <div className="settings-grid">
             <div className="settings-column">
-        <UpdatePanel shown={shown} />
+        <UpdatePanel shown={shown && tab === 2} />
             </div>
             <div className="settings-column">
         <CapacityBlock shown={shown} />

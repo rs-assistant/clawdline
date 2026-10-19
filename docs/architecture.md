@@ -323,7 +323,7 @@ machine settings, voice, remote access, session dispatch and dispatch rules. Mac
 panes share one mounted `SettingsWindow` with a controlled stable pane name; switching
 machine panes retains the window-level settings state and in-flight writes. Leaving the machine settings
 unmounts the window so background reads and listeners stop. Its embedded mode still uses the browser
-settings API and excludes privileged Cloud sign-in, pairing and tunnel management.
+settings API and excludes privileged Cloud sign-in and pairing controls.
 Cloud browsers expose only browser, work and status. The standalone `settings.html`
 window retains its own navigation and machine-authorized controls. Update deep links
 continue to open the status pane.
