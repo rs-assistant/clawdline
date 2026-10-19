@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
 	"sync"
@@ -552,5 +553,418 @@ func TestWireEfficiencyAdmissionControls(t *testing.T) {
 	}
 	if delivered != 2 {
 		t.Fatalf("delivered %d", delivered)
+	}
+}
+
+// The isolated arm deliberately retains the original same-process arm above.
+// JSON over pipes is test-only control traffic, never part of the relay protocol.
+type wireIsolatedCommand struct {
+	Action, URL, Scenario       string
+	Viewers, Op, Sessions, Want int
+	Payload                     []byte
+	Drop                        bool
+	Delay                       time.Duration
+}
+type wireIsolatedSample struct{ UserNS, SystemNS, WallNS int64 }
+type wireIsolatedReply struct {
+	PID    int
+	URL    string
+	Sample wireIsolatedSample
+	Result wireBenchResult
+}
+type wireIsolatedWorker struct {
+	cmd    *exec.Cmd
+	in     io.WriteCloser
+	enc    *json.Encoder
+	dec    *json.Decoder
+	stderr bytes.Buffer
+}
+
+func wireIsolatedStart(t *testing.T, role string) *wireIsolatedWorker {
+	t.Helper()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := &wireIsolatedWorker{cmd: exec.Command(exe, "-test.run=^TestWireEfficiencyWorker$", "-test.timeout=60s")}
+	w.cmd.Env = append(os.Environ(), "CLAWDLINE_WIRE_WORKER="+role)
+	w.cmd.Stderr = &w.stderr
+	var out io.ReadCloser
+	w.in, err = w.cmd.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err = w.cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.enc = json.NewEncoder(w.in)
+	w.dec = json.NewDecoder(out)
+	if err = w.cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = w.in.Close()
+		done := make(chan error, 1)
+		go func() { done <- w.cmd.Wait() }()
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Errorf("worker %s: %v: %s", role, err, w.stderr.String())
+			}
+		case <-time.After(5 * time.Second):
+			_ = w.cmd.Process.Kill()
+			<-done
+			t.Errorf("worker %s cleanup timeout: %s", role, w.stderr.String())
+		}
+	})
+	return w
+}
+func (w *wireIsolatedWorker) call(t *testing.T, c wireIsolatedCommand) wireIsolatedReply {
+	t.Helper()
+	if err := w.enc.Encode(c); err != nil {
+		t.Fatal(err)
+	}
+	var r wireIsolatedReply
+	if err := w.dec.Decode(&r); err != nil {
+		t.Fatalf("worker reply: %v: %s", err, w.stderr.String())
+	}
+	return r
+}
+
+// Each worker measures RUSAGE_SELF, never RUSAGE_CHILDREN. Machine accounting
+// includes its pipe decoding/control overhead but excludes payload generation,
+// fixture relay fanout and viewer signature verification/decryption.
+func TestWireEfficiencyWorker(t *testing.T) {
+	role := os.Getenv("CLAWDLINE_WIRE_WORKER")
+	if role == "" {
+		t.Skip("subprocess worker only")
+	}
+	u0, s0 := wireBenchCPUParts(t)
+	wall0 := time.Now()
+	sample := func() wireIsolatedSample {
+		u, s := wireBenchCPUParts(t)
+		return wireIsolatedSample{u - u0, s - s0, time.Since(wall0).Nanoseconds()}
+	}
+	dec, enc := json.NewDecoder(os.Stdin), json.NewEncoder(os.Stdout)
+	signer, err := domaincloud.DeviceKeyFromSeed(bytes.Repeat([]byte{17}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	key, err := domaincloud.ContentKeyFromBytes(bytes.Repeat([]byte{29}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &wireBenchRelay{signer: signer}
+	result := wireBenchResult{}
+	var received atomic.Int64
+	var viewerWG sync.WaitGroup
+	var viewerMu sync.Mutex
+	var viewerErr error
+	var clients []*adaptercloud.Conn
+	defer func() {
+		for _, c := range clients {
+			_ = c.Close()
+		}
+		viewerWG.Wait()
+	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var tr *adaptercloud.Transport
+	var relay *Relay
+	settled := make(chan uint64, 128)
+	var transportDone chan struct{}
+	defer func() {
+		if tr != nil {
+			cancel()
+			tr.Stop()
+			<-transportDone
+		}
+	}()
+	for {
+		var c wireIsolatedCommand
+		if err := dec.Decode(&c); err == io.EOF {
+			return
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		reply := wireIsolatedReply{PID: os.Getpid()}
+		switch c.Action {
+		case "init":
+			switch role {
+			case "relay":
+				r.delay = c.Delay
+				r.dropOnce = c.Drop
+				r.server = httptest.NewServer(http.HandlerFunc(r.serve))
+				defer r.server.Close()
+				reply.URL = r.server.URL
+			case "viewer":
+				for i := 0; i < c.Viewers; i++ {
+					conn, e := adaptercloud.Dial(c.URL+"?role=viewer", adaptercloud.DialOptions{NetDial: r.dial})
+					if e != nil {
+						t.Fatal(e)
+					}
+					clients = append(clients, conn)
+					viewerWG.Add(1)
+					go func() {
+						defer viewerWG.Done()
+						replay := domaincloud.NewReplayWindow(0)
+						expected := 0
+						fail := func(e error) { viewerMu.Lock(); viewerErr = e; viewerMu.Unlock() }
+						for {
+							b, e := conn.Read(time.Now().Add(30 * time.Second))
+							if e != nil {
+								return
+							}
+							var f adaptercloud.EnvelopeFrame
+							if e = json.Unmarshal(b, &f); e != nil {
+								fail(e)
+								return
+							}
+							start := time.Now()
+							env, e := domaincloud.DecodeEnvelope(f.Envelope)
+							if e != nil {
+								fail(e)
+								return
+							}
+							plain, e := env.Open(key, func(id string) (ed25519.PublicKey, bool) { return signer.PublicKey(), id == "mac-01" })
+							if e != nil {
+								fail(e)
+								return
+							}
+							viewerMu.Lock()
+							result.OpenNS = append(result.OpenNS, time.Since(start).Nanoseconds())
+							viewerMu.Unlock()
+							if replay.Claim(env.Sender, env.Seq) != domaincloud.ReplayAccepted {
+								continue
+							}
+							var payload struct {
+								Op     int
+								Source struct {
+									Freshness  string `json:"freshness"`
+									ObservedAt int    `json:"observed_at"`
+								} `json:"source"`
+							}
+							if e = json.Unmarshal(plain, &payload); e != nil {
+								fail(e)
+								return
+							}
+							if payload.Op != expected || payload.Source.Freshness != "current" || payload.Source.ObservedAt != expected {
+								fail(fmt.Errorf("stale/out of order: %+v expected %d", payload, expected))
+								return
+							}
+							expected++
+							received.Add(1)
+						}
+					}()
+				}
+			case "machine":
+				spool, e := adaptercloud.NewSpool(adaptercloud.DefaultSpoolLimits(), nil, time.Now)
+				if e != nil {
+					t.Fatal(e)
+				}
+				tr, e = adaptercloud.New(adaptercloud.Options{RelayURL: c.URL, NetDial: r.dial, Token: &adaptercloud.TokenSource{Client: adaptercloud.NewAccountClient("http" + strings.TrimPrefix(strings.TrimSuffix(c.URL, "/v1/connect"), "ws")), Credential: "credential"}, Identity: adaptercloud.Identity{AccountID: "usr_test", MachineID: "mac-01", MachineCredential: "credential"}, Signer: signer, Spool: spool, Replay: domaincloud.NewReplayWindow(0), ContentKey: key, Jitter: func() float64 { return 0.5 }, OnSettled: func(_ string, seq uint64, _ adaptercloud.SettleKind) { settled <- seq }})
+				if e != nil {
+					t.Fatal(e)
+				}
+				transportDone = make(chan struct{})
+				go func() { defer close(transportDone); _ = tr.Run(ctx) }()
+				select {
+				case <-tr.Ready():
+				case <-time.After(5 * time.Second):
+					t.Fatal("handshake timeout")
+				}
+				relay = &Relay{Transport: tr, Spool: spool, MachineID: "mac-01", Signer: signer, Secret: key}
+			default:
+				t.Fatal("unknown worker role")
+			}
+		case "registered":
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				r.mu.Lock()
+				n := len(r.viewers)
+				r.mu.Unlock()
+				if n == c.Viewers {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatal("viewer registration timeout")
+				}
+				time.Sleep(time.Millisecond)
+			}
+		case "mark":
+			// Response ends the previous phase; the following phase starts here.
+		case "publish":
+			start := time.Now()
+			seq, e := relay.PublishTracked(ctx, Outbound{Channel: fmt.Sprintf("t/mac-01/%%25%d", 10+c.Op%c.Sessions), Payload: c.Payload})
+			if e != nil {
+				t.Fatal(e)
+			}
+			result.SealNS = append(result.SealNS, time.Since(start).Nanoseconds())
+			result.PlaintextBytes += int64(len(c.Payload))
+			select {
+			case got := <-settled:
+				if got != seq {
+					t.Fatalf("settled %d want %d", got, seq)
+				}
+			case <-time.After(8 * time.Second):
+				t.Fatal("settlement timeout")
+			}
+		case "delivered":
+			deadline := time.Now().Add(5 * time.Second)
+			for received.Load() < int64(c.Want) {
+				viewerMu.Lock()
+				e := viewerErr
+				viewerMu.Unlock()
+				if e != nil {
+					t.Fatal(e)
+				}
+				if time.Now().After(deadline) {
+					t.Fatal("viewer delivery timeout")
+				}
+				time.Sleep(time.Millisecond)
+			}
+		case "result":
+			r.mu.Lock()
+			result.Connections = r.connections
+			result.Acks = r.acks
+			result.Retries = r.retries
+			result.HTTPHandshakeBytes = r.handshakeBytes
+			result.PublishWSBytes = r.frameBytes
+			result.EnvelopeBytes = r.envelopeBytes
+			result.CiphertextBytes = r.ciphertextBytes
+			result.AckWSBytes = r.ackBytes
+			result.ViewerWSBytes = r.viewerBytes
+			r.mu.Unlock()
+			viewerMu.Lock()
+			reply.Result = result
+			reply.Result.OpenNS = append([]int64(nil), result.OpenNS...)
+			e := viewerErr
+			viewerMu.Unlock()
+			if e != nil {
+				t.Fatal(e)
+			}
+			reply.Result.Deliveries = int(received.Load())
+		default:
+			t.Fatalf("unknown control action %q", c.Action)
+		}
+		reply.Sample = sample()
+		if err := enc.Encode(reply); err != nil {
+			t.Fatal(err)
+		}
+		if c.Action == "mark" {
+			u0, s0 = wireBenchCPUParts(t)
+			wall0 = time.Now()
+		}
+	}
+}
+
+type wireIsolatedResult struct {
+	Arm, Scenario      string
+	ParentPID          int
+	WorkerPIDs         map[string]int
+	Init, Idle, Active map[string]wireIsolatedSample
+	Result             wireBenchResult
+}
+
+func TestWireEfficiencyIsolated(t *testing.T) {
+	if os.Getenv("CLAWDLINE_WIRE_ISOLATED") != "1" {
+		t.Skip("set CLAWDLINE_WIRE_ISOLATED=1")
+	}
+	wireBenchCPUParts(t) // Unsupported platforms skip before spawning workers.
+	for _, s := range []struct {
+		name                   string
+		sessions, viewers, ops int
+		delay                  time.Duration
+		drop                   bool
+	}{
+		{"initial_idle", 1, 1, 0, 0, false}, {"active_one", 1, 1, 12, 0, false}, {"active_multi_session", 16, 1, 32, 0, false}, {"independent_viewers", 4, 4, 16, 0, false}, {"reconnect_unacked", 1, 1, 12, 0, true}, {"ack_delay", 1, 1, 12, 25 * time.Millisecond, false},
+	} {
+		t.Run(s.name, func(t *testing.T) {
+			u0, s0 := wireBenchCPUParts(t)
+			wall0 := time.Now()
+			parentSample := func() wireIsolatedSample {
+				u, v := wireBenchCPUParts(t)
+				return wireIsolatedSample{u - u0, v - s0, time.Since(wall0).Nanoseconds()}
+			}
+			out := wireIsolatedResult{Arm: "isolated-processes-v1", Scenario: s.name, ParentPID: os.Getpid(), WorkerPIDs: map[string]int{}, Init: map[string]wireIsolatedSample{}, Idle: map[string]wireIsolatedSample{}, Active: map[string]wireIsolatedSample{}}
+			workers := map[string]*wireIsolatedWorker{}
+			rw := wireIsolatedStart(t, "relay")
+			workers["relay"] = rw
+			rr := rw.call(t, wireIsolatedCommand{Action: "init", Drop: s.drop, Delay: s.delay})
+			out.WorkerPIDs["relay"] = rr.PID
+			url := "ws" + strings.TrimPrefix(rr.URL, "http") + "/v1/connect"
+			for _, role := range []string{"viewer", "machine"} {
+				w := wireIsolatedStart(t, role)
+				workers[role] = w
+				r := w.call(t, wireIsolatedCommand{Action: "init", URL: url, Viewers: s.viewers})
+				out.WorkerPIDs[role] = r.PID
+			}
+			rw.call(t, wireIsolatedCommand{Action: "registered", Viewers: s.viewers})
+			for _, role := range []string{"relay", "viewer", "machine"} {
+				out.Init[role] = workers[role].call(t, wireIsolatedCommand{Action: "mark"}).Sample
+			}
+			out.Init["parent_generator"] = parentSample()
+			u0, s0 = wireBenchCPUParts(t)
+			wall0 = time.Now()
+			time.Sleep(200 * time.Millisecond)
+			for _, role := range []string{"relay", "viewer", "machine"} {
+				out.Idle[role] = workers[role].call(t, wireIsolatedCommand{Action: "mark"}).Sample
+			}
+			out.Idle["parent_generator"] = parentSample()
+			u0, s0 = wireBenchCPUParts(t)
+			wall0 = time.Now()
+			result := wireBenchResult{Scenario: s.name, Sessions: s.sessions, Viewers: s.viewers, Operations: s.ops}
+			for i := 0; i < s.ops; i++ {
+				payload, e := json.Marshal(map[string]any{"op": i, "session": fmt.Sprintf("%%%d", 10+i%s.sessions), "source": map[string]any{"freshness": "current", "observed_at": i}, "text": strings.Repeat("x", 1024)})
+				if e != nil {
+					t.Fatal(e)
+				}
+				start := time.Now()
+				workers["machine"].call(t, wireIsolatedCommand{Action: "publish", Payload: payload, Op: i, Sessions: s.sessions})
+				workers["viewer"].call(t, wireIsolatedCommand{Action: "delivered", Want: (i + 1) * s.viewers})
+				result.LatencyNS = append(result.LatencyNS, time.Since(start).Nanoseconds())
+			}
+			for _, role := range []string{"relay", "viewer", "machine"} {
+				out.Active[role] = workers[role].call(t, wireIsolatedCommand{Action: "mark"}).Sample
+			}
+			out.Active["parent_generator"] = parentSample()
+			rr = rw.call(t, wireIsolatedCommand{Action: "result"})
+			mr := workers["machine"].call(t, wireIsolatedCommand{Action: "result"})
+			vr := workers["viewer"].call(t, wireIsolatedCommand{Action: "result"})
+			latency := result.LatencyNS
+			result = rr.Result
+			result.Scenario = s.name
+			result.Sessions = s.sessions
+			result.Viewers = s.viewers
+			result.Operations = s.ops
+			result.LatencyNS = latency
+			result.PlaintextBytes = mr.Result.PlaintextBytes
+			result.SealNS = mr.Result.SealNS
+			result.OpenNS = vr.Result.OpenNS
+			result.Deliveries = vr.Result.Deliveries
+			result.HTTPHandshakeBytes = mr.Result.HTTPHandshakeBytes + vr.Result.HTTPHandshakeBytes
+			result.P50NS = wireBenchPercentile(result.LatencyNS, 50)
+			result.P95NS = wireBenchPercentile(result.LatencyNS, 95)
+			result.SealP50NS = wireBenchPercentile(result.SealNS, 50)
+			result.SealP95NS = wireBenchPercentile(result.SealNS, 95)
+			result.OpenP50NS = wireBenchPercentile(result.OpenNS, 50)
+			result.OpenP95NS = wireBenchPercentile(result.OpenNS, 95)
+			if result.Acks != s.ops || result.Deliveries != s.ops*s.viewers {
+				t.Fatalf("incomplete serial delivery %+v", result)
+			}
+			if s.drop && (result.Retries != 1 || result.Connections != 2) {
+				t.Fatalf("retry byte equality/reconnect failed %+v", result)
+			}
+			if !s.drop && result.Retries != 0 {
+				t.Fatal("unexpected retry")
+			}
+			out.Result = result
+			b, e := json.Marshal(out)
+			if e != nil {
+				t.Fatal(e)
+			}
+			t.Log("WIRE_ISOLATED_RESULT " + string(b))
+		})
 	}
 }
