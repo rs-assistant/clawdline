@@ -32,6 +32,7 @@ import { CARRY_TABLE } from "./carry.js"
 import { afterForget, forgetMachine, honestyIsOurs, type ForgetOutcome } from "./forget.js"
 import { NAME_MAX, renameMachine, type RenameOutcome } from "./rename.js"
 import { setAccountMachines, setAccountRosterStatus, setMachineForgetting, setMachinePairing } from "../legacy/devices-bridge.js"
+import { setMachineManager } from "./machine-manager.js"
 import { machinePaired } from "./pairing-completion.js"
 import { setProjectSyncSeam, syncSeamFor, type SyncClient } from "./project-sync.js"
 import { machinePresentation } from "../legacy/js/session/selection.js"
@@ -774,15 +775,15 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
    * would be a second irreversible act on a guess.
    */
   const forget = useCallback(
-    async (machine: CloudMachine) => {
-      if (transport.kind !== "cloud" || forgetting) return
+    async (machine: CloudMachine): Promise<ForgetOutcome | null> => {
+      if (transport.kind !== "cloud" || forgetting) return null
       setForgetting(true)
       setTold(null)
       const outcome = await forgetMachine(transport.config.apiOrigin, machine.id)
       setForgetting(false)
       setAsking(null)
       setTold({ machine: machine.name || machine.label || machine.id, outcome })
-      if (outcome.kind !== "forgotten") return
+      if (outcome.kind !== "forgotten") return outcome
       setForgotten((was) => (was.includes(machine.id) ? was : [...was, machine.id]))
       const next = afterForget({
         forgotten: machine.id,
@@ -804,6 +805,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         reader.current?.lost()
         setScreen({ at: "machines" })
       }
+      return outcome
     },
     [transport, forgetting, remembered, reading, who],
   )
@@ -818,8 +820,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
    * retained descriptor may still carry the old hostname.
    */
   const rename = useCallback(
-    async (machine: CloudMachine, name: string) => {
-      if (transport.kind !== "cloud" || renaming) return
+    async (machine: CloudMachine, name: string): Promise<RenameOutcome | null> => {
+      if (transport.kind !== "cloud" || renaming) return null
       setRenaming(true)
       setRenamed(null)
       const outcome = await renameMachine(transport.config.apiOrigin, machine.id, name)
@@ -840,8 +842,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       }
       // A name this page would not send, or a bound the account would refuse,
       // never left the browser: the question stays open with what was typed.
-      if (outcome.kind === "blank" || outcome.kind === "too_long") return
+      if (outcome.kind === "blank" || outcome.kind === "too_long") return outcome
       setNaming(null)
+      return outcome
     },
     [transport, renaming],
   )
@@ -1000,6 +1003,38 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       setMachineForgetting(null)
     }
   }, [openPairing])
+
+  // The Devices page's machine sheet acts through the same paths as the gate's
+  // own list (`machine-manager.ts`). Refs, because the sheet outlives the
+  // renders that replace these callbacks.
+  const forgetRef = useRef(forget)
+  forgetRef.current = forget
+  const renameRef = useRef(rename)
+  renameRef.current = rename
+  const openPairingRef = useRef(openPairing)
+  openPairingRef.current = openPairing
+  useEffect(() => {
+    if (transport.kind !== "cloud") return
+    const busy = { kind: "unreadable", status: null, code: "busy" } as const
+    setMachineManager({
+      apiOrigin: transport.config.apiOrigin,
+      deviceID: () => client.current?.deviceID ?? null,
+      carrier: (machine) => carrierOf(machine),
+      tryDirect: async (machine) => {
+        const current = client.current
+        if (!current?.tryDirect) return { kind: "unsupported" }
+        return current.tryDirect(machine)
+      },
+      rename: async (machine, name) => (await renameRef.current(machine, name)) ?? busy,
+      forget: async (machine) => (await forgetRef.current(machine)) ?? busy,
+      pair: (id) => {
+        const known = machinesRef.current?.find((m) => m.id === id)
+        const named = known ? withAccountNames([known], namesRef.current, present)[0] : null
+        openPairingRef.current({ id, name: named ? named.name || named.label || id : id })
+      },
+    })
+    return () => setMachineManager(null)
+  }, [transport, carrierOf])
 
   const askForget = useCallback((machine: CloudMachine | null) => {
     if (machine) forgetReturn.current = "machines"

@@ -104,7 +104,7 @@ export const DEVICES_ELEMENT_IDS = [
  */
 let account: MachineSource | null = null
 let accountRows = new Map<string, MachineRow>()
-type AccountRosterStatus = "idle" | "loading" | "ready" | "failed"
+export type AccountRosterStatus = "idle" | "loading" | "ready" | "failed"
 let accountRosterStatus: AccountRosterStatus = "idle"
 let retryAccountRoster: (() => void) | null = null
 const accountChanges = new Set<() => void>()
@@ -139,6 +139,26 @@ export function accountMachineRow(id: string): MachineRow | null {
 /** Whether an account's list is installed — that is, whether the lede is true. */
 export function accountMachinesInstalled(): boolean {
   return account !== null
+}
+
+/**
+ * The account's machines, for the React machine list that replaces the copied
+ * cards on the hosted console (`pages/devices/AccountMachines.tsx`), or null
+ * when no account list is installed.
+ */
+export function readAccountMachines(): Promise<MachineAnswer> | null {
+  return account ? account() : null
+}
+
+/** Whether the account roster is being read, read, or could not be read, and how to ask again. */
+export function accountRoster(): { status: AccountRosterStatus; retry: (() => void) | null } {
+  return { status: accountRosterStatus, retry: retryAccountRoster }
+}
+
+/** Called whenever the installed list or the roster's status changes. */
+export function watchAccountMachines(listener: () => void): () => void {
+  accountChanges.add(listener)
+  return () => { accountChanges.delete(listener) }
 }
 
 /** The sentence this page may put under its heading, for the source it has. */
