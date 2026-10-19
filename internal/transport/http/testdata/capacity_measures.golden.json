@@ -455,6 +455,11 @@
     "Note": true
   },
   {
+    "Name": "console.execution_recovery_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.health_live_seconds",
     "Known": true,
     "Note": true
