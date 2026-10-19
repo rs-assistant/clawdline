@@ -11,10 +11,12 @@ import (
 	"testing"
 
 	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
+	"github.com/sainteye/clawdline/internal/adapters/planner"
 	adapterpush "github.com/sainteye/clawdline/internal/adapters/push"
 	"github.com/sainteye/clawdline/internal/adapters/store"
 	"github.com/sainteye/clawdline/internal/app/cloudops"
 	"github.com/sainteye/clawdline/internal/config"
+	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/auth"
 	"github.com/sainteye/clawdline/internal/domain/icon"
 	"github.com/sainteye/clawdline/internal/transport/cloud"
@@ -92,12 +94,19 @@ func newPushStandInFor(t *testing.T, appOrigin string) *pushStandIn {
 // viewer's envelope would have carried.
 func (p *pushStandIn) ask(t *testing.T, seq uint64, body map[string]any) (cloudops.Answer, map[string]any) {
 	t.Helper()
+	return p.askAs(t, "web_viewer-01", seq, body)
+}
+
+// askAs is ask from a named viewer: the envelope's verified sender, which is
+// the one thing that tells two phones on the same account apart here.
+func (p *pushStandIn) askAs(t *testing.T, sender string, seq uint64, body map[string]any) (cloudops.Answer, map[string]any) {
+	t.Helper()
 	plaintext, err := json.Marshal(body)
 	if err != nil {
 		t.Fatal(err)
 	}
 	answer := p.bridge.Handle(context.Background(), cloudops.Command{
-		Channel: "ctl/mac-01", Class: cloudops.ClassCtl, Sender: "web_viewer-01",
+		Channel: "ctl/mac-01", Class: cloudops.ClassCtl, Sender: sender,
 		Sequence: seq, Plaintext: plaintext})
 	var payload map[string]any
 	if len(answer.Payload) > 0 {
@@ -240,50 +249,168 @@ func TestACloudViewerRegistersForNotifications(t *testing.T) {
 	}
 }
 
-// TestEveryCloudViewerIsTheSameDeviceHere is the divergence these words are
-// advertised with, measured rather than reasoned about.
+// TestEachCloudViewerKeepsItsOwnSubscription is the contract these words are
+// advertised with: every phone and browser on the account is its own device to
+// the push store.
 //
-// A subscription belongs to the device that made it, and over Cloud that
-// device is not the phone: the in-process request carries this machine's own
-// local credential, so every viewer on the account is the same device to the
-// push store. `Store.Add` keeps one row per device, so a second Cloud browser
-// asking to be notified silently takes the first one's place — where two
-// phones paired to this machine's own network keep a row each.
-//
-// This is not what the push feature should do, and it is not fixed by carrying
-// the four words: it needs the viewer's own identity to reach the route, which
-// no word on this wire carries. It is held here so that the next reader finds
-// it stated rather than discovering it on a phone that stopped buzzing.
-func TestEveryCloudViewerIsTheSameDeviceHere(t *testing.T) {
+// The in-process request still carries this machine's own local credential,
+// so the gate's verdict names the same device for every Cloud viewer. What
+// tells them apart is the envelope's verified sender, which the bridge carries
+// to the route in the request's context (`cloud.CloudViewerOf`), and which the
+// push routes own their rows by. `Store.Add` keeps one row per device, so two
+// viewers keep a row each — and neither takes the place of this machine's own
+// console, which used to share their device.
+func TestEachCloudViewerKeepsItsOwnSubscription(t *testing.T) {
 	s := newPushStandIn(t)
 
-	for i, endpoint := range []string{
-		"https://web.push.apple.com/QWxpY2U",
-		"https://fcm.googleapis.com/fcm/send/Qm9i",
+	console, err := json.Marshal(cloudSubscription(t, "https://updates.push.services.mozilla.com/wpush/v2/Q29uc29sZQ"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec := s.call(t, s.local, "/v1/push/subscribe", string(console), false); rec.Code != http.StatusOK {
+		t.Fatalf("this machine's own console could not subscribe: %d %s", rec.Code, rec.Body)
+	}
+	for i, viewer := range []struct{ sender, endpoint string }{
+		{"web_viewer-a", "https://web.push.apple.com/QWxpY2U"},
+		{"web_viewer-b", "https://fcm.googleapis.com/fcm/send/Qm9i"},
 	} {
-		answer, _ := s.ask(t, uint64(i+1), map[string]any{"type": "push-subscribe",
-			"session": cloudops.MachineReplySession, "request": "req-sub-" + string(rune('a'+i)),
-			"subscription": cloudSubscription(t, endpoint)})
+		answer, _ := s.askAs(t, viewer.sender, uint64(i+1), map[string]any{"type": "push-subscribe",
+			"session": cloudops.MachineReplySession, "request": "req-sub",
+			"subscription": cloudSubscription(t, viewer.endpoint)})
 		if !answer.OK() {
-			t.Fatalf("%s was refused: %d/%q", endpoint, answer.Status, answer.Code)
+			t.Fatalf("%s was refused: %d/%q", viewer.sender, answer.Status, answer.Code)
 		}
 	}
 	rows := s.rows(t)
-	if len(rows) != 1 {
-		t.Fatalf("two Cloud viewers left %d subscriptions; this test is out of date, and the "+
-			"divergence on `push-subscribe` in internal/app/cloudops/ops.go says one", len(rows))
+	if len(rows) != 3 {
+		t.Fatalf("the console and two Cloud viewers left %d subscriptions, want 3: %+v", len(rows), rows)
 	}
-	if rows[0].Endpoint != "https://fcm.googleapis.com/fcm/send/Qm9i" {
-		t.Fatalf("the surviving row is %q, wanted the one that arrived last", rows[0].Endpoint)
+	devices := map[string]string{}
+	for _, row := range rows {
+		devices[row.Endpoint] = row.Device
 	}
-	// The *origin* stored with it is no longer part of this divergence. It was:
-	// the row kept the `http://127.0.0.1` the authorizer stamps for CSRF, and
-	// an iOS notification resolved its address against that. The two halves
-	// looked like one problem and were not — one viewer's identity cannot
-	// reach this route, and the console's address always could.
-	if rows[0].Origin != adaptercloud.DefaultAppOrigin {
-		t.Fatalf("the stored origin is %q, want the hosted console's %q",
-			rows[0].Origin, adaptercloud.DefaultAppOrigin)
+	a := devices["https://web.push.apple.com/QWxpY2U"]
+	b := devices["https://fcm.googleapis.com/fcm/send/Qm9i"]
+	local := devices["https://updates.push.services.mozilla.com/wpush/v2/Q29uc29sZQ"]
+	if a == "" || b == "" || local == "" || a == b || a == local || b == local {
+		t.Fatalf("the rows are not owned apart: viewer a %q, viewer b %q, console %q", a, b, local)
+	}
+	for _, row := range rows {
+		if row.Device != local && row.Origin != adaptercloud.DefaultAppOrigin {
+			t.Fatalf("the stored origin is %q, want the hosted console's %q",
+				row.Origin, adaptercloud.DefaultAppOrigin)
+		}
+	}
+}
+
+// TestACloudViewerActsOnlyOnItsOwnSubscription is the other half of owning a
+// row: one viewer cannot take another viewer's notifications away, nor this
+// machine's console's, by naming an id — and its test button reaches only what
+// it subscribed itself.
+func TestACloudViewerActsOnlyOnItsOwnSubscription(t *testing.T) {
+	s := newPushStandIn(t)
+
+	console, err := json.Marshal(cloudSubscription(t, "https://updates.push.services.mozilla.com/wpush/v2/Q29uc29sZQ"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rec := s.call(t, s.local, "/v1/push/subscribe", string(console), false); rec.Code != http.StatusOK {
+		t.Fatalf("this machine's own console could not subscribe: %d %s", rec.Code, rec.Body)
+	}
+	ids := map[string]string{}
+	for i, viewer := range []struct{ sender, endpoint string }{
+		{"web_viewer-a", "https://web.push.apple.com/QWxpY2U"},
+		{"web_viewer-b", "https://fcm.googleapis.com/fcm/send/Qm9i"},
+	} {
+		answer, payload := s.askAs(t, viewer.sender, uint64(i+1), map[string]any{"type": "push-subscribe",
+			"session": cloudops.MachineReplySession, "request": "req-sub",
+			"subscription": cloudSubscription(t, viewer.endpoint)})
+		if !answer.OK() {
+			t.Fatalf("%s was refused: %d/%q", viewer.sender, answer.Status, answer.Code)
+		}
+		ids[viewer.sender], _ = bodyOf(t, payload)["id"].(string)
+	}
+	for _, row := range s.rows(t) {
+		if row.Endpoint == "https://updates.push.services.mozilla.com/wpush/v2/Q29uc29sZQ" {
+			ids["console"] = row.ID
+		}
+	}
+
+	// Viewer C has subscribed nothing, so its test button has nobody to reach,
+	// whoever else on the account has.
+	answer, _ := s.askAs(t, "web_viewer-c", 1, map[string]any{"type": "push-test",
+		"session": cloudops.MachineReplySession, "request": "req-test", "target": ""})
+	if answer.Status != http.StatusConflict || answer.Code != "not_subscribed" {
+		t.Fatalf("a viewer with no subscription was answered %d/%q, want 409/not_subscribed",
+			answer.Status, answer.Code)
+	}
+
+	// Viewer A names B's row and the console's: answered as though they were
+	// not there, and both survive.
+	for i, other := range []string{ids["web_viewer-b"], ids["console"]} {
+		answer, _ := s.askAs(t, "web_viewer-a", uint64(10+i), map[string]any{"type": "push-unsubscribe",
+			"session": cloudops.MachineReplySession, "request": "req-drop-" + other, "id": other})
+		if !answer.OK() {
+			t.Fatalf("unsubscribe of another's row: %d/%q", answer.Status, answer.Code)
+		}
+	}
+	if left := s.rows(t); len(left) != 3 {
+		t.Fatalf("viewer a removed a subscription that is not its own: %d rows left", len(left))
+	}
+
+	// Its own goes.
+	answer, _ = s.askAs(t, "web_viewer-a", 20, map[string]any{"type": "push-unsubscribe",
+		"session": cloudops.MachineReplySession, "request": "req-drop-own", "id": ids["web_viewer-a"]})
+	if !answer.OK() {
+		t.Fatalf("viewer a could not unsubscribe its own row: %d/%q", answer.Status, answer.Code)
+	}
+	left := s.rows(t)
+	if len(left) != 2 {
+		t.Fatalf("after viewer a took its own back, %d rows are left, want 2", len(left))
+	}
+	for _, row := range left {
+		if row.ID == ids["web_viewer-a"] {
+			t.Fatalf("viewer a's own row survived its unsubscribe")
+		}
+	}
+}
+
+// TestTwoCloudViewersDoNotShareReceipts is the receipt half of the same rule.
+// A page picks its own request ids, so two phones can name the same one; a
+// receipt is keyed by who asked as well as by the key, and two viewers asking
+// are two askers — not a replay of each other, and not a key "reused for a
+// different request".
+func TestTwoCloudViewersDoNotShareReceipts(t *testing.T) {
+	s := newPushStandIn(t)
+	s.bridge.AllowCommands = func() bool { return true }
+	s.server.intentContext = func(context.Context) ([]planner.Place, []string) { return nil, nil }
+	runs := 0
+	s.server.planIntent = func(_ context.Context, text string, _ []planner.Place, _ []string) (contract.IntentDraft, error) {
+		runs++
+		return contract.IntentDraft{Instructions: text, Kind: "session", Days: []string{}}, nil
+	}
+	for i, viewer := range []struct{ sender, text string }{
+		{"web_viewer-a", "review the login page"},
+		{"web_viewer-b", "write the release notes"},
+	} {
+		answer, payload := s.askAs(t, viewer.sender, uint64(i+1), map[string]any{"type": "intents",
+			"session": cloudops.MachineReplySession, "request": "same-request-id", "text": viewer.text})
+		if !answer.OK() {
+			t.Fatalf("%s was answered %d/%q %s", viewer.sender, answer.Status, answer.Code, answer.Payload)
+		}
+		draft, _ := bodyOf(t, payload)["draft"].(map[string]any)
+		if draft["instructions"] != viewer.text {
+			t.Fatalf("%s was answered another viewer's draft: %v", viewer.sender, draft)
+		}
+	}
+	if runs != 2 {
+		t.Fatalf("the planner ran %d times for two viewers, want 2", runs)
+	}
+	// And the same viewer asking again is still a replay.
+	answer, _ := s.askAs(t, "web_viewer-a", 3, map[string]any{"type": "intents",
+		"session": cloudops.MachineReplySession, "request": "same-request-id", "text": "review the login page"})
+	if !answer.OK() || runs != 2 {
+		t.Fatalf("a retry from the same viewer was %d/%q and ran the planner %d times", answer.Status, answer.Code, runs)
 	}
 }
 

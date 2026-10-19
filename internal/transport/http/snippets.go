@@ -277,7 +277,7 @@ func (s *Server) snippetWrite(w http.ResponseWriter, r *http.Request,
 	}
 	principal := "orchestrator"
 	if !machineAuthed(r) {
-		principal = personPrincipal(r)
+		principal = viewerPrincipal(r)
 	}
 	// Not cancelled with the request: a phone that drops between the write and
 	// its read-back must not leave a snippet no answer ever named.

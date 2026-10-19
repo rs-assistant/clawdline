@@ -461,7 +461,7 @@ func (s *Server) sessionWrite(w http.ResponseWriter, r *http.Request, limit int6
 		act(w, raw)
 		return
 	}
-	k := store.ReceiptKey{Scope: scopeSessions, Actor: accessOf(r).verdict.Device, Key: key}
+	k := store.ReceiptKey{Scope: scopeSessions, Actor: actorOf(r), Key: key}
 	s.receiptedFor(w, r, k, requestDigest([]byte(r.Method), []byte(routePath(r)), raw),
 		store.ReceiptPolicy{Window: sessionReceiptWindow}, sessionWriteFiled,
 		func(w http.ResponseWriter) { act(w, raw) })

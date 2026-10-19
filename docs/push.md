@@ -312,6 +312,39 @@ Web Push**，手機只訂閱一次，帳號上每台機器都叫得到它，不�
 Cloud console 上的「測試通知」按鈕沒改，帳號上有兩台以上會推播的機器時仍然會回
 `cloud_machine_ambiguous`。
 
+## Each Cloud viewer is its own device (2026-10-19)
+
+Every Cloud viewer reaches the push routes in process holding this machine's own local credential
+(`internal/transport/cloud.LocalAuthorizer`), so the gate's verdict names the same device for every
+phone and browser on the account, and for this machine's own console. Until this date that was the
+device a subscription belonged to, and `Store.Add` keeps one row per device: a second phone asking
+to be notified silently replaced the first, and replaced the console's own row too.
+
+Now the bridge carries the envelope's verified sender beside the request (`LocalRequest.Viewer`,
+read by the routes as `cloud.CloudViewerOf` from the request's context; nothing arriving over a
+socket can put a value there, and no header can name a viewer). `/v1/push/subscribe`, `test` and
+`unsubscribe` own their rows as `cloud:<viewer>` (`actorOf` in `internal/transport/http`):
+
+- Two phones keep a row each; neither replaces the console's.
+- `unsubscribe` from one viewer naming another viewer's or the console's id is answered as
+  though the row were not there. `push-test` reaches only the asking viewer's own rows.
+- The same viewer id scopes the routes' idempotency receipts (start, resume, restore, actions,
+  intents, voice, project files, schedules, snippets, pairing agent), so two phones that pick the
+  same request id are two requests.
+- Requests over a socket — the local console, a phone paired on this machine's own network — are
+  owned exactly as before.
+
+**Rows written before the change are left as they are.** They carry this machine's local device id,
+so they are still sent to, and the phone that made the last one keeps its notifications. That phone
+cannot remove or test that row by itself until it subscribes again; the new subscription has the
+same endpoint and `Store.Add` replaces the old row with one the viewer owns. A rewrite at upgrade
+was not done because nothing on the row says which viewer made it. The console subscribing again
+on this machine also replaces the legacy row, as it did before.
+
+No new bound: rows per viewer is still one per device inside the registered `push.subscriptions`.
+Measured by `TestEachCloudViewerKeepsItsOwnSubscription`, `TestACloudViewerActsOnlyOnItsOwnSubscription`
+and `TestTwoCloudViewersDoNotShareReceipts` in `internal/transport/http`.
+
 ## 還沒接的線
 
 - **session 開始等待時的通知接上了（上一節），但只有這一條。** 舊版另外在 `DeployWatch.swift`、

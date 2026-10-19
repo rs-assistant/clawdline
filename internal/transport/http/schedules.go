@@ -289,7 +289,7 @@ func (s *Server) scheduleWriting(w http.ResponseWriter, r *http.Request, needKey
 		run(w)
 		return
 	}
-	who := accessOf(r).verdict.Device
+	who := actorOf(r)
 	if machine {
 		who = "orchestrator"
 	}

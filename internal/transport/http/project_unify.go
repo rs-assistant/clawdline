@@ -68,7 +68,7 @@ func (s *Server) projectUnifyRoute(w http.ResponseWriter, r *http.Request, place
 	}
 	// The receipt makes a retried key answer what the first request did,
 	// stopped or applied, instead of running the actions a second time.
-	receipt := store.ReceiptKey{Scope: scopePlaces, Actor: accessOf(r).verdict.Device, Key: key}
+	receipt := store.ReceiptKey{Scope: scopePlaces, Actor: actorOf(r), Key: key}
 	s.receipted(w, r, receipt, requestDigest([]byte(r.Method), []byte(routePath(r)), body),
 		func(status int) bool { return status != http.StatusTooManyRequests },
 		func(w http.ResponseWriter) {

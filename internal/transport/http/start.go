@@ -182,13 +182,13 @@ func (s *Server) writing(w http.ResponseWriter, r *http.Request, body func(http.
 	//
 	// The answer is filed in the store's receipts, not in this process: a
 	// retry after a restart must not open a second tab (G15).
-	k := store.ReceiptKey{Scope: scopePlaces, Actor: accessOf(r).verdict.Device, Key: key}
+	k := store.ReceiptKey{Scope: scopePlaces, Actor: actorOf(r), Key: key}
 	s.receipted(w, r, k, requestDigest([]byte(r.Method), []byte(routePath(r))),
 		// A full queue is a fact about this moment, not about the request,
 		// and filing it would refuse the same key's retry.
 		func(status int) bool { return status != http.StatusTooManyRequests },
 		body)
-	log.Printf("remote: %s %s by %s", r.Method, r.URL.Path, accessOf(r).verdict.Device)
+	log.Printf("remote: %s %s by %s", r.Method, r.URL.Path, actorOf(r))
 }
 
 // startReading is one look at the machine for one request: the places list's

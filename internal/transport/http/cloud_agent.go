@@ -70,7 +70,7 @@ func (s *Server) cloudPairingAgentRoute(w http.ResponseWriter, r *http.Request) 
 			writeAuthRefusal(w, http.StatusBadRequest, "bad_request", "An Idempotency-Key is at most 200 characters.")
 			return
 		}
-		actor := accessOf(r).verdict.Device
+		actor := actorOf(r)
 		if actor == "" {
 			actor = "local"
 		}

@@ -128,6 +128,11 @@ type LocalRequest struct {
 	Query  map[string]string
 	Header map[string]string
 	Body   []byte
+	// Viewer is the verified envelope sender this request is answered on
+	// behalf of. The bridge sets it from `Command.Sender` and no decode
+	// does, so a viewer cannot name another one. Empty is a request this
+	// machine makes of itself, such as the publisher's own reads.
+	Viewer string
 }
 
 // LocalResponse is what that route answered. ContentType matters for exactly
@@ -654,6 +659,10 @@ func (b Bridge) route(ctx context.Context, cmd Command, plan plan, o op) Answer 
 	if _, taken := req.Header["Idempotency-Key"]; !taken && req.Method != "GET" {
 		req.Header["Idempotency-Key"] = idempotencyKey(cmd, plan)
 	}
+	// Every viewer on the account reaches the routes holding this machine's
+	// own credential, so the sender is what makes one phone's subscriptions
+	// and receipts its own rather than the whole account's.
+	req.Viewer = cmd.Sender
 	res, err := b.Router.Do(ctx, req)
 	if err != nil {
 		return b.publish(cmd, plan, Refusal{Status: 502, Code: "route_failed",
