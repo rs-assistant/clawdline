@@ -12,6 +12,7 @@ for (const file of ["literal-inventory.json", "visible-inventory.json", "templat
   for (const item of read(file)) if (!sourceByKey.has(item.id)) sourceByKey.set(item.id, item.file)
 }
 const namedSources = {
+  builtinPersona: "src/builtin-display-source.json", builtinSkill: "src/builtin-display-source.json",
   bar: "src/bar/words.ts", legacy: "src/legacy/js/core/i18n.js", next: "src/next-strings.ts",
   projects: "src/pages/projects/project-list.ts", settings: "src/pages/settings/window/copy.ts",
   squad: "src/pages/Squad.tsx",
@@ -22,6 +23,7 @@ const namedSources = {
 }
 function groupFor(key) {
   const [domain, name] = key.split(".", 2)
+  if (domain === "builtinPersona" || domain === "builtinSkill") return "Squad / builtin metadata"
   const file = sourceByKey.get(key)
   if (file) {
     const base = path.basename(file).replace(/\.(tsx?|jsx?)$/u, "")
