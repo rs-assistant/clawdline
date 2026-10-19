@@ -195,7 +195,7 @@ export async function serveReview(options) {
         if (path === '/v1/places') return json(response, 200, { at: Date.now(), assistants: [{ id: 'claude', label: 'Claude Code', availability: 'available' }], places: state === 'empty' ? [] : [project] })
         if (path === '/v1/settings/default-models') return json(response, 200, { codex_default_model: '', claude_default_model: '', models: { codex: [], claude: [] } })
         if (['/v1/settings', '/v1/settings/browser', '/v1/settings/notifications'].includes(path)) return json(response, 200, { language: 'auto', voice_language: 'auto', hotkey: 'ctrl+space', console_enabled: true, codex_default_model: '', claude_default_model: '', codex_default_effort: '' })
-        if (path === '/v1/voice/language') return json(response, 200, { language: 'en', source: 'fixture' })
+        if (path === '/v1/voice/language') return json(response, 200, { setting: 'auto', code: 'en', script: '', source: 'language', tag: 'en', script_source: '', script_tag: '' })
         if (path === '/v1/personas') return json(response, 200, { license: 'MIT', personas })
         if (path === '/v1/squad/catalog') return json(response, 200, squadCatalog)
         if (path === '/v1/squad/settings') return json(response, 200, reviewSquadSettings(squadCatalog, url.searchParams.has('place_id') ? 'review-project' : 'global'))

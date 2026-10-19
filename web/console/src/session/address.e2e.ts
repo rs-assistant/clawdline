@@ -804,6 +804,24 @@ test("localization batch renders Sessions and Settings without page overflow", a
   }
 })
 
+test("redemption copy waits for the selected catalog on a cold Plan page", async () => {
+  for (const tag of ["en", "zh-Hant", "ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"]) {
+    await inTab(PHONE, async (tab) => {
+      await tab.go("/")
+      await tab.run(`localStorage.setItem("ui_language", ${JSON.stringify(tag)}); location.hash = "page=plan"`)
+      await tab.reload()
+      const selected = JSON.parse(readFileSync(join(dist, "catalogs", `${tag}.json`), "utf8"))
+      const deadline = Date.now() + 5000
+      while (await tab.run(`document.getElementById("plan-promo-title")?.textContent`) !== selected["promo.title"]) {
+        if (Date.now() > deadline) assert.fail(`${tag} cold Plan redemption did not use its catalog`)
+        await new Promise(resolve => setTimeout(resolve, 30))
+      }
+      assert.equal(await tab.run(`document.getElementById("plan-promo-label")?.textContent`), selected["promo.label"])
+      assert.equal(await tab.run(`document.getElementById("plan-promo-message")?.textContent`), selected["promo.elsewhere"])
+    })
+  }
+})
+
 before(async () => {
   assert.ok(existsSync(join(dist, "index.html")), "no built console at " + dist + "; run `npm run build` in web first")
   assert.ok(existsSync(chrome), "no Chrome at " + chrome + "; set CHROME")

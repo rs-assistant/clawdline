@@ -230,6 +230,13 @@ test('candidate localization browser review', { timeout: 3_000_000 }, async () =
                 await page.locator('#squad-skill-detail').evaluate((element: HTMLElement) => element.scrollIntoView({ block: 'start' }))
               }
             }
+            if (surface.id === 'machine-settings' && width <= 460) {
+              const tabs = await page.locator('.sw-tab').evaluateAll((nodes: Element[]) => nodes.map(node => {
+                const rect = node.getBoundingClientRect()
+                return { width: rect.width, right: rect.right }
+              }))
+              assert.ok(tabs.length >= 5 && tabs.every((tab: { width: number; right: number }) => tab.width > 22 && tab.right <= width), 'All settings tabs need readable text columns')
+            }
             await page.evaluate(() => document.fonts.ready)
             result.observedURL = page.url()
             const dom = await reviewDOM(page, Object.keys(english))

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6793,
-  "riskKeys": 3113,
-  "nonRiskCount": 3680,
+  "englishContentKeys": 6804,
+  "riskKeys": 3117,
+  "nonRiskCount": 3687,
   "groups": [
     {
       "name": "admin / other",
@@ -3222,6 +3222,22 @@
         "template.c77dd85e5dac",
         "template.c79d0687f211",
         "template.f56ee5f2d93c"
+      ]
+    },
+    {
+      "name": "promo / other",
+      "count": 7,
+      "sources": [
+        "src/pages/plan/promo.ts"
+      ],
+      "keys": [
+        "promo.action",
+        "promo.elsewhere",
+        "promo.label",
+        "promo.rateLimited",
+        "promo.success",
+        "promo.title",
+        "promo.working"
       ]
     },
     {

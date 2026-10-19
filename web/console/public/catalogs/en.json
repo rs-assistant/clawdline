@@ -6793,5 +6793,16 @@
   "builtinSkill.zero-based-review.name": "zero-based-review",
   "builtinSkill.zero-based-review.purpose": "Re-justify an existing design from zero with role reviewers",
   "builtinSkill.decision-record.name": "decision-record",
-  "builtinSkill.decision-record.purpose": "Record a technical decision with its alternatives"
+  "builtinSkill.decision-record.purpose": "Record a technical decision with its alternatives",
+  "promo.title": "Redeem a Cloud Pro offer",
+  "promo.label": "Official redemption code",
+  "promo.action": "Redeem",
+  "promo.working": "Checking your code…",
+  "promo.success": "Pro is active until {arg0}.",
+  "promo.rejected": "This code cannot be redeemed. Check the code and campaign dates.",
+  "promo.signedOut": "Sign in, then return here to redeem.",
+  "promo.rateLimited": "Too many attempts. Try again later.",
+  "promo.conflict": "This account already has a paid plan or Pro grant, so it cannot redeem this code.",
+  "promo.unavailable": "The redemption result could not be confirmed. Try again later.",
+  "promo.elsewhere": "Redeem this code in Clawdline Cloud."
 }

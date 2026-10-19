@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6793,
+  "englishKeys": 6804,
   "counts": {
-    "negation": 2059,
+    "negation": 2062,
     "state": 1135,
-    "permission": 414,
+    "permission": 415,
     "deletion": 173,
     "uncertainty": 188
   },
-  "unionCount": 3113,
+  "unionCount": 3117,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -1891,6 +1891,9 @@
       "projects.setupUnifyUnreadable",
       "projects.setupUnifyUnsupported",
       "projects.statusBoardUnavailable",
+      "promo.conflict",
+      "promo.rejected",
+      "promo.unavailable",
       "resourceCoordination.empty",
       "resourceCoordination.incompleteScan",
       "resourceCoordination.none",
@@ -3576,6 +3579,7 @@
       "plan.fine",
       "plan.machinesMany",
       "plan.machinesOne",
+      "promo.signedOut",
       "settings.cloudAccountFailed",
       "settings.cloudAccountMissing",
       "settings.cloudAccountOpen",
@@ -6769,6 +6773,10 @@
     "projects.statusBoardUnavailable",
     "projects.statusUnavailable",
     "projects.statusUpdateFailed",
+    "promo.conflict",
+    "promo.rejected",
+    "promo.signedOut",
+    "promo.unavailable",
     "resourceCoordination.accepted",
     "resourceCoordination.delivered",
     "resourceCoordination.empty",

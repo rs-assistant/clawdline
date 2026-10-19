@@ -12,6 +12,7 @@ for (const file of ["literal-inventory.json", "visible-inventory.json", "templat
   for (const item of read(file)) if (!sourceByKey.has(item.id)) sourceByKey.set(item.id, item.file)
 }
 const namedSources = {
+  promo: "src/pages/plan/promo.ts",
   builtinPersona: "src/builtin-display-source.json", builtinSkill: "src/builtin-display-source.json",
   admin: "src/cloud/admin/words.ts", workflow: "src/workflow-words.ts",
   notifications: "src/pages/notifications.tsx", dispatchPolicy: "src/pages/settings/window/DispatchPolicyPane.tsx",
