@@ -25,9 +25,17 @@ import ts from "typescript"
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const read = (name) => fs.readFileSync(path.join(root, name), "utf8")
 
-function table(name, extra, lang = "en") {
+function table(name, extra, lang = "en", declarations = null) {
   const module = { exports: {} }
-  const code = ts.transpileModule(read(name) + "\n" + extra, {
+  let source = read(name)
+  if (declarations) {
+    const file = ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true)
+    const selected = file.statements.filter((statement) => ts.isVariableStatement(statement) &&
+      statement.declarationList.declarations.some((item) => ts.isIdentifier(item.name) && declarations.includes(item.name.text)))
+    if (selected.length !== declarations.length) throw new Error(`${name}: missing source declarations ${declarations.join(", ")}`)
+    source = selected.map((statement) => statement.getText(file)).join("\n")
+  }
+  const code = ts.transpileModule(source + "\n" + extra, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText
   vm.runInNewContext(code, {
@@ -43,6 +51,11 @@ const verify = table("src/pages/verify/words.ts", "export { words as sourceWords
 const settings = table("src/pages/settings/window/copy.ts", "export { ownWords, baseW }", "en")
 const settingsZh = table("src/pages/settings/window/copy.ts", "export { ownWords, baseW }", "zh-Hant")
 const bar = table("src/bar/words.ts", "export { baseWords }")
+const admin = table("src/cloud/admin/words.ts", "export { en as sourceEn, zhTW as sourceZh }", "en", ["en", "zhTW"])
+const workflow = table("src/workflow-words.ts", "export { words as sourceWords }", "en", ["en", "zhHant", "words"]).sourceWords
+const notifications = table("src/pages/notifications.tsx", "export { notificationsWords as sourceWords }", "en", ["notificationsEn", "notificationsZh", "notificationsWords"]).sourceWords
+const dispatchPolicy = table("src/pages/settings/window/DispatchPolicyPane.tsx", "export { dispatchPolicyWords as sourceWords }", "en", ["dispatchPolicyEn", "dispatchPolicyZh", "dispatchPolicyWords"]).sourceWords
+const transcript = table("src/session/Transcript.tsx", "export { planWords as sourceWords }", "en", ["planWords"]).sourceWords
 
 // `english: false` where the table's "English" column is already translated
 // copy (settings carries Chinese, the bar one word for both), so only the key
@@ -53,6 +66,11 @@ const domains = [
   { name: "verify", en: verify.en, zh: verify["zh-Hant"], english: true },
   { name: "settings", en: settings.baseW, zh: settingsZh.baseW, english: false },
   { name: "bar", en: bar.baseWords, zh: bar.baseWords, english: false },
+  { name: "admin", en: admin.sourceEn, zh: admin.sourceZh, english: true },
+  { name: "workflow", en: workflow.en, zh: workflow["zh-Hant"], english: true },
+  { name: "notifications", en: notifications.en, zh: notifications["zh-Hant"], english: true },
+  { name: "dispatchPolicy", en: dispatchPolicy.en, zh: dispatchPolicy["zh-Hant"], english: true },
+  { name: "transcript", en: transcript.en, zh: transcript["zh-Hant"], english: true },
 ]
 
 const SECONDARY = ["ja", "zh-Hans", "ko", "es", "pt-BR", "fr", "de"]

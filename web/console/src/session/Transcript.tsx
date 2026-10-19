@@ -1541,12 +1541,17 @@ function activityOf(e: Entry): TranscriptActivity | null {
   return e.activity
 }
 
+const planWords = {
+  en: { updatedPlan: "Updated Plan" },
+  "zh-Hant": { updatedPlan: "更新後的計畫" },
+} as const satisfies Record<"en" | "zh-Hant", Record<"updatedPlan", string>>
+
 /** `planHTML`. */
 function planHTML(v: View, e: Entry, at: number) {
   const esc = L.escapeHTML
   const steps = planOf(e) || []
   const card =
-    '<section class="plan-card"><header>Updated Plan</header><ol>' +
+    '<section class="plan-card"><header>' + esc(catalogWord("transcript", "updatedPlan")) + '</header><ol>' +
     steps
       .map((step) => {
         const mark = step.status === "completed" ? "✓" : step.status === "inProgress" ? "●" : "○"

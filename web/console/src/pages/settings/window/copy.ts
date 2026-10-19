@@ -99,6 +99,8 @@ const ownWords = {
     voiceInstallingModel: "Downloading and verifying the model… Keep this page open.",
     voiceInstalledModel: "The model is installed.",
     voiceModelPaths: "Model search paths",
+    dictationNoModel: "Voice: Apple only — whisper-cli is installed, but no model is available",
+    dictationNoWhisper: "Voice: Apple only — whisper-cli is not installed",
   },
   "zh-Hant": {
     settingsRemoteHint:
@@ -187,6 +189,8 @@ const ownWords = {
     voiceInstallingModel: "正在下載並驗證模型⋯⋯請保持此頁開啟。",
     voiceInstalledModel: "模型已安裝。",
     voiceModelPaths: "模型搜尋路徑",
+    dictationNoModel: "語音：只有 Apple——whisper-cli 有了，缺模型",
+    dictationNoWhisper: "語音：只有 Apple——沒有 whisper-cli",
   },
 } as const
 
@@ -448,6 +452,8 @@ const baseW = {
   voiceInstallingModel: ownWord("voiceInstallingModel"),
   voiceInstalledModel: ownWord("voiceInstalledModel"),
   voiceModelPaths: ownWord("voiceModelPaths"),
+  dictationNoModel: ownWord("dictationNoModel"),
+  dictationNoWhisper: ownWord("dictationNoWhisper"),
   voiceLanguageFixed: "每段錄音都當成{name}來讀。",
   voiceLanguageChinese: "現在是{name}——{why}。",
   voiceLanguageDetect: "語言交給 whisper 自己判斷——{why}。聽到中文時寫成{script}——{scriptWhy}。",
@@ -575,9 +581,9 @@ export function dictationStatus(status: { kind: string; model?: string }): strin
     case "ready":
       return catalogFormat("template", "7646119625b7", [status.model ?? ""])
     case "noModel":
-      return "語音：只有 Apple——whisper-cli 有了，缺模型"
+      return W.dictationNoModel
     default:
-      return "語音：只有 Apple——沒有 whisper-cli"
+      return W.dictationNoWhisper
   }
 }
 
