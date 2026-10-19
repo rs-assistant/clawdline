@@ -32,6 +32,29 @@ func consoleBounds() []Entry {
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
 		{
+			// Hours of direct-attempt counts one browser keeps per machine
+			// (HISTORY_HOURS, web/console/src/cloud/direct-history.ts). An hour
+			// older than the window is dropped on the next write.
+			Name: ConsoleDirectHistoryHours, Class: Observation, Unit: Rows,
+			Limit: 24, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// Machines one browser keeps a direct record for (HISTORY_MACHINES).
+			// Past it, the machine whose newest hour is oldest goes.
+			Name: ConsoleDirectHistoryMachines, Class: Observation, Unit: Rows,
+			Limit: 32, AtLimit: EvictOldest,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// The open machine list re-reads the account's machines at this
+			// pace (MACHINE_LIST_POLL_MS, pages/devices/AccountMachines.tsx),
+			// because which road a machine's reads take changes with no event.
+			Name: ConsoleMachineListPoll, Class: Cache, Unit: Seconds,
+			Limit: 5, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
 			// A failed transcript read waits 2, 4, 8 … seconds, at most this
 			// long (BACKOFF.maxMs), before the next.
 			Name: ConsoleTranscriptBackoffSeconds, Class: Cache, Unit: Seconds,

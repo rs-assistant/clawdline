@@ -489,6 +489,12 @@ const (
 	ConsoleSessionNotesSafety         = "console.session_notes_safety_seconds"
 	ConsoleOpenedRowRestate           = "console.opened_row_restate_seconds"
 	ConsoleOpenedRowQuiet             = "console.opened_row_quiet_seconds"
+	// This browser's own record of direct attempts per machine, drawn on the
+	// machine sheet (web/console/src/cloud/direct-history.ts), and how often
+	// the open machine list re-reads (pages/devices/AccountMachines.tsx).
+	ConsoleDirectHistoryHours    = "console.direct_history_hours"
+	ConsoleDirectHistoryMachines = "console.direct_history_machines"
+	ConsoleMachineListPoll       = "console.machine_list_poll_seconds"
 	// The ordinary shells this machine holds open for a person, and what one
 	// request may type into one or read back from it (limits N59).
 	TerminalCount        = "terminal.count"

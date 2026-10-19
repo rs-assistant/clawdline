@@ -403,6 +403,16 @@ export class StatusCloudClient extends CatalogCloudClient {
     }
   }
 
+  /**
+   * One direct attempt the person asked for (`DirectCarrier.tryNow`), or
+   * `{ kind: "unsupported" }` when this page has no carrier to offer at all.
+   */
+  async tryDirect(machine) {
+    const carrier = this._carrierFor(machine)
+    if (!carrier || typeof carrier.tryNow !== "function") return { kind: "unsupported" }
+    return carrier.tryNow()
+  }
+
   /** The carrier for this machine, or null when this page has none to offer. */
   _carrierFor(machine) {
     if (!this.directCarriers || typeof machine !== "string" || !machine) return null
