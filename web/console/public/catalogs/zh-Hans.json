@@ -6850,6 +6850,7 @@
   "next.usageProjects": "项目用量",
   "next.usageReadCoverage": "已读取 {read} / {total} 个会话",
   "next.usageRetry": "重试",
+  "next.usageSampleOne": "{count} 个样本",
   "next.usageSamples": "{count} 个样本",
   "next.usageTaskUnit": "项任务",
   "next.usageTasks": "已分派任务",

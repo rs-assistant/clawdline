@@ -6850,6 +6850,7 @@
   "next.usageProjects": "Utilisation par projet",
   "next.usageReadCoverage": "{read} / {total} sessions lues",
   "next.usageRetry": "Réessayer",
+  "next.usageSampleOne": "{count} échantillon",
   "next.usageSamples": "{count} échantillons",
   "next.usageTaskUnit": "tâches",
   "next.usageTasks": "Tâches attribuées",

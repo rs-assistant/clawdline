@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6858,
+  "englishContentKeys": 6859,
   "riskKeys": 3130,
-  "nonRiskCount": 3728,
+  "nonRiskCount": 3729,
   "groups": [
     {
       "name": "admin / other",
@@ -2369,7 +2369,7 @@
     },
     {
       "name": "next / other",
-      "count": 270,
+      "count": 271,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2633,6 +2633,7 @@
         "next.usageReadCoverage",
         "next.usageRefresh",
         "next.usageRetry",
+        "next.usageSampleOne",
         "next.usageSamples",
         "next.usageTaskUnit",
         "next.usageTasks",

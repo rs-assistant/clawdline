@@ -4297,7 +4297,7 @@
   "template.cdf164a88db5": "{arg0} はセッション一覧の読み取りを完了できませんでした。空の一覧はセッションがないことを意味しません。",
   "template.d03a9f051a31": "\"{arg0}\" をフォローアップ",
   "template.d11ed4fee18a": "{arg0} · {arg1} キャンセル",
-  "template.d15f0c565e65": "{arg0} を更新しました",
+  "template.d15f0c565e65": "更新日時: {arg0}",
   "template.d1a333c2a48d": "{arg0} 前から新しい出力はありません",
   "template.d4763f644521": "{arg0}秒",
   "template.d4bddd9e5d03": "{arg0} 件の完了通知は受け付けられず、配信不能の記録に移りました。各通知はすでに一度送られています。",
@@ -6858,5 +6858,6 @@
   "next.usageTokens": "トークン使用量",
   "next.usageUnattributed": "未分類",
   "next.usageUnsupported": "使用状況の概要を読み取るには、このマシンを更新してください。",
-  "next.usageRefresh": "更新"
+  "next.usageRefresh": "更新",
+  "next.usageSampleOne": "{count} サンプル"
 }

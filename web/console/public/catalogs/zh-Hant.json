@@ -6850,6 +6850,7 @@
   "next.usageProjects": "專案用量",
   "next.usageReadCoverage": "已讀取 {read} / {total} 個 Session",
   "next.usageRetry": "重試",
+  "next.usageSampleOne": "{count} 筆樣本",
   "next.usageSamples": "{count} 筆樣本",
   "next.usageTaskUnit": "件",
   "next.usageTasks": "派工數量",

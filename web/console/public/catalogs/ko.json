@@ -1562,7 +1562,7 @@
   "inline.c0506b0b753a": "역할:",
   "inline.c055370cad67": "기존 항목을 유지하고 나머지 항목을 가져오기",
   "inline.c07fb8c4d3e4": "되돌리기",
-  "inline.c0b3fbff51cc": "완전함",
+  "inline.c0b3fbff51cc": "완료",
   "inline.c1f001d63fef": "이 기기가 아직 가지고 있지 않은",
   "inline.c21db84c0653": "출처",
   "inline.c2ba5dc09493": "역할 정의, 프로젝트 매뉴얼 및 채택된 스킬을 참조하십시오. 설정 변경은 나중에 생성된 세션에만 영향을 미칩니다.",
@@ -4231,7 +4231,7 @@
   "template.5b1772732dce": "결정할 수 없습니다 (공유 상태는 읽을 수 없습니다: {arg0})",
   "template.5c513a465185": "관리 에이전트가 자동으로 할당하도록 허용합니다: {arg0}",
   "template.5c5e1d37c1ed": "{arg0}자",
-  "template.614443bb7374": "{arg0} 모든 행은 정상입니다",
+  "template.614443bb7374": "전체 {arg0}개 항목이 정상입니다",
   "template.61465ed010f6": "{arg0}와 {arg1}는 동일한 내용을 가지고 있습니다. {arg2}에서 복사본을 {arg3}에 연결하여 교체합니다.",
   "template.61504537731d": "완료하지 않은 단계가 {arg0}개 있습니다. 그래도 이 항목을 완료로 표시할까요?",
   "template.65519076782c": "배포 증거: {arg0}",
@@ -4526,7 +4526,7 @@
   "work.scopePath": "프로젝트 경로: {path}",
   "work.scopeProject": "범위: {project}",
   "work.scopeSource": "프로젝트 선택 목록은 이 기기에서 인식한 프로젝트 디렉터리를 기준으로 합니다. 작업 데이터에만 있는 프로젝트도 표시됩니다.",
-  "work.sectionActive": "진행 중인",
+  "work.sectionActive": "진행 중",
   "work.sectionDecide": "완료할 전달 작업과 답변할 질문",
   "work.sectionDone": "최근 완료됨",
   "work.sectionEmpty": "지금 여기 아무것도 없어요",
@@ -6858,5 +6858,6 @@
   "next.usageTokens": "토큰 사용량",
   "next.usageUnattributed": "미분류",
   "next.usageUnsupported": "사용량 개요를 읽으려면 이 기기를 업데이트하세요.",
-  "next.usageRefresh": "새로고침"
+  "next.usageRefresh": "새로고침",
+  "next.usageSampleOne": "표본 {count}개"
 }

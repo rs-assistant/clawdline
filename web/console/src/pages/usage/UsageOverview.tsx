@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react"
+import { currentCatalogTag } from "../../catalog.js"
 import { onMachineChanged } from "../../cloud/machine-switch.js"
 import { scheduleFleet } from "../../cloud/schedule-machines.js"
 import { readUsageOverview, UsageReadError, type UsageOverview } from "./api.js"
-import { compactValue, dateRange, comparisonComplete, dailyValue, lineSegments, percentageChange, selectedDay, shortDate, UsageRequestScope, type UsageMetric } from "./model.js"
+import { compactValue, dateRange, comparisonComplete, dailyValue, lineSegments, percentageChange, sampleLabel, selectedDay, shortDate, UsageRequestScope, type UsageMetric } from "./model.js"
 import { usageWord as w } from "./words.js"
 import "./usage.css"
 
@@ -55,7 +56,7 @@ export default function UsageOverviewPage({ shown }: { shown: boolean }) {
   return <section id="usage" className="page board-page usage-page" data-page-view="usage" hidden={!shown} aria-labelledby="usage-title">
     <div className="usage-wrap">
       <header className="usage-header"><div className="usage-heading"><div className="usage-title-block"><h1 id="usage-title" tabIndex={-1} ref={title}>{w("usageOverview")}</h1>
-        <div className="usage-metadata">{data && <span>{dateRange(data.daily[0]?.date, data.daily.at(-1)?.date)} · {data.timezone}</span>}<span className="usage-machine">{machine}</span></div>
+        <div className="usage-metadata">{data && <span>{dateRange(data.daily[0]?.date, data.daily.at(-1)?.date, currentCatalogTag())} · {data.timezone}</span>}<span className="usage-machine">{machine}</span></div>
       </div>
         <button className="usage-refresh" type="button" aria-label={w("usageRefresh")} title={w("usageRefresh")} onClick={() => setRevision(n => n + 1)}>↻</button></div>
       <div className="usage-filters">
@@ -137,11 +138,13 @@ export function DailyChart({ data, metric, label }: { data: UsageOverview; metri
   const max = Math.max(1, ...[...values, ...previous].filter((n): n is number => n !== null))
   const maximum = Math.ceil(max / 3) * 3
   const currentIndex = Math.min(index, Math.max(0, values.length - 1))
+  const locale = currentCatalogTag()
+  const samples = (count: number) => sampleLabel(count, locale, w("usageSampleOne"), w("usageSamples"))
   const unit = metric === "tokens" ? "Token" : w(metric === "duration" ? "usageMinutes" : "usageTaskUnit")
-  const valueLabel = (value: number | null) => value === null ? w("usageNoValue") : `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${unit}`
+  const valueLabel = (value: number | null) => value === null ? w("usageNoValue") : `${value.toLocaleString(locale, { maximumFractionDigits: 2 })} ${unit}`
   const day = data.daily[currentIndex]
   const priorDay = data.previous_daily[currentIndex]
-  const pair = `${w("usageCurrent")} ${day?.date ?? ""}: ${valueLabel(values[currentIndex] ?? null)} · ${w("usagePrevious")} ${priorDay?.date ?? ""}: ${valueLabel(previous[currentIndex] ?? null)}${metric === "duration" ? ` · ${w("usageSamples", { count: day?.duration_samples ?? 0 })} / ${w("usageSamples", { count: priorDay?.duration_samples ?? 0 })}` : ""}`
+  const pair = `${w("usageCurrent")} ${day ? dateRange(day.date, day.date, locale) : ""}: ${valueLabel(values[currentIndex] ?? null)} · ${w("usagePrevious")} ${priorDay ? dateRange(priorDay.date, priorDay.date, locale) : ""}: ${valueLabel(previous[currentIndex] ?? null)}${metric === "duration" ? ` · ${samples(day?.duration_samples ?? 0)} / ${samples(priorDay?.duration_samples ?? 0)}` : ""}`
   return <div className="usage-chart" ref={host}>
     <div className="usage-legend"><span><i />{w("usageCurrent")}</span><span><i />{w("usagePrevious")}</span><span>{unit}</span></div>
     <div className="usage-chart-control" tabIndex={0} role="slider" aria-valuemin={1} aria-valuemax={Math.max(1, values.length)} aria-valuenow={currentIndex + 1} aria-valuetext={pair} aria-label={label} aria-describedby={`${id}-help ${id}-value`}
@@ -150,7 +153,7 @@ export function DailyChart({ data, metric, label }: { data: UsageOverview; metri
       onPointerMove={event => { if (event.pointerType === "mouse" || event.buttons) { const rect = event.currentTarget.getBoundingClientRect(); setIndex(Math.max(0, Math.min(values.length - 1, Math.round(((event.clientX - rect.left) * width / rect.width - 54) / (width - 78) * (values.length - 1))))) } }}>
       <svg viewBox={`0 0 ${width} 210`} aria-hidden="true">
         {[0, 1, 2, 3].map(tick => { const y = 174 - tick * 50; return <g key={tick}><line className="usage-grid" x1="54" x2={width - 24} y1={y} y2={y} /><text x="0" y={y + 4}>{compactValue(maximum * tick / 3)}</text></g> })}
-        {data.daily.map((day, i) => (i === 0 || i === values.length - 1 || i % Math.ceil(values.length / (width < 500 ? 4 : 7)) === 0) && <text key={day.date} x={54 + i * (width - 78) / Math.max(1, values.length - 1)} y="202" textAnchor="middle">{shortDate(day.date)}</text>)}
+        {data.daily.map((day, i) => (i === 0 || i === values.length - 1 || i % Math.ceil(values.length / (width < 500 ? 4 : 7)) === 0) && <text key={day.date} x={54 + i * (width - 78) / Math.max(1, values.length - 1)} y="202" textAnchor="middle">{shortDate(day.date, locale)}</text>)}
         {lineSegments(previous, maximum, width).map((d, i) => <path key={`p${i}`} d={d} className="usage-line usage-line-prior" />)}
         {lineSegments(values, maximum, width).map((d, i) => <path key={`c${i}`} d={d} className="usage-line" />)}
         {[{ series: previous, prior: true }, { series: values, prior: false }].map(({ series, prior }) => series.map((value, i) => value !== null && <circle key={`${prior}-${i}`} className={prior ? "usage-dot usage-dot-prior" : "usage-dot"} cx={54 + i * (width - 78) / Math.max(1, values.length - 1)} cy={174 - value / maximum * 150} r={i === currentIndex ? 4.5 : 2} />))}

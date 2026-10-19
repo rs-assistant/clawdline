@@ -42,8 +42,17 @@ export function compactValue(value: number | null): string {
   return Number(value.toFixed(1)).toLocaleString()
 }
 
-/** Calendar labels come from the daemon; never reinterpret YYYY-MM-DD in the browser zone. */
-export function shortDate(date: string): string { return date.slice(5).replace("-", "/") }
+/** Interpret the daemon's calendar date in UTC, independently of the viewer's time zone. */
+function utcDate(date: string): Date { return new Date(`${date}T00:00:00Z`) }
+export function shortDate(date: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { month: "numeric", day: "numeric", timeZone: "UTC" }).format(utcDate(date))
+}
+
+/** Select the catalog's singular or general sample sentence for its actual locale. */
+export function sampleLabel(count: number, locale: string, one: string, other: string): string {
+  const phrase = new Intl.PluralRules(locale).select(count) === "one" ? one : other
+  return phrase.replace("{count}", String(count))
+}
 
 export function selectedDay(index: number, key: string, count: number): number {
   if (key === "Home") return 0
@@ -59,8 +68,10 @@ export class UsageRequestScope {
   current(signal: AbortSignal): boolean { return signal === this.controller?.signal && !signal.aborted }
 }
 
-/** Keep calendar endpoints explicit, repeating the year only across a year boundary. */
-export function dateRange(first: string | undefined, last: string | undefined): string {
-  if (!first || !last) return first ?? last ?? ""
-  return `${first} – ${first.slice(0, 4) === last.slice(0, 4) ? last.slice(5) : last}`
+/** Show explicit localized calendar endpoints, including both years across a boundary. */
+export function dateRange(first: string | undefined, last: string | undefined, locale: string): string {
+  const format = new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" })
+  if (!first || !last) return first || last ? format.format(utcDate((first || last)!)) : ""
+  if (first === last) return format.format(utcDate(first))
+  return `${format.format(utcDate(first))} – ${format.format(utcDate(last))}`
 }
