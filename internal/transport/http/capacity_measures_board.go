@@ -11,6 +11,23 @@ import (
 // (capacity.AreaOf), one reading per row.
 func (s *Server) boardCapacityMeasures() map[string]func() capacity.Reading {
 	return map[string]func() capacity.Reading{
+		"usage.daily_days": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "57 local calendar days per source; older days remain missing"}
+		},
+		"usage.daily_rows": func() capacity.Reading {
+			n, err := s.store.UsageDailyCount(context.Background())
+			if err != nil {
+				return capacity.Unmeasured(err.Error())
+			}
+			_, _, evicted, err := s.store.UsageDailyCoverage(context.Background())
+			if err != nil {
+				return capacity.Unmeasured(err.Error())
+			}
+			return capacity.Reading{Known: true, Used: n, Counters: capacity.Counters{Evicted: evicted}}
+		},
+		"usage.overview_tasks": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-read bound; overview coverage says truncated"}
+		},
 		capacity.UsageWorkCursorRows: func() capacity.Reading {
 			n, err := s.store.WorkCursorCount(context.Background())
 			if err != nil {

@@ -783,7 +783,7 @@ func TestTheVocabularyAndTheImplementedListAgreeWithTheCatalog(t *testing.T) {
 		"work.v2.assign", "work.v2.persona-suggestion", "work.v2.remind", "work.v2.edit", "work.v2.cancel", "work.v2.complete", "work.v2.seen", "work.v2.image-create", "work.v2.image-delete", "work.v2.proposal-resolve",
 		"work.v2.convert",
 		"work.v2.todo-create", "work.v2.todo-image-create", "work.v2.todo-action",
-		"usage.session", "usage.task", "usage.item", "usage.compare-compaction", "usage.compare-handoff", "usage.work-units", "usage.work-samples",
+		"usage.session", "usage.overview", "usage.task", "usage.item", "usage.compare-compaction", "usage.compare-handoff", "usage.work-units", "usage.work-samples",
 		"verification.list", "verification.get", "verification.create", "verification.note",
 		"verification.criterion", "verification.close", "verification.delete"} {
 		if !implemented[word] {
@@ -1331,6 +1331,30 @@ func TestTheWorkSamplesCrossWithOnlyTheFieldsTheRouteReads(t *testing.T) {
 		if answer := open(r).Handle(context.Background(), request(t, ClassCtl, body)); answer.Code != "malformed_read" || len(r.seen) != 0 {
 			t.Fatalf("took %v: %+v, asked %v", body, answer, r.seen)
 		}
+	}
+}
+
+func TestUsageOverviewCrossesMachineFiltersAndRouteErrors(t *testing.T) {
+	r := &router{}
+	answer := open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{"type": "usage.overview", "session": MachineReplySession, "request": "req", "days": "28", "project": "unattributed"}))
+	if answer.Status != 200 || len(r.seen) != 1 || r.last().Path != "/v1/usage/overview" || r.last().Query["days"] != "28" || r.last().Query["project"] != "unattributed" {
+		t.Fatalf("overview %+v %v", answer, r.seen)
+	}
+	for _, extra := range []map[string]any{{"days": 7}, {"budget": 1}, {"machine": "another"}} {
+		body := map[string]any{"type": "usage.overview", "session": MachineReplySession, "request": "req"}
+		for k, v := range extra {
+			body[k] = v
+		}
+		r := &router{}
+		answer := open(r).Handle(context.Background(), request(t, ClassCtl, body))
+		if answer.Code != "malformed_read" || len(r.seen) != 0 {
+			t.Fatalf("accepted %v", body)
+		}
+	}
+	r = &router{status: 400, body: `{"error":"unknown_project","detail":"That project is unavailable."}`}
+	answer = open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{"type": "usage.overview", "session": MachineReplySession, "request": "req", "project": "unknown"}))
+	if answer.Status != 400 || answer.Code != "unknown_project" {
+		t.Fatalf("typed refusal %+v", answer)
 	}
 }
 

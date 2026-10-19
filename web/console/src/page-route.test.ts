@@ -82,3 +82,10 @@ test("the Session address keeps the terminal mode through a reload", () => {
   assert.equal(sessionsTerminalMode(sessionsPageHash()), false)
   assert.equal(sessionsTerminalMode("#page=work&mode=terminal"), false)
 })
+
+
+test("usage bookmarks open the overview when its module is available", () => {
+  const withUsage = (name: string): name is "sessions" | "usage" => name === "sessions" || name === "usage"
+  assert.equal(pageFromHash("#page=usage", withUsage), "usage")
+  assert.equal(pageFromHash("#page=dashboard", withUsage), "sessions")
+})

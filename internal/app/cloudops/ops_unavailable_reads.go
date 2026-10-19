@@ -42,6 +42,7 @@ func init() {
 		// route's, whole — a `reason` of `not_yet_read` or `transcript_missing`
 		// rides inside a 200, and an unknown id is the route's own 404.
 		op{name: "usage.session", read: true},
+		op{name: "usage.overview", read: true},
 		op{name: "usage.task", read: true},
 		op{name: "usage.item", read: true},
 

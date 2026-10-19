@@ -230,6 +230,14 @@ type ledgerCall struct {
 // needs to go on reading it. It is plain data: it is kept as JSON between
 // passes, and a Feed from a state read back is a Feed from the state written.
 type LedgerState struct {
+	DailyVersion  int               `json:"daily_version,omitempty"`
+	Daily         map[string]Tokens `json:"daily,omitempty"`
+	DailyProject  string            `json:"daily_project,omitempty"`
+	DailyTimezone string            `json:"daily_timezone,omitempty"`
+	DailyReplay   *LedgerState      `json:"daily_replay,omitempty"`
+	DailyCutoff   string            `json:"daily_cutoff,omitempty"`
+	DailyUntil    string            `json:"daily_until,omitempty"`
+	DailyUnknown  bool              `json:"daily_unknown,omitempty"`
 	// ClassificationVersion lets the reader replay a transcript after its
 	// category rules change (LedgerClassificationVersion). Zero is a reading
 	// made before versioning.
@@ -329,7 +337,7 @@ func (s *LedgerState) feed(path string, feedLimit, lineLimit int64) (FeedResult,
 	}
 	if size < s.Offset || (s.HeadLen > 0 && digest(head, s.HeadLen) != s.HeadSum) {
 		assistant, restarts := s.Assistant, s.Restarts
-		*s = LedgerState{Assistant: assistant, Restarts: restarts + 1}
+		*s = LedgerState{Assistant: assistant, Restarts: restarts + 1, DailyCutoff: s.DailyCutoff, DailyVersion: s.DailyVersion, DailyTimezone: s.DailyTimezone, DailyUntil: s.DailyUntil}
 		res.Restarted = true
 	}
 	if s.HeadLen == 0 && len(head) > 0 {
@@ -446,9 +454,13 @@ func (s *LedgerState) line(raw []byte) {
 		}
 	}
 	if s.Assistant == "codex" {
+		before := s.dailyMeasured()
 		s.codexLine(rec)
+		s.dailyRecord(rec, before)
 	} else {
+		before := s.dailyMeasured()
 		s.claudeLine(rec)
+		s.dailyRecord(rec, before)
 	}
 }
 
