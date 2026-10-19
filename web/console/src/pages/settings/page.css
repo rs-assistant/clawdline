@@ -1,6 +1,6 @@
 /* The browser settings use the native window's tab rhythm and two-column rows.
    Cloud keeps browser, work and status panes; a local browser also gets the
-   machine controls. The native controls remain inside their own scoped sheet. */
+   machine controls. Machine controls share this page's navigation and column gutters. */
 #settings #settings-sheet {
   width: min(1040px, 100%);
 }
@@ -51,20 +51,41 @@
 .page-settings .sw-window.embedded {
   position: static;
   display: block;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  overflow: hidden;
   min-height: 0;
+  background: transparent;
+  font: inherit;
+  --sw-gutter: 36px;
 }
 .page-settings .sw-window.embedded .sw-scroll {
   overflow: visible;
-  padding-bottom: 22px;
+  padding: 0;
 }
 .page-settings .sw-window.embedded .sw-pane {
   max-width: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.page-settings .sw-window.embedded .sw-pane:has(.sw-column:only-child) {
+  grid-template-columns: 1fr;
 }
 .page-settings .sw-window.embedded .sw-foot {
-  min-height: 40px;
+  height: auto;
+  min-height: 0;
+  margin-top: 24px;
+  padding: 12px 0 0;
+  border: 0;
+}
+.page-settings .sw-window.embedded .sw-foot-path {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.page-settings .sw-window.embedded .sw-row {
+  flex-wrap: wrap;
+}
+.page-settings .sw-window.embedded .sw-row-control {
+  max-width: 100%;
+}
+.page-settings .sw-window.embedded .sw-said-foot {
+  padding-inline: 0;
 }
 
 #settings #settings-close {
@@ -75,7 +96,8 @@
 }
 
 @media (max-width: 720px) {
-  .page-settings .settings-grid { grid-template-columns: 1fr; }
+  .page-settings .settings-grid,
+  .page-settings .sw-window.embedded .sw-pane { grid-template-columns: 1fr; }
   .page-settings .settings-tabs { gap: 18px; }
   #settings #settings-close { width: 100%; }
 }

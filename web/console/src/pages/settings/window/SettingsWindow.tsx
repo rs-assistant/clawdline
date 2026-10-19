@@ -1,3 +1,4 @@
+import type { SettingsPane } from "../navigation.js"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { SettingsSnapshot, TunnelStatus, VoiceLanguage, VoiceSetup } from "@clawdline/contract"
 import {
@@ -95,12 +96,17 @@ const INPUT_BAR_ENABLED = false
 const VOICE_ENABLED = true
 const HOOKS_ENABLED = false
 
-export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}) {
+
+export function SettingsWindow({ embedded = false, pane, hideNavigation = false }: {
+  embedded?: boolean
+  pane?: SettingsPane
+  hideNavigation?: boolean
+} = {}) {
   const [snapshot, setSnapshot] = useState<SettingsSnapshot | null>(null)
   const [defaultModels, setDefaultModels] = useState<DefaultModelsSnapshot | null>(null)
   const [shell, setShell] = useState<ShellState | null>(null)
   const [draft, setDraft] = useState<Draft>({})
-  const [tab, setTab] = useState(0)
+  const [selectedTab, setTab] = useState(0)
   const [said, setSaid] = useState("")
   const [recording, setRecording] = useState(false)
   const [pendingHotkey, setPendingHotkey] = useState<string | null>(null)
@@ -149,6 +155,11 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   const has = inShell()
   const voiceTab = INPUT_BAR_ENABLED ? 2 : 1
   const remoteTab = (INPUT_BAR_ENABLED ? 2 : 1) + (VOICE_ENABLED ? 1 : 0)
+  const paneIndices: Record<SettingsPane, number> = {
+    general: 0, voice: voiceTab, remote: remoteTab,
+    orchestrator: remoteTab + 1, "dispatch-policy": remoteTab + 2,
+  }
+  const tab = pane === undefined ? selectedTab : paneIndices[pane]
 
   const snapshotRef = useRef(snapshot)
   snapshotRef.current = snapshot
@@ -1467,9 +1478,9 @@ export function SettingsWindow({ embedded = false }: { embedded?: boolean } = {}
   const Pane = panes[tab]
   return (
     <div className={embedded ? "sw-window embedded" : "sw-window"}>
-      <TabStrip titles={titles} current={tab} onPick={setTab} />
+      {!hideNavigation && <TabStrip titles={titles} current={tab} onPick={setTab} />}
       <div className="sw-scroll">
-        <div className="sw-pane" id={`sw-pane-${tab}`} role="tabpanel" aria-labelledby={`sw-tab-${tab}`}>
+        <div className="sw-pane" id={`sw-pane-${tab}`} role={hideNavigation ? undefined : "tabpanel"} aria-labelledby={hideNavigation ? undefined : `sw-tab-${tab}`}>
           {Pane()}
         </div>
       </div>

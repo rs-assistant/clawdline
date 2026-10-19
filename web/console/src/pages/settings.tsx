@@ -16,6 +16,8 @@ import { pushShape, sendPushTest, startPush, subscribePush, togglePush } from ".
 import { legacyState } from "../legacy/overlay-bridge.js"
 import { followsRelay } from "../client.js"
 import { SettingsWindow } from "./settings/window/SettingsWindow.js"
+import { MACHINE_PANES, nextSettingsTab, settingsPanes } from "./settings/navigation.js"
+import { W } from "./settings/window/copy.js"
 import "./settings/window/window.css"
 import "./settings/page.css"
 import { BoardBlock } from "./settings/BoardBlock.js"
@@ -92,11 +94,13 @@ function SettingsPage({ shown }: { shown: boolean }) {
   const T = L.strings
   const cloud = followsRelay()
   const [tab, setTab] = useState(() => asksForUpdatePanel(location.hash) ? 2 : 0)
+  const paneNames = settingsPanes(cloud)
   const tabs = [
     catalogWord("settings", "browserTab"),
     catalogWord("settings", "workTab"),
     catalogWord("settings", "statusTab"),
-    ...(!cloud ? [catalogWord("settings", "machineTab")] : []),
+    ...(!cloud ? [catalogWord("settings", "machineTab"), W.settingsVoice, W.settingsRemote,
+      W.settingsOrchestrator, catalogWord("dispatchPolicy", "navTitle")] : []),
   ]
   // `enter` has not run until the page has been shown once; before that the
   // blocks it draws are as the markup has them.
@@ -259,15 +263,20 @@ function SettingsPage({ shown }: { shown: boolean }) {
               type="button"
               role="tab"
               aria-selected={tab === index}
-              aria-controls={`settings-pane-${index}`}
+              aria-controls={index >= 3 ? "settings-machine-pane" : `settings-pane-${index}`}
               tabIndex={tab === index ? 0 : -1}
-              onClick={() => setTab(index)}
+              onClick={(event) => {
+                setTab(index)
+                event.currentTarget.scrollIntoView({ block: "nearest", inline: "nearest" })
+              }}
               onKeyDown={(event) => {
-                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+                const next = nextSettingsTab(index, event.key, paneNames.length)
+                if (next === null) return
                 event.preventDefault()
-                const next = (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length
                 setTab(next)
-                document.getElementById(`settings-tab-${next}`)?.focus()
+                const button = document.getElementById(`settings-tab-${next}`)
+                button?.focus({ preventScroll: true })
+                button?.scrollIntoView({ block: "nearest", inline: "nearest" })
               }}
             >{title}</button>
           ))}
@@ -452,8 +461,8 @@ function SettingsPage({ shown }: { shown: boolean }) {
           </div>
         </div>
 
-        {!cloud && <div className="settings-pane settings-machine-pane" id="settings-pane-3" role="tabpanel" aria-labelledby="settings-tab-3" hidden={tab !== 3}>
-          {shown && tab === 3 && <SettingsWindow embedded />}
+        {!cloud && <div className="settings-pane settings-machine-pane" id="settings-machine-pane" role="tabpanel" aria-labelledby={`settings-tab-${tab >= 3 ? tab : 3}`} hidden={tab < 3}>
+          {shown && tab >= 3 && <SettingsWindow embedded hideNavigation pane={MACHINE_PANES[Math.max(0, tab - 3)]} />}
         </div>}
         <div className="foot">
           <span id="settings-version" style={entered ? { cursor: "pointer" } : undefined} onClick={pressVersion}>
