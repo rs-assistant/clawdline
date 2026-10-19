@@ -1,0 +1,1295 @@
+{
+  "arms": {
+    "baseline": [
+      {
+        "metrics": {
+          "BenchmarkPublisherEfficiency/idle_1": {
+            "ns/op": 8407545.0,
+            "ack-ns/pass": 9.619,
+            "drain-ns/pass": 173.4,
+            "frame-B/pass": 118.3,
+            "p50-ns/pass": 94250.0,
+            "p95-ns/pass": 251458.0,
+            "plain-B/pass": 69.98,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 4116.0,
+            "seal/pass": 0.08333,
+            "sealed-B/pass": 115.8,
+            "synthetic-acks/pass": 0.08333,
+            "B/op": 3980096.0,
+            "allocs/op": 23046.0
+          },
+          "BenchmarkPublisherEfficiency/idle_32": {
+            "ns/op": 100705432.0,
+            "ack-ns/pass": 99.01,
+            "drain-ns/pass": 25273.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 1255834.0,
+            "p95-ns/pass": 3754708.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 57435.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 41102274.0,
+            "allocs/op": 476593.0
+          },
+          "BenchmarkPublisherEfficiency/unwatched_32": {
+            "ns/op": 29524817.0,
+            "ack-ns/pass": 185.4,
+            "drain-ns/pass": 24268.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 43417.0,
+            "p95-ns/pass": 2356042.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 0.15,
+            "relay-ns/pass": 74119.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 8171038.0,
+            "allocs/op": 78182.0
+          },
+          "BenchmarkPublisherEfficiency/active_32": {
+            "ns/op": 97051461.0,
+            "ack-ns/pass": 483.9,
+            "drain-ns/pass": 83659.0,
+            "frame-B/pass": 2571.0,
+            "p50-ns/pass": 1213708.0,
+            "p95-ns/pass": 2944958.0,
+            "plain-B/pass": 1242.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 152855.0,
+            "seal/pass": 3.033,
+            "sealed-B/pass": 2480.0,
+            "synthetic-acks/pass": 3.033,
+            "B/op": 42365632.0,
+            "allocs/op": 474573.0
+          },
+          "BenchmarkPublisherEfficiency/restate_32": {
+            "ns/op": 2208745375.0,
+            "ack-ns/pass": 13699.0,
+            "drain-ns/pass": 26995210.0,
+            "frame-B/pass": 60200.0,
+            "p50-ns/pass": 34976500.0,
+            "p95-ns/pass": 68098000.0,
+            "plain-B/pass": 30270.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 7969308.0,
+            "seal/pass": 67.0,
+            "sealed-B/pass": 58190.0,
+            "synthetic-acks/pass": 67.0,
+            "B/op": 258227125.0,
+            "allocs/op": 769212.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_0": {
+            "ns/op": 79.46,
+            "B/op": 48.0,
+            "allocs/op": 2.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_67": {
+            "ns/op": 6307.0,
+            "B/op": 1264.0,
+            "allocs/op": 6.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_2048": {
+            "ns/op": 354490.0,
+            "B/op": 32880.0,
+            "allocs/op": 6.0
+          }
+        },
+        "process_seconds_including_fixture": {
+          "efficiency": {
+            "real": 101.87,
+            "user": 91.8,
+            "sys": 1.19,
+            "maximum resident set size bytes": 40763392,
+            "peak memory footprint bytes": 35242512
+          },
+          "-receipts": {
+            "real": 5.0,
+            "user": 4.83,
+            "sys": 0.04,
+            "maximum resident set size bytes": 49201152,
+            "peak memory footprint bytes": 41452048
+          }
+        }
+      },
+      {
+        "metrics": {
+          "BenchmarkPublisherEfficiency/idle_1": {
+            "ns/op": 9067842.0,
+            "ack-ns/pass": 16.32,
+            "drain-ns/pass": 256.5,
+            "frame-B/pass": 118.3,
+            "p50-ns/pass": 100250.0,
+            "p95-ns/pass": 308167.0,
+            "plain-B/pass": 69.98,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 5177.0,
+            "seal/pass": 0.08333,
+            "sealed-B/pass": 115.8,
+            "synthetic-acks/pass": 0.08333,
+            "B/op": 3980152.0,
+            "allocs/op": 23047.0
+          },
+          "BenchmarkPublisherEfficiency/idle_32": {
+            "ns/op": 71621390.0,
+            "ack-ns/pass": 62.92,
+            "drain-ns/pass": 15238.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 883625.0,
+            "p95-ns/pass": 1876625.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 39327.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 41102174.0,
+            "allocs/op": 476592.0
+          },
+          "BenchmarkPublisherEfficiency/unwatched_32": {
+            "ns/op": 26891226.0,
+            "ack-ns/pass": 540.1,
+            "drain-ns/pass": 23468.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 38959.0,
+            "p95-ns/pass": 2133417.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 0.15,
+            "relay-ns/pass": 65420.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 8170979.0,
+            "allocs/op": 78182.0
+          },
+          "BenchmarkPublisherEfficiency/active_32": {
+            "ns/op": 95172832.0,
+            "ack-ns/pass": 578.7,
+            "drain-ns/pass": 77399.0,
+            "frame-B/pass": 2571.0,
+            "p50-ns/pass": 1115042.0,
+            "p95-ns/pass": 2715458.0,
+            "plain-B/pass": 1242.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 138646.0,
+            "seal/pass": 3.033,
+            "sealed-B/pass": 2480.0,
+            "synthetic-acks/pass": 3.033,
+            "B/op": 42365596.0,
+            "allocs/op": 474572.0
+          },
+          "BenchmarkPublisherEfficiency/restate_32": {
+            "ns/op": 2125205293.0,
+            "ack-ns/pass": 8606.0,
+            "drain-ns/pass": 26080936.0,
+            "frame-B/pass": 60200.0,
+            "p50-ns/pass": 33998583.0,
+            "p95-ns/pass": 64607125.0,
+            "plain-B/pass": 30270.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 7637564.0,
+            "seal/pass": 67.0,
+            "sealed-B/pass": 58190.0,
+            "synthetic-acks/pass": 67.0,
+            "B/op": 258226715.0,
+            "allocs/op": 769207.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_0": {
+            "ns/op": 78.09,
+            "B/op": 48.0,
+            "allocs/op": 2.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_67": {
+            "ns/op": 5938.0,
+            "B/op": 1264.0,
+            "allocs/op": 6.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_2048": {
+            "ns/op": 360673.0,
+            "B/op": 32880.0,
+            "allocs/op": 6.0
+          }
+        },
+        "process_seconds_including_fixture": {
+          "efficiency": {
+            "real": 96.29,
+            "user": 90.87,
+            "sys": 1.0,
+            "maximum resident set size bytes": 33226752,
+            "peak memory footprint bytes": 28000760
+          },
+          "-receipts": {
+            "real": 5.0,
+            "user": 4.89,
+            "sys": 0.04,
+            "maximum resident set size bytes": 28016640,
+            "peak memory footprint bytes": 20988408
+          }
+        }
+      },
+      {
+        "metrics": {
+          "BenchmarkPublisherEfficiency/idle_1": {
+            "ns/op": 9060567.0,
+            "ack-ns/pass": 10.58,
+            "drain-ns/pass": 176.6,
+            "frame-B/pass": 118.3,
+            "p50-ns/pass": 97584.0,
+            "p95-ns/pass": 320209.0,
+            "plain-B/pass": 69.98,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 4253.0,
+            "seal/pass": 0.08333,
+            "sealed-B/pass": 115.8,
+            "synthetic-acks/pass": 0.08333,
+            "B/op": 3980126.0,
+            "allocs/op": 23046.0
+          },
+          "BenchmarkPublisherEfficiency/idle_32": {
+            "ns/op": 72150788.0,
+            "ack-ns/pass": 56.8,
+            "drain-ns/pass": 15021.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 888959.0,
+            "p95-ns/pass": 1886000.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 38974.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 41102194.0,
+            "allocs/op": 476592.0
+          },
+          "BenchmarkPublisherEfficiency/unwatched_32": {
+            "ns/op": 16677875.0,
+            "ack-ns/pass": 64.26,
+            "drain-ns/pass": 15956.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 28208.0,
+            "p95-ns/pass": 1630250.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 0.15,
+            "relay-ns/pass": 46212.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 8170988.0,
+            "allocs/op": 78182.0
+          },
+          "BenchmarkPublisherEfficiency/active_32": {
+            "ns/op": 78573629.0,
+            "ack-ns/pass": 195.5,
+            "drain-ns/pass": 69244.0,
+            "frame-B/pass": 2571.0,
+            "p50-ns/pass": 1020166.0,
+            "p95-ns/pass": 2043875.0,
+            "plain-B/pass": 1242.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 113226.0,
+            "seal/pass": 3.033,
+            "sealed-B/pass": 2480.0,
+            "synthetic-acks/pass": 3.033,
+            "B/op": 42365652.0,
+            "allocs/op": 474573.0
+          },
+          "BenchmarkPublisherEfficiency/restate_32": {
+            "ns/op": 2061807856.0,
+            "ack-ns/pass": 6665.0,
+            "drain-ns/pass": 25490703.0,
+            "frame-B/pass": 60200.0,
+            "p50-ns/pass": 33791875.0,
+            "p95-ns/pass": 63353667.0,
+            "plain-B/pass": 30270.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 7305642.0,
+            "seal/pass": 67.0,
+            "sealed-B/pass": 58190.0,
+            "synthetic-acks/pass": 67.0,
+            "B/op": 258226395.0,
+            "allocs/op": 769203.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_0": {
+            "ns/op": 85.54,
+            "B/op": 48.0,
+            "allocs/op": 2.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_67": {
+            "ns/op": 6521.0,
+            "B/op": 1264.0,
+            "allocs/op": 6.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_2048": {
+            "ns/op": 366327.0,
+            "B/op": 32880.0,
+            "allocs/op": 6.0
+          }
+        },
+        "process_seconds_including_fixture": {
+          "efficiency": {
+            "real": 92.45,
+            "user": 88.92,
+            "sys": 0.72,
+            "maximum resident set size bytes": 32473088,
+            "peak memory footprint bytes": 28033504
+          },
+          "-receipts": {
+            "real": 5.21,
+            "user": 4.9,
+            "sys": 0.05,
+            "maximum resident set size bytes": 26411008,
+            "peak memory footprint bytes": 21053968
+          }
+        }
+      }
+    ],
+    "candidate": [
+      {
+        "metrics": {
+          "BenchmarkPublisherEfficiency/idle_1": {
+            "ns/op": 7829484.0,
+            "ack-ns/pass": 8.178,
+            "drain-ns/pass": 145.6,
+            "frame-B/pass": 118.3,
+            "p50-ns/pass": 92000.0,
+            "p95-ns/pass": 236916.0,
+            "plain-B/pass": 69.98,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 3902.0,
+            "seal/pass": 0.08333,
+            "sealed-B/pass": 115.8,
+            "synthetic-acks/pass": 0.08333,
+            "B/op": 3979224.0,
+            "allocs/op": 23036.0
+          },
+          "BenchmarkPublisherEfficiency/idle_32": {
+            "ns/op": 74758668.0,
+            "ack-ns/pass": 73.1,
+            "drain-ns/pass": 6203.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 926750.0,
+            "p95-ns/pass": 1982791.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 42028.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 40984140.0,
+            "allocs/op": 476458.0
+          },
+          "BenchmarkPublisherEfficiency/unwatched_32": {
+            "ns/op": 14912089.0,
+            "ack-ns/pass": 56.79,
+            "drain-ns/pass": 5822.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 27000.0,
+            "p95-ns/pass": 1660167.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 0.15,
+            "relay-ns/pass": 38950.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 8052969.0,
+            "allocs/op": 78048.0
+          },
+          "BenchmarkPublisherEfficiency/active_32": {
+            "ns/op": 74244276.0,
+            "ack-ns/pass": 185.2,
+            "drain-ns/pass": 22696.0,
+            "frame-B/pass": 2571.0,
+            "p50-ns/pass": 950375.0,
+            "p95-ns/pass": 2013875.0,
+            "plain-B/pass": 1242.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 110896.0,
+            "seal/pass": 3.033,
+            "sealed-B/pass": 2480.0,
+            "synthetic-acks/pass": 3.033,
+            "B/op": 41866849.0,
+            "allocs/op": 474210.0
+          },
+          "BenchmarkPublisherEfficiency/restate_32": {
+            "ns/op": 779773304.0,
+            "ack-ns/pass": 4346.0,
+            "drain-ns/pass": 5075000.0,
+            "frame-B/pass": 60200.0,
+            "p50-ns/pass": 12448375.0,
+            "p95-ns/pass": 26944084.0,
+            "plain-B/pass": 30270.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 6578559.0,
+            "seal/pass": 67.0,
+            "sealed-B/pass": 58190.0,
+            "synthetic-acks/pass": 67.0,
+            "B/op": 117254636.0,
+            "allocs/op": 760907.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_0": {
+            "ns/op": 39.49,
+            "B/op": 0.0,
+            "allocs/op": 0.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_67": {
+            "ns/op": 1556.0,
+            "B/op": 0.0,
+            "allocs/op": 0.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_2048": {
+            "ns/op": 55240.0,
+            "B/op": 0.0,
+            "allocs/op": 0.0
+          }
+        },
+        "process_seconds_including_fixture": {
+          "efficiency": {
+            "real": 40.05,
+            "user": 38.64,
+            "sys": 0.28,
+            "maximum resident set size bytes": 30343168,
+            "peak memory footprint bytes": 24887824
+          },
+          "-receipts": {
+            "real": 4.58,
+            "user": 4.43,
+            "sys": 0.03,
+            "maximum resident set size bytes": 21250048,
+            "peak memory footprint bytes": 15254008
+          }
+        }
+      },
+      {
+        "metrics": {
+          "BenchmarkPublisherEfficiency/idle_1": {
+            "ns/op": 7842352.0,
+            "ack-ns/pass": 10.97,
+            "drain-ns/pass": 261.8,
+            "frame-B/pass": 118.3,
+            "p50-ns/pass": 92458.0,
+            "p95-ns/pass": 235000.0,
+            "plain-B/pass": 69.98,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 4712.0,
+            "seal/pass": 0.08333,
+            "sealed-B/pass": 115.8,
+            "synthetic-acks/pass": 0.08333,
+            "B/op": 3979240.0,
+            "allocs/op": 23037.0
+          },
+          "BenchmarkPublisherEfficiency/idle_32": {
+            "ns/op": 72214213.0,
+            "ack-ns/pass": 75.89,
+            "drain-ns/pass": 6253.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 905000.0,
+            "p95-ns/pass": 1923750.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 41649.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 40984126.0,
+            "allocs/op": 476458.0
+          },
+          "BenchmarkPublisherEfficiency/unwatched_32": {
+            "ns/op": 16154423.0,
+            "ack-ns/pass": 83.24,
+            "drain-ns/pass": 6529.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 28667.0,
+            "p95-ns/pass": 1680375.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 0.15,
+            "relay-ns/pass": 41987.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 8052975.0,
+            "allocs/op": 78048.0
+          },
+          "BenchmarkPublisherEfficiency/active_32": {
+            "ns/op": 82286218.0,
+            "ack-ns/pass": 262.3,
+            "drain-ns/pass": 25352.0,
+            "frame-B/pass": 2571.0,
+            "p50-ns/pass": 1017042.0,
+            "p95-ns/pass": 2242208.0,
+            "plain-B/pass": 1242.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 129120.0,
+            "seal/pass": 3.033,
+            "sealed-B/pass": 2480.0,
+            "synthetic-acks/pass": 3.033,
+            "B/op": 41866735.0,
+            "allocs/op": 474208.0
+          },
+          "BenchmarkPublisherEfficiency/restate_32": {
+            "ns/op": 831733166.0,
+            "ack-ns/pass": 5200.0,
+            "drain-ns/pass": 5385596.0,
+            "frame-B/pass": 60200.0,
+            "p50-ns/pass": 12876959.0,
+            "p95-ns/pass": 28210042.0,
+            "plain-B/pass": 30270.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 6993596.0,
+            "seal/pass": 67.0,
+            "sealed-B/pass": 58190.0,
+            "synthetic-acks/pass": 67.0,
+            "B/op": 117255001.0,
+            "allocs/op": 760911.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_0": {
+            "ns/op": 39.62,
+            "B/op": 0.0,
+            "allocs/op": 0.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_67": {
+            "ns/op": 1475.0,
+            "B/op": 0.0,
+            "allocs/op": 0.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_2048": {
+            "ns/op": 55807.0,
+            "B/op": 0.0,
+            "allocs/op": 0.0
+          }
+        },
+        "process_seconds_including_fixture": {
+          "efficiency": {
+            "real": 42.13,
+            "user": 39.64,
+            "sys": 0.41,
+            "maximum resident set size bytes": 30851072,
+            "peak memory footprint bytes": 25690616
+          },
+          "-receipts": {
+            "real": 4.61,
+            "user": 4.48,
+            "sys": 0.03,
+            "maximum resident set size bytes": 20627456,
+            "peak memory footprint bytes": 14615008
+          }
+        }
+      },
+      {
+        "metrics": {
+          "BenchmarkPublisherEfficiency/idle_1": {
+            "ns/op": 8866081.0,
+            "ack-ns/pass": 13.07,
+            "drain-ns/pass": 150.0,
+            "frame-B/pass": 118.3,
+            "p50-ns/pass": 97833.0,
+            "p95-ns/pass": 261625.0,
+            "plain-B/pass": 69.98,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 4730.0,
+            "seal/pass": 0.08333,
+            "sealed-B/pass": 115.8,
+            "synthetic-acks/pass": 0.08333,
+            "B/op": 3979240.0,
+            "allocs/op": 23037.0
+          },
+          "BenchmarkPublisherEfficiency/idle_32": {
+            "ns/op": 69896924.0,
+            "ack-ns/pass": 59.35,
+            "drain-ns/pass": 5511.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 869750.0,
+            "p95-ns/pass": 1837292.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 38707.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 40984005.0,
+            "allocs/op": 476456.0
+          },
+          "BenchmarkPublisherEfficiency/unwatched_32": {
+            "ns/op": 14547970.0,
+            "ack-ns/pass": 57.01,
+            "drain-ns/pass": 5703.0,
+            "frame-B/pass": 1002.0,
+            "p50-ns/pass": 27292.0,
+            "p95-ns/pass": 1575958.0,
+            "plain-B/pass": 504.5,
+            "reads/pass": 0.15,
+            "relay-ns/pass": 38380.0,
+            "seal/pass": 1.117,
+            "sealed-B/pass": 968.4,
+            "synthetic-acks/pass": 1.117,
+            "B/op": 8052952.0,
+            "allocs/op": 78048.0
+          },
+          "BenchmarkPublisherEfficiency/active_32": {
+            "ns/op": 76835404.0,
+            "ack-ns/pass": 227.0,
+            "drain-ns/pass": 28732.0,
+            "frame-B/pass": 2571.0,
+            "p50-ns/pass": 973333.0,
+            "p95-ns/pass": 2008875.0,
+            "plain-B/pass": 1242.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 118095.0,
+            "seal/pass": 3.033,
+            "sealed-B/pass": 2480.0,
+            "synthetic-acks/pass": 3.033,
+            "B/op": 41866842.0,
+            "allocs/op": 474209.0
+          },
+          "BenchmarkPublisherEfficiency/restate_32": {
+            "ns/op": 782687506.0,
+            "ack-ns/pass": 4360.0,
+            "drain-ns/pass": 5073309.0,
+            "frame-B/pass": 60200.0,
+            "p50-ns/pass": 12442834.0,
+            "p95-ns/pass": 26724750.0,
+            "plain-B/pass": 30270.0,
+            "reads/pass": 1.0,
+            "relay-ns/pass": 6621330.0,
+            "seal/pass": 67.0,
+            "sealed-B/pass": 58190.0,
+            "synthetic-acks/pass": 67.0,
+            "B/op": 117254718.0,
+            "allocs/op": 760908.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_0": {
+            "ns/op": 40.39,
+            "B/op": 0.0,
+            "allocs/op": 0.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_67": {
+            "ns/op": 1520.0,
+            "B/op": 0.0,
+            "allocs/op": 0.0
+          },
+          "BenchmarkPublisherReceiptScan/receipts_2048": {
+            "ns/op": 55310.0,
+            "B/op": 0.0,
+            "allocs/op": 0.0
+          }
+        },
+        "process_seconds_including_fixture": {
+          "efficiency": {
+            "real": 39.76,
+            "user": 38.55,
+            "sys": 0.27,
+            "maximum resident set size bytes": 48234496,
+            "peak memory footprint bytes": 42648080
+          },
+          "-receipts": {
+            "real": 4.63,
+            "user": 4.48,
+            "sys": 0.03,
+            "maximum resident set size bytes": 20758528,
+            "peak memory footprint bytes": 14189024
+          }
+        }
+      }
+    ]
+  },
+  "comparison": {
+    "BenchmarkPublisherEfficiency/idle_1": {
+      "ns/op": {
+        "baseline_median": 9060567.0,
+        "candidate_median": 7842352.0,
+        "change_percent": -13.445240237172795
+      },
+      "B/op": {
+        "baseline_median": 3980126.0,
+        "candidate_median": 3979240.0,
+        "change_percent": -0.022260601800039304
+      },
+      "allocs/op": {
+        "baseline_median": 23046.0,
+        "candidate_median": 23037.0,
+        "change_percent": -0.03905233012236886
+      },
+      "drain-ns/pass": {
+        "baseline_median": 176.6,
+        "candidate_median": 150.0,
+        "change_percent": -15.062287655719143
+      },
+      "p95-ns/pass": {
+        "baseline_median": 308167.0,
+        "candidate_median": 236916.0,
+        "change_percent": -23.120905223466494
+      }
+    },
+    "BenchmarkPublisherEfficiency/idle_32": {
+      "ns/op": {
+        "baseline_median": 72150788.0,
+        "candidate_median": 72214213.0,
+        "change_percent": 0.08790617782303833
+      },
+      "B/op": {
+        "baseline_median": 41102194.0,
+        "candidate_median": 40984126.0,
+        "change_percent": -0.2872547387616331
+      },
+      "allocs/op": {
+        "baseline_median": 476592.0,
+        "candidate_median": 476458.0,
+        "change_percent": -0.02811629234229507
+      },
+      "drain-ns/pass": {
+        "baseline_median": 15238.0,
+        "candidate_median": 6203.0,
+        "change_percent": -59.292558078487986
+      },
+      "p95-ns/pass": {
+        "baseline_median": 1886000.0,
+        "candidate_median": 1923750.0,
+        "change_percent": 2.0015906680805884
+      }
+    },
+    "BenchmarkPublisherEfficiency/unwatched_32": {
+      "ns/op": {
+        "baseline_median": 26891226.0,
+        "candidate_median": 14912089.0,
+        "change_percent": -44.54663762819888
+      },
+      "B/op": {
+        "baseline_median": 8170988.0,
+        "candidate_median": 8052969.0,
+        "change_percent": -1.4443663361150438
+      },
+      "allocs/op": {
+        "baseline_median": 78182.0,
+        "candidate_median": 78048.0,
+        "change_percent": -0.17139495024429685
+      },
+      "drain-ns/pass": {
+        "baseline_median": 23468.0,
+        "candidate_median": 5822.0,
+        "change_percent": -75.19175046872337
+      },
+      "p95-ns/pass": {
+        "baseline_median": 2133417.0,
+        "candidate_median": 1660167.0,
+        "change_percent": -22.182723771302093
+      }
+    },
+    "BenchmarkPublisherEfficiency/active_32": {
+      "ns/op": {
+        "baseline_median": 95172832.0,
+        "candidate_median": 76835404.0,
+        "change_percent": -19.267502725988017
+      },
+      "B/op": {
+        "baseline_median": 42365632.0,
+        "candidate_median": 41866842.0,
+        "change_percent": -1.1773458259751624
+      },
+      "allocs/op": {
+        "baseline_median": 474573.0,
+        "candidate_median": 474209.0,
+        "change_percent": -0.07670052868579136
+      },
+      "drain-ns/pass": {
+        "baseline_median": 77399.0,
+        "candidate_median": 25352.0,
+        "change_percent": -67.24505484566984
+      },
+      "p95-ns/pass": {
+        "baseline_median": 2715458.0,
+        "candidate_median": 2013875.0,
+        "change_percent": -25.83663602972316
+      }
+    },
+    "BenchmarkPublisherEfficiency/restate_32": {
+      "ns/op": {
+        "baseline_median": 2125205293.0,
+        "candidate_median": 782687506.0,
+        "change_percent": -63.17120475005329
+      },
+      "B/op": {
+        "baseline_median": 258226715.0,
+        "candidate_median": 117254718.0,
+        "change_percent": -54.592336428088004
+      },
+      "allocs/op": {
+        "baseline_median": 769207.0,
+        "candidate_median": 760908.0,
+        "change_percent": -1.0789033381131463
+      },
+      "drain-ns/pass": {
+        "baseline_median": 26080936.0,
+        "candidate_median": 5075000.0,
+        "change_percent": -80.5413425346391
+      },
+      "p95-ns/pass": {
+        "baseline_median": 64607125.0,
+        "candidate_median": 26944084.0,
+        "change_percent": -58.295491402844505
+      }
+    },
+    "BenchmarkPublisherReceiptScan/receipts_0": {
+      "ns/op": {
+        "baseline_median": 79.46,
+        "candidate_median": 39.62,
+        "change_percent": -50.13843443241883
+      },
+      "B/op": {
+        "baseline_median": 48.0,
+        "candidate_median": 0.0,
+        "change_percent": -100.0
+      },
+      "allocs/op": {
+        "baseline_median": 2.0,
+        "candidate_median": 0.0,
+        "change_percent": -100.0
+      }
+    },
+    "BenchmarkPublisherReceiptScan/receipts_67": {
+      "ns/op": {
+        "baseline_median": 6307.0,
+        "candidate_median": 1520.0,
+        "change_percent": -75.89979387981607
+      },
+      "B/op": {
+        "baseline_median": 1264.0,
+        "candidate_median": 0.0,
+        "change_percent": -100.0
+      },
+      "allocs/op": {
+        "baseline_median": 6.0,
+        "candidate_median": 0.0,
+        "change_percent": -100.0
+      }
+    },
+    "BenchmarkPublisherReceiptScan/receipts_2048": {
+      "ns/op": {
+        "baseline_median": 360673.0,
+        "candidate_median": 55310.0,
+        "change_percent": -84.66477945396522
+      },
+      "B/op": {
+        "baseline_median": 32880.0,
+        "candidate_median": 0.0,
+        "change_percent": -100.0
+      },
+      "allocs/op": {
+        "baseline_median": 6.0,
+        "candidate_median": 0.0,
+        "change_percent": -100.0
+      }
+    }
+  },
+  "count_equality": [
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_1",
+      "metric": "reads/pass",
+      "equal": true,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_1",
+      "metric": "seal/pass",
+      "equal": true,
+      "values": [
+        0.08333,
+        0.08333,
+        0.08333,
+        0.08333,
+        0.08333,
+        0.08333
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_1",
+      "metric": "synthetic-acks/pass",
+      "equal": true,
+      "values": [
+        0.08333,
+        0.08333,
+        0.08333,
+        0.08333,
+        0.08333,
+        0.08333
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_1",
+      "metric": "plain-B/pass",
+      "equal": true,
+      "values": [
+        69.98,
+        69.98,
+        69.98,
+        69.98,
+        69.98,
+        69.98
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_1",
+      "metric": "sealed-B/pass",
+      "equal": true,
+      "values": [
+        115.8,
+        115.8,
+        115.8,
+        115.8,
+        115.8,
+        115.8
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_1",
+      "metric": "frame-B/pass",
+      "equal": true,
+      "values": [
+        118.3,
+        118.3,
+        118.3,
+        118.3,
+        118.3,
+        118.3
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_32",
+      "metric": "reads/pass",
+      "equal": true,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_32",
+      "metric": "seal/pass",
+      "equal": true,
+      "values": [
+        1.117,
+        1.117,
+        1.117,
+        1.117,
+        1.117,
+        1.117
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_32",
+      "metric": "synthetic-acks/pass",
+      "equal": true,
+      "values": [
+        1.117,
+        1.117,
+        1.117,
+        1.117,
+        1.117,
+        1.117
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_32",
+      "metric": "plain-B/pass",
+      "equal": true,
+      "values": [
+        504.5,
+        504.5,
+        504.5,
+        504.5,
+        504.5,
+        504.5
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_32",
+      "metric": "sealed-B/pass",
+      "equal": true,
+      "values": [
+        968.4,
+        968.4,
+        968.4,
+        968.4,
+        968.4,
+        968.4
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/idle_32",
+      "metric": "frame-B/pass",
+      "equal": true,
+      "values": [
+        1002.0,
+        1002.0,
+        1002.0,
+        1002.0,
+        1002.0,
+        1002.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/unwatched_32",
+      "metric": "reads/pass",
+      "equal": true,
+      "values": [
+        0.15,
+        0.15,
+        0.15,
+        0.15,
+        0.15,
+        0.15
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/unwatched_32",
+      "metric": "seal/pass",
+      "equal": true,
+      "values": [
+        1.117,
+        1.117,
+        1.117,
+        1.117,
+        1.117,
+        1.117
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/unwatched_32",
+      "metric": "synthetic-acks/pass",
+      "equal": true,
+      "values": [
+        1.117,
+        1.117,
+        1.117,
+        1.117,
+        1.117,
+        1.117
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/unwatched_32",
+      "metric": "plain-B/pass",
+      "equal": true,
+      "values": [
+        504.5,
+        504.5,
+        504.5,
+        504.5,
+        504.5,
+        504.5
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/unwatched_32",
+      "metric": "sealed-B/pass",
+      "equal": true,
+      "values": [
+        968.4,
+        968.4,
+        968.4,
+        968.4,
+        968.4,
+        968.4
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/unwatched_32",
+      "metric": "frame-B/pass",
+      "equal": true,
+      "values": [
+        1002.0,
+        1002.0,
+        1002.0,
+        1002.0,
+        1002.0,
+        1002.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/active_32",
+      "metric": "reads/pass",
+      "equal": true,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/active_32",
+      "metric": "seal/pass",
+      "equal": true,
+      "values": [
+        3.033,
+        3.033,
+        3.033,
+        3.033,
+        3.033,
+        3.033
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/active_32",
+      "metric": "synthetic-acks/pass",
+      "equal": true,
+      "values": [
+        3.033,
+        3.033,
+        3.033,
+        3.033,
+        3.033,
+        3.033
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/active_32",
+      "metric": "plain-B/pass",
+      "equal": true,
+      "values": [
+        1242.0,
+        1242.0,
+        1242.0,
+        1242.0,
+        1242.0,
+        1242.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/active_32",
+      "metric": "sealed-B/pass",
+      "equal": true,
+      "values": [
+        2480.0,
+        2480.0,
+        2480.0,
+        2480.0,
+        2480.0,
+        2480.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/active_32",
+      "metric": "frame-B/pass",
+      "equal": true,
+      "values": [
+        2571.0,
+        2571.0,
+        2571.0,
+        2571.0,
+        2571.0,
+        2571.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/restate_32",
+      "metric": "reads/pass",
+      "equal": true,
+      "values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/restate_32",
+      "metric": "seal/pass",
+      "equal": true,
+      "values": [
+        67.0,
+        67.0,
+        67.0,
+        67.0,
+        67.0,
+        67.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/restate_32",
+      "metric": "synthetic-acks/pass",
+      "equal": true,
+      "values": [
+        67.0,
+        67.0,
+        67.0,
+        67.0,
+        67.0,
+        67.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/restate_32",
+      "metric": "plain-B/pass",
+      "equal": true,
+      "values": [
+        30270.0,
+        30270.0,
+        30270.0,
+        30270.0,
+        30270.0,
+        30270.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/restate_32",
+      "metric": "sealed-B/pass",
+      "equal": true,
+      "values": [
+        58190.0,
+        58190.0,
+        58190.0,
+        58190.0,
+        58190.0,
+        58190.0
+      ]
+    },
+    {
+      "benchmark": "BenchmarkPublisherEfficiency/restate_32",
+      "metric": "frame-B/pass",
+      "equal": true,
+      "values": [
+        60200.0,
+        60200.0,
+        60200.0,
+        60200.0,
+        60200.0,
+        60200.0
+      ]
+    }
+  ],
+  "all_counts_equal": true,
+  "process_efficiency_medians": {
+    "baseline": {
+      "real": 96.29,
+      "user": 90.87,
+      "sys": 1.0,
+      "maximum resident set size bytes": 33226752,
+      "peak memory footprint bytes": 28033504
+    },
+    "candidate": {
+      "real": 40.05,
+      "user": 38.64,
+      "sys": 0.28,
+      "maximum resident set size bytes": 30851072,
+      "peak memory footprint bytes": 25690616
+    }
+  }
+}
