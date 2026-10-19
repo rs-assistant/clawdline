@@ -14,7 +14,7 @@ export function bootAdminCatalog(config: StringsConfig | null, baseURI: string, 
 /* ---- the pages and their addresses --------------------------------------- */
 
 /** The operations pages, in the order the navigation lists them. */
-export const ADMIN_ROUTES = ["overview", "accounts", "promotions", "usage"] as const
+export const ADMIN_ROUTES = ["overview", "accounts", "promotions", "usage", "survey"] as const
 export type AdminRoute = (typeof ADMIN_ROUTES)[number]
 
 const BASE = "/admin"
@@ -37,6 +37,9 @@ export function adminRoute(pathname: string): AdminRoute | null {
 }
 
 const en = {
+  nav_survey: "Onboarding survey",
+  hint_survey: "Workflows and discovery",
+  lead_survey: "Voluntary answers about workflows, tools and discovery.",
   docTitle: "Operations · Clawdline Cloud",
   title: "Operations",
   subtitle: "Anonymous totals for Clawdline Cloud",
@@ -366,6 +369,9 @@ const en = {
 export type AdminWord = keyof typeof en
 
 const zhTW: Record<AdminWord, string> = {
+  nav_survey: "新使用者問卷",
+  hint_survey: "工作需求與認識來源",
+  lead_survey: "自願填答的工作需求、AI 工具與認識來源。",
   docTitle: "營運 · Clawdline Cloud",
   title: "營運",
   subtitle: "Clawdline Cloud 的匿名匯總數據",

@@ -1,3 +1,4 @@
+import { SurveySettingsLink } from "../onboarding/Survey.js"
 import { catalogWord } from "../catalog.js"
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react"
 import type { PageModule } from "./types.js"
@@ -277,6 +278,7 @@ function SettingsPage({ shown }: { shown: boolean }) {
             <div className="settings-column">
 
         <div className="block" id="settings-ui-language">
+          <SurveySettingsLink />
           <BrowserLanguageControl id="settings-ui-language-select" />
         </div>
 

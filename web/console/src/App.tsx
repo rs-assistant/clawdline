@@ -1,3 +1,5 @@
+import { SurveyCoordinator } from "./onboarding/Survey.js"
+import { useCloudAccount } from "./cloud/account-context.js"
 import { catalogWord } from "./catalog.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { SessionRow } from "@clawdline/contract"
@@ -287,6 +289,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   // screen at a time, and `data-pane` is the desk's second column on or off.
   // Each is mirrored in a ref because the keyboard reads them between renders,
   // as the original reads its state object.
+  const surveyAccount = useCloudAccount()
   const [selected, setSelectedState] = useState<string | null>(null)
   const [openId, setOpenState] = useState<string | null>(null)
   const [view, setViewState] = useState<"list" | "detail">("list")
@@ -1133,6 +1136,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         // the document and only hides them.
         <Component key={id} shown={page === id} />
       ))}
+      {!surveyAccount ? <SurveyCoordinator /> : null}
       <Overlays />
       {machine ? <MachineDashboard
         sessions={fleet.snapshot?.sessions ?? []}
