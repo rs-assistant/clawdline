@@ -20,6 +20,8 @@
 import { DirectLink, DIRECT_BUSY_RETRY_MS, DIRECT_RETRY_MS, browserDirectPeers, directAttemptRecorder, type DirectPeerFactory } from "./terminal-direct.ts"
 import type { SharedCarrier, TerminalEnvelope } from "./terminal-transport.js"
 import { base64Bytes, bytesBase64 } from "../legacy/js/net/cloud-crypto.js"
+// @ts-expect-error -- a `.ts` path, so Node's strip-types runner can load this file in its suite.
+import { recordDirectAttempt } from "./direct-history.ts"
 
 const enc = new TextEncoder()
 const dec = new TextDecoder("utf-8", { fatal: true })
@@ -89,6 +91,21 @@ function carrierAudience(channel: string): "terminal" | "session" | null {
   if (channel.startsWith("t/") || channel.startsWith("s/")) return "session"
   return null
 }
+
+/**
+ * What one attempt the person asked for came to, said as far as it got.
+ *
+ * `answered` means the machine took the offer and sent its own back, which is
+ * the evidence that both sides exchanged their addresses; `not_connected` after
+ * that is the two networks not reaching each other within the link's bound.
+ */
+export type DirectTry =
+  | { kind: "open"; ms: number }
+  | { kind: "unsupported" }
+  | { kind: "offline" }
+  | { kind: "busy" }
+  | { kind: "no_answer"; code: string }
+  | { kind: "not_connected"; code: string }
 
 const registry = new WeakMap<CarrierClient, Map<string, DirectCarrier>>()
 
@@ -171,13 +188,43 @@ export class DirectCarrier implements SharedCarrier {
     if (this.open) return true
     if (this.opening) return this.opening
     if (!this.supported() || !this.client.ready || this.client.retired || Date.now() < this.retryAt) return false
-    const attempt = this.negotiate()
-    this.opening = attempt
-    try { return await attempt }
-    finally { if (this.opening === attempt) this.opening = null }
+    return (await this.attempt()).kind === "open"
   }
 
-  private async negotiate(): Promise<boolean> {
+  /**
+   * One attempt the person asked for. It ignores the retry bound — the person
+   * asking is the reason to try again — and otherwise is the same negotiation
+   * `ensure` makes, so an attempt already in flight is joined, not doubled.
+   */
+  async tryNow(): Promise<DirectTry> {
+    if (this.open) return { kind: "open", ms: 0 }
+    if (!this.supported()) return { kind: "unsupported" }
+    if (!this.client.ready || this.client.retired) return { kind: "offline" }
+    if (this.opening) {
+      const started = Date.now()
+      return (await this.opening) ? { kind: "open", ms: Date.now() - started } : { kind: "not_connected", code: "carrier_failed" }
+    }
+    this.retryAt = 0
+    return this.attempt()
+  }
+
+  private async attempt(): Promise<DirectTry> {
+    let settle!: (opened: boolean) => void
+    this.opening = new Promise<boolean>((resolve) => { settle = resolve })
+    const opening = this.opening
+    try {
+      const outcome = await this.negotiate()
+      settle(outcome.kind === "open")
+      return outcome
+    } finally {
+      settle(false)
+      if (this.opening === opening) this.opening = null
+    }
+  }
+
+  private async negotiate(): Promise<DirectTry> {
+    const started = Date.now()
+    let answered = false
     const connection = random22()
     const keyID = "rk-" + random22()
     const key = crypto.getRandomValues(new Uint8Array(32))
@@ -188,17 +235,22 @@ export class DirectCarrier implements SharedCarrier {
     try {
       const sdp = await link.offer()
       const answer = await this.client.publishCarrierOffer(this.machine, { request, connection, keyID, key, sdp })
+      answered = true
       await link.answer(await openCarrierAnswer(key, connection, answer.sdpSealed))
       if (!link.open) throw fail("carrier_not_open")
       this.install(link, answer.directReceipts)
-      return true
+      recordDirectAttempt(this.machine, true)
+      return { kind: "open", ms: Date.now() - started }
     } catch (error) {
       link.close("carrier_failed")
       // `terminal_busy` is the machine saying "not now" — its roster read failed, or its own
       // peers are full. Everything else is this network or this build: wait the longer bound.
       const code = (error as { code?: string })?.code ?? "carrier_failed"
       this.retryAt = Date.now() + (code === "terminal_busy" ? DIRECT_BUSY_RETRY_MS : DIRECT_RETRY_MS)
-      return false
+      // "Not now" from the machine is not a failure of this network, so it is not counted.
+      if (code === "terminal_busy") return { kind: "busy" }
+      recordDirectAttempt(this.machine, false)
+      return answered ? { kind: "not_connected", code } : { kind: "no_answer", code }
     }
   }
 
@@ -212,6 +264,7 @@ export class DirectCarrier implements SharedCarrier {
   adopt(link: DirectLink, directReceipts: boolean): void {
     if (this.link && this.link !== link) this.link.close("carrier_replaced")
     this.install(link, directReceipts)
+    recordDirectAttempt(this.machine, true)
   }
 
   /** One channel becomes this carrier's, and counts its envelopes from one. */

@@ -26,7 +26,7 @@ import type { OpenedPairing, PendingOffer } from "./pair.js"
 import type { RecoverySession } from "./device-limit.js"
 import { StatusCloudClient } from "./status-client.js"
 // @ts-expect-error -- a `.ts` path, so Node's strip-types runner can load this file in its suite.
-import { directCarriers, type CarrierClient } from "./direct-carrier.ts"
+import { directCarriers, type CarrierClient, type DirectTry } from "./direct-carrier.ts"
 
 // The archived bootstrap derives allowWrites from a device capability that
 // older Cloud tokens can omit. The current contract makes every signed-in
@@ -101,6 +101,8 @@ export interface CloudClientHandle extends CloudReadClient {
    * the machine's row draws (`carrier-state.ts`). It opens nothing.
    */
   carrierFacts?(machine: string): { known: boolean; supported: boolean; open: boolean }
+  /** One direct attempt the person asked for (`DirectCarrier.tryNow`). */
+  tryDirect?(machine: string): Promise<DirectTry>
   /** A request with a stable id, answered on the encrypted machine channel. */
   _machineRequestAs?(
     request: string, machine: string, word: string, body: Record<string, unknown>, kind: "read" | "action", timeoutMs?: number,
