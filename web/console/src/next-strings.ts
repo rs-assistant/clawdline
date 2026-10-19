@@ -934,7 +934,7 @@ const words = {
     menuReread: "Read again",
     menuRereading: "Reading…",
     menuRereadAsked: "The machine has read its screen again.",
-    newBuild: "A newer Clawdline is being served. This page is still the older one.",
+    newBuild: "The interface has been updated. Reload to use the latest version.",
     newBuildReload: "Reload",
     // A feature this machine's Clawdline is too old for (machine/NeedsUpdate.tsx).
     machineNeedsUpdate: "This machine's Clawdline is older and does not have this feature. Update it to use this.",
@@ -2471,7 +2471,7 @@ const words = {
     menuReread: "重讀",
     menuRereading: "讀取中…",
     menuRereadAsked: "那台機器已經重讀過畫面。",
-    newBuild: "已經有新版的 Clawdline，這個頁面還是舊的那一份。",
+    newBuild: "介面已更新，重新載入即可使用。",
     newBuildReload: "重新載入",
     machineNeedsUpdate: "這台機器的 Clawdline 版本較舊，沒有這個功能。更新後就能使用。",
     machineNeedsUpdateVersion: "目前版本：{version}",

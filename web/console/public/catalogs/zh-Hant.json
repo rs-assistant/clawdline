@@ -3708,7 +3708,7 @@
   "next.menuUnreadHow": "*直接送訊息不會回答它。*打開即時畫面看它在問什麼，或取消這個選單（等於在那台機器上按 Esc），再用下面的輸入框說你的答案。",
   "next.menuUnreadSay": "Claude Code 正在那台機器上顯示一個選單，Clawdline 沒能從畫面讀出它的選項。",
   "next.menuUnverified": "這台機器經由 Clawdline Cloud 還無法確認答案對應哪一題，請直接到那台機器上作答。",
-  "next.newBuild": "已經有新版的 Clawdline，這個頁面還是舊的那一份。",
+  "next.newBuild": "介面已更新，重新載入即可使用。",
   "next.newBuildReload": "重新載入",
   "next.noticeManyLeftovers": "有 {n} 項沒做完。",
   "next.noticeOneLeftover": "有 {n} 項沒做完。",
