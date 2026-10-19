@@ -3102,11 +3102,12 @@ export class CloudClient {
         } catch (error) { return Promise.reject(error); }
     }
 
-    pastSessions(place, assistant) {
+    pastSessions(place, assistant, cursor) {
         try {
             var route = this._place(place);
-            return this._machineRequest(route.machine, "past-sessions",
-                { place: route.id, assistant: assistant || "" }, "read");
+            var body = { place: route.id, assistant: assistant || "" };
+            if (cursor) body.cursor = cursor;
+            return this._machineRequest(route.machine, "past-sessions", body, "read");
         } catch (error) { return Promise.reject(error); }
     }
 

@@ -3609,16 +3609,20 @@ type PastSession struct {
 }
 
 // GET /v1/places/{id}/sessions[/{assistant}]: what that assistant has recorded
-// in the place, newest first, at most two hundred. Dispatched children and `-p`
-// runs are not conversations and are left out.
+// in the place, newest first. Codex returns one provider page of twenty with an
+// opaque next_cursor; other assistants return at most two hundred. Dispatched
+// children and `-p` runs are not conversations and are left out.
 type PastSessionList struct {
 	Assistant string `json:"assistant"`
 	At        int64  `json:"at"`
 
 	// The list stopped at its cap and there were more.
-	More     bool          `json:"more"`
-	Place    string        `json:"place"`
-	Sessions []PastSession `json:"sessions"`
+	More bool `json:"more"`
+
+	// Opaque continuation for the next Codex page; omitted at the end.
+	NextCursor string        `json:"next_cursor,omitempty"`
+	Place      string        `json:"place"`
+	Sessions   []PastSession `json:"sessions"`
 }
 
 // One persona. `id` is what a start or resume path ends `/as/{id}` with, what a
@@ -3686,11 +3690,12 @@ type PersonaSuggestionRequest struct {
 	ExpectedVersion int64 `json:"expected_version"`
 }
 
-// A refusal from the start, resume and history routes: not_found, forbidden,
-// bad_request, invalid_launch, terminal_closed, terminal_unsupported,
-// terminal_io_failed, iterm_attention_required, capability_unavailable,
-// terminal_busy, unknown_persona (a start or resume ending `/as/{persona}` that
-// names no persona in GET /v1/personas).
+// A refusal from the start, resume and history routes: codex_unavailable (503;
+// provider read failed, retryable and never evidence of absence), not_found,
+// forbidden, bad_request, invalid_launch, terminal_closed,
+// terminal_unsupported, terminal_io_failed, iterm_attention_required,
+// capability_unavailable, terminal_busy, unknown_persona (a start or resume
+// ending `/as/{persona}` that names no persona in GET /v1/personas).
 type PlaceError struct {
 	// The terminal the refusal is about, on terminal_closed and
 	// iterm_attention_required, so a page can name it in its own language.

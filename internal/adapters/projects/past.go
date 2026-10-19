@@ -454,6 +454,12 @@ func codexExecutable() string {
 // codexThreadList is CodexNameServer's `initialize`, `initialized` and
 // `thread/list`, each request bounded, and the server stopped on every path.
 func codexThreadList(ctx context.Context, exe, cwd string, limit int) ([]byte, error) {
+	return codexRequest(ctx, exe, "thread/list", map[string]any{
+		"archived": false, "cwd": cwd, "limit": max(1, limit),
+		"sortDirection": "desc", "sortKey": "updated_at", "sourceKinds": []string{"cli"}})
+}
+
+func codexRequest(ctx context.Context, exe, method string, params map[string]any) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, exe, "app-server", "--stdio")
@@ -521,6 +527,13 @@ func codexThreadList(ctx context.Context, exe, cwd string, limit int) ([]byte, e
 					ID *int `json:"id"`
 				}
 				if json.Unmarshal(line, &head) == nil && head.ID != nil && *head.ID == id {
+					var reply struct {
+						Error  json.RawMessage `json:"error"`
+						Result json.RawMessage `json:"result"`
+					}
+					if json.Unmarshal(line, &reply) != nil || len(reply.Result) == 0 || string(reply.Result) == "null" || (len(reply.Error) > 0 && string(reply.Error) != "null") {
+						return nil, errors.Join(ErrCodexUnavailable, errors.New("codex app-server refused the request"))
+					}
 					return line, nil
 				}
 			case <-deadline.C:
@@ -541,11 +554,105 @@ func codexThreadList(ctx context.Context, exe, cwd string, limit int) ([]byte, e
 	if err := send(map[string]any{"method": "initialized", "params": map[string]any{}}); err != nil {
 		return nil, errors.Join(ErrCodexUnavailable, err)
 	}
-	list := map[string]any{"method": "thread/list", "id": 1, "params": map[string]any{
-		"archived": false, "cwd": cwd, "limit": max(1, limit),
-		"sortDirection": "desc", "sortKey": "updated_at", "sourceKinds": []string{"cli"}}}
+	list := map[string]any{"method": method, "id": 1, "params": params}
 	if err := send(list); err != nil {
 		return nil, errors.Join(ErrCodexUnavailable, err)
 	}
 	return await(1)
+}
+
+// CodexPastPage reads one provider page. Its cursor advances over filtered children too;
+// an empty visible page does not mean there are no older conversations.
+const CodexPastPageLimit = 20
+
+func CodexPastPage(ctx context.Context, place Place, open map[string]bool, titles PastTitles, cursor string) ([]Past, string, error) {
+	exe := codexExecutable()
+	if exe == "" {
+		return nil, "", ErrCodexUnavailable
+	}
+	select {
+	case codexServers <- struct{}{}:
+		defer func() { <-codexServers }()
+	case <-ctx.Done():
+		return nil, "", errors.Join(ErrCodexUnavailable, ctx.Err())
+	}
+	return codexPastPage(ctx, exe, place, open, titles, cursor)
+}
+
+func codexPastPage(ctx context.Context, exe string, place Place, open map[string]bool, titles PastTitles, cursor string) ([]Past, string, error) {
+	params := map[string]any{"archived": false, "cwd": place.Path, "limit": CodexPastPageLimit,
+		"sortDirection": "desc", "sortKey": "updated_at", "sourceKinds": []string{"cli"}}
+	if cursor != "" {
+		params["cursor"] = cursor
+	}
+	raw, err := codexRequest(ctx, exe, "thread/list", params)
+	if err != nil {
+		return nil, "", err
+	}
+	var reply struct {
+		Result struct {
+			Data       json.RawMessage `json:"data"`
+			NextCursor *string         `json:"nextCursor"`
+		} `json:"result"`
+	}
+	if json.Unmarshal(raw, &reply) != nil || len(reply.Result.Data) == 0 || string(reply.Result.Data) == "null" {
+		return nil, "", ErrCodexUnavailable
+	}
+	var data []json.RawMessage
+	if json.Unmarshal(reply.Result.Data, &data) != nil {
+		return nil, "", ErrCodexUnavailable
+	}
+	next := ""
+	if reply.Result.NextCursor != nil {
+		next = *reply.Result.NextCursor
+	}
+	if next != "" && next == cursor {
+		return nil, "", ErrCodexUnavailable
+	}
+	return codexListed(raw, place.Path, open, titles), next, nil
+}
+
+// CodexConversation verifies the selected conversation directly, independent of
+// how many pages the person has loaded. Provider failure is never absence.
+func CodexConversation(ctx context.Context, place Place, id string) (bool, error) {
+	exe := codexExecutable()
+	if exe == "" {
+		return false, ErrCodexUnavailable
+	}
+	select {
+	case codexServers <- struct{}{}:
+		defer func() { <-codexServers }()
+	case <-ctx.Done():
+		return false, errors.Join(ErrCodexUnavailable, ctx.Err())
+	}
+	return codexConversation(ctx, exe, place, id)
+}
+
+func codexConversation(ctx context.Context, exe string, place Place, id string) (bool, error) {
+	raw, err := codexRequest(ctx, exe, "thread/read", map[string]any{"threadId": id, "includeTurns": false})
+	if err != nil {
+		return false, err
+	}
+	var reply struct {
+		Result struct {
+			Thread json.RawMessage `json:"thread"`
+		} `json:"result"`
+	}
+	if json.Unmarshal(raw, &reply) != nil || len(reply.Result.Thread) == 0 {
+		return false, ErrCodexUnavailable
+	}
+	var thread struct {
+		Source    json.RawMessage `json:"source"`
+		Ephemeral bool            `json:"ephemeral"`
+	}
+	if json.Unmarshal(reply.Result.Thread, &thread) != nil || len(thread.Source) == 0 {
+		return false, ErrCodexUnavailable
+	}
+	if string(thread.Source) != `"cli"` || thread.Ephemeral {
+		return false, nil
+	}
+	// Reuse the list's directory, UUID and child exclusions for the selected row.
+	listed := []byte(`{"result":{"data":[` + string(reply.Result.Thread) + `]}}`)
+	rows := codexListed(listed, place.Path, nil, PastTitles{})
+	return len(rows) == 1 && rows[0].ID == id, nil
 }

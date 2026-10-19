@@ -97,7 +97,7 @@ export interface CloudWriteClient extends CloudReadClient {
   end(identity: CloudIdentity, acceptLoss: boolean, closeabilityVersion: string): Promise<unknown>
   focus(identity: CloudIdentity): Promise<unknown>
   places(machine: string): Promise<unknown>
-  pastSessions(place: string, assistant: string): Promise<unknown>
+  pastSessions(place: string, assistant: string, cursor?: string): Promise<unknown>
   startPlace(place: string, assistant: string, model: string): Promise<unknown>
   resumePlace(place: string, past: string, assistant: string, requestId?: string): Promise<unknown>
   voice(audio: string, rate: number): Promise<unknown>
@@ -1264,7 +1264,7 @@ export class RelayWriter {
         // page's machine, as before.
         return client.places(this.namedMachine(url))
       case "past":
-        return client.pastSessions(route.place, route.assistant)
+        return client.pastSessions(route.place, route.assistant, url.searchParams.get("cursor") || undefined)
       case "start":
         if (route.place === "@machine") {
           if (route.model || route.persona || typeof client._machineRequest !== "function") {

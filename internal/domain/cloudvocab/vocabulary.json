@@ -544,11 +544,12 @@
       "console_route": "GET /v1/places/{id}/sessions[/{assistant}]",
       "console_seam": "writer",
       "local": {"method": "GET"},
-      "example": {"assistant": "codex", "place": "/Users/sean/code/clawdline-go", "request": "req-past", "session": "__clawdline_machine__"},
+      "example": {"cursor": "opaque-older-page", "assistant": "codex", "place": "/Users/sean/code/clawdline-go", "request": "req-past", "session": "__clawdline_machine__"},
       "shapes": [
+        {"body": ["assistant", "cursor", "place", "request", "session"], "path": "/v1/places/{place}/sessions/{assistant}", "query": ["cursor"]},
         {"body": ["assistant", "place", "request", "session"], "path": "/v1/places/{place}/sessions/{assistant}"}
       ],
-      "decode": {"reply": "machine", "fields": {"place": {"type": "string", "non_empty": true}, "assistant": {"type": "string"}}, "route": {"path": "/v1/places/{place}/sessions{/assistant?}"}}
+      "decode": {"reply": "machine", "fields": {"cursor": {"type": "string"}, "place": {"type": "string", "non_empty": true}, "assistant": {"type": "string"}}, "route": {"path": "/v1/places/{place}/sessions{/assistant?}", "query": {"cursor": {"from": "cursor", "omit_empty": true}}}}
     },
     {
       "op": "peer-control",
