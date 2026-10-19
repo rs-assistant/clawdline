@@ -38,6 +38,16 @@
     opacity: 1;
     transform: translate(0, -50%);
 }
+.brand-chevron-open {
+    left: auto;
+    right: 8px;
+    opacity: 1;
+    transform: translate(0, -50%);
+}
+.brand[aria-expanded="true"] .brand-chevron-open {
+    opacity: 0;
+    transform: translate(4px, -50%);
+}
 .brand:hover .brand-handle,
 .brand:focus-visible .brand-handle,
 .brand[aria-expanded="true"] .brand-handle {
