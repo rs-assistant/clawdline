@@ -161,6 +161,8 @@ A copied row keeps the relay's sequence, because that is the number the snapshot
 
 A page built before this returns no audience for an `s/` envelope and drops it, and an older daemon copies nothing, so either half works unchanged against the other.
 
+Authentication proofs are retained while a viewer has a terminal connection or a direct peer, including a reserved peer whose offer is still being answered. Receiving another viewer's envelope must not prune a Session-only carrier's proof. Proofs with neither kind of connection are reclaimed on the next authenticated terminal envelope; retaining a proof does not bypass the fresh roster, key, capability or revocation checks.
+
 The sweep that runs every second closes a carrier whose device this machine or the account has thrown out. "Cannot tell right now" closes nothing: an unreadable roster is not a revocation, and every read on the carrier is authorized by itself anyway.
 
 #### Fallback for a read

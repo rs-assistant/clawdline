@@ -83,7 +83,7 @@ const (
 // terminal contents to diagnostics.
 func (l *Link) TerminalCapacity(name string) capacity.Reading {
 	if name == capacity.CloudTerminalDirectPeers {
-		// directMu and terminalMu are never nested, so this row is read on its own.
+		// This row needs only the direct-peer table.
 		l.directMu.Lock()
 		defer l.directMu.Unlock()
 		r := capacity.Reading{Known: true}
@@ -516,18 +516,24 @@ func (l *Link) deliverTerminal(in Inbound) {
 		if l.terminalAuthenticated == nil {
 			l.terminalAuthenticated = make(map[string]ed25519.PublicKey)
 		}
-		// Keep proofs only for viewers with a live connection and the one
-		// envelope being admitted. The existing connection capacity bounds this
-		// map without accumulating every viewer that ever sent a request.
+		// Keep proofs for terminal connections, direct peers (including offers
+		// still being answered), and the envelope being admitted. Both connection
+		// tables are bounded. Hold terminalMu before directMu so a peer cannot
+		// be installed between checking its lifetime and pruning its proof.
 		active := make(map[string]bool, len(l.terminalConnections))
 		for _, connection := range l.terminalConnections {
 			active[connection.viewer] = true
+		}
+		l.directMu.Lock()
+		for viewer := range l.directPeers {
+			active[viewer] = true
 		}
 		for viewer := range l.terminalAuthenticated {
 			if viewer != in.Sender && !active[viewer] {
 				delete(l.terminalAuthenticated, viewer)
 			}
 		}
+		l.directMu.Unlock()
 		l.terminalAuthenticated[in.Sender] = append(ed25519.PublicKey(nil), in.VerifiedKey...)
 		l.terminalMu.Unlock()
 	}
