@@ -273,6 +273,21 @@ final class BrowserBar: NSView {
     private let box = NSView()
     private var watch: [NSKeyValueObservation] = []
 
+    func updateLanguage() {
+        back.toolTip = L.t.browserBack
+        back.setAccessibilityLabel(L.t.browserBack)
+        forward.toolTip = L.t.browserForward
+        forward.setAccessibilityLabel(L.t.browserForward)
+        refresh.toolTip = L.t.webInfoRefresh
+        refresh.setAccessibilityLabel(L.t.webInfoRefresh)
+        consoleTab.show(L.t.homeLocalTitle)
+        cloudTab.toolTip = L.t.browserShowCloud
+        cloudTab.setAccessibilityLabel(L.t.browserShowCloud)
+        zoom.toolTip = L.t.menuActualSize
+        outside.toolTip = L.t.settingsRemoteOpen
+        outside.setAccessibilityLabel(L.t.settingsRemoteOpen)
+    }
+
     init(target: AnyObject) {
         // The three that move within a page's history are icons, all three:
         // a word beside two glyphs drew one button in a font and two in

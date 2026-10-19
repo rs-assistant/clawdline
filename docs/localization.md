@@ -56,7 +56,7 @@ separate language list; a voice language does not imply an interface translation
 
 | Preference | Stored where | Default | Changes |
 | --- | --- | --- | --- |
-| `ui_language` | This browser origin | `auto` | This browser's fixed console copy and document language |
+| `ui_language` | This browser origin | `auto` | This browser's fixed console copy and document language; in the macOS App's local console, its native menus, status and alerts too |
 | `language` | Daemon settings | Existing behavior | New agent response and Board authoring instruction; voice `auto` fallback |
 | `voice_language` | Daemon settings | Existing behavior | Dictation language |
 | `product_language` | Daemon settings | `en` | Daemon notifications and human-readable CLI output |
@@ -66,6 +66,15 @@ origin does not silently change a local console, another browser, an agent, or
 dictation. The settings UI must identify the browser-local control and preserve
 an unsupported pre-existing daemon `language` value, with a visible explanation
 and a way to choose a shipped interface language.
+
+The macOS App's native shell mirrors the catalog actually displayed by its
+local console, including its separate settings window. Both local WebViews
+reload after a language change so their browser copy stays in sync. A validated
+main-frame message from the App's loopback console selects native copy; the
+Cloud tab has no language bridge and its hosted-origin `ui_language` remains
+independent. The shell keeps a local mirror for its launch menus before the
+console loads. This mirror does not change daemon `product_language`, agent
+authoring language, or dictation.
 
 For the console, an explicit shipped `ui_language` wins. `auto` uses
 `navigator.languages` in order, followed by `navigator.language`, then `en`.

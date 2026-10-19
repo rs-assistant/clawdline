@@ -95,6 +95,12 @@ export function activateCatalog(candidate: unknown, requested: CatalogTag, basel
   document.documentElement.lang = active.lang
   document.documentElement.dir = active.dir
   document.documentElement.setAttribute?.("data-i18n-missing", String(missing.size))
+  // The native App shell mirrors this local console's displayed catalog. The
+  // hosted Cloud page has no such handler; Swift also checks the sender origin.
+  if (typeof window !== "undefined") {
+    const bridge = (window as Window & { webkit?: { messageHandlers?: { shellLanguage?: { postMessage(value: unknown): void } } } }).webkit?.messageHandlers?.shellLanguage
+    bridge?.postMessage({ tag: active.lang })
+  }
   return active.lang as CatalogTag
 }
 

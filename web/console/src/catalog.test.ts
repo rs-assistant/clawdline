@@ -14,6 +14,24 @@ test("a refusal with no translated detail key retains the producer's English wor
     { text: "The session is closed.", lang: "en" })
 })
 
+test("native bridge receives only the validated displayed catalog", () => {
+  const oldDocument = globalThis.document
+  const oldWindow = globalThis.window
+  const sent: unknown[] = []
+  Object.defineProperty(globalThis, "document", { configurable: true, value: { documentElement: { lang: "en", dir: "ltr", setAttribute() {} } } })
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { webkit: { messageHandlers: { shellLanguage: { postMessage: (body: unknown) => sent.push(body) } } } } })
+  try {
+    const japanese = JSON.parse(readFileSync(new URL("../public/catalogs/ja.json", import.meta.url), "utf8"))
+    assert.equal(activateCatalog(japanese, "ja"), "ja")
+    assert.equal(activateCatalog({ ...japanese, lang: "de" }, "ja"), "en")
+    assert.deepEqual(sent, [{ tag: "ja" }, { tag: "en" }])
+  } finally {
+    resetCatalogForTest()
+    Object.defineProperty(globalThis, "document", { configurable: true, value: oldDocument })
+    Object.defineProperty(globalThis, "window", { configurable: true, value: oldWindow })
+  }
+})
+
 test("an imported refusal key uses the selected language while an unknown key stays in English", () => {
   const oldDocument = globalThis.document
   Object.defineProperty(globalThis, "document", { configurable: true, value: { documentElement: { lang: "en", dir: "ltr", setAttribute() {} } } })

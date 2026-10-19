@@ -155,13 +155,16 @@ let fleetBridgeScript = """
 /// were never on a web page — and a page that made its own would be inventing
 /// them. See web/console/src/pages/settings/shell.ts for the other half.
 func settingsWordsScript() -> String {
-    let words: [String: String] = [
-        "hotkey": L.t.settingsHotkey,
-        "recording": L.t.settingsRecording,
-        "scope": L.t.settingsScope,
-        "scopeGlobal": L.t.settingsScopeGlobal,
-        "off": L.t.settingsOff,
-    ]
+    var words: [String: [String: String]] = [:]
+    for tag in ShellLanguage.tags {
+        words[tag] = [
+            "hotkey": ShellLanguage.word("settingsHotkey", language: tag),
+            "recording": ShellLanguage.word("settingsRecording", language: tag),
+            "scope": ShellLanguage.word("settingsScope", language: tag),
+            "scopeGlobal": ShellLanguage.word("settingsScopeGlobal", language: tag),
+            "off": ShellLanguage.word("settingsOff", language: tag),
+        ]
+    }
     let json = (try? JSONSerialization.data(withJSONObject: words, options: [.sortedKeys]))
         .flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     let mascotsJSON = (try? JSONSerialization.data(withJSONObject: MascotPacks.available()))
@@ -177,7 +180,11 @@ func settingsWordsScript() -> String {
     return """
     (function () {
       var shell = window.__clawdlineShell || (window.__clawdlineShell = {});
-      shell.settings = { words: \(json), mascots: \(mascotsJSON), dictation: \(dictationJSON) };
+      var words = \(json);
+      shell.settings = { mascots: \(mascotsJSON), dictation: \(dictationJSON) };
+      Object.defineProperty(shell.settings, 'words', { get: function () {
+        return words[document.documentElement.lang] || words.en;
+      }});
     })();
     """
 }
@@ -487,6 +494,7 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
                                            injectionTime: .atDocumentStart,
                                            forMainFrameOnly: true))
         content.add(WeakMessageHandler(self), name: "shellSettings")
+        content.add(WeakMessageHandler(self), name: "shellLanguage")
         content.add(WeakMessageHandler(self), name: "shellAgentSetup")
         content.add(WeakMessageHandler(self), name: "shellRestartApp")
         // The notch island listens to the same stream and opens this window
@@ -840,7 +848,32 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
             : L.t.statusWaiting(waiting)
     }
 
+    private func applyShellLanguage(_ tag: String, fromSettings: Bool) {
+        guard ShellLanguage.select(tag) else { return }
+        installMainMenu()
+        statusItem?.menu = buildMenu()
+        refreshStatusItem()
+        bar?.updateLanguage()
+        refreshBrowserBar()
+        NotchIsland.shared.languageChanged()
+        AgentSetupWindowController.shared.languageChanged()
+        SettingsWindowController.shared.languageChanged(reloadPage: !fromSettings)
+        // The other local WebView has the same browser preference but does
+        // not observe this window's reload. Its next bridge message selects
+        // the same tag and stops here.
+        if fromSettings, let page = web.url, isConsole(page) { web.reload() }
+    }
+
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "shellLanguage" {
+            guard message.frameInfo.isMainFrame, message.webView === web,
+                  let page = message.frameInfo.request.url, isConsole(page),
+                  let current = web.url, isConsole(current),
+                  let body = message.body as? [String: String],
+                  let tag = body["tag"] else { return }
+            applyShellLanguage(tag, fromSettings: false)
+            return
+        }
         if message.name == "shellRestartApp" {
             guard message.frameInfo.isMainFrame, message.webView === web,
                   let page = web.url, isConsole(page), !showingCloud,
@@ -1174,15 +1207,18 @@ final class Shell: NSObject, NSApplicationDelegate, NSWindowDelegate, WKNavigati
         pageLoaded = false
         let generation = loadGeneration
         let retrying = failedLoads <= 30
+        let title = ShellLanguage.htmlText(L.t.daemonUnavailableTitle)
+        let body = ShellLanguage.htmlText(L.t.daemonUnavailableBody(home.absoluteString))
+        let start = ShellLanguage.htmlText(L.t.daemonUnavailableStart)
+        let retry = ShellLanguage.htmlText(retrying ? L.t.daemonUnavailableRetrying
+                                                  : L.t.daemonUnavailableStopped)
+        let detail = ShellLanguage.htmlText(error.localizedDescription)
         let html = """
         <body style="font:14px -apple-system;padding:40px;color:#ddd;background:#1c1c1e">
-        <h2>The daemon is not answering</h2>
-        <p>This shell shows what <code>\(home.absoluteString)</code> serves, and nothing is
-        listening there.</p>
-        <p style="color:#888">Start it with <code>clawdline serve</code>. \(retrying
-            ? "This window tries again by itself; ⌘R tries now."
-            : "This window has stopped trying; ⌘R tries again.")</p>
-        <p style="color:#666">\(error.localizedDescription)</p></body>
+        <h2>\(title)</h2>
+        <p>\(body)</p>
+        <p style="color:#888">\(start) <code>clawdline serve</code>. \(retry)</p>
+        <p style="color:#666">\(detail)</p></body>
         """
         webView.loadHTMLString(html, baseURL: nil)
         shellLog("load failed (\(failedLoads)): \(error.localizedDescription)")
@@ -1369,6 +1405,9 @@ extension Shell {
 /// and because they are the whole of what that window may reach: it draws
 /// nothing of this app's state and changes nothing but the file.
 extension Shell: SettingsWindowHost {
+    func settingsLanguageSelected(_ tag: String) {
+        applyShellLanguage(tag, fromSettings: true)
+    }
     func settingsSuspendHotKey() {
         stopRecording(restore: false)
         hotKey.unregister()
