@@ -4,8 +4,37 @@ import assert from "node:assert/strict"
 import { squadView, type WireCatalog, type WireSettings } from "./wire.ts"
 // @ts-expect-error -- a `.ts` path, for node; see session/order.test.ts.
 import { withCatalog } from "../../catalog-testing.ts"
+import builtinSource from "../../builtin-display-source.json" with { type: "json" }
 
 withCatalog("zh-Hant")
+
+test("bundled Squad metadata is translated while bodies and versions stay authoritative", () => {
+  const words = (key: keyof typeof builtinSource.en) => ({ en: builtinSource.en[key], "zh-Hant": builtinSource["zh-Hant"][key] })
+  const bundled = structuredClone(catalog)
+  const definition = bundled.definitions[0]
+  definition.definition_id = "clawdline.persona.backend"
+  definition.name = words("builtinPersona.backend.name")
+  definition.summary = words("builtinPersona.backend.summary")
+  const skill = bundled.skills[0]
+  skill.skill_id = "clawdline.skill.golang-concurrency"
+  skill.name = words("builtinSkill.golang-concurrency.name")
+  skill.purpose = words("builtinSkill.golang-concurrency.purpose")
+  bundled.teams[0] = { team_id: "clawdline.team.engineering", name: { en: "engineering", "zh-Hant": "engineering" }, personas: [] }
+  const global = settings("global", field("Handbook"))
+  global.personas[0].definition_id = definition.definition_id
+  global.personas[0].skills.value[0].id = skill.skill_id
+  const before = JSON.stringify(bundled)
+  const view = squadView(bundled, global, global, [], [], true)
+  assert.equal(view.personas[0].name, "後端工程師")
+  assert.equal(view.personas[0].summary, definition.summary["zh-Hant"])
+  assert.equal(view.personas[0].skills[0].name, "Go 並行設計")
+  assert.equal(view.catalogSkills[0].purpose, "設計與審查 Go 並行流程")
+  assert.notEqual(view.teams[0].name, "engineering")
+  assert.equal(view.personas[0].body, definition.body)
+  assert.equal(view.personas[0].version, definition.version)
+  assert.equal(view.personas[0].skills[0].body, skill.content)
+  assert.equal(JSON.stringify(bundled), before)
+})
 
 const icon = { accent: "#fff", cells: [["#fff"]] }
 const field = <T>(value: T, source: "default" | "global" | "project" = "default", version = 0) =>

@@ -71,7 +71,7 @@ import { carrierReading, machineLight, type CarrierReading } from "./carrier-sta
 import { CloudSessionSheets, type PendingMachineAction } from "./CloudSessionSheets.js"
 import { PeerAccessPage } from "./PeerAccessPage.js"
 import { destinationAvailable, destinationFragment, destinationFromFragment, destinationKey,
-  supersedingDestination, type FleetDetailProblem, type MachineListPresentation,
+  SessionExecutionRecovery, supersedingDestination, type FleetDetailProblem, type MachineListPresentation,
   type MachineSessionProjection, type ProjectedSession, type SessionContent, type SessionDestination,
   type SessionListPresentation, type SessionProjectionSource } from "./all-machine-sessions.js"
 import { statusSource } from "./status-source.js"
@@ -304,6 +304,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const fleetScopeRef = useRef(fleetScope)
   fleetScopeRef.current = fleetScope
   const [fleetTarget, setFleetTarget] = useState<SessionDestination | null>(() => destinationFromFragment(location.hash))
+  const executionRecovery = useRef(new SessionExecutionRecovery())
   const [confirmedStart, setConfirmedStart] = useState<{ machineID: string; row: SessionRow } | null>(null)
   const startedObserved = useCallback((id: string) => {
     setConfirmedStart((current) => current?.row.id === id ? null : current)
@@ -315,6 +316,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     const followNotification = () => {
       const destination = destinationFromFragment(location.hash)
       if (!destination) return
+      executionRecovery.current.reset()
       setFleetScope(true)
       setFleetTarget(destination)
     }
@@ -328,6 +330,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // Without this the first answer was the last one until the whole page was
   // reloaded, which restored the same unreadable target.
   const [fleetReadAgain, setFleetReadAgain] = useState(0)
+  const [executionReadRevision, setExecutionReadRevision] = useState(0)
   /**
    * The opened Session whose own row has not arrived, and the one this browser
    * has waited long enough for to say so (`opened-row.ts`).
@@ -630,6 +633,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       strings: () => (config ? catalog(config) : Promise.resolve({})),
       carry: CARRY_TABLE,
       classicStatus: true,
+      onExecutionChanged: (machineID, sessionID) => {
+        document.dispatchEvent(new CustomEvent("clawdline:read-execution-changed", { detail: { machineID, sessionID } }))
+      },
       fleetTarget: () => fleetTargetRef.current,
       fleetPresentation: (target) => fleetPresentations.current.get(destinationKey(target)) ?? null,
       fleetPresentations: heldFleetRows,
@@ -1308,6 +1314,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const leaveFleet = () => { setFleetScope(false); setFleetTarget(null) }
 
   const openFleetSession = (target: SessionDestination) => {
+    executionRecovery.current.reset()
     setFleetCloseIntent(null)
     setFleetTarget(target)
     history.replaceState(history.state, "", destinationFragment(target))
@@ -1331,6 +1338,35 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       history.replaceState(history.state, "", location.pathname + location.search + "#all-machines")
     }
   }, [])
+
+  const recoverExecution = useCallback(async (target: SessionDestination) => {
+    const connected = client.current
+    return executionRecovery.current.recover(target,
+      () => liveSessionSource.readMachine(target.machineID, new AbortController().signal, true),
+      () => client.current === connected ? fleetTargetRef.current : null,
+      (next) => {
+        // A read may follow the current execution. An old mutation never does.
+        setFleetActionIntent(null)
+        setFleetCloseIntent(null)
+        fleetTargetRef.current = next
+        setFleetTarget(next)
+        setExecutionReadRevision((revision) => revision + 1)
+        setFleetReadAgain((revision) => revision + 1)
+        setFleetDetailProblem(null)
+        history.replaceState(history.state, "", destinationFragment(next))
+      })
+  }, [liveSessionSource])
+
+  useEffect(() => {
+    const recoverRead = (event: Event) => {
+      const detail = (event as CustomEvent<{ machineID: string; sessionID: string }>).detail
+      const target = fleetTargetRef.current
+      if (target && target.machineID === detail.machineID && target.sessionID === detail.sessionID)
+        void recoverExecution(target)
+    }
+    document.addEventListener("clawdline:read-execution-changed", recoverRead)
+    return () => document.removeEventListener("clawdline:read-execution-changed", recoverRead)
+  }, [recoverExecution])
 
   useEffect(() => {
     const recoverClose = (event: Event) => {
@@ -1373,11 +1409,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         fleetDetailRetry.current = { key, failures: 0 }
         return
       }
-      // An assistant that restarts keeps its terminal and takes a new
-      // generation, so a read pinned to the old one refuses — correctly. What
-      // was missing is the way out, so a refused-as-replaced read asks the
-      // machine which row took its place. Re-pinning stays a press, so nobody
-      // is moved to another execution without being told.
+      // Push addresses can outlive their execution. Follow only a unique,
+      // current replacement on the same machine and Session, once per opening.
+      if (answer.reason === "changed" && await recoverExecution(target)) return
+      if (abort.signal.aborted) return
       const replaced = answer.reason === "changed"
         ? await liveSessionSource.readMachine(target.machineID, abort.signal).catch(() => null)
         : null
@@ -1400,7 +1435,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       liveSessionSource.closeDetail?.(fleetTarget)
     }
   }, [fleetScope, fleetTarget && destinationKey(fleetTarget), clientEpoch, consoleUp, liveSessionSource, pointAt,
-    fleetReadAgain])
+    fleetReadAgain, recoverExecution])
   useEffect(() => {
     if (!fleetDetailProblem?.retryable || !fleetScope || !fleetTarget ||
       fleetDetailProblem.key !== destinationKey(fleetTarget)) return
@@ -1798,6 +1833,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             focusCloudSessions={fleetScope}
             onLeaveCloudSessions={leaveFleet}
             fleetTarget={fleetScope ? fleetTarget : null}
+            executionReadRevision={executionReadRevision}
             fleetTargetRow={fleetTargetRow}
             fleetTargetIdentity={fleetTargetIdentity?.freshness === "current" ? fleetTargetIdentity : null}
             fleetDetailProblem={fleetScope && fleetTarget

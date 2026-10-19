@@ -1,10 +1,11 @@
 import { catalogWord } from "./catalog.js"
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react"
 import type { BearingsSource, RestorableSession, ScanSource, SessionRow, TaskList, TaskRow } from "@clawdline/contract"
 import { client } from "./client.js"
 import * as L from "./legacy/bridge.js"
 import { Row } from "./session/List.js"
 import { visualBranches, visualDepths } from "./session/order.js"
+import type { ComposerDraftHandoff } from "./session/Composer.js"
 import { Detail } from "./session/Detail.js"
 import type { FleetDetailProblem } from "./cloud/all-machine-sessions.js"
 import { Start, StartSheet, StartingRow } from "./session/Start.js"
@@ -174,6 +175,11 @@ export function SessionsPage({
   }, [])
 
   // The start sheet opens a row the way the list does, and asks which is open.
+  // A different machine or Session gets a fresh editor; an execution refresh
+  // keeps only the unsent draft while Detail's keyed state is discarded.
+  const draftIdentity = fleetDetailKey ? JSON.stringify(JSON.parse(fleetDetailKey).slice(0, 2)) : null
+  const draftHandoff = useMemo<ComposerDraftHandoff | undefined>(() =>
+    draftIdentity ? { current: null } : undefined, [draftIdentity])
   const openIdRef = useRef(openId)
   openIdRef.current = openId
   const onOpenRef = useRef(onOpen)
@@ -368,7 +374,7 @@ export function SessionsPage({
           <NotifyFooter /></>}
         </section>
 
-        <Detail key={fleetDetailKey} row={fleetDetailPending ? null : open} tasks={tasks} onOpenSession={onOpen} onBack={onBack} onDid={onDid}
+        <Detail key={fleetDetailKey} draftHandoff={draftHandoff} row={fleetDetailPending ? null : open} tasks={tasks} onOpenSession={onOpen} onBack={onBack} onDid={onDid}
           scanSources={scanSources}
           projectedCoordinatorBound={fleetCoordinatorBound}
           onSent={streamTasks !== null ? undefined : onDid}

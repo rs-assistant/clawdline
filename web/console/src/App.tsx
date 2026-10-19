@@ -205,7 +205,7 @@ function rowNode(id: string): HTMLElement | null {
  * pills beside each other left the counts no room to be read.
  */
 export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, fleetTarget = null, fleetTargetRow = null,
-  fleetTargetIdentity = null, fleetReaderMachine = null,
+  fleetTargetIdentity = null, fleetReaderMachine = null, executionReadRevision = 0,
   cloudStartedRow = null, onCloudStartedObserved, cloudMachineOffline = null,
   fleetDetailProblem = null, onFleetDetailPending, onFleetClose, fleetActionIntent = null, onFleetActionIntentHandled,
   fleetCloseIntent = null, onFleetCloseIntentHandled,
@@ -214,6 +214,7 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   cloudSessions?: ReactNode
   cloudPeerAccess?: ReactNode | ((active: boolean) => ReactNode)
   fleetList?: (filter: string, onFilter: (value: string) => void) => ReactNode
+  executionReadRevision?: number
   fleetTarget?: SessionDestination | null
   fleetTargetRow?: SessionRow | null
   fleetTargetIdentity?: Pick<ProjectedSession, "machineScope" | "coordinatorBound"> | null
@@ -1107,7 +1108,8 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
         onStarted={openStarted}
         streamTasks={fleet.tasksLive ? fleet.tasks : null}
         fleetList={fleetList?.(filter, setFilter)}
-        fleetDetailKey={fleetList && fleetTarget ? destinationKey(fleetTarget) : undefined}
+        fleetDetailKey={fleetList && fleetTarget ? JSON.stringify([fleetTarget.machineID, fleetTarget.sessionID,
+          fleetTarget.executionGeneration, executionReadRevision]) : undefined}
         fleetCoordinatorBound={!!fleetList && !!fleetTarget && fleetTargetIdentity?.machineScope === true &&
           fleetTargetIdentity.coordinatorBound === true}
         fleetDetailPending={fleetDetailPending}

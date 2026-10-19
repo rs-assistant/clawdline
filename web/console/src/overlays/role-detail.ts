@@ -1,3 +1,4 @@
+import { builtinDisplay } from "../builtin-display.js"
 import type { Persona } from "@clawdline/contract"
 import { client } from "../client.js"
 import * as L from "../legacy/bridge.js"
@@ -21,7 +22,7 @@ let reading: RoleReading | null = null
 let readError: { error: unknown } | null = null
 let request = 0
 
-const word = (names: WireNames): string => names[document.documentElement.lang === "zh-Hant" ? "zh-Hant" : "en"] || names.en
+const skillDisplay = (skill: RoleSkill) => builtinDisplay("skill", skill.id, skill.name, skill.purpose)
 
 async function readRole(conversation: string, persona: string): Promise<RoleReading> {
   const definitionID = persona.includes(".") ? persona : "clawdline.persona." + persona
@@ -125,9 +126,9 @@ function paint(persona: Persona): void {
       '<pre class="role-detail-text">' + esc(reading.body) + '</pre>' +
       (reading.handbook ? '<h3>' + esc(nextWord("personaHandbook")) + '</h3><pre class="role-detail-text">' + esc(reading.handbook) + '</pre>' : '') +
       '<h3>' + esc(nextWord("personaSkills")) + '</h3>' +
-      (reading.skills.length ? reading.skills.map((skill, i) => '<details data-skill="' + i + '"><summary>' + esc(word(skill.name)) +
+      (reading.skills.length ? reading.skills.map((skill, i) => '<details data-skill="' + i + '"><summary>' + esc(skillDisplay(skill).name) +
         (skill.enabled ? '' : ' · ' + esc(nextWord("personaSkillDisabled"))) + '</summary>' +
-        (word(skill.purpose) ? '<p>' + esc(word(skill.purpose)) + '</p>' : '') +
+        (skillDisplay(skill).detail ? '<p>' + esc(skillDisplay(skill).detail) + '</p>' : '') +
         '<pre class="role-detail-text">' + esc(skill.content || nextWord("personaSkillUnavailable")) + '</pre>' +
         (skill.files.length ? '<p>' + esc(nextWord("personaSkillFiles")) + '</p><ul>' + skill.files.map((path) => '<li>' + esc(path) + '</li>').join('') + '</ul>' : '') +
         '</details>').join('')

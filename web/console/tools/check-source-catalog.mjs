@@ -21,6 +21,9 @@ import path from "node:path"
 import vm from "node:vm"
 import { fileURLToPath } from "node:url"
 import ts from "typescript"
+import { checkBuiltinDisplay } from "./check-builtin-display.mjs"
+
+checkBuiltinDisplay()
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const read = (name) => fs.readFileSync(path.join(root, name), "utf8")
