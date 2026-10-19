@@ -13,6 +13,11 @@ package http
 // reach it only through the encrypted cloudops command, which checks the
 // sender and this machine's Cloud command switch before using that token.
 // The answer starts an assistant that runs a command on another machine.
+// The two words that reach it, `pair-agent-start` and `pair-agent-status`, are
+// the only Cloud words that deliberately wear this machine's own exemption,
+// and the vocabulary flags them `local_exemption`;
+// TestEveryLocalWordThatNeedsThisMachineSaysSo refuses any other word that
+// would.
 //
 // The page supplies three values and no prose. Each is checked before it is
 // used: the offer is decoded exactly as `/v1/cloud/pairing/offer` decodes it,

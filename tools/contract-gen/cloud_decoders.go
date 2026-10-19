@@ -79,6 +79,10 @@ func decoderName(op string) string {
 func renderDecoder(b *bytes.Buffer, o cloudvocab.Operation) error {
 	d := o.Decode
 	fmt.Fprintf(b, "\n// %s is the `%s` row's decode.\n", decoderName(o.Op), o.Op)
+	if o.Local != nil && o.Local.LocalExemption {
+		b.WriteString("//\n// Deliberately this machine (`local_exemption`): its route refuses every\n" +
+			"// caller but this machine's own token, which the in-process request carries.\n")
+	}
 	fmt.Fprintf(b, "func %s(b body) (plan, LocalRequest, bool) {\n", decoderName(o.Op))
 	b.WriteString("if !b.hasOneOf(\n")
 	for _, s := range o.Shapes {

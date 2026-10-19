@@ -69,6 +69,10 @@ func TestATableThatContradictsItselfIsRefused(t *testing.T) {
 			return bytes.Replace(raw, []byte(`"console_route": "GET /v1/capacity",`),
 				[]byte(`"console_route": "GET /v1/capacity", "console_sentence": "The capacity block is not read over Clawdline Cloud yet: open it on the machine.",`), 1)
 		},
+		"a device word that claims this machine's exemption": func(raw []byte) []byte {
+			return bytes.Replace(raw, []byte(`"local": {"method": "POST", "local_exemption": true,`),
+				[]byte(`"local": {"method": "POST", "device": true, "local_exemption": true,`), 1)
+		},
 		"a wrapper check nobody knows": func(raw []byte) []byte {
 			return bytes.Replace(raw, []byte(`"strip_check": "generation"`), []byte(`"strip_check": "generations"`), 1)
 		},
