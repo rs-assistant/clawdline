@@ -25,6 +25,7 @@ import (
 	"github.com/pion/ice/v4"
 	"github.com/pion/webrtc/v4"
 
+	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
 	"github.com/sainteye/clawdline/internal/app/terminals"
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
 	"github.com/sainteye/clawdline/internal/domain/terminal"
@@ -118,7 +119,7 @@ type directMessage struct {
 // directAPI builds the WebRTC API once per link: UDP only, no mDNS at all,
 // and the timeouts this file's bounds promise.
 //
-// **Nothing here sends to the local network.** macOS asks the person before a
+// **By default, no checks go to the local network.** macOS asks the person before a
 // process reaches a device on it, and the dialog names Clawdline: on
 // 2026-10-15 opening a Session on Cloud asked "allow clawdline to find
 // devices on your local network", because a viewer's offer carried its
@@ -128,7 +129,8 @@ type directMessage struct {
 // finds. A viewer on the same network reaches this machine through the
 // router's public address, or the relay carries it as before. Gathering still
 // binds the local interfaces — that asks nothing — because the public address
-// is learned through them.
+// is learned through them. The explicit same-network opt-in widens the
+// candidate filters to private IPv4 hosts; it may trigger that system prompt.
 func (l *Link) directAPI() (*webrtc.API, error) {
 	l.directMu.Lock()
 	defer l.directMu.Unlock()
@@ -200,11 +202,22 @@ func directLocalNetworkAllowed(ip net.IP, typ string) bool {
 	return typ == "host" && ip.To4() != nil && directAddressAllowed(ip) && ip.IsPrivate()
 }
 
+// directLocalNetworkEnabled reads the opt-in for each new candidate exchange.
+// Remote enablement must not tear down the relay carrying its own receipt.
+// An unreadable policy fails closed; test-only links without a file use settings.
+func (l *Link) directLocalNetworkEnabled() bool {
+	if l.file == nil {
+		return l.settings.DirectLocalNetwork
+	}
+	settings, err := adaptercloud.ReadSettings(l.file)
+	return err == nil && settings.DirectLocalNetwork
+}
+
 // directCandidateAllowed is the whole rule for one candidate this machine
 // would send to (an offer's) or tell the viewer about (its own answer's).
-func (l *Link) directCandidateAllowed(ip net.IP, typ string) bool {
+func (l *Link) directCandidateAllowed(ip net.IP, typ string, local bool) bool {
 	return directRemoteAllowed(ip) || (l.directLoopback && ip.IsLoopback()) ||
-		(l.settings.DirectLocalNetwork && directLocalNetworkAllowed(ip, typ))
+		(local && directLocalNetworkAllowed(ip, typ))
 }
 
 // filterDirectOffer keeps the offer's UDP candidates whose address passes
@@ -219,6 +232,7 @@ func (l *Link) filterDirectOffer(sdp string) (string, error) {
 // the shape of every candidate it kept and why it removed each other one.
 // Counting changes nothing about which candidates are kept.
 func (l *Link) filterDirectOfferTraced(sdp string, trace *directTrace) (string, error) {
+	local := l.directLocalNetworkEnabled()
 	lines := strings.Split(sdp, "\n")
 	out := make([]string, 0, len(lines))
 	candidates := 0
@@ -243,7 +257,7 @@ func (l *Link) filterDirectOfferTraced(sdp string, trace *directTrace) (string, 
 			trace.offerCandidate(shape, "name")
 			continue
 		}
-		if !l.directCandidateAllowed(ip, directCandidateTyp(fields)) {
+		if !l.directCandidateAllowed(ip, directCandidateTyp(fields), local) {
 			trace.offerCandidate(shape, "private")
 			continue
 		}
@@ -286,6 +300,7 @@ func (l *Link) filterDirectAnswer(sdp string) string {
 // filterDirectAnswerTraced is filterDirectAnswer that counts, in trace, the
 // shape of what this machine gathered and offers, and what it left out.
 func (l *Link) filterDirectAnswerTraced(sdp string, trace *directTrace) string {
+	local := l.directLocalNetworkEnabled()
 	lines := strings.Split(sdp, "\n")
 	out := make([]string, 0, len(lines))
 	for _, line := range lines {
@@ -295,7 +310,7 @@ func (l *Link) filterDirectAnswerTraced(sdp string, trace *directTrace) string {
 			_, shape := directCandidateShape(fields)
 			if len(fields) >= 5 {
 				ip := net.ParseIP(fields[4])
-				if ip == nil || !l.directCandidateAllowed(ip, directCandidateTyp(fields)) {
+				if ip == nil || !l.directCandidateAllowed(ip, directCandidateTyp(fields), local) {
 					trace.answerCandidate(shape, "private")
 					continue
 				}

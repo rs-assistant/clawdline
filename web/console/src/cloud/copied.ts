@@ -103,6 +103,8 @@ export interface CloudClientHandle extends CloudReadClient {
   carrierFacts?(machine: string): { known: boolean; supported: boolean; open: boolean }
   /** One direct attempt the person asked for (`DirectCarrier.tryNow`). */
   tryDirect?(machine: string): Promise<DirectTry>
+  sameNetworkAvailable?(machine: string): boolean
+  enableSameNetwork?(machine: string): Promise<void>
   /** A request with a stable id, answered on the encrypted machine channel. */
   _machineRequestAs?(
     request: string, machine: string, word: string, body: Record<string, unknown>, kind: "read" | "action", timeoutMs?: number,

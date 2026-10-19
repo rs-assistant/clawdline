@@ -97,7 +97,17 @@ direct connections are on, `clawdline cloud direct local on|off`, or the local-o
 `POST /v1/cloud/direct/local-network`) lets the direct carrier use RFC 1918 IPv4 host addresses so a
 phone on the same network connects without hairpinning through the router; on macOS its first use
 shows the Local Network permission prompt once, and a denial leaves the public path or the relay
-([terminal-direct-path.md](terminal-direct-path.md)). An EC2 instance can additionally set `cloud_direct_udp_port` and
+([terminal-direct-path.md](terminal-direct-path.md)). The hosted Devices connection sheet offers
+**Enable same-network connections** after a failed direct negotiation when both encrypted SDPs
+contain the same public IPv4 server-reflexive address and the machine reports the opt-in is off.
+It says **Possibly on the same network**: sharing a public exit does not prove a shared LAN.
+Only a paired viewer with operation permission can enable this one setting through
+`direct-local-network-enable`; it cannot disable it or change other Cloud settings. The machine
+persists the opt-in without replacing the relay, so the successful setting receipt arrives before
+the browser retries direct ICE. Each candidate exchange reads the persisted policy. The prompt
+explains that macOS may ask for Local Network access on the target machine. A successful setting
+change and a successful direct connection are reported separately; denying system permission
+still leaves the encrypted relay available. An EC2 instance can additionally set `cloud_direct_udp_port` and
 `cloud_direct_public_ip` together to multiplex direct ICE on one inbound UDP port; see
 [Linux setup](linux.md#let-a-cloud-browser-connect-directly-to-ec2).
 

@@ -20,6 +20,8 @@ export interface MachineManager {
   carrier(machine: string): CarrierReading | null
   /** One direct attempt the person asked for. */
   tryDirect(machine: string): Promise<DirectTry>
+  sameNetworkAvailable?(machine: string): boolean
+  enableSameNetwork?(machine: string): Promise<void>
   rename(machine: CloudMachine, name: string): Promise<RenameOutcome>
   forget(machine: CloudMachine): Promise<ForgetOutcome>
   /** Opens the pairing card for a machine this browser is not paired with. */

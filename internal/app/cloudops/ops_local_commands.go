@@ -4,6 +4,8 @@ func init() {
 	register(
 		// MARK: commands with a local capability
 
+		op{name: "direct-local-network-enable"},
+
 		op{name: "send"},
 
 		op{name: "answer", guard: answerNamesItsQuestion},

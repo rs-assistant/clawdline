@@ -398,3 +398,27 @@ test("fault injection: a read takes the carrier while this page's own socket is 
   carrier.close("gone for this test")
   await assert.rejects(read(client), (error) => error.code === "offline")
 })
+
+test("same-network enable waits for a confirmed receipt before retiring its suggestion", async () => {
+  const carrier = openCarrier()
+  carrier.canEnableSameNetwork = true
+  carrier.sameNetworkEnabled = () => { carrier.canEnableSameNetwork = false }
+  const client = carrierClient(carrier)
+  client.machineDescriptor = () => ({ machine: { commands: ["direct-local-network-enable"], operation_allowed: true } })
+  assert.equal(client.sameNetworkAvailable("m"), true)
+  client._machineRequestAs = async () => { throw new Error("lost receipt") }
+  await assert.rejects(client.enableSameNetwork("m"), /lost receipt/)
+  assert.equal(client.sameNetworkAvailable("m"), true)
+  client._machineRequestAs = async () => ({ direct_local_network: false })
+  await assert.rejects(client.enableSameNetwork("m"), /confirm/)
+  assert.equal(client.sameNetworkAvailable("m"), true)
+  client._machineRequestAs = async (request, machine, word, body, kind) => {
+    assert.equal(machine, "m")
+    assert.equal(word, "direct-local-network-enable")
+    assert.equal(kind, "action")
+    assert.deepEqual(body, {})
+    return { direct_local_network: true }
+  }
+  await client.enableSameNetwork("m")
+  assert.equal(client.sameNetworkAvailable("m"), false)
+})

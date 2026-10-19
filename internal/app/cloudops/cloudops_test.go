@@ -1163,6 +1163,11 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 			"request": "req-events", "batch": map[string]any{"rows": []any{}}},
 		session: machine, name: "action:req-events", code: "unknown_command", status: 400,
 	}, {
+		word:    "direct-local-network-enable",
+		body:    map[string]any{"type": "direct-local-network-enable", "session": machine, "request": "req-local"},
+		session: machine, name: "action:req-local", method: "POST", path: "/v1/cloud/direct/local-network",
+		body2: `{"enabled":true}`,
+	}, {
 		// The one word this machine could serve and deliberately does not.
 		word: "dispatch",
 		body: map[string]any{"type": "dispatch", "session": machine, "request": "req-dispatch",

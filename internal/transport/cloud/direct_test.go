@@ -975,3 +975,27 @@ func TestSameNetworkCandidatesFollowTheSetting(t *testing.T) {
 		}
 	})
 }
+
+func TestPersistedSameNetworkEnableReachesTheNextOfferWithoutReload(t *testing.T) {
+	file := nextconfig.Open(t.TempDir())
+	l := &Link{file: file}
+	home := net.IPv4(192, 168, 1, 2).String()
+	sdp := "v=0\r\na=candidate:1 1 udp 2122260223 " + home + " 5000 typ host\r\n"
+	if strings.Contains(l.filterDirectAnswer(sdp), home) {
+		t.Fatal("private candidate escaped before opt-in")
+	}
+	if err := adaptercloud.SetDirectLocalNetwork(file, true); err != nil {
+		t.Fatal(err)
+	}
+	answer := l.filterDirectAnswer(sdp)
+	offer, err := l.filterDirectOffer(sdp)
+	if err != nil || !strings.Contains(answer, home) || !strings.Contains(offer, home) {
+		t.Fatalf("persisted enable did not reach next negotiation: %q %q %v", answer, offer, err)
+	}
+	if err := adaptercloud.SetDirectLocalNetwork(file, false); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(l.filterDirectAnswer(sdp), home) {
+		t.Fatal("revoked policy kept private candidates")
+	}
+}

@@ -101,7 +101,8 @@ func askBridge(t *testing.T, b cloudops.Bridge, seq uint64, body map[string]any)
 // `Local` set, so a route that answers only this machine (`requireLocal`, the
 // gate's Local-only writes) lets it through. That is right for exactly the
 // words the table flags `local_exemption` — the assistant-run pairing offer
-// and its status — and wrong for any other: a new Local word on such a route
+// and its status, plus the operation-gated same-network opt-in — and wrong
+// for any other: a new Local word on such a route
 // would hand every viewer on the account this machine's own hand, silently.
 //
 // Each Local word's own decoder builds its own request from the table's own

@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import type { DirectChannelLike, DirectPeerLike } from "./terminal-direct.js"
 // @ts-expect-error -- esbuild bundles the TypeScript source for Node's test runner.
-import { DirectCarrier } from "./direct-carrier.ts"
+import { DirectCarrier, samePublicIPv4 } from "./direct-carrier.ts"
 // @ts-expect-error -- esbuild bundles the TypeScript source for Node's test runner.
 import { directHistory, failingSince, recordDirectAttempt, HISTORY_HOURS, HISTORY_MACHINES } from "./direct-history.ts"
 import { bytesBase64 } from "../legacy/js/net/cloud-crypto.js"
@@ -153,4 +153,41 @@ test("past the machine bound, the machine used longest ago is dropped", () => {
   assert.equal(kept.length, HISTORY_MACHINES)
   assert.equal(kept.includes("m0"), false, "the machine used longest ago was kept")
   assert.equal(directHistory(`m${HISTORY_MACHINES}`, now, store).some((h: { ok: number }) => h.ok === 1), true)
+})
+
+const candidate = (ip: string, type = "srflx", protocol = "udp") => `a=candidate:1 1 ${protocol} 123 ${ip} 5000 typ ${type}\r\n`
+
+test("same public exit suggests a network without treating private, host, TCP or missing candidates as evidence", () => {
+  assert.equal(samePublicIPv4(candidate("203.0.113.1"), candidate("203.0.113.1")), true)
+  assert.equal(samePublicIPv4(candidate("203.0.113.1"), candidate("203.0.113.2")), false)
+  for (const ip of [...[ [192,168,1,2], [10,1,2,3], [172,16,1,2], [169,254,1,2], [100,64,1,2] ].map((octets) => octets.join(".")), "127.0.0.1", "::1", "device.local", "999.1.1.1"]) {
+    assert.equal(samePublicIPv4(candidate(ip), candidate(ip)), false, ip)
+  }
+  for (const value of [candidate("203.0.113.1", "host"), candidate("203.0.113.1", "srflx", "tcp"), ""]) {
+    assert.equal(samePublicIPv4(candidate("203.0.113.1"), value), false)
+  }
+})
+
+test("only a failed, answered attempt with the opt-in off offers same-network recovery", async () => {
+  for (const enabled of [false, true, undefined]) {
+    for (const connects of [false, true]) {
+      const peer = new FakePeer()
+      peer.createOffer = async () => ({ type: "offer", sdp: candidate("203.0.113.1") })
+      if (!connects) peer.setRemoteDescription = async () => { throw new Error("network failed") }
+      const client = {
+        deviceID: "viewer", ready: true, retired: false, carrierSupported: () => true,
+        receiveCarrierEnvelope: () => {},
+        publishCarrierOffer: async (_m: string, offer: { connection: string; key: Uint8Array }) => ({
+          sdpSealed: await sealAnswer(offer, candidate("203.0.113.1")), directReceipts: false, directLocalNetwork: enabled,
+        }),
+      }
+      const carrier = new DirectCarrier(client, "recovery", () => peer)
+      assert.equal(carrier.canEnableSameNetwork, false)
+      await carrier.tryNow()
+      assert.equal(carrier.canEnableSameNetwork, !connects && enabled === false)
+      carrier.sameNetworkEnabled()
+      assert.equal(carrier.canEnableSameNetwork, false)
+      carrier.close()
+    }
+  }
 })

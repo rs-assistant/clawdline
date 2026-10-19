@@ -344,6 +344,21 @@ func (s *Server) cloudDirectLocalNetworkRoute(w http.ResponseWriter, r *http.Req
 		writeCloudOnboardingFailure(w, err)
 		return
 	}
+	// A paired Cloud viewer may only enable this one setting. The bridge's
+	// write gate has already rechecked its permission. Keep the relay alive
+	// for the receipt; subsequent candidate exchanges read the new policy.
+	if cloudtransport.ViaCloud(r.Context()) {
+		if !on || cloudtransport.CloudViewerOf(r.Context()) == "" || !settings.Enabled || !settings.TerminalDirect || !settings.Commands {
+			writeAuthRefusal(w, http.StatusForbidden, "forbidden", "This machine must allow Cloud operations and direct connections to enable same-network connections.")
+			return
+		}
+		if err := adaptercloud.SetDirectLocalNetwork(file, true); err != nil {
+			writeCloudOnboardingFailure(w, err)
+			return
+		}
+		writeJSON(w, map[string]bool{"direct_local_network": true})
+		return
+	}
 	if settings.Enabled && s.cloudReload == nil {
 		writeAuthRefusal(w, http.StatusServiceUnavailable, "cloud_runtime_unavailable", "The Cloud connection is not available in this daemon.")
 		return

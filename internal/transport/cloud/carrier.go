@@ -113,7 +113,7 @@ func (l *Link) handleCarrierOffer(ctx context.Context, svc *terminals.Service, p
 		// makes: a terminal that borrows this carrier may ask for its everyday
 		// receipts on the channel rather than the relay.
 		if l.publishCarrierAnswer(context.Background(), req.RequestID,
-			map[string]any{"carrier": req.Connection, "sdp_sealed": sealed, "direct_receipts": true},
+			map[string]any{"carrier": req.Connection, "sdp_sealed": sealed, "direct_receipts": true, "direct_local_network": l.directLocalNetworkEnabled()},
 			200, "") != nil {
 			l.closeDirectPeerOf(viewer, "the carrier answer could not be sent")
 			return

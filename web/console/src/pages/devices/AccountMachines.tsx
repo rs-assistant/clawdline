@@ -251,8 +251,9 @@ const Cross = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" 
 function ConnectionTab({ machine, manager, onStart }: { machine: Row; manager: MachineManager; onStart: () => void }) {
   useHistoryTick()
   const [attempt, setAttempt] = useState<"idle" | "trying" | DirectTry>("idle")
+  const [localNetwork, setLocalNetwork] = useState<"idle" | "saving" | "enabled" | "failed">("idle")
   const live = useRef(true)
-  useEffect(() => () => { live.current = false }, [])
+  useEffect(() => { live.current = true; return () => { live.current = false } }, [])
   const name = nameOf(machine)
   const history = directHistory(machine.id)
   const since = failingSince(history)
@@ -265,6 +266,21 @@ function ConnectionTab({ machine, manager, onStart }: { machine: Row; manager: M
     const outcome = await manager.tryDirect(machine.id)
     if (live.current) setAttempt(outcome)
   }
+  const enableSameNetwork = async () => {
+    if (localNetwork === "saving" || !manager.enableSameNetwork) return
+    setLocalNetwork("saving")
+    try {
+      await manager.enableSameNetwork(machine.id)
+    } catch {
+      if (live.current) setLocalNetwork("failed")
+      return
+    }
+    if (!live.current) return
+    setLocalNetwork("enabled")
+    await tryNow()
+  }
+  const suggestLocal = road === "failing" && machine.pairing !== "not_paired" &&
+    manager.sameNetworkAvailable?.(machine.id) === true
   const canTry = road !== "offline" && road !== "machine_off" && road !== "direct" && machine.pairing !== "not_paired"
 
   return (
@@ -295,8 +311,22 @@ function ConnectionTab({ machine, manager, onStart }: { machine: Row; manager: M
       )}
       <HistoryChart history={history} since={since} />
       {attempt !== "idle" && <AttemptResult attempt={attempt} machine={name} />}
+      {suggestLocal && localNetwork !== "enabled" && (
+        <div className="am-stack">
+          <div>
+            <h3 className="am-road-title">{nextWord("msSameNetworkTitle")}</h3>
+            <p className="am-say">{nextWord("msSameNetworkHint", { machine: name })}</p>
+          </div>
+          <button type="button" className="am-ghost am-wide" onClick={enableSameNetwork}
+            disabled={localNetwork === "saving" || attempt === "trying"} aria-busy={localNetwork === "saving"}>
+            {nextWord(localNetwork === "saving" ? "msSameNetworkSaving" : "msSameNetworkEnable")}
+          </button>
+        </div>
+      )}
+      {localNetwork === "failed" && <p className="am-say" role="alert">{nextWord("msSameNetworkFailed")}</p>}
+      {localNetwork === "enabled" && <p className="am-say" role="status">{nextWord("msSameNetworkEnabled", { machine: name })}</p>}
       {canTry && (
-        <button type="button" className="am-ghost am-wide" onClick={tryNow} disabled={attempt === "trying"} aria-busy={attempt === "trying"}>
+        <button type="button" className="am-ghost am-wide" onClick={tryNow} disabled={attempt === "trying" || localNetwork === "saving"} aria-busy={attempt === "trying"}>
           {attempt === "trying" ? nextWord("msTrying") : nextWord("msTryNow")}
         </button>
       )}

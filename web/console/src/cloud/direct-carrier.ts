@@ -43,6 +43,8 @@ export interface CarrierAnswer {
   sdpSealed: string
   /** The machine offers to put a borrowing terminal's everyday receipts on the DC. */
   directReceipts: boolean
+  /** Absent on older machines: never infer that their setting is off. */
+  directLocalNetwork?: boolean
 }
 
 /** The little of the Cloud client a carrier uses. A test stands in for all of it. */
@@ -107,6 +109,32 @@ export type DirectTry =
   | { kind: "no_answer"; code: string }
   | { kind: "not_connected"; code: string }
 
+/** Compare only UDP server-reflexive public IPv4 addresses already in the
+ * encrypted negotiation. Equal NAT exits suggest a LAN; they do not prove it.
+ * Addresses stay in this stack frame, never in history, telemetry or storage.
+ */
+export function samePublicIPv4(offer: string, answer: string): boolean {
+  const addresses = (sdp: string): Set<string> => {
+    const found = new Set<string>()
+    for (const line of sdp.split("\n")) {
+      if (!line.startsWith("a=candidate:")) continue
+      const fields = line.trim().split(/\s+/)
+      if (fields.length < 8 || fields[2]?.toLowerCase() !== "udp" || fields[6] !== "typ" || fields[7] !== "srflx") continue
+      const ip = fields[4]!
+      const octets = ip.split(".")
+      if (octets.length !== 4 || octets.some((n) => !/^(0|[1-9]\d*)$/.test(n) || Number(n) > 255)) continue
+      const [a, b] = octets.map(Number)
+      if (a === 0 || a === 10 || a === 127 || a! >= 224 ||
+        a === 169 && b === 254 || a === 172 && b! >= 16 && b! <= 31 ||
+        a === 192 && b === 168 || a === 100 && b! >= 64 && b! <= 127) continue
+      found.add(ip)
+    }
+    return found
+  }
+  const local = addresses(offer)
+  return [...addresses(answer)].some((ip) => local.has(ip))
+}
+
 const registry = new WeakMap<CarrierClient, Map<string, DirectCarrier>>()
 
 export class DirectCarrier implements SharedCarrier {
@@ -128,6 +156,7 @@ export class DirectCarrier implements SharedCarrier {
   private gen = 0
   private retryAt = 0
   private receipts = false
+  private sameNetworkSuggestion = false
   private readonly listeners = new Map<"terminal" | "session", (envelope: TerminalEnvelope) => void>()
   private readonly down = new Set<(code: string) => void>()
 
@@ -159,6 +188,9 @@ export class DirectCarrier implements SharedCarrier {
   static held(client: CarrierClient, machine: string): DirectCarrier | null {
     return registry.get(client)?.get(machine) ?? null
   }
+
+  get canEnableSameNetwork(): boolean { return !this.open && this.sameNetworkSuggestion }
+  sameNetworkEnabled(): void { this.sameNetworkSuggestion = false }
 
   get open(): boolean { return !!this.link?.open }
   /** Which channel this carrier is on. A read answer's sequence is only a number within it. */
@@ -225,6 +257,8 @@ export class DirectCarrier implements SharedCarrier {
   private async negotiate(): Promise<DirectTry> {
     const started = Date.now()
     let answered = false
+    let suggestSameNetwork = false
+    this.sameNetworkSuggestion = false
     const connection = random22()
     const keyID = "rk-" + random22()
     const key = crypto.getRandomValues(new Uint8Array(32))
@@ -236,7 +270,9 @@ export class DirectCarrier implements SharedCarrier {
       const sdp = await link.offer()
       const answer = await this.client.publishCarrierOffer(this.machine, { request, connection, keyID, key, sdp })
       answered = true
-      await link.answer(await openCarrierAnswer(key, connection, answer.sdpSealed))
+      const answerSDP = await openCarrierAnswer(key, connection, answer.sdpSealed)
+      suggestSameNetwork = answer.directLocalNetwork === false && samePublicIPv4(sdp, answerSDP)
+      await link.answer(answerSDP)
       if (!link.open) throw fail("carrier_not_open")
       this.install(link, answer.directReceipts)
       recordDirectAttempt(this.machine, true)
@@ -249,6 +285,7 @@ export class DirectCarrier implements SharedCarrier {
       this.retryAt = Date.now() + (code === "terminal_busy" ? DIRECT_BUSY_RETRY_MS : DIRECT_RETRY_MS)
       // "Not now" from the machine is not a failure of this network, so it is not counted.
       if (code === "terminal_busy") return { kind: "busy" }
+      this.sameNetworkSuggestion = answered && suggestSameNetwork
       recordDirectAttempt(this.machine, false)
       return answered ? { kind: "not_connected", code } : { kind: "no_answer", code }
     }

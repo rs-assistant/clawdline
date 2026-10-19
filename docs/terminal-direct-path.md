@@ -194,8 +194,13 @@ removed on 2026-10-06: a hidden page now keeps its Cloud connection exactly as a
   person inviting it. If the permission is denied, those checks fail and the pair is made over the
   public addresses as before, or the relay carries the connection. Off, both filters answer byte for
   byte what they answered before the setting existed (`TestSameNetworkCandidatesFollowTheSetting`).
-  Changing it replaces the Cloud line like the direct switch does, so open peers close and the next
-  offer is filtered by the new choice.
+  Changing it locally replaces the Cloud line like the direct switch does. The hosted Devices
+  sheet can also offer an enable-only action after failed ICE with a shared public IPv4 exit,
+  described as a possible same network rather than proof of a LAN. That command requires the
+  paired viewer's operation permission and persists the choice without replacing the Cloud line:
+  the relay must deliver its setting receipt before the browser retries. Subsequent offer and
+  answer filters read the persisted policy, including revocation. The UI explains that the target
+  machine may show the macOS permission prompt, and reports setting success separately from ICE.
   The residual risk when it is on: a viewer the person has paired can now name private IPv4 hosts
   in its offer, and this machine sends ICE connectivity checks to them. That is bounded by the same
   admission as every offer — it must decrypt under that viewer's key, at most 32 candidates per
