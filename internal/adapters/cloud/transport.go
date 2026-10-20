@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/domain/cloud"
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 )
 
 // Options configure one transport.
@@ -97,6 +98,9 @@ type Options struct {
 	// test sets them to answer as the production relay from this process.
 	TLSConfig *tls.Config
 	NetDial   func(network, address string) (net.Conn, error)
+	// Health is the daemon's connection-health tracker. Nil (monitoring off,
+	// or a caller that predates it) records nothing and changes nothing.
+	Health *connectionhealth.Tracker
 }
 
 // Transport is one line to the relay.
@@ -283,6 +287,7 @@ func (t *Transport) session(ctx context.Context) error {
 		return err
 	}
 	defer conn.Close()
+	conn.health = t.opts.Health
 
 	if err := t.handshake(conn); err != nil {
 		return err
@@ -407,6 +412,8 @@ func (t *Transport) setState(state string) {
 // keepalive sends `{"type":"ping"}` every KeepaliveInterval. A send that fails
 // closes the socket, which is how the reader finds out.
 func (t *Transport) keepalive(conn *Conn, done <-chan struct{}) {
+	loop := t.opts.Health.Start(connectionhealth.LoopSpec(connectionhealth.LocKeepaliveLoop))
+	defer loop.End(true)
 	ticker := time.NewTicker(KeepaliveInterval)
 	defer ticker.Stop()
 	lastWall := t.opts.Now()
@@ -428,6 +435,7 @@ func (t *Transport) keepalive(conn *Conn, done <-chan struct{}) {
 				return
 			}
 			lastWall = now
+			_ = loop.Progress(connectionhealth.StageIdle)
 			if err := conn.WriteText(PingFrame, t.opts.Now().Add(KeepaliveInterval)); err != nil {
 				t.logf("cloud keepalive failed reason=%s", FailureCode(err))
 				_ = conn.Close()
@@ -443,6 +451,11 @@ func missedKeepalive(previous, now time.Time) bool {
 
 // read is the receive loop.
 func (t *Transport) read(ctx context.Context, conn *Conn) error {
+	// The reader holds a reserved slot for the socket's whole life: it is
+	// the loop whose progress proves every frame after it, so business
+	// phases filling the table must not hide it.
+	loop := t.opts.Health.Start(connectionhealth.LoopSpec(connectionhealth.LocReadLoop))
+	defer loop.End(true)
 	for {
 		select {
 		case <-ctx.Done():
@@ -458,6 +471,7 @@ func (t *Transport) read(ctx context.Context, conn *Conn) error {
 			}
 			return err
 		}
+		_ = loop.Progress(connectionhealth.StageIdle)
 		if err := t.handle(conn, data); err != nil {
 			return err
 		}
@@ -470,7 +484,18 @@ func (t *Transport) read(ctx context.Context, conn *Conn) error {
 // unknown status, an uncorrelated error: all of those are logged and the
 // socket kept, because the alternative is that one bad frame from the relay
 // costs every open session its line.
-func (t *Transport) handle(conn *Conn, data []byte) error {
+func (t *Transport) handle(conn *Conn, data []byte) (err error) {
+	// One finite phase per frame, begun before anything the frame can wait
+	// on, so a frame whose ack settlement, sender lookup or inbound callback
+	// never returns shows where it stopped. Its correlation is minted here
+	// and never taken from the frame.
+	h := t.opts.Health.Start(connectionhealth.DaemonSpec(connectionhealth.StageFrameRead,
+		connectionhealth.ClassTransport, connectionhealth.LocHandleFrame, t.opts.Health.NewCorrelation()))
+	defer func() { h.End(err == nil) }()
+	return t.handleFrame(conn, data, h)
+}
+
+func (t *Transport) handleFrame(conn *Conn, data []byte, h connectionhealth.Handle) error {
 	kind, err := frameType(data)
 	if err != nil {
 		t.logf("cloud dropped a frame reason=%s", err)
@@ -496,61 +521,73 @@ func (t *Transport) handle(conn *Conn, data []byte) error {
 		t.logf("cloud uncorrelated relay error code=%s", relay.Code)
 		return nil
 	case FrameAck:
+		_ = h.Step(connectionhealth.StageFrameRead, connectionhealth.LocSettleReceipt)
 		t.handleAck(data)
 		return nil
 	case FramePublishError:
+		_ = h.Step(connectionhealth.StageFrameRead, connectionhealth.LocSettleReceipt)
 		t.handlePublishError(data)
 		return nil
 	case FrameEnvelope:
-		t.handleEnvelope(data)
+		t.handleEnvelope(data, h)
 		return nil
 	case "peer_envelope":
 		if t.opts.PeerInbound != nil {
+			_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocPeerCallback)
 			t.opts.PeerInbound(data)
 		}
 		return nil
 	case "peer_discovery_ack", "peer_discovery_error":
 		if t.opts.PeerDiscoveryStatus != nil {
+			_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocPeerCallback)
 			t.opts.PeerDiscoveryStatus(data)
 		}
 		return nil
 	case "peer_discovery_envelope":
 		if t.opts.PeerDiscoveryInbound != nil {
+			_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocPeerCallback)
 			t.opts.PeerDiscoveryInbound(data)
 		}
 		return nil
 	case "peer_task_start_envelope":
 		if t.opts.PeerTaskStartInbound != nil {
+			_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocPeerCallback)
 			t.opts.PeerTaskStartInbound(data)
 		}
 		return nil
 	case "peer_task_probe_envelope":
 		if t.opts.PeerTaskProbeInbound != nil {
+			_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocPeerCallback)
 			t.opts.PeerTaskProbeInbound(data)
 		}
 		return nil
 	case "peer_task_probe_ack":
 		if t.opts.PeerTaskProbeAck != nil {
+			_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocPeerCallback)
 			t.opts.PeerTaskProbeAck(data)
 		}
 		return nil
 	case "peer_task_event_envelope":
 		if t.opts.PeerTaskEventInbound != nil {
+			_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocPeerCallback)
 			t.opts.PeerTaskEventInbound(data)
 		}
 		return nil
 	case "peer_task_event_ack":
 		if t.opts.PeerTaskEventAck != nil {
+			_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocPeerCallback)
 			t.opts.PeerTaskEventAck(data)
 		}
 		return nil
 	case "peer_task_start_ack":
 		if t.opts.PeerTaskStartAck != nil {
+			_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocPeerCallback)
 			t.opts.PeerTaskStartAck(data)
 		}
 		return nil
 	case "peer_ack":
 		if t.opts.PeerAck != nil {
+			_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocPeerCallback)
 			t.opts.PeerAck(data)
 		}
 		return nil
@@ -630,7 +667,7 @@ func (t *Transport) handlePublishError(data []byte) {
 // signature, and **only then** the replay claim. Claiming first would let an
 // unauthenticated envelope spend a sequence number that the real sender then
 // could not use (`CloudTransport.swift:2371-2374`).
-func (t *Transport) handleEnvelope(data []byte) {
+func (t *Transport) handleEnvelope(data []byte, h connectionhealth.Handle) {
 	var frame EnvelopeFrame
 	if err := json.Unmarshal(data, &frame); err != nil || len(frame.Envelope) == 0 {
 		t.opts.Status.Dropped(DropMalformed)
@@ -649,7 +686,7 @@ func (t *Transport) handleEnvelope(data []byte) {
 			return
 		}
 	}
-	t.admitEnvelope(frame.Envelope, "")
+	t.admitTraced(frame.Envelope, "", h)
 }
 
 // AcceptDirect admits one envelope that arrived on a viewer's data channel
@@ -659,8 +696,14 @@ func (t *Transport) handleEnvelope(data []byte) {
 // round, and it also requires one of the two channels that viewer may address
 // the machine on: its own `termi`, or the read-only `r/` this machine answers
 // Session reads from. It reports whether the envelope was admitted.
-func (t *Transport) AcceptDirect(viewer string, raw []byte) bool {
-	return viewer != "" && t.admitEnvelope(raw, viewer)
+func (t *Transport) AcceptDirect(viewer string, raw []byte) (admitted bool) {
+	if viewer == "" {
+		return false
+	}
+	h := t.opts.Health.Start(connectionhealth.DaemonSpec(connectionhealth.StageFrameRead,
+		connectionhealth.ClassTransport, connectionhealth.LocHandleFrame, t.opts.Health.NewCorrelation()))
+	defer func() { h.End(admitted) }()
+	return t.admitTraced(raw, viewer, h)
 }
 
 // directChannelAllowed is which channels a viewer may publish on its carrier.
@@ -673,6 +716,11 @@ func (t *Transport) directChannelAllowed(channel, viewer string) bool {
 }
 
 func (t *Transport) admitEnvelope(raw []byte, directViewer string) bool {
+	return t.admitTraced(raw, directViewer, connectionhealth.Handle{})
+}
+
+// admitTraced is admitEnvelope stepping h through each wait of the ladder.
+func (t *Transport) admitTraced(raw []byte, directViewer string, h connectionhealth.Handle) bool {
 	envelope, err := cloud.DecodeEnvelope(raw)
 	if err != nil {
 		t.opts.Status.Dropped(DropMalformed)
@@ -702,6 +750,9 @@ func (t *Transport) admitEnvelope(raw []byte, directViewer string) bool {
 		t.opts.Status.Dropped(DropRosterUnreadable)
 		return false
 	}
+	// The lookup may read the roster file or refresh it from the control
+	// plane, so it is its own location.
+	_ = h.Step(connectionhealth.StageFrameRead, connectionhealth.LocSenderLookup)
 	verifiedKey, known := t.opts.PublicKeyFor(envelope.Sender)
 	if !known {
 		t.opts.Status.Dropped(DropUnknownSender)
@@ -711,12 +762,14 @@ func (t *Transport) admitEnvelope(raw []byte, directViewer string) bool {
 	keyForEnvelope := func(sender string) (ed25519.PublicKey, bool) {
 		return verifiedKey, sender == envelope.Sender
 	}
+	_ = h.Step(connectionhealth.StageFrameRead, connectionhealth.LocSignatureCheck)
 	if !envelope.Verify(keyForEnvelope) {
 		t.opts.Status.Dropped(DropBadSignature)
 		t.logf("cloud dropped an envelope reason=%s sender=%s seq=%d", DropBadSignature, envelope.Sender, envelope.Seq)
 		return false
 	}
 
+	_ = h.Step(connectionhealth.StageSenderVerified, connectionhealth.LocReplayClaim)
 	switch t.opts.Replay.Claim(envelope.Sender, envelope.Seq) {
 	case cloud.ReplayRefused:
 		t.opts.Status.Dropped(DropReplay)
@@ -728,6 +781,7 @@ func (t *Transport) admitEnvelope(raw []byte, directViewer string) bool {
 		return false
 	}
 
+	_ = h.Step(connectionhealth.StageSenderVerified, connectionhealth.LocOpenEnvelope)
 	var plaintext []byte
 	contentKey := t.opts.ContentKey
 	if t.opts.Role == "viewer" {
@@ -753,6 +807,9 @@ func (t *Transport) admitEnvelope(raw []byte, directViewer string) bool {
 		}
 	}
 	t.opts.Status.Inbound()
+	// Inbound must not block (it enqueues for the link's lanes); this step
+	// is what shows it when it does.
+	_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocInboundCallback)
 	if directViewer != "" && t.opts.DirectInbound != nil {
 		t.opts.DirectInbound(envelope, plaintext, verifiedKey)
 		return true
@@ -895,7 +952,10 @@ func (t *Transport) Unsubscribe(channels ...string) error {
 // from a list snapshotted **once** — a row settling mid-drain must not be able
 // to cause a second write or a skipped one.
 func (t *Transport) drain(conn *Conn, done <-chan struct{}, reconnect bool) {
+	loop := t.opts.Health.Start(connectionhealth.LoopSpec(connectionhealth.LocDrainLoop))
+	defer loop.End(true)
 	if reconnect {
+		pass := t.drainPass()
 		for _, seq := range t.opts.Spool.InFlight() {
 			sealed, err := t.opts.Spool.Resend(seq)
 			if err != nil {
@@ -903,10 +963,12 @@ func (t *Transport) drain(conn *Conn, done <-chan struct{}, reconnect bool) {
 			}
 			if err := conn.WriteText(PublishFrame(sealed), t.opts.Now().Add(OpeningTimeout)); err != nil {
 				t.logf("cloud re-send failed seq=%d reason=%s", seq, FailureCode(err))
+				pass.End(false)
 				return
 			}
 			t.logf("cloud re-sent seq=%d", seq)
 		}
+		pass.End(true)
 	}
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
@@ -918,24 +980,44 @@ func (t *Transport) drain(conn *Conn, done <-chan struct{}, reconnect bool) {
 			return
 		case <-ticker.C:
 		}
-		t.opts.Spool.BurnExpired()
-		t.settleBurned()
-		for {
-			disposition := t.opts.Spool.SendNext()
-			if disposition.Row == nil {
-				break
-			}
-			if err := conn.WriteText(PublishFrame(disposition.Row.Sealed), t.opts.Now().Add(OpeningTimeout)); err != nil {
-				// The row stays `sent`. Whether those bytes reached the relay
-				// is unknown, and only the attempt window decides.
-				t.logf("cloud publish failed seq=%d reason=%s", disposition.Row.Seq, FailureCode(err))
-				_ = conn.Close()
-				return
-			}
-			t.opts.Status.Published()
+		_ = loop.Progress(connectionhealth.StageIdle)
+		if !t.drainOnce(conn) {
+			return
 		}
-		t.settleBurned()
 	}
+}
+
+// drainPass is the finite phase of one drain pass: the spool's locks, the
+// burned-row callbacks and the writes it makes.
+func (t *Transport) drainPass() connectionhealth.Handle {
+	return t.opts.Health.Start(connectionhealth.DaemonSpec(connectionhealth.StageSpoolQueued,
+		connectionhealth.ClassTransport, connectionhealth.LocDrainSend, ""))
+}
+
+// drainOnce is one tick of drain, and false once the socket was closed.
+func (t *Transport) drainOnce(conn *Conn) bool {
+	pass := t.drainPass()
+	ok := true
+	defer func() { pass.End(ok) }()
+	t.opts.Spool.BurnExpired()
+	t.settleBurned()
+	for {
+		disposition := t.opts.Spool.SendNext()
+		if disposition.Row == nil {
+			break
+		}
+		if err := conn.WriteText(PublishFrame(disposition.Row.Sealed), t.opts.Now().Add(OpeningTimeout)); err != nil {
+			// The row stays `sent`. Whether those bytes reached the relay
+			// is unknown, and only the attempt window decides.
+			t.logf("cloud publish failed seq=%d reason=%s", disposition.Row.Seq, FailureCode(err))
+			_ = conn.Close()
+			ok = false
+			return false
+		}
+		t.opts.Status.Published()
+	}
+	t.settleBurned()
+	return true
 }
 
 // settleBurned tells OnSettled about every row the spool burned since the

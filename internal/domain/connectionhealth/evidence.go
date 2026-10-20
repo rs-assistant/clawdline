@@ -138,26 +138,34 @@ type Wiring struct {
 	Status string `json:"status"`
 }
 
-// Wiring statuses.
+// Wiring statuses. Partial means some of the part exists and the rest is
+// named in docs/admin-connection-health-contract.md §1.
 const (
 	WiringImplemented   = "implemented"
+	WiringPartial       = "partial"
 	WiringUnimplemented = "unimplemented"
 )
 
-// Unwired is what this foundation does not do yet.
+// Unwired is what this build does and does not do yet. The call sites are
+// partial: frame read, sender lookup, verification, inbound and peer
+// callbacks, receipt settlement, the drain pass, writer-lock wait and socket
+// write, and the link's read, command and sessions lanes and handlers are
+// wired; response sealing and the spool enqueue inside the relay are not.
+// The location map names functions, not lines.
 func Unwired() []Wiring {
 	return []Wiring{
 		{"active_phase_tracker", WiringImplemented},
 		{"watchdog", WiringImplemented},
 		{"memory_journal", WiringImplemented},
-		{"daemon_instrumentation_call_sites", WiringUnimplemented},
+		{"daemon_runtime_per_boot", WiringImplemented},
+		{"daemon_instrumentation_call_sites", WiringPartial},
 		{"durable_segmented_journal", WiringUnimplemented},
 		{"stack_capture_worker", WiringUnimplemented},
-		{"local_health_cli_and_route", WiringUnimplemented},
+		{"local_health_cli_and_route", WiringImplemented},
 		{"cloud_ingest", WiringUnimplemented},
 		{"cloud_query", WiringUnimplemented},
 		{"relay_and_viewer_producers", WiringUnimplemented},
-		{"stage_location_map_per_build", WiringUnimplemented},
+		{"stage_location_map_per_build", WiringPartial},
 	}
 }
 
@@ -169,6 +177,8 @@ type Evidence struct {
 	Watchdog    Report    `json:"watchdog"`
 	Journal     Page      `json:"journal"`
 	Wiring      []Wiring  `json:"wiring"`
+	// Locations is this build's location map; Runtime.Export sets it.
+	Locations *LocationMap `json:"locations,omitempty"`
 }
 
 // Export assembles Evidence from the watchdog's latest report (taken on the

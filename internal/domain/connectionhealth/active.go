@@ -1,6 +1,7 @@
 package connectionhealth
 
 import (
+	"strconv"
 	"sync/atomic"
 	"time"
 )
@@ -121,6 +122,9 @@ type Tracker struct {
 
 	completed [5]atomic.Uint64
 	failed    [5]atomic.Uint64
+
+	correlations atomic.Uint64
+	invalidSpecs atomic.Uint64
 }
 
 // NewTracker makes an empty table.
@@ -175,9 +179,56 @@ func (t *Tracker) countOverflow(s Spec) {
 	t.overflowLast.Store(at)
 }
 
+// Start is Begin for a call site: it never returns an error to a business
+// path. A nil tracker (monitoring off, or a test that wired none) and a full
+// table both give the zero Handle, whose every call is a no-op; the refusal
+// was already counted by Begin. A Spec that fails validation is a bug in the
+// call site, which the location tests pin, and is counted as invalid.
+func (t *Tracker) Start(s Spec) Handle {
+	if t == nil {
+		return Handle{}
+	}
+	h, err := t.Begin(s)
+	if err != nil && CodeOf(err) == CodeInvalidField {
+		t.invalidSpecs.Add(1)
+	}
+	return h
+}
+
+// InvalidSpecs is how many Start calls were refused for an invalid Spec.
+func (t *Tracker) InvalidSpecs() uint64 {
+	if t == nil {
+		return 0
+	}
+	return t.invalidSpecs.Load()
+}
+
+// NewCorrelation is a fresh opaque logical-operation id ("op-1k"): a
+// counter, never derived from a payload, channel, session or viewer, so it
+// carries nothing but its own uniqueness within this boot. The journal's
+// boot_id makes it unique across boots. A nil tracker answers "".
+func (t *Tracker) NewCorrelation() string {
+	if t == nil {
+		return ""
+	}
+	return "op-" + strconv.FormatUint(t.correlations.Add(1), 36)
+}
+
 // Progress records a receipt: the phase is now in stage, and it moved now.
 // A handle whose phase has ended is a no-op.
-func (h Handle) Progress(stage Stage) error {
+func (h Handle) Progress(stage Stage) error { return h.move(stage, "") }
+
+// Step is Progress that also moves the phase to the code location it is now
+// waiting in, so a phase that crosses several functions (sender lookup,
+// signature check, inbound callback) names the one it is stuck in.
+func (h Handle) Step(stage Stage, location string) error {
+	if h.t != nil && !ValidLocation(location) {
+		return invalid("location")
+	}
+	return h.move(stage, location)
+}
+
+func (h Handle) move(stage Stage, location string) error {
 	if h.t == nil {
 		return nil
 	}
@@ -192,6 +243,9 @@ func (h Handle) Progress(stage Stage) error {
 		}
 		p := *old
 		p.Spec.Stage = stage
+		if location != "" {
+			p.Spec.Location = location
+		}
 		p.LastProgress = h.t.clock.Now()
 		p.Progress++
 		if s.phase.CompareAndSwap(old, &p) {

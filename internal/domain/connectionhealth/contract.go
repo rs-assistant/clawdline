@@ -164,12 +164,17 @@ const (
 type Code string
 
 const (
-	CodeInvalidField        Code = "invalid_field"
-	CodeUnsupportedSchema   Code = "unsupported_schema"
-	CodeSlotsExhausted      Code = "slots_exhausted"
-	CodeRecordTooLarge      Code = "record_too_large"
-	CodeQueryBoundExceeded  Code = "query_bound_exceeded"
-	CodeCursorOtherBoot     Code = "cursor_other_boot"
+	CodeInvalidField       Code = "invalid_field"
+	CodeUnsupportedSchema  Code = "unsupported_schema"
+	CodeSlotsExhausted     Code = "slots_exhausted"
+	CodeRecordTooLarge     Code = "record_too_large"
+	CodeQueryBoundExceeded Code = "query_bound_exceeded"
+	CodeCursorOtherBoot    Code = "cursor_other_boot"
+	// CodeInvalidCursor is an after_seq this journal has not reached yet,
+	// or one that is not a number at all: a cursor from the future names
+	// records that do not exist, and answering it with an empty page would
+	// read as "nothing happened since".
+	CodeInvalidCursor       Code = "invalid_cursor"
 	CodeUnsupported         Code = "unsupported"
 	CodeForbidden           Code = "forbidden"
 	CodeIdempotencyConflict Code = "idempotency_conflict"

@@ -220,8 +220,35 @@ func (w *Watchdog) noteLost(upTo uint64, at Instant) {
 	if upTo <= w.lostSeen {
 		return
 	}
-	if w.journal.appendLost(upTo-w.lostSeen, at) == nil {
-		w.lostSeen = upTo
+	if w.journal.appendLost(upTo-w.lostSeen, at) != nil {
+		return
+	}
+	w.lostSeen = upTo
+	w.restate(at)
+}
+
+// restate journals, after a loss, every phase the latest published report
+// holds as slow, blocked or unverified (EventStateAfterLoss). It reads only
+// the atomic Latest, never the scan's own state, so the writer still shares
+// nothing with a scan; the report has at most MaxActiveSlots findings. Under
+// writeMu.
+func (w *Watchdog) restate(at Instant) {
+	r := w.latest.Load()
+	if r == nil {
+		return
+	}
+	for _, f := range r.Findings {
+		switch f.State {
+		case StateSlow, StateBlocked, StateUnverified:
+		default:
+			continue
+		}
+		_ = w.journal.appendState(Record{
+			Source: f.Source, Stage: f.Stage, Class: f.Class, Kind: f.Kind,
+			Location: f.Location, PhaseID: f.PhaseID, Correlation: f.Correlation,
+			AgeNS: f.AgeNS, DeadlineNS: f.DeadlineNS, Count: f.Progress,
+			Rule: RuleVersion, State: f.State,
+		}, at)
 	}
 }
 

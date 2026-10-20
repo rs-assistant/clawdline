@@ -36,6 +36,14 @@ const (
 	// before this record, because the queue to the journal was full. Only
 	// the journal's own writer appends it.
 	EventTransitionsLost Event = "transitions_lost"
+	// EventStateAfterLoss re-states, right after a transitions_lost record,
+	// each phase the watchdog's latest report holds as slow, blocked or
+	// unverified. The dropped transition may have been that phase's
+	// stall_detected, and the watchdog does not repeat a transition it has
+	// already made, so without this a journal could show a loss followed by
+	// silence while a handler is still stuck. Only the writer appends it, at
+	// most MaxActiveSlots per loss record.
+	EventStateAfterLoss Event = "state_after_loss"
 )
 
 // producerEvents are the events Append accepts from a caller. EventBoot and
@@ -84,6 +92,8 @@ type Record struct {
 	Count      uint64 `json:"count,omitempty"`
 	Rule       string `json:"rule,omitempty"`
 	Build      string `json:"build_commit,omitempty"`
+	// State is the watchdog state a state_after_loss record re-states.
+	State State `json:"state,omitempty"`
 }
 
 // validate admits only what the journal can vouch for. Every string is an
@@ -103,8 +113,12 @@ func (r Record) validate(own bool) error {
 		return invalid("boot_id")
 	case !r.Wall.IsZero() || r.MonoNS != 0:
 		return invalid("time")
-	case !producerEvent(r.Event) && !(own && (r.Event == EventBoot || r.Event == EventTransitionsLost)):
+	case !producerEvent(r.Event) && !(own && (r.Event == EventBoot || r.Event == EventTransitionsLost || r.Event == EventStateAfterLoss)):
 		return invalid("event")
+	case r.State != "" && r.Event != EventStateAfterLoss:
+		return invalid("state")
+	case r.State != "" && r.State != StateSlow && r.State != StateBlocked && r.State != StateUnverified:
+		return invalid("state")
 	case r.Rule != "" && r.Rule != RuleVersion:
 		return invalid("rule")
 	case r.Kind != "" && !knownKind(r.Kind):
@@ -146,6 +160,7 @@ type Journal struct {
 	refused uint64
 	limit   int
 	maxB    int
+	maxRec  int
 }
 
 // NewJournal opens a journal for one boot; its first record is EventBoot.
@@ -154,13 +169,21 @@ func NewJournal(clock Clock, bootID, build string) (*Journal, error) {
 }
 
 func newJournal(clock Clock, bootID, build string, rows, bytes int) (*Journal, error) {
+	return newJournalBounded(clock, bootID, build, rows, bytes, MaxRecordBytes)
+}
+
+// newJournalBounded takes the per-record bound as well, so a test can drive
+// record_too_large with a valid record: every field of a real one is bounded
+// well under MaxRecordBytes, which is what makes the bound a guard rather
+// than a path anybody takes.
+func newJournalBounded(clock Clock, bootID, build string, rows, bytes, record int) (*Journal, error) {
 	if !ValidID(bootID) {
 		return nil, invalid("boot_id")
 	}
 	if !ValidID(build) {
 		return nil, invalid("build")
 	}
-	j := &Journal{clock: clock, bootID: bootID, build: build, recs: make([]Record, rows), sizes: make([]int, rows), limit: rows, maxB: bytes}
+	j := &Journal{clock: clock, bootID: bootID, build: build, recs: make([]Record, rows), sizes: make([]int, rows), limit: rows, maxB: bytes, maxRec: record}
 	if err := j.appendStamped(Record{Event: EventBoot, Build: build}); err != nil {
 		return nil, err
 	}
@@ -180,6 +203,12 @@ func (j *Journal) appendStamped(r Record) error { return j.append(r, true, nil) 
 // watchdog's writer appends after the scan, and the record keeps the scan's
 // time rather than the moment the writer got the lock.
 func (j *Journal) appendObserved(r Record, at Instant) error { return j.append(r, false, &at) }
+
+// appendState journals a re-statement of one stuck phase after a loss.
+func (j *Journal) appendState(r Record, at Instant) error {
+	r.Event = EventStateAfterLoss
+	return j.append(r, true, &at)
+}
 
 // appendLost journals that n watchdog transitions were dropped before at.
 func (j *Journal) appendLost(n uint64, at Instant) error {
@@ -206,7 +235,7 @@ func (j *Journal) append(r Record, own bool, at *Instant) error {
 	r.EventID = j.bootID + "-" + strconv.FormatUint(seq, 10)
 	r.Wall, r.MonoNS = now.Wall, int64(now.Mono)
 	b, err := json.Marshal(r)
-	if err != nil || len(b) > MaxRecordBytes {
+	if err != nil || len(b) > j.maxRec {
 		j.refused++
 		return &Error{Code: CodeRecordTooLarge}
 	}
@@ -293,6 +322,12 @@ func (j *Journal) Read(q Query) (Page, error) {
 	defer j.mu.Unlock()
 	if q.BootID != "" && q.BootID != j.bootID {
 		return Page{}, &Error{Code: CodeCursorOtherBoot}
+	}
+	if q.AfterSeq > j.seq {
+		// Past the newest sequence this boot has assigned. Checked before
+		// any arithmetic on it, so the largest uint64 cannot wrap the gap
+		// computation below into a page that looks complete.
+		return Page{}, &Error{Code: CodeInvalidCursor, Field: "after_seq"}
 	}
 	p := Page{Schema: PageSchema, GeneratedAt: now.Wall, BootID: j.bootID, Build: j.build, Records: []Record{}}
 	c := Coverage{Quality: QualityComplete, Evicted: j.evicted, Refused: j.refused, Durability: DurabilityMemory, NextAfterSeq: q.AfterSeq}
