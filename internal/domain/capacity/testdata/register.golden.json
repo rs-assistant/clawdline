@@ -3049,6 +3049,227 @@
   },
   {
     "Register": "daemon",
+    "Name": "console.viewer_health_attempts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_backoff_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_batch_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 50,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_body_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_buffer_rows",
+    "Class": "progress",
+    "Unit": "rows",
+    "Limit": 200,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_coalesce_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_count_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1000000,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_elapsed_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 3600,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_hourly_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 262144,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_hourly_requests",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_request_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_retry_after_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 3600,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.viewer_health_send_every_seconds",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 60,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
     "Name": "coordinator.aliases",
     "Class": "journal",
     "Unit": "rows",

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 7900,
-  "riskKeys": 3518,
-  "nonRiskCount": 4382,
+  "englishContentKeys": 7926,
+  "riskKeys": 3524,
+  "nonRiskCount": 4402,
   "groups": [
     {
       "name": "admin / other",
@@ -275,7 +275,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 193,
+      "count": 213,
       "sources": [
         null
       ],
@@ -366,6 +366,26 @@
         "capacityRow.console.transcript_backoff_seconds.full",
         "capacityRow.console.transcript_backoff_seconds.what",
         "capacityRow.console.transcript_follow_later_seconds.what",
+        "capacityRow.console.viewer_health_attempts.what",
+        "capacityRow.console.viewer_health_backoff_seconds.full",
+        "capacityRow.console.viewer_health_backoff_seconds.what",
+        "capacityRow.console.viewer_health_batch_rows.full",
+        "capacityRow.console.viewer_health_batch_rows.what",
+        "capacityRow.console.viewer_health_body_bytes.what",
+        "capacityRow.console.viewer_health_buffer_rows.what",
+        "capacityRow.console.viewer_health_coalesce_seconds.full",
+        "capacityRow.console.viewer_health_coalesce_seconds.what",
+        "capacityRow.console.viewer_health_count_rows.full",
+        "capacityRow.console.viewer_health_count_rows.what",
+        "capacityRow.console.viewer_health_elapsed_seconds.full",
+        "capacityRow.console.viewer_health_elapsed_seconds.what",
+        "capacityRow.console.viewer_health_hourly_bytes.what",
+        "capacityRow.console.viewer_health_hourly_requests.what",
+        "capacityRow.console.viewer_health_request_seconds.what",
+        "capacityRow.console.viewer_health_retry_after_seconds.full",
+        "capacityRow.console.viewer_health_retry_after_seconds.what",
+        "capacityRow.console.viewer_health_send_every_seconds.full",
+        "capacityRow.console.viewer_health_send_every_seconds.what",
         "capacityRow.coordinator.aliases.what",
         "capacityRow.deploy.health_seconds.full",
         "capacityRow.diagnostics.route_latency_samples.what",

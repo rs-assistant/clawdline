@@ -780,6 +780,58 @@
     "Note": true
   },
   {
+    "Name": "console.viewer_health_attempts",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_backoff_seconds",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_batch_rows",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_body_bytes",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_buffer_rows",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_coalesce_seconds",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_count_rows",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_elapsed_seconds",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_hourly_bytes",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_hourly_requests",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_request_seconds",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_retry_after_seconds",
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_send_every_seconds",
+    "Note": true
+  },
+  {
     "Name": "coordinator.aliases",
     "Known": true
   },

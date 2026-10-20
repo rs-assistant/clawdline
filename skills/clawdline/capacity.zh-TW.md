@@ -162,6 +162,19 @@
 | `console.transcript_follow_seconds` | 90 | `seconds` | `expire` | `diagnostics` | — |
 | `console.transcript_merged_rows` | 1000 | `rows` | `expire` | `diagnostics` | — |
 | `console.transcript_safety_seconds` | 30 | `seconds` | `expire` | `diagnostics` | — |
+| `console.viewer_health_attempts` | 4 | `rows` | `refuse` | `diagnostics` | — |
+| `console.viewer_health_backoff_seconds` | 60 | `seconds` | `expire` | `diagnostics` | — |
+| `console.viewer_health_batch_rows` | 50 | `rows` | `refuse` | `diagnostics` | — |
+| `console.viewer_health_body_bytes` | 16384 | `bytes` | `refuse` | `diagnostics` | — |
+| `console.viewer_health_buffer_rows` | 200 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `console.viewer_health_coalesce_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
+| `console.viewer_health_count_rows` | 1000000 | `rows` | `coalesce` | `diagnostics` | — |
+| `console.viewer_health_elapsed_seconds` | 3600 | `seconds` | `coalesce` | `diagnostics` | — |
+| `console.viewer_health_hourly_bytes` | 262144 | `bytes` | `refuse` | `diagnostics` | — |
+| `console.viewer_health_hourly_requests` | 60 | `rows` | `refuse` | `diagnostics` | — |
+| `console.viewer_health_request_seconds` | 10 | `seconds` | `expire` | `diagnostics` | — |
+| `console.viewer_health_retry_after_seconds` | 3600 | `seconds` | `expire` | `diagnostics` | — |
+| `console.viewer_health_send_every_seconds` | 60 | `seconds` | `expire` | `diagnostics` | — |
 | `coordinator.aliases` | 32 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `coordinator.bind_attempts` | 6 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `decisions.open` | 256 | `rows` | `refuse` | `diagnostics, sender` | — |
