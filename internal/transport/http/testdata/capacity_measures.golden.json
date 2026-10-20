@@ -199,6 +199,71 @@
     "Note": true
   },
   {
+    "Name": "cloud.health_sealed_attempt_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_ciphertext_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_life_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_queued_jobs",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_request_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_response_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_revisions",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_snapshot_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_snapshot_coverage",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_snapshot_field_chars",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_store_attachments",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_store_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.health_store_bytes",
     "Known": true,
     "Note": true

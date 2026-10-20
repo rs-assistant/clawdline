@@ -102,6 +102,7 @@ export function OwnerDiagnostics({ machineID }: { machineID: string }) {
 
   const copy = async (opened: OpenedDiagnostic) => {
     const text = exportSnapshot(opened.snapshot, opened)
+    // refusal-ok: a clipboard write that fails is the browser refusing, not a Cloud refusal with a code to show.
     try { await navigator.clipboard.writeText(text); setSaid(nextWord("ownerDiagExported")) } catch { setSaid(nextWord("ownerDiagErrUnavailable")) }
   }
 

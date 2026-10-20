@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 7778,
-  "riskKeys": 3468,
-  "nonRiskCount": 4310,
+  "englishContentKeys": 7804,
+  "riskKeys": 3482,
+  "nonRiskCount": 4322,
   "groups": [
     {
       "name": "admin / other",
@@ -275,7 +275,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 190,
+      "count": 202,
       "sources": [
         null
       ],
@@ -297,6 +297,18 @@
         "capacityRow.cloud.health_query_rows.full",
         "capacityRow.cloud.health_query_rows.what",
         "capacityRow.cloud.health_record_bytes.what",
+        "capacityRow.cloud.health_sealed_attempt_seconds.what",
+        "capacityRow.cloud.health_sealed_ciphertext_bytes.what",
+        "capacityRow.cloud.health_sealed_life_seconds.what",
+        "capacityRow.cloud.health_sealed_queued_jobs.what",
+        "capacityRow.cloud.health_sealed_request_bytes.what",
+        "capacityRow.cloud.health_sealed_response_bytes.what",
+        "capacityRow.cloud.health_sealed_revisions.what",
+        "capacityRow.cloud.health_sealed_snapshot_bytes.what",
+        "capacityRow.cloud.health_sealed_snapshot_coverage.what",
+        "capacityRow.cloud.health_sealed_snapshot_field_chars.what",
+        "capacityRow.cloud.health_sealed_store_attachments.what",
+        "capacityRow.cloud.health_sealed_store_bytes.what",
         "capacityRow.cloud.health_store_dir_entries.what",
         "capacityRow.cloud.health_store_lost_ranges.what",
         "capacityRow.cloud.health_upload_attempt_seconds.what",

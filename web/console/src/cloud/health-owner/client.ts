@@ -127,12 +127,15 @@ export async function refusalOf(response: Response): Promise<SealedError> {
   const s = response.status
   const as = (kind: SealedErrorCode, message: string) => new SealedError(kind, message, s, code || null)
   if (s === 401) return as("not_signed_in", "Cloud does not know this browser as a viewer")
+  // refusal-ok: these sentences are SealedError messages for logs; the panel words each typed code through refusalWords.
   if (s === 403) return code === "key_handover_required" ? as("key_handover_required", "this device has no key grant for that epoch")
     : as("forbidden", "Cloud refused this device's proof")
   if (s === 404) return as("unknown_attachment", "Cloud has no such attachment for this account")
+  // refusal-ok: these sentences are SealedError messages for logs; the panel words each typed code through refusalWords.
   if (s === 409) return code === "identity_epoch_changed" ? as("stale", "the account identity epoch changed")
     : code === "key_handover_required" ? as("key_handover_required", "this device has no key grant for that epoch")
     : as("conflict", "Cloud refused the proof as replayed or out of date")
+  // refusal-ok: these sentences are SealedError messages for logs; the panel words each typed code through refusalWords.
   if (s === 410) return code === "sealed_deleted" ? as("deleted", "the attachment was deleted") : as("expired", "the attachment has expired")
   if (s === 429) return as("busy", "Cloud is busy or the quota is used")
   return as("unavailable", "Cloud could not answer")

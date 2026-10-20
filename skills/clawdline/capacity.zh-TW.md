@@ -45,6 +45,19 @@
 | `cloud.health_query_rows` | 200 | `rows` | `evict_oldest` | `diagnostics, sender` | — |
 | `cloud.health_record_bytes` | 1024 | `bytes` | `refuse` | `diagnostics` | — |
 | `cloud.health_reserved_slots` | 8 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_attempt_seconds` | 10 | `seconds` | `disconnect` | `diagnostics` | — |
+| `cloud.health_sealed_attempts` | 4 | `rows` | `expire` | `diagnostics` | — |
+| `cloud.health_sealed_ciphertext_bytes` | 262144 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_life_seconds` | 604800 | `seconds` | `expire` | `diagnostics` | — |
+| `cloud.health_sealed_queued_jobs` | 8 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_request_bytes` | 409600 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_response_bytes` | 16384 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_revisions` | 8 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_snapshot_bytes` | 16384 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_snapshot_coverage` | 32 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_snapshot_field_chars` | 512 | `characters` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_store_attachments` | 16 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_store_bytes` | 4194304 | `bytes` | `refuse` | `diagnostics` | — |
 | `cloud.health_store_bytes` | 104857600 | `bytes` | `evict_oldest` | `diagnostics` | — |
 | `cloud.health_store_dir_entries` | 4096 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_store_frame_bytes` | 4096 | `bytes` | `refuse` | `diagnostics` | — |

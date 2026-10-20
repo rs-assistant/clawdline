@@ -589,6 +589,51 @@ dial/TLS), its own goroutine, no relay socket, writer lock, spool or lane.
 private fields stay on this machine and no remote investigation is complete); Cloud fields for
 storage loss and `state_after_loss`; heartbeat/presence; uploading on a schedule tighter than 30 s.
 
+## 9b. Owner-sealed diagnostic clients (implemented, not wired to a live key)
+
+The private Cloud contract §13 defines the wire. This repository holds both clients:
+
+- Go: `internal/adapters/healthsealed`. `DeriveKey` is HKDF-SHA256 (32 zero-byte salt, info
+  `clawdline/health-sealed/v1`), `AAD` is the 13-field canonical JSON, `Seal`/`Open` are
+  AES-256-GCM. The plaintext is `clawdline.health-owner-diagnostics/1` (`Snapshot`): a whitelist of
+  location, `age_ns`, `deadline_ns`, build, stage, correlation id, observation time, coverage, and
+  `truncated`/`lost`. Int64 values are decimal strings; a value that could not be read is `null`,
+  never `0`. Each revision's exact body is written atomically to the pending store before the first
+  send, so a retry, including one after a restart, sends identical bytes; the receipt's
+  `aad_sha256` must equal the client's own or the upload counts as failed. The worker takes
+  snapshots through a non-blocking `Offer` (queue 8; full answers `busy`), and a full store
+  answers `store_full` at once. Every bound is in `capacity/register_healthsealed.go`.
+- PWA: `web/console/src/cloud/health-owner`. It lists `GET /v1/health/sealed`, signs a
+  `clawdline.health-sealed-read/1` proof with the registered device key, posts it to
+  `POST /v1/health/sealed/read`, and opens the revision only after the AAD, its digest, tenant,
+  machine, attachment, revision, epoch, expiry and ciphertext digest all match. Decrypted snapshots
+  are held in memory only; a generation counter, bumped on sign-out, account or epoch change,
+  keeps a stale fetch or decrypt from repopulating the cache. The panel is the Diagnostics tab of
+  the paired machine view, outside `AdminGate`.
+- The opt-in is `cloud_health_owner_retention`, off by default and independent of
+  `cloud_health_upload`. Off writes nothing and makes no request.
+
+Both sides pin the §13.7 synthetic vector in `internal/adapters/healthsealed/testdata/vector.json`.
+
+**Why nothing can be sealed or opened yet.** No content-key epoch is recorded anywhere in the
+product, and the PWA keeps the master secret only as a non-extractable AES-GCM `CryptoKey`
+(`legacy/js/net/cloud-crypto.js` `importMasterSecret`), which cannot seed HKDF. Both clients
+therefore answer `key_handover_required` rather than guess. Closing it needs the pairing handover
+to also keep an HKDF import of the master secret together with its content-key epoch, the device
+and identity epochs to be known to the client, and the content-key grant contract. The daemon
+does not yet construct the uploader (`cmd/clawdline/health.go`).
+
+**The content-key grant (Cloud §13.9) is not signed by this daemon.** Cloud records a grant only
+when the machine's `confirm` on `POST /v1/pairing/identity/phases/confirm` carries a
+`handover_attestation`, which the machine may sign only after the viewer's `activate` proved it
+holds the master secret of that content-key epoch. This daemon pairs through
+`/v1/pairing/invitations/start`, `/poll` and `/v1/pairing/complete`
+(`internal/adapters/cloud/pairing.go`), has no identity-phase client, and no viewer sends a key
+confirmation in `activate`. Signing without that proof would record a grant Cloud cannot tell
+from a true one, so no attestation is sent. Until then a sealed read answers
+`403 key_handover_required`, which the panel shows as "pair this device again" and never retries.
+
+
 ## 10. Remaining wiring, in order
 
 1. Done: one runtime per boot, real capacity measures (§1).
@@ -600,4 +645,5 @@ storage loss and `state_after_loss`; heartbeat/presence; uploading on a schedule
 4. Done: durable store opened and fed (`docs/admin-connection-health-storage.md`), and flushed and
    closed at daemon shutdown.
 5. Done: the daemon uploader (§9a). Next: Cloud fields for storage loss and `state_after_loss`,
-   owner sealing, viewer producer, stack capture, and M01–M06 on real sources.
+   owner sealing (clients in §9b; key source and daemon wiring still missing), viewer producer,
+   stack capture, and M01–M06 on real sources.
