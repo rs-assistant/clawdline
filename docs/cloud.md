@@ -241,6 +241,8 @@ each row on both the local and Cloud console; it hides that directory from the P
 lists without deleting files or sessions. Re-adding it restores visibility.
 The Project list refreshes as soon as removal succeeds; an open session start sheet refreshes automatically.
 
+The proposed [connection health administration](admin-connection-health.md) covers durable cross-source timelines, independent stall capture and agent investigation evidence. It is a product plan, not a shipped monitoring capability.
+
 For a machine that appears offline, inspect `clawdline cloud status` or the local status route first: the switch, identity, connection state, last error and publication counters narrow down which side has evidence. Then inspect the hosted build using [hosted-console.md](hosted-console.md). The status route and logs expose this machine's observations; they do not prove that a particular browser decrypted or displayed a frame. [cloud-cutover.md](cloud-cutover.md) records local preflight and stand-in tests, not a fresh production validation.
 
 ## Limits of this overview
