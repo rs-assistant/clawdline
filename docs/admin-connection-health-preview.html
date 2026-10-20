@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>連線健康 · 設計原型</title>
+<!--
+  Connection health — a standalone design prototype for the hosted console's /admin.
+  Illustrative, deterministic fixtures only: nothing here reads a live source.
+  Tokens are copied from web/console/src/legacy/tokens.css (dark only, on purpose) and the
+  shell, tiles, panels and tables follow web/console/src/cloud/admin/admin.css.
+  The design rationale is docs/admin-connection-health-design.md.
+-->
+<style>
+:root {
+  --bg: #0e0e11; --card: #16161a; --card-hi: #1c1c22; --line: #24242b;
+  --ink: #e8e6e3; --dim: #9a978f; --faint: #6d6a64;
+  --accent: #d97757; --accent-in: rgba(217, 119, 87, .13); --accent-ed: rgba(217, 119, 87, .34);
+  --warn: #b08a4a; --bad: #a3564a;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --ui: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+  --radius: 11px; --ease: cubic-bezier(.2, .7, .2, 1);
+  /* Admin-local, as in admin.css .adm */
+  --adm-chart: #a39283; --adm-link: #eca080;
+  /* Health lanes (proposal): the healthy bar is a quiet grey so that nothing healthy outranks a block. */
+  --lane-ok: #4a4852; --lane-unknown: #6d6a64;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--ui); }
+body { min-height: 100dvh; overflow-x: hidden; }
+a { color: var(--adm-link); }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h1:focus, h2:focus { outline: none; }
+h1:focus-visible { outline: 2px solid var(--accent); }
+
+/* ---- prototype label: always on screen ---------------------------------- */
+.proto {
+  position: sticky; top: 0; z-index: 70;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px;
+  padding: 7px 12px; background: var(--accent); color: #1a1310;
+  font-size: 13px; font-weight: 650; text-align: center;
+}
+.proto button { min-height: 32px; padding: 0 10px; border-radius: 7px; border: 1px solid rgba(26, 19, 16, .45); background: transparent; color: #1a1310; font: inherit; font-weight: 600; cursor: pointer; }
+.proto button:hover { background: rgba(26, 19, 16, .12); }
+.proto button:focus-visible { outline: 2px solid #1a1310; }
+
+/* ---- shell (admin.css .adm-shell) ---------------------------------------- */
+.shell { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: calc(100dvh - 46px); }
+.side { display: flex; flex-direction: column; gap: 18px; padding: 18px 14px; background: var(--card); border-right: 1px solid var(--line); }
+.brand { padding: 0 6px; }
+.brand small { display: block; color: var(--dim); font-size: 12px; }
+.brand strong { font-size: 16px; font-weight: 640; }
+.nav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.nav a, .nav span.off { display: grid; gap: 1px; min-height: 52px; padding: 8px 10px; border-radius: 10px; color: var(--dim); text-decoration: none; align-content: center; }
+.nav a:hover { background: var(--card-hi); color: var(--ink); }
+.nav .on { background: var(--accent-in); color: var(--ink); box-shadow: 0 0 0 1px var(--accent-ed); }
+.nav b { font-size: 14.5px; font-weight: 560; }
+.nav .on b { font-weight: 640; }
+.nav small { font-size: 12px; color: var(--dim); }
+.side-foot { margin-top: auto; padding: 14px 6px 0; border-top: 1px solid var(--line); color: var(--dim); font-size: 12.5px; line-height: 1.5; }
+.top { display: none; }
+.content { min-width: 0; }
+.main { max-width: 1120px; margin: 0 auto; padding: 24px 16px 56px; display: grid; gap: 22px; min-width: 0; }
+.scrim { display: none; }
+
+/* ---- page head and controls --------------------------------------------- */
+.crumbs { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 13px; color: var(--dim); margin: 0; padding: 0; list-style: none; }
+.crumbs a { display: inline-flex; align-items: center; min-height: 32px; padding: 0 6px; border-radius: 6px; color: var(--adm-link); text-decoration: none; }
+.crumbs a:hover { background: var(--accent-in); color: var(--ink); }
+.pagehead { display: grid; gap: 4px; }
+.pagehead h1 { margin: 0; font-size: 28px; font-weight: 650; letter-spacing: -.01em; line-height: 1.15; }
+.sub { margin: 0; color: var(--dim); font-size: 13.5px; line-height: 1.5; max-width: 72ch; }
+.controls { display: grid; gap: 12px; padding: 14px 16px; border: 1px solid var(--accent-ed); border-radius: var(--radius); background: var(--accent-in); }
+.controls-row { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > span, fieldset legend { font-size: 12px; color: var(--dim); font-weight: 560; }
+select { min-height: 40px; max-width: 100%; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; font-size: 14px; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--line); border-radius: 9px; background: var(--card); overflow: hidden; }
+.seg label { position: relative; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { display: inline-flex; align-items: center; min-height: 38px; padding: 0 12px; font-size: 13.5px; color: var(--dim); border-left: 1px solid var(--line); }
+.seg label:first-child span { border-left: 0; }
+.seg input:checked + span { background: var(--accent-in); color: var(--ink); font-weight: 620; box-shadow: inset 0 -2px var(--accent); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
+.seg input:hover + span { color: var(--ink); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--ink); font: inherit; font-size: 14px; font-weight: 560; cursor: pointer; text-decoration: none; }
+.btn:hover { background: var(--card-hi); border-color: var(--accent-ed); }
+.btn:active { transform: translateY(1px); }
+.btn[aria-pressed="true"] { border-color: var(--accent-ed); }
+.btn-small { min-height: 34px; padding: 0 12px; font-size: 13px; }
+.live-note { margin: 0; font-size: 12.5px; color: var(--dim); line-height: 1.5; }
+.notice { margin: 0; padding: 10px 14px; border-radius: 9px; border: 1px solid rgba(176, 138, 74, .45); background: rgba(176, 138, 74, .1); font-size: 13.5px; line-height: 1.5; }
+
+/* ---- sections, panels, tiles (admin.css) --------------------------------- */
+.section { display: grid; gap: 12px; min-width: 0; }
+.h2 { margin: 0; font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.h3 { margin: 0; font-size: 15px; font-weight: 620; }
+.panel { min-width: 0; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; margin-bottom: 10px; }
+.fine { margin: 0; color: var(--dim); font-size: 12.5px; line-height: 1.55; max-width: 72ch; }
+.tiles { display: grid; gap: 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tile { min-width: 0; min-height: 112px; padding: 16px 16px 14px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; gap: 6px; }
+.tile-label { margin: 0; color: var(--dim); font-size: 13px; }
+.tile-value { margin: 0; font-size: 26px; font-weight: 620; line-height: 1.15; letter-spacing: -.02em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tile-value small { font-size: 14px; color: var(--dim); font-weight: 500; letter-spacing: 0; }
+.tile-note { margin: auto 0 0; color: var(--dim); font-size: 12.5px; line-height: 1.45; }
+.meter { display: block; height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.meter > span { display: block; height: 100%; background: var(--adm-chart); }
+.meter-hot > span { background: var(--accent); }
+
+/* ---- verdict: the first thing on the page -------------------------------- */
+.verdict { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px 16px; align-items: center; padding: 18px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--card); }
+.verdict-blocked { border-color: var(--accent); box-shadow: inset 0 3px var(--accent); }
+.verdict-degraded { border-color: rgba(176, 138, 74, .6); box-shadow: inset 0 3px var(--warn); }
+.verdict-unknown { border-style: dashed; border-color: var(--faint); }
+.verdict-offline { border-color: var(--faint); }
+.verdict h2 { margin: 0; font-size: 20px; font-weight: 650; line-height: 1.25; }
+.verdict p { margin: 2px 0 0; color: var(--dim); font-size: 13.5px; line-height: 1.5; }
+.glyph-big { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 10px; font-size: 22px; font-weight: 700; background: var(--card-hi); }
+
+/* Severity: a glyph and a word, never colour alone. */
+.sev { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); white-space: nowrap; }
+.sev i { font-style: normal; width: 18px; height: 18px; display: inline-grid; place-items: center; border-radius: 4px; font-size: 11px; font-weight: 800; flex: none; }
+.s-blocked i, .glyph-blocked { background: var(--accent); color: #1a1310; }
+.s-degraded i, .glyph-degraded { background: var(--warn); color: #1a1310; }
+.s-error i, .glyph-error { background: var(--bad); color: var(--ink); }
+.s-healthy i, .glyph-healthy { background: var(--card-hi); color: var(--dim); border: 1px solid var(--line); }
+.s-idle i { background: transparent; color: var(--dim); border: 1px solid var(--line); }
+.s-unknown i, .glyph-unknown { background: transparent; color: var(--ink); border: 1px dashed var(--dim); }
+.s-offline i, .glyph-offline { background: transparent; color: var(--dim); border: 1.5px solid var(--dim); border-radius: 50%; }
+.s-hidden i, .s-unsupported i, .s-retention i { background: transparent; color: var(--dim); border: 1px dotted var(--faint); }
+.s-hidden, .s-unsupported, .s-retention { color: var(--dim); }
+
+/* ---- freshness strip ----------------------------------------------------- */
+.sources { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.source { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); display: grid; gap: 4px; min-width: 0; }
+.source-name { font-size: 13.5px; font-weight: 600; }
+.source-age { font-size: 12.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.source-ret { font-size: 12px; color: var(--dim); }
+
+/* ---- timeline ------------------------------------------------------------ */
+.tl { display: grid; gap: 4px; min-width: 0; }
+.tl-axis, .tl-lane { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; align-items: center; }
+.tl-axis-track { position: relative; height: 22px; color: var(--dim); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.tl-axis-track span { position: absolute; top: 2px; transform: translateX(-50%); white-space: nowrap; }
+.tl-axis-track span:first-child { transform: none; }
+.tl-axis-track span:last-child { transform: translateX(-100%); }
+.tl-name { font-size: 13px; line-height: 1.3; min-width: 0; }
+.tl-name small { display: block; color: var(--dim); font-size: 11.5px; }
+.tl-track { position: relative; height: 34px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.tl-seg { position: absolute; top: 50%; transform: translateY(-50%); }
+.st-healthy { height: 6px; background: var(--lane-ok); }
+.st-idle { height: 2px; background: var(--line); }
+.st-degraded { height: 12px; background: var(--warn); }
+.st-blocked { height: 20px; background: var(--accent); border-radius: 3px; }
+.st-error { height: 14px; background: repeating-linear-gradient(90deg, var(--bad) 0 3px, transparent 3px 6px); }
+.st-unknown { height: 100%; background: repeating-linear-gradient(135deg, rgba(109, 106, 100, .55) 0 4px, transparent 4px 9px); }
+.st-offline { height: 14px; border: 1.5px solid var(--dim); border-radius: 7px; }
+.st-retention { height: 0; border-top: 2px dotted var(--faint); }
+.st-hidden { height: 100%; background: transparent; }
+.tl-hidden-note, .tl-ret-note { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 10px; color: var(--dim); font-size: 12px; pointer-events: none; }
+.tl-mark { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: .55; }
+.tl-now { position: absolute; top: 0; bottom: 0; right: 0; width: 2px; background: var(--adm-link); }
+.tl-incidents { position: relative; height: 40px; }
+.tl-inc { position: absolute; top: 4px; min-width: 32px; height: 32px; padding: 0 8px; transform: translateX(-50%); border-radius: 8px; border: 1px solid var(--line); background: var(--card-hi); color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+.tl-inc:hover { border-color: var(--accent-ed); }
+.tl-inc[aria-current="true"] { border-color: var(--accent); background: var(--accent-in); box-shadow: 0 0 0 1px var(--accent); }
+.tl-band { position: absolute; top: 0; bottom: 0; background: rgba(217, 119, 87, .07); border-left: 1px dashed var(--accent-ed); border-right: 1px dashed var(--accent-ed); pointer-events: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--dim); font-size: 12px; margin-top: 8px; }
+.legend > span { display: inline-flex; align-items: center; gap: 7px; }
+.legend .sw { position: relative; width: 26px; height: 16px; border-radius: 3px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.legend .sw > b { position: absolute; left: 2px; right: 2px; top: 50%; transform: translateY(-50%); }
+.legend .sw > .st-unknown { left: 0; right: 0; }
+.tl-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: center; margin-top: 4px; }
+
+/* ---- tables (admin.css .adm-table) --------------------------------------- */
+.table-wrap { max-width: 100%; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+thead th { border-top: 0; color: var(--dim); font-size: 12px; font-weight: 560; padding-top: 4px; }
+tbody th { font-weight: 560; }
+.num { text-align: right; }
+.dimtext { color: var(--dim); }
+.mono { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+
+/* ---- incident ------------------------------------------------------------ */
+.inc-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.inc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+.inc-row:first-child { border-top: 0; padding-top: 2px; }
+.inc-row p { margin: 0; }
+.inc-title { font-size: 14.5px; font-weight: 600; }
+.inc-meta { color: var(--dim); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.claims { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.claim { padding: 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); display: grid; gap: 8px; align-content: start; min-width: 0; }
+.claim-fact { border-left: 0; box-shadow: inset 0 3px var(--dim); }
+.claim-suspect { border-style: solid; box-shadow: inset 0 3px var(--warn); }
+.claim-missing { border-style: dashed; }
+.claim h3 { margin: 0; font-size: 14px; font-weight: 640; display: flex; gap: 8px; align-items: center; }
+.claim ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; font-size: 13.5px; line-height: 1.5; }
+.claim .src { color: var(--dim); font-size: 12px; }
+.certainty { display: inline-flex; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--ink); }
+.cert-confirmed { border-color: var(--dim); }
+.cert-suspected { border-color: var(--warn); }
+.cert-unknown { border-style: dashed; }
+.facts { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px 18px; }
+.facts div { display: grid; gap: 3px; min-width: 0; }
+.facts dt { color: var(--dim); font-size: 12px; }
+.facts dd { margin: 0; font-size: 14px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+
+/* Waterfall: one row per stage; a missing receipt is a dashed empty bar with words. */
+.wf { display: grid; gap: 6px; }
+.wf-row { display: grid; grid-template-columns: 190px minmax(0, 1fr) 96px; gap: 12px; align-items: center; }
+.wf-name { font-size: 13px; }
+.wf-name small { display: block; color: var(--dim); font-size: 11.5px; }
+.wf-track { position: relative; height: 22px; background: var(--bg); border: 1px solid var(--line); border-radius: 5px; }
+.wf-bar { position: absolute; top: 4px; bottom: 4px; min-width: 3px; border-radius: 3px; background: var(--adm-chart); }
+.wf-late { background: var(--warn); }
+.wf-stuck { background: var(--accent); }
+.wf-missing { position: absolute; inset: 3px; border: 1px dashed var(--faint); border-radius: 3px; display: flex; align-items: center; padding-left: 8px; color: var(--dim); font-size: 11.5px; }
+.wf-time { text-align: right; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.code { display: grid; gap: 8px; }
+.code li { display: grid; gap: 2px; }
+.view-toggle { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---- evidence ------------------------------------------------------------ */
+pre.json { margin: 0; padding: 14px; max-height: 70vh; overflow: auto; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-family: var(--mono); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.status-line { margin: 0; font-size: 13px; color: var(--ink); min-height: 1.4em; }
+
+/* ---- phone width --------------------------------------------------------- */
+@media (max-width: 899px) {
+  .shell { display: block; }
+  .top { position: sticky; top: 46px; z-index: 30; display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: rgba(14, 14, 17, .96); border-bottom: 1px solid var(--line); }
+  .top p { margin: 0; flex: 1; min-width: 0; font-size: 15px; font-weight: 620; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .menu { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font-size: 18px; cursor: pointer; }
+  .side { position: fixed; z-index: 80; top: 0; left: 0; bottom: 0; width: min(320px, 86vw); transform: translateX(-102%); visibility: hidden; transition: transform .22s var(--ease), visibility 0s linear .22s; }
+  .drawer-open .side { transform: none; visibility: visible; transition: transform .22s var(--ease); }
+  .drawer-open .scrim { display: block; position: fixed; inset: 0; z-index: 75; background: rgba(0, 0, 0, .55); }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .claims { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .proto { top: 0; font-size: 12px; }
+  .top { top: 0; position: relative; }
+  .main { padding-top: 16px; gap: 18px; }
+  .pagehead h1 { font-size: 23px; }
+  .panel { padding: 14px; }
+  .tile { min-height: 100px; padding: 13px; }
+  .tile-value { font-size: 21px; }
+  .verdict { grid-template-columns: auto minmax(0, 1fr); padding: 14px; }
+  .verdict > .btn { grid-column: 1 / -1; }
+  /* Lanes: the name goes above its track so the track keeps the full width. */
+  .tl-axis, .tl-lane { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .tl-axis .tl-name { display: none; }
+  .tl-lane { margin-top: 6px; }
+  .tl-name small { display: inline; margin-left: 6px; }
+  .tl-incidents { margin-left: 0 !important; }
+  .wf-row { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; }
+  .wf-track { grid-column: 1 / -1; grid-row: 2; }
+  .seg span { padding: 0 10px; }
+  .controls { padding: 12px; }
+  /* Tables become one card per row, as admin.css does for campaigns. */
+  .cards thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .cards, .cards tbody, .cards tr { display: block; }
+  .cards tr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .cards th, .cards td { display: block; border: 0; padding: 0; text-align: left; }
+  .cards tbody th { grid-column: 1 / -1; font-size: 14.5px; }
+  .cards td::before { content: attr(data-label); display: block; color: var(--dim); font-size: 11.5px; margin-bottom: 2px; }
+  .cards td.wide { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { .side, .drawer-open .side { transition: none; } }
+</style>
+</head>
+<body>
+<div class="proto" role="note" id="proto">
+  <span id="protoText"></span>
+  <button type="button" id="langBtn"></button>
+</div>
+<div class="shell" id="shell">
+  <div class="top">
+    <button type="button" class="menu" id="menuBtn" aria-controls="side" aria-expanded="false"><span aria-hidden="true">☰</span><span class="vh" data-t="menu"></span></button>
+    <p data-t="navHealth"></p>
+  </div>
+  <div class="scrim" id="scrim"></div>
+  <aside class="side" id="side">
+    <div class="brand"><small>Clawdline Cloud</small><strong data-t="ops"></strong></div>
+    <nav class="nav" data-t-label="navLabel">
+      <ul>
+        <li><span class="off"><b data-t="navOverview"></b><small data-t="notInProto"></small></span></li>
+        <li><span class="off"><b data-t="navAccounts"></b><small data-t="notInProto"></small></span></li>
+        <li><span class="off"><b data-t="navUsage"></b><small data-t="notInProto"></small></span></li>
+        <li><a href="#overview" class="on" aria-current="page"><b data-t="navHealth"></b><small data-t="navHealthHint"></small></a></li>
+      </ul>
+    </nav>
+    <p class="side-foot" data-t="sideFoot"></p>
+  </aside>
+  <div class="content">
+    <main class="main" id="main"></main>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================== words ===================================== */
+const WORDS = {
+  en: {
+    proto: "Design prototype · illustrative data · not live monitoring",
+    lang: "中文", menu: "Menu", ops: "Operations", navLabel: "Operations pages",
+    navOverview: "Overview", navAccounts: "Accounts", navUsage: "Usage", navHealth: "Connection health",
+    navHealthHint: "Blocks, slowness, errors", notInProto: "Not part of this prototype",
+    sideFoot: "Read-only. This page never restarts, retries or changes anything.",
+    title: "Connection health", lead: "Where requests are blocked, slow or failing, when it started, and the evidence to find the code.",
+    scenario: "Fixture scenario", scope: "Scope", window: "Time window",
+    scopeCloud: "Cloud service", scopeMachine: "Your machine", scopeViewer: "This viewer",
+    w15: "15 min", w60: "1 hour", w360: "6 hours",
+    live: "Live", paused: "Paused", pause: "Pause", resume: "Resume live",
+    liveNote: "Live: the window follows the clock and source ages keep counting. No new fixture events arrive; this is a prototype.",
+    pausedNote: "Paused at {time} UTC. The window and every age are frozen; {n} simulated receipts would have arrived since.",
+    scenarioReset: "Scenario changed: the selection was reset to this scenario's newest active incident and the window to its default.",
+    incidentGone: "That incident is not in the current scenario. Showing the overview instead.",
+    sc_healthy: "Healthy", sc_stalled: "Handler stalled (Cloud socket stays open)", sc_receipt: "Relay receipt delayed",
+    sc_source: "Monitoring source unavailable", sc_offline: "Machine offline", sc_storm: "Reconnect storm",
+    // verdicts
+    v_healthy: "Requests are flowing", v_blocked: "Requests are blocked", v_degraded: "Requests are slow or failing",
+    v_unknown: "Health is unknown for part of the path", v_offline: "The machine is offline",
+    v_since: "Since {time} UTC ({ago})", v_open: "Open incident", v_none: "No incident in this window.",
+    // severity words
+    st_healthy: "Healthy", st_idle: "No requests", st_degraded: "Slow", st_error: "Errors", st_blocked: "Blocked",
+    st_unknown: "Unknown", st_offline: "Offline", st_hidden: "Not visible in this scope", st_unsupported: "Not reported by this build",
+    st_retention: "Not retained",
+    // tiles
+    t_incident: "Latest active incident", t_queue: "Machine inbound queue", t_err: "Error rate", t_lat: "Latency (end to end)",
+    t_queueNote: "{used} of {limit} rows · oldest waiting {age}", t_errNote: "{bad} of {n} requests in the window",
+    t_latNote: "p95 {p95} · p99 {p99} · {n} samples", t_fewSamples: "Too few samples for p99 ({n})",
+    t_none: "None", t_noData: "No data", t_hiddenNote: "Owner data; this scope cannot read it.",
+    // freshness
+    fresh: "Data freshness, by source", f_fresh: "Fresh", f_stale: "Stale", f_unknown: "No receipt", f_unsupported: "Not reported",
+    f_hidden: "Not visible in this scope", f_age: "Last receipt {age} ago · expected every {every}", f_never: "No receipt in this window",
+    f_ret: "Kept for {ret}",
+    src_browser: "This viewer (browser)", src_relay: "Relay metrics (Cloud)", src_machine: "Machine status snapshot (owner)", src_collector: "Telemetry collector (Cloud)",
+    // segments
+    segHealth: "Health by segment", seg: "Segment", state: "State", p50: "p50", p95: "p95", p99: "p99", samples: "Samples", errors: "Errors", age: "Source age",
+    lane_browser: "Browser", lane_relay: "Relay", lane_recv: "Machine · receive", lane_proc: "Machine · process", lane_send: "Machine · send", lane_coll: "Collector",
+    lane_browser_s: "this viewer", lane_relay_s: "Cloud", lane_recv_s: "owner", lane_proc_s: "owner", lane_send_s: "owner", lane_coll_s: "Cloud",
+    // timeline
+    timeline: "Shared timeline", tlRange: "{from} – {to} UTC", tlNow: "now", tableView: "Show as table", chartView: "Show as timeline",
+    tlSummary: "{lane}: {list}", tlFrom: "from", tlTo: "to", tlLegend: "Legend",
+    gapNote: "Hatched means no observation reached us: unknown, never healthy.",
+    incidents: "Incidents in this window", openIncident: "Open", active: "Active", resolved: "Resolved",
+    noIncidents: "No incident was opened in this window.",
+    // incident
+    incident: "Incident", facts: "Observed facts", suspected: "Suspected cause", missing: "Missing evidence",
+    cert_confirmed: "Cause confirmed", cert_suspected: "Cause suspected", cert_unknown: "Cause unknown",
+    startedAt: "Started", endedAt: "Ended", ongoing: "Ongoing", segment: "Segment", trace: "Trace", build: "Build",
+    waterfall: "One correlated request, stage by stage", wfNote: "Each stage is a separate receipt. A stage without a receipt is not assumed to have happened.",
+    stage: "Stage", at: "At", took: "After previous", by: "Recorded by", receiptAge: "Receipt age", noReceipt: "No receipt",
+    stg_accepted: "Accepted", stg_queued: "Queued", stg_executed: "Executed", stg_published: "Published", stg_delivered: "Relay delivered", stg_observed: "Viewer observed", stg_acked: "Acknowledged",
+    stg_accepted_s: "Cloud ledger", stg_queued_s: "machine inbound", stg_executed_s: "machine ledger", stg_published_s: "machine outbound", stg_delivered_s: "relay receipt", stg_observed_s: "viewer", stg_acked_s: "viewer, on screen",
+    code: "Where to look in the code", codeNote: "Locations are the stage owners named by the evidence, at the build that emitted it.",
+    toEvidence: "Agent evidence", back: "Connection health",
+    // evidence
+    evidence: "Agent evidence", evidenceLead: "The structured record an agent reads to locate the code. Illustrative; generated from the fixture on this page.",
+    copy: "Copy JSON", download: "Download .json", copied: "Copied the illustrative JSON to the clipboard.",
+    copyFailed: "This browser refused clipboard access. The JSON is selected; press Ctrl+C or ⌘C.",
+    downloaded: "Saved a file generated from the fixture. It contains no captured diagnostics.",
+    evidenceNote: "Capturing real diagnostics is not part of this prototype.",
+    ago_s: "{n} s", ago_m: "{n} min", ago_h: "{n} h", agoWord: "{t} ago",
+    quality: "Evidence", q_complete: "Complete", q_partial: "Partial", q_stale: "Stale", q_not_collected: "Not collected",
+    q_unsupported: "Unsupported", q_forbidden: "Not permitted", q_no_requests: "No requests",
+    qualityNote: "Two separate answers: what happened to requests, and how much of it we could see.",
+    outcome: "Outcome", monitoring: "Monitoring status", monitoringLead: "Whether each source is producing, arriving and readable. When a source is missing, health there is unknown.",
+    openMonitoring: "Monitoring status", openTrace: "Request trace", traceLead: "One logical operation, every stage receipt, and where each stage lives in the code.",
+    gaps: "Gaps in window", dropped: "Dropped records", schema: "Schema", producer: "Source",
+    probe: "Read-only probe", probeLead: "A synthetic read issued from this viewer. It is excluded from user success and error counts, and it proves only the edges it exercised.",
+    probeRead: "Status read via relay", probeControl: "Command execution", probeNot: "Not exercised: unverified",
+    probeLast: "Last probe {age} ago · every 60 s · one outstanding at most", probeView: "Proves this viewer's viewpoint only.",
+  },
+  "zh-TW": {
+    proto: "設計原型 · 示意資料 · 非即時監控",
+    lang: "English", menu: "選單", ops: "營運", navLabel: "營運頁面",
+    navOverview: "總覽", navAccounts: "帳號", navUsage: "用量", navHealth: "連線健康",
+    navHealthHint: "阻塞、變慢、錯誤", notInProto: "不在這份原型裡",
+    sideFoot: "唯讀。這一頁不會重新啟動、重試或更改任何東西。",
+    title: "連線健康", lead: "哪裡的請求被擋住、變慢或失敗，從什麼時候開始，以及找到程式碼的證據。",
+    scenario: "示意情境", scope: "範圍", window: "時間範圍",
+    scopeCloud: "Cloud 服務", scopeMachine: "你的機器", scopeViewer: "這個瀏覽器",
+    w15: "15 分鐘", w60: "1 小時", w360: "6 小時",
+    live: "即時", paused: "已暫停", pause: "暫停", resume: "回到即時",
+    liveNote: "即時：時間範圍跟著時鐘走，各來源的時間會繼續累加。不會有新的示意事件進來；這是原型。",
+    pausedNote: "暫停於 UTC {time}。時間範圍與所有時間都凍結；暫停後本來會收到 {n} 筆模擬回執。",
+    scenarioReset: "情境已切換：選取改回這個情境最新的進行中事件，時間範圍改回預設。",
+    incidentGone: "目前的情境裡沒有這個事件，改為顯示總覽。",
+    sc_healthy: "正常", sc_stalled: "處理程序卡住（Cloud socket 仍開著）", sc_receipt: "Relay 回執延遲",
+    sc_source: "監控來源無法取得", sc_offline: "機器離線", sc_storm: "重新連線風暴",
+    v_healthy: "請求正常流動", v_blocked: "請求被擋住了", v_degraded: "請求變慢或失敗",
+    v_unknown: "部分路徑的健康狀態不明", v_offline: "機器離線",
+    v_since: "自 UTC {time} 起（{ago}）", v_open: "開啟事件", v_none: "這段時間沒有事件。",
+    st_healthy: "正常", st_idle: "沒有請求", st_degraded: "變慢", st_error: "錯誤", st_blocked: "阻塞",
+    st_unknown: "不明", st_offline: "離線", st_hidden: "此範圍看不到", st_unsupported: "此版本不回報",
+    st_retention: "未保留",
+    t_incident: "最新進行中事件", t_queue: "機器入站佇列", t_err: "錯誤率", t_lat: "延遲（端到端）",
+    t_queueNote: "{limit} 列中用了 {used} 列 · 最久已等 {age}", t_errNote: "這段時間 {n} 筆請求中有 {bad} 筆",
+    t_latNote: "p95 {p95} · p99 {p99} · {n} 筆樣本", t_fewSamples: "樣本太少，不算 p99（{n} 筆）",
+    t_none: "沒有", t_noData: "沒有資料", t_hiddenNote: "這是機器擁有者的資料，此範圍讀不到。",
+    fresh: "各來源的資料新鮮度", f_fresh: "最新", f_stale: "過時", f_unknown: "沒有回執", f_unsupported: "未回報",
+    f_hidden: "此範圍看不到", f_age: "最後回執在 {age}前 · 應每 {every} 一次", f_never: "這段時間沒有回執",
+    f_ret: "保留 {ret}",
+    src_browser: "這個瀏覽器", src_relay: "Relay 指標（Cloud）", src_machine: "機器狀態快照（擁有者）", src_collector: "遙測收集器（Cloud）",
+    segHealth: "各路段的健康狀態", seg: "路段", state: "狀態", p50: "p50", p95: "p95", p99: "p99", samples: "樣本數", errors: "錯誤", age: "來源時間",
+    lane_browser: "瀏覽器", lane_relay: "Relay", lane_recv: "機器 · 接收", lane_proc: "機器 · 處理", lane_send: "機器 · 送出", lane_coll: "收集器",
+    lane_browser_s: "這個瀏覽器", lane_relay_s: "Cloud", lane_recv_s: "擁有者", lane_proc_s: "擁有者", lane_send_s: "擁有者", lane_coll_s: "Cloud",
+    timeline: "共用時間線", tlRange: "UTC {from} – {to}", tlNow: "現在", tableView: "改用表格", chartView: "改用時間線",
+    tlSummary: "{lane}：{list}", tlFrom: "從", tlTo: "到", tlLegend: "圖例",
+    gapNote: "斜線表示沒有觀測資料送到：狀態不明，絕不當成正常。",
+    incidents: "這段時間的事件", openIncident: "開啟", active: "進行中", resolved: "已結束",
+    noIncidents: "這段時間沒有開啟任何事件。",
+    incident: "事件", facts: "觀察到的事實", suspected: "疑似原因", missing: "缺少的證據",
+    cert_confirmed: "原因已確認", cert_suspected: "原因未確認", cert_unknown: "原因不明",
+    startedAt: "開始", endedAt: "結束", ongoing: "仍在進行", segment: "路段", trace: "追蹤", build: "版本",
+    waterfall: "同一筆請求，逐段來看", wfNote: "每個階段都是各自的回執。沒有回執的階段，不會被假設已經發生。",
+    stage: "階段", at: "時間", took: "距上一段", by: "記錄者", receiptAge: "回執時間", noReceipt: "沒有回執",
+    stg_accepted: "已接受", stg_queued: "已排隊", stg_executed: "已執行", stg_published: "已發出", stg_delivered: "Relay 已送達", stg_observed: "瀏覽器已收到", stg_acked: "已確認",
+    stg_accepted_s: "Cloud 帳本", stg_queued_s: "機器入站", stg_executed_s: "機器帳本", stg_published_s: "機器出站", stg_delivered_s: "relay 回執", stg_observed_s: "瀏覽器", stg_acked_s: "瀏覽器，已畫在畫面上",
+    code: "程式碼要看哪裡", codeNote: "位置是證據點名的階段負責者，版本是發出證據的那一版。",
+    toEvidence: "給 agent 的證據", back: "連線健康",
+    evidence: "給 agent 的證據", evidenceLead: "agent 用來找到程式碼的結構化紀錄。示意用，由這一頁的示意資料產生。",
+    copy: "複製 JSON", download: "下載 .json", copied: "已把示意 JSON 複製到剪貼簿。",
+    copyFailed: "這個瀏覽器拒絕存取剪貼簿。JSON 已經選取，請按 Ctrl+C 或 ⌘C。",
+    downloaded: "已存下由示意資料產生的檔案，裡面沒有任何實際擷取的診斷。",
+    evidenceNote: "擷取真實診斷不在這份原型的範圍內。",
+    ago_s: "{n} 秒", ago_m: "{n} 分鐘", ago_h: "{n} 小時", agoWord: "{t}前",
+    quality: "證據", q_complete: "完整", q_partial: "部分", q_stale: "過時", q_not_collected: "未收集",
+    q_unsupported: "不支援", q_forbidden: "無權限", q_no_requests: "沒有請求",
+    qualityNote: "分開回答兩件事：請求發生了什麼，以及我們看得到多少。",
+    outcome: "結果", monitoring: "監控狀態", monitoringLead: "每個來源有沒有在產生、送達、可以讀取。來源缺席時，那一段的健康狀態就是不明。",
+    openMonitoring: "監控狀態", openTrace: "請求追蹤", traceLead: "同一個邏輯操作、每一段的回執，以及每一段在程式碼的哪裡。",
+    gaps: "這段時間的空白", dropped: "丟棄的紀錄", schema: "Schema", producer: "來源",
+    probe: "唯讀探測", probeLead: "從這個瀏覽器發出的合成讀取。不算進使用者的成功與錯誤數，也只證明它實際走過的路徑。",
+    probeRead: "經 relay 讀取狀態", probeControl: "指令執行", probeNot: "沒有走到：未驗證",
+    probeLast: "最後一次探測在 {age}前 · 每 60 秒 · 同時最多一筆", probeView: "只證明這個瀏覽器的觀點。",
+  },
+}
+let locale = "zh-TW"
+function t(key, vars) {
+  let s = (WORDS[locale] && WORDS[locale][key]) ?? WORDS.en[key] ?? key
+  if (vars) for (const [k, v] of Object.entries(vars)) s = s.split("{" + k + "}").join(String(v))
+  return s
+}
+const L = (o) => (o && typeof o === "object" ? (locale === "zh-TW" ? o.zh : o.en) : o)
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
+
+/* ============================== fixtures ================================== */
+// Everything is relative to the moment a scenario is loaded: s/e are minutes before it (negative),
+// and e = 0 means the state continues to the present. All names, ids and builds are synthetic.
+const LANES = ["browser", "relay", "recv", "proc", "send", "coll"]
+const LANE_SOURCE = { browser: "browser", relay: "relay", recv: "machine", proc: "machine", send: "machine", coll: "collector" }
+const RETENTION_MIN = { browser: 1440, relay: 1440, machine: 60, collector: 360 }
+const RETENTION_WORD = { browser: { en: "24 h, hourly counts", zh: "24 小時，逐時計數" }, relay: { en: "24 h", zh: "24 小時" },
+  machine: { en: "newest 50 commands (about 1 h here)", zh: "最新 50 筆指令（此處約 1 小時）" }, collector: { en: "6 h", zh: "6 小時" } }
+const BUILD = "2.0.0-dev+synthetic.7f3a"
+const ok = (s = -360, e = 0) => ({ s, e, st: "healthy" })
+const W = (en, zh) => ({ en, zh })
+
+const SCENARIOS = {
+  healthy: {
+    probe: { read: "healthy", readNote: W("Answered in 310 ms", "310 毫秒內回應") },
+    lanes: { browser: [{ s: -360, e: -38, st: "idle" }, ok(-38, 0)], relay: [ok()], recv: [ok(-60)], proc: [ok(-60)], send: [ok(-60)], coll: [ok()] },
+    marks: [],
+    sources: { browser: { age: 3, every: 5 }, relay: { age: 9, every: 15 }, machine: { age: 1, every: 2 }, collector: { age: 22, every: 30 } },
+    queue: { used: 2, limit: 64, oldest: 0.4 },
+    totals: { n: 1842, bad: 4, p50: 140, p95: 380, p99: 720 },
+    segs: { browser: [62, 150, 260, 1842, 2], relay: [18, 41, 88, 1842, 1], recv: [3, 9, 21, 1840, 0], proc: [40, 160, 410, 1840, 1], send: [6, 14, 30, 1839, 0], coll: [null, null, null, 0, 0] },
+    incidents: [],
+  },
+  stalled: {
+    probe: { read: "healthy", readNote: W("Answered in 290 ms: reads still work while commands are stuck", "290 毫秒內回應：指令卡住時讀取仍然可以") },
+    lanes: { browser: [{ s: -360, e: -50, st: "idle" }, ok(-50, -18), { s: -18, e: -9, st: "degraded" }, { s: -9, e: 0, st: "error" }],
+      relay: [ok(-360, -18), { s: -18, e: 0, st: "degraded" }], recv: [ok(-60, -9), { s: -9, e: 0, st: "error" }], proc: [ok(-60, -18), { s: -18, e: 0, st: "blocked" }],
+      send: [ok(-60, -18), { s: -18, e: 0, st: "idle" }], coll: [ok()] },
+    marks: [{ lane: "recv", t: -9 }, { lane: "proc", t: -18 }],
+    sources: { browser: { age: 2, every: 5 }, relay: { age: 6, every: 15 }, machine: { age: 1, every: 2 }, collector: { age: 14, every: 30 } },
+    queue: { used: 64, limit: 64, oldest: 1080 },
+    totals: { n: 731, bad: 188, p50: 220, p95: 30000, p99: 60000 },
+    segs: { browser: [210, 30000, 60000, 731, 188], relay: [17, 44, 91, 731, 214], recv: [3, 11, 25, 543, 188], proc: [null, null, null, 0, 0], send: [null, null, null, 0, 0], coll: [null, null, null, 0, 0] },
+    incidents: [{
+      id: "INC-S1", start: -18, end: 0, sev: "blocked", lane: "proc", cert: "confirmed",
+      title: W("Commands are accepted but never executed", "指令被接受，卻一直沒有執行"),
+      facts: [
+        [W("Relay socket to the machine stayed open the whole time; heartbeats every 30 s were acknowledged. Socket-open proves only the transport.", "到機器的 relay socket 全程開著，每 30 秒的心跳都有回應。socket 開著只證明傳輸層。"), "relay"],
+        [W("Since 08:27 UTC the relay forwarded 214 commands and saw no reply envelope for any of them.", "UTC 08:27 起 relay 轉送了 214 筆指令，沒有看到任何一筆的回覆信封。"), "relay"],
+        [W("The machine accepted 214 commands after the stall began and executed none of them.", "卡住之後機器接受了 214 筆指令，一筆都沒有執行。"), "machine"],
+        [W("The inbound queue reached its limit of 64 rows; new commands were refused with cloud_ingress_busy.", "入站佇列到了 64 列的上限，新指令以 cloud_ingress_busy 拒絕。"), "machine"],
+      ],
+      suspected: [[W("Confirmed for this fixture: a synthetic fault injected into the command handler holds its lease and never returns.", "這份示意資料已確認：注入到指令處理程序的合成故障，拿著租約不放、一直不回傳。"), "fixture"]],
+      missing: [[W("None needed for this cause. Viewer acknowledgement does not apply: nothing reached the viewer.", "這個原因不需要更多證據。瀏覽器確認不適用：沒有東西送到瀏覽器。"), ""]],
+      trace: "tr-9c41e2", stages: [["accepted", 0, "relay", 4], ["queued", 35, "machine", 2], ["executed", null], ["published", null], ["delivered", null], ["observed", null], ["acked", null]],
+      code: [["internal/transport/cloud/relay.go:123", "(*Relay).start", W("drains the inbound queue that filled", "負責清空塞滿的入站佇列")],
+        ["internal/domain/capacity/register_cloud.go:175", "CloudRelayQueue", W("the registered 64-row bound and its refusal", "登記的 64 列上限與拒絕方式")]],
+    }],
+  },
+  receipt: {
+    probe: { read: "degraded", readNote: W("Answered after 58 s", "58 秒後才回應") },
+    lanes: { browser: [{ s: -360, e: -55, st: "idle" }, ok(-55, -26), { s: -26, e: 0, st: "degraded" }],
+      relay: [ok(-360, -26), { s: -26, e: -17, st: "degraded" }, { s: -17, e: -11, st: "unknown" }, { s: -11, e: 0, st: "degraded" }],
+      recv: [ok(-60)], proc: [ok(-60)], send: [ok(-60)], coll: [ok()] },
+    marks: [],
+    sources: { browser: { age: 4, every: 5 }, relay: { age: 11, every: 15 }, machine: { age: 1, every: 2 }, collector: { age: 18, every: 30 } },
+    queue: { used: 5, limit: 64, oldest: 1.2 },
+    totals: { n: 1206, bad: 31, p50: 380, p95: 61400, p99: 88000 },
+    segs: { browser: [300, 61400, 88000, 1206, 31], relay: [21, 59800, 86100, 1206, 0], recv: [3, 9, 22, 1206, 0], proc: [55, 190, 420, 1206, 0], send: [6, 15, 33, 1206, 0], coll: [null, null, null, 0, 0] },
+    incidents: [{
+      id: "INC-R1", start: -26, end: 0, sev: "degraded", lane: "relay", cert: "suspected",
+      title: W("Replies are published but delivery receipts arrive late", "回覆已發出，但送達回執很晚才到"),
+      facts: [
+        [W("1,158 of 1,206 traced requests were executed and published by the machine within 0.5 s.", "1,206 筆追蹤請求中，有 1,158 筆在 0.5 秒內被機器執行並發出。"), "machine"],
+        [W("For those, the relay delivered receipt came 40–90 s after publishing.", "這些請求的 relay 送達回執，比發出晚了 40–90 秒。"), "relay"],
+        [W("Relay metrics have a 6-minute gap (08:23–08:29 UTC in this fixture).", "Relay 指標有一段 6 分鐘的空白（此示意資料的 UTC 08:23–08:29）。"), "relay"],
+      ],
+      suspected: [[W("Relay fan-out to this viewer is delayed. This rests on ordering only: the delay begins after publishing and before delivery, which does not by itself show where the time went.", "Relay 對這個瀏覽器的分送被延遲。這只依據先後順序：延遲發生在發出之後、送達之前，這本身還不能證明時間花在哪裡。"), "inference"]],
+      missing: [
+        [W("Relay per-connection queue depth for the delayed requests (not recorded by this build).", "延遲請求在 relay 端每條連線的佇列深度（此版本未記錄）。"), "relay"],
+        [W("Viewer observed times for 48 requests: the tab was in the background and its batch was not delivered.", "48 筆請求的瀏覽器收到時間：分頁在背景，批次沒有送出。"), "browser"],
+        [W("Relay stage events during the 6-minute gap.", "6 分鐘空白期間的 relay 階段事件。"), "relay"],
+      ],
+      trace: "tr-51b7d0", stages: [["accepted", 0, "relay", 3], ["queued", 40, "machine", 2], ["executed", 210, "machine", 2], ["published", 260, "machine", 2], ["delivered", 61400, "relay", 3, "late"], ["observed", 61600, "browser", 1], ["acked", 61700, "browser", 1]],
+      code: [["internal/transport/cloud/publish.go:572", "(*Publisher).open", W("where a published reply waits for the relay receipt", "發出的回覆在這裡等 relay 回執")],
+        ["web/console/src/cloud/direct-history.ts:64", "recordDirectAttempt", W("this browser's own record of direct attempts", "這個瀏覽器自己的直連嘗試紀錄")]],
+    }],
+  },
+  source: {
+    probe: { read: "healthy", readNote: W("Answered in 330 ms", "330 毫秒內回應") },
+    lanes: { browser: [{ s: -360, e: -40, st: "idle" }, ok(-40, 0)], relay: [ok()],
+      recv: [ok(-60, -22), { s: -22, e: 0, st: "unknown" }], proc: [ok(-60, -22), { s: -22, e: 0, st: "unknown" }], send: [ok(-60, -22), { s: -22, e: 0, st: "unknown" }],
+      coll: [ok(-360, -22), { s: -22, e: 0, st: "unknown" }] },
+    marks: [],
+    sources: { browser: { age: 3, every: 5 }, relay: { age: 8, every: 15 }, machine: { age: 1320, every: 2, stuck: true }, collector: { age: 1320, every: 30, stuck: true } },
+    queue: null,
+    totals: { n: 402, bad: 1, p50: 150, p95: 410, p99: null },
+    segs: { browser: [70, 160, 280, 402, 1], relay: [19, 43, 90, 402, 0], recv: [null, null, null, null, null], proc: [null, null, null, null, null], send: [null, null, null, null, null], coll: [null, null, null, null, null] },
+    incidents: [{
+      id: "INC-M1", start: -22, end: 0, sev: "unknown", lane: "coll", cert: "unknown",
+      title: W("No machine or collector observations for 22 minutes", "22 分鐘沒有機器與收集器的觀測資料"),
+      facts: [
+        [W("The collector's last receipt was 22 minutes ago; it is expected every 30 s.", "收集器最後一次回執在 22 分鐘前，原本應每 30 秒一次。"), "collector"],
+        [W("The relay still reports the machine connected and forwarding traffic.", "Relay 仍回報機器已連線，也還在轉送流量。"), "relay"],
+        [W("The browser's requests succeed (1 error in 402).", "瀏覽器的請求都成功（402 筆中 1 筆錯誤）。"), "browser"],
+      ],
+      suspected: [[W("Nothing is suspected about the connection. The monitoring path itself is unavailable, so machine-side health is unknown, not healthy.", "連線本身沒有疑點。是監控路徑無法取得，所以機器端的健康狀態是不明，不是正常。"), "inference"]],
+      missing: [[W("Every machine-side stage since the gap began.", "空白開始後機器端的每一個階段。"), "machine"], [W("Why the collector stopped: it has not reported a reason.", "收集器為什麼停：它沒有回報原因。"), "collector"]],
+      trace: null, stages: [],
+      code: [["internal/adapters/cloud/status.go:95", "(*StatusRecorder).Snapshot", W("the machine-side snapshot that stopped arriving", "不再送來的機器端快照")]],
+    }],
+  },
+  offline: {
+    lanes: { browser: [{ s: -360, e: -45, st: "idle" }, ok(-45, -14), { s: -14, e: 0, st: "error" }],
+      relay: [ok(-360, -14), { s: -14, e: 0, st: "error" }],
+      recv: [ok(-60, -14), { s: -14, e: 0, st: "offline" }], proc: [ok(-60, -14), { s: -14, e: 0, st: "offline" }], send: [ok(-60, -14), { s: -14, e: 0, st: "offline" }],
+      coll: [ok()] },
+    marks: [{ lane: "browser", t: -16 }, { lane: "relay", t: -14 }],
+    sources: { browser: { age: 2, every: 5 }, relay: { age: 7, every: 15 }, machine: { age: 840, every: 2, stuck: true, offline: true }, collector: { age: 12, every: 30 } },
+    probe: { read: "error", readNote: W("Refused: machine_offline", "拒絕：machine_offline") },
+    queue: { used: 0, limit: 64, oldest: 0, asOf: -14 }, presence: "expired",
+    totals: { n: 96, bad: 57, p50: 160, p95: 420, p99: null },
+    segs: { browser: [80, 190, 300, 96, 57], relay: [12, 30, 60, 96, 57], recv: [null, null, null, null, null], proc: [null, null, null, null, null], send: [null, null, null, null, null], coll: [null, null, null, 0, 0] },
+    incidents: [{
+      id: "INC-O1", start: -14, end: 0, sev: "offline", lane: "relay", cert: "confirmed",
+      title: W("Machine offline; commands are refused as machine_offline", "機器離線；指令以 machine_offline 拒絕"),
+      facts: [
+        [W("The direct path closed 16 minutes ago. On its own that made only the direct path unavailable; reads fell back to the relay.", "直連路徑在 16 分鐘前關閉。單憑這件事，只代表直連這條路不能用；讀取改走 relay。"), "browser"],
+        [W("The machine's authenticated presence expired 14 minutes ago (the relay presence contract) and has not been renewed.", "機器經過驗證的 presence 在 14 分鐘前到期（relay 的 presence 約定），之後沒有更新。"), "relay"],
+        [W("57 commands from this viewer were refused with machine_offline.", "這個瀏覽器有 57 筆指令以 machine_offline 拒絕。"), "relay"],
+        [W("The machine's last status snapshot is 14 minutes old; its queue was empty then.", "機器最後一份狀態快照是 14 分鐘前的，當時佇列是空的。"), "machine"],
+      ],
+      suspected: [[W("The machine is offline. Why it went offline is not modelled or guessed here.", "機器離線。它為什麼離線，這裡不建模，也不猜。"), "relay"]],
+      missing: [[W("Anything from the machine after it went offline.", "機器離線之後的任何資料。"), "machine"]],
+      trace: "tr-0e2a77", stages: [["accepted", 0, "relay", 2], ["queued", null], ["executed", null], ["published", null], ["delivered", null], ["observed", 90, "browser", 1], ["acked", 120, "browser", 1]],
+      code: [["web/console/src/pages/devices/AccountMachines.tsx:70", "roadOf", W("how the machine sheet names the offline road", "機器頁怎麼標示離線")]],
+    }],
+  },
+  storm: {
+    probe: { read: "degraded", readNote: W("2 of 9 probes failed during the storm", "風暴期間 9 次探測失敗 2 次") },
+    lanes: { browser: [{ s: -360, e: -48, st: "idle" }, ok(-48, -12), { s: -12, e: -3, st: "degraded" }, ok(-3, 0)],
+      relay: [ok(-360, -12), { s: -12, e: -3, st: "error" }, ok(-3, 0)],
+      recv: [ok(-60, -12), { s: -12, e: -3, st: "degraded" }, ok(-3, 0)], proc: [ok(-60)], send: [ok(-60, -12), { s: -12, e: -3, st: "unsupported" }, ok(-3, 0)], coll: [ok()] },
+    marks: Array.from({ length: 12 }, (_, i) => ({ lane: "relay", t: -12 + i * 0.75 })),
+    sources: { browser: { age: 3, every: 5 }, relay: { age: 5, every: 15 }, machine: { age: 1, every: 2 }, collector: { age: 9, every: 30 } },
+    queue: { used: 7, limit: 64, oldest: 2.5 },
+    totals: { n: 988, bad: 74, p50: 190, p95: 4200, p99: 9100 },
+    segs: { browser: [120, 4200, 9100, 988, 74], relay: [20, 900, 3100, 988, 74], recv: [3, 600, 2400, 914, 0], proc: [48, 170, 400, 914, 0], send: [null, null, null, null, null], coll: [null, null, null, 0, 0] },
+    incidents: [{
+      id: "INC-C1", start: -12, end: -3, sev: "degraded", lane: "relay", cert: "suspected",
+      title: W("The machine reconnected 47 times in 9 minutes", "機器在 9 分鐘內重新連線 47 次"),
+      facts: [
+        [W("Connection generation rose from 211 to 258; each connection lasted 6–14 s.", "連線代數從 211 升到 258；每條連線只撐 6–14 秒。"), "relay"],
+        [W("74 requests failed while a connection was being replaced.", "74 筆請求在連線替換期間失敗。"), "relay"],
+        [W("It stopped on its own 3 minutes ago.", "它在 3 分鐘前自己停了。"), "relay"],
+      ],
+      suspected: [[W("A replacement connection may be closing its predecessor, which then reconnects. Closes happen in pairs, but pairing alone does not prove which side started it.", "可能是替代連線把前一條關掉，前一條又重連。關閉總是成對出現，但光是成對，不能證明是哪一邊先開始。"), "inference"]],
+      missing: [
+        [W("Close reasons for 31 of 47 closes: this build does not report them.", "47 次關閉中 31 次的關閉原因：此版本不回報。"), "relay"],
+        [W("Machine send-side stage events during the storm (not reported by this build).", "風暴期間機器送出端的階段事件（此版本不回報）。"), "machine"],
+      ],
+      trace: "tr-7d19a3", stages: [["accepted", 0, "relay", 4], ["queued", 30, "machine", 3], ["executed", 220, "machine", 3], ["published", 260, "machine", 3], ["delivered", 4100, "relay", 4, "late"], ["observed", 4200, "browser", 3], ["acked", 4260, "browser", 3]],
+      code: [["internal/transport/cloud/link.go:957", "(*Link).runOnce", W("one connection's lifetime and its replacement", "一條連線的生命週期與替換")]],
+    }],
+  },
+}
+const SCENARIO_ORDER = ["healthy", "stalled", "receipt", "source", "offline", "storm"]
+
+/* ============================== state ===================================== */
+const state = {
+  scenario: "stalled", scope: "machine", windowMin: 60, live: true,
+  loadedAt: Date.now(), pausedAt: null, selected: null, tableView: false, notice: null,
+}
+const sc = () => SCENARIOS[state.scenario]
+const now = () => (state.live ? Date.now() : state.pausedAt)
+const FIXTURE_CLOCK = Date.UTC(2026, 9, 20, 8, 45, 0) // what the fixture calls "loaded at"
+const clock = (ms) => FIXTURE_CLOCK + (ms - state.loadedAt)
+const hhmm = (ms, sec) => new Date(clock(ms)).toISOString().slice(11, sec ? 19 : 16)
+const minAgo = (m) => state.loadedAt + m * 60000
+
+function ago(sec) {
+  sec = Math.max(0, Math.round(sec))
+  if (sec < 90) return t("ago_s", { n: sec })
+  if (sec < 5400) return t("ago_m", { n: Math.round(sec / 60) })
+  return t("ago_h", { n: Math.round(sec / 3600) })
+}
+function ms(v) {
+  if (v === null || v === undefined) return "—"
+  return v < 1000 ? v + " ms" : (v / 1000).toFixed(v < 10000 ? 1 : 0) + " s"
+}
+
+/* What this scope may read. Machine lanes are owner data (a separate permission). */
+function visible(lane) {
+  if (state.scope === "cloud") return LANE_SOURCE[lane] !== "machine" && lane !== "browser"
+  if (state.scope === "viewer") return lane === "browser"
+  return true
+}
+function sourceVisible(src) {
+  if (state.scope === "cloud") return src === "relay" || src === "collector"
+  if (state.scope === "viewer") return src === "browser"
+  return true
+}
+
+/* A source's receipt age now. A flowing source keeps receiving; a stuck one only ages. */
+function sourceAge(src) {
+  const f = sc().sources[src]
+  const elapsed = (now() - state.loadedAt) / 1000
+  if (f.stuck) return f.age + elapsed
+  return (f.age + elapsed) % f.every
+}
+function freshness(src) {
+  if (!sourceVisible(src)) return "hidden"
+  const f = sc().sources[src]
+  const age = sourceAge(src)
+  if (f.stuck && f.offline) return "stale"
+  if (f.stuck) return "unknown"
+  return age <= f.every * 2 ? "fresh" : "stale"
+}
+
+/* Truth table (see the design document): the worst visible state wins, but unknown is never
+   hidden behind healthy, and offline is its own answer rather than an error. */
+const RANK = { blocked: 6, offline: 5, error: 4, degraded: 3, unknown: 2, unsupported: 1, idle: 0, healthy: 0, retention: 0, hidden: -1 }
+function laneNow(lane) {
+  if (!visible(lane)) return "hidden"
+  const segs = sc().lanes[lane]
+  const last = segs[segs.length - 1]
+  if (LANE_SOURCE[lane] === "machine" && freshness("machine") === "unknown") return "unknown"
+  return last.st
+}
+function verdict() {
+  const states = LANES.map(laneNow)
+  if (states.includes("blocked")) return "blocked"
+  // Offline is decided by the relay's presence contract expiring, which every scope may see;
+  // a direct-path close alone never makes a machine offline.
+  if (sc().presence === "expired" || states.includes("offline")) return "offline"
+  if (states.includes("error") || states.includes("degraded")) return "degraded"
+  if (states.includes("unknown") || states.includes("unsupported")) return "unknown"
+  if (["relay", "collector", "machine", "browser"].some((s) => sourceVisible(s) && freshness(s) !== "fresh" && freshness(s) !== "hidden")) return "unknown"
+  return "healthy"
+}
+/* Evidence quality is the second dimension: how much of the window we could actually see. */
+const Q_RANK = { complete: 0, no_requests: 0, partial: 1, unsupported: 2, not_collected: 3, stale: 4, forbidden: -1 }
+function laneQuality(lane) {
+  if (!visible(lane)) return "forbidden"
+  const segs = laneSegments(lane).filter((x) => x.st !== "retention")
+  const cur = segs[segs.length - 1]
+  if (LANE_SOURCE[lane] === "machine" && sc().sources.machine.stuck) return "stale"
+  if (cur.st === "unknown") return "not_collected"
+  if (cur.st === "unsupported") return "unsupported"
+  if (segs.some((x) => x.st === "unknown" || x.st === "unsupported")) return "partial"
+  if (segs.every((x) => x.st === "idle")) return "no_requests"
+  return "complete"
+}
+function overallQuality() {
+  return LANES.map(laneQuality).filter((q) => q !== "forbidden").reduce((w, q) => (Q_RANK[q] > Q_RANK[w] ? q : w), "complete")
+}
+const Q_SEV = { complete: "healthy", no_requests: "idle", partial: "degraded", unsupported: "unsupported", not_collected: "unknown", stale: "unknown", forbidden: "hidden" }
+const qual = (q) => `<span class="sev s-${Q_SEV[q]}"><i aria-hidden="true">${{ complete: "✓", no_requests: "–", partial: "◐", unsupported: "∅", not_collected: "?", stale: "⌛", forbidden: "⊘" }[q]}</i>${esc(t("q_" + q))}</span>`
+const screenId = (id) => `<span class="certainty mono" style="margin-right:8px">${id}</span>`
+
+const GLYPH = { healthy: "✓", idle: "–", degraded: "▲", error: "✕", blocked: "■", unknown: "?", offline: "○", hidden: "⊘", unsupported: "∅", retention: "…" }
+const sev = (st, label) => `<span class="sev s-${st}"><i aria-hidden="true">${GLYPH[st] || "?"}</i>${esc(label ?? t("st_" + st))}</span>`
+
+function activeIncidents() { return sc().incidents.filter((i) => i.end === 0) }
+function windowStart() { return now() - state.windowMin * 60000 }
+
+/* ============================== rendering ================================= */
+const main = document.getElementById("main")
+
+function render(focus) {
+  document.documentElement.lang = locale === "zh-TW" ? "zh-Hant-TW" : "en"
+  document.title = t("title") + " · " + t("proto")
+  document.getElementById("protoText").textContent = t("proto")
+  document.getElementById("langBtn").textContent = t("lang")
+  document.querySelectorAll("[data-t]").forEach((n) => { n.textContent = t(n.dataset.t) })
+  document.querySelectorAll("[data-t-label]").forEach((n) => n.setAttribute("aria-label", t(n.dataset.tLabel)))
+  const [route, id] = location.hash.replace(/^#/, "").split("/")
+  let inc = id ? sc().incidents.find((i) => i.id === id) : null
+  if ((route === "incident" || route === "evidence" || route === "trace") && !inc) {
+    state.notice = t("incidentGone")
+    history.replaceState(null, "", "#overview")
+    return render(focus)
+  }
+  if (inc) state.selected = inc.id
+  const body = route === "incident" ? incidentView(inc) : route === "evidence" ? evidenceView(inc) : route === "trace" ? traceView(inc) : route === "monitoring" ? monitoringView() : overviewView()
+  main.innerHTML = controls() + body
+  bind()
+  if (focus) { const h = main.querySelector("h1"); if (h) h.focus() }
+}
+
+function controls() {
+  const opt = SCENARIO_ORDER.map((k) => `<option value="${k}"${k === state.scenario ? " selected" : ""}>${esc(t("sc_" + k))}</option>`).join("")
+  const radios = (name, items, cur) => items.map(([v, label]) =>
+    `<label><input type="radio" name="${name}" value="${v}"${String(v) === String(cur) ? " checked" : ""}><span>${esc(label)}</span></label>`).join("")
+  const liveText = state.live ? t("liveNote") : t("pausedNote", { time: hhmm(state.pausedAt, true), n: Math.floor((Date.now() - state.pausedAt) / 5000) })
+  return `
+  <section class="controls" aria-label="${esc(t("scenario"))}">
+    <div class="controls-row">
+      <label class="field"><span>${esc(t("scenario"))}</span><select id="scenario">${opt}</select></label>
+      <fieldset class="field"><legend>${esc(t("scope"))}</legend><div class="seg">${radios("scope", [["cloud", t("scopeCloud")], ["machine", t("scopeMachine")], ["viewer", t("scopeViewer")]], state.scope)}</div></fieldset>
+      <fieldset class="field"><legend>${esc(t("window"))}</legend><div class="seg">${radios("win", [[15, t("w15")], [60, t("w60")], [360, t("w360")]], state.windowMin)}</div></fieldset>
+      <button type="button" class="btn" id="liveBtn" aria-pressed="${!state.live}">${state.live ? "❚❚ " + esc(t("pause")) : "▶ " + esc(t("resume"))}</button>
+    </div>
+    <p class="live-note" id="liveNote" aria-live="polite"><strong>${esc(state.live ? t("live") : t("paused"))}</strong> · ${esc(liveText)}</p>
+    ${state.notice ? `<p class="notice" role="status">${esc(state.notice)}</p>` : ""}
+  </section>`
+}
+
+function overviewView() {
+  const v = verdict()
+  const act = activeIncidents()[0]
+  const tot = sc().totals
+  const vText = { healthy: t("v_healthy"), blocked: t("v_blocked"), degraded: t("v_degraded"), unknown: t("v_unknown"), offline: t("v_offline") }[v]
+  const since = act ? t("v_since", { time: hhmm(minAgo(act.start)), ago: t("agoWord", { t: ago((now() - minAgo(act.start)) / 1000) }) }) : t("v_none")
+  return `
+  <div class="pagehead">
+    <p class="sub">${screenId("M01")}</p>
+    <h1 tabindex="-1">${esc(t("title"))}</h1>
+    <p class="sub">${esc(t("lead"))}</p>
+  </div>
+  <section class="verdict verdict-${v}" aria-labelledby="vh">
+    <div class="glyph-big glyph-${v === "healthy" ? "healthy" : v}" aria-hidden="true">${GLYPH[v]}</div>
+    <div><h2 id="vh">${esc(vText)}</h2><p>${act ? esc(L(act.title)) + " · " : ""}${esc(since)}</p>
+      <p>${esc(t("outcome"))}: ${sev(v === "healthy" ? "healthy" : v)} · ${esc(t("quality"))}: ${qual(overallQuality())}${LANES.some((l) => !visible(l)) ? " + " + qual("forbidden") : ""} · <a href="#monitoring">${esc(t("openMonitoring"))} (M06)</a></p>
+      <p>${esc(t("qualityNote"))}</p></div>
+    ${act ? `<a class="btn" href="#incident/${act.id}">${esc(t("v_open"))} →</a>` : ""}
+  </section>
+  ${tiles(act, tot)}
+  ${freshnessStrip()}
+  ${timeline()}
+  ${incidentList()}
+  ${segmentTable()}`
+}
+
+function tiles(act, tot) {
+  const q = sc().queue
+  const machineOk = sourceVisible("machine")
+  const qHot = q && q.used / q.limit >= 0.75
+  const qTile = !machineOk
+    ? `<p class="tile-value"><small>${esc(t("st_hidden"))}</small></p><p class="tile-note">${esc(t("t_hiddenNote"))}</p>`
+    : !q ? `<p class="tile-value">${sev("unknown")}</p><p class="tile-note">${esc(t("f_never"))}</p>`
+    : `<p class="tile-value">${q.used}<small> / ${q.limit}</small></p>
+       <span class="meter${qHot ? " meter-hot" : ""}" aria-hidden="true"><span style="width:${(q.used / q.limit) * 100}%"></span></span>
+       <p class="tile-note">${esc(t("t_queueNote", { used: q.used, limit: q.limit, age: ms(q.oldest * 1000) }))}${q.asOf ? " · " + esc(t("agoWord", { t: ago(-q.asOf * 60) })) : ""}</p>`
+  const rate = tot.n ? ((tot.bad / tot.n) * 100).toFixed(tot.bad / tot.n < 0.1 ? 1 : 0) + "%" : "—"
+  const lat = tot.n >= 20 ? t("t_latNote", { p95: ms(tot.p95), p99: tot.p99 ? ms(tot.p99) : "—", n: tot.n }) : t("t_fewSamples", { n: tot.n })
+  return `
+  <section class="section" aria-label="${esc(t("segHealth"))}">
+    <div class="tiles">
+      <div class="tile"><p class="tile-label">${esc(t("t_incident"))}</p>
+        ${act ? `<p class="tile-value" style="font-size:16px;letter-spacing:0">${sev(act.sev)}</p><p class="tile-note"><a href="#incident/${act.id}">${esc(L(act.title))}</a></p>` : `<p class="tile-value">${esc(t("t_none"))}</p>`}</div>
+      <div class="tile"><p class="tile-label">${esc(t("t_queue"))}</p>${qTile}</div>
+      <div class="tile"><p class="tile-label">${esc(t("t_err"))}</p><p class="tile-value">${rate}</p><p class="tile-note">${esc(t("t_errNote", { bad: tot.bad, n: tot.n }))}</p></div>
+      <div class="tile"><p class="tile-label">${esc(t("t_lat"))}</p><p class="tile-value">p50 ${ms(tot.p50)}</p><p class="tile-note">${esc(lat)}</p></div>
+    </div>
+  </section>`
+}
+
+function freshnessStrip() {
+  const items = ["browser", "relay", "machine", "collector"].map((src) => {
+    const f = freshness(src)
+    const def = sc().sources[src]
+    const st = { fresh: "healthy", stale: "degraded", unknown: "unknown", hidden: "hidden", unsupported: "unsupported" }[f]
+    const word = t("f_" + f)
+    const age = f === "hidden" ? t("t_hiddenNote") : t("f_age", { age: ago(sourceAge(src)), every: ago(def.every) })
+    return `<li class="source"><span class="source-name">${esc(t("src_" + src))}</span>${sev(st, word)}
+      <span class="source-age">${esc(age)}</span><span class="source-ret">${esc(t("f_ret", { ret: L(RETENTION_WORD[src]) }))}</span></li>`
+  }).join("")
+  return `<section class="section" aria-labelledby="fh"><h2 class="h2" id="fh">${esc(t("fresh"))}</h2><ul class="sources">${items}</ul></section>`
+}
+
+/* Segments of a lane clipped to the window, with retention and permission applied. */
+function laneSegments(lane) {
+  const start = windowStart(), end = now()
+  if (!visible(lane)) return [{ a: start, b: end, st: "hidden" }]
+  const retFrom = end - RETENTION_MIN[LANE_SOURCE[lane]] * 60000
+  const out = []
+  if (retFrom > start) out.push({ a: start, b: retFrom, st: "retention" })
+  let cursor = Math.max(start, retFrom)
+  for (const s of sc().lanes[lane]) {
+    let a = minAgo(s.s), b = s.e === 0 ? end : minAgo(s.e)
+    a = Math.max(a, cursor); b = Math.min(b, end)
+    if (b <= a) continue
+    if (a > cursor) out.push({ a: cursor, b: a, st: "unknown" })
+    let st = s.st
+    if (LANE_SOURCE[lane] === "machine" && freshness("machine") === "unknown" && s.e === 0 && st !== "unknown") st = "unknown"
+    out.push({ a, b, st }); cursor = b
+  }
+  if (cursor < end) out.push({ a: cursor, b: end, st: "unknown" })
+  return out
+}
+const pct = (x) => (((x - windowStart()) / (now() - windowStart())) * 100).toFixed(3)
+
+function timeline() {
+  const start = windowStart(), end = now()
+  const ticks = 4
+  const axis = Array.from({ length: ticks + 1 }, (_, i) => {
+    const x = start + ((end - start) * i) / ticks
+    return `<span style="left:${(i / ticks) * 100}%">${i === ticks ? esc(t("tlNow")) : hhmm(x)}</span>`
+  }).join("")
+  const sel = state.selected
+  const incs = sc().incidents.filter((i) => minAgo(i.start) < end && (i.end === 0 || minAgo(i.end) > start))
+  const bands = incs.map((i) => {
+    const a = Math.max(minAgo(i.start), start), b = i.end === 0 ? end : Math.min(minAgo(i.end), end)
+    return `<div class="tl-band" style="left:${pct(a)}%;width:${(pct(b) - pct(a)).toFixed(3)}%"></div>`
+  }).join("")
+  if (state.tableView) return timelineTable(start, end, incs)
+  const lanes = LANES.map((lane) => {
+    const segs = laneSegments(lane)
+    const summary = segs.map((s) => `${t("st_" + s.st)} ${hhmm(s.a)}–${hhmm(s.b)}`).join("; ")
+    const inner = segs.map((s) => `<span class="tl-seg st-${s.st}" style="left:${pct(s.a)}%;width:${(pct(s.b) - pct(s.a)).toFixed(3)}%"></span>`).join("")
+    const hidden = segs.length === 1 && segs[0].st === "hidden" ? `<span class="tl-hidden-note">⊘ ${esc(t("st_hidden"))}</span>` : ""
+    const ret = segs.find((s) => s.st === "retention") ? `<span class="tl-ret-note" style="width:${pct(segs.find((s) => s.st === "retention").b)}%">${esc(t("st_retention"))}</span>` : ""
+    const marks = visible(lane) ? sc().marks.filter((m) => m.lane === lane && minAgo(m.t) >= start).map((m) => `<span class="tl-mark" style="left:${pct(minAgo(m.t))}%"></span>`).join("") : ""
+    return `<div class="tl-lane"><div class="tl-name">${esc(t("lane_" + lane))}<small>${esc(t("lane_" + lane + "_s"))}</small></div>
+      <div class="tl-track" role="img" aria-label="${esc(t("tlSummary", { lane: t("lane_" + lane), list: summary }))}">${bands}${inner}${marks}${hidden}${ret}${state.live ? '<span class="tl-now"></span>' : ""}</div></div>`
+  }).join("")
+  const buttons = incs.map((i) => {
+    const x = Math.max(minAgo(i.start), start)
+    return `<button type="button" class="tl-inc" data-inc="${i.id}" style="left:${pct(x)}%" aria-current="${i.id === sel}" aria-label="${esc(L(i.title))}, ${esc(t("v_since", { time: hhmm(minAgo(i.start)), ago: ago((end - minAgo(i.start)) / 1000) }))}">${GLYPH[i.sev]} ${esc(i.id)}</button>`
+  }).join("")
+  const legend = ["healthy", "idle", "degraded", "error", "blocked", "offline", "unknown", "retention"].map((st) =>
+    `<span><span class="sw"><b class="st-${st}"></b></span>${esc(t("st_" + st))}</span>`).join("")
+  return `
+  <section class="section panel" aria-labelledby="tlh">
+    <div class="panel-head"><h2 class="h3" id="tlh">${esc(t("timeline"))}</h2>
+      <span class="dimtext" style="font-size:12.5px">${esc(t("tlRange", { from: hhmm(start), to: hhmm(end) }))} · ${esc(state.live ? t("live") : t("paused"))}</span></div>
+    <div class="tl">
+      <div class="tl-axis"><div class="tl-name"></div><div class="tl-axis-track" aria-hidden="true">${axis}</div></div>
+      ${lanes}
+      ${buttons ? `<div class="tl-axis"><div class="tl-name dimtext" style="font-size:12px">${esc(t("incidents"))}</div><div class="tl-incidents">${buttons}</div></div>` : ""}
+    </div>
+    <div class="legend" aria-label="${esc(t("tlLegend"))}">${legend}</div>
+    <div class="tl-foot"><p class="fine">${esc(t("gapNote"))}</p>
+      <button type="button" class="btn btn-small" id="viewBtn">${esc(t("tableView"))}</button></div>
+  </section>`
+}
+
+function timelineTable(start, end, incs) {
+  const rows = LANES.map((lane) => {
+    const segs = laneSegments(lane)
+    return `<tr><th scope="row">${esc(t("lane_" + lane))} <span class="dimtext">${esc(t("lane_" + lane + "_s"))}</span></th>
+      <td data-label="${esc(t("state"))}" class="wide">${segs.map((s) => `${sev(s.st)} <span class="dimtext">${hhmm(s.a)}–${hhmm(s.b)}</span>`).join("<br>")}</td></tr>`
+  }).join("")
+  return `
+  <section class="section panel" aria-labelledby="tlh">
+    <div class="panel-head"><h2 class="h3" id="tlh">${esc(t("timeline"))}</h2>
+      <span class="dimtext" style="font-size:12.5px">${esc(t("tlRange", { from: hhmm(start), to: hhmm(end) }))}</span></div>
+    <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("seg"))}</th><th scope="col">${esc(t("state"))}</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="tl-foot"><p class="fine">${esc(t("gapNote"))}</p>
+      <button type="button" class="btn btn-small" id="viewBtn">${esc(t("chartView"))}</button></div>
+  </section>`
+}
+
+function incidentList() {
+  const list = sc().incidents
+  const rows = list.length ? list.map((i) => `
+    <li class="inc-row"><div><p class="inc-title">${sev(i.sev, "")} ${esc(L(i.title))}</p>
+      <p class="inc-meta">${esc(i.id)} · ${esc(i.end === 0 ? t("active") : t("resolved"))} · ${hhmm(minAgo(i.start))}${i.end === 0 ? "–" : "–" + hhmm(minAgo(i.end))} UTC · ${esc(t("cert_" + i.cert))}</p></div>
+      <a class="btn btn-small" href="#incident/${i.id}"${i.id === state.selected ? ' aria-current="true"' : ""}>${esc(t("openIncident"))} →</a></li>`).join("")
+    : `<li class="inc-row"><p class="dimtext">${esc(t("noIncidents"))}</p></li>`
+  return `<section class="section panel" aria-labelledby="ih"><h2 class="h3" id="ih" style="margin-bottom:8px">${esc(t("incidents"))}</h2><ul class="inc-list">${rows}</ul></section>`
+}
+
+function segmentTable() {
+  const rows = LANES.map((lane) => {
+    const st = laneNow(lane)
+    const v = sc().segs[lane]
+    const vis = visible(lane)
+    const src = LANE_SOURCE[lane]
+    const cell = (x, f) => (!vis ? "—" : x === null || x === undefined ? `<span class="dimtext">${esc(t("st_unknown"))}</span>` : f(x))
+    const few = vis && v[3] !== null && v[3] < 20
+    return `<tr><th scope="row">${esc(t("lane_" + lane))}</th>
+      <td data-label="${esc(t("state"))}">${sev(st)}</td>
+      <td data-label="${esc(t("quality"))}">${qual(laneQuality(lane))}</td>
+      <td data-label="p50" class="num">${cell(v[0], ms)}</td><td data-label="p95" class="num">${cell(v[1], ms)}</td>
+      <td data-label="p99" class="num">${few ? `<span class="dimtext">${esc(t("t_fewSamples", { n: v[3] }))}</span>` : cell(v[2], ms)}</td>
+      <td data-label="${esc(t("samples"))}" class="num">${cell(v[3], (x) => x.toLocaleString())}</td>
+      <td data-label="${esc(t("errors"))}" class="num">${cell(v[4], (x) => x.toLocaleString())}</td>
+      <td data-label="${esc(t("age"))}">${sourceVisible(src) ? esc(ago(sourceAge(src))) : "—"}</td></tr>`
+  }).join("")
+  return `<section class="section panel" aria-labelledby="sh"><h2 class="h3" id="sh" style="margin-bottom:8px">${esc(t("segHealth"))}</h2>
+    <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("seg"))}</th><th scope="col">${esc(t("state"))}</th><th scope="col">${esc(t("quality"))}</th><th scope="col" class="num">p50</th><th scope="col" class="num">p95</th><th scope="col" class="num">p99</th><th scope="col" class="num">${esc(t("samples"))}</th><th scope="col" class="num">${esc(t("errors"))}</th><th scope="col">${esc(t("age"))}</th></tr></thead><tbody>${rows}</tbody></table></div></section>`
+}
+
+function crumbs(extra) {
+  return `<nav aria-label="breadcrumb"><ol class="crumbs"><li><a href="#overview">${esc(t("back"))}</a></li>${extra.map(([h, l]) => `<li aria-hidden="true">›</li><li>${h ? `<a href="${h}">${esc(l)}</a>` : `<span aria-current="page">${esc(l)}</span>`}</li>`).join("")}</ol></nav>`
+}
+
+function incidentView(i) {
+  const srcName = (s) => (s && WORDS.en["src_" + s] ? t("src_" + s) : s === "fixture" ? (locale === "zh-TW" ? "示意資料宣告" : "fixture declaration") : s === "inference" ? (locale === "zh-TW" ? "推論" : "inference") : "")
+  const li = (rows) => rows.map(([w, s]) => `<li>${esc(L(w))}${s ? `<br><span class="src">${esc(srcName(s))}</span>` : ""}</li>`).join("")
+  const maxT = Math.max(1, ...i.stages.filter((s) => s[1] !== null).map((s) => s[1]))
+  const scale = (v) => (Math.log10(1 + v) / Math.log10(1 + maxT)) * 100
+  let prev = 0
+  const wf = i.stages.length ? i.stages.map(([k, at, by, age, flag]) => {
+    const name = `<div class="wf-name">${esc(t("stg_" + k))}<small>${esc(t("stg_" + k + "_s"))}</small></div>`
+    if (at === null) return `<div class="wf-row">${name}<div class="wf-track"><span class="wf-missing">${esc(t("noReceipt"))}</span></div><div class="wf-time dimtext">—</div></div>`
+    const left = scale(prev), right = scale(at)
+    const cls = flag === "late" ? " wf-late" : ""
+    const row = `<div class="wf-row">${name}<div class="wf-track"><span class="wf-bar${cls}" style="left:${left}%;width:${Math.max(0.8, right - left)}%"></span></div><div class="wf-time">+${ms(at)}${flag === "late" ? " ▲" : ""}</div></div>`
+    prev = at
+    return row
+  }).join("") : `<p class="fine">${esc(t("f_never"))}</p>`
+  prev = 0
+  const table = i.stages.map(([k, at, by, age]) => {
+    const d = at === null ? "—" : ms(at - prev); if (at !== null) prev = at
+    return `<tr><th scope="row">${esc(t("stg_" + k))}</th><td data-label="${esc(t("at"))}" class="num">${at === null ? `<span class="dimtext">${esc(t("noReceipt"))}</span>` : "+" + ms(at)}</td>
+      <td data-label="${esc(t("took"))}" class="num">${d}</td><td data-label="${esc(t("by"))}">${by ? esc(t("src_" + (by === "machine" ? "machine" : by))) : "—"}</td>
+      <td data-label="${esc(t("receiptAge"))}">${age ? esc(ago(age)) : "—"}</td></tr>`
+  }).join("")
+  const end = i.end === 0 ? t("ongoing") : hhmm(minAgo(i.end)) + " UTC"
+  return `
+  ${crumbs([[null, i.id]])}
+  <div class="pagehead"><p class="sub">${screenId("M05")}</p><h1 tabindex="-1">${esc(L(i.title))}</h1>
+    <p class="sub">${sev(i.sev)} · <span class="certainty cert-${i.cert}">${esc(t("cert_" + i.cert))}</span></p></div>
+  <section class="panel"><dl class="facts">
+    <div><dt>${esc(t("incident"))}</dt><dd class="mono">${esc(i.id)}</dd></div>
+    <div><dt>${esc(t("startedAt"))}</dt><dd>${hhmm(minAgo(i.start), true)} UTC</dd></div>
+    <div><dt>${esc(t("endedAt"))}</dt><dd>${esc(end)}</dd></div>
+    <div><dt>${esc(t("segment"))}</dt><dd>${esc(t("lane_" + i.lane))}</dd></div>
+    <div><dt>${esc(t("trace"))}</dt><dd class="mono">${esc(i.trace ?? "—")}</dd></div>
+    <div><dt>${esc(t("build"))}</dt><dd class="mono">${esc(BUILD)}</dd></div>
+  </dl></section>
+  <section class="claims" aria-label="${esc(t("facts"))} / ${esc(t("suspected"))} / ${esc(t("missing"))}">
+    <div class="claim claim-fact"><h3><span aria-hidden="true">●</span>${esc(t("facts"))}</h3><ul>${li(i.facts)}</ul></div>
+    <div class="claim claim-suspect"><h3><span aria-hidden="true">◐</span>${esc(t("suspected"))} · ${esc(t("cert_" + i.cert))}</h3><ul>${li(i.suspected)}</ul></div>
+    <div class="claim claim-missing"><h3><span aria-hidden="true">○</span>${esc(t("missing"))}</h3><ul>${li(i.missing)}</ul></div>
+  </section>
+  <section class="panel section" aria-labelledby="wfh">
+    <div class="panel-head"><h2 class="h3" id="wfh">${esc(t("waterfall"))}</h2><span class="mono dimtext">${esc(i.trace ?? "")}</span></div>
+    <p class="fine">${esc(t("wfNote"))}</p>
+    ${state.tableView
+      ? `<div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("stage"))}</th><th scope="col" class="num">${esc(t("at"))}</th><th scope="col" class="num">${esc(t("took"))}</th><th scope="col">${esc(t("by"))}</th><th scope="col">${esc(t("receiptAge"))}</th></tr></thead><tbody>${table}</tbody></table></div>`
+      : `<div class="wf" role="list">${wf}</div>`}
+    <div class="view-toggle"><button type="button" class="btn btn-small" id="viewBtn">${esc(state.tableView ? t("chartView") : t("tableView"))}</button></div>
+  </section>
+  <section class="panel section" aria-labelledby="ch"><h2 class="h3" id="ch">${esc(t("code"))}</h2><p class="fine">${esc(t("codeNote"))} <span class="mono">${esc(BUILD)}</span></p>
+    <ul class="code" style="margin:0;padding-left:18px">${i.code.map(([p, sym, w]) => `<li><span class="mono">${esc(p)}</span><span><span class="mono">${esc(sym)}</span> — ${esc(L(w))}</span></li>`).join("")}</ul></section>
+  <div class="actions">${i.trace ? `<a class="btn" href="#trace/${i.id}">${esc(t("openTrace"))} (M04) →</a>` : ""}<a class="btn" href="#evidence/${i.id}">${esc(t("toEvidence"))} →</a><a class="btn" href="#overview">← ${esc(t("back"))}</a></div>`
+}
+
+function traceView(i) {
+  const full = incidentView(i)
+  const wf = full.slice(full.indexOf('<section class="panel section" aria-labelledby="wfh">'), full.indexOf('<div class="actions">'))
+  return `
+  ${crumbs([["#incident/" + i.id, i.id], [null, t("openTrace")]])}
+  <div class="pagehead"><p class="sub">${screenId("M04")}</p><h1 tabindex="-1">${esc(t("openTrace"))} · <span class="mono">${esc(i.trace ?? "—")}</span></h1><p class="sub">${esc(t("traceLead"))}</p></div>
+  ${wf}
+  <div class="actions"><a class="btn" href="#evidence/${i.id}">${esc(t("toEvidence"))} →</a><a class="btn" href="#incident/${i.id}">← ${esc(i.id)}</a></div>`
+}
+
+function monitoringView() {
+  const pr = sc().probe
+  const gapsOf = (src) => LANES.filter((l) => LANE_SOURCE[l] === src).flatMap(laneSegments).filter((x) => x.st === "unknown").length
+  const rows = ["browser", "relay", "machine", "collector"].map((src) => {
+    const f = freshness(src)
+    const st = { fresh: "healthy", stale: "degraded", unknown: "unknown", hidden: "hidden" }[f]
+    const vis = sourceVisible(src)
+    return `<tr><th scope="row">${esc(t("src_" + src))}</th><td data-label="${esc(t("state"))}">${sev(st, t("f_" + f))}</td>
+      <td data-label="${esc(t("age"))}">${vis ? esc(ago(sourceAge(src))) : "—"}</td>
+      <td data-label="${esc(t("gaps"))}" class="num">${vis ? gapsOf(src) : "—"}</td>
+      <td data-label="${esc(t("dropped"))}" class="num">${vis ? (state.scenario === "storm" && src === "relay" ? 31 : 0) : "—"}</td>
+      <td data-label="${esc(t("schema"))}" class="mono">${vis ? "0.1-draft" : "—"}</td>
+      <td data-label="${esc(t("f_ret", { ret: "" }).trim())}" class="wide">${esc(L(RETENTION_WORD[src]))}</td></tr>`
+  }).join("")
+  const probeRows = sourceVisible("browser") ? `
+    <ul class="inc-list">
+      <li class="inc-row"><div><p class="inc-title">${sev(pr.read, t("probeRead"))}</p><p class="inc-meta">${esc(L(pr.readNote))}</p></div></li>
+      <li class="inc-row"><div><p class="inc-title">${sev("unknown", t("probeControl"))}</p><p class="inc-meta">${esc(t("probeNot"))}</p></div></li>
+    </ul>
+    <p class="fine">${esc(t("probeLast", { age: ago(((now() - state.loadedAt) / 1000 + 41) % 60) }))} ${esc(t("probeView"))}</p>`
+    : `<p class="fine">${sev("hidden")} ${esc(t("t_hiddenNote"))}</p>`
+  return `
+  ${crumbs([[null, t("monitoring")]])}
+  <div class="pagehead"><p class="sub">${screenId("M06")}</p><h1 tabindex="-1">${esc(t("monitoring"))}</h1><p class="sub">${esc(t("monitoringLead"))}</p></div>
+  ${freshnessStrip()}
+  <section class="panel section" aria-labelledby="mh"><h2 class="h3" id="mh">${esc(t("producer"))}</h2>
+    <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("producer"))}</th><th scope="col">${esc(t("state"))}</th><th scope="col">${esc(t("age"))}</th><th scope="col" class="num">${esc(t("gaps"))}</th><th scope="col" class="num">${esc(t("dropped"))}</th><th scope="col">${esc(t("schema"))}</th><th scope="col">${esc(t("f_ret", { ret: "" }).trim())}</th></tr></thead><tbody>${rows}</tbody></table></div></section>
+  <section class="panel section" aria-labelledby="ph"><h2 class="h3" id="ph">${esc(t("probe"))}</h2><p class="fine">${esc(t("probeLead"))}</p>${probeRows}</section>
+  <div class="actions"><a class="btn" href="#overview">← ${esc(t("back"))}</a></div>`
+}
+
+function evidenceFor(i) {
+  const srcs = ["browser", "relay", "machine", "collector"]
+  return {
+    schema: "clawdline.connection-evidence/0.1-draft",
+    illustrative: true,
+    generated_by: "design prototype fixture; not captured from any system",
+    incident: { id: i.id, opened_at: new Date(clock(minAgo(i.start))).toISOString(), state: i.end === 0 ? "active" : "resolved", severity: i.sev, segment: i.lane, cause_certainty: i.cert },
+    trace: i.trace ? { trace_id: i.trace, stages: i.stages.map(([k, at, by, age, flag]) => at === null ? { stage: k, receipt: "missing" } : { stage: k, offset_ms: at, recorded_by: by, receipt_age_s: age, ...(flag ? { flag } : {}) }) } : null,
+    program_stage: i.stages.find((s) => s[1] === null)?.[0] ?? "complete",
+    build: { revision: BUILD, boot_id: "boot-synthetic-0003" },
+    sources: srcs.map((s) => ({ source: s, visible_in_scope: sourceVisible(s), freshness: freshness(s), receipt_age_s: Math.round(sourceAge(s)), expected_every_s: sc().sources[s].every, retention: L(RETENTION_WORD[s]) })),
+    provenance: { scope: state.scope, scope_authorization: state.scope === "machine" ? "operator superuser + owner device key (separately granted)" : state.scope === "cloud" ? "operator superuser only" : "this viewer only", window_minutes: state.windowMin, mode: state.live ? "live" : "paused" },
+    sequence_coverage: i.trace ? { first_seq: 8120, last_seq: 8334, gaps: i.missing.length ? [[8201, 8216]] : [] } : { first_seq: null, last_seq: null, gaps: "unknown" },
+    facts: i.facts.map(([w, s]) => ({ text: w.en, source: s })),
+    suspected_cause: i.suspected.map(([w, s]) => ({ text: w.en, basis: s })),
+    missing_evidence: i.missing.map(([w, s]) => ({ text: w.en, source: s || null })),
+    code_locations: i.code.map(([p, sym]) => ({ path: p, symbol: sym })),
+    redactions: ["account id → opaque", "machine id → opaque", "session id → omitted", "paths, prompts, titles, transcript → never collected"],
+    truncation: { stage_events: { kept: 214, limit: 256, dropped: 0 }, whole: !i.missing.length },
+  }
+}
+
+function evidenceView(i) {
+  const json = JSON.stringify(evidenceFor(i), null, 2)
+  return `
+  ${crumbs([["#incident/" + i.id, i.id], [null, t("evidence")]])}
+  <div class="pagehead"><h1 tabindex="-1">${esc(t("evidence"))}</h1><p class="sub">${esc(t("evidenceLead"))}</p></div>
+  <div class="actions"><button type="button" class="btn" id="copyBtn">${esc(t("copy"))}</button><button type="button" class="btn" id="dlBtn">${esc(t("download"))}</button>
+    <p class="status-line" id="copyStatus" role="status"></p></div>
+  <p class="fine">${esc(t("evidenceNote"))}</p>
+  <pre class="json" id="json" tabindex="0" aria-label="JSON">${esc(json)}</pre>
+  <div class="actions"><a class="btn" href="#incident/${i.id}">← ${esc(i.id)}</a></div>`
+}
+
+/* ============================== interaction =============================== */
+function bind() {
+  const q = (id) => document.getElementById(id)
+  q("scenario").onchange = (e) => {
+    state.scenario = e.target.value
+    state.loadedAt = Date.now(); if (!state.live) state.pausedAt = state.loadedAt
+    state.windowMin = 60
+    state.selected = activeIncidents()[0]?.id ?? null
+    state.notice = t("scenarioReset")
+    const [route] = location.hash.replace(/^#/, "").split("/")
+    if (route === "incident" || route === "evidence" || route === "trace") {
+      history.replaceState(null, "", state.selected ? `#${route}/${state.selected}` : "#overview")
+    }
+    render(); q("scenario")?.focus()
+  }
+  document.querySelectorAll('input[name="scope"]').forEach((r) => (r.onchange = () => { state.scope = r.value; state.notice = null; render(); document.querySelector(`input[name="scope"][value="${r.value}"]`).focus() }))
+  document.querySelectorAll('input[name="win"]').forEach((r) => (r.onchange = () => { state.windowMin = Number(r.value); state.notice = null; render(); document.querySelector(`input[name="win"][value="${r.value}"]`).focus() }))
+  q("liveBtn").onclick = () => {
+    state.live = !state.live
+    state.pausedAt = state.live ? null : Date.now()
+    render(); q("liveBtn").focus()
+  }
+  const vb = q("viewBtn"); if (vb) vb.onclick = () => { state.tableView = !state.tableView; render(); q("viewBtn").focus() }
+  document.querySelectorAll(".tl-inc").forEach((b) => (b.onclick = () => { state.selected = b.dataset.inc; location.hash = "#incident/" + b.dataset.inc }))
+  const cb = q("copyBtn")
+  if (cb) {
+    const pre = q("json")
+    cb.onclick = async () => {
+      try { await navigator.clipboard.writeText(pre.textContent); q("copyStatus").textContent = t("copied") }
+      catch { const r = document.createRange(); r.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(r); q("copyStatus").textContent = t("copyFailed") }
+    }
+    q("dlBtn").onclick = () => {
+      const url = URL.createObjectURL(new Blob([pre.textContent], { type: "application/json" }))
+      const a = document.createElement("a"); a.href = url; a.download = "connection-evidence-illustrative.json"
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000)
+      q("copyStatus").textContent = t("downloaded")
+    }
+  }
+}
+
+document.getElementById("langBtn").onclick = () => { locale = locale === "zh-TW" ? "en" : "zh-TW"; render(); document.getElementById("langBtn").focus() }
+const shell = document.getElementById("shell"), menuBtn = document.getElementById("menuBtn")
+const drawer = (open) => { shell.classList.toggle("drawer-open", open); menuBtn.setAttribute("aria-expanded", String(open)); if (open) document.querySelector(".nav a").focus(); else menuBtn.focus() }
+menuBtn.onclick = () => drawer(true)
+document.getElementById("scrim").onclick = () => drawer(false)
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shell.classList.contains("drawer-open")) drawer(false) })
+window.addEventListener("hashchange", () => { state.notice = null; shell.classList.remove("drawer-open"); render(true) })
+
+// Live mode redraws only the parts that age, without moving focus or the scroll position.
+setInterval(() => {
+  if (!state.live) { const n = document.getElementById("liveNote"); if (n) n.innerHTML = `<strong>${esc(t("paused"))}</strong> · ${esc(t("pausedNote", { time: hhmm(state.pausedAt, true), n: Math.floor((Date.now() - state.pausedAt) / 5000) }))}`; return }
+  const active = document.activeElement, id = active && active.id, inc = active && active.dataset && active.dataset.inc
+  const y = window.scrollY
+  render()
+  window.scrollTo(0, y)
+  const back = id ? document.getElementById(id) : inc ? document.querySelector(`.tl-inc[data-inc="${inc}"]`) : null
+  if (back) back.focus()
+}, 5000)
+
+state.selected = activeIncidents()[0]?.id ?? null
+if (!location.hash) history.replaceState(null, "", "#overview")
+render()
+</script>
+</body>
+</html>
