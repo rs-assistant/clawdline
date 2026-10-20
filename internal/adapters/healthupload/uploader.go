@@ -66,17 +66,18 @@ const (
 	MaxStateBytes = 64 << 10
 	// MaxReceipts is how many receipts the progress file keeps.
 	MaxReceipts = 16
+	// MaxStepPages is how many store pages one cycle reads; the rest waits
+	// for the next cycle.
+	MaxStepPages = 8
 )
 
 // Cadences (not held state).
 const (
 	idleInterval   = 30 * time.Second
 	firstBackoff   = 5 * time.Second
-	maxBackoff     = 5 * time.Minute
+	backoffCeiling = 5 * time.Minute
 	stateRetry     = time.Minute
 	headroomBytes  = 512
-	pageLimit      = connectionhealth.MaxQueryRecords
-	maxBuildRounds = 8
 )
 
 // Code is a stable state or failure a caller can branch on.
@@ -240,6 +241,8 @@ type Status struct {
 	// LastReceipt is the newest durable receipt. Accepted means Cloud
 	// committed it; nothing here says a person has seen it.
 	LastReceipt *Receipt `json:"last_receipt,omitempty"`
+	// ReceiptsKept is how many receipts the progress file holds.
+	ReceiptsKept int `json:"receipts_kept"`
 }
 
 // Refusal is a typed Cloud refusal.
@@ -291,6 +294,7 @@ func (u *Uploader) Status() Status {
 		s.Pending = &PendingStatus{BatchID: p.BatchID, BootID: p.BootID, Events: p.Events, Bytes: len(p.Body),
 			FirstSeq: p.FirstSeq, LastSeq: p.LastSeq, Attempts: p.Attempts, NextAttempt: p.NotBefore, Persisted: persistedState}
 	}
+	s.ReceiptsKept = len(u.st.Receipts)
 	if n := len(u.st.Receipts); n > 0 {
 		r := u.st.Receipts[n-1]
 		s.LastReceipt = &r
@@ -422,11 +426,11 @@ func (u *Uploader) build(now time.Time) (time.Duration, bool) {
 		u.set(CodeSourceOpening)
 		return u.o.Wake, false
 	}
-	for round := 0; round < maxBuildRounds; round++ {
+	for round := 0; round < MaxStepPages; round++ {
 		u.mu.Lock()
 		cursor := u.st.Cursor
 		u.mu.Unlock()
-		page, err := src.Read(healthjournal.Query{Cursor: cursor, Limit: pageLimit})
+		page, err := src.Read(healthjournal.Query{Cursor: cursor, Limit: connectionhealth.MaxQueryRecords})
 		if err != nil {
 			if healthjournal.CodeOf(err) == healthjournal.CodeInvalidCursor {
 				// The cursor's segment and offset no longer exist (a store
@@ -659,10 +663,10 @@ func (u *Uploader) send(ctx context.Context, endpoint, credential string, body [
 
 func backoff(attempts int) time.Duration {
 	d := firstBackoff
-	for i := 1; i < attempts && d < maxBackoff; i++ {
+	for i := 1; i < attempts && d < backoffCeiling; i++ {
 		d *= 2
 	}
-	return min(d, maxBackoff)
+	return min(d, backoffCeiling)
 }
 
 // settle applies one answer. Only a parsed receipt for this batch moves the

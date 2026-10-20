@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
+	"github.com/sainteye/clawdline/internal/adapters/healthupload"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 )
@@ -25,6 +26,9 @@ func (s *Server) connectionHealthCapacityMeasures() map[string]func() capacity.R
 		"cloud.health_query_rows", "cloud.health_query_bytes",
 	}
 	out := s.connectionHealthStoreMeasures(rt != nil)
+	for name, f := range s.connectionHealthUploadMeasures(rt != nil) {
+		out[name] = f
+	}
 	if rt == nil {
 		for _, name := range names {
 			out[name] = func() capacity.Reading {
@@ -137,6 +141,78 @@ func storeReading(name string, st healthjournal.Status, now time.Time) capacity.
 		r.Counters.Refused = int64(st.TooLarge)
 	default:
 		return capacity.Unmeasured("the durable store's status does not report this row's occupancy")
+	}
+	return r
+}
+
+// connectionHealthUploadMeasures reads the cloud.health_upload_* rows from the
+// uploader's Status, a copy under its own short lock that never waits on the
+// network. The hourly rows are this clock hour's spending; the pending batch
+// is the one body held; the receipts are what the progress file keeps. A
+// per-request bound holds nothing between requests.
+func (s *Server) connectionHealthUploadMeasures(monitoring bool) map[string]func() capacity.Reading {
+	names := []string{
+		"cloud.health_upload_batch_bytes", "cloud.health_upload_batch_events", "cloud.health_upload_hourly_bytes",
+		"cloud.health_upload_hourly_requests", "cloud.health_upload_attempts", "cloud.health_upload_retry_seconds",
+		"cloud.health_upload_retry_after_seconds", "cloud.health_upload_attempt_seconds",
+		"cloud.health_upload_response_bytes", "cloud.health_upload_state_bytes", "cloud.health_upload_receipts",
+		"cloud.health_upload_step_pages",
+	}
+	out := map[string]func() capacity.Reading{}
+	for _, name := range names {
+		name := name
+		out[name] = func() capacity.Reading {
+			f := s.connectionHealthUpload.Load()
+			switch {
+			case !monitoring:
+				return capacity.Reading{Known: true, Note: "connection-health monitoring is off in this daemon; nothing is held"}
+			case f == nil:
+				return capacity.Reading{Known: true, Note: "the connection-health uploader has not started; nothing is held"}
+			}
+			return uploadReading(name, (*f)(), time.Now())
+		}
+	}
+	return out
+}
+
+func uploadReading(name string, st healthupload.Status, now time.Time) capacity.Reading {
+	failing := false
+	switch st.State {
+	case healthupload.CodeAuthRefused, healthupload.CodeStateUnwritable, healthupload.CodeStateUnreadable,
+		healthupload.CodeSourceFailed, healthupload.CodeOtherOrigin, healthupload.CodeIdentityUnread:
+		failing = true
+	}
+	r := capacity.Reading{Known: true, Failing: failing, Note: string(st.State),
+		Counters: capacity.Counters{Dropped: int64(st.Totals.AbandonedEvents + st.Totals.RefusedEvents)}}
+	thisHour := st.Hour.Start.Equal(now.UTC().Truncate(time.Hour))
+	switch name {
+	case "cloud.health_upload_hourly_bytes":
+		if thisHour {
+			r.Used = st.Hour.Bytes
+		}
+	case "cloud.health_upload_hourly_requests":
+		if thisHour {
+			r.Used = st.Hour.Requests
+		}
+	case "cloud.health_upload_batch_bytes":
+		if st.Pending != nil {
+			r.Used = int64(st.Pending.Bytes)
+		}
+	case "cloud.health_upload_batch_events":
+		if st.Pending != nil {
+			r.Used = int64(st.Pending.Events)
+		}
+	case "cloud.health_upload_attempts":
+		if st.Pending != nil {
+			r.Used = int64(st.Pending.Attempts)
+		}
+		r.Counters.Evicted = int64(st.Totals.AbandonedBatches)
+	case "cloud.health_upload_receipts":
+		r.Used = int64(st.ReceiptsKept)
+	case "cloud.health_upload_state_bytes":
+		return capacity.Unmeasured("the uploader's status does not report the progress file's size")
+	default:
+		r.Note = "a bound per request or per cycle; nothing is held between them (" + string(st.State) + ")"
 	}
 	return r
 }

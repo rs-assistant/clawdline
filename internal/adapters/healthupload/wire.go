@@ -115,8 +115,8 @@ var (
 	cloudEvent  = regexp.MustCompile(`^[A-Za-z0-9_-]{1,96}$`)
 )
 
-// maxSafeInteger is JavaScript's Number.MAX_SAFE_INTEGER.
-const maxSafeInteger = 1<<53 - 1
+// jsSafeInteger is JavaScript's Number.MAX_SAFE_INTEGER.
+const jsSafeInteger = 1<<53 - 1
 
 // toWire copies the allowlisted fields of a stamped record, or names why it
 // cannot be sent. It never alters a value to make it fit.
@@ -131,8 +131,8 @@ func toWire(r connectionhealth.Record) (wireEvent, string) {
 		return wireEvent{}, ExcludedStage
 	case r.Source != "" && r.Source != connectionhealth.SourceDaemon:
 		return wireEvent{}, ExcludedSource
-	case r.MonoNS < 0 || r.MonoNS > maxSafeInteger || r.Seq > maxSafeInteger ||
-		r.PhaseID > maxSafeInteger || r.Count > maxSafeInteger:
+	case r.MonoNS < 0 || r.MonoNS > jsSafeInteger || r.Seq > jsSafeInteger ||
+		r.PhaseID > jsSafeInteger || r.Count > jsSafeInteger:
 		return wireEvent{}, ExcludedUnsafeInteger
 	case r.Seq < 1 || !cloudOpaque.MatchString(r.BootID) || !cloudEvent.MatchString(r.EventID),
 		r.Build != "" && !cloudOpaque.MatchString(r.Build),

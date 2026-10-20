@@ -330,7 +330,7 @@ func TestAStateAfterLossRecordIsCountedNotSent(t *testing.T) {
 	if _, reason := toWire(r); reason != ExcludedStateAfterLoss {
 		t.Fatalf("state_after_loss: %q", reason)
 	}
-	r.Event, r.MonoNS = connectionhealth.EventStallDetected, maxSafeInteger+1
+	r.Event, r.MonoNS = connectionhealth.EventStallDetected, jsSafeInteger+1
 	if _, reason := toWire(r); reason != ExcludedUnsafeInteger {
 		t.Fatalf("unsafe mono_ns: %q", reason)
 	}
