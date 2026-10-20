@@ -2,8 +2,10 @@ package connectionhealth
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -40,7 +42,7 @@ func TestARecordOverTheBoundIsRefusedAndCounted(t *testing.T) {
 	big := Record{Event: EventStallDetected, Source: SourceDaemon, Stage: StageHandlerStarted, Class: ClassRead,
 		Kind: Finite, Location: "cloud.link.read_handler.with_a_rather_long_location_code_for_this_test",
 		Correlation: "op-0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghij",
-		PhaseID: 1, AgeNS: 1, DeadlineNS: 1, Count: 1, Rule: RuleVersion}
+		PhaseID:     1, AgeNS: 1, DeadlineNS: 1, Count: 1, Rule: RuleVersion}
 	if err := j.Append(big); CodeOf(err) != CodeRecordTooLarge {
 		t.Fatalf("an oversized record: %v", err)
 	}
@@ -252,8 +254,11 @@ func TestRuntimeLifetimeAndStatus(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	st, _ = rt.Status()
-	if !st.Running || st.Quality != QualityComplete || st.Report == nil {
+	if !st.Running || st.Quality != QualityComplete || st.Report == nil || st.Report.Findings == nil {
 		t.Fatalf("status while running: %+v", st)
+	}
+	if b, _ := json.Marshal(st); !strings.Contains(string(b), `"findings":[]`) {
+		t.Fatalf("an empty scan is not published as []: %s", b)
 	}
 	cancel()
 	select {

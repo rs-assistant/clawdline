@@ -334,7 +334,8 @@ func (w *Watchdog) Scan() Report {
 		}
 	}
 	published := r
-	published.Findings = append([]Finding(nil), r.Findings...)
+	// make, not append to nil: an empty scan is published as [], never null.
+	published.Findings = append(make([]Finding, 0, len(r.Findings)), r.Findings...)
 	w.latest.Store(&published)
 	return r
 }

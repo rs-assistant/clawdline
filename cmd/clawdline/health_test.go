@@ -77,7 +77,9 @@ func TestHealthCommandSaysRefusedOrUnknown(t *testing.T) {
 	}
 	var stderr bytes.Buffer
 	down := func(*http.Request) (*http.Response, error) { return nil, errors.New("connection refused") }
-	newRequest := func(path string, _ url.Values) (*http.Request, error) { return http.NewRequest(http.MethodGet, "http://127.0.0.1:1"+path, nil) }
+	newRequest := func(path string, _ url.Values) (*http.Request, error) {
+		return http.NewRequest(http.MethodGet, "http://127.0.0.1:1"+path, nil)
+	}
 	if code := healthRun(io.Discard, &stderr, []string{"status"}, time.Now(), newRequest, down); code != 1 || !strings.Contains(stderr.String(), "unknown") {
 		t.Fatalf("unreachable: exit %d: %s", code, stderr.String())
 	}

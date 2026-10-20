@@ -48,8 +48,8 @@ import (
 	"github.com/sainteye/clawdline/internal/app/terminals"
 	peercontract "github.com/sainteye/clawdline/internal/domain/agenthandoff"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
-	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	"github.com/sainteye/clawdline/internal/domain/schedulewebhook"
 	"github.com/sainteye/clawdline/internal/domain/terminal"
 )

@@ -134,3 +134,50 @@ func TestASaturatedTableKeepsTheReaderVisible(t *testing.T) {
 		t.Fatalf("phases left: %+v", phases)
 	}
 }
+
+// discardConn is a net.Conn whose writes always succeed at once, so a
+// benchmark measures writeFrame and its instrumentation, not a socket.
+type discardConn struct{ net.Conn }
+
+func (discardConn) Write(b []byte) (int, error)      { return len(b), nil }
+func (discardConn) SetWriteDeadline(time.Time) error { return nil }
+func (discardConn) Close() error                     { return nil }
+
+func benchWrite(b *testing.B, tr *connectionhealth.Tracker) {
+	conn := &Conn{conn: discardConn{}, health: tr}
+	payload := []byte(`{"type":"publish","envelope":{"v":1,"ch":"ss/machine/session","seq":1}}`)
+	deadline := time.Now().Add(time.Hour)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := conn.WriteText(payload, deadline); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkWriteFrame is one masked text write with connection health off
+// (nil tracker) and on.
+func BenchmarkWriteFrame(b *testing.B) {
+	b.Run("off", func(b *testing.B) { benchWrite(b, nil) })
+	b.Run("on", func(b *testing.B) { benchWrite(b, connectionhealth.NewTracker(connectionhealth.NewSystemClock())) })
+}
+
+func benchHandle(b *testing.B, tr *connectionhealth.Tracker) {
+	transport := &Transport{opts: Options{PeerInbound: func([]byte) {}, Status: NewStatusRecorder(time.Now()), Health: tr}}
+	frame := []byte(`{"type":"peer_envelope","frame":{}}`)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := transport.handle(nil, frame); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkHandleFrame is one inbound frame through handle to its callback,
+// with connection health off and on.
+func BenchmarkHandleFrame(b *testing.B) {
+	b.Run("off", func(b *testing.B) { benchHandle(b, nil) })
+	b.Run("on", func(b *testing.B) { benchHandle(b, connectionhealth.NewTracker(connectionhealth.NewSystemClock())) })
+}

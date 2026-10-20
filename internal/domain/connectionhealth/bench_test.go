@@ -35,3 +35,24 @@ func BenchmarkScanFullTable(b *testing.B) {
 		w.Scan()
 	}
 }
+
+// BenchmarkIdleScan is the watchdog's cost on an idle line: the reader,
+// keepalive and drain loops held, nothing else active — what the daemon pays
+// once per DefaultCadence while nothing happens.
+func BenchmarkIdleScan(b *testing.B) {
+	c := NewSystemClock()
+	tr := NewTracker(c)
+	j, err := NewJournal(c, "boot-b", "abc")
+	if err != nil {
+		b.Fatal(err)
+	}
+	w := NewWatchdog(tr, j, c, time.Second)
+	for _, loc := range []string{LocReadLoop, LocKeepaliveLoop, LocDrainLoop} {
+		tr.Start(LoopSpec(loc))
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		w.Scan()
+	}
+}
