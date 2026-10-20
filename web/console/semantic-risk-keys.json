@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 7898,
+  "englishKeys": 7900,
   "counts": {
     "negation": 2309,
-    "state": 1277,
+    "state": 1279,
     "permission": 451,
     "deletion": 190,
     "uncertainty": 222
   },
-  "unionCount": 3516,
+  "unionCount": 3518,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -2751,6 +2751,8 @@
       "health.inc_notAcked",
       "health.inc_openCount",
       "health.inc_openTitle",
+      "health.inc_problemLine",
+      "health.inc_problemWorst",
       "health.inc_prov_acknowledged",
       "health.inc_recoveryObserved",
       "health.inc_refused",
@@ -5265,6 +5267,8 @@
     "health.inc_openCount",
     "health.inc_openTitle",
     "health.inc_ownerUnsupported",
+    "health.inc_problemLine",
+    "health.inc_problemWorst",
     "health.inc_prov_acknowledged",
     "health.inc_recoveryNot",
     "health.inc_recoveryObserved",

@@ -116,10 +116,24 @@ export function ProblemSummary({ state, say, nav, staleCount = null }: { state: 
   const coverage = (partBody(state, "overview") ?? partBody(state, "outcomes"))?.coverage ?? null
   const failed = panelQualities(state).filter((p) => p.quality === "failed").length
   const list = problems(groups, sources, coverage, failed, staleCount)
+  // Durable incidents come first: each is a record Cloud keeps, so the line links to its evidence.
+  const incidents = partBody(state, "incidents")?.incidents.filter((r) => r.state !== null && r.state !== "closed") ?? []
+  const RANK = { active: 0, recovering: 1, recovered_awaiting_review: 2, closed: 3 } as const
+  const worst = [...incidents].sort((a, b) => RANK[a.state!] - RANK[b.state!])[0]
   return (
     <section className="adm-panel adh-problems" aria-label={say("tl_problemsTitle")}>
       <h2 className="adm-h3">{say("tl_problemsTitle")}</h2>
-      {list.length === 0 ? <p className="adm-fine">{say("tl_problemNone")}</p> : (
+      {worst ? (
+        <p className="adh-problem adh-problem-first">
+          <span aria-hidden="true" className="adh-glyph">■</span>{" "}
+          <span>{say("inc_problemLine", { n: incidents.length })}{" "}
+            <a className="adh-link" href={nav.href({ screen: "M05", incident: worst.id })} onClick={(e) => linkClick(e, () => nav.go({ screen: "M05", incident: worst.id }))}>
+              {say("inc_problemWorst", { state: say(`inc_state_${worst.state}` as HealthWord), machine: worst.machine_id })}
+            </a>
+          </span>
+        </p>
+      ) : null}
+      {list.length === 0 ? (worst ? null : <p className="adm-fine">{say("tl_problemNone")}</p>) : (
         <ol className="adh-problem-list">
           {list.map((p, i) => (
             <li key={p.kind} className={i === 0 ? "adh-problem adh-problem-first" : "adh-problem"}>

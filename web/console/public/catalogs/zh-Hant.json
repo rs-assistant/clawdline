@@ -7873,6 +7873,8 @@
   "health.inc_traceTitle": "這個操作的事件",
   "health.inc_window": "開啟時間在 {from} 到 {to} 之間（UTC）。",
   "health.inc_windowLabel": "證據時間範圍",
+  "health.inc_problemLine": "第一頁有 {n} 個未關閉的事件。",
+  "health.inc_problemWorst": "查看最緊急的：{machine} 的「{state}」",
   "capacityRow.console.health_ui_request_seconds.what": "連線健康頁面等待單一 Cloud 讀取的最長時間，超過就標示為逾時。",
   "capacityRow.console.health_ui_request_seconds.full": "該讀取會在自己的區塊顯示逾時，其他已回應的讀取照常顯示。",
   "capacityRow.console.health_ui_budget_seconds.what": "連線健康頁面一次載入（含所有讀取）可花的最長時間。",

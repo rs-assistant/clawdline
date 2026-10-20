@@ -7873,6 +7873,8 @@
   "health.inc_traceTitle": "Incidents for this operation",
   "health.inc_window": "Opened between {from} and {to} (UTC).",
   "health.inc_windowLabel": "Evidence window",
+  "health.inc_problemLine": "{n} open incidents on the first page.",
+  "health.inc_problemWorst": "Open the most urgent: {state} on {machine}",
   "capacityRow.console.health_ui_request_seconds.what": "How long the connection-health page waits for one Cloud read before marking it timed out.",
   "capacityRow.console.health_ui_request_seconds.full": "That read shows as timed out in its own panel; the reads that answered stay on screen.",
   "capacityRow.console.health_ui_budget_seconds.what": "How long one load of the connection-health page may take, every read included.",
