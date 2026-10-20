@@ -6978,5 +6978,11 @@
   "survey.cloudBasis": "顯示次數以不重複 Cloud 帳號計算。曾略過者也可能已送出答案。配對數是目前已配對的填答帳號，不能據此推論問卷促成配對。",
   "survey.tool_codex": "Codex",
   "survey.settingsEntry": "設定",
-  "survey.statsFailed": "無法載入統計，目前不顯示數字。"
+  "survey.statsFailed": "無法載入統計，目前不顯示數字。",
+  "capacityRow.artifacts.report_image_side.what": "HTML 報告內單張截圖最長的一邊。這個上限避免很小的壓縮檔解開後變成過大的圖片。",
+  "capacityRow.artifacts.report_image_side.full": "超過上限的圖片不會顯示在報告中。作者可先縮小截圖，再重新發布報告。",
+  "capacityRow.artifacts.report_image_pixels.what": "HTML 報告內單張截圖解開後的像素總數。除了文件大小上限，另以此限制圖片占用的記憶體。",
+  "capacityRow.artifacts.report_image_pixels.full": "超過上限的圖片不會顯示在報告中。請縮小圖片後再內嵌，報告其他內容仍可閱讀。",
+  "capacityRow.artifacts.report_total_image_pixels.what": "一份 HTML 報告保留的所有截圖解開後的像素總數。重複的圖片也會計入，避免很小的檔案占用無上限的圖片記憶體。",
+  "capacityRow.artifacts.report_total_image_pixels.full": "超出報告剩餘額度的圖片不會顯示。請縮小或減少截圖後再發布；文字與先前有效的圖片仍可閱讀。"
 }

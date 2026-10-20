@@ -559,18 +559,26 @@ func TestWireEfficiencyAdmissionControls(t *testing.T) {
 // The isolated arm deliberately retains the original same-process arm above.
 // JSON over pipes is test-only control traffic, never part of the relay protocol.
 type wireIsolatedCommand struct {
+	Publisher                   bool
+	Seed, Key                   []byte
+	Publications                []publisherCPUEnvelope
 	Action, URL, Scenario       string
 	Viewers, Op, Sessions, Want int
 	Payload                     []byte
 	Drop                        bool
 	Delay                       time.Duration
 }
-type wireIsolatedSample struct{ UserNS, SystemNS, WallNS int64 }
+type wireIsolatedSample struct{ UserNS, SystemNS, WallNS, StartUnixNS, EndUnixNS int64 }
 type wireIsolatedReply struct {
-	PID    int
-	URL    string
-	Sample wireIsolatedSample
-	Result wireBenchResult
+	PID                 int
+	Generated, Accepted int
+	Settled             []uint64
+	Publications        []publisherCPUEnvelope
+	Duplicates          int
+	PerViewer           []int
+	URL                 string
+	Sample              wireIsolatedSample
+	Result              wireBenchResult
 }
 
 // Worker stderr can still be copied after reply decoding fails.
@@ -629,6 +637,8 @@ func wireIsolatedStart(t *testing.T, role string) *wireIsolatedWorker {
 		case err := <-done:
 			if err != nil {
 				t.Errorf("worker %s: %v: %s", role, err, w.stderr.String())
+			} else {
+				t.Logf("WIRE_WORKER_JOINED role=%s pid=%d", role, w.cmd.Process.Pid)
 			}
 		case <-time.After(5 * time.Second):
 			_ = w.cmd.Process.Kill()
@@ -638,13 +648,36 @@ func wireIsolatedStart(t *testing.T, role string) *wireIsolatedWorker {
 	})
 	return w
 }
+
+// callErr bounds both pipe encoding and reply decoding. On timeout the worker
+// is killed; registered cleanup still Waits it and joins the stderr copier.
+func (w *wireIsolatedWorker) callErr(c wireIsolatedCommand) (wireIsolatedReply, error) {
+	type outcome struct {
+		reply wireIsolatedReply
+		err   error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		var r wireIsolatedReply
+		err := w.enc.Encode(c)
+		if err == nil {
+			err = w.dec.Decode(&r)
+		}
+		done <- outcome{r, err}
+	}()
+	select {
+	case got := <-done:
+		return got.reply, got.err
+	case <-time.After(15 * time.Second):
+		_ = w.cmd.Process.Kill()
+		got := <-done
+		return got.reply, fmt.Errorf("worker IPC timeout: %v", got.err)
+	}
+}
 func (w *wireIsolatedWorker) call(t *testing.T, c wireIsolatedCommand) wireIsolatedReply {
 	t.Helper()
-	if err := w.enc.Encode(c); err != nil {
-		t.Fatal(err)
-	}
-	var r wireIsolatedReply
-	if err := w.dec.Decode(&r); err != nil {
+	r, err := w.callErr(c)
+	if err != nil {
 		t.Fatalf("worker reply: %v: %s", err, w.stderr.String())
 	}
 	return r
@@ -657,6 +690,9 @@ func TestWireEfficiencyWorker(t *testing.T) {
 	role := os.Getenv("CLAWDLINE_WIRE_WORKER")
 	if role == "" {
 		t.Skip("subprocess worker only")
+	}
+	if role == "publisher-early-exit" {
+		return
 	}
 	if role == "malformed-diagnostics" {
 		done := make(chan struct{})
@@ -674,7 +710,7 @@ func TestWireEfficiencyWorker(t *testing.T) {
 	wall0 := time.Now()
 	sample := func() wireIsolatedSample {
 		u, s := wireBenchCPUParts(t)
-		return wireIsolatedSample{u - u0, s - s0, time.Since(wall0).Nanoseconds()}
+		return wireIsolatedSample{UserNS: u - u0, SystemNS: s - s0, WallNS: time.Since(wall0).Nanoseconds(), StartUnixNS: wall0.UnixNano(), EndUnixNS: time.Now().UnixNano()}
 	}
 	dec, enc := json.NewDecoder(os.Stdin), json.NewEncoder(os.Stdout)
 	signer, err := domaincloud.DeviceKeyFromSeed(bytes.Repeat([]byte{17}, 32))
@@ -704,6 +740,8 @@ func TestWireEfficiencyWorker(t *testing.T) {
 	var relay *Relay
 	settled := make(chan uint64, 128)
 	var transportDone chan struct{}
+	var pub *publisherCPUDriver
+	var evidence publisherCPUViewer
 	defer func() {
 		if tr != nil {
 			cancel()
@@ -721,12 +759,44 @@ func TestWireEfficiencyWorker(t *testing.T) {
 		reply := wireIsolatedReply{PID: os.Getpid()}
 		switch c.Action {
 		case "init":
+			if c.Publisher {
+				signer, err = domaincloud.DeviceKeyFromSeed(c.Seed)
+				if err != nil {
+					t.Fatal(err)
+				}
+				key, err = domaincloud.ContentKeyFromBytes(c.Key)
+				if err != nil {
+					t.Fatal(err)
+				}
+				r.signer = signer
+			}
 			switch role {
 			case "relay":
 				r.delay = c.Delay
 				r.dropOnce = c.Drop
-				r.server = httptest.NewServer(http.HandlerFunc(r.serve))
-				defer r.server.Close()
+				if c.Publisher {
+					var handlers sync.WaitGroup
+					r.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+						handlers.Add(1)
+						defer handlers.Done()
+						r.serve(w, req)
+					}))
+					defer func() {
+						r.server.Close()
+						r.mu.Lock()
+						for _, v := range r.viewers {
+							_ = v.c.Close()
+						}
+						if r.machine != nil {
+							_ = r.machine.c.Close()
+						}
+						r.mu.Unlock()
+						handlers.Wait()
+					}()
+				} else {
+					r.server = httptest.NewServer(http.HandlerFunc(r.serve))
+					defer r.server.Close()
+				}
 				reply.URL = r.server.URL
 			case "viewer":
 				for i := 0; i < c.Viewers; i++ {
@@ -735,6 +805,10 @@ func TestWireEfficiencyWorker(t *testing.T) {
 						t.Fatal(e)
 					}
 					clients = append(clients, conn)
+					viewerID := i
+					if c.Publisher {
+						evidence.init(c.Viewers)
+					}
 					viewerWG.Add(1)
 					go func() {
 						defer viewerWG.Done()
@@ -765,6 +839,10 @@ func TestWireEfficiencyWorker(t *testing.T) {
 							viewerMu.Lock()
 							result.OpenNS = append(result.OpenNS, time.Since(start).Nanoseconds())
 							viewerMu.Unlock()
+							if c.Publisher {
+								evidence.record(viewerID, env.Seq, env.Ch, plain, replay.Claim(env.Sender, env.Seq) != domaincloud.ReplayAccepted)
+								continue
+							}
 							if replay.Claim(env.Sender, env.Seq) != domaincloud.ReplayAccepted {
 								continue
 							}
@@ -793,7 +871,16 @@ func TestWireEfficiencyWorker(t *testing.T) {
 				if e != nil {
 					t.Fatal(e)
 				}
-				tr, e = adaptercloud.New(adaptercloud.Options{RelayURL: c.URL, NetDial: r.dial, Token: &adaptercloud.TokenSource{Client: adaptercloud.NewAccountClient("http" + strings.TrimPrefix(strings.TrimSuffix(c.URL, "/v1/connect"), "ws")), Credential: "credential"}, Identity: adaptercloud.Identity{AccountID: "usr_test", MachineID: "mac-01", MachineCredential: "credential"}, Signer: signer, Spool: spool, Replay: domaincloud.NewReplayWindow(0), ContentKey: key, Jitter: func() float64 { return 0.5 }, OnSettled: func(_ string, seq uint64, _ adaptercloud.SettleKind) { settled <- seq }})
+				tr, e = adaptercloud.New(adaptercloud.Options{RelayURL: c.URL, NetDial: r.dial, Token: &adaptercloud.TokenSource{Client: adaptercloud.NewAccountClient("http" + strings.TrimPrefix(strings.TrimSuffix(c.URL, "/v1/connect"), "ws")), Credential: "credential"}, Identity: adaptercloud.Identity{AccountID: "usr_test", MachineID: "mac-01", MachineCredential: "credential"}, Signer: signer, Spool: spool, Replay: domaincloud.NewReplayWindow(0), ContentKey: key, Jitter: func() float64 { return 0.5 }, OnAck: func(a adaptercloud.AckFrame) {
+					if pub != nil {
+						pub.p.Acked(a.Ch, a.Fanout)
+					}
+				}, OnSettled: func(_ string, seq uint64, kind adaptercloud.SettleKind) {
+					if kind != adaptercloud.SettleDelivered {
+						t.Error("non-delivery settlement")
+					}
+					settled <- seq
+				}})
 				if e != nil {
 					t.Fatal(e)
 				}
@@ -805,9 +892,24 @@ func TestWireEfficiencyWorker(t *testing.T) {
 					t.Fatal("handshake timeout")
 				}
 				relay = &Relay{Transport: tr, Spool: spool, MachineID: "mac-01", Signer: signer, Secret: key}
+				if c.Publisher {
+					pub = publisherCPUInit(t, c.Payload, relay)
+				}
 			default:
 				t.Fatal("unknown worker role")
 			}
+		case "publisher-pass":
+			pub.body = c.Payload
+			reply.Publications = pub.pass(t, ctx, c.Op, settled)
+			reply.Generated = pub.generated
+			reply.Accepted = len(pub.all)
+			reply.Settled = append([]uint64(nil), pub.settled...)
+		case "publisher-delivered":
+			evidence.check(t, c.Publications)
+		case "drop-next":
+			r.mu.Lock()
+			r.dropOnce = true
+			r.mu.Unlock()
 		case "registered":
 			deadline := time.Now().Add(5 * time.Second)
 			for {
@@ -875,6 +977,7 @@ func TestWireEfficiencyWorker(t *testing.T) {
 				t.Fatal(e)
 			}
 			reply.Result.Deliveries = int(received.Load())
+			reply.PerViewer, reply.Duplicates = evidence.counts()
 		default:
 			t.Fatalf("unknown control action %q", c.Action)
 		}
@@ -890,11 +993,13 @@ func TestWireEfficiencyWorker(t *testing.T) {
 }
 
 type wireIsolatedResult struct {
-	Arm, Scenario      string
-	ParentPID          int
-	WorkerPIDs         map[string]int
-	Init, Idle, Active map[string]wireIsolatedSample
-	Result             wireBenchResult
+	Arm, Scenario       string
+	ParentPID           int
+	Generated, Accepted int
+	Settled             []uint64
+	WorkerPIDs          map[string]int
+	Init, Idle, Active  map[string]wireIsolatedSample
+	Result              wireBenchResult
 }
 
 func TestWireEfficiencyIsolated(t *testing.T) {
@@ -915,7 +1020,7 @@ func TestWireEfficiencyIsolated(t *testing.T) {
 			wall0 := time.Now()
 			parentSample := func() wireIsolatedSample {
 				u, v := wireBenchCPUParts(t)
-				return wireIsolatedSample{u - u0, v - s0, time.Since(wall0).Nanoseconds()}
+				return wireIsolatedSample{UserNS: u - u0, SystemNS: v - s0, WallNS: time.Since(wall0).Nanoseconds(), StartUnixNS: wall0.UnixNano(), EndUnixNS: time.Now().UnixNano()}
 			}
 			out := wireIsolatedResult{Arm: "isolated-processes-v1", Scenario: s.name, ParentPID: os.Getpid(), WorkerPIDs: map[string]int{}, Init: map[string]wireIsolatedSample{}, Idle: map[string]wireIsolatedSample{}, Active: map[string]wireIsolatedSample{}}
 			workers := map[string]*wireIsolatedWorker{}

@@ -177,7 +177,7 @@ func (s *Server) serveDocument(w http.ResponseWriter, root, path string) {
 	// Keep the declared document type; HTML has already been sanitized by Read.
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy",
-		"sandbox; default-src 'none'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+		"sandbox; default-src 'none'; script-src 'none'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)

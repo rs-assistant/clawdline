@@ -18,7 +18,7 @@ func TestHTMLDocumentResponseIsSanitizedAndSandboxed(t *testing.T) {
 	if w.Code != 200 || w.Header().Get("Content-Type") != "text/html; charset=utf-8" {
 		t.Fatalf("response: %d %v", w.Code, w.Header())
 	}
-	if w.Header().Get("Content-Security-Policy") != "sandbox; default-src 'none'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" {
+	if w.Header().Get("Content-Security-Policy") != "sandbox; default-src 'none'; script-src 'none'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" {
 		t.Fatal(w.Header())
 	}
 	if w.Header().Get("X-Content-Type-Options") != "nosniff" || w.Header().Get("Cache-Control") != "private, no-store" {
