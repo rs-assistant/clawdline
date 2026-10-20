@@ -6090,6 +6090,12 @@ type SettingsRequest struct {
 	// Empty, or a Claude Code model name used when a new Session does not name one.
 	ClaudeDefaultModel *string `json:"claude_default_model"`
 
+	// Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+	// as ciphertext only paired owner devices can open. Separate from
+	// cloud_health_upload, which never permits it. Absent or false means off, and off
+	// makes no request. Only the local token may change it.
+	CloudHealthOwnerRetention *bool `json:"cloud_health_owner_retention"`
+
 	// Whether this daemon uploads its connection-health records to Cloud. Absent or
 	// false means off, and off makes no request. Only the local token may change it.
 	// Owner diagnostics (location, age, deadline) are never sent.
@@ -6274,6 +6280,12 @@ type SettingsSnapshot struct {
 	// The model used for a new Claude Code session when that launch does not name one.
 	// Empty leaves the choice to Claude Code.
 	ClaudeDefaultModel *string `json:"claude_default_model"`
+
+	// Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+	// as ciphertext only paired owner devices can open. Separate from
+	// cloud_health_upload, which never permits it. Absent or false means off, and off
+	// makes no request. Only the local token may change it.
+	CloudHealthOwnerRetention *bool `json:"cloud_health_owner_retention"`
 
 	// Whether this daemon uploads its connection-health records to Cloud. Absent or
 	// false means off, and off makes no request. Only the local token may change it.

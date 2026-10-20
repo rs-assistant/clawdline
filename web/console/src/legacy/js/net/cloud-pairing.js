@@ -428,3 +428,237 @@ export async function openPairingHandover(input) {
         masterKey: await importMasterSecret(masterSecret)
     };
 }
+
+/* ---- identity pairing: the four strict phases ----------------------------
+
+   The mirror of `internal/domain/cloud/health_pairing.go`. The Mac starts the
+   pairing and shows a QR (`#pairid=`); this viewer writes `offer`, opens the
+   Mac's `grant`, proves in `activate` that it holds the master secret it just
+   opened (a key confirmation the Mac verifies before it signs Cloud's
+   handover statement), and keeps the keys only after the Mac's `confirm`
+   names that exact activate. The master secret is imported twice — AES-GCM
+   for the relay, HKDF for sealed diagnostics — both non-extractable, and the
+   raw bytes are zeroed before this returns. */
+
+const IDENTITY_QR_MEMBERS = [
+    "v", "type", "pairing_id", "claim_nonce", "expires_at", "account_id", "machine_id",
+    "machine_signing_key", "machine_fingerprint", "machine_ephemeral_key", "pairing_nonce"
+];
+const IDENTITY_GRANT_MEMBERS = [
+    "v", "type", "pairing_id", "account_id", "machine_id", "machine_signing_key",
+    "machine_fingerprint", "viewer_device_id", "offer_sha256", "content_key_epoch",
+    "identity_epoch", "master_secret"
+];
+const IDENTITY_CONFIRM_MEMBERS = [
+    "v", "type", "pairing_id", "account_id", "machine_id", "viewer_device_id",
+    "content_key_epoch", "activate_sha256"
+];
+export const KEY_CONFIRMATION_INFO = "clawdline/content-key-confirm/v1";
+const KEY_CONFIRMATION_CONTEXT = "clawdline-content-key-confirm-v1\n";
+const SHORT_CODE_CONTEXT = "clawdline-identity-pairing-code-v1\n";
+
+function hexOf(bytes) {
+    return Array.from(bytes, function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+}
+
+/** Cloud's `phase_sha256`: hex SHA-256 of the canonical wrapper. */
+export async function identityPhaseDigest(wrapper) {
+    return hexOf(await sha256(canonicalBytes(wrapper)));
+}
+
+export function decodeIdentityPairingQR(fragment, nowMilliseconds) {
+    var text = decoder.decode(base64URLBytes(fragment));
+    var qr;
+    try { qr = JSON.parse(text); } catch (e) {
+        throw pairingError("bad_qr", "the pairing QR is not JSON");
+    }
+    if (!qr || typeof qr !== "object" || Array.isArray(qr)) throw pairingError("bad_qr", "the pairing QR is not an object");
+    exactMembers(qr, IDENTITY_QR_MEMBERS, "bad_qr");
+    if (qr.v !== 1 || qr.type !== "pairing_qr" || canonicalJSON(qr) !== text) {
+        throw pairingError("bad_qr", "the pairing QR is not canonical version 1");
+    }
+    requireLength(base64Bytes(qr.claim_nonce, "claim_nonce"), 32, "claim_nonce");
+    requireLength(base64Bytes(qr.pairing_nonce, "pairing_nonce"), 32, "pairing_nonce");
+    requireLength(base64Bytes(qr.machine_ephemeral_key, "machine_ephemeral_key"), 32, "machine_ephemeral_key");
+    if (qr.claim_nonce === qr.pairing_nonce) throw pairingError("bad_qr", "the pairing nonces repeat");
+    if (!Number.isSafeInteger(qr.expires_at) || qr.expires_at < nowMilliseconds) {
+        throw pairingError("pairing_expired", "that pairing QR has expired");
+    }
+    return qr;
+}
+
+/** Verifies the QR's machine fingerprint; a separate async step because hashing is async. */
+export async function checkIdentityPairingQR(qr) {
+    var key = requireLength(base64Bytes(qr.machine_signing_key, "machine_signing_key"), 32, "machine_signing_key");
+    if (qr.machine_fingerprint !== await ed25519Fingerprint(key)) {
+        throw pairingError("bad_fingerprint", "the machine fingerprint does not match its key");
+    }
+    return qr;
+}
+
+/** The six digits both screens show. A comparison, not a secret. */
+export async function identityShortCode(qr, viewerSigningKey, viewerEphemeralKey) {
+    var parts = [qr.pairing_id, qr.machine_signing_key, qr.machine_ephemeral_key, viewerSigningKey, viewerEphemeralKey]
+        .map(function (field) { return l16(encoder.encode(field)); });
+    var digest = await sha256(concat([encoder.encode(SHORT_CODE_CONTEXT)].concat(parts)));
+    var n = ((digest[0] << 24) >>> 0) + (digest[1] << 16) + (digest[2] << 8) + digest[3];
+    return String(n % 1000000).padStart(6, "0");
+}
+
+async function identityPhaseAEAD(qr, phase, privateKey, peerEphemeral) {
+    var phaseKey = await derivePhaseKey({
+        shared: await sharedSecret(privateKey, base64Bytes(peerEphemeral, "ephemeral_key")),
+        pairingNonce: base64Bytes(qr.pairing_nonce, "pairing_nonce"),
+        pairingID: qr.pairing_id,
+        claimNonce: base64Bytes(qr.claim_nonce, "claim_nonce"),
+        phase: phase
+    });
+    var key = await subtle().importKey("raw", phaseKey, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
+    phaseKey.fill(0);
+    return key;
+}
+
+function wrapperAAD(wrapper) {
+    return canonicalBytes({
+        v: 1, phase: wrapper.phase, pairing_id: wrapper.pairing_id,
+        sender_device_id: wrapper.sender_device_id, ephemeral_key: wrapper.ephemeral_key
+    });
+}
+
+async function sealIdentityPhase(qr, phase, senderDeviceID, privateKey, ownEphemeral, peerEphemeral, plaintext) {
+    var nonce = crypto.getRandomValues(new Uint8Array(12));
+    var wrapper = { v: 1, phase: phase, pairing_id: qr.pairing_id, sender_device_id: senderDeviceID,
+        ephemeral_key: ownEphemeral, nonce: bytesBase64(nonce), ct: "" };
+    var key = await identityPhaseAEAD(qr, phase, privateKey, peerEphemeral);
+    wrapper.ct = bytesBase64(new Uint8Array(await subtle().encrypt(
+        { name: "AES-GCM", iv: nonce, tagLength: 128, additionalData: wrapperAAD(wrapper) }, key, plaintext)));
+    return wrapper;
+}
+
+async function openIdentityPhase(qr, wrapper, phase, wantSender, wantPeer, privateKey, members, type) {
+    if (!wrapper || typeof wrapper !== "object" || Array.isArray(wrapper)) throw pairingError("bad_wrapper", "the phase is not an object");
+    exactMembers(wrapper, WRAPPER_MEMBERS, "bad_wrapper");
+    if (wrapper.v !== 1 || wrapper.phase !== phase || wrapper.pairing_id !== qr.pairing_id) {
+        throw pairingError("bad_wrapper", "the phase is not this pairing's " + phase);
+    }
+    if (wrapper.sender_device_id !== wantSender) throw pairingError("wrong_sender", "the phase was sealed by a different device");
+    if (wrapper.ephemeral_key !== wantPeer) throw pairingError("wrong_key", "the phase is bound to another ephemeral key");
+    var key = await identityPhaseAEAD(qr, phase, privateKey, wrapper.ephemeral_key);
+    var clear;
+    try {
+        clear = new Uint8Array(await subtle().decrypt({
+            name: "AES-GCM", iv: requireLength(base64Bytes(wrapper.nonce, "nonce"), 12, "nonce"),
+            tagLength: 128, additionalData: wrapperAAD(wrapper)
+        }, key, base64Bytes(wrapper.ct, "ct")));
+    } catch (e) {
+        throw pairingError("bad_phase", "the sealed " + phase + " did not authenticate");
+    }
+    var text = decoder.decode(clear);
+    clear.fill(0);
+    var doc;
+    try { doc = JSON.parse(text); } catch (e) { throw pairingError("bad_phase", "the " + phase + " is not JSON"); }
+    if (!doc || typeof doc !== "object" || Array.isArray(doc)) throw pairingError("bad_phase", "the " + phase + " is not an object");
+    exactMembers(doc, members, "bad_phase");
+    if (doc.v !== 1 || doc.type !== type || canonicalJSON(doc) !== text) {
+        throw pairingError("bad_phase", "the " + phase + " is not canonical version 1");
+    }
+    return doc;
+}
+
+/**
+ * The offer this viewer writes. `signingPublicKey` is its registered Ed25519 key (32 bytes).
+ * The returned private ephemeral key is non-extractable and lives only for this pairing.
+ */
+export async function createIdentityOffer(input) {
+    var qr = input.qr;
+    var signing = requireLength(input.signingPublicKey, 32, "viewer_signing_key");
+    var pair = await subtle().generateKey({ name: "X25519" }, false, ["deriveBits"]);
+    var ephemeralPublic = bytesBase64(new Uint8Array(await subtle().exportKey("raw", pair.publicKey)));
+    var signingB64 = bytesBase64(signing);
+    var offer = {
+        v: 1, type: "identity_offer", pairing_id: qr.pairing_id, account_id: qr.account_id,
+        machine_id: qr.machine_id, viewer_device_id: input.deviceID, viewer_signing_key: signingB64,
+        viewer_fingerprint: await ed25519Fingerprint(signing), viewer_ephemeral_key: ephemeralPublic
+    };
+    var wrapper = await sealIdentityPhase(qr, "offer", input.deviceID, pair.privateKey, ephemeralPublic,
+        qr.machine_ephemeral_key, canonicalBytes(offer));
+    return {
+        wrapper: wrapper,
+        offerSHA256: await identityPhaseDigest(wrapper),
+        ephemeralPrivateKey: pair.privateKey,
+        ephemeralPublicKey: ephemeralPublic,
+        signingKey: signingB64,
+        fingerprint: offer.viewer_fingerprint,
+        shortCode: await identityShortCode(qr, signingB64, ephemeralPublic)
+    };
+}
+
+/**
+ * Opens the Mac's grant, imports the master secret as two non-extractable keys, and seals the
+ * activate with the key confirmation. Nothing is persisted here; see `openIdentityConfirm`.
+ */
+export async function openIdentityGrant(input) {
+    var qr = input.qr;
+    var offered = input.offered;
+    var grant = await openIdentityPhase(qr, input.wrapper, "grant", qr.machine_id, qr.machine_ephemeral_key,
+        offered.ephemeralPrivateKey, IDENTITY_GRANT_MEMBERS, "identity_grant");
+    if (grant.pairing_id !== qr.pairing_id || grant.account_id !== qr.account_id || grant.machine_id !== qr.machine_id ||
+        grant.machine_signing_key !== qr.machine_signing_key || grant.machine_fingerprint !== qr.machine_fingerprint ||
+        grant.viewer_device_id !== input.deviceID || grant.offer_sha256 !== offered.offerSHA256) {
+        throw pairingError("wrong_transcript", "the grant does not answer this offer");
+    }
+    if (!Number.isSafeInteger(grant.content_key_epoch) || grant.content_key_epoch < 1 ||
+        !Number.isSafeInteger(grant.identity_epoch) || grant.identity_epoch < 0) {
+        throw pairingError("bad_epoch", "the grant names no usable content-key epoch");
+    }
+    var raw = requireLength(base64Bytes(grant.master_secret, "master_secret"), 32, "master_secret");
+    grant.master_secret = "";
+    var masterKey, hkdfKey;
+    try {
+        masterKey = await importMasterSecret(raw);
+        hkdfKey = await subtle().importKey("raw", raw, { name: "HKDF" }, false, ["deriveKey", "deriveBits"]);
+    } finally {
+        raw.fill(0);
+    }
+    var grantSHA256 = await identityPhaseDigest(input.wrapper);
+    var confirmKey = await subtle().deriveKey(
+        { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info: encoder.encode(KEY_CONFIRMATION_INFO) },
+        hkdfKey, { name: "HMAC", hash: "SHA-256", length: 256 }, false, ["sign"]);
+    var transcript = concat([encoder.encode(KEY_CONFIRMATION_CONTEXT), canonicalBytes({
+        schema: "clawdline.content-key-confirm/1", account_id: qr.account_id, pairing_id: qr.pairing_id,
+        machine_id: qr.machine_id, viewer_device_id: input.deviceID, viewer_signing_key: offered.signingKey,
+        content_key_epoch: grant.content_key_epoch, identity_epoch: grant.identity_epoch, grant_sha256: grantSHA256
+    })]);
+    var confirmation = bytesBase64(new Uint8Array(await subtle().sign("HMAC", confirmKey, transcript)));
+    var activate = {
+        v: 1, type: "identity_activate", pairing_id: qr.pairing_id, account_id: qr.account_id,
+        machine_id: qr.machine_id, viewer_device_id: input.deviceID, content_key_epoch: grant.content_key_epoch,
+        grant_sha256: grantSHA256, key_confirmation: confirmation
+    };
+    var wrapper = await sealIdentityPhase(qr, "activate", input.deviceID, offered.ephemeralPrivateKey,
+        offered.ephemeralPublicKey, qr.machine_ephemeral_key, canonicalBytes(activate));
+    return {
+        wrapper: wrapper,
+        activateSHA256: await identityPhaseDigest(wrapper),
+        contentKeyEpoch: grant.content_key_epoch,
+        identityEpoch: grant.identity_epoch,
+        machineID: qr.machine_id,
+        machineSigningKey: base64Bytes(qr.machine_signing_key, "machine_signing_key"),
+        machineFingerprint: qr.machine_fingerprint,
+        masterKey: masterKey,
+        hkdfKey: hkdfKey
+    };
+}
+
+/** Accepts the Mac's confirm only if it names this exact activate. */
+export async function openIdentityConfirm(input) {
+    var qr = input.qr;
+    var doc = await openIdentityPhase(qr, input.wrapper, "confirm", qr.machine_id, qr.machine_ephemeral_key,
+        input.offered.ephemeralPrivateKey, IDENTITY_CONFIRM_MEMBERS, "identity_confirm");
+    if (doc.pairing_id !== qr.pairing_id || doc.account_id !== qr.account_id || doc.machine_id !== qr.machine_id ||
+        doc.viewer_device_id !== input.deviceID || doc.content_key_epoch !== input.activated.contentKeyEpoch ||
+        doc.activate_sha256 !== input.activated.activateSHA256) {
+        throw pairingError("wrong_transcript", "the confirm does not name this activate");
+    }
+    return true;
+}

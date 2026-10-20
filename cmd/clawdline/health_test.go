@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -400,5 +401,40 @@ func TestTheHealthUploadOptInIsASettingTheUploaderReads(t *testing.T) {
 	}
 	if c := code(); c == healthupload.CodeNotOptedIn {
 		t.Fatal("true still reads as not opted in")
+	}
+}
+
+// The owner-diagnostic retention opt-in is its own key: turning the metadata
+// upload on must leave it off, and it reads off when absent.
+func TestOwnerRetentionIsASeparateOptIn(t *testing.T) {
+	stored := map[string]any{}
+	call := func(method string, body any) (int, []byte, error) {
+		if method == http.MethodPost {
+			for key, value := range body.(map[string]any) {
+				stored[key] = value
+			}
+		}
+		data, _ := json.Marshal(stored)
+		return http.StatusOK, data, nil
+	}
+	run := func(args ...string) (int, string) {
+		var out, errs bytes.Buffer
+		code := runSetting(&out, &errs, args, call)
+		return code, out.String()
+	}
+	if code, out := run("set", "cloud_health_upload", "on"); code != 0 || !strings.HasPrefix(out, "cloud_health_upload: on") {
+		t.Fatalf("upload on: %d %q", code, out)
+	}
+	if code, out := run("get", "cloud_health_owner_retention"); code != 0 || !strings.HasPrefix(out, "cloud_health_owner_retention: off") {
+		t.Fatalf("the metadata switch must not turn retention on: %d %q", code, out)
+	}
+	if _, ok := stored["cloud_health_owner_retention"]; ok {
+		t.Fatalf("retention was written by the upload switch: %v", stored)
+	}
+	if code, out := run("set", "cloud_health_owner_retention", "on"); code != 0 || !strings.HasPrefix(out, "cloud_health_owner_retention: on") || stored["cloud_health_owner_retention"] != true {
+		t.Fatalf("on: %d %q %v", code, out, stored)
+	}
+	if code, _ := run("set", "cloud_health_owner_retention", "maybe"); code != 2 {
+		t.Fatalf("a word: %d", code)
 	}
 }

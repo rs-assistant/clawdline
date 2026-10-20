@@ -635,6 +635,25 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.content_key_epoch_record_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.maxEpochRecordBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.header_read_diagnostic_rows",
     "Class": "observation",
     "Unit": "rows",
@@ -820,6 +839,254 @@
     "QuietRecovery": false,
     "Sources": [
       "internal/domain/connectionhealth.MaxReservedSlots"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_attempt_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "disconnect",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxAttemptSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_attempts",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxAttempts"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_ciphertext_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 262144,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxCiphertextBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_life_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 604800,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxLifeSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_queued_jobs",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxQueuedJobs",
+      "internal/adapters/healthsealed.NewWorker:chan(MaxQueuedJobs)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_request_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 409600,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxRequestBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_response_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxResponseBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_revisions",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxRevisions"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_snapshot_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxSnapshotBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_snapshot_coverage",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 32,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxSnapshotCoverage"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_snapshot_field_chars",
+    "Class": "buffer",
+    "Unit": "characters",
+    "Limit": 512,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxSnapshotFieldChars"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_store_attachments",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxPendingAttachments"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_sealed_store_bytes",
+    "Class": "idempotency",
+    "Unit": "bytes",
+    "Limit": 4194304,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthsealed.MaxStoreBytes"
     ]
   },
   {
@@ -1241,6 +1508,25 @@
     "QuietRecovery": false,
     "Sources": [
       "internal/adapters/healthupload.MaxStepPages"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.identity_pairing_poll_attempts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 600,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.MaxIdentityPollAttempts"
     ]
   },
   {

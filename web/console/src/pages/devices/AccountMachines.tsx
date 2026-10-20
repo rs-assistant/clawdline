@@ -14,6 +14,7 @@ import { listViewerDevices, revokeViewerDevice, type ViewerDevice, type ViewerDe
 import { MachinePlatformIcon } from "../../cloud/MachinePlatformIcon.js"
 import { sessionsFact } from "../../cloud/unpaired-rows.js"
 import { machineSeenWord } from "../../cloud/machine-seen.js"
+import { OwnerDiagnostics } from "../../cloud/health-owner/OwnerDiagnostics.js"
 import "./account-machines.css"
 
 /**
@@ -177,7 +178,7 @@ export function AccountMachines({ shown, onStart }: { shown: boolean; onStart: (
   )
 }
 
-type Tab = "connection" | "access"
+type Tab = "connection" | "access" | "diagnostics"
 
 export function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
   machine: Row
@@ -241,11 +242,15 @@ export function MachineSheet({ machine, manager, onClose, onStart, onForgotten }
                 className={tab === "connection" ? "on" : ""} onClick={() => setTab("connection")}>{nextWord("msTabConnection")}</button>
               <button type="button" role="tab" id="am-tab-access" aria-selected={tab === "access"} aria-controls="am-panel"
                 className={tab === "access" ? "on" : ""} onClick={() => setTab("access")}>{nextWord("msTabNameAccess")}</button>
+              <button type="button" role="tab" id="am-tab-diagnostics" aria-selected={tab === "diagnostics"} aria-controls="am-panel"
+                className={tab === "diagnostics" ? "on" : ""} onClick={() => setTab("diagnostics")}>{nextWord("ownerDiagTab")}</button>
             </div>
-            <div className="am-panel" id="am-panel" role="tabpanel" aria-labelledby={tab === "connection" ? "am-tab-connection" : "am-tab-access"}>
+            <div className="am-panel" id="am-panel" role="tabpanel" aria-labelledby={"am-tab-" + tab}>
               {tab === "connection"
                 ? <ConnectionTab machine={machine} manager={manager} onStart={() => close(onStart)} />
-                : <AccessTab machine={machine} manager={manager} onForget={() => setForgetting(true)} />}
+                : tab === "diagnostics"
+                  ? <OwnerDiagnostics machineID={machine.id} />
+                  : <AccessTab machine={machine} manager={manager} onForget={() => setForgetting(true)} />}
             </div>
           </>
         )}
