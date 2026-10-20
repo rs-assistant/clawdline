@@ -49,3 +49,5 @@ An independent reality-checker verified the exact source hashes, 24 artifact has
 The experiment adds attribution, not a product optimization. Never subtract earlier combined-process CPU or synthetic transport-worker CPU from these new machine measurements as a speedup. Full terminal enumeration, actual browser workloads, direct/fallback application paths and account-control-plane revocation remain separate gaps. No new product protocol, error code, bound, parser behavior, deployment or live pairing changed. Full integration CI is tracked separately.
 
 The root also rebuilt the final integrated source and passed one explicit compatibility run covering the original isolated transport, combined Publisher, new process CPU, worker-exit and malformed-diagnostic modes before the local commit gate. This run is verification, not another pooled measurement round.
+
+The [terminal inventory and carrier baseline](cloud-terminal-baseline.md) measures real private tmux enumeration and local direct/relay screen delivery separately. Its Go-only/combined CPU subjects and byte boundaries differ from the Publisher process windows.
