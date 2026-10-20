@@ -1,10 +1,15 @@
 # Connection health: durable local storage
 
-Status: 2026-10-20. `internal/adapters/healthjournal` is implemented and tested. **Nothing in the
-daemon opens it yet**: no runtime, CLI, local route or uploader calls it, and the foundation's
-`Unwired()` list still says `durable_segmented_journal: unimplemented` until the root wires it.
-The in-memory ring in `internal/domain/connectionhealth` is unchanged and still says
-`memory_only_lost_on_restart`; this store does not relabel it. Product scope is
+Status: 2026-10-20. `internal/adapters/healthjournal` is implemented and tested, and the daemon
+opens it: `cmd/clawdline/health.go` `startConnectionHealth` opens it under
+`<state>/connection-health/journal` on its own goroutine after the runtime starts (never on the
+startup path), and `Watchdog.Attach` makes the watchdog's one journal writer hand each record it
+appended, as the journal stamped it, to `Offer` — no `Journal.Read` per record; the ring is read
+once, at attach, under the writer's lock, so nothing is offered twice or skipped. A failed open is
+reported by its code on the status route and the boot stays memory only. The in-memory ring in
+`internal/domain/connectionhealth` still says `memory_only_lost_on_restart`; this store does not
+relabel it. `GET /v1/connection-health/history?cursor&limit` and `clawdline health history` page
+it (this machine's own token only, never through Cloud). Product scope is
 `docs/admin-connection-health.md`; the record contract is `docs/admin-connection-health-contract.md`.
 
 ## 1. What it is for
@@ -33,9 +38,8 @@ err = s.Close(ctx)                 // <-s.Done() closes when the worker exited a
   Windows; released by the kernel when the process dies). A second opener gets `locked`.
 - `Open` scans every segment synchronously and enforces retention before it returns. Measured on a
   full 96 MiB store: 0.57 s (Apple M4 Pro, SSD). Call it off the daemon's startup critical path.
-- `Offer` takes a record the foundation stamped — today that is a record read back from
-  `Journal.Read`. Integration should hand the store the record the journal stamped instead of
-  re-reading the ring per append (see §8).
+- `Offer` takes a record the foundation stamped; the daemon hands it the record the journal
+  writer just appended (`Watchdog.Attach`), never re-reading the ring per append (see §8).
 
 ## 3. Contract by failure
 
@@ -161,19 +165,19 @@ These are one machine's numbers, not service-level targets.
 
 ## 9. Bounds
 
-All registered in `internal/domain/capacity/register_healthjournal.go` and measured as a known
-zero (`internal/transport/http/capacity_measures_connection_health.go`) until the daemon opens a
-store: `cloud.health_store_bytes` 100 MiB, `_seconds` 604,800, `_segment_bytes` 8 MiB,
+All registered in `internal/domain/capacity/register_healthjournal.go` and measured from the
+open store's `Status` (`internal/transport/http/capacity_measures_connection_health.go`; a known
+zero while it is opening or monitoring is off, unmeasured with its code when it failed to open): `cloud.health_store_bytes` 100 MiB, `_seconds` 604,800, `_segment_bytes` 8 MiB,
 `_segments` 256, `_queue_rows` 1,024, `_queue_bytes` 2 MiB, `_frame_bytes` 4,096, `_readers` 4,
 `_dir_entries` 4,096, `_lost_ranges` 64. Cadences, not held state: fsync every 5 s, retention every
 minute, stall after 5 s, worker tick 1 s, write retry backoff 1 s → 60 s.
 
 ## 10. Not done here
 
-- Daemon wiring: who opens the store (directory under the daemon's state directory, e.g.
-  `<state>/connection-health/journal`), when, and how records flow from the watchdog's journal
-  writer into `Offer`; `Unwired()` update; Status into the capacity measures and diagnostics.
-- The local route and `clawdline health` CLI over `Read`, with scope checks.
+- `Close` at daemon shutdown: the daemon has no shutdown context today, so a stopping daemon does
+  not flush; what was queued and not yet written is the crash-loss window of §4.
 - Upload of pages to Cloud, and the Cloud side.
 - Measured budgets: the bounds above are the plan's proposals.
+- Three store rows (`_segment_bytes`, `_dir_entries`, `_lost_ranges`) read as unmeasured: `Status`
+  does not report their occupancy.
 - Windows and Linux were compiled and vetted, not run.

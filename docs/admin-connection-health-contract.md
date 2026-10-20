@@ -21,7 +21,7 @@ code reads or writes them. Product scope stays as `docs/admin-connection-health.
 | Daemon call sites | **partial**: see §4.1 for the exact list. Response sealing and the spool enqueue inside `internal/transport/cloud/relay.go` are **not wired**, and the correlation does not cross the relay queue between the transport's callback and the link's lane | `internal/adapters/cloud/transport.go`, `websocket.go`, `internal/transport/cloud/link.go` |
 | Local route `GET /v1/connection-health/{status,events,trace,export}` and `clawdline health` | implemented, this machine's own token only, refused through Cloud | `internal/transport/http/connection_health.go`, `cmd/clawdline/health.go` |
 | Per-build location map | **partial**: every wired location code names its Go function (checked by `runtime.FuncForPC` in the owning package's tests); no file lines | `locations.go` |
-| Durable segmented on-disk journal, boot markers on disk | **not built**; the ring is memory only and says so (`durability: memory_only_lost_on_restart`) | — |
+| Durable segmented store, boot markers on disk | implemented and opened by the daemon off the startup path; the watchdog's journal writer offers each stamped record (`Watchdog.Attach`); history route and CLI read it. The ring itself is still memory only and says so | `internal/adapters/healthjournal`, `docs/admin-connection-health-storage.md` |
 | Stack capture worker | **not built** | — |
 | Cloud ingest, stored queries, relay and viewer producers, uploader, UI | **not built here** (separate tasks) | — |
 
@@ -291,6 +291,10 @@ token. The route reads atomics and the journal's lock; it never calls `Scan`, th
 spool or a status snapshot. `clawdline health status|events|trace|export` reads it with the local
 token (`--since/--until` as RFC 3339 or a duration back from now, `--after-seq`, `--limit`,
 `--boot-id`, `--correlation`, `--json`); a daemon it cannot ask is reported unknown, exit 1.
+`history?cursor&limit` (and `clawdline health history --cursor --limit`) pages the durable store
+across boots; until the store is open it answers `unsupported` naming `opening` or the failure
+code. `status` carries a `durable` block: `opening`, `open` with the store's `Status`, or `failed`
+with its code.
 
 ## 5. Typed failures
 
@@ -499,6 +503,7 @@ never an empty success; a `null` duration is never drawn as zero.
    `internal/transport/cloud/relay.go`, and carrying one correlation from the transport's inbound
    callback through the relay queue to the link's lane (it needs a field on `Inbound`).
 3. Done: local route and CLI (§4.1).
-4. Durable segmented journal with boot markers and a documented crash-loss window.
+4. Done: durable store opened and fed (`docs/admin-connection-health-storage.md`); not yet closed
+   at daemon shutdown.
 5. Uploader over the proposed ingest, then the Cloud stored queries, relay/viewer producers,
    stage-to-source map per build, stack capture, and M01–M06 on real sources.
