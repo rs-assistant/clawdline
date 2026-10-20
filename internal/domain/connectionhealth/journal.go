@@ -32,7 +32,30 @@ const (
 	EventOverflow        Event = "overflow"
 	EventSchedulingGap   Event = "scheduling_gap"
 	EventClockAnomaly    Event = "clock_anomaly"
+	// EventTransitionsLost says Count watchdog transitions were dropped,
+	// before this record, because the queue to the journal was full. Only
+	// the journal's own writer appends it.
+	EventTransitionsLost Event = "transitions_lost"
 )
+
+// producerEvents are the events Append accepts from a caller. EventBoot and
+// EventTransitionsLost are the journal's own, so no caller can forge a boot
+// boundary or a loss.
+var producerEvents = []Event{
+	EventSlowDetected, EventStallDetected, EventRecovered, EventReleasedStalled,
+	EventOverflow, EventSchedulingGap, EventClockAnomaly,
+}
+
+func producerEvent(e Event) bool {
+	for _, x := range producerEvents {
+		if x == e {
+			return true
+		}
+	}
+	return false
+}
+
+func knownKind(k Kind) bool { return k == Finite || k == LongLived }
 
 // Record is one journal entry: content-free by construction, since every
 // string field is an enum, a location code or an opaque id.
@@ -63,8 +86,32 @@ type Record struct {
 	Build      string `json:"build_commit,omitempty"`
 }
 
-func (r Record) validate() error {
+// validate admits only what the journal can vouch for. Every string is an
+// enum, a location code or an opaque id, checked against its own rule; the
+// stamps (schema, sequence, event id, boot, time) are the journal's and a
+// caller that sets any of them is refused, not silently overwritten. own is
+// true only for the journal's own records.
+func (r Record) validate(own bool) error {
 	switch {
+	case r.Schema != "":
+		return invalid("schema")
+	case r.Seq != 0:
+		return invalid("producer_seq")
+	case r.EventID != "":
+		return invalid("event_id")
+	case r.BootID != "":
+		return invalid("boot_id")
+	case !r.Wall.IsZero() || r.MonoNS != 0:
+		return invalid("time")
+	case !producerEvent(r.Event) && !(own && (r.Event == EventBoot || r.Event == EventTransitionsLost)):
+		return invalid("event")
+	case r.Rule != "" && r.Rule != RuleVersion:
+		return invalid("rule")
+	case r.Kind != "" && !knownKind(r.Kind):
+		return invalid("kind")
+	case r.Build != "" && r.Event != EventBoot:
+		// The build belongs to the boot record and the page, not to an event.
+		return invalid("build")
 	case r.Source != "" && !knownSource(r.Source):
 		return invalid("source")
 	case r.Stage != "" && !knownStage(r.Stage):
@@ -114,7 +161,7 @@ func newJournal(clock Clock, bootID, build string, rows, bytes int) (*Journal, e
 		return nil, invalid("build")
 	}
 	j := &Journal{clock: clock, bootID: bootID, build: build, recs: make([]Record, rows), sizes: make([]int, rows), limit: rows, maxB: bytes}
-	if err := j.Append(Record{Event: EventBoot, Build: build}); err != nil {
+	if err := j.appendStamped(Record{Event: EventBoot, Build: build}); err != nil {
 		return nil, err
 	}
 	return j, nil
@@ -122,26 +169,48 @@ func newJournal(clock Clock, bootID, build string, rows, bytes int) (*Journal, e
 
 // Append stamps r with this journal's schema, boot, sequence and time and
 // keeps it, evicting the oldest records the bounds require. A record that is
-// invalid or larger than MaxRecordBytes is refused and counted.
-func (j *Journal) Append(r Record) error {
-	if err := r.validate(); err != nil {
+// invalid or larger than MaxRecordBytes is refused and counted, and takes no
+// sequence number, so a gap in the sequence is always an eviction.
+func (j *Journal) Append(r Record) error { return j.append(r, false, nil) }
+
+// appendStamped is Append for the journal's own boot record.
+func (j *Journal) appendStamped(r Record) error { return j.append(r, true, nil) }
+
+// appendObserved is Append for a record observed at an earlier instant: the
+// watchdog's writer appends after the scan, and the record keeps the scan's
+// time rather than the moment the writer got the lock.
+func (j *Journal) appendObserved(r Record, at Instant) error { return j.append(r, false, &at) }
+
+// appendLost journals that n watchdog transitions were dropped before at.
+func (j *Journal) appendLost(n uint64, at Instant) error {
+	return j.append(Record{Event: EventTransitionsLost, Count: n, Rule: RuleVersion}, true, &at)
+}
+
+func (j *Journal) append(r Record, own bool, at *Instant) error {
+	if err := r.validate(own); err != nil {
 		j.mu.Lock()
 		j.refused++
 		j.mu.Unlock()
 		return err
 	}
-	now := j.clock.Now()
+	var now Instant
+	if at != nil {
+		now = *at
+	} else {
+		now = j.clock.Now()
+	}
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	j.seq++
-	r.Schema, r.Seq, r.BootID = RecordSchema, j.seq, j.bootID
-	r.EventID = j.bootID + "-" + strconv.FormatUint(j.seq, 10)
+	seq := j.seq + 1
+	r.Schema, r.Seq, r.BootID = RecordSchema, seq, j.bootID
+	r.EventID = j.bootID + "-" + strconv.FormatUint(seq, 10)
 	r.Wall, r.MonoNS = now.Wall, int64(now.Mono)
 	b, err := json.Marshal(r)
 	if err != nil || len(b) > MaxRecordBytes {
 		j.refused++
 		return &Error{Code: CodeRecordTooLarge}
 	}
+	j.seq = seq
 	for j.n > 0 && (j.n == j.limit || j.bytes+len(b) > j.maxB) {
 		j.bytes -= j.sizes[j.head]
 		j.recs[j.head] = Record{}
@@ -168,6 +237,8 @@ type Query struct {
 
 // Coverage is what a page can and cannot vouch for.
 type Coverage struct {
+	// Quality is partial when records the query covers were evicted, or
+	// when the page holds a transitions_lost record.
 	Quality Quality `json:"quality"`
 	// FirstRetainedSeq and LastSeq are the journal's retained range when
 	// the page was read; zero only for an empty journal, which cannot
@@ -249,6 +320,11 @@ func (j *Journal) Read(q Query) (Page, error) {
 			break
 		}
 		p.Records = append(p.Records, r)
+		if r.Event == EventTransitionsLost {
+			// The page covers a moment the watchdog's transitions did not
+			// all reach the journal.
+			c.Quality = QualityPartial
+		}
 		bytes += j.sizes[i]
 		c.NextAfterSeq = r.Seq
 	}

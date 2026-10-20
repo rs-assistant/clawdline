@@ -5594,6 +5594,8 @@
   "capacityRow.cloud.health_record_bytes.full": "太大的事件不會保留，並記為一次拒收。",
   "capacityRow.cloud.health_query_rows.what": "讀取一次連線健康事件最多回傳幾筆。",
   "capacityRow.cloud.health_query_rows.full": "這次讀取會提早結束，標明被截斷，並給出下一次從哪裡接著讀。",
+  "capacityRow.cloud.health_pending_transitions.what": "最多有幾筆連線健康判讀可以排隊等著寫進連線健康紀錄。",
+  "capacityRow.cloud.health_pending_transitions.full": "放不下的判讀不會保留；會計數，紀錄裡也會寫明遺失了幾筆。",
   "capacityRow.cloud.health_query_bytes.what": "讀取一次連線健康事件最多回傳多少資料。",
   "capacityRow.cloud.health_query_bytes.full": "這次讀取會提早結束，標明被截斷，並給出下一次從哪裡接著讀。",
   "capacityRow.cloud.reload_stop_seconds.what": "你更改 Cloud 設定時，Clawdline 最久等舊的 Cloud 連線關掉多久，免得同時跑兩條連線。",

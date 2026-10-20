@@ -13,6 +13,7 @@ func connectionHealthCapacityMeasures() map[string]func() capacity.Reading {
 	for _, name := range []string{
 		"cloud.health_active_slots", "cloud.health_reserved_slots",
 		"cloud.health_journal_rows", "cloud.health_journal_bytes", "cloud.health_record_bytes",
+		"cloud.health_pending_transitions",
 		"cloud.health_query_rows", "cloud.health_query_bytes",
 	} {
 		out[name] = func() capacity.Reading { return capacity.Reading{Known: true, Note: note} }

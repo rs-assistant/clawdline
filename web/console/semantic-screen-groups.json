@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 7088,
-  "riskKeys": 3208,
-  "nonRiskCount": 3880,
+  "englishContentKeys": 7090,
+  "riskKeys": 3209,
+  "nonRiskCount": 3881,
   "groups": [
     {
       "name": "admin / other",
@@ -270,7 +270,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 158,
+      "count": 159,
       "sources": [
         null
       ],
@@ -286,6 +286,7 @@
         "capacityRow.cloud.header_read_diagnostic_seconds.what",
         "capacityRow.cloud.health_journal_bytes.what",
         "capacityRow.cloud.health_journal_rows.what",
+        "capacityRow.cloud.health_pending_transitions.what",
         "capacityRow.cloud.health_query_bytes.full",
         "capacityRow.cloud.health_query_bytes.what",
         "capacityRow.cloud.health_query_rows.full",

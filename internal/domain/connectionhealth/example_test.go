@@ -24,6 +24,7 @@ func ExampleExport() {
 		c.advance(time.Second)
 		r = w.Scan()
 	}
+	w.Flush()
 	ev, _ := Export(&r, j, Query{BootID: "boot-7f3a"})
 	b, _ := json.MarshalIndent(ev, "", "  ")
 	fmt.Println(string(b))
@@ -67,7 +68,11 @@ func ExampleExport() {
 	//       "total": 0,
 	//       "critical": 0
 	//     },
-	//     "trace_coverage": "complete"
+	//     "trace_coverage": "complete",
+	//     "scan_seq": 16,
+	//     "transitions": "complete",
+	//     "transitions_lost_total": 0,
+	//     "transitions_pending": 2
 	//   },
 	//   "journal": {
 	//     "schema": "clawdline.connection-health.page/1",

@@ -726,6 +726,26 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.health_pending_transitions",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxPendingTransitions",
+      "internal/domain/connectionhealth.NewWatchdog:chan(MaxPendingTransitions)"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.health_query_bytes",
     "Class": "observation",
     "Unit": "bytes",

@@ -40,6 +40,7 @@
 | `cloud.health_active_slots` | 128 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_journal_bytes` | 4194304 | `bytes` | `evict_oldest` | `diagnostics` | — |
 | `cloud.health_journal_rows` | 4096 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `cloud.health_pending_transitions` | 256 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_query_bytes` | 1048576 | `bytes` | `evict_oldest` | `diagnostics, sender` | — |
 | `cloud.health_query_rows` | 200 | `rows` | `evict_oldest` | `diagnostics, sender` | — |
 | `cloud.health_record_bytes` | 1024 | `bytes` | `refuse` | `diagnostics` | — |

@@ -42,6 +42,19 @@ func connectionHealthBounds() []Entry {
 			Sources: []string{"internal/domain/connectionhealth.MaxJournalBytes"},
 		},
 		{
+			// The queue between a watchdog scan and the journal writer. A
+			// scan never waits: a transition that finds it full is dropped
+			// and counted, the report says transitions partial, and the
+			// writer journals the count as transitions_lost where it happened.
+			Name: "cloud.health_pending_transitions", Class: Buffer, Unit: Rows,
+			Limit: 256, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{
+				"internal/domain/connectionhealth.MaxPendingTransitions",
+				"internal/domain/connectionhealth.NewWatchdog:chan(MaxPendingTransitions)",
+			},
+		},
+		{
 			// One encoded journal record; a larger one is refused and counted.
 			Name: "cloud.health_record_bytes", Class: Buffer, Unit: Bytes,
 			Limit: 1024, AtLimit: Refuse,

@@ -105,6 +105,7 @@ func TestAStuckHandlerIsBlockedAndAnIdleReaderIsNot(t *testing.T) {
 	if f := finding(t, r, reader.id); f.State != StateIdle {
 		t.Errorf("an idle long-lived loop is not stuck: %+v", f)
 	}
+	w.Flush()
 	ev := events(t, j)
 	if strings.Join(eventStrings(ev), ",") != "boot,slow_detected,stall_detected" {
 		t.Errorf("journal events %v", ev)
@@ -138,6 +139,7 @@ func TestRecoveryNeedsProgressNotSilence(t *testing.T) {
 	}
 	other.End(true)
 	w.Scan()
+	w.Flush()
 	ev := strings.Join(eventStrings(events(t, j)), ",")
 	if ev != "boot,slow_detected,slow_detected,stall_detected,stall_detected,recovered,released_after_stall" {
 		t.Errorf("journal events %s", ev)
@@ -178,6 +180,7 @@ func TestFullTableRefusesBusinessKeepsReservedAndSaysPartial(t *testing.T) {
 	if len(r.Findings) != MaxActiveSlots-MaxReservedSlots+1 {
 		t.Errorf("findings %d", len(r.Findings))
 	}
+	w.Flush()
 	if ev := events(t, j); ev[len(ev)-1] != EventOverflow {
 		t.Errorf("overflow not journaled: %v", ev)
 	}
@@ -259,6 +262,7 @@ func TestClockJumpsAndSchedulingGaps(t *testing.T) {
 	if f := finding(t, w.Scan(), h.id); f.State != StateBlocked {
 		t.Errorf("after the gap the stall stands: %+v", f)
 	}
+	w.Flush()
 	ev := strings.Join(eventStrings(events(t, j)), ",")
 	if ev != "boot,clock_anomaly,scheduling_gap,stall_detected" {
 		t.Errorf("journal events %s", ev)

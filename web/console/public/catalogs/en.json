@@ -5594,6 +5594,8 @@
   "capacityRow.cloud.health_record_bytes.full": "An event that is too large is not kept and is counted as refused.",
   "capacityRow.cloud.health_query_rows.what": "How many connection health events one reading returns.",
   "capacityRow.cloud.health_query_rows.full": "The reading stops early, says it was cut short and gives the place to continue from.",
+  "capacityRow.cloud.health_pending_transitions.what": "How many connection health findings can wait to be written to the connection health record.",
+  "capacityRow.cloud.health_pending_transitions.full": "A finding that does not fit is not kept; it is counted and the record says how many were lost.",
   "capacityRow.cloud.health_query_bytes.what": "How much data one reading of connection health events returns.",
   "capacityRow.cloud.health_query_bytes.full": "The reading stops early, says it was cut short and gives the place to continue from.",
   "capacityRow.cloud.reload_stop_seconds.what": "How long Clawdline waits for its old Cloud connection to shut down when you change Cloud settings, so two connections never run at once.",
