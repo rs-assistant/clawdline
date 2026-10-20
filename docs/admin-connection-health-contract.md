@@ -576,7 +576,7 @@ hourly cap that is about 25 ms of CPU per hour. Production network cost is not m
 
 **Status.** `GET /v1/connection-health/status` carries `upload`: `state`, `last_error`,
 `last_refusal {http, code, field}`, `pending {batch_id, events, bytes, attempts, next_attempt,
-persisted: no|unknown}`, `hour`, `totals`, `last_receipt`, `receipts_kept`; `clawdline health
+persisted: no|unknown}`, `hour`, `totals`, `last_receipt`, `receipts_kept`, `state_bytes` (the progress file's size as last read or written, `null` before it is read; it feeds the `cloud.health_upload_state_bytes` capacity row); `clawdline health
 status` prints one line of it. Capacity rows `cloud.health_upload_*` measure the hour's spending,
 the pending batch and the receipts. Status is a copy under the uploader's own lock: an unreachable
 Cloud never makes it, the local query or any business path wait.

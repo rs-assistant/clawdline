@@ -694,3 +694,31 @@ func TestARecreatedStoreRestartsAnOldCursorWithoutAPanic(t *testing.T) {
 		t.Fatalf("records of the recreated store must upload after the restart: receipted %d after %d", got, before)
 	}
 }
+
+// The status reports the progress file's real size once it has been read
+// or written, and null before; the capacity row reads it from there.
+func TestTheStatusReportsTheProgressFileSize(t *testing.T) {
+	dir := t.TempDir()
+	f := newFixture(t, dir, "boot-s")
+	f.add(3)
+	state := filepath.Join(dir, "upload")
+	if New(Options{StateDir: state}).Status().StateBytes != nil {
+		t.Fatal("an uploader that has not read its file reports a size")
+	}
+	h := newHarness(t, f, newCloud(), state)
+	if n := h.u.Status().StateBytes; n == nil || *n != 0 {
+		t.Fatalf("no file yet is a known zero: %v", n)
+	}
+	h.step(t)
+	info, err := os.Stat(filepath.Join(state, stateFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := h.u.Status().StateBytes; n == nil || int64(*n) != info.Size() {
+		t.Fatalf("state_bytes %v, file on disk %d", n, info.Size())
+	}
+	h.u = h.make()
+	if n := h.u.Status().StateBytes; n == nil || int64(*n) != info.Size() {
+		t.Fatalf("after a reload state_bytes %v, file on disk %d", n, info.Size())
+	}
+}

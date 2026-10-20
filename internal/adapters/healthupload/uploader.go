@@ -243,6 +243,9 @@ type Status struct {
 	LastReceipt *Receipt `json:"last_receipt,omitempty"`
 	// ReceiptsKept is how many receipts the progress file holds.
 	ReceiptsKept int `json:"receipts_kept"`
+	// StateBytes is the progress file's size as last read or written
+	// (bounded by MaxStateBytes); null before the uploader has read it.
+	StateBytes *int `json:"state_bytes"`
 }
 
 // Refusal is a typed Cloud refusal.
@@ -295,6 +298,10 @@ func (u *Uploader) Status() Status {
 			FirstSeq: p.FirstSeq, LastSeq: p.LastSeq, Attempts: p.Attempts, NextAttempt: p.NotBefore, Persisted: persistedState}
 	}
 	s.ReceiptsKept = len(u.st.Receipts)
+	if u.st.sized {
+		n := u.st.size
+		s.StateBytes = &n
+	}
 	if n := len(u.st.Receipts); n > 0 {
 		r := u.st.Receipts[n-1]
 		s.LastReceipt = &r
@@ -494,10 +501,12 @@ func (u *Uploader) snapshot() persisted {
 // save persists next and, only once it is on disk, makes it the state.
 func (u *Uploader) save(next persisted) error {
 	next.Schema = StateSchema
-	if err := saveState(u.o.StateDir, next); err != nil {
+	n, err := saveState(u.o.StateDir, next)
+	if err != nil {
 		u.set(CodeStateUnwritable)
 		return err
 	}
+	next.size, next.sized = n, true
 	u.mu.Lock()
 	u.st = next
 	u.mu.Unlock()

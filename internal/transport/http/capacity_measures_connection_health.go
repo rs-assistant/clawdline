@@ -210,7 +210,10 @@ func uploadReading(name string, st healthupload.Status, now time.Time) capacity.
 	case "cloud.health_upload_receipts":
 		r.Used = int64(st.ReceiptsKept)
 	case "cloud.health_upload_state_bytes":
-		return capacity.Unmeasured("the uploader's status does not report the progress file's size")
+		if st.StateBytes == nil {
+			return capacity.Unmeasured("the uploader has not read its progress file yet")
+		}
+		r.Used = int64(*st.StateBytes)
 	default:
 		r.Note = "a bound per request or per cycle; nothing is held between them (" + string(st.State) + ")"
 	}

@@ -23,6 +23,10 @@ const stateFile = "upload-state.json"
 // fixed set of counters.
 type persisted struct {
 	Schema string `json:"schema"`
+	// size is the progress file's length as last read or written, and sized
+	// whether either has happened; neither is stored in the file.
+	size  int
+	sized bool
 	// Cursor resumes after the last entry whose batch was settled
 	// (receipted, refused or abandoned). Empty starts at the oldest
 	// retained entry.
@@ -145,7 +149,7 @@ var errStateTooLarge = errors.New("healthupload: progress state exceeds its boun
 func loadState(dir string) (persisted, bool, error) {
 	data, err := os.ReadFile(filepath.Join(dir, stateFile))
 	if errors.Is(err, fs.ErrNotExist) {
-		return persisted{Schema: StateSchema}, false, nil
+		return persisted{Schema: StateSchema, sized: true}, false, nil
 	}
 	if err != nil {
 		return persisted{}, false, err
@@ -160,19 +164,25 @@ func loadState(dir string) (persisted, bool, error) {
 	if p.Pending != nil && (len(p.Pending.Body) == 0 || len(p.Pending.Body) > MaxBatchBytes) {
 		return persisted{}, false, errors.New("healthupload: progress state holds an invalid batch")
 	}
+	p.size, p.sized = len(data), true
 	return p, true, nil
 }
 
 // saveState replaces the progress file atomically: write a temporary file,
-// fsync it, rename it over the old one, fsync the directory.
-func saveState(dir string, p persisted) error {
+// fsync it, rename it over the old one, fsync the directory. It answers the
+// bytes written.
+func saveState(dir string, p persisted) (int, error) {
 	data, err := json.Marshal(p)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if len(data) > MaxStateBytes {
-		return errStateTooLarge
+		return 0, errStateTooLarge
 	}
+	return len(data), writeState(dir, data)
+}
+
+func writeState(dir string, data []byte) error {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
