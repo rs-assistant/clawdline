@@ -102,6 +102,16 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `console.direct_history_machines` | 32 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `console.execution_recovery_attempts` | 1 | `rows` | `refuse` | `sender, diagnostics` | — |
 | `console.health_live_seconds` | 90 | `seconds` | `expire` | `diagnostics` | — |
+| `console.health_ui_body_bytes` | 1572864 | `bytes` | `refuse` | `diagnostics` | — |
+| `console.health_ui_budget_seconds` | 12 | `seconds` | `expire` | `diagnostics` | — |
+| `console.health_ui_event_pages` | 5 | `rows` | `refuse` | `diagnostics` | — |
+| `console.health_ui_export_bytes` | 524288 | `bytes` | `refuse` | `diagnostics` | — |
+| `console.health_ui_id_characters` | 64 | `characters` | `refuse` | `diagnostics` | — |
+| `console.health_ui_page_rows` | 200 | `rows` | `refuse` | `diagnostics` | — |
+| `console.health_ui_parallel_reads` | 2 | `rows` | `refuse` | `diagnostics` | — |
+| `console.health_ui_reads_per_load` | 3 | `rows` | `refuse` | `diagnostics` | — |
+| `console.health_ui_refresh_seconds` | 15 | `seconds` | `expire` | `diagnostics` | — |
+| `console.health_ui_request_seconds` | 6 | `seconds` | `expire` | `diagnostics` | — |
 | `console.machine_list_poll_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
 | `console.opened_row_quiet_seconds` | 8 | `seconds` | `expire` | `diagnostics` | — |
 | `console.opened_row_restate_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |

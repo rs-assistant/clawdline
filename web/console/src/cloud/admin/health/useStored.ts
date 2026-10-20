@@ -1,0 +1,62 @@
+/* Holds one screen's stored evidence: one load at a time, refreshed while the
+ * window is live, cancelled when the route or scope changes or the page goes
+ * away. A changed route key starts empty, so one scope's figures never flash
+ * under another's, and a refused session clears everything at once. */
+import { useCallback, useEffect, useReducer, useRef } from "react"
+import { emptyStored, HEALTH_UI_LIMITS, loadStored, olderRead, planFor, runReads, storedReducer, type StoredState } from "./cloud"
+import { routeKey, type HealthRoute } from "./route"
+
+export function useStored(get: typeof fetch, apiOrigin: string, route: HealthRoute): { state: StoredState; refresh: () => void; loadOlder: () => void } {
+  const key = routeKey(route)
+  const [state, dispatch] = useReducer(storedReducer, key, emptyStored)
+  const inFlight = useRef<AbortController | null>(null)
+  const routeRef = useRef(route)
+  routeRef.current = route
+  const stateRef = useRef(state)
+  stateRef.current = state
+
+  const run = useCallback(() => {
+    if (inFlight.current) return
+    const ctl = new AbortController()
+    inFlight.current = ctl
+    dispatch({ type: "start" })
+    void loadStored(get, apiOrigin, routeRef.current, Date.now(), ctl.signal).then((outcome) => {
+      if (inFlight.current === ctl) inFlight.current = null
+      if (!ctl.signal.aborted) dispatch({ type: "loaded", outcome, at: Date.now() })
+    })
+  }, [get, apiOrigin])
+
+  useEffect(() => {
+    dispatch({ type: "reset", key })
+    run()
+    return () => {
+      inFlight.current?.abort()
+      inFlight.current = null
+    }
+  }, [key, run])
+
+  const live = route.scope.until === null
+  useEffect(() => {
+    if (!live) return
+    const id = setInterval(run, HEALTH_UI_LIMITS.refreshMs)
+    return () => clearInterval(id)
+  }, [live, run, key])
+
+  const loadOlder = useCallback(() => {
+    const s = stateRef.current
+    if (inFlight.current || s.olderBusy || s.olderCursor === null || s.window === null) return
+    const first = planFor(routeRef.current, Date.now()).reads.find((r) => r.part === "trace" || r.part === "events")
+    if (!first) return
+    const ctl = new AbortController()
+    inFlight.current = ctl
+    dispatch({ type: "older_start" })
+    void runReads(get, apiOrigin, [olderRead(first, s.window, s.olderCursor)], ctl.signal).then((r) => {
+      if (inFlight.current === ctl) inFlight.current = null
+      if (ctl.signal.aborted || r.kind === "aborted") return
+      if (r.kind === "refused") dispatch({ type: "older_refused", refusal: r.refusal })
+      else dispatch({ type: "older_loaded", result: r.parts[first.part] ?? { ok: false, code: "network" }, at: Date.now() })
+    })
+  }, [get, apiOrigin])
+
+  return { state, refresh: run, loadOlder }
+}

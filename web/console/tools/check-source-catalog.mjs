@@ -55,6 +55,7 @@ const settings = table("src/pages/settings/window/copy.ts", "export { ownWords, 
 const settingsZh = table("src/pages/settings/window/copy.ts", "export { ownWords, baseW }", "zh-Hant")
 const bar = table("src/bar/words.ts", "export { baseWords }")
 const admin = table("src/cloud/admin/words.ts", "export { en as sourceEn, zhTW as sourceZh }", "en", ["en", "zhTW"])
+const health = table("src/cloud/admin/health/words.ts", "export { en as sourceEn, zhTW as sourceZh }", "en", ["en", "zhTW"])
 const workflow = table("src/workflow-words.ts", "export { words as sourceWords }", "en", ["en", "zhHant", "words"]).sourceWords
 const notifications = table("src/pages/notifications.tsx", "export { notificationsWords as sourceWords }", "en", ["notificationsEn", "notificationsZh", "notificationsWords"]).sourceWords
 const dispatchPolicy = table("src/pages/settings/window/DispatchPolicyPane.tsx", "export { dispatchPolicyWords as sourceWords }", "en", ["dispatchPolicyEn", "dispatchPolicyZh", "dispatchPolicyWords"]).sourceWords
@@ -76,6 +77,7 @@ const domains = [
   { name: "settings", en: settings.baseW, zh: settingsZh.baseW, english: false },
   { name: "bar", en: bar.baseWords, zh: bar.baseWords, english: false },
   { name: "admin", en: admin.sourceEn, zh: admin.sourceZh, english: true },
+  { name: "health", en: health.sourceEn, zh: health.sourceZh, english: true },
   { name: "workflow", en: workflow.en, zh: workflow["zh-Hant"], english: true },
   { name: "notifications", en: notifications.en, zh: notifications["zh-Hant"], english: true },
   { name: "dispatchPolicy", en: dispatchPolicy.en, zh: dispatchPolicy["zh-Hant"], english: true },
