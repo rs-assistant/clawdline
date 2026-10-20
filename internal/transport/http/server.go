@@ -477,6 +477,8 @@ func (s *Server) routeTable() []route {
 		// hands over the account key.
 		{Route{"*", "/v1/cloud/pairing"}, s.cloudPairingRoute},
 		{Route{"*", "/v1/cloud/pairing/offer"}, s.cloudPairingOfferRoute},
+		{Route{"*", "/v1/cloud/pairing/identity"}, s.cloudIdentityPairingRoute},
+		{Route{"*", "/v1/cloud/pairing/identity/decision"}, s.cloudIdentityPairingDecisionRoute},
 		{Route{"*", "/v1/cloud/pairing/agent"}, s.cloudPairingAgentRoute},
 		{Route{"*", "/v1/cloud/pairing/agent/"}, s.cloudPairingAgentTaskRoute},
 		{Route{"*", "/v1/cloud/devices/revoke"}, s.cloudDeviceRoute},
