@@ -169,12 +169,42 @@
     "Note": true
   },
   {
+    "Name": "cloud.health_capture_budget_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_capture_export_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_capture_frames",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_capture_raw_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_captures_per_minute",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.health_journal_bytes",
     "Known": true,
     "Note": true
   },
   {
     "Name": "cloud.health_journal_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_owner_incidents",
     "Known": true,
     "Note": true
   },
@@ -255,6 +285,16 @@
   },
   {
     "Name": "cloud.health_sealed_snapshot_field_chars",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_snapshot_frames",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_sealed_snapshot_sources",
     "Known": true,
     "Note": true
   },

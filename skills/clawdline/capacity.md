@@ -39,8 +39,14 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `cloud.header_read_diagnostic_rows` | 24 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cloud.header_read_diagnostic_seconds` | 3600 | `seconds` | `expire` | `diagnostics` | — |
 | `cloud.health_active_slots` | 128 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_capture_budget_seconds` | 2 | `seconds` | `refuse` | `diagnostics` | — |
+| `cloud.health_capture_export_bytes` | 524288 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_capture_frames` | 64 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_capture_raw_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_captures_per_minute` | 4 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_journal_bytes` | 4194304 | `bytes` | `evict_oldest` | `diagnostics` | — |
 | `cloud.health_journal_rows` | 4096 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `cloud.health_owner_incidents` | 32 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_pending_transitions` | 256 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_query_bytes` | 1048576 | `bytes` | `evict_oldest` | `diagnostics, sender` | — |
 | `cloud.health_query_rows` | 200 | `rows` | `evict_oldest` | `diagnostics, sender` | — |
@@ -57,6 +63,8 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `cloud.health_sealed_snapshot_bytes` | 16384 | `bytes` | `refuse` | `diagnostics` | — |
 | `cloud.health_sealed_snapshot_coverage` | 32 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_sealed_snapshot_field_chars` | 512 | `characters` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_snapshot_frames` | 24 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_sealed_snapshot_sources` | 8 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_sealed_store_attachments` | 16 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.health_sealed_store_bytes` | 4194304 | `bytes` | `refuse` | `diagnostics` | — |
 | `cloud.health_store_bytes` | 104857600 | `bytes` | `evict_oldest` | `diagnostics` | — |

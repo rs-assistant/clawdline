@@ -23,7 +23,7 @@ client. The query shapes in §9 remain a proposal; Cloud's implemented API is it
 | Local route `GET /v1/connection-health/{status,events,trace,export}` and `clawdline health` | implemented, this machine's own token only, refused through Cloud | `internal/transport/http/connection_health.go`, `cmd/clawdline/health.go` |
 | Per-build location map | **partial**: every wired location code names its Go function (checked by `runtime.FuncForPC` in the owning package's tests); no file lines | `locations.go` |
 | Durable segmented store, boot markers on disk | implemented and opened by the daemon off the startup path; the watchdog's journal writer offers each stamped record (`Watchdog.Attach`); history route and CLI read it. The ring itself is still memory only and says so | `internal/adapters/healthjournal`, `docs/admin-connection-health-storage.md` |
-| Stack capture worker | **not built** | — |
+| Stall capture worker (one worker, one in flight, 1 MiB raw buffer kept in memory only, 512 KiB sanitized capture, 2 s budget, 4 a minute) | implemented, on by default; `CLAWDLINE_STALL_CAPTURE=off` turns it off (§4.2) | `internal/domain/connectionhealth/capture.go`, `cmd/clawdline/health.go` |
 | Daemon uploader to Cloud ingest (opt-in, own HTTPS client, bounded, durable progress) | implemented, off by default (§9a) | `internal/adapters/healthupload`, `cmd/clawdline/health.go` |
 | Shutdown: watchdog and writer stopped, uploader stopped, store flushed and closed within 3 s | implemented on SIGTERM/interrupt | `cmd/clawdline/health.go` `stopConnectionHealthOnSignal` |
 | Browser viewer producer (opt-in, own HTTPS upload, bounded) | implemented, off by default; installed only by an explicit `startViewerHealth` call (§11) | `web/console/src/health-viewer`, `web/console/src/legacy/js/net/viewer-health-hook.js` |
@@ -231,7 +231,7 @@ display and may jump.
     { "part": "daemon_instrumentation_call_sites", "status": "partial" },
     { "part": "durable_segmented_journal", "status": "implemented" },
     { "part": "durable_history_route", "status": "implemented" },
-    { "part": "stack_capture_worker", "status": "unimplemented" },
+    { "part": "stack_capture_worker", "status": "implemented" },
     { "part": "local_health_cli_and_route", "status": "implemented" },
     { "part": "cloud_ingest", "status": "unimplemented" },
     { "part": "cloud_query", "status": "unimplemented" },
@@ -315,6 +315,119 @@ token (`--since/--until` as RFC 3339 or a duration back from now, `--after-seq`,
 across boots; until the store is open it answers `unsupported` naming `opening` or the failure
 code. `status` carries a `durable` block: `opening`, `open` with the store's `Status`, or `failed`
 with its code.
+
+### 4.2 Stall capture (implemented, on by default)
+
+When a scan first calls a finite phase `blocked`, `Watchdog.transition` queues the
+`stall_detected` record and then calls `Capturer.Request`, which takes one compare-and-swap and
+one send on an empty channel. The scan never waits for the capture, the journal, a disk or the
+network. The one worker (`Capturer.Run`, started by `Runtime.Run` and not joined at shutdown)
+dumps every goroutine into its own reused 1 MiB buffer, sanitizes the dump, clears the raw bytes
+and publishes an immutable `Capture` through an atomic pointer. The raw dump never leaves the
+worker: it is not exported, not logged and not written to disk.
+
+| Situation | What the caller sees |
+| --- | --- |
+| Capture off (`CLAWDLINE_STALL_CAPTURE=off`) | `state: "off"`, `skipped_off_total` counts each stall; the stall record stands |
+| A capture in flight | the trigger is refused, `refused_busy_total` |
+| More than 4 captures started in one minute | refused, `refused_rate_limited_total` |
+| A capture running past 2 s | `state: "timed_out_unavailable"`, `timed_out_total` once; later triggers are refused as `refused_unavailable_total`; no second worker is ever started, because `runtime.Stack` cannot be cancelled |
+| It finishes late | published with `over_budget: true`, `over_budget_total`; the worker takes triggers again |
+| The sanitized capture fails the final allowlist check | not published, `rejected_total` |
+
+The stall record, its `recovered` or `released_after_stall` record and the journal are written
+by the watchdog's own writer whatever the capture does; a test holds the capture forever and
+checks both are journaled and the export still answers.
+
+**Sanitizing.** A goroutine header keeps its id, the runtime's wait-state words and its
+`N minutes`; anything else in the header (labels, `gp=`/`m=` fields) is dropped. A function keeps
+its name without the argument list only when it belongs to this module, the standard library
+(first path element without a dot, or `main`) or a module this binary was built with
+(`debug.ReadBuildInfo`); otherwise it is `<redacted>` and counted in `functions_redacted`. A file
+becomes `file:line` relative to this module, the Go root or the module cache (for a listed module
+only), without the `+0x` offset; anything else, any `..`, and the file of a redacted function is
+dropped and counted in `source_unavailable`. A line the sanitizer does not recognise is dropped and
+counted in `lines_unparsed`, never copied.
+
+**Join.** `Capture.join` names the trigger's location code, the Go function the location map gives
+it (`Locations`), how many goroutines hold that function and the exact `file:line` of each, read
+from this build's own dump. Matching goroutines are listed first so trimming to 512 KiB keeps them.
+`Runtime.Export` adds `stall_capture`:
+
+```json
+"stall_capture": {
+  "status": { "state": "idle", "enabled": true, "requested_total": 1, "started_total": 1,
+              "completed_total": 1, "refused_busy_total": 0, "refused_unavailable_total": 0,
+              "refused_rate_limited_total": 0, "skipped_off_total": 0, "timed_out_total": 0,
+              "over_budget_total": 0, "rejected_total": 0, "latest_seq": 1 },
+  "latest": { "schema": "clawdline.connection-health.capture/1", "seq": 1, "boot_id": "…",
+              "build_commit": "…", "trigger": { "phase_id": 2, "location": "cloud.websocket.writer_lock", … },
+              "join": { "location": "cloud.websocket.writer_lock",
+                        "function": "github.com/sainteye/clawdline/internal/adapters/cloud.(*Conn).writeFrame",
+                        "mapped": true, "matched_goroutines": 1,
+                        "sources": ["internal/adapters/cloud/websocket.go:211"] },
+              "goroutines": [ … ], "goroutines_total": 57, "truncated": false, … },
+  "recovery": { "state": "recovered", "recovered_at": "…", "recovery_ns": 2000000000,
+                "journal_quality": "complete" }
+}
+```
+
+`recovery.state` is `recovered`, `released_outcome_unknown`, `still_blocked` or `unknown`, read
+from the journal and the latest report, never from the capture; `journal_quality` is `partial`
+when the stall record itself is no longer in the ring. `GET /v1/connection-health/status` carries
+the worker's status as `stall_capture`.
+
+**Owner diagnostics.** The owner-sealed feed (`cmd/clawdline/health.go` `sealedFeed`) seals the
+stall as revision 1 in `clawdline.health-owner-diagnostics/1`, unchanged. A published capture
+and the stall's recovery are later revisions of the same attachment in
+`clawdline.health-owner-diagnostics/2`, which adds `capture` (the join, the first matching
+goroutine's frames, at most 24, and the counts) and `recovery`. /1 refuses either field, /2
+requires one of them, an unknown version is refused, and both the Go and the TypeScript readers
+check every frame against the same allowlist (`internal/adapters/healthsealed/testdata/snapshot-v2.json`
+is the shared vector). Cloud stores only the ciphertext; no Cloud change is needed. The feed
+remembers 32 stalls; a forgotten stall's capture is sealed from its own trigger and its recovery is
+not sealed (the local export still has it).
+
+**Measured cost** (`CLAWDLINE_CAPTURE_MEASURE=1 go test -run TestMeasureCaptureCost -v
+./internal/domain/connectionhealth`, go1.27.1 darwin/arm64, 14 procs, 20 rounds, parked goroutines
+12 frames deep; control is the same loop with capture off):
+
+| Goroutines | Mode | p50 wall | CPU per capture | Allocs / bytes per capture | Worst lateness of a 200 µs ticker | Largest non-GC stop-the-world | Raw / sanitized |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 100 | off | 250 ns | — (probe only, 0.67 ms) | 7 / 992 B | 0.11 ms | — | — |
+| 100 | on | 5.7 ms | 7.6 ms | 1,212 / 1.5 MB | 1.07 ms | ≤ 1.3 ms | 369 KiB / 259 KiB |
+| 1,000 | on | 17.4 ms | 21.9 ms | 2,843 / 5.7 MB | 5.8 ms | ≤ 6.3 ms | 1,024 KiB (full) / 489 KiB |
+| 5,000 | on | 36.6 ms | 45.0 ms | 2,823 / 5.5 MB | 26.3 ms | ≤ 29.4 ms | 1,024 KiB (full) / 489 KiB |
+
+A capture runs only after a phase has made no progress for 15 s, at most four a minute, so the
+worst measured case costs at most about 120 ms of pauses a minute on a process with 5,000
+goroutines, and about 5 ms with 100. That is why it is on by default. At 1,000 goroutines and above
+the raw buffer fills and the capture says `raw_truncated`; the runtime prints the calling goroutine
+first, so the dump still begins with the stack it was taken from but may miss the stalled one,
+which `join.matched_goroutines: 0` then says. The owner page shows that as "unavailable" with the
+evidence gap `capture_not_matched`, never as a clean capture and never as proof the goroutine was
+not stuck.
+
+**Target-first sampling was investigated and not adopted (2026-10-21).** A ten-line experiment
+(go1.27.1 darwin/arm64, goroutines parked 12 frames deep plus one stalled in a distinct function
+started last) compared `runtime.Stack(buf, true)` into the 1 MiB buffer with the supported
+aggregated goroutine profile, `pprof.Lookup("goroutine").WriteTo(w, 1)`:
+
+| Goroutines | `runtime.Stack` | holds the stalled one | aggregated profile | holds the stalled one |
+| --- | --- | --- | --- | --- |
+| 1,000 | 1,024 KiB (full), 9.8 ms | no | 3.3 KB, 4.2 ms | yes |
+| 5,000 | 1,024 KiB (full), 33.0 ms | no | 3.3 KB, 10.1 ms | yes |
+| 20,000 | 1,024 KiB (full), 88.8 ms | no | 3.3 KB, 30.9 ms | yes |
+
+The aggregated profile finds the stalled goroutine here only because the other stacks are
+identical. It cannot be bounded by this worker: the runtime first collects one stack record per
+goroutine (memory grows with the goroutine count, outside the raw buffer's bound), its output
+grows with the number of distinct stacks, and it lists records by count, so a single stalled
+stack sorts last and is the first thing a bounded writer would cut. It also carries no goroutine
+state. Go offers no supported API to dump one chosen goroutine. So the 1 MiB raw and 512 KiB
+sanitized caps, the one in-flight worker and the measurements above stay as they are, and a large
+process keeps answering `raw_truncated` with `matched_goroutines: 0` honestly. Revisit if the
+runtime gains a bounded per-goroutine or filtered stack API.
 
 ## 5. Typed failures
 
@@ -413,7 +526,8 @@ classes.
 | Machine identity | `boot_id`, `build_commit`, presence, last snapshot age | yes (opaque machine id) | yes | no |
 | Correlation | `correlation`, `phase_id`, `event_id`, `producer_seq` | yes, as opaque ids; no cross-tenant lookup by guessing | yes | own traces only |
 | Owner diagnostics | `location`, `age_ns`, `deadline_ns`, overflow `by_class`, watchdog findings | **no** — aggregate counts only | yes | no |
-| Never exported | payloads, paths, URLs, tokens, session or document names, SDP/ICE addresses, stacks | no | no | no |
+| Owner diagnostics: sanitized stall capture | `stall_capture` (§4.2): allowlisted function names, module-, Go-root- or dependency-relative `file:line`, wait state, counts | **no** — sealed for the owner only | yes | no |
+| Never exported | payloads, paths, URLs, tokens, session or document names, SDP/ICE addresses, raw goroutine dumps, function arguments, addresses, absolute paths | no | no | no |
 
 An item the scope cannot read stays as `{ "source": "<source>", "forbidden": true }` with no body.
 
@@ -619,7 +733,18 @@ The private Cloud contract §13 defines the wire. This repository holds both cli
   send, so a retry, including one after a restart, sends identical bytes; the receipt's
   `aad_sha256` must equal the client's own or the upload counts as failed. The worker takes
   snapshots through a non-blocking `Offer` (queue 8; full answers `busy`), and a full store
-  answers `store_full` at once. Every bound is in `capacity/register_healthsealed.go`.
+  answers `store_full` at once. A snapshot that arrives while an earlier revision of the same
+  attachment is still pending (held request, lost receipt, spent attempts) is sealed at once as
+  the next revision, chained to the pending one's fixed ciphertext digest, and queued behind it in
+  the same on-disk record; the pending bytes are never rewritten, so Cloud never sees a changed
+  body for a revision. `Send` delivers the queue in revision order after each receipt, and a
+  restart resumes it from disk. The queue is bounded by `MaxRevisions` (8) and the store bounds;
+  a snapshot past them is not written and is counted in `dropped` with its code
+  (`revisions_exhausted`, `store_full`, `too_large`, `sealed_expired`). A permanent refusal of
+  a pending revision refuses every revision chained after it (`predecessor_refused`) without
+  sending them; after a content-key rotation queued material is refused locally (`wrong_epoch`)
+  and never sent; with the opt-in off nothing is sent and the queue waits until the attachment
+  expires and is pruned. Every bound is in `capacity/register_healthsealed.go`.
 - PWA: `web/console/src/cloud/health-owner`. It lists `GET /v1/health/sealed`, signs a
   `clawdline.health-sealed-read/1` proof with the registered device key, posts it to
   `POST /v1/health/sealed/read`, and opens the revision only after the AAD, its digest, tenant,
@@ -661,8 +786,8 @@ from a true one, so no attestation is sent. Until then a sealed read answers
 3. Done: local route and CLI (§4.1).
 4. Done: durable store opened and fed (`docs/admin-connection-health-storage.md`), and flushed and
    closed at daemon shutdown.
-5. Done: the daemon uploader (§9a). Next: Cloud fields for storage loss and `state_after_loss`,
-   stack capture and full real-source acceptance of M01–M06 remain pending. Owner sealing is
+5. Done: the daemon uploader (§9a) and the stall capture worker (§4.2). Next: Cloud fields for
+   storage loss and `state_after_loss` and full real-source acceptance of M01–M06 remain pending. Owner sealing is
    now wired into daemon startup; loss counters use separate immutable metadata-only batches.
 6. Done, off by default: the browser viewer producer (§11), hosted-page lifecycle behind
    `VITE_VIEWER_HEALTH=on` (§11.4), and relay write observation. Still pending: direct-carrier

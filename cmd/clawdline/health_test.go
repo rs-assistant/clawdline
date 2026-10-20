@@ -838,3 +838,197 @@ func TestARotatedIdentityEpochIsNotSentTheOldRevision(t *testing.T) {
 		t.Fatalf("the old revision was sent after the rotation: %d posts", n)
 	}
 }
+
+func sampleCapture(phase uint64, frames int, fn string) *connectionhealth.Capture {
+	g := connectionhealth.CaptureGoroutine{ID: 41, State: "sync.Mutex.Lock", MatchesLocation: true}
+	for i := 0; i < frames; i++ {
+		g.Frames = append(g.Frames, connectionhealth.CaptureFrame{Function: fn,
+			Source: "internal/adapters/cloud/websocket.go:" + strconv.Itoa(200+i), SourceKind: connectionhealth.SourceKindModule})
+	}
+	return &connectionhealth.Capture{Schema: connectionhealth.CaptureSchema, Seq: 1, BootID: "boot-s", Build: "c9fe745db066",
+		Trigger: connectionhealth.CaptureTrigger{PhaseID: phase, Location: "cloud.websocket.writer_lock",
+			Stage: connectionhealth.StageWriterLockWaiting, AgeNS: 15_000_000_000, DeadlineNS: 15_000_000_000, RequestedMonoNS: 20_000_000_000},
+		DurationNS: 1_200_000, GoroutinesTotal: 3,
+		Join: connectionhealth.CaptureJoin{Location: "cloud.websocket.writer_lock", Function: fn, Mapped: true,
+			Goroutines: 1, Sources: []string{"internal/adapters/cloud/websocket.go:200"}},
+		Goroutines: []connectionhealth.CaptureGoroutine{g, {ID: 1, State: "select", Frames: []connectionhealth.CaptureFrame{{Function: "main.other"}}}}}
+}
+
+// A stall, its capture and its recovery are three revisions of one owner
+// attachment: the first stays /1 for a reader that knows only /1, the
+// later two are /2 and carry the join, the stalled goroutine and the
+// recovery; nothing of them leaves the machine outside the ciphertext.
+func TestAStallsCaptureAndRecoveryReviseItsOwnerAttachment(t *testing.T) {
+	const fn = "github.com/sainteye/clawdline/internal/adapters/cloud.(*Conn).writeFrame"
+	c, base := newSealedCloud(t)
+	dir, _ := sealedMachine(t, base, 2)
+	w, err := newSealedDiagnostics(dir, nil, sealedMachines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runSealed(t, w)
+	waitFor(t, "the opt-in to be read", w.Enabled)
+	o := newOwnerIncidents()
+	stall := stallRecord(7)
+	// A real stall record carries no build (only the boot record does).
+	stall.MonoNS, stall.Build = 20_000_000_000, ""
+	job, ok := sealedJob(stall, 0)
+	if !ok {
+		t.Fatal("no stall job")
+	}
+	o.remember(stall, job)
+	captured, ok := o.captured(sampleCapture(7, 3, fn))
+	if !ok {
+		t.Fatal("no capture revision")
+	}
+	rec := stall
+	rec.Event, rec.MonoNS = connectionhealth.EventRecovered, 23_500_000_000
+	recovered, ok := o.recovered(rec)
+	if !ok {
+		t.Fatal("no recovery revision")
+	}
+	if _, again := o.recovered(rec); again {
+		t.Fatal("a second recovery for one stall made another revision")
+	}
+	if job.Snapshot.Schema != healthsealed.SnapshotSchema || captured.Snapshot.Schema != healthsealed.SnapshotSchemaV2 ||
+		recovered.Snapshot.Schema != healthsealed.SnapshotSchemaV2 {
+		t.Fatalf("schemas: %s %s %s", job.Snapshot.Schema, captured.Snapshot.Schema, recovered.Snapshot.Schema)
+	}
+	rv := recovered.Snapshot
+	if rv.Capture == nil || rv.Capture.Function != fn || len(rv.Capture.Frames) != 3 || rv.Capture.Sources[0] != "internal/adapters/cloud/websocket.go:200" ||
+		rv.Recovery == nil || rv.Recovery.State != "recovered" || rv.Recovery.RecoveryNS.Value != 3_500_000_000 ||
+		rv.Location != "cloud.link.read_handler" || rv.CorrelationID != "op-1" || rv.Build != "c9fe745db066" {
+		t.Fatalf("the recovery revision does not join stall, capture and recovery: %+v", rv)
+	}
+	plain, err := rv.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := healthsealed.DecodeSnapshot(plain)
+	if err != nil || back.Capture == nil || back.Capture.Frames[0].Source != "internal/adapters/cloud/websocket.go:200" {
+		t.Fatalf("the /2 snapshot does not round-trip: %v %+v", err, back.Capture)
+	}
+	for _, j := range []healthsealed.Job{job, captured, recovered} {
+		if err := w.Offer(j); err != nil {
+			t.Fatal(err)
+		}
+		n := w.Status().Stored + 1
+		waitFor(t, "the receipt", func() bool { return w.Status().Stored == n })
+	}
+	posts := c.sent()
+	if len(posts) != 3 {
+		t.Fatalf("three uploads, got %d", len(posts))
+	}
+	for i, p := range posts {
+		var b healthsealed.UploadBody
+		if err := json.Unmarshal(p, &b); err != nil {
+			t.Fatal(err)
+		}
+		if b.Revision != int64(i+1) || b.SubjectID != "phase-7" {
+			t.Fatalf("upload %d: revision %d subject %s", i, b.Revision, b.SubjectID)
+		}
+		for _, private := range []string{"writeFrame", "websocket.go", "sync.Mutex", "recovered"} {
+			if strings.Contains(string(p), private) {
+				t.Fatalf("%q left the machine outside the ciphertext", private)
+			}
+		}
+	}
+}
+
+// The feed remembers maxOwnerIncidents stalls; a forgotten stall's
+// recovery is not sealed, and its capture is sealed from its own trigger.
+func TestOwnerIncidentsAreBounded(t *testing.T) {
+	o := newOwnerIncidents()
+	for i := uint64(1); i <= maxOwnerIncidents+1; i++ {
+		r := stallRecord(i)
+		job, _ := sealedJob(r, 0)
+		o.remember(r, job)
+	}
+	if len(o.rows) != maxOwnerIncidents || len(o.order) != maxOwnerIncidents {
+		t.Fatalf("rows %d order %d", len(o.rows), len(o.order))
+	}
+	rec := stallRecord(1)
+	rec.Event = connectionhealth.EventRecovered
+	if _, ok := o.recovered(rec); ok {
+		t.Fatal("a forgotten stall's recovery was sealed")
+	}
+	j, ok := o.captured(sampleCapture(1, 1, "main.main"))
+	if !ok || j.Snapshot.Location != "cloud.websocket.writer_lock" || j.SubjectID != "phase-1" {
+		t.Fatalf("a forgotten stall's capture: %v %+v", ok, j.Snapshot)
+	}
+}
+
+// A capture too big for the owner bound is trimmed frame by frame, and
+// says so.
+func TestAnOwnerCaptureIsTrimmedToTheSnapshotBound(t *testing.T) {
+	fn := "github.com/sainteye/clawdline/internal/adapters/cloud." + strings.Repeat("x", 130)
+	o := newOwnerIncidents()
+	r := stallRecord(3)
+	job, _ := sealedJob(r, 0)
+	o.remember(r, job)
+	j, ok := o.captured(sampleCapture(3, 64, fn))
+	if !ok {
+		t.Fatal("no revision")
+	}
+	plain, err := j.Snapshot.Encode()
+	if err != nil || len(plain) > healthsealed.MaxSnapshotBytes {
+		t.Fatalf("%v, %d bytes", err, len(plain))
+	}
+	c := j.Snapshot.Capture
+	if !c.Truncated || len(c.Frames) == 0 || int64(len(c.Frames))+c.FramesOmitted.Value != 64 {
+		t.Fatalf("frames %d omitted %d truncated %v", len(c.Frames), c.FramesOmitted.Value, c.Truncated)
+	}
+}
+
+// TestWriteSyntheticOwnerSnapshot turns the synthetic bundle's local
+// export (internal/domain/connectionhealth TestWriteSyntheticBundle) into
+// the /2 owner snapshot the daemon would seal for it. It runs only with
+// HEALTH_SYNTHETIC_BUNDLE_DIR set (the package clears CLAWDLINE_* variables).
+func TestWriteSyntheticOwnerSnapshot(t *testing.T) {
+	dir := os.Getenv("HEALTH_SYNTHETIC_BUNDLE_DIR")
+	if dir == "" {
+		t.Skip("set HEALTH_SYNTHETIC_BUNDLE_DIR to write the owner snapshot")
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "export.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ev connectionhealth.Evidence
+	if err := json.Unmarshal(raw, &ev); err != nil {
+		t.Fatal(err)
+	}
+	if ev.StallCapture == nil || ev.StallCapture.Latest == nil {
+		t.Fatal("the export has no capture")
+	}
+	c := ev.StallCapture.Latest
+	var stall connectionhealth.Record
+	for _, r := range ev.Journal.Records {
+		if r.Event == connectionhealth.EventStallDetected && r.PhaseID == c.Trigger.PhaseID {
+			stall = r
+		}
+	}
+	if stall.PhaseID == 0 {
+		t.Fatal("the export's journal has no stall for the capture")
+	}
+	o := newOwnerIncidents()
+	job, ok := sealedJob(stall, ev.Watchdog.TransitionsLost)
+	if !ok {
+		t.Fatal("no stall job")
+	}
+	o.remember(stall, job)
+	rev, ok := o.captured(c)
+	if !ok {
+		t.Fatal("no capture revision")
+	}
+	plain, err := rev.Snapshot.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, plain, "", "  "); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "owner-snapshot-v2.json"), append(pretty.Bytes(), '\n'), 0o444); err != nil {
+		t.Fatal(err)
+	}
+}

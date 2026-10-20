@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -91,6 +92,7 @@ func startConnectionHealth(stateDir string, srv *httptransport.Server) *connecti
 		log.Printf("connection health: owner-sealed diagnostics are unavailable (%s)", healthsealed.CodeOf(sealedErr))
 	}
 	h.sealed = sealed
+	rt.Capture.SetEnabled(stallCaptureOn())
 	feed := sealedFeed(rt, sealed)
 	srv.SetConnectionHealth(rt)
 	srv.SetConnectionHealthStore(nil, nil, true)
@@ -501,22 +503,200 @@ func sealedJob(r connectionhealth.Record, lost uint64) (healthsealed.Job, bool) 
 	return healthsealed.Job{BootID: r.BootID, SubjectKind: healthsealed.SubjectIncident, SubjectID: subject, Snapshot: snap}, true
 }
 
+// stallCaptureEnv turns the stall capture worker off for a boot ("off").
+// It is on by default: the measured cost is in
+// docs/admin-connection-health.md "Stall capture", and a capture only runs
+// when a phase is called blocked, at most MaxCapturesPerWindow a minute.
+const stallCaptureEnv = "CLAWDLINE_STALL_CAPTURE"
+
+func stallCaptureOn() bool {
+	on := !strings.EqualFold(os.Getenv(stallCaptureEnv), "off")
+	if !on {
+		log.Printf("connection health: stall capture off (%s=off)", stallCaptureEnv)
+	}
+	return on
+}
+
 // sealedFeed is what the journal writer offers each record to. It reads
 // only the worker's cached opt-in and an atomic counter, and Offer never
-// waits, so the writer is never held by the owner-sealed sender.
+// waits, so the writer is never held by the owner-sealed sender. It also
+// subscribes to the capture worker: a published capture becomes a /2
+// revision of its stall's attachment, and so does the stall's recovery.
 func sealedFeed(rt *connectionhealth.Runtime, w *healthsealed.Worker) func(connectionhealth.Record) {
 	if w == nil {
 		return nil
 	}
+	incidents := newOwnerIncidents()
+	rt.Capture.OnPublish(func(c *connectionhealth.Capture) {
+		if !w.Enabled() {
+			return
+		}
+		if job, ok := incidents.captured(c); ok {
+			_ = w.Offer(job)
+		}
+	})
 	return func(r connectionhealth.Record) {
 		if !w.Enabled() {
 			return
 		}
 		_, lost := rt.Watchdog.Pending()
 		if job, ok := sealedJob(r, lost); ok {
+			incidents.remember(r, job)
+			_ = w.Offer(job)
+		}
+		if job, ok := incidents.recovered(r); ok {
 			_ = w.Offer(job)
 		}
 	}
+}
+
+// maxOwnerIncidents is how many stalled phases the owner feed remembers so
+// a capture or a recovery can revise the stall's attachment (capacity row
+// cloud.health_owner_incidents). The oldest is forgotten; its later
+// capture is then sealed from the capture's own trigger, and its recovery
+// is not sealed, which the local export still shows.
+const maxOwnerIncidents = 32
+
+// ownerIncidents is the owner feed's memory of stalls. Its lock is held only
+// for a map update by the journal writer or the capture worker, never by
+// business code, and nothing under it waits.
+type ownerIncidents struct {
+	mu    sync.Mutex
+	rows  map[uint64]*ownerIncident
+	order []uint64
+}
+
+type ownerIncident struct {
+	job       healthsealed.Job
+	stallMono int64
+	capture   *healthsealed.CaptureExcerpt
+	recovery  *healthsealed.Recovery
+}
+
+func newOwnerIncidents() *ownerIncidents {
+	return &ownerIncidents{rows: map[uint64]*ownerIncident{}}
+}
+
+// remember keeps a stall's job as the base of its later revisions.
+func (o *ownerIncidents) remember(r connectionhealth.Record, job healthsealed.Job) {
+	if r.Event != connectionhealth.EventStallDetected || r.PhaseID == 0 {
+		return
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if row, ok := o.rows[r.PhaseID]; ok {
+		row.job, row.stallMono = job, r.MonoNS
+		return
+	}
+	if len(o.order) >= maxOwnerIncidents {
+		delete(o.rows, o.order[0])
+		o.order = o.order[1:]
+	}
+	o.rows[r.PhaseID] = &ownerIncident{job: job, stallMono: r.MonoNS}
+	o.order = append(o.order, r.PhaseID)
+}
+
+// recovered is the /2 revision for a remembered stall that recovered or
+// was released.
+func (o *ownerIncidents) recovered(r connectionhealth.Record) (healthsealed.Job, bool) {
+	var rec healthsealed.Recovery
+	switch r.Event {
+	case connectionhealth.EventRecovered:
+		rec.State = connectionhealth.RecoveryRecovered
+	case connectionhealth.EventReleasedStalled:
+		rec.State = connectionhealth.RecoveryReleased
+	default:
+		return healthsealed.Job{}, false
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	row, ok := o.rows[r.PhaseID]
+	if !ok || row.recovery != nil {
+		return healthsealed.Job{}, false
+	}
+	if rec.State == connectionhealth.RecoveryRecovered && r.MonoNS >= row.stallMono {
+		rec.RecoveryNS = healthsealed.Int64{Value: r.MonoNS - row.stallMono, Set: true}
+	}
+	row.recovery = &rec
+	return row.revision()
+}
+
+// captured is the /2 revision carrying a published capture.
+func (o *ownerIncidents) captured(c *connectionhealth.Capture) (healthsealed.Job, bool) {
+	ex := captureExcerpt(c)
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	row, ok := o.rows[c.Trigger.PhaseID]
+	if !ok {
+		t := c.Trigger
+		at := healthsealed.Int64{Value: t.RequestedWall.UnixMilli(), Set: !t.RequestedWall.IsZero()}
+		row = &ownerIncident{job: healthsealed.Job{BootID: c.BootID, SubjectKind: healthsealed.SubjectIncident,
+			SubjectID: "phase-" + strconv.FormatUint(t.PhaseID, 10),
+			Snapshot: healthsealed.Snapshot{Schema: healthsealed.SnapshotSchema, Location: t.Location,
+				AgeNS: healthsealed.Int64{Value: t.AgeNS, Set: true}, DeadlineNS: healthsealed.Int64{Value: t.DeadlineNS, Set: t.DeadlineNS > 0},
+				Build: c.Build, Stage: string(t.Stage), CorrelationID: t.Correlation, ObservedAtMS: at}}}
+	}
+	row.capture = ex
+	if row.job.Snapshot.Build == "" {
+		// Journal records carry the build only on the boot record; the
+		// capture names the build its source lines are exact for.
+		row.job.Snapshot.Build = c.Build
+	}
+	return row.revision()
+}
+
+// revision is the remembered stall with its capture and recovery, as /2,
+// trimmed frame by frame until it fits MaxSnapshotBytes.
+func (row *ownerIncident) revision() (healthsealed.Job, bool) {
+	job := row.job
+	job.Snapshot.Schema = healthsealed.SnapshotSchemaV2
+	job.Snapshot.Recovery = row.recovery
+	if row.capture != nil {
+		ex := *row.capture
+		ex.Frames = append([]healthsealed.CaptureFrame(nil), ex.Frames...)
+		job.Snapshot.Capture = &ex
+	}
+	for {
+		_, err := job.Snapshot.Encode()
+		if err == nil {
+			return job, true
+		}
+		c := job.Snapshot.Capture
+		if c == nil || len(c.Frames) == 0 {
+			return healthsealed.Job{}, false
+		}
+		c.Frames = c.Frames[:len(c.Frames)-1]
+		c.FramesOmitted.Value++
+		c.Truncated = true
+	}
+}
+
+// captureExcerpt is the owner's part of a capture: the join and the first
+// matching goroutine's frames, never the other goroutines.
+func captureExcerpt(c *connectionhealth.Capture) *healthsealed.CaptureExcerpt {
+	n := func(v int) healthsealed.Int64 { return healthsealed.Int64{Value: int64(v), Set: true} }
+	ex := &healthsealed.CaptureExcerpt{Seq: healthsealed.Int64{Value: int64(min(c.Seq, 1<<62)), Set: true},
+		DurationNS: healthsealed.Int64{Value: c.DurationNS, Set: true}, OverBudget: c.OverBudget,
+		Function: c.Join.Function, Mapped: c.Join.Mapped, MatchedGoroutines: n(c.Join.Goroutines),
+		GoroutinesTotal: n(c.GoroutinesTotal), RawTruncated: c.RawTruncated, Truncated: c.Truncated,
+		Redacted: n(c.Redacted), SourceUnavailable: n(c.SourceUnavailable), FramesOmitted: n(0)}
+	ex.Sources = append(ex.Sources, c.Join.Sources[:min(len(c.Join.Sources), healthsealed.MaxSnapshotSources)]...)
+	if len(c.Join.Sources) > healthsealed.MaxSnapshotSources {
+		ex.Truncated = true
+	}
+	if len(c.Goroutines) > 0 && c.Goroutines[0].MatchesLocation {
+		g := c.Goroutines[0]
+		ex.State = g.State
+		keep := min(len(g.Frames), healthsealed.MaxSnapshotFrames)
+		for _, f := range g.Frames[:keep] {
+			ex.Frames = append(ex.Frames, healthsealed.CaptureFrame{Function: f.Function, Source: f.Source, SourceKind: f.SourceKind})
+		}
+		ex.FramesOmitted = n(g.FramesOmitted + len(g.Frames) - keep)
+		if keep < len(g.Frames) {
+			ex.Truncated = true
+		}
+	}
+	return ex
 }
 
 // ownerDiagnosticsStatus is the sealed sender as the health status shows

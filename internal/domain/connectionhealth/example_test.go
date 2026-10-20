@@ -174,7 +174,7 @@ func ExampleExport() {
 	//     },
 	//     {
 	//       "part": "stack_capture_worker",
-	//       "status": "unimplemented"
+	//       "status": "implemented"
 	//     },
 	//     {
 	//       "part": "local_health_cli_and_route",

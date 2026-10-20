@@ -75,5 +75,56 @@ func connectionHealthBounds() []Entry {
 			Told: []Channel{Diagnostics, Sender}, EvictedBy: Daemon,
 			Sources: []string{"internal/domain/connectionhealth.MaxQueryBytes"},
 		},
+		{
+			// The capture worker's one raw goroutine dump buffer. A dump that
+			// fills it is cut by the runtime; the capture says raw_truncated.
+			// It never leaves the worker: not exported, not persisted.
+			Name: "cloud.health_capture_raw_bytes", Class: Buffer, Unit: Bytes,
+			Limit: 1 << 20, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/connectionhealth.MaxCaptureRawBytes"},
+		},
+		{
+			// One sanitized capture as JSON: goroutines are dropped from the
+			// end, the stalled one last, and the capture says truncated.
+			Name: "cloud.health_capture_export_bytes", Class: Buffer, Unit: Bytes,
+			Limit: 512 << 10, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/connectionhealth.MaxCaptureExportBytes"},
+		},
+		{
+			// Frames kept per captured goroutine; the rest are counted.
+			Name: "cloud.health_capture_frames", Class: Buffer, Unit: Rows,
+			Limit: 64, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/connectionhealth.MaxCaptureFrames"},
+		},
+		{
+			// Captures that may start in one minute. A trigger past it is
+			// refused and counted as rate limited; the stall record stands.
+			Name: "cloud.health_captures_per_minute", Class: Buffer, Unit: Rows,
+			Limit: 4, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/connectionhealth.MaxCapturesPerWindow"},
+		},
+		{
+			// The proposed completion budget. runtime.Stack cannot be
+			// cancelled: past it the worker reads timed_out_unavailable,
+			// triggers are refused and counted, and no second worker starts.
+			Name: "cloud.health_capture_budget_seconds", Class: Buffer, Unit: Seconds,
+			Limit: 2, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/domain/connectionhealth.MaxCaptureBudgetSeconds"},
+		},
+		{
+			// Stalls the owner-sealed feed remembers so a capture or a
+			// recovery can revise the stall's attachment. The oldest is
+			// forgotten: its recovery is then not sealed (the local export
+			// still has it).
+			Name: "cloud.health_owner_incidents", Class: Buffer, Unit: Rows,
+			Limit: 32, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"cmd/clawdline.maxOwnerIncidents"},
+		},
 	}
 }

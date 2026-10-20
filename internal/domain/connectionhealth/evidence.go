@@ -163,7 +163,7 @@ func Unwired() []Wiring {
 		{"daemon_instrumentation_call_sites", WiringPartial},
 		{"durable_segmented_journal", WiringImplemented},
 		{"durable_history_route", WiringImplemented},
-		{"stack_capture_worker", WiringUnimplemented},
+		{"stack_capture_worker", WiringImplemented},
 		{"local_health_cli_and_route", WiringImplemented},
 		{"cloud_ingest", WiringUnimplemented},
 		{"cloud_query", WiringUnimplemented},
@@ -182,6 +182,9 @@ type Evidence struct {
 	Wiring      []Wiring  `json:"wiring"`
 	// Locations is this build's location map; Runtime.Export sets it.
 	Locations *LocationMap `json:"locations,omitempty"`
+	// StallCapture is the capture worker's status, its latest sanitized
+	// capture and that stall's recovery; Runtime.Export sets it.
+	StallCapture *StallCapture `json:"stall_capture,omitempty"`
 }
 
 // Export assembles Evidence from the watchdog's latest report (taken on the

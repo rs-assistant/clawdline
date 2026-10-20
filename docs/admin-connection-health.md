@@ -173,6 +173,17 @@ and record recovery duration independently of capture success. Raw stacks stay
 local; exports sanitize function/frame locations and any paths/values. Stack collection and full
 profiling are distinct: block/mutex profiling is a bounded opt-in diagnostic session, not always-on.
 
+**Stall capture (implemented).** The capture worker above is built as approved: one worker, one
+capture in flight, a 1 MiB raw buffer that stays in memory and is never exported or persisted, a
+512 KiB sanitized capture, a 2-second budget after which the worker reads unavailable and no
+replacement starts, and at most four captures a minute. Its measured cost (100 goroutines: 5.7 ms
+per capture, at most 1.3 ms stop-the-world; 5,000 goroutines: 36.6 ms, at most 29 ms) is small
+for something that runs only after a 15-second stall, so it is on by default and
+`CLAWDLINE_STALL_CAPTURE=off` turns it off. The local export joins each capture to the location
+map's function, the exact `file:line` in this build and the stall's recovery; the owner receives
+the same join and the stalled goroutine's frames as a later sealed revision. The contract,
+sanitizing rules and the full measurement are in `docs/admin-connection-health-contract.md` §4.2.
+
 This watchdog cannot survive total process suspension, scheduler starvation or host failure. Cloud
 presence and application probes supply another viewpoint; any separately shipped supervisor must
 have an explicit cross-platform lifecycle. A private helper on one developer machine is not the product.

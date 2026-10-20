@@ -516,15 +516,24 @@ func TestRestartResendsIdenticalBody(t *testing.T) {
 	store2, _ := OpenStore(u.Store.dir)
 	u2 := *u
 	u2.Store = store2
-	if _, err := u2.Seal(ctx, "boot-1", SubjectEvidence, "ev-1", snap("y.go:2")); CodeOf(err) != CodeBusy {
-		t.Fatalf("a new revision was sealed over a pending one: %v", err)
+	// A new snapshot queues behind the pending revision without touching it.
+	if p2, err := u2.Seal(ctx, "boot-1", SubjectEvidence, "ev-1", snap("y.go:2")); err != nil || p2.Revision != 2 {
+		t.Fatalf("a snapshot behind a pending revision: %+v %v", p2, err)
+	}
+	if again, _, _ := store2.Load(p.AttachmentID); string(again.Revisions[0].Body) != string(before.Revisions[0].Body) {
+		t.Fatal("the pending revision's body changed")
 	}
 	rc, err := u2.Send(ctx, p.AttachmentID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rc.Status != "duplicate" {
-		t.Fatalf("resend was not byte-identical: %+v", rc)
+	// Revision 1 was resent byte-identical (a 409 would have refused it) and
+	// the queued revision 2 followed it.
+	if rc.Revision != 2 || rc.Status != "stored" {
+		t.Fatalf("receipt after the resend: %+v", rc)
+	}
+	if got := cloud.revs[p.AttachmentID][0]["body"].(string); got != string(before.Revisions[0].Body) {
+		t.Fatal("Cloud holds other bytes for revision 1")
 	}
 }
 
@@ -712,5 +721,80 @@ func TestOptInIsOnlyAJSONTrue(t *testing.T) {
 	}
 	if EnabledFrom(nil)() {
 		t.Fatal("no settings reader enabled owner retention")
+	}
+}
+
+// v2Vector is the committed /2 plaintext the owner reader also decodes
+// (web/console/src/cloud/health-owner/crypto.test.ts).
+func v2Vector() Snapshot {
+	n := func(v int64) Int64 { return Int64{Value: v, Set: true} }
+	return Snapshot{Schema: SnapshotSchemaV2, Location: "cloud.websocket.writer_lock", AgeNS: n(15_000_000_000),
+		DeadlineNS: n(15_000_000_000), Build: "c9fe745db066", Stage: "writer_lock_waiting", CorrelationID: "op-1",
+		ObservedAtMS: n(1787745600000), Lost: n(0),
+		Coverage: []Coverage{{Source: "watchdog.transitions", FromMS: n(1787745600000), ToMS: n(1787745600000), Lost: n(0)}},
+		Capture: &CaptureExcerpt{Seq: n(1), DurationNS: n(1_200_000), Mapped: true,
+			Function:          "github.com/sainteye/clawdline/internal/adapters/cloud.(*Conn).writeFrame",
+			MatchedGoroutines: n(1), Sources: []string{"internal/adapters/cloud/websocket.go:211"}, State: "sync.Mutex.Lock",
+			Frames: []CaptureFrame{
+				{Function: "sync.(*Mutex).Lock", Source: "sync/mutex.go:81", SourceKind: "std"},
+				{Function: "github.com/sainteye/clawdline/internal/adapters/cloud.(*Conn).writeFrame", Source: "internal/adapters/cloud/websocket.go:211", SourceKind: "module"},
+				{Function: "<redacted>", SourceKind: "unavailable"},
+			},
+			FramesOmitted: n(0), GoroutinesTotal: n(57), Redacted: n(1), SourceUnavailable: n(1)},
+		Recovery: &Recovery{State: "recovered", RecoveryNS: n(3_500_000_000)}}
+}
+
+// /2 adds the capture and the recovery; /1 cannot carry them, /2 must carry
+// one, an unknown version is refused, and a frame with an absolute path,
+// an argument list or an unknown kind is refused whatever the version.
+func TestSnapshotV2IsCommittedAndVersioned(t *testing.T) {
+	b, err := v2Vector().Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join("testdata", "snapshot-v2.json")
+	if os.Getenv("HEALTHSEALED_WRITE_VECTOR") == "1" {
+		if err := os.WriteFile(path, append(b, '\n'), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != strings.TrimSuffix(string(want), "\n") {
+		t.Fatalf("the /2 vector changed:\n%s", b)
+	}
+	back, err := DecodeSnapshot(b)
+	if err != nil || back.Capture.Frames[1].Source != "internal/adapters/cloud/websocket.go:211" || back.Recovery.RecoveryNS.Value != 3_500_000_000 {
+		t.Fatalf("round trip: %v %+v", err, back)
+	}
+	v1 := strings.Replace(string(b), SnapshotSchemaV2, SnapshotSchema, 1)
+	if _, err := DecodeSnapshot([]byte(v1)); CodeOf(err) != CodeBadInput {
+		t.Fatalf("a /1 snapshot carrying a capture was accepted: %v", err)
+	}
+	v3 := strings.Replace(string(b), SnapshotSchemaV2, "clawdline.health-owner-diagnostics/3", 1)
+	if _, err := DecodeSnapshot([]byte(v3)); CodeOf(err) != CodeBadInput {
+		t.Fatalf("an unknown version was accepted: %v", err)
+	}
+	if _, err := DecodeSnapshot([]byte(`{"schema":"` + SnapshotSchemaV2 + `"}`)); CodeOf(err) != CodeBadInput {
+		t.Fatalf("a /2 with neither capture nor recovery was accepted: %v", err)
+	}
+	if _, err := DecodeSnapshot([]byte(strings.Replace(string(b), `"state":"sync.Mutex.Lock"`, `"state":"x","raw":"secret"`, 1))); CodeOf(err) != CodeBadInput {
+		t.Fatalf("an unknown capture field was accepted: %v", err)
+	}
+	for name, bad := range map[string]func(*Snapshot){
+		"absolute source": func(s *Snapshot) { s.Capture.Frames[0].Source = "/Users/a/go/src/sync/mutex.go:81" },
+		"climbing source": func(s *Snapshot) { s.Capture.Sources[0] = "../x.go:1" },
+		"arguments":       func(s *Snapshot) { s.Capture.Frames[0].Function = `sync.(*Mutex).Lock(0xc000, "tok")` },
+		"kind":            func(s *Snapshot) { s.Capture.Frames[0].SourceKind = "home" },
+		"recovery state":  func(s *Snapshot) { s.Recovery.State = "fine" },
+		"too many frames": func(s *Snapshot) { s.Capture.Frames = make([]CaptureFrame, MaxSnapshotFrames+1) },
+	} {
+		s := v2Vector()
+		bad(&s)
+		if _, err := s.Encode(); err == nil {
+			t.Errorf("%s: encoded", name)
+		}
 	}
 }

@@ -95,6 +95,9 @@ const (
 	CodeUpstream            Code = "upstream_unavailable"
 	CodeRefused             Code = "refused"
 	CodeReceiptMismatch     Code = "receipt_mismatch"
+	// CodePredecessorRefused is a queued revision refused because the
+	// revision it is chained to was refused for good.
+	CodePredecessorRefused Code = "predecessor_refused"
 )
 
 // Error carries a Code and, for a Cloud refusal, Cloud's own code. It never

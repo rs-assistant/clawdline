@@ -24,6 +24,8 @@ func (s *Server) connectionHealthCapacityMeasures() map[string]func() capacity.R
 		"cloud.health_journal_rows", "cloud.health_journal_bytes", "cloud.health_record_bytes",
 		"cloud.health_pending_transitions",
 		"cloud.health_query_rows", "cloud.health_query_bytes",
+		"cloud.health_capture_raw_bytes", "cloud.health_capture_export_bytes", "cloud.health_capture_frames",
+		"cloud.health_captures_per_minute", "cloud.health_capture_budget_seconds", "cloud.health_owner_incidents",
 	}
 	out := s.connectionHealthStoreMeasures(rt != nil)
 	for name, f := range s.connectionHealthUploadMeasures(rt != nil) {
@@ -70,6 +72,44 @@ func (s *Server) connectionHealthCapacityMeasures() map[string]func() capacity.R
 	out["cloud.health_pending_transitions"] = func() capacity.Reading {
 		depth, lost := rt.Watchdog.Pending()
 		return capacity.Reading{Known: true, Used: int64(depth), Counters: capacity.Counters{Dropped: int64(lost)}}
+	}
+	// The stall capture worker: its status counters say what each bound
+	// refused; the raw buffer is held only while a capture runs.
+	capture := func(pick func(connectionhealth.CaptureStatus, *connectionhealth.Capture) (int64, capacity.Counters)) func() capacity.Reading {
+		return func() capacity.Reading {
+			st := rt.Capture.Status()
+			latest, _ := rt.Capture.Latest()
+			used, c := pick(st, latest)
+			r := capacity.Reading{Known: true, Used: used, Counters: c, Note: "stall capture " + st.State}
+			return r
+		}
+	}
+	out["cloud.health_capture_raw_bytes"] = capture(func(st connectionhealth.CaptureStatus, l *connectionhealth.Capture) (int64, capacity.Counters) {
+		if l == nil {
+			return 0, capacity.Counters{}
+		}
+		return int64(l.RawBytes), capacity.Counters{}
+	})
+	out["cloud.health_capture_export_bytes"] = capture(func(st connectionhealth.CaptureStatus, l *connectionhealth.Capture) (int64, capacity.Counters) {
+		if l == nil {
+			return 0, capacity.Counters{}
+		}
+		return 0, capacity.Counters{Dropped: int64(l.GoroutinesOmitted)}
+	})
+	out["cloud.health_capture_frames"] = capture(func(st connectionhealth.CaptureStatus, l *connectionhealth.Capture) (int64, capacity.Counters) {
+		if l == nil {
+			return 0, capacity.Counters{}
+		}
+		return 0, capacity.Counters{Dropped: int64(l.FramesOmitted)}
+	})
+	out["cloud.health_captures_per_minute"] = capture(func(st connectionhealth.CaptureStatus, _ *connectionhealth.Capture) (int64, capacity.Counters) {
+		return 0, capacity.Counters{Refused: int64(st.RefusedRate)}
+	})
+	out["cloud.health_capture_budget_seconds"] = capture(func(st connectionhealth.CaptureStatus, _ *connectionhealth.Capture) (int64, capacity.Counters) {
+		return st.RunningNS / int64(time.Second), capacity.Counters{Refused: int64(st.RefusedUnavailable)}
+	})
+	out["cloud.health_owner_incidents"] = func() capacity.Reading {
+		return capacity.Reading{Known: true, Note: "the owner feed's remembered stalls are not counted here; a forgotten stall's recovery stays in the local export"}
 	}
 	// A page is built and answered within one request; nothing is held
 	// between reads, so the per-page rows are a true zero.
@@ -238,7 +278,8 @@ func (s *Server) connectionHealthSealedMeasures(monitoring bool) map[string]func
 		"cloud.health_sealed_attempt_seconds", "cloud.health_sealed_response_bytes",
 		"cloud.health_sealed_queued_jobs", "cloud.health_sealed_revisions",
 		"cloud.health_sealed_snapshot_bytes", "cloud.health_sealed_snapshot_field_chars",
-		"cloud.health_sealed_snapshot_coverage", "cloud.health_sealed_store_attachments",
+		"cloud.health_sealed_snapshot_coverage", "cloud.health_sealed_snapshot_frames",
+		"cloud.health_sealed_snapshot_sources", "cloud.health_sealed_store_attachments",
 		"cloud.health_sealed_store_bytes",
 	}
 	out := map[string]func() capacity.Reading{}
