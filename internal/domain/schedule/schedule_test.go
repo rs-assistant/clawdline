@@ -203,3 +203,113 @@ func TestATriggerOnlyScheduleHasNoClock(t *testing.T) {
 		t.Fatalf("Decide: %s, want %s", got, NoClock)
 	}
 }
+
+func TestCalendarIntervalOccurrences(t *testing.T) {
+	for _, tc := range []struct {
+		start                   string
+		n                       int64
+		zone, now, latest, next string
+	}{
+		{"2026-10-21", 3, "Asia/Taipei", "2026-10-20T10:00:00+08:00", "", "2026-10-21T09:00:00+08:00"},
+		{"2026-10-21", 3, "Asia/Taipei", "2026-10-21T08:59:00+08:00", "", "2026-10-21T09:00:00+08:00"},
+		{"2026-10-21", 3, "Asia/Taipei", "2026-10-21T09:00:00+08:00", "2026-10-21T09:00:00+08:00", "2026-10-24T09:00:00+08:00"},
+		{"2026-10-21", 3, "Asia/Taipei", "2026-11-02T08:00:00+08:00", "2026-10-30T09:00:00+08:00", "2026-11-02T09:00:00+08:00"},
+		{"2028-02-27", 3, "UTC", "2028-03-01T09:00:00Z", "2028-03-01T09:00:00Z", "2028-03-04T09:00:00Z"},
+		{"2026-03-06", 3, "America/New_York", "2026-03-09T08:00:00-04:00", "2026-03-06T09:00:00-05:00", "2026-03-09T09:00:00-04:00"},
+		{"2026-10-30", 3, "America/New_York", "2026-11-02T09:00:00-05:00", "2026-11-02T09:00:00-05:00", "2026-11-05T09:00:00-05:00"},
+		{"2026-01-01", 30, "UTC", "2026-03-05T09:00:00Z", "2026-03-02T09:00:00Z", "2026-04-01T09:00:00Z"},
+		{"1970-01-01", 9223372036854775807, "UTC", "2026-01-01T09:00:00Z", "1970-01-01T09:00:00Z", ""},
+	} {
+		t.Run(tc.now+tc.zone+tc.start, func(t *testing.T) {
+			w, err := ParseWhen(map[string]any{"at": "09:00", "every_days": tc.n, "start": tc.start})
+			if err != nil {
+				t.Fatal(err)
+			}
+			loc, err := time.LoadLocation(tc.zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			now, err := time.Parse(time.RFC3339, tc.now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for name, got := range map[string]time.Time{"latest": w.LatestFire(now, loc), "next": w.NextFire(now, loc)} {
+				want := tc.latest
+				if name == "next" {
+					want = tc.next
+				}
+				if want == "" {
+					if !got.IsZero() {
+						t.Fatalf("%s=%s", name, got)
+					}
+					continue
+				}
+				parsed, _ := time.Parse(time.RFC3339, want)
+				if !got.Equal(parsed) {
+					t.Fatalf("%s=%s want %s", name, got, want)
+				}
+			}
+			round, err := ParseWhen(w.Object())
+			if err != nil || !w.Same(round) {
+				t.Fatalf("round trip: %+v %v", round, err)
+			}
+		})
+	}
+}
+
+func TestCalendarIntervalRejectsAmbiguousOrInvalidRules(t *testing.T) {
+	for _, patch := range []map[string]any{
+		{"every_days": 0}, {"every_days": -3}, {"every_days": "3"}, {"every_days": 1.5},
+		{"start": "2026-02-30"}, {"start": "1969-12-31"}, {"days": "daily"}, {"on": "2026-10-21"}, {"trigger_only": true},
+	} {
+		obj := map[string]any{"at": "09:00", "every_days": int64(3), "start": "2026-10-21"}
+		for k, v := range patch {
+			obj[k] = v
+		}
+		if _, err := ParseWhen(obj); err == nil {
+			t.Fatalf("accepted %v", obj)
+		}
+	}
+	for _, obj := range []map[string]any{{"at": "09:00", "every_days": int64(3)}, {"at": "09:00", "start": "2026-10-21"}} {
+		if _, err := ParseWhen(obj); err == nil {
+			t.Fatalf("accepted %v", obj)
+		}
+	}
+	a, _ := ParseWhen(map[string]any{"at": "09:00", "every_days": int64(3), "start": "2026-10-21"})
+	for _, obj := range []map[string]any{{"at": "09:00", "every_days": int64(4), "start": "2026-10-21"}, {"at": "09:00", "every_days": int64(3), "start": "2026-10-22"}} {
+		b, _ := ParseWhen(obj)
+		if a.Same(b) {
+			t.Fatal("retime not detected")
+		}
+	}
+}
+
+func TestCalendarIntervalUsesExistingCatchUpAndSightingRules(t *testing.T) {
+	w, err := ParseWhen(map[string]any{"at": "09:00", "every_days": int64(3), "start": "2026-10-21"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := Schedule{Enabled: true, When: w, CatchUpHours: 6}
+	seen := local(2026, 10, 20, 0, 0)
+	for _, tc := range []struct {
+		now, first, handled time.Time
+		want                Action
+	}{
+		{local(2026, 10, 24, 10, 0), seen, time.Time{}, Run},
+		{local(2026, 10, 24, 16, 0), seen, time.Time{}, Missed},
+		{local(2026, 10, 24, 10, 0), local(2026, 10, 24, 10, 0), time.Time{}, BeforeSighting},
+		{local(2026, 10, 24, 10, 0), seen, local(2026, 10, 24, 9, 0), AlreadyHandled},
+	} {
+		if got := decide(s, tc.now, tc.first, tc.handled); got != tc.want {
+			t.Fatalf("at %s: %s want %s", tc.now, got, tc.want)
+		}
+	}
+	one, _ := ParseWhen(map[string]any{"at": "09:00", "every_days": int64(1), "start": "2026-01-01"})
+	daily := When{Hour: 9, Daily: true}
+	for day := 1; day <= 365; day++ {
+		now := local(2026, 1, day, 10, 0)
+		if !one.NextFire(now, loc).Equal(daily.NextFire(now, loc)) || !one.LatestFire(now, loc).Equal(daily.LatestFire(now, loc)) {
+			t.Fatalf("one-day interval differs from daily at %s", now)
+		}
+	}
+}

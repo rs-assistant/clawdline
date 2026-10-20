@@ -901,6 +901,8 @@ body）與 `DELETE /v1/orchestrator/schedules/<id>`（以 JSON body 送出兩個
 指示。絕對不要把一次 run 當成使用者沒有要求之工作的概括授權。這份證據讓代轉行為可以稽核；它不會把
 整台機器共用的 orchestrator token 變成某個 Session 專屬的憑證。
 
+每隔固定天數的排程用 `"at":"09:00", "every_days":3, "start":"2026-10-21"` 取代 `days` 或 `on`。正整數天數依 `time_zone` 的日曆日期計算，包含起始日期；手動執行不移動週期，補跑仍只處理最近一次。這是長期指示，須帶相同的使用者授權證明。
+
 排程可以不設時間：用 `"trigger_only": true` 取代 `at`、`days` 與 `on`。時鐘永遠不會執行它；它只由
 `…/run` 或它的 webhook 啟動，而且只在 `enabled` 時。它和重複排程一樣是長期指示，需要同一份證據。
 

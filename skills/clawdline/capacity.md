@@ -8,6 +8,9 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `artifacts.drops_young` | 1 | `rows` | `evict_oldest` | `diagnostics, notice, log` | — |
 | `artifacts.image_bytes` | 67108864 | `bytes` | `evict_oldest` | `diagnostics, notice, log` | — |
 | `artifacts.images` | 64 | `rows` | `evict_oldest` | `diagnostics, notice, log` | — |
+| `artifacts.report_image_pixels` | 16777216 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `artifacts.report_image_side` | 8192 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `artifacts.report_total_image_pixels` | 67108864 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `audit.security` | 8388608 | `bytes` | `rotate` | `diagnostics, notice, health` | — |
 | `board.receipts` | 4096 | `rows` | `refuse` | `diagnostics, notice` | — |
 | `cache.assistant_quota` | 32 | `rows` | `evict_oldest` | `diagnostics, notice` | — |

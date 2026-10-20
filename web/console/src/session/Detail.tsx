@@ -556,8 +556,11 @@ function Tools({
   }
   const closeMenu = (restore: boolean) => {
     if (!open) return
+    if (mainRef.current?.contains(document.activeElement) || moreRef.current?.contains(document.activeElement)) {
+      triggerRef.current?.focus({ preventScroll: true })
+    }
     setOpen(false)
-    setMore(false)
+    // Preserve the current level while its closing picture is retained by CSS.
     if (restore) focusNext.current = "trigger"
   }
 
@@ -747,13 +750,15 @@ function Tools({
         </button>
         <div
           className="session-actions"
+          data-motion-id="AN-001"
           id="session-actions"
           role="menu"
           hidden={!open}
+          inert={!open}
           aria-label={T.webSessionActions}
           onKeyDown={onMenuKey}
         >
-          <div className="session-action-stage">
+          <div className="session-action-stage" data-motion-id="AN-002">
             <div
               className="session-action-level"
               id="session-actions-main"

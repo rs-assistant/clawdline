@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6989,
-  "riskKeys": 3160,
-  "nonRiskCount": 3829,
+  "englishContentKeys": 7001,
+  "riskKeys": 3162,
+  "nonRiskCount": 3839,
   "groups": [
     {
       "name": "admin / other",
@@ -270,11 +270,16 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 146,
+      "count": 151,
       "sources": [
         null
       ],
       "keys": [
+        "capacityRow.artifacts.report_image_pixels.full",
+        "capacityRow.artifacts.report_image_pixels.what",
+        "capacityRow.artifacts.report_image_side.full",
+        "capacityRow.artifacts.report_image_side.what",
+        "capacityRow.artifacts.report_total_image_pixels.full",
         "capacityRow.cache.session_activity.what",
         "capacityRow.cache.session_skills.what",
         "capacityRow.callback.per_machine.what",
@@ -2743,12 +2748,16 @@
     },
     {
       "name": "next / schedule",
-      "count": 25,
+      "count": 30,
       "sources": [
         "src/next-strings.ts"
       ],
       "keys": [
         "next.scheduleEffortField",
+        "next.scheduleEveryDays",
+        "next.scheduleInterval",
+        "next.scheduleIntervalInvalid",
+        "next.scheduleIntervalSummary",
         "next.scheduleInvalid",
         "next.scheduleInvalidSchema",
         "next.scheduleInvalidStatus",
@@ -2765,6 +2774,7 @@
         "next.schedulePermissionEdits",
         "next.scheduleRunStartedTitle",
         "next.scheduleRunsHeading",
+        "next.scheduleStart",
         "next.scheduleTriggerOnlyNext",
         "next.scheduleUntitled",
         "next.scheduleWebhookCopied",

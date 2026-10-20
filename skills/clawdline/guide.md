@@ -1030,6 +1030,8 @@ there is no run: ask them to send the instruction through Clawdline. Never reuse
 permission for work the person's message did not request. This proof makes the relay auditable; it
 does not turn the machine-wide orchestrator token into a session-specific credential.
 
+A calendar-day interval uses `"at":"09:00", "every_days":3, "start":"2026-10-21"` instead of `days` or `on`. The positive integer counts calendar dates in `time_zone`, starting on the inclusive anchor date. Manual runs do not shift the anchor; catch-up still considers only the latest occurrence. It is a recurring instruction and requires the same authorization proof.
+
 A schedule may have no time: send `"trigger_only": true` instead of `at`, `days` and `on`. The
 clock never runs it; it runs only by `…/run` or by its webhook, and only while `enabled`. It is a
 standing instruction like a repeating one and needs the same proof.

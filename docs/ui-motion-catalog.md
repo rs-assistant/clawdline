@@ -8,7 +8,17 @@ The source audit is pinned to `85d42421ec8e0968290b15515b1d9c11cf60927e` (2026-1
 
 Do not renumber or reuse IDs. The next unused ID is AN-032. Keep an old localized name as an alias when renaming; use child IDs when splitting a scope. The Taiwan Traditional Chinese names below are the exact feedback labels issued to the person.
 
-AN-001 through AN-023 are unapproved proposals or improvements. AN-024 through AN-031 describe existing behavior and are retained for feedback. Screenshots in the companion review artifact use production React components and CSS with synthetic data; they locate targets and do not prove animation quality, authenticated Cloud flows, or full acceptance.
+AN-001 through AN-023 were cataloged as proposals or improvements. The first approved batch is recorded below; the remaining proposals still require selection. AN-024 through AN-031 describe existing behavior and are retained for feedback. Screenshots in the companion review artifact use production React components and CSS with synthetic data; they locate targets and do not prove animation quality, authenticated Cloud flows, or full acceptance.
+
+## First approved batch
+
+AN-001, AN-002, AN-003, AN-004, AN-009 and AN-014 are implemented for review. Production deployment requires separate approval; the earlier HTML atlas remains a pre-implementation target map.
+
+The Session action menu, composer suggestions and Project picker retain only a non-interactive closing picture through discrete display transitions. Hidden content is inert immediately. Unsupported engines keep immediate controls. More commands keeps its existing level slide and observes reduced motion.
+
+The native to-do disclosure measures its body only on a toggle and animates height and padding for 220 ms. Its summary's requested expanded state and the body's inert state change immediately; native content remains open only until the closing picture finishes. Rapid reversal cancels the old animation after reading its current height. Data refreshes do not restart it. Attention Notes use a reversible grid transition; secret fields still unmount immediately on close, nested details retain their prior reset behavior, and secret completion does not acquire a second exit transition. Composer selection state still clears immediately; only the last displayed suggestion rows survive for the exit picture.
+
+Chromium and WebKit passed at 390px and 1280px with synthetic data: open/close, intermediate heights, reversal, keyboard focus, nested controls, secret-field clearing, suggestion filtering and reduced motion. Disabling the new stylesheet made menu opening immediate (opacity 1); enabling it produced intermediate opacity. In one recorded run at 390px the to-do disclosure closed from 258.56px through 106.53px to 38.39px in Chromium, and from 257px through 107.58px to 38px in WebKit. These runs verify the production components locally and do not claim authenticated Cloud acceptance.
 
 ## Interactions
 

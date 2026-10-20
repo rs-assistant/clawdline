@@ -70,10 +70,10 @@ export function ProjectPicker({ places, value, onChange, onOpen, allowAll = fals
       {mark(selected?.icon)}<span className="project-picker-label" title={selected?.label}>{selected?.label || (allowAll ? allLabel ?? catalogWord("literal", "b2ee45d95857") : placeholder ?? catalogWord("literal", "ef8fe1c8ac54"))}</span>
       <span className="project-picker-chevron" aria-hidden="true">⌄</span>
     </button>
-    {open && <div className="project-picker-menu" id={menuID} role="listbox" aria-label={name}>
+    <div className="project-picker-menu" data-motion-id="AN-014" id={menuID} role="listbox" aria-label={name} hidden={!open} inert={!open}>
       {allowAll && option({ id: "", label: allLabel ?? catalogWord("inline", "24926b27517e") })}
       {places.map(option)}
       {!places.length && <p className="project-picker-empty">{refreshing ? catalogWord("literal", "eec20299e1b1") : catalogWord("literal", "dc9a2139ef07")}</p>}
-    </div>}
+    </div>
   </div>
 }

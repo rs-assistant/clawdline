@@ -81,6 +81,66 @@
   },
   {
     "Register": "daemon",
+    "Name": "artifacts.report_image_pixels",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 16777216,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/documents.MaximumImagePixels"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "artifacts.report_image_side",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8192,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/documents.MaximumImageSide"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "artifacts.report_total_image_pixels",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 67108864,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/documents.MaximumReportImagePixels"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "audit.security",
     "Class": "security_audit",
     "Unit": "bytes",
