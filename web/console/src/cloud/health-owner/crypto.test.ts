@@ -116,3 +116,41 @@ test("the snapshot whitelist refuses unknown fields and keeps int64 exact", () =
   assert.deepEqual(Object.keys(exported).sort(), ["evidence_gaps", "schema", "snapshot", "source"])
   assert.ok(!JSON.stringify(exported).includes("ciphertext") && !JSON.stringify(exported).includes("nonce"))
 })
+
+// The /2 plaintext the Go writer commits (internal/adapters/healthsealed/testdata/snapshot-v2.json).
+const v2Text = readFileSync(new URL("../../../../../internal/adapters/healthsealed/testdata/snapshot-v2.json", import.meta.url), "utf8").trim()
+
+test("a /2 snapshot carries the capture join, frames and recovery, and nothing outside its whitelist", () => {
+  const enc = (value: unknown) => new TextEncoder().encode(JSON.stringify(value))
+  const invalid = (e: unknown) => e instanceof SealedError && e.code === "snapshot_invalid"
+  const s = decodeSnapshot(new TextEncoder().encode(v2Text))
+  assert.equal(s.schema, "clawdline.health-owner-diagnostics/2")
+  assert.equal(s.capture?.function, "github.com/sainteye/clawdline/internal/adapters/cloud.(*Conn).writeFrame")
+  assert.deepEqual(s.capture?.sources, ["internal/adapters/cloud/websocket.go:211"])
+  assert.equal(s.capture?.frames[1].source, "internal/adapters/cloud/websocket.go:211")
+  assert.equal(s.capture?.frames[2].function, "<redacted>")
+  assert.deepEqual(s.recovery, { state: "recovered", recoveryNs: "3500000000" })
+  assert.deepEqual(evidenceGaps(s), ["capture_source_unavailable", "capture_functions_redacted"])
+  const exported = JSON.parse(exportSnapshot(s, { attachmentID: "hs_x", machineID: "m", revision: 3, bootID: "b", subjectKind: "incident", subjectID: "phase-7", contentKeyEpoch: 1, expiresAtMs: 2, receivedAtMs: 1 }))
+  assert.equal(exported.snapshot.capture.frames[1].source, "internal/adapters/cloud/websocket.go:211")
+  assert.equal(exported.snapshot.recovery.recovery_ns, "3500000000")
+
+  const v2 = JSON.parse(v2Text)
+  // A /1 cannot carry a capture; an unknown version and an empty /2 are refused.
+  assert.throws(() => decodeSnapshot(enc({ ...v2, schema: "clawdline.health-owner-diagnostics/1" })), invalid)
+  assert.throws(() => decodeSnapshot(enc({ ...v2, schema: "clawdline.health-owner-diagnostics/3" })), invalid)
+  assert.throws(() => decodeSnapshot(enc({ schema: "clawdline.health-owner-diagnostics/2" })), invalid)
+  // A /1 written before /2 still opens exactly as before.
+  const old = decodeSnapshot(enc({ schema: "clawdline.health-owner-diagnostics/1", lost: "0", coverage: [{ source: "journal", from_ms: "1", to_ms: "2", lost: "0", truncated: false }] }))
+  assert.equal(old.capture, null)
+  assert.equal(old.recovery, null)
+  const frame = (over: Record<string, unknown>) => ({ ...v2, capture: { ...v2.capture, frames: [{ ...v2.capture.frames[0], ...over }] } })
+  assert.throws(() => decodeSnapshot(enc(frame({ source: "/Users/a/go/src/sync/mutex.go:81" }))), invalid)
+  assert.throws(() => decodeSnapshot(enc(frame({ source: "../x.go:1" }))), invalid)
+  assert.throws(() => decodeSnapshot(enc(frame({ function: 'sync.(*Mutex).Lock(0xc000, "tok")' }))), invalid)
+  assert.throws(() => decodeSnapshot(enc(frame({ source_kind: "home" }))), invalid)
+  assert.throws(() => decodeSnapshot(enc(frame({ raw: "x" }))), invalid)
+  assert.throws(() => decodeSnapshot(enc({ ...v2, capture: { ...v2.capture, raw_stack: "goroutine 1" } })), invalid)
+  assert.throws(() => decodeSnapshot(enc({ ...v2, recovery: { state: "fine" } })), invalid)
+  assert.throws(() => decodeSnapshot(enc({ ...v2, capture: { ...v2.capture, frames: new Array(25).fill(v2.capture.frames[0]) } })), invalid)
+})
