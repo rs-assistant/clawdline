@@ -301,9 +301,13 @@ The web side is three npm workspaces:
 the work board (including its create sheet) and usage overview. It accepts caller-owned IDs,
 labels and marks; callers retain their surrounding layout and control dimensions. The control
 owns its non-native menu, keyboard navigation, dismissal and optional refresh on opening.
-Usage options remain ledger-owned, including historical and unattributed projects. Their marks
-are matched to places by SHA-256 of the exact path, as in `overviewProject`, never by basename;
-missing places or an unavailable decorative mark read leave filtering usable with placeholders.
+Usage filter choices come from configured project places, using their configured names and marks.
+Their IDs match ledger options by SHA-256 of the exact path, as in `overviewProject`, never by
+basename. Only configured projects accepted by the current usage response are offered; historical
+Session-only paths and unattributed usage do not become project choices. The all-project reading
+and its aggregation remain unchanged. If configured places cannot be read, the all-project
+choice remains available. [Console loading inventory](console-loading.md) records the stable
+screen IDs and the first-read skeleton behavior.
 
 `core` asks its host for two things: `fetch`, and a stream transport. That split exists so a
 future React Native app can reuse everything below the screens ([plan.md](plan.md) §3.1).

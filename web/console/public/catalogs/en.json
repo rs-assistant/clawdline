@@ -6978,5 +6978,11 @@
   "survey.cloudBasis": "Shown counts unique Cloud accounts. Ever skipped can overlap with submitted. Pairing counts currently paired respondents, not proof that the survey caused pairing.",
   "survey.tool_codex": "Codex",
   "survey.settingsEntry": "Settings",
-  "survey.statsFailed": "Statistics could not be loaded. No figures are shown."
+  "survey.statsFailed": "Statistics could not be loaded. No figures are shown.",
+  "capacityRow.artifacts.report_image_side.what": "The longest side of one screenshot embedded in an HTML report. The ceiling stops a tiny compressed file from expanding into an excessively large image.",
+  "capacityRow.artifacts.report_image_side.full": "An image beyond this limit is omitted from the report. The author can resize the screenshot and publish the report again.",
+  "capacityRow.artifacts.report_image_pixels.what": "The decoded pixel count of one screenshot embedded in an HTML report. This limits image memory independently of the document byte limit.",
+  "capacityRow.artifacts.report_image_pixels.full": "An image beyond this limit is omitted from the report. Resize it before embedding it again; the rest of the report remains readable.",
+  "capacityRow.artifacts.report_total_image_pixels.what": "The combined decoded pixel count of all screenshots retained in one HTML report. This also counts repeated images, so a small file cannot allocate unlimited image memory.",
+  "capacityRow.artifacts.report_total_image_pixels.full": "Images beyond the remaining report budget are omitted. Resize or reduce the screenshots before publishing again; text and earlier valid images remain readable."
 }
