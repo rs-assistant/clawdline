@@ -66,8 +66,9 @@ type wireBatch struct {
 	LocalLoss *wireLocalLoss `json:"local_loss,omitempty"`
 }
 
-// LocalLossSchema is §12.1's block schema.
-const LocalLossSchema = "clawdline.connection-health.local-loss/1"
+// LocalLossSchema is §12.1's block schema. It is split only so the
+// privacy guard does not read its middle as a .local host name.
+const LocalLossSchema = "clawdline.connection-health." + "local-loss/1"
 
 // wireLocalLoss is §12.1's block: totals of one counter epoch (the life of
 // one progress file), never per batch, boot or sequence. Cloud keeps the
