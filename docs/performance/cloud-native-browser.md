@@ -21,11 +21,11 @@ round and observe **DONE / PASS** three times. The fixture persists each round
 before the next begins. In another shell, run:
 
 ```sh
-node web/console/tools/cloud-browser-baseline.mjs summarize "$RAW_RESULTS" "$BUILD_ARTIFACTS"
+node web/console/tools/cloud-browser-baseline.mjs summarize "$RAW_RESULTS" "$BUILD_ARTIFACTS" "$MEASURED_COMMIT"
 curl --fail-with-body -X POST -H "Origin: $FIXTURE_ORIGIN" "$FIXTURE_ORIGIN/stop"
 ```
 
-Set `FIXTURE_ORIGIN` to the printed origin. Wait for the owned starter to exit 0,
+Set `MEASURED_COMMIT` to the full measured Git commit (for these archived runs, `4f8d11c192641e5a35af8c2de1f248ba1a7d3845`). The final validator `8ca73d3bc228547db303cca817a93a97dabfe89e` reads the archived source via Git and verifies its original manifest; it does not claim that the corrected validator produced the archived run. Omit the revision only when the current checkout exactly matches the measured source. Set `FIXTURE_ORIGIN` to the printed origin. Wait for the owned starter to exit 0,
 verify its listener is gone, and preserve `server-final.json`. Do not use the
 production daemon, a real account or external STUN/TURN. Build cache cleanup is
 in the builder's finally block. Each measured run uses one binary and bundle;
@@ -102,13 +102,22 @@ checkpoints, matching nonempty build identities, finite nonnegative samples and
 monotonic CPU/counters across scenarios and rounds. Missing data is refused.
 
 Root ran the corrected source through another three native rounds. Authentic
-records were accepted; fourteen independent copied-record mutations were refused:
+records were accepted; nineteen independent copied-record mutations were refused:
 missing scenario, wrong delivery count, missing native RTC, wrong read count,
 negative CPU, duplicate round, missing sequence, missing server identity, missing
 read counter, invalid duration, wrong viewer count, wrong canary, regressed counter,
-and wrong artifact hash. Originals were not modified. Go peer/Pion smoke and HTTP
+wrong artifact hash, incorrect publication/pin-restoration/fixture-restoration canaries, regressed reconnect sequence, and changed reconnect context. Originals were not modified. Go peer/Pion smoke and HTTP
 startup smoke are separate evidence and are not described as native-browser runs.
-The scoped local commit gate passed on the corrected source.
+The scoped local commit gate passed on the corrected source. Final independent
+review of `8ca73d3bc` returned **safe_to_land**: all 23 historical source hashes,
+existing binary/bundle, 93 raw rows and every summary metric were independently
+checked. The reviewer executed 35 summary invocations: authentic revised data
+accepted; 24 record mutations and five version-path controls refused; authentic
+old data accepted; the four prior blocker mutations still accepted by the old
+validator. This old/new control demonstrates that the semantic correction is
+being exercised. No raw measurements, numeric summaries, or build artifacts changed.
+The final review did not rerun the browser or compile Go. Root retains the actual
+native-browser observation and normal-shutdown evidence.
 
 Freshness/order/authority controls require exact decoded canaries and Sessions,
 advancing sequences, replay refusal, no accepted read after local pin removal,

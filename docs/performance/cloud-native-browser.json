@@ -10357,6 +10357,11 @@
   "negative_controls": {
     "positive_exit": 0,
     "rejected": {
+      "wrong-publication-canary": 1,
+      "wrong-restoration-canary": 1,
+      "wrong-fixture-restoration-canary": 1,
+      "reconnect-sequence-regression": 1,
+      "reconnect-context-change": 1,
       "missing-scenario": 1,
       "wrong-delivered": 1,
       "native-rtc-missing": 1,
@@ -10372,5 +10377,13 @@
       "counter-regression": 1,
       "bad-hash": 1
     }
+  },
+  "validator_commit": "8ca73d3bc228547db303cca817a93a97dabfe89e",
+  "independent_review": {
+    "verdict": "safe_to_land",
+    "record_negatives": 24,
+    "version_path_negatives": 5,
+    "summary_invocations": 35,
+    "old_validator_former_blockers_accepted": 4
   }
 }
