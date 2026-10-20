@@ -15,6 +15,12 @@ func connectionHealthCapacityMeasures() map[string]func() capacity.Reading {
 		"cloud.health_journal_rows", "cloud.health_journal_bytes", "cloud.health_record_bytes",
 		"cloud.health_pending_transitions",
 		"cloud.health_query_rows", "cloud.health_query_bytes",
+		// The durable store (internal/adapters/healthjournal) is not opened
+		// by this daemon yet either; its Status replaces these when it is.
+		"cloud.health_store_bytes", "cloud.health_store_seconds", "cloud.health_store_segment_bytes",
+		"cloud.health_store_segments", "cloud.health_store_queue_rows", "cloud.health_store_queue_bytes",
+		"cloud.health_store_frame_bytes", "cloud.health_store_readers", "cloud.health_store_dir_entries",
+		"cloud.health_store_lost_ranges",
 	} {
 		out[name] = func() capacity.Reading { return capacity.Reading{Known: true, Note: note} }
 	}

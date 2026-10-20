@@ -199,6 +199,56 @@
     "Note": true
   },
   {
+    "Name": "cloud.health_store_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_dir_entries",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_frame_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_lost_ranges",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_queue_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_queue_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_readers",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_segment_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_segments",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.peer_body_bytes",
     "Known": true,
     "Note": true
