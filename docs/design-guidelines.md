@@ -1,5 +1,7 @@
 # Design guidelines
 
+The [UI motion catalog](ui-motion-catalog.md) assigns stable feedback IDs to proposed and existing interactions; it records recommendations rather than implementation approval.
+
 > **The concrete implementation decisions are in [`docs/design-decisions.md`](design-decisions.md); this page holds the principles. Where the two disagree, follow that one and report the disagreement.**
 
 > The user's words (2026-09-18, translated from Chinese): "Take the problems you saw in this round of design and consolidate them into the guidelines we design systems by from now on…
