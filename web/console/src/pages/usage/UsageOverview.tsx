@@ -1,5 +1,6 @@
 import { ProjectPicker } from "../../ui/ProjectPicker.js"
 import { readProjectPlaces, type ProjectPlace } from "../work/api.js"
+import { UsageSkeleton } from "./UsageSkeleton.js"
 import { usageProjectOptions } from "./project-options.js"
 import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { currentCatalogTag } from "../../catalog.js"
@@ -28,11 +29,12 @@ export default function UsageOverviewPage({ shown }: { shown: boolean }) {
   const [read, setRead] = useState<ReadState>({ state: "loading" })
   const [revision, setRevision] = useState(0)
   const scope = useRef(new UsageRequestScope())
+  const initialRead = useRef(true)
   const title = useRef<HTMLHeadingElement>(null)
   const [visible, setVisible] = useState(() => !document.hidden)
 
   useEffect(() => {
-    const changed = () => { scope.current.cancel(); setRead({ state: "loading" }); setProject(""); setOptions([]); setPlaces([]); setRevision(n => n + 1) }
+    const changed = () => { initialRead.current = true; scope.current.cancel(); setRead({ state: "loading" }); setProject(""); setOptions([]); setPlaces([]); setRevision(n => n + 1) }
     return onMachineChanged(changed)
   }, [])
   useEffect(() => {
@@ -54,9 +56,9 @@ export default function UsageOverviewPage({ shown }: { shown: boolean }) {
     const signal = request.begin()
     setRead({ state: "loading" })
     void readUsageOverview(days, project, signal).then(data => {
-      if (request.current(signal)) { setOptions(data.project_options); setRead({ state: "ready", data }) }
+      if (request.current(signal)) { initialRead.current = false; setOptions(data.project_options); setRead({ state: "ready", data }) }
     }).catch(error => {
-      if (request.current(signal)) setRead({ state: "error", code: error instanceof UsageReadError ? error.code : "read_failed" })
+      if (request.current(signal)) { initialRead.current = false; setRead({ state: "error", code: error instanceof UsageReadError ? error.code : "read_failed" }) }
     })
     return () => request.cancel()
   }, [days, project, revision, shown, visible])
@@ -70,17 +72,17 @@ export default function UsageOverviewPage({ shown }: { shown: boolean }) {
       <header className="usage-header"><div className="usage-heading"><div className="usage-title-block"><h1 id="usage-title" tabIndex={-1} ref={title}>{w("usageOverview")}</h1>
         <div className="usage-metadata">{data && <span>{dateRange(data.daily[0]?.date, data.daily.at(-1)?.date, currentCatalogTag())} · {data.timezone}</span>}<span className="usage-machine">{machine}</span></div>
       </div>
-        <button className="usage-refresh" type="button" aria-label={w("usageRefresh")} title={w("usageRefresh")} onClick={() => setRevision(n => n + 1)}>↻</button></div>
+        <button className="usage-refresh" type="button" aria-label={w("usageRefresh")} title={w("usageRefresh")} onClick={() => { initialRead.current = false; setRevision(n => n + 1) }}>↻</button></div>
       <div className="usage-filters">
         <div className="usage-project-filter"><span className="usage-filter-label">{w("usageProject")}</span>
           <ProjectPicker places={pickerOptions} value={project}
             label={w("usageProject")} allLabel={w("usageAllProjects")} allowAll
-            onChange={value => { if (value === project) return; scope.current.cancel(); setRead({ state: "loading" }); setProject(value) }} />
+            onChange={value => { if (value === project) return; initialRead.current = false; scope.current.cancel(); setRead({ state: "loading" }); setProject(value) }} />
         </div>
-        <div className="usage-switch" role="group" aria-label={w("usagePeriod")}>{([7, 28] as const).map(period => <button key={period} type="button" aria-pressed={days === period} onClick={() => { if (days !== period) { scope.current.cancel(); setRead({ state: "loading" }); setDays(period) } }}>{w("usageDays", { days: period })}</button>)}</div>
+        <div className="usage-switch" role="group" aria-label={w("usagePeriod")}>{([7, 28] as const).map(period => <button key={period} type="button" aria-pressed={days === period} onClick={() => { if (days !== period) { initialRead.current = false; scope.current.cancel(); setRead({ state: "loading" }); setDays(period) } }}>{w("usageDays", { days: period })}</button>)}</div>
       </div></header>
       <div className="usage-body" aria-busy={read.state === "loading"}>
-        {read.state === "loading" && <div className="usage-state" role="status">{w("usageLoading")}</div>}
+        {read.state === "loading" && (initialRead.current ? <UsageSkeleton /> : <div className="usage-state" role="status">{w("usageLoading")}</div>)}
         {read.state === "error" && <div className="usage-state" role="alert"><p>{errorWord(read.code)}</p><button type="button" onClick={() => setRevision(n => n + 1)}>{w("usageRetry")}</button></div>}
         {data && <>
           <div className="usage-totals">
