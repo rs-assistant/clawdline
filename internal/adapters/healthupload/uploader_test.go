@@ -611,3 +611,38 @@ func TestWriteABodyForTheCloudParser(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// The daemon's journal is moved aside and recreated while the progress file
+// keeps its cursor. The uploader runs on its own goroutine inside the
+// business daemon, so the old cursor must restart from the new store's
+// oldest entry, counted as a gap, and never panic.
+func TestARecreatedStoreRestartsAnOldCursorWithoutAPanic(t *testing.T) {
+	dir := t.TempDir()
+	f := newFixture(t, dir, "boot-old")
+	f.add(3)
+	c := newCloud()
+	h := newHarness(t, f, c, filepath.Join(dir, "upload"))
+	h.step(t)
+	before := h.u.Status().Totals.Receipted
+	if h.u.Status().Cursor == "" || c.count() != 1 || before < 3 {
+		t.Fatalf("first batch not uploaded: %+v", h.u.Status())
+	}
+	f.close()
+	if err := os.Rename(filepath.Join(dir, "journal"), filepath.Join(dir, "journal.aside")); err != nil {
+		t.Fatal(err)
+	}
+	f.open()
+	h.now = h.now.Add(time.Minute)
+	h.u = h.make()
+	h.step(t)
+	st := h.u.Status()
+	if st.Totals.Gaps["invalid_cursor"] != 1 {
+		t.Fatalf("the stale cursor must be counted once as an invalid_cursor gap: %+v", st.Totals)
+	}
+	f.add(2)
+	h.now = h.now.Add(time.Minute)
+	h.step(t)
+	if got := h.u.Status().Totals.Receipted; got < before+2 {
+		t.Fatalf("records of the recreated store must upload after the restart: receipted %d after %d", got, before)
+	}
+}

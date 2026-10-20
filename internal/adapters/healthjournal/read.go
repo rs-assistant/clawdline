@@ -175,10 +175,10 @@ func (s *Store) Read(q Query) (Page, error) {
 		}
 		switch {
 		case start == len(segs):
-			last := segs[len(segs)-1:]
-			if len(last) == 0 || wantSeg > last[0].index {
-				return Page{}, fail(CodeInvalidCursor)
-			}
+			// Every retained segment is older than the cursor's, including
+			// when none is retained at all (a store moved aside and
+			// recreated): the cursor points past what exists.
+			return Page{}, fail(CodeInvalidCursor)
 		case segs[start].index != wantSeg:
 			reason := GapMissing
 			if start == 0 {
