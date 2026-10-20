@@ -37,6 +37,13 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `callback.tail_bytes` | 8192 | `bytes` | `evict_oldest` | `diagnostics` | — |
 | `cloud.header_read_diagnostic_rows` | 24 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cloud.header_read_diagnostic_seconds` | 3600 | `seconds` | `expire` | `diagnostics` | — |
+| `cloud.health_active_slots` | 128 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_journal_bytes` | 4194304 | `bytes` | `evict_oldest` | `diagnostics` | — |
+| `cloud.health_journal_rows` | 4096 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `cloud.health_query_bytes` | 1048576 | `bytes` | `evict_oldest` | `diagnostics, sender` | — |
+| `cloud.health_query_rows` | 200 | `rows` | `evict_oldest` | `diagnostics, sender` | — |
+| `cloud.health_record_bytes` | 1024 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_reserved_slots` | 8 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.peer_body_bytes` | 524288 | `bytes` | `refuse` | `diagnostics, notice, sender` | — |
 | `cloud.peer_discovery_reply` | 1 | `rows` | `refuse` | `sender, diagnostics` | — |
 | `cloud.peer_frame_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics, log, sender` | — |
