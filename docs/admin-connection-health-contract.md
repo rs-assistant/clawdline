@@ -3,9 +3,10 @@
 Status: 2026-10-20. The local evidence foundation in `internal/domain/connectionhealth` is
 implemented and tested, and the daemon now runs one runtime of it per boot, instruments the relay
 transport, the WebSocket writer and the link's lanes, and answers it on a local route and the
-`clawdline health` CLI. Everything is still memory only. The Cloud upload, ingest and
-query shapes below are a **proposal** to be unified by the root with the Cloud API work; no Cloud
-code reads or writes them. Product scope stays as `docs/admin-connection-health.md` states it
+`clawdline health` CLI. The durable store keeps the journal across boots, and an opt-in daemon
+uploader (§9a) sends its content-free metadata to Cloud's machine ingest over its own HTTPS
+client. The query shapes in §9 remain a proposal; Cloud's implemented API is its own
+`docs/connection-health-contract.md`. Product scope stays as `docs/admin-connection-health.md` states it
 (P0–P3, M01–M06); this page is only the wire and evidence contract under it.
 
 ## 1. What exists and what does not
@@ -18,12 +19,14 @@ code reads or writes them. Product scope stays as `docs/admin-connection-health.
 | Segment truth table, stage progress, local export | implemented | `evidence.go` |
 | One runtime per daemon boot (fresh random `boot_id`, build from the binary's commit), watchdog run for the daemon's lifetime, Cloud on or off | implemented; `CLAWDLINE_CONNECTION_HEALTH=off` turns it off | `runtime.go`, `cmd/clawdline/health.go` `startConnectionHealth` |
 | Capacity rows `cloud.health_*` | measured from the tracker snapshot, journal occupancy and transition queue; unmeasured with a reason when monitoring is off | `internal/transport/http/capacity_measures_connection_health.go` |
-| Daemon call sites | **partial**: see §4.1 for the exact list. Response sealing and the spool enqueue inside `internal/transport/cloud/relay.go` are **not wired**, and the correlation does not cross the relay queue between the transport's callback and the link's lane | `internal/adapters/cloud/transport.go`, `websocket.go`, `internal/transport/cloud/link.go` |
+| Daemon call sites | **partial**: see §4.1 for the exact list. One correlation now crosses the relay queue from the transport's frame phase to the link's lane and handler (`Inbound.Correlation`). Response sealing and the spool enqueue inside `internal/transport/cloud/relay.go` are **not wired**, and the answer's seal, spool and socket write still start their own phases | `internal/adapters/cloud/transport.go`, `websocket.go`, `internal/transport/cloud/link.go` |
 | Local route `GET /v1/connection-health/{status,events,trace,export}` and `clawdline health` | implemented, this machine's own token only, refused through Cloud | `internal/transport/http/connection_health.go`, `cmd/clawdline/health.go` |
 | Per-build location map | **partial**: every wired location code names its Go function (checked by `runtime.FuncForPC` in the owning package's tests); no file lines | `locations.go` |
 | Durable segmented store, boot markers on disk | implemented and opened by the daemon off the startup path; the watchdog's journal writer offers each stamped record (`Watchdog.Attach`); history route and CLI read it. The ring itself is still memory only and says so | `internal/adapters/healthjournal`, `docs/admin-connection-health-storage.md` |
 | Stack capture worker | **not built** | — |
-| Cloud ingest, stored queries, relay and viewer producers, uploader, UI | **not built here** (separate tasks) | — |
+| Daemon uploader to Cloud ingest (opt-in, own HTTPS client, bounded, durable progress) | implemented, off by default (§9a) | `internal/adapters/healthupload`, `cmd/clawdline/health.go` |
+| Shutdown: watchdog and writer stopped, uploader stopped, store flushed and closed within 3 s | implemented on SIGTERM/interrupt | `cmd/clawdline/health.go` `stopConnectionHealthOnSignal` |
+| Cloud stored queries in a UI, viewer producer, owner sealing | **not built here** (separate tasks) | — |
 
 Every export carries the same list as `wiring[]` (`evidence.go` `Unwired`), so no reader can take
 the foundation for the pipeline.
@@ -496,14 +499,97 @@ minute aggregates). The cursor is bound to scope, filter and window. Stored quer
 the machine, relay or account handler. A source with no data is `not_collected` or `unsupported`,
 never an empty success; a `null` duration is never drawn as zero.
 
+## 9a. Daemon uploader (implemented)
+
+`internal/adapters/healthupload` posts the durable store's records to Cloud's
+`POST <cloud_api_base>/v1/health/ingest` (Cloud contract §2) and nothing else.
+
+**Turning it on.** All three, read from local files on every cycle (30 s), so turning any of them
+off stops the next request without a restart:
+
+```json
+// <state dir>/config.json; the default state dir is ~/.config/clawdline-next
+{ "cloud_enabled": true, "cloud_health_upload": true }
+```
+
+`clawdline cloud on` sets `cloud_enabled`; `cloud_health_upload` is written into the same file by
+hand (`clawdline setting` does not accept it yet). It must be JSON `true`; anything else is off.
+The machine must also be enrolled. The identity is the machine's
+own (`machine-identity-v1.json`), and its `api_base` must equal the settings' `cloud_api_base`
+(`adaptercloud.CheckEnvironment`), else `origin_refused`. The base must be `https://`; plain
+`http://` to loopback is accepted only when `Options.AllowLoopbackHTTP` is set, which the daemon
+never does. Off states make no request at all: `not_opted_in`, `cloud_off`, `no_identity`,
+`identity_unreadable`, `origin_refused`, `source_not_open`.
+
+**Wire.** One batch per request, one boot per batch: `schema_version: 1`, `batch_id`
+`s<first_seq>-<last_seq>`, `producer_instance: "daemon"`, `boot_id`, `build_commit` from the
+store's boot header, `events[]` of record/1. Each event is copied through a fixed struct
+(`wireEvent`) with exactly Cloud's keys: `schema, producer_seq, event_id, boot_id, event, wall
+(UTC), mono_ns, build_commit, source, stage, class, kind, phase_id, correlation, count, rule`.
+`location`, `age_ns`, `deadline_ns` and `state` have no field there, so they cannot leave.
+`sent_at` is omitted on purpose: it is part of Cloud's batch digest, and a batch rebuilt from the
+same records after a lost progress file must replay (200), not conflict (409). Cloud therefore
+reports `clock_offset_ms: null` for this producer. The bearer is the machine credential in the
+`Authorization` header only; redirects are not followed and there is no cookie jar.
+
+**Not sent, counted instead** (`totals.excluded` by reason): `state_after_loss` (Cloud record/1
+has no such event and no `state` key: `state_after_loss_unsupported_by_cloud`), an event or stage
+Cloud does not list, a source other than `daemon`, `mono_ns` or any integer above 2^53−1, an id
+or rule that fails Cloud's pattern, and a single record that alone would exceed the body bound.
+Durable-store loss markers (`loss` entries) have no producer sequence and cannot be record/1
+events; they are counted as `storage_loss_records`, and store gaps by reason as `store_gaps`. Both
+stay visible locally only — **wire gap for Cloud**: Cloud has no field for producer-side storage
+loss or for `state_after_loss` yet.
+
+**Delivery and retries.** One batch in flight. Its exact body is written to
+`<state>/connection-health/upload/upload-state.json` (atomic replace, fsync) before the first
+attempt, and each attempt is counted there before it is made. Only a parsed receipt naming this
+`batch_id` moves the cursor as delivered (`receipted_events`; `duplicate_events` for Cloud's
+`duplicate_event`); a 2xx without one is retried. Committed (the store's fsync), sent, and
+receipted are separate counters; nothing here says a person saw anything.
+
+| Cloud answers | The uploader |
+| --- | --- |
+| 201 / 200 with a receipt for the batch | moves the cursor; keeps the newest 16 receipts |
+| network error, timeout (10 s per attempt), 5xx, 2xx without receipt | same body, same `batch_id`, backoff 5 s doubling to 5 min |
+| 429 | waits `Retry-After` (≤ 1 h), then the same body |
+| 401 / 403 | `auth_refused`; that credential is not used again until the identity changes; the batch waits |
+| 400, 409, 413, other 4xx | the batch is counted as refused with Cloud's code and field (never its message) and not resent |
+| 6 attempts or 1 h without a receipt | abandoned and counted (`abandoned_events`; Cloud may or may not hold it) |
+
+**Budgets.** At most 120 requests and 960 KiB (1 MiB less Cloud's 64 KiB metadata reserve) per
+clock hour, every attempt counted, persisted across restarts; at the bound `quota_local` until the
+next hour. Batches are at most 100 events and 32 KiB (a 512 B margin is kept). Idle (nothing new
+in the store) is one local identity read and one store page read per 30 s and **no request**
+(`TestARestartResendsThePendingBatchAndKeepsTheCursor`). Measured on an Apple M4 Pro: building and
+encoding one 97-event, 31.8 KB batch from a 200-entry page costs 206 µs and 333 KB allocated; an
+idle cycle 18.5 µs and 35 KB (`go test -bench . ./internal/adapters/healthupload`). At the
+hourly cap that is about 25 ms of CPU per hour. Production network cost is not measured.
+
+**Status.** `GET /v1/connection-health/status` carries `upload`: `state`, `last_error`,
+`last_refusal {http, code, field}`, `pending {batch_id, events, bytes, attempts, next_attempt,
+persisted: no|unknown}`, `hour`, `totals`, `last_receipt`, `receipts_kept`; `clawdline health
+status` prints one line of it. Capacity rows `cloud.health_upload_*` measure the hour's spending,
+the pending batch and the receipts. Status is a copy under the uploader's own lock: an unreachable
+Cloud never makes it, the local query or any business path wait.
+
+**Independence.** The uploader's import graph contains no Cloud line package
+(`TestTheUploaderDoesNotDependOnTheCloudLine`): its own `http.Transport` (one connection, 5 s
+dial/TLS), its own goroutine, no relay socket, writer lock, spool or lane.
+
+**Not done.** Owner-sealed diagnostics (encryption is the next separate capability; until then the
+private fields stay on this machine and no remote investigation is complete); Cloud fields for
+storage loss and `state_after_loss`; heartbeat/presence; uploading on a schedule tighter than 30 s.
+
 ## 10. Remaining wiring, in order
 
 1. Done: one runtime per boot, real capacity measures (§1).
-2. Partly done (§4.1). Still to wire: response sealing and spool enqueue in
-   `internal/transport/cloud/relay.go`, and carrying one correlation from the transport's inbound
-   callback through the relay queue to the link's lane (it needs a field on `Inbound`).
+2. Partly done (§4.1). The transport's correlation now reaches the lane and handler through
+   `Inbound.Correlation`. Still to wire: response sealing and spool enqueue in
+   `internal/transport/cloud/relay.go`, and carrying the same correlation on `Outbound` to the
+   seal, spool and socket write.
 3. Done: local route and CLI (§4.1).
-4. Done: durable store opened and fed (`docs/admin-connection-health-storage.md`); not yet closed
-   at daemon shutdown.
-5. Uploader over the proposed ingest, then the Cloud stored queries, relay/viewer producers,
-   stage-to-source map per build, stack capture, and M01–M06 on real sources.
+4. Done: durable store opened and fed (`docs/admin-connection-health-storage.md`), and flushed and
+   closed at daemon shutdown.
+5. Done: the daemon uploader (§9a). Next: Cloud fields for storage loss and `state_after_loss`,
+   owner sealing, viewer producer, stack capture, and M01–M06 on real sources.

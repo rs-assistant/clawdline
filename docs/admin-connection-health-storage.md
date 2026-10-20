@@ -174,9 +174,12 @@ minute, stall after 5 s, worker tick 1 s, write retry backoff 1 s → 60 s.
 
 ## 10. Not done here
 
-- `Close` at daemon shutdown: the daemon has no shutdown context today, so a stopping daemon does
-  not flush; what was queued and not yet written is the crash-loss window of §4.
-- Upload of pages to Cloud, and the Cloud side.
+- `Close` at shutdown is done for SIGTERM and interrupt (`stopConnectionHealthOnSignal`): the
+  watchdog and its writer stop first, then `Flush` and `Close` within 3 s, then the signal's own
+  action ends the process. A kill without a signal handler (SIGKILL, a crash) is still the
+  crash-loss window of §4.
+- Upload is `internal/adapters/healthupload` (contract §9a); it reads pages with `Read` and keeps
+  its own cursor, so the store is unchanged by it.
 - Measured budgets: the bounds above are the plan's proposals.
 - Three store rows (`_segment_bytes`, `_dir_entries`, `_lost_ranges`) read as unmeasured: `Status`
   does not report their occupancy.
