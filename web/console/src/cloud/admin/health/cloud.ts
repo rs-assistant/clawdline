@@ -15,6 +15,9 @@ import { windowBounds } from "./route.ts"
 import type { EventsBody, IncidentDetailBody, IncidentListBody, OutcomesBody, OverviewBody, SourcesBody, StoredEvent } from "./stored.ts"
 // @ts-expect-error -- a `.ts` path, so node's strip-types tests can import this module.
 import { parseEvents, parseIncidentDetail, parseIncidentList, parseOutcomes, parseOverview, parseSources, StoredContractError, STORED_BOUNDS } from "./stored.ts"
+import type { AggregatesBody, TrendRange } from "./aggregates.ts"
+// @ts-expect-error -- a `.ts` path, so node's strip-types tests can import this module.
+import { parseAggregates, trendWindow } from "./aggregates.ts"
 
 /** Bounds of one load. Registered as console.health_ui_* (internal/domain/capacity). */
 export const HEALTH_UI_LIMITS = {
@@ -42,8 +45,9 @@ export const HEALTH_UI_LIMITS = {
   incidentWindowMs: 7 * 86_400_000,
 } as const
 
-export type PartName = "overview" | "outcomes" | "sources" | "events" | "trace" | "incidents" | "incident"
+export type PartName = "overview" | "outcomes" | "sources" | "events" | "trace" | "incidents" | "incident" | "aggregates"
 export type PartBody = {
+  aggregates: AggregatesBody
   overview: OverviewBody
   outcomes: OutcomesBody
   sources: SourcesBody
@@ -76,6 +80,24 @@ export function planFor(route: HealthRoute, now: number): { window: { from: stri
   // ends, so a pinned page lists the same incidents on every load.
   const incidentList: Read = { part: "incidents", path: "incidents", params: { from: new Date(Date.parse(window.to) - HEALTH_UI_LIMITS.incidentWindowMs).toISOString(), to: window.to, limit: String(HEALTH_UI_LIMITS.incidentRows) } }
   let reads: Read[]
+  const trend = route.screen === "M01" || route.screen === "M03" || route.screen === "M06" ? route.trend ?? null : null
+  if (trend !== null && (route.screen === "M01" || route.screen === "M03" || route.screen === "M06")) {
+    // The trend view replaces the screen's raw reads instead of adding a fourth: the same
+    // per-load cap, concurrency and budget hold. 30 days is the Cloud's daily buckets, never a
+    // client-side scan of raw rows.
+    const t = trendWindow(trend as TrendRange, Date.parse(window.to))
+    const agg: Record<string, string> = { from: t.from, to: t.to, bucket: t.bucket }
+    if (route.trendMachine) agg.machine_id = route.trendMachine
+    if (route.screen === "M03" && route.source) agg.source = route.source
+    if (route.screen === "M03" && route.sourceId) agg.source_id = route.sourceId
+    const aggregates: Read = { part: "aggregates", path: "aggregates", params: agg }
+    // Incidents opened over the 7 days ending where the trend ends, for the "investigate" links.
+    const incidents: Read = { ...incidentList, params: { ...incidentList.params, from: new Date(Date.parse(t.to) - HEALTH_UI_LIMITS.incidentWindowMs).toISOString(), to: new Date(Math.min(Date.parse(t.to), Date.parse(window.to))).toISOString() } }
+    reads = route.screen === "M01" ? [aggregates, { part: "overview", path: "overview", params: win }, incidents]
+      : [aggregates, { part: "overview", path: "overview", params: win }, { part: "sources", path: "sources", params: {} }]
+    if (route.scope.account !== null) reads = reads.map((r) => ({ ...r, params: { ...r.params, account: route.scope.account! } }))
+    return { window: { from: t.from, to: t.to }, reads: reads.slice(0, HEALTH_UI_LIMITS.readsPerLoad) }
+  }
   switch (route.screen) {
     case "M01":
       reads = [{ part: "overview", path: "overview", params: win }, { part: "outcomes", path: "outcomes", params: win }, incidentList]
@@ -128,7 +150,7 @@ export function readURL(apiOrigin: string, read: Read): string {
 }
 
 const PARSERS: { [N in PartName]: (body: unknown) => PartBody[N] } = {
-  overview: parseOverview, outcomes: parseOutcomes, sources: parseSources, events: parseEvents, trace: parseEvents, incidents: parseIncidentList, incident: parseIncidentDetail,
+  aggregates: parseAggregates, overview: parseOverview, outcomes: parseOutcomes, sources: parseSources, events: parseEvents, trace: parseEvents, incidents: parseIncidentList, incident: parseIncidentDetail,
 }
 
 /** The server's typed refusal codes this page explains; anything else is its HTTP class. */

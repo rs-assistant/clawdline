@@ -43,7 +43,7 @@ export function ChartPanel({ title, say, chart, table }: { title: string; say: H
 
 /* ---- quality and problems -------------------------------------------------- */
 
-const RELEVANT: PartName[] = ["overview", "outcomes", "sources", "events", "trace"]
+const RELEVANT: PartName[] = ["aggregates", "overview", "outcomes", "sources", "events", "trace"]
 
 /** Per-read quality of the reads this screen relies on; incidents are labelled unsupported elsewhere. */
 export function panelQualities(state: StoredState): PanelQuality[] {
