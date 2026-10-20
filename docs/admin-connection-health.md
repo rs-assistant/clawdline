@@ -403,3 +403,49 @@ receives only the dashboard/export. It must identify the fault domain and implem
 precisely name the missing evidence. When evidence is insufficient, name the next missing instrumentation point and a reproducible
 verification step. A plausible guess is not a pass. Historical selection is labeled historical,
 not current, and pauses live movement until the person explicitly returns to now.
+
+## Local real-adapter acceptance (2026-10-21)
+
+An isolated test binary over source commit `c4926432a` exercised the real WebSocket `Conn`,
+Runtime, system monotonic clock, watchdog, journal, runtime stack collector and production
+sanitizer. Its only added source was a task-owned test harness; it was not a released daemon.
+The two blocked exports were handed, without injector code or expected answers, to an independent
+investigator. Source SHA-256 values for the adapter, location map, capture worker and runtime
+matched that commit. The investigator correctly distinguished both waits:
+
+| Observation | Exact-build join | What the export established |
+| --- | --- | --- |
+| `writer_lock_waiting`, no progress | `internal/adapters/cloud/websocket.go:316`, `Conn.writeFrame` | A captured goroutine was waiting in `sync.Mutex.Lock`; it did not establish the holder or a deadlock. |
+| `socket_write_started`, one progress step | `internal/adapters/cloud/websocket.go:353`, `Conn.writeFrame` | A captured goroutine was in `net.(*pipe).write`; it did not establish a production TCP failure, peer cause or byte count. |
+
+Each arm first established the actual tracker phase and runtime frame. Detection was about
+15.1 seconds in each single local observation. Twenty local probe/export pairs remained callable
+while each fault was held. After release, findings cleared in about 99 ms and the harness observed
+successful writes. Those successful return values were separate harness assertions: the shared
+blocked exports showed `still_blocked`, and the later export reported
+`released_outcome_unknown`. Neither export proves successful delivery. These measurements are
+not a production latency target, overhead benchmark, persistence/restart acceptance or an
+explanation of a historical connection outage.
+
+### Remaining attribution and the next instrumentation points
+
+The following are explicit design points for a later evidence-contract revision, not fields that
+this acceptance claims are implemented:
+
+- Bind writer phases to a process-local opaque connection resource and an instrumented holder
+  operation. At `Conn.writeFrame`, record lock acquisition/release and the holder's current child
+  stage independently of the writer lock. An uninstrumented holder remains unknown. Validate with
+  multiple connections and multiple writers; stack-function matches alone cannot select a holder.
+- At each underlying `Write` return, retain a bounded outcome distinguishing header and payload,
+  returned byte count, typed error, deadline expiry and local close/cancellation. Keep addresses,
+  payloads and peer identity out of public metadata; any private detail follows owner encryption.
+  A return still does not prove peer observation or viewer application.
+- Bind the real operation's terminal outcome to capture recovery through an independent bounded
+  journal path. Distinguish phase release, successful local return, transport receipt and viewer
+  application. If a terminal transition was dropped or never collected, preserve
+  `released_outcome_unknown`; never upgrade it from silence.
+
+Any implementation must version and validate the affected export/upload contracts together,
+register genuinely new bounds, preserve nonblocking observation, and retain failure-injection
+proof. The local experiment establishes useful stage attribution while leaving these deeper
+causal and recovery claims unavailable.
