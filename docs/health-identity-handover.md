@@ -77,7 +77,8 @@ unsendable rather than a block that would read the missing key as 0.
 ## Not done here
 
 - The local identity route and console comparison below now write the content-key epoch after confirmed handover.
-- No console control sets `cloud_health_owner_retention`; it is settable through `clawdline setting`.
+- `cloud_health_owner_retention` is set in Settings → Remote → **Owner diagnostics in Cloud**
+  (`cloud/health-owner/OwnerRetentionBlock.tsx`) or with `clawdline setting`; see §8.
 - The owner reader is wired below; real-browser acceptance remains pending.
 ## Product handover and browser health lifecycle
 
@@ -177,6 +178,52 @@ and what it cannot record (`viewer_sse_gap`, the direct carrier) is in
   denial keeps nothing; approval persists once; reload then sealed open; sign-out clears
   plaintext; rotation needs a new handover; revocation deletes records.
 
-Not proven here: a real browser's IndexedDB and the visual review of both sheets; a browser that
-has never taken the legacy pairing (it stays on the pairing screen, where this handover does not
-run yet).
+- `web/console/src/cloud/health-owner/pairing-screen.test.ts`: a fresh device on the pairing
+  screen takes the link and keeps only its `clawdline.health-handover:` record; no device key or
+  another account runs nothing and keeps the link; denial, sign-out during the comparison, and an
+  account change during the write keep nothing; reload, a new content-key epoch, and revocation.
+- `web/console/src/cloud/health-owner/retention.test.ts`: the opt-in's status lines (§8).
+
+Not proven here: a real browser's IndexedDB, `CloudGate`'s wiring of the pairing screen in a
+rendered page, and the visual review of both sheets and the Settings block.
+
+## 7. A browser that never took the legacy pairing
+
+Signing in registers this browser as a device with its Ed25519 key before any relay pairing exists
+(`cloud-boot.js` `ensureSession`); `connect` stops at `pairing_required` only because no relay
+master key is held. That device can sign an identity offer, so `CloudGate` runs
+`watchIdentityPairing` for the account of either the console or the pairing screen
+(`handoverAccount`, kept through a reconnect's "checking" and cleared on sign-in and revocation).
+`handoverSigner` admits only the session's own device, for the account the page is signed in to.
+
+Two capabilities, said apart (`RelayAccess`): the handover leaves a diagnostics key and nothing the
+relay reads, so the finished sheet on the pairing screen says the browser can open this machine's
+diagnostics and that reading Sessions still needs **Pair browser** (`handoverDoneRelayNeeded`). It
+grants no account membership: the link runs only for a page already signed in to the machine's
+account, and a link for another account fails `wrong_account`. Sealed reads from such a browser also
+need a minted device token for their epochs (`tokenIdentity`); until the relay connection mints
+one the reader answers unknown epochs rather than guessing.
+
+## 8. The owner-retention opt-in in Settings
+
+Settings → Remote, under the diagnostics-key block: one switch for `cloud_health_owner_retention`
+(`POST /v1/settings`, this machine's own token only). Default off; it is consent for sealed owner
+evidence and never touches `cloud_health_upload`. The daemon re-reads the file before every seal
+and send, so writing `false` cancels the next one. The lines under it come from
+`GET /v1/connection-health/status` → `upload.status.owner_diagnostics` (`senderReading`,
+`retentionLines`), re-read every 5 s while shown with a 5 s timeout:
+
+| Status | Shown |
+| --- | --- |
+| route unreadable or not a status | unknown, with the reason; never "off" or "0 sent" |
+| no `owner_diagnostics` | this daemon runs no sender |
+| off, nothing ever kept | nothing is sealed or sent |
+| off, something receipted or kept | nothing new is sent; Cloud's copy is **not** deleted and stays until Cloud's own retention ends |
+| on: `waiting` / `active` / `partial` | nothing yet / receipted count / receipted, dropped and refused counts |
+| on: `failed` `key_handover_required` | take the diagnostics key first |
+| on: other `failed` | the daemon's code and Cloud's code |
+| local records | count and size, or "not counted yet" while `attachments` is null |
+
+There is no account-level Cloud setting for this or for the browser producer: the browser
+producer stays behind the explicit `VITE_VIEWER_HEALTH=on` build flag, and an account toggle would
+need a Cloud setting this repository does not own.

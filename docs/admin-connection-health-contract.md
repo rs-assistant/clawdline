@@ -702,6 +702,11 @@ sent to cost the batch a 400. `elapsed_ms` and `count` are clamped to the Cloud'
 | `viewer_request_issued` (class `control`) | `cloud-client.js` `_publishAcknowledged` (a write that resolves on the relay's ack: an answer to a Mac without `cloud_status.v >= 1`) | started |
 | `viewer_response_received` (class `control`) | the same write, when it settles | completed `ok` on the relay's ack; completed `pending` when the ack timer ran out and the write resolved having heard nothing; failed with the classified word on a relay refusal (`machine_offline`, `publish_error`) or a seal failure |
 | `viewer_decrypt_apply` | `_settleRead` success (an answer is only settled opened and applied), and `_receiveEnvelope`'s failure path | completed `ok` under the read's correlation; failed `replay_rejected`, `apply_failed` (probe stage `apply`) or `decrypt_failed` (anything before the payload opened), under its own correlation |
+| `viewer_carrier_replace` (class `transport`) | `direct-carrier.ts` `negotiate`: one WebRTC carrier attempt, the direct path taking reads over from the relay | started; completed `ok` when the channel opened; completed `aborted` on the machine's `terminal_busy`; failed with `directCarrierHealthError` (`terminal_direct_ice_failed` → `network_unreachable`, `terminal_direct_chunk_timeout` → `timeout`, a closed or never-opened channel → `carrier_closed`, an answer or envelope that would not open → `decrypt_failed`, anything else through `classifyViewerError`) |
+| `viewer_carrier_replace` (class `transport`) | `direct-carrier.ts` `lost`: an **open** carrier that stopped carrying | failed, with its own correlation; a deliberate close (`carrier_client_retired`, `carrier_client_stopped`, `carrier_replaced`) records nothing |
+| `viewer_request_issued` / `viewer_response_received` / `viewer_decrypt_apply` (class `read`) | `status-client.js` `_readOnCarrier`: a read written to the open carrier | the same trace as a relay read, settled by `_settleRead`: a carrier that takes the request and never answers is failed `timeout`, not silence behind an open relay socket |
+| `viewer_carrier_replace` (class `read`) | `status-client.js` `_relayAfterCarrier`: the carrier gave a read up and the relay takes it over | failed (`carrier_closed`, or the publish failure's word) under the **read's** correlation, before the relay's answer settles the read |
+| `viewer_decrypt_apply` (class `read`) | `status-client.js` `receiveCarrierEnvelope` failure path | failed with the relay path's words, under its own correlation |
 
 "SSE" in the Cloud's stage names is mapped onto the relay WebSocket the hosted console actually
 uses: the hosted console has no EventSource; its stream resume is the successor socket taking over
@@ -713,11 +718,20 @@ transport's own codes, anything else `unclassified`, never a guess.
 - `viewer_sse_gap`: the relay socket has no contiguous per-stream ids for the page to detect a
   skipped range (sequences are per sender across channels), so no record is ever sent. A Cloud
   reader showing no gap rows has **no** evidence that none happened.
-- The WebRTC direct carrier (`direct-carrier.ts`, `terminal-direct.ts`) records nothing. The
-  Cloud's eight stages describe the relay socket; `viewer_carrier_replace` means a successor relay
-  socket taking over from a ready one. Recording a peer-to-peer attempt under it, or under
-  `viewer_connect`, would mix a second carrier into the relay's rates, so it waits for a stage of
-  its own in the Cloud contract.
+- **The Cloud wire has no carrier dimension.** The direct carrier is recorded under
+  `viewer_carrier_replace` (a carrier taking reads over is a carrier replacement), class
+  `transport`, beside the relay's successor sockets: a Cloud reader cannot tell the two apart from
+  the record, and the correlation is random (`vt-`) for both. Splitting them needs a carrier field
+  or stage in Cloud's §14 parser; until then the direct carrier's failures are visible but mixed
+  into that one stage's rates, and never into `viewer_connect`.
+- A terminal's own `direct_offer` (`terminal-direct.ts`, a link the carrier later `adopt`s) is not
+  recorded as a negotiation; once adopted, its loss is recorded by `lost` like any open carrier.
+- No gap is derived from carrier sequences: they are per peer channel, and a copied `s/` row keeps
+  the relay sender's number, so neither is a contiguous stream id.
+- `_publishAcknowledged` (inspected for this list): every settle is recorded once — the relay's
+  ack, its refusal, a seal or publish failure, and the ack timer (`pending`). A retired client hands
+  the write to its successor, which records it; one that rejects before a successor exists records
+  nothing, because nothing was issued.
 - Writes that resolve from the Mac's own result (send, dispatch, and an answer to a Mac with
   `cloud_status.v >= 1`) go through `_read` and are recorded as reads (class `read`), not as
   `control`.
