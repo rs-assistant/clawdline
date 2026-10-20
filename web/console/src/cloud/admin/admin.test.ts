@@ -205,7 +205,7 @@ test("pure Workflow source formatting stays compatible while edited messages rem
 })
 
 test("each page has its own address, and an address names one page or none", () => {
-  assert.deepEqual(ADMIN_ROUTES.map(adminPath), ["/admin", "/admin/accounts", "/admin/promotions", "/admin/usage", "/admin/survey"])
+  assert.deepEqual(ADMIN_ROUTES.map(adminPath), ["/admin", "/admin/accounts", "/admin/promotions", "/admin/usage", "/admin/survey", "/admin/health"])
   for (const route of ADMIN_ROUTES) assert.equal(adminRoute(adminPath(route)), route)
   assert.equal(adminRoute("/admin/"), "overview")
   assert.equal(adminRoute("/admin/promotions/"), "promotions")
@@ -213,6 +213,10 @@ test("each page has its own address, and an address names one page or none", () 
   assert.equal(adminRoute("/admin/nope"), null)
   assert.equal(adminRoute("/administrator"), null)
   assert.equal(adminRoute("/"), null)
+  // Connection health owns its whole subtree; its screens are decided by health/route.ts.
+  assert.equal(adminRoute("/admin/health/trace/tr-1"), "health")
+  assert.equal(adminRoute("/admin/health/machines/mac_1"), "health")
+  assert.equal(adminRoute("/admin/healthy"), null)
 })
 
 // The tables are typed against each other; what types cannot see is a key the

@@ -1,5 +1,5 @@
 import { SurveyStatistics } from "../../onboarding/Statistics.js"
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { chooseTransport, cloudViewerDeviceMetadata, newCloudSession, readCloudConfig, type CloudConfig, type EnsuredSession } from "../copied.js"
 import { DeviceLimitPanel } from "../DeviceLimitPanel.js"
 import { currentCatalogTag } from "../../catalog.js"
@@ -10,7 +10,8 @@ import { demoOverview } from "./demo.js"
 import { mayLeaveCode } from "./navigation-guard.js"
 import { loadOverview, type Overview } from "./api.js"
 import { ADMIN_ROUTES, adminPath, adminRoute, adminWords, bootAdminCatalog, type AdminRoute, type Say } from "./words.js"
-import { ConnectionHealth } from "./health/ConnectionHealth.js"
+// Loaded on first visit, so the other operations pages do not carry its screens and copy.
+const ConnectionHealth = lazy(() => import("./health/ConnectionHealth.js").then((m) => ({ default: m.ConnectionHealth })))
 import { healthRoute } from "./health/route.js"
 import type { Refusal } from "./health/cloud.js"
 import "./admin.css"
@@ -218,6 +219,7 @@ export function AdminGate({ declared }: { declared: string }) {
   if (route === "health") {
     return (
       <Shell route={route} go={go} say={say} consoleHref={consoleHref} stampText={null} refreshing={false} onRefresh={null}>
+        <Suspense fallback={<Skeleton label={say("loading")} />}>
         {health === null ? (
           <Notice title={say("failedTitle")} body={say("healthUnknownAddress")}>
             <RouteLink href={adminPath("health")} go={go} className="adm-btn" current={false}>{say("nav_health")}</RouteLink>
@@ -227,6 +229,7 @@ export function AdminGate({ declared }: { declared: string }) {
         ) : config ? (
           <ConnectionHealth route={health} go={go} apiOrigin={config.apiOrigin} get={healthFetch} fixture={false} onRefused={healthRefused} arrivedByMove={moved > 0} />
         ) : null}
+        </Suspense>
       </Shell>
     )
   }
