@@ -529,6 +529,10 @@ function daemon(): Server {
     if (path === "/v1/transcript") {
       return json(res, 200, { entries: untrustedContent ? [{ role: "assistant", text: untrustedContent, at: 1 }] : [], evidence: "process", id: url.searchParams.get("session"), signature: "fixture" })
     }
+    if (path === "/v1/sessions/" + encodeURIComponent(TMUX) + "/documents/project/report.html") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" })
+      return res.end("<!doctype html><html><body><h1>HTML navigation marker</h1></body></html>")
+    }
     if (path === "/v1/sessions/" + encodeURIComponent(TMUX) + "/documents/project/security.md") {
       res.writeHead(200, { "content-type": "text/markdown; charset=utf-8" })
       return res.end(untrustedContent)
@@ -888,6 +892,39 @@ after(async () => {
   server?.closeAllConnections()
   await new Promise<void>((ok) => (server ? server.close(() => ok()) : ok()))
   if (profile) rmSync(profile, { recursive: true, force: true, maxRetries: 5 })
+})
+
+test("a phone follows a document fragment without closing its Session first", async () => {
+  untrustedContent = "Document navigation marker"
+  try {
+    for (const filename of ["security.md", "report.html"]) await inTab(PHONE, async (tab) => {
+      await tab.go("/" + FRAGMENT[TMUX])
+      await tab.until("the Session is open", (s) => s.open === TMUX && s.view === "detail")
+      const hash = "#document=1&machine=this-mac&session=" + escapedPane(801) + "&scope=project&path=" + filename
+      await tab.run(`(() => {
+        const link = document.createElement("a")
+        link.href = ${JSON.stringify(hash)}
+        link.textContent = "Read report"
+        document.body.append(link)
+        link.click()
+      })()`)
+      await tab.run(`new Promise((resolve, reject) => {
+        const deadline = Date.now() + 5000
+        const read = () => {
+          const body = document.querySelector('#documents-page:not([hidden]) #document-body')
+          const loaded = ${JSON.stringify(filename)}.endsWith(".html")
+            ? body?.querySelector("iframe")?.srcdoc?.includes("HTML navigation marker")
+            : body?.textContent?.includes("Document navigation marker")
+          if (location.hash === ${JSON.stringify(hash)} && loaded) return resolve(true)
+          if (Date.now() > deadline) return reject(new Error("document navigation was lost: " + location.hash))
+          setTimeout(read, 25)
+        }
+        read()
+      })`)
+      await tab.run("history.back()")
+      await tab.until("Back returns to the open Session", (s) => s.hash === FRAGMENT[TMUX] && s.open === TMUX && s.view === "detail")
+    })
+  } finally { untrustedContent = "" }
 })
 
 test("untrusted transcript and document Markdown stays inert in the browser", async () => {
