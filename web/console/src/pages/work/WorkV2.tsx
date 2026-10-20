@@ -410,12 +410,13 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
   <section ref={board} id="work" className="page board-page work-page" data-page-view="work" hidden={!shown} aria-labelledby="work-v2-title"
     aria-busy={loading || refreshing || paging ? "true" : undefined}>
     <header className="board-head">
-      <div><p className="board-eyebrow">{catalogWord("inline", "68441095f928")}</p><h1 id="work-v2-title">{catalogWord("inline", "0072da457a09")}</h1></div>
+      <div><h1 id="work-v2-title">{catalogWord("inline", "0072da457a09")}</h1></div>
       <div className="work-head-tools">
         <button className="board-button" type="button" onClick={() => { setFailure(""); setCreatedItem(null); setCreateDraft({}); setCreating(true) }}>{catalogWord("inline", "e5a0a01cc43c")}</button>
-        <button className="board-button" type="button" disabled={!!busy || loading || refreshing || paging}
-          aria-busy={refreshing ? "true" : undefined} aria-label={refreshing ? catalogWord("literal", "8e0d15ad92d4") : undefined}
-          onClick={() => { rearrange.current = true; void load(true) }}>{L.strings.webInfoRefresh}</button>
+        <button className="board-button work-refresh" type="button" disabled={!!busy || loading || refreshing || paging}
+          aria-busy={refreshing ? "true" : undefined} aria-label={refreshing ? catalogWord("literal", "8e0d15ad92d4") : L.strings.webInfoRefresh}
+          title={L.strings.webInfoRefresh}
+          onClick={() => { rearrange.current = true; void load(true) }}><WorkIcon name="refresh" /></button>
       </div>
     </header>
     <div className="work-wrap">
@@ -451,7 +452,16 @@ export function WorkV2Page({ shown }: { shown: boolean }) {
         <div className="work-cards">{done.map((item) => <CompactWorkCard key={item.id} item={item}
           sessions={sessions} nowSeconds={nowSeconds} decisions={decisionsForWorkItem(decisions, item.id)} onOpen={() => openItem(item)} />)}</div>
       </details>}
-      {loaded && !failure && visibleItems.length === 0 && <p className="work-empty work-filter-empty" role="status">
+      {loaded && !failure && visibleItems.length === 0 && !search && status !== "done" && (showPlans || hiddenPlans === 0) &&
+        <div className="work-first-empty" role="status">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4" width="5" height="16" rx="1.5" /><rect x="10" y="4" width="5" height="10" rx="1.5" /><rect x="17" y="4" width="4" height="7" rx="1.5" /></svg>
+          <h2>{nextWord("workEmptyTitle")}</h2>
+          <p>{nextWord("workEmptyBody")}</p>
+          <button className="work-first-create" type="button" onClick={() => { setFailure(""); setCreatedItem(null); setCreateDraft({}); setCreating(true) }}>
+            {nextWord("workCreateItem")}
+          </button>
+        </div>}
+      {loaded && !failure && visibleItems.length === 0 && !(!search && status !== "done" && (showPlans || hiddenPlans === 0)) && <p className="work-empty work-filter-empty" role="status">
         {!showPlans && hiddenPlans > 0
           ? search ? catalogWord("literal", "f653840acc04") : catalogWord("literal", "000c45f69d2f")
           : search ? catalogFormat("template", "1619c02fca4b", [search]) : status === "done" ? catalogWord("literal", "6bb45a6f3d11") : catalogWord("literal", "9c2aa7fb1748")}

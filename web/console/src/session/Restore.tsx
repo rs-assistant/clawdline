@@ -314,10 +314,10 @@ export function RestoreSheet({
           <button className="chip restore-go" type="button" disabled={busy || count === 0} onClick={restore}>
             {phase === "restoring" ? nextWord("restoreGoing") : nextWord("restoreGo", { n: count })}
           </button>
-          <button className="chip" type="button" disabled={busy} onClick={dismissAll}>
+          <button className="chip restore-quiet restore-dismiss" type="button" disabled={busy} onClick={dismissAll}>
             {phase === "dismissing" ? nextWord("restoreDismissing") : nextWord("restoreDismissAll")}
           </button>
-          <button className="chip" type="button" disabled={busy} onClick={onClose}>
+          <button className="chip restore-quiet restore-later" type="button" disabled={busy} onClick={onClose}>
             {acted ? nextWord("restoreDone") : nextWord("restoreCancel")}
           </button>
         </div>

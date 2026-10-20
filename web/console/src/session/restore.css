@@ -62,10 +62,16 @@
 .restore-outcome.opened { color: var(--ok); }
 .restore-outcome.failed { color: #e09985; }
 
-.restore-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
-.restore-buttons .chip { min-width: 88px; padding: 9px 14px; min-height: 40px; text-align: center; }
-.restore-buttons .chip.restore-go { order: 3; border-color: var(--accent-ed); color: var(--accent); }
+/* One filled action; "later" and "never ask again" are quiet text buttons that
+   read differently, so neither is mistaken for the other. */
+.restore-buttons { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.restore-buttons .chip { min-width: 88px; padding: 9px 14px; min-height: 44px; text-align: center; }
+.restore-buttons .chip.restore-go { order: 3; border-color: var(--accent); background: var(--accent); color: #17110e; font-weight: 600; }
 .restore-buttons .chip.restore-go:disabled { opacity: 0.45; }
+.restore-buttons .chip.restore-quiet { border-color: transparent; background: none; color: var(--dim); min-width: 0; }
+.restore-buttons .chip.restore-quiet:hover:not(:disabled) { color: var(--ink); }
+.restore-buttons .chip.restore-later { order: 1; }
+.restore-buttons .chip.restore-dismiss { order: 2; }
 
 @media (max-width: 899px) {
     .restore-card { flex-direction: column; align-items: stretch; }

@@ -413,7 +413,8 @@ function drawMachines(): void {
 function drawResume(): void {
   const row = el("start-resume")
   row.innerHTML = ""
-  row.hidden = !write
+  // Resuming needs a project to resume in; with none, the sheet's one job is adding a folder.
+  row.hidden = !write || (!at && !!places && places.length === 0)
   if (row.hidden) return
 
   if (at) {
@@ -487,6 +488,9 @@ function draw(): void {
     webkit?: { messageHandlers?: { shellAgentSetup?: unknown } }
   }).webkit?.messageHandlers?.shellAgentSetup)
   retry.hidden = machineOnly || mode !== "session" || !(placesUnread || needsAgent)
+  // The only labelled way on when this machine has no project: the same picker as the small "+".
+  el<HTMLButtonElement>("start-add-first").hidden = machineOnly || !!at || !write || placesUnread || !places || places.length > 0
+  el<HTMLButtonElement>("start-add-first").disabled = !!pressing || !!wait
   retry.disabled = loading
   retry.textContent = placesUnread ? nextWord("firstSessionRetry") : nextWord("firstSessionRetryAgent")
   setup.hidden = machineOnly || mode !== "session" || !needsAgent || !localMac
@@ -1238,6 +1242,7 @@ export function StartSheet() {
     el("start-close").addEventListener("click", onClose)
     el("start-machine-action").addEventListener("click", onMachine)
     el("start-add-project").addEventListener("click", onAddProject)
+    el("start-add-first").addEventListener("click", onAddProject)
     el("start-retry-places").addEventListener("click", onRetryPlaces)
     el("start-agent-setup").addEventListener("click", onAgentSetup)
     window.addEventListener("clawdline:agent-setup-changed", onAgentChanged)
@@ -1258,6 +1263,7 @@ export function StartSheet() {
       el("start-close")?.removeEventListener("click", onClose)
       el("start-machine-action")?.removeEventListener("click", onMachine)
       el("start-add-project")?.removeEventListener("click", onAddProject)
+      el("start-add-first")?.removeEventListener("click", onAddProject)
       el("start-retry-places")?.removeEventListener("click", onRetryPlaces)
       el("start-agent-setup")?.removeEventListener("click", onAgentSetup)
       window.removeEventListener("clawdline:agent-setup-changed", onAgentChanged)
@@ -1318,6 +1324,7 @@ export function StartSheet() {
             </div>
           </div>
           <ul className="places" id="start-list"></ul>
+          <button className="chip wide start-add-first" id="start-add-first" type="button" hidden>{nextWord("startAddFirstFolder")}</button>
           <button className="chip wide" id="start-retry-places" type="button" hidden>{nextWord("firstSessionRetry")}</button>
           <a className="chip wide" id="start-agent-setup" href="clawdline-next://setup" hidden>{nextWord("firstSessionOpenSetup")}</a>
           <p className="say" id="start-agent-help" hidden>{nextWord("firstSessionAgentOtherHint")}</p>

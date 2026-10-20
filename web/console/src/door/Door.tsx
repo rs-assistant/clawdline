@@ -7,6 +7,9 @@ import { toast } from "../overlays/toast.js"
 import { onHealth } from "../health-feed.js"
 import { doorApi, type DoorFailure, type DoorHealth } from "./api.js"
 import { passwordFailureSentence } from "./failure.js"
+import { nextWord } from "../next-strings.js"
+import { failureParts } from "../refusals/refusal-text.js"
+import "./door.css"
 
 /**
  * The door: what is on screen when this daemon is answering, and not *this
@@ -212,8 +215,13 @@ function Door({ shown, password, onSignedIn }: { shown: boolean; password: boole
         </div>
 
         <section data-step="ask">
-          <p className="lede">{T.webDoorAskLede}</p>
-          <p className="fine" dangerouslySetInnerHTML={{ __html: L.wordsHTML(T.webDoorAskFine) }} />
+          <p className="lede">{nextWord("doorAskTitle")}</p>
+          <p className="fine">{nextWord("doorAskBenefit")}</p>
+          <ol className="door-steps">
+            <li>{nextWord("doorAskStep1")}</li>
+            <li>{nextWord("doorAskStep2")}</li>
+            <li>{nextWord("doorAskStep3")}</li>
+          </ol>
           <label htmlFor="door-name">{T.webDoorName}</label>
           <input id="door-name" name="d1n" {...nameAttrs} />
           <button className="go" id="door-ask" type="button">
@@ -222,6 +230,10 @@ function Door({ shown, password, onSignedIn }: { shown: boolean; password: boole
           <button className="alt" id="door-to-password" type="button">
             {T.webDoorToPassword}
           </button>
+          <details className="door-why">
+            <summary>{nextWord("doorAskWhy")}</summary>
+            <p>{nextWord("doorAskWhyBody")}</p>
+          </details>
         </section>
 
         <section data-step="code">
@@ -277,6 +289,10 @@ function Door({ shown, password, onSignedIn }: { shown: boolean; password: boole
         </section>
 
         <p className="say" id="door-say" role="status" aria-live="polite" />
+        <details className="door-detail" id="door-detail" hidden>
+          <summary>{nextWord("cloudErrorDetails")}</summary>
+          <span id="door-detail-tag" />
+        </details>
       </div>
     </div>
   )
@@ -307,6 +323,8 @@ function bindDoor(host: HTMLElement, onSignedIn: () => void): DoorControl {
     pwGo: byId<HTMLButtonElement>("door-pw-go"),
     toPair: byId<HTMLButtonElement>("door-to-pair"),
     say: byId<HTMLParagraphElement>("door-say"),
+    detail: byId<HTMLDetailsElement>("door-detail"),
+    detailTag: byId<HTMLSpanElement>("door-detail-tag"),
     form: byId<HTMLFormElement>("door-pw-form"),
   }
   const boxes = Array.from(els.digits.children) as HTMLInputElement[]
@@ -346,10 +364,17 @@ function bindDoor(host: HTMLElement, onSignedIn: () => void): DoorControl {
       if (name !== "code") this.stopClock()
     },
 
-    /** What went wrong, or what is about to happen: the server's own sentences, shown as they are. */
-    say(words: string, calm?: boolean) {
+    /**
+     * What went wrong, or what is about to happen. A refusal's code and origin
+     * go under "Details", folded: the sentence is for the person, the tag for
+     * whoever they ask for help.
+     */
+    say(words: string, calm?: boolean, tag?: string) {
       els.say.textContent = words || ""
       els.say.className = "say" + (calm ? " calm" : "")
+      els.detailTag.textContent = tag || ""
+      els.detail.hidden = !tag
+      if (!tag) els.detail.open = false
     },
 
     ask() {
@@ -374,12 +399,11 @@ function bindDoor(host: HTMLElement, onSignedIn: () => void): DoorControl {
           // `rate_limited` used to arrive as that message, or as one sentence
           // when there was none — so a `forbidden` and a daemon that is not
           // there read alike. The catalog names each code and tags it.
-          this.say(
-            L.failureSentence(e, {
-              sentence: e.code === "rate_limited" ? T.webDoorRateLimited : "",
-              fallback: T.webDoorAskFailed,
-            }),
-          )
+          const said = failureParts(e, {
+            sentence: e.code === "rate_limited" ? T.webDoorRateLimited : "",
+            fallback: T.webDoorAskFailed,
+          })
+          this.say(said.text, false, said.tag)
         })
         .then(() => {
           els.ask.disabled = false
@@ -406,6 +430,15 @@ function bindDoor(host: HTMLElement, onSignedIn: () => void): DoorControl {
           // not a wrong guess.
           if (e.code === "wrong_code") this.wrong += 1
           this.clearDigits()
+          // The machine has let this pairing go: the countdown and the
+          // confirm button belong to a code that no longer exists.
+          // refusal-ok: an expired pairing has exactly one way on, asking for new digits, and its code changes nothing the person can do.
+          if (e.code === "expired") {
+            this.pairing = null
+            this.step("ask")
+            this.say(nextWord("doorCodeExpired"))
+            return
+          }
           if (this.wrong >= 5 || (e.code === "wrong_code" && e.triesLeft === 0)) {
             this.pairing = null
             this.step("ask")
@@ -415,12 +448,14 @@ function bindDoor(host: HTMLElement, onSignedIn: () => void): DoorControl {
           // Not every refusal on this press is a wrong code: `rate_limited`,
           // `forbidden` and a door that never answered used to read as "驗證碼
           // 不對", which sends somebody to type the same six digits again.
-          this.say(
-            L.failureSentence(e, {
-              sentence: e.code === "wrong_code" ? T.webDoorWrongCode : "",
-              fallback: T.webDoorAskFailed,
-            }),
-          )
+          const wrong = typeof e.triesLeft === "number" && e.triesLeft > 0
+            ? nextWord("doorWrongCodeTries", { n: e.triesLeft })
+            : T.webDoorWrongCode
+          const said = failureParts(e, {
+            sentence: e.code === "wrong_code" ? wrong : "",
+            fallback: T.webDoorAskFailed,
+          })
+          this.say(said.text, false, said.tag)
           if (!phone()) boxes[0]?.focus()
         })
         .then(() => {
