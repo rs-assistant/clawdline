@@ -3,6 +3,8 @@
 // Every snapshot below is a synthetic test body; none is reachable from the page.
 import { test } from "node:test"
 import assert from "node:assert/strict"
+import type { HealthQuery } from "./types.ts"
+import type { HealthTarget } from "./model.ts"
 // @ts-expect-error -- a `.ts` path, for node.
 import { HEALTH_BOUNDS, HealthContractError, parseHealthSnapshot } from "./parse.ts"
 // @ts-expect-error -- a `.ts` path, for node.
@@ -136,7 +138,8 @@ test("a live refresh keeps a chosen incident, and says when the new data no long
 })
 
 test("every screen has an address that reads back to itself, and stray addresses name none", () => {
-  for (const t of [{ screen: "M01" }, { screen: "M02", machine: null }, { screen: "M02", machine: "m/1 x" }, { screen: "M03" }, { screen: "M04", trace: "TR 1" }, { screen: "M05", incident: "INC-1" }, { screen: "M06" }, { screen: "evidence", incident: "INC-1" }]) {
+  const targets: HealthTarget[] = [{ screen: "M01" }, { screen: "M02", machine: null }, { screen: "M02", machine: "m/1 x" }, { screen: "M03" }, { screen: "M04", trace: "TR 1" }, { screen: "M05", incident: "INC-1" }, { screen: "M06" }, { screen: "evidence", incident: "INC-1" }]
+  for (const t of targets) {
     assert.deepEqual(healthTarget(healthPath(t)), t)
   }
   assert.equal(healthTarget("/admin"), null)
@@ -163,7 +166,7 @@ test("the agent record holds only what the scope could read, and names example d
 
 test("a load is bounded by its deadline, and a superseded load is dropped, not shown", async () => {
   const hang = { load: (_q: unknown, signal: AbortSignal) => new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("x")))) }
-  const q = { scope: "cloud_operator", window_s: 3600, until: null }
+  const q: HealthQuery = { scope: "cloud_operator", window_s: 3600, until: null }
   assert.deepEqual(await loadHealth(hang, q, new AbortController().signal, 20), { ok: false, code: "timeout" })
   const outer = new AbortController()
   const pending = loadHealth(hang, q, outer.signal, 1000)
