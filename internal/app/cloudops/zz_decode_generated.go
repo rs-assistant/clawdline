@@ -953,11 +953,15 @@ func genDecodePairAgentStatus(b body) (plan, LocalRequest, bool) {
 // genDecodePastSessions is the `past-sessions` row's decode.
 func genDecodePastSessions(b body) (plan, LocalRequest, bool) {
 	if !b.hasOneOf(
+		[]string{"type", "assistant", "cursor", "place", "request", "session"},
 		[]string{"type", "assistant", "place", "request", "session"},
 	) {
 		return plan{}, LocalRequest{}, false
 	}
 	if !b.genValid("assistant", genRule{kind: "string"}) {
+		return plan{}, LocalRequest{}, false
+	}
+	if !b.genValid("cursor", genRule{kind: "string"}) {
 		return plan{}, LocalRequest{}, false
 	}
 	if !b.genValid("place", genRule{kind: "string", nonEmpty: true}) {
@@ -972,6 +976,7 @@ func genDecodePastSessions(b body) (plan, LocalRequest, bool) {
 		path += "/" + segment(t)
 	}
 	req := LocalRequest{Method: "GET", Path: path}
+	req.Query = b.genQuery(map[string]genValue{"cursor": genValue{from: "cursor", omitEmpty: true}})
 	return p, req, true
 }
 

@@ -1246,3 +1246,17 @@ func TestEveryOperationIsAnsweredAsItself(t *testing.T) {
 		})
 	}
 }
+
+func TestPastPageCursorReachesTheLocalHistoryRoute(t *testing.T) {
+	r := &router{}
+	answer := open(r).Handle(context.Background(), request(t, ClassCtl, map[string]any{
+		"type": "past-sessions", "session": MachineReplySession, "request": "req-past-page", "place": "project", "assistant": "codex", "cursor": "older/+?= page",
+	}))
+	if answer.Session != MachineReplySession {
+		t.Fatalf("wrong reply %v", answer)
+	}
+	req := r.last()
+	if req.Path != "/v1/places/project/sessions/codex" || req.Query["cursor"] != "older/+?= page" {
+		t.Fatalf("wrong request %v", req)
+	}
+}

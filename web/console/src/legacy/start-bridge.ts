@@ -98,10 +98,10 @@ export const startApi = {
    */
   places: (machine?: string | null) => jsonFetch<{ places?: StartPlaceRow[]; assistants?: StartAssistantRow[] }>(
     "/v1/places" + (machine ? "?machine=" + encodeURIComponent(machine) : "")),
-  pastSessions: (id: string, assistant?: string | null) => {
+  pastSessions: (id: string, assistant?: string | null, cursor?: string) => {
     let path = "/v1/places/" + encodeURIComponent(id) + "/sessions"
     if (assistant) path += "/" + encodeURIComponent(assistant)
-    return jsonFetch<{ sessions?: PastRow[]; more?: boolean }>(path)
+    return jsonFetch<{ sessions?: PastRow[]; more?: boolean; next_cursor?: string }>(path + (cursor ? "?cursor=" + encodeURIComponent(cursor) : ""))
   },
   /**
    * The key is minted once per press: a retry of this request is the same start.

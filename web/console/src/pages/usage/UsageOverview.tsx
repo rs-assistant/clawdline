@@ -61,8 +61,7 @@ export default function UsageOverviewPage({ shown }: { shown: boolean }) {
     return () => request.cancel()
   }, [days, project, revision, shown, visible])
 
-  const unattributed = w("usageUnattributed")
-  const pickerOptions = useMemo(() => usageProjectOptions(options, places, unattributed), [options, places, unattributed])
+  const pickerOptions = useMemo(() => usageProjectOptions(options, places), [options, places])
   const data = read.state === "ready" ? read.data : null
   const fleet = scheduleFleet()
   const machine = fleet?.machines.find(m => m.id === fleet.current)?.name ?? w("usageThisMachine")

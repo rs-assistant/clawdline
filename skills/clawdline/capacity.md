@@ -221,6 +221,7 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `session.close_scheduled` | 16 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `session.close_scheduled_per_terminal` | 1 | `rows` | `coalesce` | `diagnostics, sender` | — |
 | `session.close_scheduled_seconds` | 900 | `seconds` | `expire` | `diagnostics, log` | — |
+| `session.codex_past_page` | 20 | `rows` | `evict_oldest` | `diagnostics, sender` | — |
 | `session.direct_todo_bytes` | 8192 | `bytes` | `refuse` | `diagnostics, sender, health` | — |
 | `session.direct_todos` | 500 | `rows` | `refuse` | `diagnostics, sender, health` | — |
 | `session.executions` | 4096 | `rows` | `refuse` | `diagnostics, health, sender, log` | — |

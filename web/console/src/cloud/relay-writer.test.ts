@@ -109,8 +109,8 @@ class FakeClient implements CloudWriteClient {
   places(machine: string) {
     return this.act("places", [machine], { places: [{ id: "mac-a\u0000p1", label: "api" }], assistants: [{ id: "claude" }] })
   }
-  pastSessions(place: string, assistant: string) {
-    return this.act("pastSessions", [place, assistant], { sessions: [] })
+  pastSessions(place: string, assistant: string, cursor?: string) {
+    return this.act("pastSessions", cursor ? [place, assistant, cursor] : [place, assistant], { sessions: [] })
   }
   startPlace(place: string, assistant: string, model: string) {
     return this.act("startPlace", [place, assistant, model], { ok: true, id: "new-1", backend: "iterm" })
@@ -2551,4 +2551,13 @@ test("a static HTML document crosses the Cloud reader transport with its exact M
     assert.equal((await json<{error: string}>(rejected)).error, "malformed_answer")
     client.documentReply = {scope: "project", path: "report.html", media_type: "text/html; charset=utf-8", byte_count: text.length, data: btoa(text)}
   }
+})
+
+test("older history pages preserve their opaque cursor across the Cloud seam", async () => {
+ const client = new FakeClient()
+ const { reader } = seam(client)
+ const cursor = "older/+?= page"
+ const res = await reader.fetch("/v1/places/p1/sessions/codex?cursor=" + encodeURIComponent(cursor))
+ assert.equal(res.status,200)
+ assert.deepEqual(client.calls, [["pastSessions", "p1", "codex", cursor]])
 })

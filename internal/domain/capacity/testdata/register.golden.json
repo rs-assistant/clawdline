@@ -4260,6 +4260,26 @@
   },
   {
     "Register": "daemon",
+    "Name": "session.codex_past_page",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/projects.CodexPastPageLimit"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "session.direct_todo_bytes",
     "Class": "evidence",
     "Unit": "bytes",

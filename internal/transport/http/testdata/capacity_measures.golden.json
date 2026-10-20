@@ -1057,6 +1057,11 @@
     "Note": true
   },
   {
+    "Name": "session.codex_past_page",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "session.direct_todo_bytes",
     "Known": true,
     "Note": true

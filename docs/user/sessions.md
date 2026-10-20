@@ -107,6 +107,14 @@ the tunnel's HTTPS address, or the hosted console.
 3. Choose **Claude Code** or **Codex** under **Start with**, or resume a past
    conversation under **Pick up an earlier one**.
 
+Codex history loads twenty provider records at a time. Choose **Load older sessions** to
+continue; a page containing only excluded background conversations still offers the next page.
+If a read fails, **Retry** keeps the sessions already loaded and retries the same page. A read
+failure does not mean a conversation was deleted. Resuming checks the selected conversation
+directly rather than listing the project's entire history again. Provider subprocesses retain
+their two-process concurrency cap, eight-second per-response timeout and twenty-second total
+deadline; retries happen only when requested.
+
 **Check:** the sheet says **Started. Waiting for it to appear…** and the new
 session shows up in the list. With several machines on a Cloud account, **Machine** chooses
 where it runs.

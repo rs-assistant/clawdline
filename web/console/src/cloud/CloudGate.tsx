@@ -402,6 +402,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const switcherRef = useRef<HTMLDivElement>(null)
   const switchButtonRef = useRef<HTMLButtonElement>(null)
+  const closeSwitcher = useCallback(() => {
+    // Return focus before inert removes the closing menu from keyboard access.
+    if (switcherRef.current?.querySelector(".cloud-switch-menu")?.contains(document.activeElement)) {
+      switchButtonRef.current?.focus({ preventScroll: true })
+    }
+    setSwitcherOpen(false)
+  }, [])
   // Forgetting a machine (`forget.ts`): which one is being asked about, which
   // ones this tab or the account says are forgotten, and what the account
   // answered about the last one. The relay can retain an old snapshot after
@@ -1252,13 +1259,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   useEffect(() => {
     if (!switcherOpen) return
     const outside = (event: PointerEvent) => {
-      if (!switcherRef.current?.contains(event.target as Node)) setSwitcherOpen(false)
+      if (!switcherRef.current?.contains(event.target as Node)) closeSwitcher()
     }
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
       event.preventDefault()
       event.stopPropagation()
-      setSwitcherOpen(false)
+      closeSwitcher()
       switchButtonRef.current?.focus()
     }
     document.addEventListener("pointerdown", outside)
@@ -1267,7 +1274,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
       document.removeEventListener("pointerdown", outside)
       document.removeEventListener("keydown", escape, true)
     }
-  }, [switcherOpen])
+  }, [switcherOpen, closeSwitcher])
 
   const shown = useMemo<MachineListState>(
     () => {
@@ -1504,7 +1511,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [scheduleFleetKey])
 
   const switchMachine = (machine: CloudMachine) => {
-    setSwitcherOpen(false)
+    closeSwitcher()
     setFleetScope(false)
     setFleetTarget(null)
     // The address names a fleet that is being left, or a Session on the machine
@@ -1544,7 +1551,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }
 
   const openAllSessions = () => {
-    setSwitcherOpen(false)
+    closeSwitcher()
     // Every machine is this tab's choice now, so the one machine it chose
     // before is not: leaving it recorded would reopen that machine alone on
     // the next load from any address but this one.
@@ -1607,7 +1614,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         aria-expanded={switcherOpen}
         aria-controls="cloud-quick-machines"
         ref={switchButtonRef}
-        onClick={() => setSwitcherOpen((open) => !open)}
+        onClick={() => switcherOpen ? closeSwitcher() : setSwitcherOpen(true)}
       >
         <span className="dot" aria-hidden="true" />
         <span className="cloud-switch-name">{fleetScope ? nextWord("cloudAllMachines") : named.name || named.label || named.id}</span>
@@ -1617,8 +1624,10 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           <path d="m3 4.5 3 3 3-3" />
         </svg>
       </button>
-      {switcherOpen && (
-        <div
+      <div
+          data-open={switcherOpen}
+          inert={!switcherOpen}
+          aria-hidden={!switcherOpen}
           className="cloud-switch-menu"
           id="cloud-quick-machines"
           role="dialog"
@@ -1681,7 +1690,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
                         title={nextWord("cloudPairOne", { machine: name })}
                         aria-label={nextWord("cloudPairOne", { machine: name })}
                         onClick={() => {
-                          setSwitcherOpen(false)
+                          closeSwitcher()
                           openPairing({ id: machine.id, name })
                         }}
                       >
@@ -1698,14 +1707,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             type="button"
             className="cloud-switch-manage"
             onClick={() => {
-              setSwitcherOpen(false)
+              closeSwitcher()
               leave()
             }}
           >
             {nextWord("cloudManageMachines")}
           </button>
         </div>
-      )}
     </div>
   )
   // A pairing is drawn over whatever is on screen, the console included, but
