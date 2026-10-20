@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 7892,
+  "englishKeys": 7898,
   "counts": {
-    "negation": 2306,
+    "negation": 2309,
     "state": 1277,
     "permission": 451,
     "deletion": 190,
     "uncertainty": 222
   },
-  "unionCount": 3513,
+  "unionCount": 3516,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -239,6 +239,9 @@
       "capacityRow.console.health_live_seconds.full",
       "capacityRow.console.health_ui_export_bytes.full",
       "capacityRow.console.health_ui_id_characters.full",
+      "capacityRow.console.health_ui_incident_export_bytes.full",
+      "capacityRow.console.health_ui_incident_rows.full",
+      "capacityRow.console.health_ui_incident_window_seconds.full",
       "capacityRow.console.health_ui_page_rows.full",
       "capacityRow.console.health_ui_reads_per_load.full",
       "capacityRow.console.opened_row_quiet_seconds.full",
@@ -4784,6 +4787,9 @@
     "capacityRow.console.health_ui_budget_seconds.full",
     "capacityRow.console.health_ui_export_bytes.full",
     "capacityRow.console.health_ui_id_characters.full",
+    "capacityRow.console.health_ui_incident_export_bytes.full",
+    "capacityRow.console.health_ui_incident_rows.full",
+    "capacityRow.console.health_ui_incident_window_seconds.full",
     "capacityRow.console.health_ui_page_rows.full",
     "capacityRow.console.health_ui_parallel_reads.full",
     "capacityRow.console.health_ui_reads_per_load.full",

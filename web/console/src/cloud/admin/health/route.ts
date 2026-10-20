@@ -84,19 +84,19 @@ export function healthScope(search: string, now: number = Date.now()): HealthSco
 /** The per-screen query: the M03 source filter and the M05 revision. Malformed values are dropped. */
 function screenQuery(screen: HealthScreen, search: string): HealthScreen {
   const q = new URLSearchParams(search)
+  // Only values present are written, so an address without them reads back as the bare screen.
   if (screen.screen === "M03") {
     const source = q.get("source")
     const sourceId = q.get("source_id")
-    return {
-      screen: "M03",
-      source: source !== null && (SOURCE_FILTERS as readonly string[]).includes(source) ? (source as SourceFilter) : null,
-      sourceId: sourceId !== null && SOURCE_ID.test(sourceId) ? sourceId : null,
-    }
+    const out: HealthScreen = { screen: "M03" }
+    if (source !== null && (SOURCE_FILTERS as readonly string[]).includes(source)) out.source = source as SourceFilter
+    if (sourceId !== null && SOURCE_ID.test(sourceId)) out.sourceId = sourceId
+    return out
   }
   if (screen.screen === "M05" && screen.incident !== null) {
     const raw = q.get("revision")
     const n = raw !== null && /^[0-9]{1,2}$/.test(raw) ? Number(raw) : NaN
-    return { ...screen, revision: n >= 1 && n <= MAX_REVISION ? n : null }
+    return n >= 1 && n <= MAX_REVISION ? { ...screen, revision: n } : screen
   }
   return screen
 }

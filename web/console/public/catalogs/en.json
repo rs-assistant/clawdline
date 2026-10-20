@@ -7891,6 +7891,12 @@
   "capacityRow.console.health_ui_event_pages.full": "At the bound, loading older records is replaced by a note to narrow the window.",
   "capacityRow.console.health_ui_export_bytes.what": "The largest evidence record the connection-health page copies.",
   "capacityRow.console.health_ui_export_bytes.full": "A larger record is not copied, and the page says how large it would be.",
+  "capacityRow.console.health_ui_incident_rows.what": "The incidents the connection-health page asks Cloud for in one list.",
+  "capacityRow.console.health_ui_incident_rows.full": "More incidents are not shown, and the page says more were opened in that window.",
+  "capacityRow.console.health_ui_incident_export_bytes.what": "The largest incident export the connection-health page keeps for download or copy.",
+  "capacityRow.console.health_ui_incident_export_bytes.full": "A larger export stops being read, and nothing is kept or offered.",
+  "capacityRow.console.health_ui_incident_window_seconds.what": "How far back the connection-health page lists incidents by when they opened.",
+  "capacityRow.console.health_ui_incident_window_seconds.full": "Older incidents are not listed.",
   "capacityRow.console.health_ui_id_characters.what": "The longest trace or boot id an operator address may carry.",
   "capacityRow.console.health_ui_id_characters.full": "A longer id names no screen, so the page says the address is unknown."
 }

@@ -7891,6 +7891,12 @@
   "capacityRow.console.health_ui_event_pages.full": "到達上限時，「載入更早的紀錄」會換成縮小時間範圍的提示。",
   "capacityRow.console.health_ui_export_bytes.what": "連線健康頁面可複製的證據紀錄大小上限。",
   "capacityRow.console.health_ui_export_bytes.full": "超過時不會複製，頁面會說明紀錄會有多大。",
+  "capacityRow.console.health_ui_incident_rows.what": "連線健康頁面一次向 Cloud 要求的事件數量。",
+  "capacityRow.console.health_ui_incident_rows.full": "更多的事件不會顯示，頁面會說明那段時間還有更多事件。",
+  "capacityRow.console.health_ui_incident_export_bytes.what": "連線健康頁面保留供下載或複製的事件匯出大小上限。",
+  "capacityRow.console.health_ui_incident_export_bytes.full": "超過時會停止讀取，不保留也不提供任何內容。",
+  "capacityRow.console.health_ui_incident_window_seconds.what": "連線健康頁面依開啟時間列出事件的回溯範圍。",
+  "capacityRow.console.health_ui_incident_window_seconds.full": "更早的事件不會列出。",
   "capacityRow.console.health_ui_id_characters.what": "營運者網址中追蹤或開機 id 的最長長度。",
   "capacityRow.console.health_ui_id_characters.full": "更長的 id 不對應任何畫面，頁面會說明網址無法辨識。"
 }
