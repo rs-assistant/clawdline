@@ -4,7 +4,7 @@ package capacity
 // rows are declared in register_connection_health.go, and the
 // cloud.health_store_* rows in register_healthjournal.go.
 func cloudBounds() []Entry {
-	return append(append(connectionHealthBounds(), healthJournalBounds()...), []Entry{
+	return append(append(append(connectionHealthBounds(), healthJournalBounds()...), healthUploadBounds()...), []Entry{
 		{
 			// A Cloud Session row (s/), status row (ss/) or status marker
 			// whose only change is its activity time, its sub-agents or its

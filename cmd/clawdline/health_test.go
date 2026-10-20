@@ -15,7 +15,10 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
+	"github.com/sainteye/clawdline/internal/adapters/healthupload"
+	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
+	httptransport "github.com/sainteye/clawdline/internal/transport/http"
 )
 
 func healthRunAgainst(t *testing.T, handler http.HandlerFunc, args ...string) (int, string, string, *http.Request) {
@@ -147,4 +150,85 @@ func TestHealthHistoryAsksTheDurableStore(t *testing.T) {
 	if code, _, _, _ := healthRunAgainst(t, never, "history", "--limit", "500"); code != 2 {
 		t.Fatalf("an over-bound limit: exit %d", code)
 	}
+}
+
+func newHealthServer(t *testing.T) (string, *httptransport.Server) {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "next")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	srv, err := httptransport.New(config.Config{Dir: dir, Host: "127.0.0.1", Port: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir, srv
+}
+
+// Stopping flushes and closes the store, frees its lock, and the next boot
+// reads this boot's records back from disk.
+func TestStoppingFlushesAndClosesTheStoreForTheNextBoot(t *testing.T) {
+	dir, srv := newHealthServer(t)
+	h := startConnectionHealth(dir, srv)
+	if h == nil {
+		t.Fatal("monitoring is off")
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for h.store.Load() == nil {
+		if time.Now().After(deadline) {
+			t.Fatal("the store did not open")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), connectionHealthStopTimeout)
+	defer cancel()
+	if err := h.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-h.store.Load().Done():
+	case <-time.After(time.Second):
+		t.Fatal("the store's worker is still running after Stop")
+	}
+	if st := h.upload.Status(); st.State != healthupload.CodeStopped {
+		t.Fatalf("uploader %s after Stop", st.State)
+	}
+	// The next boot: the lock is free and this boot's boot record is there.
+	next, err := healthjournal.Open(healthjournal.Options{Dir: connectionHealthStoreDir(dir), BootID: "boot-next", Build: "abc"})
+	if err != nil {
+		t.Fatalf("the next boot cannot open the store: %v", err)
+	}
+	defer func() { _ = next.Close(context.Background()) }()
+	page, err := next.Read(healthjournal.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, e := range page.Entries {
+		if e.BootID == h.rt.BootID && e.Record != nil && e.Record.Event == connectionhealth.EventBoot {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the stopped boot's records are not on disk: %+v", page.Entries)
+	}
+}
+
+// A shutdown that began while the store was opening, and whose Stop gave up
+// waiting: the open still completes and closes its own handle, so the lock
+// does not outlive the shutdown.
+func TestStoppingWhileTheStoreOpensDoesNotLeakIt(t *testing.T) {
+	dir, srv := newHealthServer(t)
+	h := startConnectionHealth(dir, srv)
+	h.cancel()
+	select {
+	case <-h.opened:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the open never finished")
+	}
+	next, err := healthjournal.Open(healthjournal.Options{Dir: connectionHealthStoreDir(dir), BootID: "boot-next", Build: "abc"})
+	if err != nil {
+		t.Fatalf("the lock leaked: %v", err)
+	}
+	_ = next.Close(context.Background())
 }

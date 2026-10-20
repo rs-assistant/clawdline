@@ -280,7 +280,9 @@ func serve() {
 	srv.SetVersion(version)
 	// One connection-health runtime per boot, before anything it instruments
 	// starts and whether or not Cloud is on (health.go).
-	startConnectionHealth(context.Background(), cfg.Dir, srv)
+	// A stopping daemon stops it first, so the durable store is flushed and
+	// closed rather than abandoned mid-write.
+	go stopConnectionHealthOnSignal(startConnectionHealth(cfg.Dir, srv))
 	// A device file that cannot be read stops the daemon here, rather than
 	// letting it listen and refuse everybody.
 	if err := srv.AuthReady(); err != nil {
@@ -540,6 +542,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_open_print_sign_a_browser_in", "  open [--print]   sign a browser in with permission to read and send"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_pair_watch_show_the_code_when", "  pair [--watch]            show the code when a device asks to pair"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_devices_revoke_id_the_browsers_and", "  devices [revoke <id>]     the browsers and devices signed in to this machine directly; revoke one"))
+	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_health_status_events_trace_export_history", "  health <status|events|trace|export|history>   this machine's connection-health watchdog, journal, saved history and Cloud upload; local only"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_cloud_status_on_off_login_connect", "  cloud <status|on|off|login|connect>   the line to app.clawdline.com; off by default"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_remote_agent_tasks", "  remote <machines|dispatch|show|send|finish|ack|retry>   work with a paired Agent on another machine"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_board_tracks_rows_json_the_old", "  board tracks [--rows] [--json]   the old cards on the three tracks, read-only"))

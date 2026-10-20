@@ -1016,6 +1016,235 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.health_upload_attempt_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 10,
+    "WarnAt": 0,
+    "AtLimit": "disconnect",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxAttemptSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_attempts",
+    "Class": "idempotency",
+    "Unit": "rows",
+    "Limit": 6,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxAttempts"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_batch_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 32768,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxBatchBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_batch_events",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 100,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxBatchEvents"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_hourly_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 983040,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxHourlyRoutineBytes",
+      "internal/adapters/healthupload.MaxHourlyBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_hourly_requests",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 120,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxHourlyRequests"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_receipts",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 16,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxReceipts"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_response_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 16384,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxResponseBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_retry_after_seconds",
+    "Class": "buffer",
+    "Unit": "seconds",
+    "Limit": 3600,
+    "WarnAt": 0,
+    "AtLimit": "coalesce",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxRetryAfterSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_retry_seconds",
+    "Class": "idempotency",
+    "Unit": "seconds",
+    "Limit": 3600,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxRetrySeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_state_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 65536,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxStateBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_upload_step_pages",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthupload.MaxStepPages"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.peer_body_bytes",
     "Class": "buffer",
     "Unit": "bytes",

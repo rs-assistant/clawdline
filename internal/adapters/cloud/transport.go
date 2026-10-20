@@ -61,6 +61,13 @@ type Options struct {
 	// bytes of a direct `r/` request and a relay one are identical. A nil one
 	// falls back to Inbound, which answers everything on the relay.
 	DirectInbound func(cloud.Envelope, []byte, ed25519.PublicKey)
+	// InboundTraced, when set, is called instead of Inbound and
+	// DirectInbound, with the content-free correlation of the frame's
+	// connection-health phase (minted by the tracker, never taken from the
+	// envelope) and which carrier it came on, so the receiver's lane
+	// continues the same logical operation. Which callback runs and when is
+	// otherwise unchanged; it must not block either.
+	InboundTraced func(env cloud.Envelope, plaintext []byte, key ed25519.PublicKey, correlation string, direct bool)
 	// PeerInbound receives opaque machine-to-machine frames. It must enqueue
 	// rather than perform a Cloud authorization read on the socket reader.
 	PeerInbound          func([]byte)
@@ -815,6 +822,10 @@ func (t *Transport) admitTraced(raw []byte, directViewer string, h connectionhea
 	// Inbound must not block (it enqueues for the link's lanes); this step
 	// is what shows it when it does.
 	_ = h.Step(connectionhealth.StageLaneQueued, connectionhealth.LocInboundCallback)
+	if t.opts.InboundTraced != nil {
+		t.opts.InboundTraced(envelope, plaintext, verifiedKey, h.Correlation(), directViewer != "" && t.opts.DirectInbound != nil)
+		return true
+	}
 	if directViewer != "" && t.opts.DirectInbound != nil {
 		t.opts.DirectInbound(envelope, plaintext, verifiedKey)
 		return true

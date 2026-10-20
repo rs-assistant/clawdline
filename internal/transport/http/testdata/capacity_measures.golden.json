@@ -249,6 +249,66 @@
     "Note": true
   },
   {
+    "Name": "cloud.health_upload_attempt_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_batch_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_batch_events",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_hourly_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_hourly_requests",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_receipts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_response_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_retry_after_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_retry_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_state_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_step_pages",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.peer_body_bytes",
     "Known": true,
     "Note": true
