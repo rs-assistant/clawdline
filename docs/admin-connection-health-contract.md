@@ -26,7 +26,8 @@ client. The query shapes in §9 remain a proposal; Cloud's implemented API is it
 | Stack capture worker | **not built** | — |
 | Daemon uploader to Cloud ingest (opt-in, own HTTPS client, bounded, durable progress) | implemented, off by default (§9a) | `internal/adapters/healthupload`, `cmd/clawdline/health.go` |
 | Shutdown: watchdog and writer stopped, uploader stopped, store flushed and closed within 3 s | implemented on SIGTERM/interrupt | `cmd/clawdline/health.go` `stopConnectionHealthOnSignal` |
-| Cloud stored queries in a UI, viewer producer, owner sealing | **not built here** (separate tasks) | — |
+| Browser viewer producer (opt-in, own HTTPS upload, bounded) | implemented, off by default; installed only by an explicit `startViewerHealth` call (§11) | `web/console/src/health-viewer`, `web/console/src/legacy/js/net/viewer-health-hook.js` |
+| Cloud stored queries in a UI, owner sealing | **not built here** (separate tasks) | — |
 
 Every export carries the same list as `wiring[]` (`evidence.go` `Unwired`), so no reader can take
 the foundation for the pipeline.
@@ -663,3 +664,102 @@ from a true one, so no attestation is sent. Until then a sealed read answers
 5. Done: the daemon uploader (§9a). Next: Cloud fields for storage loss and `state_after_loss`,
    owner sealing (clients in §9b; key source and daemon wiring still missing), viewer producer,
    stack capture, and M01–M06 on real sources.
+6. Done in code, not yet turned on: the browser viewer producer (§11). Next: the hosted page's
+   start/stop hookup (§11.4), then `viewer_sse_gap` and the write and direct-carrier paths (§11.3).
+
+## 11. Browser viewer producer (implemented, off by default)
+
+The signed-in hosted console's own evidence: how this page's relay connection, reads and
+decryption went, sent as `clawdline.viewer-health.record/1` to Cloud's `POST
+/v1/health/viewer-ingest` (Cloud contract §14). Its value is that it does not travel on the relay
+it reports on: when the relay socket is down the page still uploads over its own HTTPS `fetch`
+with the session cookie (`credentials: "include"`, header `x-clawdline-health: viewer/1`).
+
+### 11.1 Wire
+
+Every enum, pattern and limit is the Cloud parser's (`record.ts`): eight stages, three events,
+five outcomes, thirteen error words, the five classes. A record carries only `schema`,
+`producer_seq`, `event_id` (`<boot_id>-<seq>`), `boot_id`, `event`, `wall`, `mono_ns`, `stage` and
+optionally `class`, `correlation`, `outcome`, `elapsed_ms`, `error`, `count`. `boot_id` (`pg-` + 16
+hex) is generated at producer start; each logical attempt gets a fresh random `correlation`
+(`vt-` + 12 hex). Neither is derived from a URL, channel, Session, document, message or request id,
+and no hook site passes one: the hook API (`viewer-health-hook.js`) takes a stage, a class and an
+error word only. An observation the Cloud would refuse (an error word on a non-failed event, an
+unknown stage, a non-opaque correlation) is dropped and counted locally (`refusedLocally`), never
+sent to cost the batch a 400. `elapsed_ms` and `count` are clamped to the Cloud's ceilings.
+
+### 11.2 Wired sites
+
+| Stage | Where | Events |
+| --- | --- | --- |
+| `viewer_connect` | `cloud-boot.js` `keepConnected` loop, the loop's first `session.connect()` | started; completed `ok`, failed with the classified error, or completed `aborted` (stopped, pairing, device seat) |
+| `viewer_reconnect` | the same loop, every later attempt while no client serves | as above |
+| `viewer_carrier_replace` | the same loop, an attempt while a ready client still serves (token renewal, fresh socket after a long hide) | as above |
+| `viewer_sse_resume` | `cloud-client.js` `start` → `_becameReady` of a client created with `resumeFrom` | completed `ok` when the predecessor's delivery provably continued (`_continueFrom` taken); failed `sse_resume_refused` when continuity was unproven and rows are asked for again; failed `carrier_closed` if the socket closed first |
+| `viewer_request_issued` | `cloud-client.js` `_read`, when the read's waiter is created | started |
+| `viewer_response_received` | `cloud-client.js` `_settleRead` | completed `ok`; failed `timeout`, `carrier_closed`, …; an abandoned read is failed `unclassified` with outcome `aborted` |
+| `viewer_decrypt_apply` | `_settleRead` success (an answer is only settled opened and applied), and `_receiveEnvelope`'s failure path | completed `ok` under the read's correlation; failed `replay_rejected`, `apply_failed` (probe stage `apply`) or `decrypt_failed` (anything before the payload opened), under its own correlation |
+
+"SSE" in the Cloud's stage names is mapped onto the relay WebSocket the hosted console actually
+uses: the hosted console has no EventSource; its stream resume is the successor socket taking over
+from its predecessor. Error words come from `classifyViewerError`: a fixed table of the
+transport's own codes, anything else `unclassified`, never a guess.
+
+### 11.3 Not wired (stated, not hidden)
+
+- `viewer_sse_gap`: the relay socket has no contiguous per-stream ids for the page to detect a
+  skipped range (sequences are per sender across channels), so no record is ever sent. A Cloud
+  reader showing no gap rows has **no** evidence that none happened.
+- Writes (`_publishAcknowledged`: send, answer, dispatch) and the WebRTC direct carrier
+  (`direct-carrier.ts`, `terminal-direct.ts`) record nothing.
+- A decrypt or apply failure of an envelope cannot be tied to the read it answered (the read id is
+  inside the ciphertext), so it carries its own correlation; the read then shows as a failed
+  response (usually `timeout`) under the read's correlation.
+- The local console's same-origin daemon and its SSE streams are not Cloud viewers; nothing there
+  records.
+
+### 11.4 Turning it on
+
+`startViewerHealth({ enabled: true, apiOrigin, targetMachineId? })` (`install.ts`) starts the page's
+one producer and installs it into the hook; any other configuration answers `null` and records
+nothing. `handle.setTargetMachine(id)` names the owned machine later batches attribute to.
+`handle.stop()` / `stopViewerHealth()` clears the buffer and pending batch, aborts the request in
+flight, and uninstalls. **Not hooked up yet:** the hosted page's lifecycle lives in
+`CloudGate.tsx`, owned by a concurrent task. The root's hookup is: start it where the Cloud
+transport is configured and the session is signed in (behind the page's own explicit setting),
+`setTargetMachine` with the Cloud `machines` id of the reader's machine, and `stop()` in the
+`revoked`, `sign_in` and transport-leaves-Cloud branches of its `keepConnected` state handler.
+
+### 11.5 Bounds and failure behavior
+
+Rows `console.viewer_health_*` (`register_viewer_health.go`, held to `VIEWER_HEALTH_LIMITS` by
+`TestViewerHealthBoundsMatchTheProducer`): body 16 KiB, 50 records per batch, 200 buffered (oldest
+dropped and counted), one batch per 60 s at most after a 5 s coalesce, 60 requests and 256 KiB per
+clock hour (retries included; at the bound nothing is sent until the hour turns), 4 tries with
+5/20/60 s backoff and `Retry-After` honored up to an hour, 10 s per request. One worker: one
+timer and at most one request in flight per page.
+
+| Cloud answer | Producer |
+| --- | --- |
+| 201, 200 (identical replay) | batch done |
+| network error, timeout, 429, 5xx (except below) | same body bytes, same `batch_id`, after backoff; dropped and counted after the 4th try |
+| 401 | stop and clear: `session_gone` until a new session starts a new producer |
+| 403, 503 `health_ingest_disabled` | stop and clear until reload |
+| 404 `machine_not_found` | the same records go again with no `target_machine_id` (a new identity, so a new `batch_id`) |
+| 413 | split: records back to the buffer front, later batches cut to half |
+| 409, 400, other 4xx | batch dropped and counted; only status, `code` and `details.field` are kept |
+
+Records arriving while a batch waits for its retry go to the next batch; the retried body is the
+frozen string, never rebuilt. A stop increments a generation so a late answer changes nothing. A
+hook or producer exception is swallowed at the hook; the page's connect, read and apply paths
+never await the producer.
+
+### 11.6 Measured cost
+
+`node --experimental-strip-types` over the real `viewerRecord`: a typical record is 297 bytes, a
+worst-case one 407; 50 typical records are 15,122 bytes (under 16 KiB), 50 worst-case 20,622, so the
+body bound cuts those at ~39. Page memory: at most 200 × 407 ≈ 80 KB of records plus one 16 KiB
+pending body. Network: at most 256 KiB per hour per page by the hourly bound. Cloud retention is
+the Cloud's: 24 h, 4 MiB per device; revoking the device stops new uploads but stored rows stay
+until their retention ends (Cloud §14.4). Not measured: real-browser CPU per record, and Cloud
+index overhead of viewer rows.
