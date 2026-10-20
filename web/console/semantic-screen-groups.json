@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6990,
-  "riskKeys": 3161,
-  "nonRiskCount": 3829,
+  "englishContentKeys": 7001,
+  "riskKeys": 3162,
+  "nonRiskCount": 3839,
   "groups": [
     {
       "name": "admin / other",
@@ -765,14 +765,17 @@
     },
     {
       "name": "documents / other",
-      "count": 17,
+      "count": 27,
       "sources": [
         "src/pages/documents/copy-adapter.ts and src/legacy/js/view/documents.js"
       ],
       "keys": [
         "documents.back",
+        "documents.backToDocuments",
         "documents.copied",
         "documents.copy",
+        "documents.exitFullscreen",
+        "documents.fullscreen",
         "documents.invalidLinkError",
         "documents.listBack",
         "documents.listProjectMeta",
@@ -780,12 +783,19 @@
         "documents.listTaskMeta",
         "documents.listTaskMetaOne",
         "documents.loading",
+        "documents.otherDocuments",
         "documents.projectMeta",
         "documents.projectMetaOne",
+        "documents.projectSize",
+        "documents.retry",
+        "documents.revealControls",
         "documents.share",
         "documents.shared",
+        "documents.sizeBytes",
+        "documents.sizeBytesOne",
         "documents.taskMeta",
         "documents.taskMetaOne",
+        "documents.taskSize",
         "documents.title"
       ]
     },
