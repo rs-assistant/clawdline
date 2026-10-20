@@ -11,7 +11,7 @@ import type { HealthScreen } from "./route"
 import { healthClock, healthDuration, healthMs, type HealthSay, type HealthWord } from "./words"
 import { linkClick, Panel } from "./parts"
 import {
-  bottleneck, filterLoaded, problems, qualitySummary, stageMatrix, traceLanes, windowBands,
+  bottleneck, problems, qualitySummary, stageMatrix, traceLanes, windowBands,
   type Axis, type Band, type Lane, type MarkKind, type PanelQuality, type Problem, type SeqLane, type SourceMark, type StageRow, type TraceLane,
 } from "./timeline"
 
@@ -342,24 +342,14 @@ function outcomeLine(say: HealthSay, c: StageRow["cells"][number]): string {
 
 /** Source × stage on the loaded page, with each stage's own elapsed time as a bar. */
 export function StageChart({ events, say, nav, asOf, more }: { events: StoredEvent[]; say: HealthSay; nav: ChartNav; asOf: string; more: boolean }) {
-  const [only, setOnly] = useState<string | null>(null)
-  const service = events.filter((e) => e.source === "relay" || e.source === "cloud_api")
-  const { rows: filtered, of } = filterLoaded(service, only)
+  // The source filter is the Cloud's own (M03's control); this draws what that read returned.
+  const filtered = events.filter((e) => e.source === "relay" || e.source === "cloud_api")
+  const of = filtered.length
   const rows = stageMatrix(filtered)
   const max = Math.max(1, ...rows.flatMap((r) => r.cells.map((c) => c.maxElapsedMs ?? 0)))
   const b = bottleneck(rows, asOf)
   return (
     <div className="adh-stages">
-      <div className="adh-controls">
-        <label className="adh-control">
-          <span>{say("tl_filterLabel")}</span>
-          <select value={only ?? ""} onChange={(e) => setOnly(e.target.value === "" ? null : e.target.value)}>
-            <option value="">{say("tl_filterAll")}</option>
-            <option value="relay">{say("tl_filter_relay")}</option>
-            <option value="cloud_api">{say("tl_filter_cloud_api")}</option>
-          </select>
-        </label>
-      </div>
       <p className="adm-fine">{say(more ? "tl_stagesLocalMore" : "tl_stagesLocal", { n: filtered.length, of })}</p>
       {b ? (
         <p className="adh-bneck" role="status">

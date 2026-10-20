@@ -1,7 +1,7 @@
 /* The evidence record an operator can copy for an agent: only what this page
- * obtained under its own authorization, field by field. The Cloud's own export
- * route answers 501 (durable incidents and bundles are not built), so this is a
- * local copy of stored metadata, and it says so; it is not an incident bundle. */
+ * obtained under its own authorization, field by field. It is a local copy of
+ * stored metadata, and it says so; it is not an incident bundle. A durable
+ * incident's bundle is exported from M05 as the Cloud's own audited artifact. */
 import type { HealthRoute } from "./route.ts"
 import type { StoredEvent, StoredGroup, StoredSource, Envelope } from "./stored.ts"
 import type { PartName, StoredState } from "./cloud.ts"
@@ -36,7 +36,7 @@ const eventView = (e: StoredEvent) => ({
   id: e.id, account: e.account, machine_id: e.machine_id, source_id: e.source_id, producer_instance: e.producer_instance, schema: e.schema,
   producer_seq: e.producer_seq, event_id: e.event_id, boot_id: e.boot_id, batch_id: e.batch_id, build_commit: e.build_commit, event: e.event,
   wall: e.wall, mono_ns: e.mono_ns, source: e.source, stage: e.stage, class: e.class, kind: e.kind, phase_id: e.phase_id,
-  correlation: e.correlation, count: e.count, rule: e.rule, received_at: e.received_at,
+  correlation: e.correlation, count: e.count, rule: e.rule, state: e.state, received_at: e.received_at,
 })
 
 const sourceView = (s: StoredSource) => ({
@@ -67,7 +67,9 @@ export function buildStoredEvidence(state: StoredState, route: HealthRoute, expo
     origin: "operator_stored_reads",
     not_an_incident_bundle: true,
     filter: { trace: route.screen === "evidence" ? route.trace : null, account: route.scope.account, window: state.window, pinned_until: route.scope.until },
-    unsupported: { incidents: "unsupported", incident_export: "unsupported_capability", owner_diagnostics: "unsupported", overall_outcome: "no_presence_contract" },
+    // Durable incidents have their own audited, hash-checked export (M05); none is folded in here.
+    incident_bundles: "not_included_use_incident_export",
+    unsupported: { owner_diagnostics: "unsupported", overall_outcome: "no_presence_contract" },
     read_failures: failures,
     outcomes: outcomes ? { envelope: envelopeView(outcomes), groups: groups.map(groupView), ungrouped: outcomes.ungrouped } : null,
     events: list ? { envelope: envelopeView(list), pages: 1 + state.older.length, more: state.olderCursor !== null, rows: events.map(eventView) } : null,

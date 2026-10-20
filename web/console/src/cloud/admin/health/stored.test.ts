@@ -25,7 +25,7 @@ const NOW = Date.parse("2026-10-20T12:00:00.000Z")
 const API = "https://api.example.invalid"
 
 async function fixtureBody(path: string, scenario: FixtureScenario = "normal"): Promise<unknown> {
-  return (await fixtureAnswer(scenario, `${API}/su/v1/health/${path}?from=2026-10-20T11:00:00.000Z&to=2026-10-20T12:00:00.000Z`, NOW).json())
+  return (await (await fixtureAnswer(scenario, `${API}/su/v1/health/${path}?from=2026-10-20T11:00:00.000Z&to=2026-10-20T12:00:00.000Z`, NOW)).json())
 }
 
 const route = (path: string, search = ""): HealthRoute => healthRoute(path, search, NOW)!

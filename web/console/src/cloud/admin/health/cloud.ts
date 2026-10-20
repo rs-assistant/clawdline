@@ -12,9 +12,9 @@
 import type { HealthRoute } from "./route.ts"
 // @ts-expect-error -- a `.ts` path, so node's strip-types tests can import this module.
 import { windowBounds } from "./route.ts"
-import type { EventsBody, IncidentsBody, OutcomesBody, OverviewBody, SourcesBody, StoredEvent } from "./stored.ts"
+import type { EventsBody, IncidentDetailBody, IncidentListBody, OutcomesBody, OverviewBody, SourcesBody, StoredEvent } from "./stored.ts"
 // @ts-expect-error -- a `.ts` path, so node's strip-types tests can import this module.
-import { parseEvents, parseIncidents, parseOutcomes, parseOverview, parseSources, StoredContractError, STORED_BOUNDS } from "./stored.ts"
+import { parseEvents, parseIncidentDetail, parseIncidentList, parseOutcomes, parseOverview, parseSources, StoredContractError, STORED_BOUNDS } from "./stored.ts"
 
 /** Bounds of one load. Registered as console.health_ui_* (internal/domain/capacity). */
 export const HEALTH_UI_LIMITS = {
@@ -34,6 +34,12 @@ export const HEALTH_UI_LIMITS = {
   pageRows: STORED_BOUNDS.pageRows,
   /** Pages of one event list held at once, the first included. */
   eventPages: 5,
+  /** Incident rows asked for per list read (the Cloud's default page; its maximum is 200). */
+  incidentRows: 50,
+  /** One incident export body: the Cloud refuses to export past 1 MiB, so more is not its bundle. */
+  incidentExportBytes: 1024 * 1024,
+  /** The incident list's window over `opened_at` (the Cloud's own maximum, 7 days). */
+  incidentWindowMs: 7 * 86_400_000,
 } as const
 
 export type PartName = "overview" | "outcomes" | "sources" | "events" | "trace" | "incidents" | "incident"
@@ -43,18 +49,20 @@ export type PartBody = {
   sources: SourcesBody
   events: EventsBody
   trace: EventsBody
-  incidents: IncidentsBody
-  incident: IncidentsBody
+  incidents: IncidentListBody
+  incident: IncidentDetailBody
 }
 
 export type StoredFailure =
   | "timeout" | "budget" | "network" | "body_too_large" | "contract_schema" | "contract_shape" | "contract_bound"
   | "unsupported" | "rate_limited" | "unavailable" | "server_deadline" | "audit_unavailable" | "machine_not_found"
   | "bad_cursor" | "invalid_request" | "http_error"
+  | "incident_not_found" | "revision_not_found" | "incident_expired" | "bad_origin" | "revision_cap"
 
 export type Refusal = "signed_out" | "forbidden"
 
-export type PartResult<N extends PartName = PartName> = { ok: true; body: PartBody[N] } | { ok: false; code: StoredFailure }
+/** `expiredAt`: the Cloud's `details.expired_at` on `410 incident_expired`, so the page can say when. */
+export type PartResult<N extends PartName = PartName> = { ok: true; body: PartBody[N] } | { ok: false; code: StoredFailure; expiredAt?: string | null }
 
 export type Read = { part: PartName; path: string; params: Record<string, string> }
 
@@ -64,10 +72,13 @@ export function planFor(route: HealthRoute, now: number): { window: { from: stri
   const win = { from: window.from, to: window.to }
   const e = encodeURIComponent
   const rows = String(HEALTH_UI_LIMITS.pageRows)
+  // Incidents are listed by when they opened, over the Cloud's 7-day window ending where this one
+  // ends, so a pinned page lists the same incidents on every load.
+  const incidentList: Read = { part: "incidents", path: "incidents", params: { from: new Date(Date.parse(window.to) - HEALTH_UI_LIMITS.incidentWindowMs).toISOString(), to: window.to, limit: String(HEALTH_UI_LIMITS.incidentRows) } }
   let reads: Read[]
   switch (route.screen) {
     case "M01":
-      reads = [{ part: "overview", path: "overview", params: win }, { part: "outcomes", path: "outcomes", params: win }, { part: "incidents", path: "incidents", params: {} }]
+      reads = [{ part: "overview", path: "overview", params: win }, { part: "outcomes", path: "outcomes", params: win }, incidentList]
       break
     case "M02":
       reads = route.machine === null
@@ -78,17 +89,22 @@ export function planFor(route: HealthRoute, now: number): { window: { from: stri
             { part: "events", path: "events", params: { ...win, machine_id: route.machine, limit: rows } },
           ]
       break
-    case "M03":
-      reads = [{ part: "overview", path: "overview", params: win }, { part: "sources", path: "sources", params: {} }, { part: "events", path: "events", params: { ...win, limit: rows } }]
+    case "M03": {
+      // The Cloud narrows the events read itself (contract §3); its cursor binds the filter.
+      const filter: Record<string, string> = {}
+      if (route.source) filter.source = route.source
+      if (route.sourceId) filter.source_id = route.sourceId
+      reads = [{ part: "overview", path: "overview", params: win }, { part: "sources", path: "sources", params: {} }, { part: "events", path: "events", params: { ...win, ...filter, limit: rows } }]
       break
+    }
     case "M04":
-      reads = [{ part: "trace", path: `trace/${e(route.trace)}`, params: { ...win, limit: rows } }, { part: "outcomes", path: "outcomes", params: win }]
+      reads = [{ part: "trace", path: `trace/${e(route.trace)}`, params: { ...win, limit: rows } }, { part: "outcomes", path: "outcomes", params: win }, incidentList]
       break
     case "M05":
-      reads = [
-        route.incident === null ? { part: "incidents", path: "incidents", params: {} } : { part: "incident", path: `incidents/${e(route.incident)}`, params: {} },
-        { part: "outcomes", path: "outcomes", params: win },
-      ]
+      reads = route.incident === null
+        ? [incidentList, { part: "outcomes", path: "outcomes", params: win }]
+        // One revision of one incident; no revision asks for the latest.
+        : [{ part: "incident", path: `incidents/${e(route.incident)}`, params: route.revision ? { revision: String(route.revision) } : {} }]
       break
     case "M06":
       reads = [{ part: "overview", path: "overview", params: win }, { part: "sources", path: "sources", params: {} }, { part: "outcomes", path: "outcomes", params: win }]
@@ -112,7 +128,7 @@ export function readURL(apiOrigin: string, read: Read): string {
 }
 
 const PARSERS: { [N in PartName]: (body: unknown) => PartBody[N] } = {
-  overview: parseOverview, outcomes: parseOutcomes, sources: parseSources, events: parseEvents, trace: parseEvents, incidents: parseIncidents, incident: parseIncidents,
+  overview: parseOverview, outcomes: parseOutcomes, sources: parseSources, events: parseEvents, trace: parseEvents, incidents: parseIncidentList, incident: parseIncidentDetail,
 }
 
 /** The server's typed refusal codes this page explains; anything else is its HTTP class. */
@@ -129,6 +145,11 @@ export function failureFor(status: number, code: string | null): StoredFailure |
     case "machine_not_found": return "machine_not_found"
     case "bad_cursor": return "bad_cursor"
     case "invalid_field": case "invalid_window": case "window_too_wide": case "unknown_field": return "invalid_request"
+    case "incident_not_found": return "incident_not_found"
+    case "revision_not_found": return "revision_not_found"
+    case "incident_expired": return "incident_expired"
+    case "bad_origin": return "bad_origin"
+    case "revision_cap": return "revision_cap"
   }
   if (status === 501) return "unsupported"
   if (status === 429) return "rate_limited"
@@ -145,23 +166,28 @@ async function boundedText(res: Response): Promise<string | null> {
   return new TextEncoder().encode(text).length > HEALTH_UI_LIMITS.bodyBytes ? null : text
 }
 
-function errorCode(text: string | null): string | null {
-  if (text === null) return null
+/** The error code, and `details.expired_at` when the Cloud gave one, from a refused read's body. */
+export function errorInfo(text: string | null): { code: string | null; expiredAt: string | null } {
+  if (text === null) return { code: null, expiredAt: null }
   try {
-    const code = (JSON.parse(text) as { error?: { code?: unknown } })?.error?.code
-    return typeof code === "string" && /^[a-z_]{1,64}$/.test(code) ? code : null
+    const error = (JSON.parse(text) as { error?: { code?: unknown; details?: { expired_at?: unknown } } })?.error
+    const code = typeof error?.code === "string" && /^[a-z_]{1,64}$/.test(error.code) ? error.code : null
+    const at = error?.details?.expired_at
+    return { code, expiredAt: typeof at === "string" && at.length <= 40 && Number.isFinite(Date.parse(at)) ? at : null }
   } catch {
-    return null
+    return { code: null, expiredAt: null }
   }
 }
 
-type One = { ok: true; body: PartBody[PartName] } | { ok: false; code: StoredFailure } | { refused: Refusal }
+type One = { ok: true; body: PartBody[PartName] } | { ok: false; code: StoredFailure; expiredAt?: string | null } | { refused: Refusal }
 
 async function readOne(get: typeof fetch, url: string, part: PartName, signal: AbortSignal): Promise<One> {
   const res = await get(url, { credentials: "include", headers: { accept: "application/json" }, signal })
   if (!res.ok) {
-    const failure = failureFor(res.status, errorCode(await boundedText(res).catch(() => null)))
-    return isRefusal(failure) ? { refused: failure } : { ok: false, code: failure }
+    const info = errorInfo(await boundedText(res).catch(() => null))
+    const failure = failureFor(res.status, info.code)
+    if (isRefusal(failure)) return { refused: failure }
+    return failure === "incident_expired" ? { ok: false, code: failure, expiredAt: info.expiredAt } : { ok: false, code: failure }
   }
   const text = await boundedText(res)
   if (text === null) return { ok: false, code: "body_too_large" }
@@ -256,7 +282,7 @@ export function olderRead(first: Read, window: { from: string; to: string }, cur
 
 export type PartState =
   | { status: "ok"; body: PartBody[PartName]; at: number; failure: StoredFailure | null }
-  | { status: "failed"; code: StoredFailure }
+  | { status: "failed"; code: StoredFailure; expiredAt?: string | null }
 
 export type StoredState = {
   key: string
@@ -284,6 +310,9 @@ export const emptyStored = (key: string): StoredState => ({
   key, status: "loading", refusal: null, refreshing: true, window: null, parts: {}, older: [], olderCursor: null, olderFailure: null, olderBusy: false,
 })
 
+/** Failures that mean the thing itself is gone, so an earlier answer must not stay on screen. */
+const GONE: ReadonlySet<StoredFailure> = new Set(["incident_not_found", "revision_not_found", "incident_expired", "machine_not_found"])
+
 const listPart = (parts: StoredState["parts"]): PartState | undefined => parts.trace ?? parts.events
 
 export function storedReducer(state: StoredState, action: StoredAction): StoredState {
@@ -301,8 +330,9 @@ export function storedReducer(state: StoredState, action: StoredAction): StoredS
       for (const [name, r] of Object.entries(o.parts) as [PartName, PartResult][]) {
         const prev = state.parts[name]
         if (r.ok) parts[name] = { status: "ok", body: r.body, at: action.at, failure: null }
-        else if (prev && prev.status === "ok") parts[name] = { ...prev, failure: r.code }
-        else parts[name] = { status: "failed", code: r.code }
+        // An incident that expired or vanished is not shown from before: its evidence is gone.
+        else if (prev && prev.status === "ok" && !GONE.has(r.code)) parts[name] = { ...prev, failure: r.code }
+        else parts[name] = { status: "failed", code: r.code, ...(r.expiredAt !== undefined ? { expiredAt: r.expiredAt } : {}) }
       }
       const sameWindow = state.window !== null && state.window.from === o.window.from && state.window.to === o.window.to
       const list = listPart(parts)

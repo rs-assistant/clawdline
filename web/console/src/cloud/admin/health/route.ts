@@ -12,13 +12,22 @@ export const DEFAULT_WINDOW_S: StoredWindow = 3600
 
 const OPAQUE = /^[A-Za-z0-9_-]{1,64}$/
 const STORED_ID = /^[A-Za-z0-9_-]{1,128}$/
+const INCIDENT_ID = /^hi_[0-9a-f]{32}$/
+const SOURCE_ID = /^hs_[0-9a-f]{32}$/
+/** Producers the Cloud's events read narrows to (contract §3 `source`). */
+export const SOURCE_FILTERS = ["daemon", "cloud_api", "relay", "viewer", "collector"] as const
+export type SourceFilter = (typeof SOURCE_FILTERS)[number]
+/** Revisions the Cloud keeps per incident (contract §11.5). */
+export const MAX_REVISION = 16
 
 export type HealthScreen =
   | { screen: "M01" }
   | { screen: "M02"; machine: string | null }
-  | { screen: "M03" }
+  /** The Cloud-side events filter; absent is every source. */
+  | { screen: "M03"; source?: SourceFilter | null; sourceId?: string | null }
   | { screen: "M04"; trace: string }
-  | { screen: "M05"; incident: string | null }
+  /** `revision` absent or null is the latest; a number is that immutable revision. */
+  | { screen: "M05"; incident: string | null; revision?: number | null }
   | { screen: "M06" }
   | { screen: "evidence"; trace: string | null }
 
@@ -43,7 +52,7 @@ export function healthScreen(pathname: string): HealthScreen | null {
   const parts = pathname.slice(HEALTH_BASE.length).split("/").filter(Boolean)
   if (parts.length > 2) return null
   const head = parts[0]
-  const pattern = head === "machines" ? STORED_ID : OPAQUE
+  const pattern = head === "machines" ? STORED_ID : head === "incidents" ? INCIDENT_ID : OPAQUE
   const idPart = decode(parts[1], pattern)
   if (idPart === undefined) return null
   switch (head) {
@@ -72,9 +81,29 @@ export function healthScope(search: string, now: number = Date.now()): HealthSco
   return { window_s, until, account }
 }
 
+/** The per-screen query: the M03 source filter and the M05 revision. Malformed values are dropped. */
+function screenQuery(screen: HealthScreen, search: string): HealthScreen {
+  const q = new URLSearchParams(search)
+  if (screen.screen === "M03") {
+    const source = q.get("source")
+    const sourceId = q.get("source_id")
+    return {
+      screen: "M03",
+      source: source !== null && (SOURCE_FILTERS as readonly string[]).includes(source) ? (source as SourceFilter) : null,
+      sourceId: sourceId !== null && SOURCE_ID.test(sourceId) ? sourceId : null,
+    }
+  }
+  if (screen.screen === "M05" && screen.incident !== null) {
+    const raw = q.get("revision")
+    const n = raw !== null && /^[0-9]{1,2}$/.test(raw) ? Number(raw) : NaN
+    return { ...screen, revision: n >= 1 && n <= MAX_REVISION ? n : null }
+  }
+  return screen
+}
+
 export function healthRoute(pathname: string, search: string, now?: number): HealthRoute | null {
   const screen = healthScreen(pathname)
-  return screen === null ? null : { ...screen, scope: healthScope(search, now) }
+  return screen === null ? null : { ...screenQuery(screen, search), scope: healthScope(search, now) }
 }
 
 /** The address for a screen in a scope. Only non-default scope values are written. */
@@ -94,6 +123,9 @@ export function healthHref(screen: HealthScreen, scope: HealthScope): string {
   if (scope.window_s !== DEFAULT_WINDOW_S) q.set("window", String(scope.window_s))
   if (scope.until !== null) q.set("until", scope.until)
   if (scope.account !== null) q.set("account", scope.account)
+  if (screen.screen === "M03" && screen.source) q.set("source", screen.source)
+  if (screen.screen === "M03" && screen.sourceId) q.set("source_id", screen.sourceId)
+  if (screen.screen === "M05" && screen.incident !== null && screen.revision) q.set("revision", String(screen.revision))
   const s = q.toString()
   return s ? `${path}?${s}` : path
 }
@@ -106,6 +138,11 @@ export function windowBounds(scope: HealthScope, now: number): { from: string; t
 
 /** Two routes ask for the same evidence when screen, ids and scope agree. */
 export function routeKey(r: HealthRoute): string {
-  const id = r.screen === "M02" ? r.machine : r.screen === "M04" ? r.trace : r.screen === "M05" ? r.incident : r.screen === "evidence" ? r.trace : null
+  const id = r.screen === "M02" ? r.machine
+    : r.screen === "M03" ? `${r.source ?? ""}/${r.sourceId ?? ""}`
+    : r.screen === "M04" ? r.trace
+    : r.screen === "M05" ? `${r.incident ?? ""}/${r.revision ?? ""}`
+    : r.screen === "evidence" ? r.trace : null
+  // A changed filter, incident or revision is a new key: the old pages and bytes are dropped.
   return [r.screen, id ?? "", r.scope.window_s, r.scope.until ?? "", r.scope.account ?? ""].join("|")
 }

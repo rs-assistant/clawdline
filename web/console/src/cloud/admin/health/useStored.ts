@@ -3,10 +3,10 @@
  * away. A changed route key starts empty, so one scope's figures never flash
  * under another's, and a refused session clears everything at once. */
 import { useCallback, useEffect, useReducer, useRef } from "react"
-import { emptyStored, HEALTH_UI_LIMITS, loadStored, olderRead, planFor, runReads, storedReducer, type StoredState } from "./cloud"
+import { emptyStored, HEALTH_UI_LIMITS, loadStored, olderRead, planFor, runReads, storedReducer, type Refusal, type StoredState } from "./cloud"
 import { routeKey, type HealthRoute } from "./route"
 
-export function useStored(get: typeof fetch, apiOrigin: string, route: HealthRoute): { state: StoredState; refresh: () => void; loadOlder: () => void } {
+export function useStored(get: typeof fetch, apiOrigin: string, route: HealthRoute): { state: StoredState; refresh: () => void; loadOlder: () => void; refuse: (r: Refusal) => void } {
   const key = routeKey(route)
   const [state, dispatch] = useReducer(storedReducer, key, emptyStored)
   const inFlight = useRef<AbortController | null>(null)
@@ -58,5 +58,12 @@ export function useStored(get: typeof fetch, apiOrigin: string, route: HealthRou
     })
   }, [get, apiOrigin])
 
-  return { state, refresh: run, loadOlder }
+  // A refusal met outside a load (an export or an acknowledgement) clears everything just the same.
+  const refuse = useCallback((r: Refusal) => {
+    inFlight.current?.abort()
+    inFlight.current = null
+    dispatch({ type: "older_refused", refusal: r })
+  }, [])
+
+  return { state, refresh: run, loadOlder, refuse }
 }

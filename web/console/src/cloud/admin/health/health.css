@@ -301,3 +301,10 @@
   .adh-stage-track { grid-column: 1 / -1; grid-row: 2; }
   .adh-switch-btn { min-height: 44px; }
 }
+
+/* Incidents (M05): recovery and acknowledgement side by side, stacked on a phone. */
+.adh-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 720px) { .adh-pair { grid-template-columns: minmax(0, 1fr); } }
+.adh-hash { overflow-wrap: anywhere; word-break: break-all; }
+.adh-inc-active, .adh-inc-recovering { color: var(--warn); }
+.adh-inc-expired { color: var(--ink); opacity: .8; }

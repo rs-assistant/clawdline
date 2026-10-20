@@ -22,6 +22,11 @@ export const STORED_BOUNDS = {
   coverageKeys: 16,
   ungroupedKeys: 32,
   byEventKeys: 32,
+  /** Incident revisions, facts and context per revision, refusal rows per read (contract §11.5). */
+  revisions: 16,
+  bundleFacts: 200,
+  bundleContext: 20,
+  refusalRows: 50,
 } as const
 
 /** An opaque id as the Cloud admits it (`^[A-Za-z0-9_-]{1,64}$`), and the longest one the page carries. */
@@ -37,7 +42,8 @@ export type StoredQuality = (typeof QUALITY)[number]
 export const SEQUENCE = ["exact", "unverified", "not_collected", "not_computed"] as const
 export type SequenceState = (typeof SEQUENCE)[number]
 /** `service_scope`: Relay and API evidence, on the operator surface only and never attributed to an account (contract §10.4). */
-export const COVERAGE_STATES = ["collected", "not_collected", "unsupported", "service_scope"] as const
+/** `disabled` / `supported`: the incident reads' own coverage words (contract §11.4). */
+export const COVERAGE_STATES = ["collected", "not_collected", "unsupported", "service_scope", "disabled", "supported"] as const
 export type CoverageState = (typeof COVERAGE_STATES)[number]
 export const GROUP_OUTCOMES = ["stall_detected", "slow", "recovered", "released_after_stall", "loss", "unsupported"] as const
 export type GroupOutcome = (typeof GROUP_OUTCOMES)[number]
@@ -48,6 +54,14 @@ export const GAP_CAUSES = ["unexplained", "unverified"] as const
 /** A service stage's own result (record/2 only, contract §10.2). `pending` means still active, never final. */
 export const RECORD_OUTCOMES = ["ok", "error", "timeout", "refused", "zero_target", "threw", "pending"] as const
 export type RecordOutcome = (typeof RECORD_OUTCOMES)[number]
+/** The watchdog's state after a loss marker (contract §12): only on `state_after_loss`, record/1. */
+export const WATCHDOG_STATES = ["slow", "blocked", "unverified_after_gap"] as const
+export type WatchdogState = (typeof WATCHDOG_STATES)[number]
+/** Producers the events read can be narrowed to (`source=`, contract §3). */
+export const EVENT_SOURCES = ["daemon", "cloud_api", "relay", "viewer", "collector"] as const
+export type EventSource = (typeof EVENT_SOURCES)[number]
+/** A stored source id as the events read admits it (`source_id=`). */
+export const SOURCE_ID = /^hs_[0-9a-f]{32}$/
 
 export class StoredContractError extends Error {
   readonly code: "contract_schema" | "contract_shape" | "contract_bound"
@@ -125,6 +139,8 @@ export type StoredEvent = {
   outcome: RecordOutcome | null
   /** The service's own elapsed time for that stage (the maximum, for an aggregate). Not end-to-end latency. */
   elapsed_ms: number | null
+  /** `state_after_loss` only: what the watchdog could still say after a loss. Null on every other event. */
+  state: WatchdogState | null
   received_at: string
   retain_until: string
 }
@@ -198,7 +214,94 @@ export type OverviewBody = Envelope & {
 export type EventsBody = Envelope & { events: StoredEvent[] }
 export type SourcesBody = Envelope & { sources: StoredSource[] }
 export type OutcomesBody = Envelope & { groups: StoredGroup[] | null; ungrouped: Record<string, number> | null }
-export type IncidentsBody = Envelope & { incidents: null }
+export const INCIDENT_STATES = ["active", "recovering", "recovered_awaiting_review", "closed"] as const
+export type IncidentState = (typeof INCIDENT_STATES)[number]
+export const INCIDENT_TRIGGERS = ["stall", "slow", "loss"] as const
+export const RECOVERY_REASONS = ["released_outcome_unknown", "ended_failed", "sequence_gap", "sequence_unverified", "not_recovery_evidence"] as const
+export const CLOSURES = ["acknowledged_after_observed_recovery", "acknowledged_without_observed_recovery"] as const
+/** `hi_` + 32 hex (contract §11.2). Anything else names no incident and is never sent. */
+export const INCIDENT_ID = /^hi_[0-9a-f]{32}$/
+export const CONTENT_HASH = /^sha256:[0-9a-f]{64}$/
+
+export type IncidentGroupKey = { rule: string; kind: "operation" | "loss"; correlation: string | null; phase_id: number | null }
+
+export type IncidentRow = {
+  id: string
+  account: string | null
+  machine_id: string
+  source: string
+  source_id: string
+  producer_instance: string
+  boot_id: string
+  group: IncidentGroupKey
+  trigger: (typeof INCIDENT_TRIGGERS)[number]
+  /** null only on an expired row: its evidence is gone, its state is not "nothing". */
+  state: IncidentState | null
+  expired: boolean
+  revision: number
+  content_hash: string
+  opened_at: string
+  updated_at: string
+  acknowledged: boolean
+  facts: number | null
+  facts_refused: number
+  bytes: number
+  retain_until: string
+}
+
+export type IncidentListBody = Envelope & {
+  state_rule: string
+  aggregates: { minute: string; retention_days: number | null }
+  incidents: IncidentRow[]
+  refusals: { rows: { account: string | null; reason: string; window_start: string; count: number }[]; truncated: boolean }
+}
+
+export type BundleFact = {
+  id: string; schema: string; event_id: string; producer_seq: number; boot_id: string; batch_id: string | null
+  event: string; source: string | null; stage: string | null; class: string | null; kind: string | null; phase_id: number | null
+  correlation: string | null; count: number | null; rule: string | null; outcome: RecordOutcome | null; elapsed_ms: number | null
+  state: WatchdogState | null; build_commit: string | null; mono_ns: number; wall: string; received_at: string; digest: string
+}
+
+export type StageProof = { stage: string; event_key: string; basis: string } | null
+
+export type Bundle = {
+  manifest: {
+    schema: string
+    incident_id: string
+    revision: number
+    rule_versions: { grouping: string; state: string }
+    scope: { machine_id: string; source_id: string; producer_instance: string; source: string; boot_id: string; group: IncidentGroupKey }
+    window: { from: string | null; to: string | null; basis: string }
+    build: { commits: string[]; provenance: string }
+    sources: { source_id: string; source: string; producer_instance: string; boot_id: string; boot_order: string }[]
+    sequence: { exactness: string; reason: string | null; present: { from: number; to: number }[]; gaps: { from: number; to: number; count: number | null; cause: string }[]; gap_edges: string }
+    dropped: { transitions_lost: number | null; overflow: number | null; facts_refused_by_bound: number }
+    retention: { raw_retain_until_earliest: string | null; bundle_retain_until: string; frozen: string }
+    clock: { uncertainty_ms: number | null; basis: string; order: string; producer_wall: string }
+    redaction: { class: string; owner_diagnostics: string; absent_fields: string[]; payloads_paths_names: string }
+    provenance: { reason: "opened" | "new_evidence" | "acknowledged"; previous_revision: number | null; previous_content_hash: string | null; added: { id: string; producer_seq: number; received_at: string }[]; late: boolean; revised_at: string }
+  }
+  summary: {
+    state: IncidentState
+    trigger: (typeof INCIDENT_TRIGGERS)[number]
+    opened_at: string
+    recovery: { observed: boolean; event_key: string | null; event: string | null; received_at: string | null; unverified_reason: (typeof RECOVERY_REASONS)[number] | null }
+    acknowledgement: { at: string; through_seq: number } | null
+    closure: (typeof CLOSURES)[number] | null
+    /** Cloud derives no cause: `root_cause` is always `not_derived`; anything else is refused as drift. */
+    stages: { last_proven: StageProof; active: StageProof; next: "unknown"; root_cause: "not_derived"; hypotheses: string[] }
+  }
+  facts: BundleFact[]
+  context: BundleFact[]
+  next: { missing_evidence: string; owner_diagnostics: string; automatic_repair: string }
+}
+
+export type IncidentDetailBody = Envelope & {
+  incident: IncidentRow & { revisions: number[] }
+  revision: { number: number; created_at: string; content_hash: string; bytes: number }
+  bundle: Bundle
+}
 
 /* ---- readers ---------------------------------------------------------------- */
 
@@ -336,9 +439,18 @@ function event(v: unknown, path: string): StoredEvent {
     rule: strOrNull(o.rule, `${path}.rule`),
     outcome: o.outcome === null || o.outcome === undefined ? null : oneOf(o.outcome, RECORD_OUTCOMES, `${path}.outcome`),
     elapsed_ms: natOrNull(o.elapsed_ms, `${path}.elapsed_ms`),
+    state: watchdogState(o, path),
     received_at: instant(o.received_at, `${path}.received_at`),
     retain_until: instant(o.retain_until, `${path}.retain_until`),
   }
+}
+
+/** `state` belongs to `state_after_loss` and nowhere else: a missing one there, or one anywhere
+ *  else, is schema drift and refused, never read as "no state". */
+function watchdogState(o: Obj, path: string): WatchdogState | null {
+  if (o.event === "state_after_loss") return oneOf(o.state, WATCHDOG_STATES, `${path}.state`)
+  if (o.state !== undefined && o.state !== null) return shape(`${path}.state`)
+  return null
 }
 
 export function parseEvents(body: unknown): EventsBody {
@@ -423,10 +535,202 @@ export function parseOutcomes(body: unknown): OutcomesBody {
   return { ...env, groups, ungrouped: o.ungrouped === null || o.ungrouped === undefined ? null : counts(o.ungrouped, "$.ungrouped", STORED_BOUNDS.ungroupedKeys) }
 }
 
-export function parseIncidents(body: unknown): IncidentsBody {
-  const env = parseEnvelope(body)
-  if ((body as Obj).incidents !== null) return shape("$.incidents")
-  return { ...env, incidents: null }
+/** The incident reads carry no sequence coverage of their own: it is not computed, never "exact". */
+const UNCOMPUTED = { retention_floor: null, sequence: "not_computed", sequence_reason: null, seq_ranges: null, gaps: null, dropped: null }
+
+function incidentEnvelope(body: unknown): Envelope {
+  const o = obj(body, "$")
+  return parseEnvelope(o.coverage === undefined ? { ...o, coverage: UNCOMPUTED } : o)
+}
+
+function groupKey(v: unknown, path: string): IncidentGroupKey {
+  const g = obj(v, path)
+  return {
+    rule: id(g.rule, `${path}.rule`, /^[A-Za-z0-9_./-]{1,64}$/),
+    kind: oneOf(g.kind, ["operation", "loss"] as const, `${path}.kind`),
+    correlation: idOrNull(g.correlation, `${path}.correlation`, OPAQUE),
+    phase_id: intOrNull(g.phase_id, `${path}.phase_id`),
+  }
+}
+
+function incidentRow(v: unknown, path: string): IncidentRow {
+  const o = obj(v, path)
+  const expired = bool(o.expired, `${path}.expired`)
+  const state = o.state === null ? null : oneOf(o.state, INCIDENT_STATES, `${path}.state`)
+  // A live row always has a state; an expired one never shows one (contract §11.4).
+  if (expired !== (state === null)) return shape(`${path}.state`)
+  return {
+    id: id(o.id, `${path}.id`, INCIDENT_ID),
+    account: idOrNull(o.account, `${path}.account`, ACCOUNT),
+    machine_id: id(o.machine_id, `${path}.machine_id`),
+    source: id(o.source, `${path}.source`),
+    source_id: id(o.source_id, `${path}.source_id`),
+    producer_instance: id(o.producer_instance, `${path}.producer_instance`, OPAQUE),
+    boot_id: id(o.boot_id, `${path}.boot_id`, OPAQUE),
+    group: groupKey(o.group, `${path}.group`),
+    trigger: oneOf(o.trigger, INCIDENT_TRIGGERS, `${path}.trigger`),
+    state,
+    expired,
+    revision: revisionNumber(o.revision, `${path}.revision`),
+    content_hash: hash(o.content_hash, `${path}.content_hash`),
+    opened_at: instant(o.opened_at, `${path}.opened_at`),
+    updated_at: instant(o.updated_at, `${path}.updated_at`),
+    acknowledged: bool(o.acknowledged, `${path}.acknowledged`),
+    facts: expired ? (o.facts === null ? null : shape(`${path}.facts`)) : nat(o.facts, `${path}.facts`),
+    facts_refused: nat(o.facts_refused, `${path}.facts_refused`),
+    bytes: nat(o.bytes, `${path}.bytes`),
+    retain_until: instant(o.retain_until, `${path}.retain_until`),
+  }
+}
+
+const hash = (v: unknown, path: string): string => (typeof v === "string" && CONTENT_HASH.test(v) ? v : shape(path))
+const hashOrNull = (v: unknown, path: string): string | null => (v === null || v === undefined ? null : hash(v, path))
+const revisionNumber = (v: unknown, path: string): number => {
+  const n = nat(v, path)
+  return n >= 1 && n <= STORED_BOUNDS.revisions ? n : shape(path)
+}
+
+export function parseIncidentList(body: unknown): IncidentListBody {
+  const env = incidentEnvelope(body)
+  const o = body as Obj
+  const agg = obj(o.aggregates, "$.aggregates")
+  const ref = obj(o.refusals, "$.refusals")
+  return {
+    ...env,
+    state_rule: str(o.state_rule, "$.state_rule"),
+    aggregates: { minute: id(agg.minute, "$.aggregates.minute"), retention_days: natOrNull(agg.retention_days, "$.aggregates.retention_days") },
+    incidents: list(o.incidents, "$.incidents", STORED_BOUNDS.pageRows, incidentRow),
+    refusals: {
+      rows: list(ref.rows, "$.refusals.rows", STORED_BOUNDS.refusalRows, (r, p) => {
+        const ro = obj(r, p)
+        return { account: idOrNull(ro.account, `${p}.account`, ACCOUNT), reason: id(ro.reason, `${p}.reason`), window_start: instant(ro.window_start, `${p}.window_start`), count: nat(ro.count, `${p}.count`) }
+      }),
+      truncated: bool(ref.truncated, "$.refusals.truncated"),
+    },
+  }
+}
+
+function fact(v: unknown, path: string): BundleFact {
+  const o = obj(v, path)
+  return {
+    id: id(o.id, `${path}.id`), schema: str(o.schema, `${path}.schema`), event_id: id(o.event_id, `${path}.event_id`),
+    producer_seq: nat(o.producer_seq, `${path}.producer_seq`), boot_id: id(o.boot_id, `${path}.boot_id`, OPAQUE),
+    batch_id: idOrNull(o.batch_id, `${path}.batch_id`, OPAQUE), event: id(o.event, `${path}.event`), source: idOrNull(o.source, `${path}.source`),
+    stage: idOrNull(o.stage, `${path}.stage`), class: idOrNull(o.class, `${path}.class`), kind: idOrNull(o.kind, `${path}.kind`),
+    phase_id: intOrNull(o.phase_id, `${path}.phase_id`), correlation: idOrNull(o.correlation, `${path}.correlation`, OPAQUE),
+    count: natOrNull(o.count, `${path}.count`), rule: strOrNull(o.rule, `${path}.rule`),
+    outcome: o.outcome === null || o.outcome === undefined ? null : oneOf(o.outcome, RECORD_OUTCOMES, `${path}.outcome`),
+    elapsed_ms: natOrNull(o.elapsed_ms, `${path}.elapsed_ms`), state: watchdogState(o, path),
+    build_commit: idOrNull(o.build_commit, `${path}.build_commit`, OPAQUE), mono_ns: nat(o.mono_ns, `${path}.mono_ns`),
+    wall: instant(o.wall, `${path}.wall`), received_at: instant(o.received_at, `${path}.received_at`), digest: hash(o.digest, `${path}.digest`),
+  }
+}
+
+function proof(v: unknown, path: string): StageProof {
+  if (v === null) return null
+  const o = obj(v, path)
+  return { stage: id(o.stage, `${path}.stage`), event_key: id(o.event_key, `${path}.event_key`), basis: id(o.basis, `${path}.basis`) }
+}
+
+/** One frozen revision, read field by field. A cause, a next stage or a hypothesis Cloud does not
+ *  derive is drift and refused, so the page can never show an invented root cause. */
+export function parseBundle(v: unknown, path = "$.bundle"): Bundle {
+  const b = obj(v, path)
+  const m = obj(b.manifest, `${path}.manifest`)
+  const scope = obj(m.scope, `${path}.manifest.scope`)
+  const win = obj(m.window, `${path}.manifest.window`)
+  const build = obj(m.build, `${path}.manifest.build`)
+  const seq = obj(m.sequence, `${path}.manifest.sequence`)
+  const dropped = obj(m.dropped, `${path}.manifest.dropped`)
+  const ret = obj(m.retention, `${path}.manifest.retention`)
+  const clock = obj(m.clock, `${path}.manifest.clock`)
+  const red = obj(m.redaction, `${path}.manifest.redaction`)
+  const prov = obj(m.provenance, `${path}.manifest.provenance`)
+  const rules = obj(m.rule_versions, `${path}.manifest.rule_versions`)
+  const s = obj(b.summary, `${path}.summary`)
+  const rec = obj(s.recovery, `${path}.summary.recovery`)
+  const st = obj(s.stages, `${path}.summary.stages`)
+  const ack = s.acknowledgement === null || s.acknowledgement === undefined ? null : obj(s.acknowledgement, `${path}.summary.acknowledgement`)
+  const nx = obj(b.next, `${path}.next`)
+  const rule = /^[A-Za-z0-9_./-]{1,64}$/
+  const p = `${path}.manifest`
+  return {
+    manifest: {
+      schema: oneOf(m.schema, ["clawdline.health-incident-bundle/1"] as const, `${p}.schema`),
+      incident_id: id(m.incident_id, `${p}.incident_id`, INCIDENT_ID),
+      revision: revisionNumber(m.revision, `${p}.revision`),
+      rule_versions: { grouping: id(rules.grouping, `${p}.rule_versions.grouping`, rule), state: id(rules.state, `${p}.rule_versions.state`, rule) },
+      scope: {
+        machine_id: id(scope.machine_id, `${p}.scope.machine_id`), source_id: id(scope.source_id, `${p}.scope.source_id`),
+        producer_instance: id(scope.producer_instance, `${p}.scope.producer_instance`, OPAQUE), source: id(scope.source, `${p}.scope.source`),
+        boot_id: id(scope.boot_id, `${p}.scope.boot_id`, OPAQUE), group: groupKey(scope.group, `${p}.scope.group`),
+      },
+      window: { from: instantOrNull(win.from, `${p}.window.from`), to: instantOrNull(win.to, `${p}.window.to`), basis: id(win.basis, `${p}.window.basis`) },
+      build: { commits: list(build.commits, `${p}.build.commits`, STORED_BOUNDS.bundleFacts + STORED_BOUNDS.bundleContext, (c, cp) => id(c, cp, OPAQUE)), provenance: id(build.provenance, `${p}.build.provenance`) },
+      sources: list(m.sources, `${p}.sources`, STORED_BOUNDS.bootsPerSource, (x, xp) => {
+        const o = obj(x, xp)
+        return { source_id: id(o.source_id, `${xp}.source_id`), source: id(o.source, `${xp}.source`), producer_instance: id(o.producer_instance, `${xp}.producer_instance`, OPAQUE), boot_id: id(o.boot_id, `${xp}.boot_id`, OPAQUE), boot_order: id(o.boot_order, `${xp}.boot_order`) }
+      }),
+      sequence: {
+        exactness: oneOf(seq.exactness, ["exact", "unverified"] as const, `${p}.sequence.exactness`),
+        reason: idOrNull(seq.reason, `${p}.sequence.reason`),
+        present: list(seq.present, `${p}.sequence.present`, STORED_BOUNDS.ranges, (r, rp) => { const o = obj(r, rp); return { from: nat(o.from, `${rp}.from`), to: nat(o.to, `${rp}.to`) } }),
+        gaps: list(seq.gaps, `${p}.sequence.gaps`, STORED_BOUNDS.gaps, (r, rp) => { const o = obj(r, rp); return { from: nat(o.from, `${rp}.from`), to: nat(o.to, `${rp}.to`), count: natOrNull(o.count, `${rp}.count`), cause: oneOf(o.cause, GAP_CAUSES, `${rp}.cause`) } }),
+        gap_edges: id(seq.gap_edges, `${p}.sequence.gap_edges`),
+      },
+      dropped: { transitions_lost: natOrNull(dropped.transitions_lost, `${p}.dropped.transitions_lost`), overflow: natOrNull(dropped.overflow, `${p}.dropped.overflow`), facts_refused_by_bound: nat(dropped.facts_refused_by_bound, `${p}.dropped.facts_refused_by_bound`) },
+      retention: { raw_retain_until_earliest: instantOrNull(ret.raw_retain_until_earliest, `${p}.retention.raw_retain_until_earliest`), bundle_retain_until: instant(ret.bundle_retain_until, `${p}.retention.bundle_retain_until`), frozen: id(ret.frozen, `${p}.retention.frozen`) },
+      clock: { uncertainty_ms: natOrNull(clock.uncertainty_ms, `${p}.clock.uncertainty_ms`), basis: id(clock.basis, `${p}.clock.basis`), order: id(clock.order, `${p}.clock.order`), producer_wall: id(clock.producer_wall, `${p}.clock.producer_wall`) },
+      redaction: { class: id(red.class, `${p}.redaction.class`), owner_diagnostics: id(red.owner_diagnostics, `${p}.redaction.owner_diagnostics`), absent_fields: list(red.absent_fields, `${p}.redaction.absent_fields`, STORED_BOUNDS.coverageKeys, (x, xp) => id(x, xp)), payloads_paths_names: id(red.payloads_paths_names, `${p}.redaction.payloads_paths_names`) },
+      provenance: {
+        reason: oneOf(prov.reason, ["opened", "new_evidence", "acknowledged"] as const, `${p}.provenance.reason`),
+        previous_revision: prov.previous_revision === null ? null : revisionNumber(prov.previous_revision, `${p}.provenance.previous_revision`),
+        previous_content_hash: hashOrNull(prov.previous_content_hash, `${p}.provenance.previous_content_hash`),
+        added: list(prov.added, `${p}.provenance.added`, STORED_BOUNDS.bundleFacts, (x, xp) => { const o = obj(x, xp); return { id: id(o.id, `${xp}.id`), producer_seq: nat(o.producer_seq, `${xp}.producer_seq`), received_at: instant(o.received_at, `${xp}.received_at`) } }),
+        late: bool(prov.late, `${p}.provenance.late`),
+        revised_at: instant(prov.revised_at, `${p}.provenance.revised_at`),
+      },
+    },
+    summary: {
+      state: oneOf(s.state, INCIDENT_STATES, `${path}.summary.state`),
+      trigger: oneOf(s.trigger, INCIDENT_TRIGGERS, `${path}.summary.trigger`),
+      opened_at: instant(s.opened_at, `${path}.summary.opened_at`),
+      recovery: {
+        observed: bool(rec.observed, `${path}.summary.recovery.observed`), event_key: idOrNull(rec.event_key, `${path}.summary.recovery.event_key`),
+        event: idOrNull(rec.event, `${path}.summary.recovery.event`), received_at: instantOrNull(rec.received_at, `${path}.summary.recovery.received_at`),
+        unverified_reason: rec.unverified_reason === null ? null : oneOf(rec.unverified_reason, RECOVERY_REASONS, `${path}.summary.recovery.unverified_reason`),
+      },
+      acknowledgement: ack === null ? null : { at: instant(ack.at, `${path}.summary.acknowledgement.at`), through_seq: nat(ack.through_seq, `${path}.summary.acknowledgement.through_seq`) },
+      closure: s.closure === null || s.closure === undefined ? null : oneOf(s.closure, CLOSURES, `${path}.summary.closure`),
+      stages: {
+        last_proven: proof(st.last_proven, `${path}.summary.stages.last_proven`),
+        active: proof(st.active, `${path}.summary.stages.active`),
+        next: oneOf(st.next, ["unknown"] as const, `${path}.summary.stages.next`),
+        root_cause: oneOf(st.root_cause, ["not_derived"] as const, `${path}.summary.stages.root_cause`),
+        hypotheses: list(st.hypotheses, `${path}.summary.stages.hypotheses`, 0, (x, xp) => str(x, xp)),
+      },
+    },
+    facts: list(b.facts, `${path}.facts`, STORED_BOUNDS.bundleFacts, fact),
+    context: list(b.context, `${path}.context`, STORED_BOUNDS.bundleContext, fact),
+    next: { missing_evidence: id(nx.missing_evidence, `${path}.next.missing_evidence`), owner_diagnostics: id(nx.owner_diagnostics, `${path}.next.owner_diagnostics`), automatic_repair: oneOf(nx.automatic_repair, ["never"] as const, `${path}.next.automatic_repair`) },
+  }
+}
+
+export function parseIncidentDetail(body: unknown): IncidentDetailBody {
+  const env = incidentEnvelope(body)
+  const o = body as Obj
+  const inc = obj(o.incident, "$.incident")
+  const row = incidentRow(inc, "$.incident")
+  const revisions = list(inc.revisions, "$.incident.revisions", STORED_BOUNDS.revisions, (x, xp) => revisionNumber(x, xp))
+  // Revisions are 1..n with n the row's latest, in order: anything else is not the immutable chain.
+  if (revisions.length !== row.revision || revisions.some((n, i) => n !== i + 1)) return shape("$.incident.revisions")
+  const rv = obj(o.revision, "$.revision")
+  const revision = { number: revisionNumber(rv.number, "$.revision.number"), created_at: instant(rv.created_at, "$.revision.created_at"), content_hash: hash(rv.content_hash, "$.revision.content_hash"), bytes: nat(rv.bytes, "$.revision.bytes") }
+  if (revision.number > row.revision) return shape("$.revision.number")
+  const bundle = parseBundle(o.bundle)
+  if (bundle.manifest.incident_id !== row.id) return shape("$.bundle.manifest.incident_id")
+  if (bundle.manifest.revision !== revision.number) return shape("$.bundle.manifest.revision")
+  return { ...env, incident: { ...row, revisions }, revision, bundle }
 }
 
 /* ---- what a service stage means (contract §10.3) --------------------------- */

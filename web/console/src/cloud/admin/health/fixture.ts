@@ -5,16 +5,22 @@
  * answers in memory: no request leaves the browser.
  *
  * Scenarios: `normal` (also `1`), `partial`, `errors`, `empty`, `slow`,
- * `signed_out`, `forbidden`, `service`. */
+ * `signed_out`, `forbidden`, `service`; for incidents `incidents_disabled`
+ * (the Cloud has them turned off), `audit_fail` (every export answers
+ * `503 audit_unavailable`) and `tampered` (an export whose bundle no longer
+ * matches its hash). Incident bundles carry real canonical sha256 hashes. */
 
-export const FIXTURE_SCENARIOS = ["normal", "partial", "errors", "empty", "slow", "signed_out", "forbidden", "service"] as const
+export const FIXTURE_SCENARIOS = ["normal", "partial", "errors", "empty", "slow", "signed_out", "forbidden", "service", "incidents_disabled", "audit_fail", "tampered"] as const
 export type FixtureScenario = (typeof FIXTURE_SCENARIOS)[number]
 
 const MAC_A = "fixture_mac_a"
 const MAC_B = "fixture_mac_b"
-const SRC_A = "hs_fixture_a"
-const SRC_B = "hs_fixture_b"
-const SRC_RELAY = "hs_fixture_relay"
+// Source ids keep the Cloud's shape (`hs_` + 32 hex) so the source filter can name them.
+const SRC_A = "hs_f100000000000000000000000000000a"
+const SRC_B = "hs_f100000000000000000000000000000b"
+const SRC_RELAY = "hs_f100000000000000000000000000000c"
+const SRC_RELAY_DO = "hs_f100000000000000000000000000000d"
+const SRC_API = "hs_f100000000000000000000000000000e"
 const ACCOUNT = "fixture_account"
 const BOOT_A = "fixture-boot-a"
 const BOOT_B = "fixture-boot-b"
@@ -61,6 +67,7 @@ function events(now: number, scenario: FixtureScenario): Row[] {
       [BOOT_B, 1, 2_400_000, 1, 2_400_500, "boot"], [BOOT_B, 6, 2_100_000, 300, 2_100_500, "slow_detected"],
       [BOOT_B, 8, 1_980_000, 420, 1_980_500, "scheduling_gap"], [BOOT_B, 7, 1_950_000, 400, 1_950_500, "scheduling_gap"],
       [BOOT_B, 10, 1_860_000, 380, 1_990_000, "scheduling_gap"], [BOOT_B, 12, 1_800_000, 600, 1_800_500, "scheduling_gap"],
+      [BOOT_B, 13, 1_790_000, 610, 1_790_500, "transitions_lost"], [BOOT_B, 14, 1_780_000, 620, 1_780_500, "state_after_loss"],
     ] as const) {
       const at = now - ago
       rows.push({
@@ -68,6 +75,8 @@ function events(now: number, scenario: FixtureScenario): Row[] {
         schema: "clawdline.connection-health.record/1", producer_seq: seq, event_id: `${boot}-${seq}`, boot_id: boot, batch_id: null, build_commit: null,
         event, wall: new Date(now - wallAgo).toISOString(), mono_ns: mono * 1_000_000_000, source: "daemon", stage: null, class: null, kind: null,
         phase_id: null, correlation: null, count: 1, rule: null, received_at: new Date(at).toISOString(), retain_until: new Date(at + 86_400_000).toISOString(),
+        // The watchdog could not tell what happened across the loss: unverified, not recovered.
+        ...(event === "state_after_loss" ? { state: "unverified_after_gap" } : {}),
       })
     }
   }
@@ -77,12 +86,12 @@ function events(now: number, scenario: FixtureScenario): Row[] {
       ["relay", "relay-worker", SRC_RELAY, 2, "account_dispatch_started", "pending", 8_400, 1, "fixture-relay-op"],
       ["relay", "relay-worker", SRC_RELAY, 3, "account_dispatch_returned", "ok", 120, 11, null],
       ["relay", "relay-worker", SRC_RELAY, 4, "outer_settled", "ok", 35, 12, null],
-      ["relay", "relay-do", "hs_fixture_relay_do", 1, "do_entered", "ok", 1, 11, null],
-      ["relay", "relay-do", "hs_fixture_relay_do", 2, "storage_started", "ok", 260, 11, null],
-      ["relay", "relay-do", "hs_fixture_relay_do", 3, "fanout_sent", "zero_target", 0, 11, null],
-      ["cloud_api", "api", "hs_fixture_api", 1, "api_admitted", "ok", 1, 40, null],
-      ["cloud_api", "api", "hs_fixture_api", 2, "api_dependency_started", "ok", 640, 40, null],
-      ["cloud_api", "api", "hs_fixture_api", 3, "api_response_completed", "error", 700, 2, "fixture-api-op"],
+      ["relay", "relay-do", SRC_RELAY_DO, 1, "do_entered", "ok", 1, 11, null],
+      ["relay", "relay-do", SRC_RELAY_DO, 2, "storage_started", "ok", 260, 11, null],
+      ["relay", "relay-do", SRC_RELAY_DO, 3, "fanout_sent", "zero_target", 0, 11, null],
+      ["cloud_api", "api", SRC_API, 1, "api_admitted", "ok", 1, 40, null],
+      ["cloud_api", "api", SRC_API, 2, "api_dependency_started", "ok", 640, 40, null],
+      ["cloud_api", "api", SRC_API, 3, "api_response_completed", "error", 700, 2, "fixture-api-op"],
     ] as const
     stages.forEach(([source, instance, sourceId, i, stage, outcome, elapsed, count, correlation], n) => {
       const at = now - (60 - n * 2) * 1_000
@@ -153,7 +162,7 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 const refusal = (status: number, code: string) => json(status, { error: { code, message: code } })
 
 /** Answers one URL from the fixture. Exported for the module tests. */
-export function fixtureAnswer(scenario: FixtureScenario, url: string, now: number): Response {
+export async function fixtureAnswer(scenario: FixtureScenario, url: string, now: number, method = "GET"): Promise<Response> {
   if (scenario === "signed_out") return refusal(401, "unauthorized")
   if (scenario === "forbidden") return refusal(404, "not_found")
   const u = new URL(url, "https://fixture.invalid")
@@ -168,7 +177,7 @@ export function fixtureAnswer(scenario: FixtureScenario, url: string, now: numbe
       window: { from: q.get("from"), to: q.get("to") }, partial_reason: scenario === "partial" ? "count_cap" : null,
       events: { total: empty ? null : all.length, total_is_floor: scenario === "partial", by_event: empty || scenario === "partial" ? null : by },
       sources: { listed: empty ? 0 : 2, more: false, fresh: empty ? null : 1, stale: empty ? null : 1 },
-      incidents: { coverage: "unsupported" },
+      incidents: { coverage: scenario === "incidents_disabled" || empty ? "disabled" : "collected" },
     }, empty ? { sequence: "not_collected", sequence_reason: null, seq_ranges: null, gaps: null, dropped: null } : coverageOf()))
   }
   if (path === "outcomes") {
@@ -185,21 +194,228 @@ export function fixtureAnswer(scenario: FixtureScenario, url: string, now: numbe
   if (path === "events" || path.startsWith("trace/")) {
     if (scenario === "errors" && path === "events") return refusal(429, "health_busy")
     const correlation = path.startsWith("trace/") ? decodeURIComponent(path.slice(6)) : null
+    const source = q.get("source")
+    const sourceId = q.get("source_id")
+    // The Cloud's own validation of the filter (contract §3).
+    if (source !== null && !["daemon", "cloud_api", "relay", "viewer", "collector"].includes(source)) return refusal(400, "invalid_field")
+    if (sourceId !== null && !/^hs_[0-9a-f]{32}$/.test(sourceId)) return refusal(400, "invalid_field")
     let rows = empty ? [] : events(now, scenario)
     if (correlation) rows = rows.filter((e) => e.correlation === correlation)
     if (q.get("machine_id")) rows = rows.filter((e) => e.machine_id === q.get("machine_id"))
+    if (source !== null) rows = rows.filter((e) => e.source === source)
+    if (sourceId !== null) rows = rows.filter((e) => e.source_id === sourceId)
     const limit = Math.min(200, Number(q.get("limit") ?? 100))
-    const offset = q.get("cursor") ? Number(atob(q.get("cursor")!.replace(/-/g, "+").replace(/_/g, "/"))) : 0
+    // The cursor binds the filter and window, as the Cloud's does: another filter's cursor is refused.
+    const bind = [path, q.get("from"), q.get("to"), q.get("machine_id"), source, sourceId].join("|")
+    let offset = 0
+    if (q.get("cursor")) {
+      const [at, bound] = atob(q.get("cursor")!.replace(/-/g, "+").replace(/_/g, "/")).split("\n")
+      if (bound !== bind) return refusal(400, "bad_cursor")
+      offset = Number(at)
+    }
     const page = rows.slice(offset, offset + limit)
     const more = offset + limit < rows.length
-    const cursor = more ? btoa(String(offset + limit)).replace(/=+$/, "") : null
+    const cursor = more ? btoa(`${offset + limit}\n${bind}`).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") : null
     return json(200, envelope(now, empty ? "not_collected" : more ? "partial" : "complete", {
       window: { from: q.get("from"), to: q.get("to") }, partial_reason: more ? "row_limit" : null, next_cursor: cursor, events: page,
     }, empty ? null : coverageOf()))
   }
-  if (path === "incidents") return json(200, envelope(now, "unsupported", { source_coverage: { incidents: "unsupported", bundles: "unsupported", exports: "unsupported" }, incidents: null }, null))
-  if (path.startsWith("incidents/")) return refusal(501, "unsupported_capability")
+  if (path === "incidents" || path.startsWith("incidents/")) return incidentAnswer(scenario, path, q, now, method)
   return refusal(404, "not_found")
+}
+
+/* ---- incidents (contract §11) ------------------------------------------------ */
+
+const INC = {
+  active: "hi_f1000000000000000000000000000a01",
+  loss: "hi_f1000000000000000000000000000a02",
+  recovering: "hi_f1000000000000000000000000000a06",
+  review: "hi_f1000000000000000000000000000a03",
+  closed: "hi_f1000000000000000000000000000a04",
+  expired: "hi_f1000000000000000000000000000a05",
+} as const
+export const FIXTURE_INCIDENTS = INC
+
+async function sha256(text: string): Promise<string> {
+  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))
+  return Array.from(new Uint8Array(d), (b) => b.toString(16).padStart(2, "0")).join("")
+}
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`
+  if (v && typeof v === "object") return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonical((v as Row)[k])}`).join(",")}}`
+  return JSON.stringify(v)
+}
+const hashOf = async (v: unknown) => `sha256:${await sha256(canonical(v))}`
+
+type Spec = {
+  id: string; machine: string; source: string; sourceId: string; instance: string; boot: string
+  group: Row; trigger: "stall" | "slow" | "loss"; openedAgo: number
+  /** Per revision: the facts it holds (seq, event, stage, outcome) and its state. */
+  revisions: { facts: [number, string, string | null][]; state: string; recovery: Row; reason: "opened" | "new_evidence" | "acknowledged"; gaps: Row[]; exactness: "exact" | "unverified"; closure?: string; ackSeq?: number }[]
+}
+
+const none = { observed: false, event_key: null, event: null, received_at: null, unverified_reason: null }
+
+function specs(): Spec[] {
+  const op = (correlation: string | null, phase: number | null) => ({ rule: "incident-group/1", kind: "operation", correlation, phase_id: phase })
+  return [
+    { id: INC.active, machine: "svc_relay", source: "relay", sourceId: SRC_RELAY, instance: "relay-worker", boot: "fixture-relay-worker-boot", group: op("fixture-relay-op", null), trigger: "stall", openedAgo: 40_000,
+      revisions: [{ facts: [[2, "stall_detected", "account_dispatch_started"]], state: "active", recovery: none, reason: "opened", gaps: [], exactness: "exact" }] },
+    { id: INC.loss, machine: MAC_B, source: "daemon", sourceId: SRC_B, instance: "daemon", boot: BOOT_B, group: { rule: "incident-group/1", kind: "loss", correlation: null, phase_id: null }, trigger: "loss", openedAgo: 1_790_000,
+      revisions: [{ facts: [[13, "transitions_lost", null], [14, "state_after_loss", null]], state: "active", recovery: none, reason: "opened", gaps: [{ from: 11, to: 11, count: 1, cause: "unexplained" }], exactness: "exact" }] },
+    { id: INC.recovering, machine: "svc_api", source: "cloud_api", sourceId: SRC_API, instance: "api", boot: "fixture-api-boot", group: op("fixture-api-op", null), trigger: "slow", openedAgo: 50_000,
+      revisions: [
+        { facts: [[2, "slow_detected", "api_dependency_started"]], state: "active", recovery: none, reason: "opened", gaps: [], exactness: "exact" },
+        { facts: [[2, "slow_detected", "api_dependency_started"], [3, "stage_failed", "api_response_completed"]], state: "recovering", recovery: { observed: false, event: "stage_failed", unverified_reason: "ended_failed" }, reason: "new_evidence", gaps: [], exactness: "exact" },
+      ] },
+    { id: INC.review, machine: MAC_A, source: "daemon", sourceId: SRC_A, instance: "daemon", boot: BOOT_A, group: op("fixture-trace-1", 7), trigger: "stall", openedAgo: 120_000,
+      revisions: [
+        { facts: [[230, "slow_detected", "handler_started"], [231, "stall_detected", "handler_started"]], state: "active", recovery: none, reason: "opened", gaps: [], exactness: "exact" },
+        { facts: [[230, "slow_detected", "handler_started"], [231, "stall_detected", "handler_started"], [238, "recovered", "handler_started"]], state: "recovered_awaiting_review", recovery: { observed: true, event: "recovered" }, reason: "new_evidence", gaps: [], exactness: "exact" },
+      ] },
+    { id: INC.closed, machine: MAC_B, source: "daemon", sourceId: SRC_B, instance: "daemon", boot: BOOT_B, group: op(null, 3), trigger: "slow", openedAgo: 2_100_000,
+      revisions: [
+        { facts: [[6, "slow_detected", "socket_write"]], state: "active", recovery: none, reason: "opened", gaps: [], exactness: "exact" },
+        { facts: [[6, "slow_detected", "socket_write"], [10, "released_after_stall", "socket_write"]], state: "recovering", recovery: { observed: false, event: "released_after_stall", unverified_reason: "released_outcome_unknown" }, reason: "new_evidence", gaps: [{ from: 9, to: 9, count: 1, cause: "unexplained" }], exactness: "exact" },
+        { facts: [[6, "slow_detected", "socket_write"], [10, "released_after_stall", "socket_write"]], state: "closed", recovery: { observed: false, event: "released_after_stall", unverified_reason: "released_outcome_unknown" }, reason: "acknowledged", gaps: [{ from: 9, to: 9, count: 1, cause: "unexplained" }], exactness: "exact", closure: "acknowledged_without_observed_recovery", ackSeq: 10 },
+      ] },
+    { id: INC.expired, machine: MAC_A, source: "daemon", sourceId: SRC_A, instance: "daemon", boot: BOOT_A, group: op(null, 2), trigger: "slow", openedAgo: 6.9 * 86_400_000,
+      revisions: [{ facts: [[5, "slow_detected", "handler_started"]], state: "active", recovery: none, reason: "opened", gaps: [], exactness: "exact" }] },
+  ]
+}
+
+/** Acknowledgements made in this tab, so the harness shows the new closing revision. */
+const acknowledgedHere = new Set<string>()
+
+function withAck(spec: Spec): Spec {
+  if (!acknowledgedHere.has(spec.id)) return spec
+  const last = spec.revisions[spec.revisions.length - 1]
+  if (last.state === "closed") return spec
+  const through = Math.max(...last.facts.map((f) => f[0]))
+  return { ...spec, revisions: [...spec.revisions, { ...last, state: "closed", reason: "acknowledged", closure: (last.recovery as { observed?: boolean }).observed ? "acknowledged_after_observed_recovery" : "acknowledged_without_observed_recovery", ackSeq: through }] }
+}
+
+async function bundleOf(spec: Spec, n: number, now: number): Promise<{ bundle: Row; hash: string; bytes: number; created: string }> {
+  const opened = now - spec.openedAgo
+  const rv = spec.revisions[n - 1]
+  const at = (seq: number) => new Date(opened + seq * 500).toISOString()
+  const factRow = ([seq, event, stage]: [number, string, string | null]) => ({
+    id: `he_${spec.id.slice(3, 11)}${String(seq).padStart(32, "0")}`, schema: "clawdline.connection-health.record/1", event_id: `${spec.boot}-${seq}`, producer_seq: seq,
+    boot_id: spec.boot, batch_id: null, event, source: spec.source, stage, class: stage ? "read" : null, kind: event === "stall_detected" || event === "slow_detected" ? "finite" : null,
+    phase_id: spec.group.phase_id, correlation: spec.group.correlation, count: 1, rule: event.endsWith("_detected") ? "watchdog/1" : null,
+    outcome: null, elapsed_ms: null, state: event === "state_after_loss" ? "unverified_after_gap" : null, build_commit: spec.source === "daemon" ? BUILD : null,
+    mono_ns: seq * 1_000_000, wall: new Date(opened + seq * 500 - 1_500).toISOString(), received_at: at(seq), digest: `sha256:${"0".repeat(63)}${seq % 10}`,
+  })
+  const facts = rv.facts.map(factRow)
+  const prev = n > 1 ? await bundleOf(spec, n - 1, now) : null
+  const prevFacts = new Set(n > 1 ? spec.revisions[n - 2].facts.map((f) => f[0]) : [])
+  const added = rv.facts.filter((f) => !prevFacts.has(f[0])).map((f) => ({ id: factRow(f).id, producer_seq: f[0], received_at: at(f[0]) }))
+  const seqs = rv.facts.map((f) => f[0]).sort((a, b) => a - b)
+  const recovery = rv.recovery === none ? none : { ...none, ...rv.recovery, event_key: facts[facts.length - 1].id, received_at: facts[facts.length - 1].received_at }
+  const created = rv.reason === "acknowledged" ? new Date(now - 5_000).toISOString() : facts[facts.length - 1].received_at
+  const bundle = {
+    manifest: {
+      schema: "clawdline.health-incident-bundle/1", incident_id: spec.id, revision: n,
+      rule_versions: { grouping: "incident-group/1", state: "incident-state/1" },
+      scope: { machine_id: spec.machine, source_id: spec.sourceId, producer_instance: spec.instance, source: spec.source, boot_id: spec.boot, group: spec.group },
+      window: { from: facts[0].received_at, to: facts[facts.length - 1].received_at, basis: "server_received_at" },
+      build: { commits: spec.source === "daemon" ? [BUILD] : [], provenance: "producer_declared" },
+      sources: [{ source_id: spec.sourceId, source: spec.source, producer_instance: spec.instance, boot_id: spec.boot, boot_order: spec.machine === MAC_B ? "unverified" : "single_boot" }],
+      sequence: { exactness: rv.exactness, reason: null, present: seqs.map((x) => ({ from: x, to: x })), gaps: rv.gaps, gap_edges: "not_inferred" },
+      dropped: { transitions_lost: spec.trigger === "loss" ? 1 : 0, overflow: 0, facts_refused_by_bound: 0 },
+      retention: { raw_retain_until_earliest: new Date(opened + 86_400_000).toISOString(), bundle_retain_until: new Date(opened + 7 * 86_400_000).toISOString(), frozen: "facts_and_context_copied" },
+      clock: { uncertainty_ms: null, basis: "server_received_at", order: "producer_seq", producer_wall: "display_only" },
+      redaction: { class: "content_free_metadata", owner_diagnostics: "refused_at_ingest", absent_fields: ["location", "age_ns", "deadline_ns"], payloads_paths_names: "never_accepted" },
+      provenance: { reason: rv.reason, previous_revision: n > 1 ? n - 1 : null, previous_content_hash: prev?.hash ?? null, added: rv.reason === "acknowledged" ? [] : added, late: false, revised_at: created },
+    },
+    summary: {
+      state: rv.state, trigger: spec.trigger, opened_at: new Date(opened).toISOString(), recovery,
+      acknowledgement: rv.ackSeq === undefined ? null : { at: created, through_seq: rv.ackSeq },
+      ...(rv.closure ? { closure: rv.closure } : {}),
+      stages: {
+        last_proven: rv.state === "recovered_awaiting_review" ? { stage: "handler_started", event_key: facts[facts.length - 1].id, basis: "settled_record" } : null,
+        active: rv.state === "active" && facts.some((f) => f.stage) ? { stage: facts.filter((f) => f.stage).pop()!.stage, event_key: facts[facts.length - 1].id, basis: "producer_watchdog_record" } : null,
+        next: "unknown", root_cause: "not_derived", hypotheses: [],
+      },
+    },
+    facts,
+    context: [factRow([1, "boot", null])],
+    next: { missing_evidence: rv.gaps.length > 0 ? "sequence_gaps_listed" : "none_listed", owner_diagnostics: "unsupported", automatic_repair: "never" },
+  }
+  const text = canonical(bundle)
+  return { bundle, hash: `sha256:${await sha256(text)}`, bytes: new TextEncoder().encode(text).length, created }
+}
+
+async function incidentRow(spec: Spec, now: number): Promise<Row> {
+  const n = spec.revisions.length
+  const latest = await bundleOf(spec, n, now)
+  const opened = now - spec.openedAgo
+  const retain = spec.id === INC.expired ? now - 60_000 : opened + 7 * 86_400_000
+  const expired = retain <= now
+  return {
+    id: spec.id, account: spec.source === "relay" ? "svc:relay" : spec.source === "cloud_api" ? "svc:api" : ACCOUNT, machine_id: spec.machine, source: spec.source, source_id: spec.sourceId,
+    producer_instance: spec.instance, boot_id: spec.boot, group: spec.group, trigger: spec.trigger, state: expired ? null : spec.revisions[n - 1].state,
+    expired, revision: n, content_hash: latest.hash, opened_at: new Date(opened).toISOString(), updated_at: latest.created,
+    acknowledged: spec.revisions[n - 1].ackSeq !== undefined, facts: expired ? null : spec.revisions[n - 1].facts.length, facts_refused: 0,
+    bytes: latest.bytes, retain_until: new Date(retain).toISOString(),
+  }
+}
+
+function incidentEnvelope(now: number, extra: Row): Row {
+  const iso = new Date(now).toISOString()
+  return {
+    schema_version: 1, generated_at: iso, as_of: iso, scope: { kind: "operator", account: null }, outcome: "unknown", outcome_reason: "no_presence_contract",
+    rule_version: "incident-group/1", state_rule: "incident-state/1", clock_uncertainty_ms: null,
+    clock: { basis: "server_received_at", order: "producer_seq", producer_wall: "display_only" }, owner_diagnostics: "unsupported",
+    aggregates: { minute: "unsupported", retention_days: null }, evidence_quality: "complete", partial_reason: null, next_cursor: null, ...extra,
+  }
+}
+
+async function incidentAnswer(scenario: FixtureScenario, path: string, q: URLSearchParams, now: number, method: string): Promise<Response> {
+  const disabled = scenario === "incidents_disabled" || scenario === "empty"
+  const all = disabled ? [] : specs().map(withAck)
+  if (path === "incidents") {
+    const from = Date.parse(q.get("from") ?? "") || now - 7 * 86_400_000
+    const to = Date.parse(q.get("to") ?? "") || now
+    const rows = await Promise.all(all.filter((x) => now - x.openedAgo >= from && now - x.openedAgo <= to).sort((a, b) => a.openedAgo - b.openedAgo).map((x) => incidentRow(x, now)))
+    return json(200, incidentEnvelope(now, {
+      window: { from: new Date(from).toISOString(), to: new Date(to).toISOString(), basis: "opened_at" },
+      evidence_quality: disabled ? "not_collected" : "complete",
+      source_coverage: { incidents: disabled ? "disabled" : "collected", bundles: disabled ? "disabled" : "collected", exports: "supported" },
+      incidents: rows,
+      refusals: { rows: disabled ? [] : [{ account: ACCOUNT, reason: "tenant_incident_cap", window_start: new Date(now - 3_600_000).toISOString(), count: 2 }], truncated: false },
+    }))
+  }
+  const [, rawId, tail] = path.split("/")
+  const spec = all.find((x) => x.id === rawId)
+  if (!spec) return refusal(404, "incident_not_found")
+  if (tail === "acknowledge") {
+    if (method !== "POST") return refusal(404, "not_found")
+    const before = spec.revisions[spec.revisions.length - 1].state === "closed"
+    acknowledgedHere.add(spec.id)
+    return json(200, incidentEnvelope(now, { revised: !before, incident: await incidentRow(withAck(spec), now) }))
+  }
+  const row = await incidentRow(spec, now)
+  if (row.expired) return json(410, { error: { code: "incident_expired", message: "incident_expired", details: { expired_at: row.retain_until } } })
+  const raw = q.get("revision")
+  const n = raw === null ? spec.revisions.length : Number(raw)
+  if (!Number.isSafeInteger(n) || n < 1 || n > 16) return refusal(400, "invalid_field")
+  if (n > spec.revisions.length) return refusal(404, "revision_not_found")
+  const b = await bundleOf(spec, n, now)
+  if (tail === "export") {
+    if (scenario === "audit_fail") return refusal(503, "audit_unavailable")
+    const bundle = scenario === "tampered" ? { ...b.bundle, next: { ...(b.bundle.next as Row), automatic_repair: "never", missing_evidence: "none_listed_after_edit" } } : b.bundle
+    return new Response(JSON.stringify({
+      schema_version: 1,
+      export: { incident_id: spec.id, revision: n, latest_revision: spec.revisions.length, content_hash: b.hash, hash_basis: "sha256 over key-sorted JSON of `bundle`", exported_at: new Date(now).toISOString(), expires_at: row.retain_until, scope: { kind: "operator", account: row.account } },
+      bundle,
+    }), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "content-disposition": `attachment; filename="${spec.id}.r${n}.json"` } })
+  }
+  return json(200, incidentEnvelope(now, {
+    incident: { ...row, revisions: Array.from({ length: spec.revisions.length }, (_, i) => i + 1) },
+    revision: { number: n, created_at: b.created, content_hash: b.hash, bytes: b.bytes },
+    bundle: b.bundle,
+  }))
 }
 
 /** A fetch that answers from the fixture, honouring the caller's abort signal. */
@@ -208,7 +424,7 @@ export function fixtureFetch(name: string): typeof fetch {
   return ((input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((resolve, reject) => {
     const signal = init?.signal
     const delay = scenario === "slow" ? 8_000 : 120
-    const timer = setTimeout(() => resolve(fixtureAnswer(scenario, String(input), Date.now())), delay)
+    const timer = setTimeout(() => resolve(fixtureAnswer(scenario, String(input), Date.now(), init?.method ?? "GET")), delay)
     signal?.addEventListener("abort", () => { clearTimeout(timer); reject(new DOMException("aborted", "AbortError")) }, { once: true })
   })) as typeof fetch
 }

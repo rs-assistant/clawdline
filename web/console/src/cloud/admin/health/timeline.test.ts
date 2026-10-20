@@ -18,7 +18,7 @@ function ev(seq: number, minute: number, over: Partial<StoredEvent> = {}): Store
     id: `he_${over.source_id ?? "s1"}_${over.boot_id ?? "b1"}_${seq}`, account: "acct_private_1", machine_id: "m1", source_id: "s1", producer_instance: "daemon",
     schema: "clawdline.connection-health.record/1", producer_seq: seq, event_id: `b1-${seq}`, boot_id: "b1", batch_id: null, build_commit: null,
     event: "scheduling_gap", wall: at(minute), mono_ns: seq * 1_000_000_000, source: "daemon", stage: null, class: null, kind: null, phase_id: null,
-    correlation: null, count: 1, rule: null, outcome: null, elapsed_ms: null, received_at: at(minute), retain_until: at(2000), ...over,
+    correlation: null, count: 1, rule: null, outcome: null, elapsed_ms: null, state: null, received_at: at(minute), retain_until: at(2000), ...over,
   }
 }
 
