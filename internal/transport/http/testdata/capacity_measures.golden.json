@@ -480,6 +480,56 @@
     "Note": true
   },
   {
+    "Name": "console.health_ui_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_budget_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_event_pages",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_export_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_id_characters",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_page_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_parallel_reads",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_reads_per_load",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_refresh_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_request_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.machine_list_poll_seconds",
     "Known": true,
     "Note": true
