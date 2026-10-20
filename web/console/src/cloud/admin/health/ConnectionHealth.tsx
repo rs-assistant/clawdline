@@ -1,123 +1,96 @@
-/* The connection-health page: controls, whole-page states and the screen the
- * route names. It renders inside the existing admin shell, which the root wires;
- * it owns no route table and fetches only through the injected source. */
-import { useEffect, useMemo, useRef, useState } from "react"
+/* The connection-health page inside the admin shell: the window and pause
+ * controls, the whole-page states, and the screen the address names, drawn from
+ * the Cloud's stored operator reads (`/su/v1/health/…`). It owns no session: the
+ * shell signs in, and a refused read here asks the shell to sign in again.
+ *
+ * The draft snapshot screens (screens.tsx) are the full-product design; they are
+ * not reachable from a route until a producer and the Cloud can fill them. */
+import { useEffect, useMemo, useRef } from "react"
 import "./health.css"
-import type { HealthQuery, Scope } from "./types"
-import { WINDOWS_S } from "./types"
-import { keepSelection, type HealthTarget, type Selection } from "./model"
-import { useHealth } from "./useHealth"
-import type { HealthSource } from "./source"
-import { healthClock, healthWords, type HealthLocale, type HealthWord } from "./words"
-import type { HealthNav } from "./parts"
-import { EvidenceView, M01Overview, M02Machines, M03Services, M04Trace, M05Incident, M06Monitoring } from "./screens"
+import { healthWords, type HealthLocale, type HealthWord } from "./words"
+import { HEALTH_UI_LIMITS, type Refusal } from "./cloud"
+import { useStored } from "./useStored"
+import { healthHref, STORED_WINDOWS_S, type HealthRoute, type HealthScope, type HealthScreen } from "./route"
+import { exactUTC, StoredScreen, type StoredNav } from "./stored-screens"
 
 export type ConnectionHealthProps = {
-  /** Where data comes from. Production passes a source for real routes; never an example source. */
-  source: HealthSource
-  target: HealthTarget
-  nav: HealthNav
-  locale: HealthLocale
-  /** The scopes this person holds, each authorized separately. One is never derived from another. */
-  scopes: readonly Scope[]
+  route: HealthRoute
+  /** In-place navigation to an address under /admin; the shell owns history. */
+  go: (href: string) => void
+  /** Where the operator reads go. Production passes the declared Cloud API origin. */
+  apiOrigin: string
+  /** The fetch the reads use. Production passes the browser's; the fixture harness its own. */
+  get: typeof fetch
+  /** True only for the development fixture harness: every view says so. */
+  fixture: boolean
+  /** The session was refused: the shell decides what signing in again means. */
+  onRefused: (refusal: Refusal) => void
+  /** Explicit locale for tests; the page reads the public catalog otherwise. */
+  locale?: HealthLocale
+  /** The page was reached by a move inside admin, so its heading takes the focus at once. */
+  arrivedByMove?: boolean
 }
 
-export function ConnectionHealth(props: ConnectionHealthProps) {
-  // With no authorized scope there is nothing to ask for; no scope is assumed on the person's behalf.
-  if (props.scopes.length === 0) {
-    const say = healthWords(props.locale)
-    return (
-      <div className="adh">
-        <div className="adm-notice" role="alert"><h2>{say("failedTitle")}</h2><p>{say("failure_forbidden")}</p></div>
-      </div>
-    )
-  }
-  return <Page {...props} />
-}
-
-function Page({ source, target, nav, locale, scopes }: ConnectionHealthProps) {
+export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused, locale, arrivedByMove = false }: ConnectionHealthProps) {
   const say = useMemo(() => healthWords(locale), [locale])
-  const [scope, setScope] = useState<Scope>(scopes[0])
-  const [windowS, setWindowS] = useState<number>(3600)
-  const [pausedAt, setPausedAt] = useState<string | null>(null)
-  const query: HealthQuery = useMemo(() => ({ scope, window_s: windowS, until: pausedAt }), [scope, windowS, pausedAt])
-  const { state, refresh } = useHealth(source, query, pausedAt === null)
-  const [now, setNow] = useState(() => Date.now())
-  const [selection, setSelection] = useState<Selection>({ id: null, chosen: false, absent: false })
+  const { state, refresh, loadOlder } = useStored(get, apiOrigin, route)
   const heading = useRef<HTMLHeadingElement>(null)
+  const scope = route.scope
+  const nav: StoredNav = useMemo(() => ({ href: (s: HealthScreen) => healthHref(s, scope), go: (s: HealthScreen) => go(healthHref(s, scope)) }), [go, scope])
+  const setScope = (next: Partial<HealthScope>) => go(healthHref(route, { ...scope, ...next }))
 
-  // Ages keep counting while live; paused freezes every age at the pause instant.
   useEffect(() => {
-    if (pausedAt !== null) {
-      setNow(Date.parse(pausedAt))
-      return
-    }
-    setNow(Date.now())
-    const id = setInterval(() => setNow(Date.now()), 1000)
-    return () => clearInterval(id)
-  }, [pausedAt])
+    if (state.status === "refused" && state.refusal) onRefused(state.refusal)
+  }, [state.status, state.refusal, onRefused])
 
-  // The route names the investigation; a refresh never replaces it.
-  const routed = target.screen === "M05" || target.screen === "evidence" ? target.incident : null
+  // A move between screens puts the focus on this page's heading; a refresh or a scope change does not.
+  const first = useRef(!arrivedByMove)
+  const screenKey = route.screen === "M02" ? `M02|${route.machine ?? ""}` : route.screen === "M04" ? `M04|${route.trace}` : route.screen
   useEffect(() => {
-    if (routed !== null) setSelection((prev) => (prev.id === routed && prev.chosen ? prev : { id: routed, chosen: true, absent: false }))
-  }, [routed])
-  const snapshot = state.snapshot
-  useEffect(() => {
-    if (snapshot) setSelection((prev) => keepSelection(prev, snapshot.incidents))
-  }, [snapshot])
+    if (first.current) { first.current = false; return }
+    heading.current?.focus({ preventScroll: true })
+  }, [screenKey])
 
-  // A route change moves focus to the page heading; a live refresh does not.
-  useEffect(() => {
-    heading.current?.focus()
-  }, [target.screen])
-
-  const title = say(`screen_${target.screen}` as HealthWord)
-  const lead = say(`lead_${target.screen}` as HealthWord)
-  const props = snapshot ? { snapshot, say, now, nav } : null
+  const title = say(`screen_${route.screen}` as HealthWord)
+  const anyOk = Object.values(state.parts).some((p) => p?.status === "ok")
+  const allFailed = state.status === "ready" && !anyOk
 
   return (
     <div className="adh">
-      {snapshot?.example ? <p className="adh-example" role="note">{say("exampleBanner")}</p> : null}
+      {fixture ? <p className="adh-example" role="note">{say("st_fixtureBanner")}</p> : null}
       <header className="adh-head">
         <h1 className="adh-title" tabIndex={-1} ref={heading}>{title}</h1>
-        <p className="adm-sub">{lead}</p>
+        <p className="adm-sub">{say(`lead_${route.screen}` as HealthWord)}</p>
       </header>
 
       <div className="adh-controls">
-        <label className="adh-control">
-          <span>{say("scopeLabel")}</span>
-          <select value={scope} onChange={(e) => setScope(e.target.value as Scope)} disabled={scopes.length < 2}>
-            {scopes.map((sc) => <option key={sc} value={sc}>{say(`scope_${sc}` as HealthWord)}</option>)}
-          </select>
-        </label>
         <fieldset className="adh-control adh-windows">
           <legend>{say("windowLabel")}</legend>
-          {WINDOWS_S.map((w) => (
-            <label key={w} className={windowS === w ? "adh-window adh-window-on" : "adh-window"}>
-              <input type="radio" name="adh-window" value={w} checked={windowS === w} onChange={() => setWindowS(w)} />
+          {STORED_WINDOWS_S.map((w) => (
+            <label key={w} className={scope.window_s === w ? "adh-window adh-window-on" : "adh-window"}>
+              <input type="radio" name="adh-window" value={w} checked={scope.window_s === w} onChange={() => setScope({ window_s: w })} />
               {say(`window_${w}` as HealthWord)}
             </label>
           ))}
         </fieldset>
         <div className="adh-control adh-live">
-          <button type="button" className="adm-btn adm-btn-small" aria-pressed={pausedAt !== null}
-            onClick={() => setPausedAt(pausedAt === null ? new Date().toISOString() : null)}>
-            {pausedAt === null ? say("pause") : say("resume")}
+          <button type="button" className="adm-btn adm-btn-small" aria-pressed={scope.until !== null}
+            onClick={() => setScope({ until: scope.until === null ? new Date().toISOString() : null })}>
+            {scope.until === null ? say("pause") : say("resume")}
           </button>
-          <button type="button" className="adm-btn adm-btn-small adm-btn-quiet" onClick={refresh} disabled={state.refreshing}>
+          <button type="button" className="adm-btn adm-btn-small adm-btn-quiet" onClick={refresh} disabled={state.refreshing} aria-busy={state.refreshing}>
             {state.refreshing ? say("refreshing") : say("refresh")}
           </button>
         </div>
       </div>
-      <p className="adm-fine">{say(`scopeNote_${scope}` as HealthWord)}</p>
-      {pausedAt ? <p className="adm-fine">{say("pausedNote", { time: healthClock(pausedAt) })}</p> : null}
-      {snapshot ? <p className="adm-stamp adh-stamp">{say("generated", { time: healthClock(snapshot.generated_at) })}</p> : null}
-
-      {state.status === "ready" && state.failure ? (
-        <p className="adm-stale" role="status">{say("staleNote", { code: say(`failure_${state.failure}` as HealthWord), time: healthClock(state.snapshot.generated_at) })}</p>
+      <p className="adm-fine">{say("scopeNote_cloud_operator")}</p>
+      {scope.account !== null ? (
+        <p className="adm-fine">{say("st_accountFilter", { account: scope.account })} <a className="adh-link" href={healthHref(route, { ...scope, account: null })} onClick={(e) => { e.preventDefault(); setScope({ account: null }) }}>{say("st_clearFilter")}</a></p>
       ) : null}
-      {selection.chosen && selection.absent && selection.id ? <p className="adm-stale" role="status">{say("selectionAbsent", { id: selection.id })}</p> : null}
+      <p className="adm-fine">
+        {state.window ? say("st_window", { from: exactUTC(state.window.from), to: exactUTC(state.window.to) }) : null}
+        {" "}{scope.until === null ? say("st_liveEvery", { s: HEALTH_UI_LIMITS.refreshMs / 1000 }) : say("st_pinned")}
+      </p>
 
       {state.status === "loading" ? (
         <div className="adm-skeleton" aria-busy="true">
@@ -125,25 +98,27 @@ function Page({ source, target, nav, locale, scopes }: ConnectionHealthProps) {
           <div className="adm-tile adm-shimmer" />
           <div className="adm-panel adm-shimmer adm-shimmer-tall" />
         </div>
-      ) : state.status === "failed" ? (
+      ) : state.status === "refused" ? (
+        <div className="adm-notice adm-notice-wide" role="alert">
+          <h2>{say("failedTitle")}</h2>
+          <p>{say(state.refusal === "signed_out" ? "st_refusedSignedOut" : "st_refusedForbidden")}</p>
+        </div>
+      ) : allFailed ? (
         <div className="adm-notice adm-notice-wide" role="alert">
           <h2>{say("failedTitle")}</h2>
           <p>{say("failedBody")}</p>
-          <p>{say(`failure_${state.failure}` as HealthWord)}</p>
-          <p className="adm-code">{say("failedCode", { code: state.failure })}</p>
+          <ul className="adh-fail-list">
+            {Object.entries(state.parts).map(([name, p]) => p && p.status === "failed" ? (
+              <li key={name}>{say(`st_part_${name}` as HealthWord)}: {say(`st_fail_${p.code}` as HealthWord)} <span className="adm-code">({p.code})</span></li>
+            ) : null)}
+          </ul>
           <div className="adm-notice-actions">
             <button type="button" className="adm-btn" onClick={refresh} disabled={state.refreshing}>{say("tryAgain")}</button>
           </div>
         </div>
-      ) : props ? (
-        target.screen === "M01" ? <M01Overview {...props} />
-          : target.screen === "M02" ? <M02Machines {...props} machine={target.machine} />
-          : target.screen === "M03" ? <M03Services {...props} />
-          : target.screen === "M04" ? <M04Trace {...props} trace={target.trace} />
-          : target.screen === "M05" ? <M05Incident {...props} incident={target.incident} />
-          : target.screen === "M06" ? <M06Monitoring {...props} />
-          : <EvidenceView {...props} incident={target.incident} />
-      ) : null}
+      ) : (
+        <StoredScreen state={state} route={route} say={say} nav={nav} fixture={fixture} loadOlder={loadOlder} />
+      )}
     </div>
   )
 }

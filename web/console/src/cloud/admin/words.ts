@@ -14,7 +14,7 @@ export function bootAdminCatalog(config: StringsConfig | null, baseURI: string, 
 /* ---- the pages and their addresses --------------------------------------- */
 
 /** The operations pages, in the order the navigation lists them. */
-export const ADMIN_ROUTES = ["overview", "accounts", "promotions", "usage", "survey"] as const
+export const ADMIN_ROUTES = ["overview", "accounts", "promotions", "usage", "survey", "health"] as const
 export type AdminRoute = (typeof ADMIN_ROUTES)[number]
 
 const BASE = "/admin"
@@ -28,15 +28,23 @@ export function isAdminPath(pathname: string): boolean {
   return pathname === BASE || pathname.startsWith(BASE + "/")
 }
 
-/** The page an address names; null for an address under `/admin` that names none. */
+/** The page an address names; null for an address under `/admin` that names none. Connection
+ *  health owns everything under `/admin/health`; its own screens are `health/route.ts`'s. */
 export function adminRoute(pathname: string): AdminRoute | null {
   if (!isAdminPath(pathname)) return null
   const rest = pathname.slice(BASE.length).replace(/^\/+|\/+$/g, "")
   if (rest === "") return "overview"
+  if (rest === "health" || rest.startsWith("health/")) return "health"
   return (ADMIN_ROUTES as readonly string[]).includes(rest) && rest !== "overview" ? (rest as AdminRoute) : null
 }
 
 const en = {
+  nav_health: "Connection health",
+  hint_health: "Stored evidence from Cloud",
+  lead_health: "What Cloud has stored about connections, and how much of it can be seen.",
+  healthUnknownAddress: "This address names no connection health screen.",
+  fixtureOnlyTitle: "Fixture harness",
+  fixtureOnlyBody: "This development harness serves only connection health, from task-owned example data. Other operations pages need a real session.",
   nav_survey: "Onboarding survey",
   hint_survey: "Workflows and discovery",
   lead_survey: "Voluntary answers about workflows, tools and discovery.",
@@ -369,6 +377,12 @@ const en = {
 export type AdminWord = keyof typeof en
 
 const zhTW: Record<AdminWord, string> = {
+  nav_health: "連線健康",
+  hint_health: "Cloud 已保存的證據",
+  lead_health: "Cloud 保存了哪些連線證據，以及看得到多少。",
+  healthUnknownAddress: "這個網址沒有對應的連線健康畫面。",
+  fixtureOnlyTitle: "固定測試資料環境",
+  fixtureOnlyBody: "這個開發環境只提供連線健康，資料是任務自備的範例。其他營運頁面需要真正登入。",
   nav_survey: "新使用者問卷",
   hint_survey: "工作需求與認識來源",
   lead_survey: "自願填答的工作需求、AI 工具與認識來源。",
