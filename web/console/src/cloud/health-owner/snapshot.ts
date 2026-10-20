@@ -234,6 +234,8 @@ export function evidenceGaps(s: OwnerSnapshot): string[] {
   const c = s.capture
   if (c) {
     if (!c.mapped) gaps.push("capture_unmapped")
+    // No matched goroutine says only that the capture did not hold it, never that it was not stuck.
+    if (c.matchedGoroutines === null || c.matchedGoroutines === "0") gaps.push("capture_not_matched")
     if (c.overBudget) gaps.push("capture_over_budget")
     if (c.rawTruncated || c.truncated) gaps.push("capture_truncated")
     if (c.sourceUnavailable === null || c.sourceUnavailable !== "0") gaps.push("capture_source_unavailable")

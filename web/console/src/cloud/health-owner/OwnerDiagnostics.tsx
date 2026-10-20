@@ -3,7 +3,7 @@ import { byteWords, nextWord } from "../../next-strings.js"
 import type { NextWord } from "../../next-strings.js"
 import { SealedError } from "./crypto.js"
 import { ownerDiagnostics, type OpenedDiagnostic, type SealedAttachmentMeta } from "./client.js"
-import { evidenceGaps, exportSnapshot } from "./snapshot.js"
+import { evidenceGaps, exportSnapshot, type CaptureExcerpt, type CaptureFrame, type OwnerSnapshot, type StallRecovery } from "./snapshot.js"
 import { ownerDiagnosticsSource, watchOwnerDiagnosticsSource } from "./source.js"
 
 /**
@@ -40,7 +40,17 @@ export function refusalWords(error: unknown): string {
 const GAP_WORDS: Record<string, NextWord> = {
   truncated: "ownerDiagGapTruncated", lost: "ownerDiagGapLost", lost_unknown: "ownerDiagGapLostUnknown",
   no_coverage: "ownerDiagGapNoCoverage", coverage_truncated: "ownerDiagGapCoverageTruncated", coverage_lost: "ownerDiagGapCoverageLost",
+  capture_unmapped: "ownerDiagGapCaptureUnmapped", capture_not_matched: "ownerDiagGapCaptureNotMatched",
+  capture_over_budget: "ownerDiagGapCaptureOverBudget", capture_truncated: "ownerDiagGapCaptureTruncated",
+  capture_source_unavailable: "ownerDiagGapCaptureSourceUnavailable", capture_functions_redacted: "ownerDiagGapCaptureRedacted",
 }
+
+const KIND_WORDS: Record<CaptureFrame["sourceKind"], NextWord> = {
+  module: "ownerDiagKindModule", std: "ownerDiagKindStd", dependency: "ownerDiagKindDependency", unavailable: "ownerDiagKindUnavailable",
+}
+
+/** Long function names and file:line pairs wrap anywhere so a narrow phone never scrolls sideways. */
+const WRAP = { overflowWrap: "anywhere" as const }
 
 const STATE_WORDS: Record<SealedAttachmentMeta["state"], NextWord> = {
   live: "ownerDiagStateLive", expired: "ownerDiagStateExpired", deleted: "ownerDiagStateDeleted",
@@ -59,6 +69,91 @@ function duration(ns: string | null): string {
   const big = BigInt(ns)
   const ms = big / 1_000_000n
   return ms <= BigInt(Number.MAX_SAFE_INTEGER) ? (Number(ms) / 1000).toFixed(1) + " s" : ns + " ns"
+}
+
+/** A capture takes milliseconds; seconds would round it to 0.0. */
+function shortDuration(ns: string | null): string {
+  if (ns === null) return nextWord("ownerDiagUnknown")
+  const big = BigInt(ns)
+  return big < 1_000_000_000n ? (Number(big) / 1_000_000).toFixed(1) + " ms" : duration(ns)
+}
+
+function count(n: string | null): string {
+  return n === null ? nextWord("ownerDiagUnknown") : n
+}
+
+/**
+ * The /2 capture: the build join, how many goroutines the capture found at the stalled
+ * location, how complete it is, and the stalled goroutine's frames. Every value was decoded
+ * through `decodeSnapshot`'s whitelist; frames are already bounded there and carry only an
+ * allowlisted function name and a relative file:line, rendered as text, never as a link.
+ */
+function CaptureView({ capture, build }: { capture: CaptureExcerpt; build: string }) {
+  const buildText = build || nextWord("ownerDiagUnknown")
+  const matched = capture.matchedGoroutines !== null && capture.matchedGoroutines !== "0"
+  return (
+    <div className="am-card-text" aria-label={nextWord("ownerDiagCapture")}>
+      <strong>{nextWord("ownerDiagCapture")}</strong>
+      <span style={WRAP}>{capture.mapped && capture.function
+        ? nextWord("ownerDiagCaptureJoin", { function: capture.function, build: buildText })
+        : nextWord("ownerDiagCaptureJoinUnmapped", { build: buildText })}</span>
+      {capture.sources.length ? <span className="am-sub" style={WRAP}>{nextWord("ownerDiagCaptureLines", { lines: capture.sources.join(", ") })}</span> : null}
+      <span role={matched ? undefined : "note"}>{matched
+        ? nextWord("ownerDiagCaptureMatched", { count: capture.matchedGoroutines as string })
+        : nextWord("ownerDiagCaptureMatchedNone")}</span>
+      {capture.state ? <span className="am-sub">{nextWord("ownerDiagCaptureState", { state: capture.state })}</span> : null}
+      <span className="am-sub">{nextWord("ownerDiagCaptureQuality", { duration: shortDuration(capture.durationNs), total: count(capture.goroutinesTotal) })}</span>
+      <span className="am-sub">{nextWord("ownerDiagCaptureLimits", {
+        trimmed: nextWord(capture.rawTruncated || capture.truncated ? "ownerDiagYes" : "ownerDiagNo"),
+        omitted: count(capture.framesOmitted), redacted: count(capture.redacted), unavailable: count(capture.sourceUnavailable),
+      })}</span>
+      <span>{nextWord("ownerDiagCaptureFrames")}</span>
+      {capture.frames.length ? (
+        <ol className="am-sub" style={{ margin: 0, paddingInlineStart: "1.25em" }}>
+          {capture.frames.map((f, index) => (
+            <li key={index} style={WRAP}>
+              <code>{f.function || nextWord("ownerDiagUnknown")}</code>
+              <br />
+              {f.source ? f.source + " · " + nextWord(KIND_WORDS[f.sourceKind]) : nextWord("ownerDiagKindUnavailable")}
+            </li>
+          ))}
+        </ol>
+      ) : <span className="am-sub">{nextWord("ownerDiagCaptureNoFrames")}</span>}
+    </div>
+  )
+}
+
+function RecoveryView({ recovery }: { recovery: StallRecovery }) {
+  const words = recovery.state === "recovered" ? "ownerDiagRecovered" : "ownerDiagReleasedUnknown"
+  return (
+    <div className="am-card-text" aria-label={nextWord("ownerDiagRecovery")}>
+      <strong>{nextWord("ownerDiagRecovery")}</strong>
+      <span>{nextWord(words)}</span>
+      {recovery.recoveryNs !== null ? <span className="am-sub">{nextWord("ownerDiagRecoveryAfter", { duration: duration(recovery.recoveryNs) })}</span> : null}
+    </div>
+  )
+}
+
+/** One decrypted snapshot, /1 or /2. Exported so a read-only preview can mount it without keys. */
+export function OwnerSnapshotView({ snapshot }: { snapshot: OwnerSnapshot }) {
+  const gaps = evidenceGaps(snapshot)
+  return (
+    <div className="am-card-text">
+      <span>{nextWord("ownerDiagStage")}: {snapshot.stage || nextWord("ownerDiagUnknown")}</span>
+      <span style={WRAP}>{nextWord("ownerDiagLocation")}: {snapshot.location || nextWord("ownerDiagUnknown")}</span>
+      <span>{nextWord("ownerDiagAge")}: {duration(snapshot.ageNs)} · {nextWord("ownerDiagDeadline")}: {duration(snapshot.deadlineNs)}</span>
+      <span style={WRAP}>{nextWord("ownerDiagBuild")}: {snapshot.build || nextWord("ownerDiagUnknown")} · {nextWord("ownerDiagCorrelation")}: {snapshot.correlationID || nextWord("ownerDiagUnknown")}</span>
+      <span>{nextWord("ownerDiagObserved")}: {when(snapshot.observedAtMs)}</span>
+      {snapshot.coverage.map((c, index) => (
+        <span className="am-sub" key={index}>{nextWord("ownerDiagSource")}: {c.source} · {when(c.fromMs)} – {when(c.toMs)}</span>
+      ))}
+      {snapshot.capture ? <CaptureView capture={snapshot.capture} build={snapshot.build} /> : null}
+      {snapshot.recovery ? <RecoveryView recovery={snapshot.recovery} /> : null}
+      <span className="am-sub">{gaps.length
+        ? nextWord("ownerDiagGaps", { gaps: gaps.map((g) => nextWord(GAP_WORDS[g] ?? "ownerDiagUnknown")).join(", ") })
+        : nextWord("ownerDiagNoGaps")}</span>
+    </div>
+  )
 }
 
 function useStoreTick(): number {
@@ -121,7 +216,6 @@ export function OwnerDiagnostics({ machineID }: { machineID: string }) {
         if (!latest) return null
         const id = a.attachmentID + "#" + latest.revision
         const opened = ownerDiagnostics.openedFor(a.attachmentID, latest.revision)
-        const gaps = opened ? evidenceGaps(opened.snapshot) : []
         return (
           <section className="am-card" key={a.attachmentID} aria-label={a.subjectID}>
             <div className="am-card-row">
@@ -139,17 +233,7 @@ export function OwnerDiagnostics({ machineID }: { machineID: string }) {
             {openErrors[id] ? <p className="am-say" role="alert">{openErrors[id]}</p> : null}
             {opened ? (
               <div className="am-card-text">
-                <span>{nextWord("ownerDiagStage")}: {opened.snapshot.stage || nextWord("ownerDiagUnknown")}</span>
-                <span>{nextWord("ownerDiagLocation")}: {opened.snapshot.location || nextWord("ownerDiagUnknown")}</span>
-                <span>{nextWord("ownerDiagAge")}: {duration(opened.snapshot.ageNs)} · {nextWord("ownerDiagDeadline")}: {duration(opened.snapshot.deadlineNs)}</span>
-                <span>{nextWord("ownerDiagBuild")}: {opened.snapshot.build || nextWord("ownerDiagUnknown")} · {nextWord("ownerDiagCorrelation")}: {opened.snapshot.correlationID || nextWord("ownerDiagUnknown")}</span>
-                <span>{nextWord("ownerDiagObserved")}: {when(opened.snapshot.observedAtMs)}</span>
-                {opened.snapshot.coverage.map((c, index) => (
-                  <span className="am-sub" key={index}>{nextWord("ownerDiagSource")}: {c.source} · {when(c.fromMs)} – {when(c.toMs)}</span>
-                ))}
-                <span className="am-sub">{gaps.length
-                  ? nextWord("ownerDiagGaps", { gaps: gaps.map((g) => nextWord(GAP_WORDS[g] ?? "ownerDiagUnknown")).join(", ") })
-                  : nextWord("ownerDiagNoGaps")}</span>
+                <OwnerSnapshotView snapshot={opened.snapshot} />
                 <button type="button" className="am-ghost am-small" onClick={() => void copy(opened)}>{nextWord("ownerDiagExport")}</button>
               </div>
             ) : null}

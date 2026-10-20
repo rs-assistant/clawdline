@@ -154,3 +154,14 @@ test("a /2 snapshot carries the capture join, frames and recovery, and nothing o
   assert.throws(() => decodeSnapshot(enc({ ...v2, recovery: { state: "fine" } })), invalid)
   assert.throws(() => decodeSnapshot(enc({ ...v2, capture: { ...v2.capture, frames: new Array(25).fill(v2.capture.frames[0]) } })), invalid)
 })
+
+test("a capture without the stalled goroutine is an evidence gap, never a clean capture", () => {
+  const enc = (value: unknown) => new TextEncoder().encode(JSON.stringify(value))
+  const v2 = JSON.parse(v2Text)
+  const big = { ...v2, capture: { ...v2.capture, matched_goroutines: "0", goroutines_total: "5000", raw_truncated: true, functions_redacted: "0", source_unavailable: "0" } }
+  assert.deepEqual(evidenceGaps(decodeSnapshot(enc(big))), ["capture_not_matched", "capture_truncated"])
+  const unread = { ...big, capture: { ...big.capture, matched_goroutines: null, raw_truncated: false } }
+  assert.deepEqual(evidenceGaps(decodeSnapshot(enc(unread))), ["capture_not_matched"])
+  const found = { ...big, capture: { ...big.capture, matched_goroutines: "1", raw_truncated: false } }
+  assert.deepEqual(evidenceGaps(decodeSnapshot(enc(found))), [])
+})

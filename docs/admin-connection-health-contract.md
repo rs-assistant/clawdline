@@ -404,7 +404,30 @@ worst measured case costs at most about 120 ms of pauses a minute on a process w
 goroutines, and about 5 ms with 100. That is why it is on by default. At 1,000 goroutines and above
 the raw buffer fills and the capture says `raw_truncated`; the runtime prints the calling goroutine
 first, so the dump still begins with the stack it was taken from but may miss the stalled one,
-which `join.matched_goroutines: 0` then says.
+which `join.matched_goroutines: 0` then says. The owner page shows that as "unavailable" with the
+evidence gap `capture_not_matched`, never as a clean capture and never as proof the goroutine was
+not stuck.
+
+**Target-first sampling was investigated and not adopted (2026-10-21).** A ten-line experiment
+(go1.27.1 darwin/arm64, goroutines parked 12 frames deep plus one stalled in a distinct function
+started last) compared `runtime.Stack(buf, true)` into the 1 MiB buffer with the supported
+aggregated goroutine profile, `pprof.Lookup("goroutine").WriteTo(w, 1)`:
+
+| Goroutines | `runtime.Stack` | holds the stalled one | aggregated profile | holds the stalled one |
+| --- | --- | --- | --- | --- |
+| 1,000 | 1,024 KiB (full), 9.8 ms | no | 3.3 KB, 4.2 ms | yes |
+| 5,000 | 1,024 KiB (full), 33.0 ms | no | 3.3 KB, 10.1 ms | yes |
+| 20,000 | 1,024 KiB (full), 88.8 ms | no | 3.3 KB, 30.9 ms | yes |
+
+The aggregated profile finds the stalled goroutine here only because the other stacks are
+identical. It cannot be bounded by this worker: the runtime first collects one stack record per
+goroutine (memory grows with the goroutine count, outside the raw buffer's bound), its output
+grows with the number of distinct stacks, and it lists records by count, so a single stalled
+stack sorts last and is the first thing a bounded writer would cut. It also carries no goroutine
+state. Go offers no supported API to dump one chosen goroutine. So the 1 MiB raw and 512 KiB
+sanitized caps, the one in-flight worker and the measurements above stay as they are, and a large
+process keeps answering `raw_truncated` with `matched_goroutines: 0` honestly. Revisit if the
+runtime gains a bounded per-goroutine or filtered stack API.
 
 ## 5. Typed failures
 
