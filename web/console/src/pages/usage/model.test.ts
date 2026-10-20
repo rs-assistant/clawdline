@@ -127,3 +127,17 @@ test("sample labels select the locale's singular form without changing CJK wordi
   assert.equal(sampleLabel(1, "fr", "{count} échantillon", "{count} échantillons"), "1 échantillon")
   assert.equal(sampleLabel(1, "ja", "{count} サンプル", "{count} サンプル"), "1 サンプル")
 })
+
+// @ts-expect-error -- Node runs source tests with type stripping.
+import { usageProjectOptions } from "./project-options.ts"
+// @ts-expect-error -- Node runs source tests with type stripping.
+import { sha256Hex } from "../../session/fingerprint.ts"
+
+test("usage project choices come from configured projects rather than Session history", () => {
+  const id = sha256Hex(new TextEncoder().encode("/projects/configured"))
+  const options = [{ id: "session-only", name: "temporary-session" }, { id, name: "old-directory-name" }, { id: "unattributed", name: "unattributed" }]
+  const places = [{ path: "/projects/configured", label: "Configured project", icon: { svg: "project-mark" } }]
+  assert.deepEqual(usageProjectOptions(options, places), [{ id, label: "Configured project", icon: places[0].icon }])
+  assert.deepEqual(usageProjectOptions(options, []), [])
+  assert.deepEqual(usageProjectOptions([], places), [])
+})
