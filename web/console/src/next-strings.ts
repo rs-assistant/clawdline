@@ -962,8 +962,9 @@ const words = {
     sendKeptWords:
       "This page kept the words when it was reloaded, but not the pictures, so this one cannot be sent again from here.",
     sendDiagnose: "Record diagnostics",
-    sendDiagnosticQueued: "Recorded; sending to the machine when Cloud is available",
-    sendDiagnosticUnavailable: "Could not record diagnostics; try again after reconnecting",
+    sendDiagnosticSending: "Sending diagnostics…",
+    sendDiagnosticQueued: "Diagnostics delivered to the machine",
+    sendDiagnosticUnavailable: "Diagnostics not confirmed; retry",
     menuUnknown: "Not known whether that answer reached the machine. Waiting for the session to update.",
     menuChooseAgain: "Choose again",
     menuUnreadSay:
@@ -2551,8 +2552,9 @@ const words = {
     sendInterrupted: "送出到一半這一頁被重新載入了，不知道有沒有送到那台機器。",
     sendKeptWords: "重新載入時這一頁留住了文字，但沒有留住圖片，所以這一則不能從這裡再送一次。",
     sendDiagnose: "記錄診斷",
-    sendDiagnosticQueued: "已記錄；Cloud 恢復後會送到機器",
-    sendDiagnosticUnavailable: "無法記錄診斷；連線恢復後再試",
+    sendDiagnosticSending: "正在傳送診斷…",
+    sendDiagnosticQueued: "診斷已送達機器",
+    sendDiagnosticUnavailable: "尚未確認診斷送達；重試",
     menuUnknown: "不知道剛才的選擇有沒有送到那台機器，等畫面更新。",
     menuChooseAgain: "重新選擇",
     menuUnreadSay: "Claude Code 正在那台機器上顯示一個選單，Clawdline 沒能從畫面讀出它的選項。",

@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 7029,
+  "englishKeys": 7030,
   "counts": {
     "negation": 2091,
-    "state": 1151,
+    "state": 1152,
     "permission": 431,
     "deletion": 179,
     "uncertainty": 194
   },
-  "unionCount": 3178,
+  "unionCount": 3179,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -3007,6 +3007,7 @@
       "next.scheduleRunStartedWaiting",
       "next.screenForbidden",
       "next.secretHandoffError",
+      "next.sendDiagnosticQueued",
       "next.sendInterrupted",
       "next.sendKeptWords",
       "next.sessionNotStartedShort",
@@ -6642,6 +6643,7 @@
     "next.sendAbsentMayDuplicate",
     "next.sendAgainTip",
     "next.sendAsking",
+    "next.sendDiagnosticQueued",
     "next.sendDiagnosticUnavailable",
     "next.sendEnterBehindQuestion",
     "next.sendEnterMoved",

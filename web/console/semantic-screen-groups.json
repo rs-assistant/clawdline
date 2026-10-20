@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "englishContentKeys": 7029,
-  "riskKeys": 3178,
+  "englishContentKeys": 7030,
+  "riskKeys": 3179,
   "nonRiskCount": 3851,
   "groups": [
     {
@@ -2808,7 +2808,7 @@
         "next.sendAgainMayDuplicate",
         "next.sendAgainMayDuplicateTip",
         "next.sendDiagnose",
-        "next.sendDiagnosticQueued",
+        "next.sendDiagnosticSending",
         "next.sendEnter",
         "next.sendEntering",
         "next.sendLook",

@@ -128,6 +128,7 @@ export interface CloudEvent {
  * are `CloudWriteClient`, reached only through `relay-writer.ts`.
  */
 export interface CloudReadClient {
+  sendDiagnostic?(machine: string, data: Record<string, unknown>): Promise<unknown>
   readonly ready?: boolean
   readonly allowWrites?: boolean
   /**
@@ -722,18 +723,16 @@ export class RelayReader {
     if (client.ready !== false) for (const wake of [...this.awaitingClient]) wake()
   }
 
-  /** A deliberate phone-side sample, carried by the existing bounded viewer event log. */
-  recordSendDiagnostic(code: string): boolean {
-    try {
-      const log = (this.client as { viewerEvents?: { record?(event: string, data: Record<string, unknown>): { n?: number | null } } } | null)?.viewerEvents
-      const result = log?.record?.("cloud.send.diagnostic_requested", {
-        code, machine: this.machine,
-        connection: !this.client ? "none" : this.client.ready === false ? "not_ready" : "ready",
-        online: typeof navigator === "undefined" ? null : navigator.onLine,
-        visible: typeof document === "undefined" ? null : document.visibilityState,
-      })
-      return typeof result?.n === "number"
-    } catch { return false }
+  /** A deliberate phone-side sample, confirmed by the selected machine's receipt. */
+  async recordSendDiagnostic(code: string): Promise<void> {
+    const client = this.client
+    if (!client?.sendDiagnostic) throw Object.assign(new Error("Diagnostic delivery is unavailable"), { code: "cloud_not_carried" })
+    await client.sendDiagnostic(this.machine, {
+      code,
+      connection: client.ready === false ? "not_ready" : "ready",
+      online: typeof navigator === "undefined" ? null : navigator.onLine,
+      visible: typeof document === "undefined" ? null : document.visibilityState,
+    })
   }
 
   /**

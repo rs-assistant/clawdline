@@ -2735,6 +2735,26 @@ export class CloudClient {
             failure.status !== 408 && failure.status !== 429;
     }
 
+    /** A person's diagnostic press is one explicit request, independent of background quotas
+     * and the lifetime writer lock of another tab. Only the machine's matching receipt
+     * establishes delivery; a timeout leaves the button available for another press. */
+    async sendDiagnostic(machine, data) {
+        if (!this.ready) throw cloudError("cloud_reconnecting", "Cloud is not ready to deliver diagnostics");
+        if (this._machineImplements(machine, VIEWER_EVENTS_COMMAND, { learned: false }) !== "yes") {
+            throw cloudError("cloud_feature_unavailable", "This machine has not advertised viewer diagnostics");
+        }
+        const log = new ViewerEventLog();
+        log.record("cloud.send.diagnostic_requested", Object.assign({}, data, { machine: machine }));
+        const outbox = log.takeBatch({ device: this.deviceID, tab: this.tabID,
+            webBuild: this.webBuild, machine: machine, why: "explicit" });
+        const receipt = await this._machineRequestAs(outbox.request, machine, VIEWER_EVENTS_COMMAND,
+            { batch: JSON.parse(outbox.body) }, "action", undefined, { probe: false });
+        if (!receipt || receipt.batch_id !== outbox.batch_id || receipt.rows !== outbox.rows) {
+            throw cloudError("bad_payload", "The machine's receipt does not name this diagnostic batch");
+        }
+        return receipt;
+    }
+
     _armViewerEvents() {
         if (!this.viewerEventDelivery) return;
         if (!this.viewerEventsOff) {

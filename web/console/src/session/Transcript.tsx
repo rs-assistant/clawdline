@@ -900,9 +900,16 @@ function pendingAction(ev: MouseEvent<HTMLElement>) {
   if (diagnose) {
     const card = pendingSends.card(diagnose.getAttribute("data-pending-diagnose") ?? "")
     if (card?.state === "failed") {
-      const kept = recordSendDiagnostic(card.failure)
-      diagnose.textContent = nextWord(kept ? "sendDiagnosticQueued" : "sendDiagnosticUnavailable")
-      if (diagnose instanceof HTMLButtonElement) diagnose.disabled = kept
+      if (!(diagnose instanceof HTMLButtonElement) || diagnose.disabled) return
+      diagnose.disabled = true
+      diagnose.textContent = nextWord("sendDiagnosticSending")
+      void recordSendDiagnostic(card.failure).then(() => {
+        diagnose.textContent = nextWord("sendDiagnosticQueued")
+      }, (error: unknown) => {
+        diagnose.textContent = nextWord("sendDiagnosticUnavailable")
+        diagnose.title = L.failureSentence(error, nextWord("sendDiagnosticUnavailable"))
+        diagnose.disabled = false
+      })
     }
     return
   }
