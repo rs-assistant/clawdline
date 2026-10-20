@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8031,
-  "riskKeys": 3576,
-  "nonRiskCount": 4455,
+  "englishContentKeys": 8047,
+  "riskKeys": 3589,
+  "nonRiskCount": 4458,
   "groups": [
     {
       "name": "admin / other",
@@ -2966,7 +2966,7 @@
     },
     {
       "name": "next / other",
-      "count": 329,
+      "count": 332,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3125,6 +3125,9 @@
         "next.ownerDiagStage",
         "next.ownerDiagStateLive",
         "next.ownerDiagTab",
+        "next.ownerRetentionHead",
+        "next.ownerRetentionLabel",
+        "next.ownerRetentionLocal",
         "next.proposalResolveEvidence",
         "next.proposalResolveSubmit",
         "next.providerWork",
