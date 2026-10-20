@@ -158,6 +158,9 @@ type Options struct {
 	Log               func(format string, args ...any)
 	// Wake, when set, is the idle interval (tests).
 	Wake time.Duration
+	// AttemptTimeout, when set below MaxAttemptSeconds, shortens one
+	// request's deadline (tests).
+	AttemptTimeout time.Duration
 }
 
 // Uploader is one daemon's health uploader.
@@ -185,6 +188,9 @@ func New(o Options) *Uploader {
 	if o.Wake == 0 {
 		o.Wake = idleInterval
 	}
+	if o.AttemptTimeout <= 0 || o.AttemptTimeout > MaxAttemptSeconds*time.Second {
+		o.AttemptTimeout = MaxAttemptSeconds * time.Second
+	}
 	transport := o.Transport
 	if transport == nil {
 		transport = &http.Transport{
@@ -200,7 +206,7 @@ func New(o Options) *Uploader {
 	}
 	u := &Uploader{o: o, client: &http.Client{
 		Transport: transport,
-		Timeout:   MaxAttemptSeconds * time.Second,
+		Timeout:   o.AttemptTimeout,
 		// A redirect would carry the bearer to another place: never follow.
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}}
@@ -527,7 +533,7 @@ func assemble(page healthjournal.Page, cursor string) span {
 		b.next = g.Resume
 		return b
 	}
-	if g := page.Coverage.Gap; g != nil {
+	if g := page.Coverage.Gap; g != nil && g.Before == cursor {
 		b.skipped.gap(g.Reason)
 	}
 	envelope := len(`{"schema_version":1,"batch_id":"s18446744073709551615-18446744073709551615","producer_instance":"daemon","boot_id":"","build_commit":"","events":[]}`) + 2*64
@@ -625,7 +631,7 @@ func (u *Uploader) attempt(ctx context.Context, endpoint string, id Identity, no
 }
 
 func (u *Uploader) send(ctx context.Context, endpoint, credential string, body []byte) (int, []byte, time.Duration, error) {
-	actx, cancel := context.WithTimeout(ctx, MaxAttemptSeconds*time.Second)
+	actx, cancel := context.WithTimeout(ctx, u.o.AttemptTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(actx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
