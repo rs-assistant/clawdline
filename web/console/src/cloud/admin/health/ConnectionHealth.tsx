@@ -10,7 +10,8 @@ import "./health.css"
 import { healthWords, type HealthLocale, type HealthWord } from "./words"
 import { HEALTH_UI_LIMITS, type Refusal } from "./cloud"
 import { useStored } from "./useStored"
-import { healthHref, STORED_WINDOWS_S, type HealthRoute, type HealthScope, type HealthScreen } from "./route"
+import { healthHref, STORED_WINDOWS_S, TREND_RANGE_WORDS, type HealthRoute, type HealthScope, type HealthScreen, type TrendRangeWord } from "./route"
+import { TrendScreen } from "./trend-view"
 import { exactUTC, StoredScreen, type StoredNav } from "./stored-screens"
 
 export type ConnectionHealthProps = {
@@ -33,12 +34,17 @@ export type ConnectionHealthProps = {
 
 export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused, locale, arrivedByMove = false }: ConnectionHealthProps) {
   const say = useMemo(() => healthWords(locale), [locale])
-  const { state, refresh, loadOlder, refuse } = useStored(get, apiOrigin, route)
-  const actions = useMemo(() => ({ get, apiOrigin, refresh, refuse }), [get, apiOrigin, refresh, refuse])
+  const { state, refresh, loadOlder, loadOlderIncidents, refuse } = useStored(get, apiOrigin, route)
+  const actions = useMemo(() => ({ get, apiOrigin, refresh, refuse, loadOlderIncidents }), [get, apiOrigin, refresh, refuse, loadOlderIncidents])
   const heading = useRef<HTMLHeadingElement>(null)
   const scope = route.scope
   const nav: StoredNav = useMemo(() => ({ href: (s: HealthScreen) => healthHref(s, scope), go: (s: HealthScreen) => go(healthHref(s, scope)) }), [go, scope])
   const setScope = (next: Partial<HealthScope>) => go(healthHref(route, { ...scope, ...next }))
+  const trendable = route.screen === "M01" || route.screen === "M03" || route.screen === "M06"
+  const trend = trendable ? route.trend ?? null : null
+  const trendMachine = trendable ? route.trendMachine ?? null : null
+  // The trend range is part of the address: a change is a new query, chart and history entry.
+  const setTrend = (next: TrendRangeWord | null) => go(healthHref({ ...route, trend: next, ...(next === null ? { trendMachine: null } : {}) } as HealthScreen, scope))
 
   useEffect(() => {
     if (state.status === "refused" && state.refusal) onRefused(state.refusal)
@@ -65,7 +71,26 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
         <p className="adm-sub">{say(`lead_${route.screen}` as HealthWord)}</p>
       </header>
 
+      {trendable ? (
+        <nav className="adh-switch adh-view-switch" aria-label={say("tr_viewLabel")}>
+          <a className="adh-switch-btn" aria-current={trend === null ? "page" : undefined} href={healthHref({ ...route, trend: null, trendMachine: null } as HealthScreen, scope)}
+            onClick={(e) => { if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); setTrend(null) } }}>{say("tr_viewRaw")}</a>
+          <a className="adh-switch-btn" aria-current={trend !== null ? "page" : undefined} href={healthHref({ ...route, trend: trend ?? "30d" } as HealthScreen, scope)}
+            onClick={(e) => { if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); setTrend(trend ?? "30d") } }}>{say("tr_viewTrend")}</a>
+        </nav>
+      ) : null}
       <div className="adh-controls">
+        {trend !== null ? (
+          <fieldset className="adh-control adh-windows">
+            <legend>{say("tr_rangeLabel")}</legend>
+            {TREND_RANGE_WORDS.map((r) => (
+              <label key={r} className={trend === r ? "adh-window adh-window-on" : "adh-window"}>
+                <input type="radio" name="adh-trend" value={r} checked={trend === r} onChange={() => setTrend(r)} />
+                {say(`tr_range_${r}` as HealthWord)}
+              </label>
+            ))}
+          </fieldset>
+        ) : (
         <fieldset className="adh-control adh-windows">
           <legend>{say("windowLabel")}</legend>
           {STORED_WINDOWS_S.map((w) => (
@@ -75,6 +100,7 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
             </label>
           ))}
         </fieldset>
+        )}
         <div className="adh-control adh-live">
           <button type="button" className="adm-btn adm-btn-small" aria-pressed={scope.until !== null}
             onClick={() => setScope({ until: scope.until === null ? new Date().toISOString() : null })}>
@@ -86,6 +112,9 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
         </div>
       </div>
       <p className="adm-fine">{say("scopeNote_cloud_operator")}</p>
+      {trend !== null && trendMachine ? (
+        <p className="adm-fine">{say("tr_machineFilter", { machine: trendMachine })} <a className="adh-link" href={healthHref({ ...route, trendMachine: null } as HealthScreen, scope)} onClick={(e) => { e.preventDefault(); go(healthHref({ ...route, trendMachine: null } as HealthScreen, scope)) }}>{say("st_clearFilter")}</a></p>
+      ) : null}
       {scope.account !== null ? (
         <p className="adm-fine">{say("st_accountFilter", { account: scope.account })} <a className="adh-link" href={healthHref(route, { ...scope, account: null })} onClick={(e) => { e.preventDefault(); setScope({ account: null }) }}>{say("st_clearFilter")}</a></p>
       ) : null}
@@ -119,7 +148,7 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
           </div>
         </div>
       ) : (
-        <StoredScreen state={state} route={route} say={say} nav={nav} fixture={fixture} loadOlder={loadOlder} actions={actions} />
+        trend !== null ? <TrendScreen state={state} route={route} say={say} go={go} /> : <StoredScreen state={state} route={route} say={say} nav={nav} fixture={fixture} loadOlder={loadOlder} actions={actions} />
       )}
     </div>
   )

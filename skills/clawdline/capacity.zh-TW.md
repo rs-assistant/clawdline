@@ -163,6 +163,7 @@
 | `console.health_ui_export_bytes` | 524288 | `bytes` | `refuse` | `diagnostics` | — |
 | `console.health_ui_id_characters` | 64 | `characters` | `refuse` | `diagnostics` | — |
 | `console.health_ui_incident_export_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics` | — |
+| `console.health_ui_incident_pages` | 5 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_incident_rows` | 50 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_incident_window_seconds` | 604800 | `seconds` | `expire` | `diagnostics` | — |
 | `console.health_ui_page_rows` | 200 | `rows` | `refuse` | `diagnostics` | — |
@@ -170,6 +171,8 @@
 | `console.health_ui_reads_per_load` | 3 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_refresh_seconds` | 15 | `seconds` | `expire` | `diagnostics` | — |
 | `console.health_ui_request_seconds` | 6 | `seconds` | `expire` | `diagnostics` | — |
+| `console.health_ui_trend_lanes` | 12 | `rows` | `refuse` | `diagnostics` | — |
+| `console.health_ui_trend_signals` | 20 | `rows` | `refuse` | `diagnostics` | — |
 | `console.machine_list_poll_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
 | `console.opened_row_quiet_seconds` | 8 | `seconds` | `expire` | `diagnostics` | — |
 | `console.opened_row_restate_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |

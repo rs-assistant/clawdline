@@ -12,9 +12,12 @@
 import type { HealthRoute } from "./route.ts"
 // @ts-expect-error -- a `.ts` path, so node's strip-types tests can import this module.
 import { windowBounds } from "./route.ts"
-import type { EventsBody, IncidentDetailBody, IncidentListBody, OutcomesBody, OverviewBody, SourcesBody, StoredEvent } from "./stored.ts"
+import type { EventsBody, IncidentDetailBody, IncidentListBody, IncidentRow, OutcomesBody, OverviewBody, SourcesBody, StoredEvent } from "./stored.ts"
 // @ts-expect-error -- a `.ts` path, so node's strip-types tests can import this module.
 import { parseEvents, parseIncidentDetail, parseIncidentList, parseOutcomes, parseOverview, parseSources, StoredContractError, STORED_BOUNDS } from "./stored.ts"
+import type { AggregatesBody, TrendRange } from "./aggregates.ts"
+// @ts-expect-error -- a `.ts` path, so node's strip-types tests can import this module.
+import { parseAggregates, trendWindow } from "./aggregates.ts"
 
 /** Bounds of one load. Registered as console.health_ui_* (internal/domain/capacity). */
 export const HEALTH_UI_LIMITS = {
@@ -40,10 +43,17 @@ export const HEALTH_UI_LIMITS = {
   incidentExportBytes: 1024 * 1024,
   /** The incident list's window over `opened_at` (the Cloud's own maximum, 7 days). */
   incidentWindowMs: 7 * 86_400_000,
+  /** Pages of the incident list held at once, the first included (250 incidents at 50 a page). */
+  incidentPages: 5,
+  /** Trend lanes drawn as charts (each up to 360 buckets); the rest stay in the table. */
+  trendLanes: 12,
+  /** Trend buckets listed to investigate, newest first; the rest are counted. */
+  trendSignals: 20,
 } as const
 
-export type PartName = "overview" | "outcomes" | "sources" | "events" | "trace" | "incidents" | "incident"
+export type PartName = "overview" | "outcomes" | "sources" | "events" | "trace" | "incidents" | "incident" | "aggregates"
 export type PartBody = {
+  aggregates: AggregatesBody
   overview: OverviewBody
   outcomes: OutcomesBody
   sources: SourcesBody
@@ -76,6 +86,24 @@ export function planFor(route: HealthRoute, now: number): { window: { from: stri
   // ends, so a pinned page lists the same incidents on every load.
   const incidentList: Read = { part: "incidents", path: "incidents", params: { from: new Date(Date.parse(window.to) - HEALTH_UI_LIMITS.incidentWindowMs).toISOString(), to: window.to, limit: String(HEALTH_UI_LIMITS.incidentRows) } }
   let reads: Read[]
+  const trend = route.screen === "M01" || route.screen === "M03" || route.screen === "M06" ? route.trend ?? null : null
+  if (trend !== null && (route.screen === "M01" || route.screen === "M03" || route.screen === "M06")) {
+    // The trend view replaces the screen's raw reads instead of adding a fourth: the same
+    // per-load cap, concurrency and budget hold. 30 days is the Cloud's daily buckets, never a
+    // client-side scan of raw rows.
+    const t = trendWindow(trend as TrendRange, Date.parse(window.to))
+    const agg: Record<string, string> = { from: t.from, to: t.to, bucket: t.bucket }
+    if (route.trendMachine) agg.machine_id = route.trendMachine
+    if (route.screen === "M03" && route.source) agg.source = route.source
+    if (route.screen === "M03" && route.sourceId) agg.source_id = route.sourceId
+    const aggregates: Read = { part: "aggregates", path: "aggregates", params: agg }
+    // Incidents opened over the 7 days ending where the trend ends, for the "investigate" links.
+    const incidents: Read = { ...incidentList, params: { ...incidentList.params, from: new Date(Date.parse(t.to) - HEALTH_UI_LIMITS.incidentWindowMs).toISOString(), to: new Date(Math.min(Date.parse(t.to), Date.parse(window.to))).toISOString() } }
+    reads = route.screen === "M01" ? [aggregates, { part: "overview", path: "overview", params: win }, incidents]
+      : [aggregates, { part: "overview", path: "overview", params: win }, { part: "sources", path: "sources", params: {} }]
+    if (route.scope.account !== null) reads = reads.map((r) => ({ ...r, params: { ...r.params, account: route.scope.account! } }))
+    return { window: { from: t.from, to: t.to }, reads: reads.slice(0, HEALTH_UI_LIMITS.readsPerLoad) }
+  }
   switch (route.screen) {
     case "M01":
       reads = [{ part: "overview", path: "overview", params: win }, { part: "outcomes", path: "outcomes", params: win }, incidentList]
@@ -128,7 +156,7 @@ export function readURL(apiOrigin: string, read: Read): string {
 }
 
 const PARSERS: { [N in PartName]: (body: unknown) => PartBody[N] } = {
-  overview: parseOverview, outcomes: parseOutcomes, sources: parseSources, events: parseEvents, trace: parseEvents, incidents: parseIncidentList, incident: parseIncidentDetail,
+  aggregates: parseAggregates, overview: parseOverview, outcomes: parseOutcomes, sources: parseSources, events: parseEvents, trace: parseEvents, incidents: parseIncidentList, incident: parseIncidentDetail,
 }
 
 /** The server's typed refusal codes this page explains; anything else is its HTTP class. */
@@ -296,6 +324,12 @@ export type StoredState = {
   olderCursor: string | null
   olderFailure: StoredFailure | null
   olderBusy: boolean
+  /** Incident-list pages after the first, from the same frozen window and filter (the Cloud's
+   *  cursor hashes both, so a moved window starts again). */
+  incOlder: IncidentRow[][]
+  incCursor: string | null
+  incFailure: StoredFailure | null
+  incBusy: boolean
 }
 
 export type StoredAction =
@@ -305,9 +339,12 @@ export type StoredAction =
   | { type: "older_start" }
   | { type: "older_loaded"; result: PartResult; at: number }
   | { type: "older_refused"; refusal: Refusal }
+  | { type: "inc_older_start" }
+  | { type: "inc_older_loaded"; result: PartResult; at: number }
 
 export const emptyStored = (key: string): StoredState => ({
   key, status: "loading", refusal: null, refreshing: true, window: null, parts: {}, older: [], olderCursor: null, olderFailure: null, olderBusy: false,
+  incOlder: [], incCursor: null, incFailure: null, incBusy: false,
 })
 
 /** Failures that mean the thing itself is gone, so an earlier answer must not stay on screen. */
@@ -337,12 +374,17 @@ export function storedReducer(state: StoredState, action: StoredAction): StoredS
       const sameWindow = state.window !== null && state.window.from === o.window.from && state.window.to === o.window.to
       const list = listPart(parts)
       const firstCursor = list?.status === "ok" && list.failure === null ? (list.body as EventsBody).next_cursor : null
+      const inc = parts.incidents
+      const incCursor = inc?.status === "ok" && inc.failure === null ? (inc.body as IncidentListBody).next_cursor : null
       return {
         ...state, status: "ready", refusal: null, refreshing: false, window: o.window, parts,
         // Older pages belong to one window; a moved window starts paging again.
         older: sameWindow ? state.older : [],
         olderCursor: sameWindow && state.older.length > 0 ? state.olderCursor : firstCursor,
         olderFailure: sameWindow ? state.olderFailure : null,
+        incOlder: sameWindow ? state.incOlder : [],
+        incCursor: sameWindow && state.incOlder.length > 0 ? state.incCursor : incCursor,
+        incFailure: sameWindow ? state.incFailure : null,
       }
     }
     case "older_start":
@@ -355,6 +397,14 @@ export function storedReducer(state: StoredState, action: StoredAction): StoredS
       const page = (r.body as EventsBody)
       return { ...state, olderBusy: false, older: [...state.older, page.events], olderCursor: page.next_cursor }
     }
+    case "inc_older_start":
+      return { ...state, incBusy: true, incFailure: null }
+    case "inc_older_loaded": {
+      const r = action.result
+      if (!r.ok) return { ...state, incBusy: false, incFailure: r.code }
+      const page = r.body as IncidentListBody
+      return { ...state, incBusy: false, incOlder: [...state.incOlder, page.incidents], incCursor: page.next_cursor }
+    }
   }
 }
 
@@ -363,6 +413,26 @@ export function mayLoadOlder(state: StoredState, pinned: boolean): "yes" | "live
   if (state.olderCursor === null) return "none"
   if (!pinned) return "live"
   return 1 + state.older.length >= HEALTH_UI_LIMITS.eventPages ? "bound" : "yes"
+}
+
+/** Whether another incident page may be held: the same rule as events, under its own page bound. */
+export function mayLoadOlderIncidents(state: StoredState, pinned: boolean): "yes" | "live" | "none" | "bound" {
+  if (state.incCursor === null) return "none"
+  if (!pinned) return "live"
+  return 1 + state.incOlder.length >= HEALTH_UI_LIMITS.incidentPages ? "bound" : "yes"
+}
+
+/** Every incident held, newest opened first, without repeats. */
+export function heldIncidents(state: StoredState): IncidentRow[] {
+  const first = partBody(state, "incidents")?.incidents ?? []
+  const seen = new Set<string>()
+  const out: IncidentRow[] = []
+  for (const r of [first, ...state.incOlder].flat()) {
+    if (seen.has(r.id)) continue
+    seen.add(r.id)
+    out.push(r)
+  }
+  return out
 }
 
 /** Every event held, newest first, without repeats (a late row can appear on two pages). */

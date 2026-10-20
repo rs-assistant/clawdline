@@ -308,3 +308,36 @@
 .adh-hash { overflow-wrap: anywhere; word-break: break-all; }
 .adh-inc-active, .adh-inc-recovering { color: var(--warn); }
 .adh-inc-expired { color: var(--ink); opacity: .8; }
+
+/* ---- trends (trend-view.tsx): orange is data, warm gray is unknown; nothing unknown looks like zero ---- */
+.adh-view-switch { display: inline-flex; gap: 4px; margin: 0 0 10px; flex-wrap: wrap; }
+.adh-view-switch .adh-switch-btn { text-decoration: none; }
+.adh-view-switch .adh-switch-btn[aria-current="page"] { background: var(--accent-in); border-color: var(--accent-ed); color: var(--ink); }
+.adh-tr { display: grid; gap: 8px; min-width: 0; }
+.adh-tr-axis { display: flex; justify-content: space-between; gap: 8px; margin: 0; color: var(--dim); font-size: 11.5px; font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.adh-tr-lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.adh-tr-row { display: grid; gap: 4px; min-width: 0; }
+.adh-tr-name { overflow-wrap: anywhere; }
+.adh-tr-svg { display: block; width: 100%; height: 48px; border-bottom: 1px solid var(--line); }
+.adh-tr-bar { fill: var(--accent); opacity: .72; }
+.adh-tr-bar-floor { opacity: .4; }
+.adh-tr-bar-bad { fill: var(--warn); opacity: 1; }
+.adh-tr-signal { fill: var(--bad); }
+.adh-tr-gap { fill: rgba(109, 106, 100, .28); }
+.adh-tr-gap-before_retention, .adh-tr-gap-before_covered { fill: rgba(109, 106, 100, .55); }
+.adh-tr-gap-after_as_of { fill: transparent; }
+.adh-tr-restart { stroke: var(--ink); stroke-width: .25; stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
+.adh-tr-key { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.adh-tr-k { display: inline-block; width: 12px; height: 10px; vertical-align: middle; }
+.adh-tr-k-bar { background: var(--accent); opacity: .72; }
+.adh-tr-k-bad { background: var(--warn); }
+.adh-tr-k-gap { background: rgba(109, 106, 100, .28); }
+.adh-tr-k-old { background: rgba(109, 106, 100, .55); }
+.adh-tr-k-restart { width: 2px; border-left: 2px dashed var(--ink); }
+.adh-tr-signals, .adh-tr-notes, .adh-tr-stages { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.adh-tr-signals li, .adh-tr-notes li { overflow-wrap: anywhere; }
+.adh-tr-note-warn::before { content: "! "; color: var(--warn); font-weight: 700; }
+.adh-tr-stage { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.adh-tr-stage-name { overflow-wrap: anywhere; }
+.adh-tr-stage-bar { display: block; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.adh-tr-stage-bar > span { display: block; height: 100%; background: var(--accent); }

@@ -8,9 +8,15 @@
  * `signed_out`, `forbidden`, `service`; for incidents `incidents_disabled`
  * (the Cloud has them turned off), `audit_fail` (every export answers
  * `503 audit_unavailable`) and `tampered` (an export whose bundle no longer
- * matches its hash). Incident bundles carry real canonical sha256 hashes. */
+ * matches its hash). Incident bundles carry real canonical sha256 hashes.
+ * Trends (`aggregates`): `normal` holds a daemon with a restart, a stall day, loss and absent
+ * buckets, a relay with stage times and a viewer with errors; `partial` is scan-capped with a
+ * refused day and dropped cells; `errors` answers `503 health_store_unavailable`; `rollups_off`
+ * is a Cloud with rollups turned off (`aggregates.minute: unsupported`). `many_incidents` adds 124
+ * closed list rows (ids `hi_f2…`, list only: opening one answers 404) so the incident list pages by
+ * the Cloud's cursor, which is bound to the window like the real one. */
 
-export const FIXTURE_SCENARIOS = ["normal", "partial", "errors", "empty", "slow", "signed_out", "forbidden", "service", "incidents_disabled", "audit_fail", "tampered"] as const
+export const FIXTURE_SCENARIOS = ["normal", "partial", "errors", "empty", "slow", "signed_out", "forbidden", "service", "incidents_disabled", "audit_fail", "tampered", "rollups_off", "many_incidents"] as const
 export type FixtureScenario = (typeof FIXTURE_SCENARIOS)[number]
 
 const MAC_A = "fixture_mac_a"
@@ -161,6 +167,107 @@ function groups(now: number): Row[] {
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })
 const refusal = (status: number, code: string) => json(status, { error: { code, message: code } })
 
+/* ---- trends: the shape of `GET /su/v1/health/aggregates` (Cloud 13e7387, contract §15.2) ---- */
+
+const ROLLUP_BUCKETS: Record<string, { ms: number; max: number }> = {
+  "1m": { ms: 60_000, max: 6 * 3_600_000 }, "5m": { ms: 300_000, max: 24 * 3_600_000 },
+  "1h": { ms: 3_600_000, max: 7 * 86_400_000 }, "1d": { ms: 86_400_000, max: 30 * 86_400_000 },
+}
+const ELAPSED_BOUNDS = [10, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000, 60_000]
+
+function rollCell(event: string, stage: string | null, cls: string | null, outcome: string | null, error: string | null, records: number, count: number | null, elapsedMs: number | null): Row {
+  const buckets = ELAPSED_BOUNDS.map(() => 0).concat([0])
+  if (elapsedMs !== null) buckets[ELAPSED_BOUNDS.findIndex((b) => elapsedMs <= b) === -1 ? ELAPSED_BOUNDS.length : ELAPSED_BOUNDS.findIndex((b) => elapsedMs <= b)] = records
+  return {
+    event, stage, class: cls, outcome, error, records, count_total: count === null ? 0 : count * records, count_is_floor: count === null, records_without_count: count === null ? records : 0,
+    elapsed: elapsedMs === null ? null : { records, max_ms: elapsedMs, bounds_ms: ELAPSED_BOUNDS, buckets, basis: "per_record_reported_elapsed" },
+  }
+}
+
+/** Which buckets of a series hold a rollup: deterministic in the bucket index, with holes. */
+function rollPoints(kind: "daemon" | "relay" | "viewer", from: number, to: number, ms: number, now: number): Row[] {
+  const out: Row[] = []
+  const n = Math.round((to - from) / ms)
+  for (let i = 0; i < n; i++) {
+    const start = from + i * ms
+    if (start > now) break
+    // Holes: every seventh daemon bucket (none of the last six, which hold the signals) and every
+    // fifth viewer bucket were never rolled up: unknown.
+    if (kind === "daemon" && i % 7 === 5 && i < n - 6) continue
+    if (kind === "viewer" && i % 5 === 1) continue
+    const late = i >= Math.floor(n * 0.6)
+    const cells: Row[] = []
+    if (kind === "daemon") {
+      cells.push(rollCell("scheduling_gap", null, null, null, null, 4 + (i % 3), 1, null))
+      if (i === n - 4) cells.push(rollCell("stall_detected", "handler_started", "read", null, null, 1, null, null), rollCell("slow_detected", "handler_started", "read", null, null, 1, null, null))
+    } else if (kind === "relay") {
+      cells.push(rollCell("stage_completed", "account_dispatch_started", null, "ok", null, 3, 40, 120 + (i % 4) * 90))
+      cells.push(rollCell("stage_completed", "fanout_sent", null, "ok", null, 3, 40, 8))
+      if (i === n - 2) cells.push(rollCell("stage_failed", "storage_started", null, "timeout", null, 1, 1, 5_200))
+    } else {
+      cells.push(rollCell("viewer_stage_completed", "viewer_request_issued", null, "ok", null, 2, 12, 340))
+      if (i % 4 === 2) cells.push(rollCell("viewer_stage_failed", "viewer_sse_resume", null, "error", "sse_gap", 1, 1, 2_100))
+      if (i === n - 3) cells.push(rollCell("viewer_stage_failed", "viewer_connect", null, "error", "auth_refused", 1, null, null))
+    }
+    const boots = kind === "daemon" ? [late ? BOOT_B : BOOT_A] : kind === "relay" ? ["fixture-relay-boot"] : ["fixture-viewer-boot"]
+    out.push({
+      start: new Date(start).toISOString(), boots: boots.length, boot_ids: boots, boot_ids_truncated: false,
+      batches: 1 + (i % 2), records: cells.reduce((a, c) => a + (c.records as number), 0), duplicates_refused: kind === "daemon" && i === 5 ? 1 : 0,
+      producer_wall_behind: kind === "daemon" && i === n - 6 ? 2 : 0, producer_wall_ahead: 0, loss_reported: kind === "daemon" && i === n - 5 ? 6 : 0, cells_dropped: 0,
+      cells: cells.sort((a, b) => `${a.event}|${a.stage}`.localeCompare(`${b.event}|${b.stage}`)),
+    })
+  }
+  return out
+}
+
+function aggregatesAnswer(scenario: FixtureScenario, q: URLSearchParams, now: number): Response {
+  if (scenario === "errors") return refusal(503, "health_store_unavailable")
+  for (const k of q.keys()) if (!["from", "to", "bucket", "machine_id", "source", "source_id", "event", "stage", "class", "outcome", "error", "account"].includes(k)) return refusal(400, "unknown_field")
+  const bucket = q.get("bucket") ?? "1h"
+  const spec = ROLLUP_BUCKETS[bucket]
+  if (!spec) return refusal(400, "invalid_field")
+  // The Cloud's own quantization (§15.2): from floors, to ceils and is at most the current bucket.
+  const nowEnd = Math.ceil((now + 1) / spec.ms) * spec.ms
+  const to = Math.min(Math.ceil((Date.parse(q.get("to") ?? "") || now) / spec.ms) * spec.ms, nowEnd)
+  const from = Math.floor((Date.parse(q.get("from") ?? "") || to - spec.max) / spec.ms) * spec.ms
+  if (from >= to) return refusal(400, "invalid_window")
+  if (to - from > spec.max) return refusal(400, "window_too_wide")
+  const floor = (Math.floor((now - 30 * 86_400_000 - 3_600_000) / 3_600_000) + 1) * 3_600_000
+  const off = scenario === "rollups_off" || scenario === "empty"
+  const partial = scenario === "partial"
+  const all = off ? [] : [
+    { source_id: SRC_A, machine_id: MAC_A, source: "daemon", producer_instance: "daemon", denominator: "unknown", kind: "daemon" as const, loss: { storage_lost_records: 6, store_gaps: 1, excluded: 0 } },
+    { source_id: SRC_RELAY, machine_id: "svc_relay", source: "relay", producer_instance: "relay_worker", denominator: "service_reported_operations", kind: "relay" as const, loss: { storage_lost_records: 0, store_gaps: 0, excluded: 0 } },
+    { source_id: "hs_f100000000000000000000000000000f", machine_id: MAC_B, source: "viewer", producer_instance: "viewer", denominator: "viewer_reported_stage_ends", kind: "viewer" as const, loss: { storage_lost_records: 0, store_gaps: 0, excluded: 0 } },
+  ]
+  const wanted = all.filter((x) => (!q.get("machine_id") || x.machine_id === q.get("machine_id")) && (!q.get("source") || x.source === q.get("source")) && (!q.get("source_id") || x.source_id === q.get("source_id")))
+  const clipped = from < floor
+  const coveredFrom = partial ? from + Math.floor((to - from) / spec.ms / 3) * spec.ms : clipped ? floor : from
+  const series = wanted.map((x) => ({
+    account: x.source === "daemon" || x.source === "viewer" ? ACCOUNT : "svc:relay", source_id: x.source_id, machine_id: x.machine_id, source: x.source, producer_instance: x.producer_instance, denominator: x.denominator,
+    producer_reported_loss: { ...x.loss, attribution: "first_received_minute", provenance: "producer_declared", counters: "monotonic" },
+    points: rollPoints(x.kind, from, to, spec.ms, now).filter((p) => Date.parse(p.start as string) >= (clipped ? floor : from)),
+  }))
+  const reason = partial ? "scan_cap" : clipped ? "retention_floor" : series.some((s) => s.points.some((p) => (p.loss_reported as number) > 0)) ? "producer_reported_loss" : null
+  const quality = series.length === 0 ? "not_collected" : reason !== null ? "partial" : "complete"
+  return json(200, {
+    ...envelope(now, quality, {
+      window: { from: new Date(from).toISOString(), to: new Date(to).toISOString(), bucket, bucket_ms: spec.ms, basis: "server_received_at" },
+      partial_reason: reason,
+      source_coverage: { daemon: series.length ? "collected" : "not_collected", relay_worker: "service_scope", relay_do: "service_scope", api: "service_scope", viewer: "unsupported", external_probe: "unsupported" },
+      aggregates: off && scenario === "rollups_off" ? { minute: "unsupported", retention_days: null } : { minute: "collected", retention_days: 30, rule_version: "minute-rollup/1", route: "aggregates" },
+      series, series_total: series.length,
+    }, {
+      truncated: partial, retention_floor: new Date(floor).toISOString(), retention_clipped: clipped, covered_from: new Date(coveredFrom).toISOString(),
+      sequence: "not_computed", sequence_reason: "aggregates_hold_counts_only", seq_ranges: null, gaps: null, dropped: null, absent_bucket: "unknown",
+      refusals: { rows: partial ? [{ account: ACCOUNT, day: new Date(Math.floor((to - spec.ms) / 86_400_000) * 86_400_000).toISOString(), reason: "account_bytes", batches: 3 }] : [], truncated: false },
+      cells_dropped: partial ? 4 : 0, cell_filter: "none",
+    }),
+    rule_version: "minute-rollup/1",
+    semantics: { counts: "accepted_event_records", distinct_operations: "not_aggregated", elapsed: "per_record_reported_elapsed_not_end_to_end", boots: "never_merged_in_storage", clock: "server_received_at_minute" },
+  })
+}
+
 /** Answers one URL from the fixture. Exported for the module tests. */
 export async function fixtureAnswer(scenario: FixtureScenario, url: string, now: number, method = "GET"): Promise<Response> {
   if (scenario === "signed_out") return refusal(401, "unauthorized")
@@ -169,6 +276,7 @@ export async function fixtureAnswer(scenario: FixtureScenario, url: string, now:
   const path = u.pathname.replace(/^.*\/su\/v1\/health\//, "")
   const q = u.searchParams
   const empty = scenario === "empty"
+  if (path === "aggregates") return aggregatesAnswer(scenario, q, now)
   if (path === "overview") {
     const all = empty ? [] : events(now, scenario)
     const by: Record<string, number> = {}
@@ -382,8 +490,33 @@ async function incidentAnswer(scenario: FixtureScenario, path: string, q: URLSea
   if (path === "incidents") {
     const from = Date.parse(q.get("from") ?? "") || now - 7 * 86_400_000
     const to = Date.parse(q.get("to") ?? "") || now
-    const rows = await Promise.all(all.filter((x) => now - x.openedAgo >= from && now - x.openedAgo <= to).sort((a, b) => a.openedAgo - b.openedAgo).map((x) => incidentRow(x, now)))
+    let rows: Row[] = await Promise.all(all.filter((x) => now - x.openedAgo >= from && now - x.openedAgo <= to).sort((a, b) => a.openedAgo - b.openedAgo).map((x) => incidentRow(x, now)))
+    let nextCursor: string | null = null
+    if (scenario === "many_incidents" && rows.length > 0) {
+      // A closed, unexpired row is the template: an expired one carries no state or facts.
+      const base = rows.find((r) => r.state === "closed" && r.expired === false) ?? rows[0]
+      for (let i = 0; i < 124; i++) {
+        const opened = now - 6 * 3_600_000 - i * 1_200_000
+        if (opened < from || opened > to) continue
+        rows.push({ ...base, id: `hi_f2${String(i).padStart(30, "0")}`, state: "closed", expired: false, acknowledged: true, opened_at: new Date(opened).toISOString(), updated_at: new Date(opened + 60_000).toISOString() })
+      }
+      rows.sort((a, b) => Date.parse(String(b.opened_at)) - Date.parse(String(a.opened_at)))
+      // The Cloud's cursor binds the reader, filter and window; this one binds the window.
+      const bind = `${from}|${to}`
+      const limit = Math.min(200, Number(q.get("limit") ?? 50))
+      let offset = 0
+      const cursor = q.get("cursor")
+      if (cursor !== null) {
+        const [at, bound] = atob(cursor.replace(/-/g, "+").replace(/_/g, "/")).split("\n")
+        if (bound !== bind || !/^[0-9]+$/.test(at)) return refusal(400, "bad_cursor")
+        offset = Number(at)
+      }
+      const more = offset + limit < rows.length
+      nextCursor = more ? btoa(`${offset + limit}\n${bind}`).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") : null
+      rows = rows.slice(offset, offset + limit)
+    }
     return json(200, incidentEnvelope(now, {
+      next_cursor: nextCursor,
       window: { from: new Date(from).toISOString(), to: new Date(to).toISOString(), basis: "opened_at" },
       evidence_quality: disabled ? "not_collected" : "complete",
       source_coverage: { incidents: disabled ? "disabled" : "collected", bundles: disabled ? "disabled" : "collected", exports: "supported" },

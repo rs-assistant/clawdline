@@ -770,3 +770,6 @@ export function stageRole(stage: string | null): StageRole | null {
 export function isServiceSource(source: string | null): boolean {
   return source === "relay" || source === "cloud_api"
 }
+
+/** The field readers, for the other adapters of this page (aggregates.ts): one strictness everywhere. */
+export const storedReaders = { shape, obj, str, id, idOrNull, instant, instantOrNull, nat, natOrNull, bool, oneOf, list } as const

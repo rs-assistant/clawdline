@@ -1,6 +1,6 @@
 # Connection health: UI integration
 
-Status: 2026-10-20. `/admin/health` is a page of the hosted admin shell. It reads the Cloud's
+Status: 2026-10-21. `/admin/health` is a page of the hosted admin shell. It reads the Cloud's
 stored operator evidence (`GET {api}/su/v1/health/…`, private contract
 `docs/connection-health-contract.md` in the Cloud repository, §3, §3a, §10, §11 and §12) through an
 explicit adapter, and draws M01–M06 and the evidence view from what those reads return. It is
@@ -29,9 +29,13 @@ overview does not hide this page; a refused health read does not break the busin
 | `/admin/health/incidents/<hi_…>[?revision=n]` | M05 one revision | `incidents/<id>?revision=n`; export and acknowledge on demand |
 | `/admin/health/monitoring` | M06 monitoring | `overview`, `sources`, `outcomes` |
 | `/admin/health/evidence[/<correlation>]` | evidence record | `outcomes`, `events` or `trace/<correlation>`, `sources` |
+| `/admin/health?trend=<range>` | M01 trends | `aggregates`, `overview`, `incidents` (7 days ending where the trend ends) |
+| `/admin/health/services?trend=<range>[&source=…&source_id=hs_…]` | M03 trends | `aggregates?source&source_id`, `overview`, `sources` |
+| `/admin/health/monitoring?trend=<range>` | M06 trends | `aggregates`, `overview`, `sources` |
 
-Query: `window` (900, 3600, 21600 or 86400 s; default 3600), `until` (a past instant: paused), and
-`account` (an operator filter, never authority). A malformed value falls back to live/default; ids
+Query: `window` (900, 3600, 21600 or 86400 s; default 3600), `until` (a past instant: paused),
+`account` (an operator filter, never authority), and on M01/M03/M06 `trend` (`6h`, `24h`, `7d`,
+`30d`) with an optional `machine_id` that narrows the trend read. A malformed value falls back to live/default; ids
 must match the Cloud's opaque-id rule. Refresh, a shared link, Back and Forward land on the same
 screen and scope (`health/route.ts`). A screen change moves focus to the page heading; a refresh
 or a scope change does not.
@@ -51,6 +55,8 @@ or a scope change does not.
 | `health/stored-export.ts` | The evidence record: listed fields only, ≤ 512 KiB, `not_an_incident_bundle: true`, `incident_bundles: not_included_use_incident_export`. |
 | `health/useStored.ts` | One load at a time; 15 s live refresh; cancelled on route or scope change. |
 | `health/ConnectionHealth.tsx` | Page controls and whole-page states. Loaded lazily by `AdminGate.tsx`. |
+| `health/aggregates.ts` | The trend adapter and chart model (below). |
+| `health/trend-view.tsx` | The trend view: lanes, buckets to investigate, stage times, viewer errors, coverage. |
 | `health/fixture.ts` | Development-only example answers (see below). |
 | `health/stored.test.ts` | Module tests (mocked fetch; run by `npm test`). |
 | `health/{types,parse,model,source,useHealth,screens,parts}.ts(x)` | The earlier draft snapshot design (`v0-draft`). `parts.tsx` is shared; the rest is the full-product rendering target and is not reachable from a route until producers and the Cloud can fill it. |
@@ -150,12 +156,64 @@ each read's own quality is listed. It never says more than "only what these read
 - Unsupported parts (latency, presence, relay/viewer stages, spans, probes) share one
   "requested, not collected yet" panel per screen with their exact limitation.
 
+## Trends (M01, M03, M06): the Cloud's minute rollups
+
+Private contract §15 (Cloud commit `13e7387`), `GET {api}/su/v1/health/aggregates`.
+"Raw records (24 h)" and "Trends (up to 30 days)" are two views of the same screen; the trend
+view **replaces** the screen's raw reads, so a load is still at most three reads, two in flight,
+under the same deadlines and budget — never a fourth read. Each range asks for the only bucket
+the Cloud allows for it: `6h` → `1m`, `24h` → `5m`, `7d` → `1h`, `30d` → `1d` (30 daily buckets,
+never the raw events read and never a client-side scan). The window is aligned to the bucket and
+exactly the Cloud's widest, so its own floor/ceil cannot turn it into `window_too_wide`. The
+range is part of the address (a new query, a new chart, a history entry); live refresh and
+pause behave as on the raw view. M03's `source`/`source_id` and the trend `machine_id` are sent
+as the Cloud's own filters; `account` stays a filter.
+
+The adapter (`parseAggregates`) refuses: a `rule_version` other than `minute-rollup/1`, any
+`semantics` value other than the five §15.2 states, `absent_bucket` other than `unknown`, an
+overall outcome other than `unknown`, a `bucket_ms` that is not its bucket's, a point that is not
+bucket-aligned, inside the window and ascending, a `count_is_floor` that disagrees with
+`records_without_count`, a `boots` count that disagrees with its ids, a viewer error outside the
+viewer enum, and anything past the Cloud's bounds (50 series, 360 points, 64 cells, 8 boot ids,
+200 refusal rows) — as `contract_schema`/`contract_shape`/`contract_bound`, never truncated.
+
+What the view draws, from `trendLanes`, `viewerErrors` and `stageElapsed`:
+
+- One lane per source (`HEALTH_UI_LIMITS.trendLanes`, 12, drawn; the table lists every one), one
+  slot per bucket. A held bucket is an orange bar of **accepted event records**; a bucket with a
+  stall, slow, failed stage or loss is darker with a mark. A bucket the Cloud did not list is a
+  warm-gray "unknown" block, never a zero bar; before the retention floor and before
+  `covered_from` (scan cap) are their own darker unknowns; held buckets older than `covered_from`
+  are drawn as floors. After `as_of` is blank.
+- A bucket whose boot set differs from the previous held one, or that holds several boots, is a
+  restart: a dashed break, counted per lane. Producer clocks are only counted
+  (`producer_wall_behind/ahead`); time is the Cloud's receipt minute.
+- Reported operations (`count_total` of stage-end cells) are shown only for relay/API and viewer
+  denominators, "at least" when any record had no count. The daemon's denominator is unknown, so
+  it has no operations total and no ratio anywhere; no ratio is computed for any source.
+- **Each stage's own reported time** (M03, M06): per source × stage the largest `max_ms` and the
+  per-record histogram. Never summed, never end-to-end.
+- **Viewer errors**: records per viewer error class over held buckets, with the reported count
+  ("at least" when floored).
+- **Buckets to investigate** (`trendSignals`, 20, newest first; the rest counted): each links to
+  M03's raw records for that source and source id pinned at the bucket's end (only while raw
+  records are within their 24 h), and to the incident list pinned there, both in the same account
+  scope.
+- **What these trends cannot say**: absent = unknown, the clock basis, what the counts are, and
+  every `partial_reason`, retention clip, `covered_from`, series beyond 50, dropped cells and
+  refused days the answer listed. `aggregates.minute: unsupported` shows "unsupported" and no
+  chart. `503 health_store_unavailable` (rollups not migrated) is the trend panel's own failure;
+  401/404 still clear the page.
+
 ## Bounds (`HEALTH_UI_LIMITS`, registered)
 
 Per read 6 s; per load 12 s; 2 reads in flight (the Cloud's per-principal admission); 3 reads per
 load; 1.5 MiB per body (refused unread above); 200 rows per page; 5 pages held (older paging only
 while paused, because the Cloud's cursor hashes the window); 512 KiB evidence record; 64-character
-ids; 50 incidents per list over 7 days; 1 MiB incident export. Revisions (16), facts (200) and
+ids; 50 incidents per list page over 7 days, 5 list pages held (250 incidents, paused only); 1 MiB
+incident export; 12 trend lanes drawn; 20 trend buckets listed to investigate. A parity test
+(`internal/domain/capacity/connection_health_ui_test.go`) fails when a `HEALTH_UI_LIMITS` key has
+no row or a row disagrees. Revisions (16), facts (200) and
 context (20) per revision are the Cloud's bounds, refused past them as `contract_bound`. These are this page's choices against the Cloud's documented bounds, not measurements of
 production.
 
@@ -171,9 +229,21 @@ VITE_ADMIN_HEALTH_FIXTURE=normal npx vite --host 127.0.0.1 --port 5274 --strictP
 # open http://127.0.0.1:5274/admin/health
 ```
 
-Scenarios: `normal`, `partial`, `errors` (outcomes 503, events 429), `empty`, `slow` (every read
+Scenarios: `normal`, `partial`, `errors` (outcomes 503, events 429, aggregates 503), `empty`, `slow` (every read
 times out), `signed_out`, `forbidden`, `service`, `incidents_disabled`, `audit_fail` (every export
-503 `audit_unavailable`), `tampered` (an export whose bundle no longer matches its hash). `normal`
+503 `audit_unavailable`), `tampered` (an export whose bundle no longer matches its hash),
+`rollups_off` (aggregates `minute: unsupported`), `many_incidents` (124 extra closed list rows, so
+the list pages by cursor; opening one of them answers 404). The aggregates answer is in the shape
+Cloud `13e7387` serves (§15.2) and applies its own quantization and `window_too_wide`; `normal`
+holds a daemon with absent buckets, a restart, a stall/slow bucket, loss and a clock-skew count, a
+relay with stage times and a failed stage, and a viewer with `sse_gap` and `auth_refused`;
+`partial` is scan-capped with a refused day and dropped cells.
+
+Trend addresses for review: `/admin/health?trend=30d`, `?trend=24h`, `?trend=6h`,
+`/admin/health/services?trend=7d&source=relay`, `/admin/health/monitoring?trend=24h`,
+`/admin/health?trend=30d&until=<two days ago>` (retention clip), `?trend=30d&machine_id=fixture_mac_a`,
+with `normal`, `partial`, `errors`, `empty` and `rollups_off`; incident paging:
+`VITE_ADMIN_HEALTH_FIXTURE=many_incidents`, `/admin/health/incidents?until=<a past instant>`. `normal`
 holds one incident per state with real canonical hashes: `…a01` active (relay), `…a02` loss
 (active), `…a06` recovering (failed stage), `…a03` recovery observed awaiting review (two
 revisions), `…a04` closed by review without observed recovery (three revisions; r2 recovering),
@@ -217,10 +287,17 @@ of the growth is the English and Chinese copy tables in `words.ts`. A production
 - No production read: the Cloud reads are not deployed. Field names follow the committed Cloud
   branches (2a4ecc78 `4a40b35`, 8de84319 `1414a55`, 35ba675a `fac588c`); a later Cloud change needs
   the adapter updated.
-- The incident list shows its first page (50); a later page is named, not loaded. M04's incident
-  links come from that page only.
+- The incident list loads older pages only while paused (the Cloud's cursor hashes the window);
+  live, it says to pause. M01's open-incident tile and M04's incident links still come from the
+  first page only.
+- **The trend view was not rendered in a browser by the task that built it.** Owed by the root:
+  the trend addresses above at desktop and 390 px, keyboard through the view switch, the range
+  radios, the chart/table switch and the investigate links, and against a deployed Cloud with
+  rollups migrated and enabled. The aggregates read has not been called against any Cloud; its
+  fields follow Cloud commit `13e7387`, and a later wire change needs `aggregates.ts` updated.
+- Probes stay "unsupported" here; a probe read (`/su/v1/health/probes`) is not consumed.
 - The fixture's acknowledgement is per tab and in memory; the real route's `Origin` check was not
   exercised against a Cloud.
 - Not built anywhere yet: owner encryption and owner-sealed attachments, presence contract,
-  viewer producer, external probe, minute aggregates, clock uncertainty, account-attributed service
-  evidence.
+  external probe, clock uncertainty, account-attributed service evidence, sequence gaps over 30
+  days (the rollups hold counts only), distinct operations over 30 days.

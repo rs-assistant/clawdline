@@ -3117,6 +3117,23 @@
   },
   {
     "Register": "daemon",
+    "Name": "console.health_ui_incident_pages",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
     "Name": "console.health_ui_incident_rows",
     "Class": "buffer",
     "Unit": "rows",
@@ -3225,6 +3242,40 @@
     "Limit": 6,
     "WarnAt": 0,
     "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_trend_lanes",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 12,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_trend_signals",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
     "Deviation": "",
     "Told": [
       "diagnostics"

@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { BundleFact, IncidentDetailBody, IncidentListBody, IncidentRow, IncidentState } from "./stored"
 import type { Refusal, StoredState } from "./cloud"
-import { partBody } from "./cloud"
+import { heldIncidents, HEALTH_UI_LIMITS, mayLoadOlderIncidents, partBody } from "./cloud"
 import { acknowledgeIncident, fetchIncidentExport, type ExportFailure, type VerifiedExport } from "./incident-export"
 import type { HealthRoute } from "./route"
 import type { HealthSay, HealthWord } from "./words"
@@ -25,6 +25,8 @@ export type IncidentActions = {
   refresh: () => void
   /** A refused session: clear everything held and let the shell sign in again. */
   refuse: (r: Refusal) => void
+  /** The next page of the incident list, under the same frozen window and filter. */
+  loadOlderIncidents: () => void
 }
 
 const STATE_GLYPH: Record<IncidentState, string> = { active: "■", recovering: "◇", recovered_awaiting_review: "✓", closed: "◼" }
@@ -84,19 +86,28 @@ export function IncidentCoverage({ body, say }: { body: IncidentListBody; say: H
   )
 }
 
-function IncidentList({ state, say, nav }: { state: StoredState; say: HealthSay; nav: StoredNav }) {
+function IncidentList({ state, say, nav, pinned, loadOlder }: { state: StoredState; say: HealthSay; nav: StoredNav; pinned: boolean; loadOlder: () => void }) {
   const p = state.parts.incidents
   if (!p) return null
   if (p.status === "failed") return <PartFailed name="incidents" code={p.code} say={say} />
   const body = p.body as IncidentListBody
   const off = body.source_coverage.incidents === "disabled"
+  const rows = heldIncidents(state)
+  const older = mayLoadOlderIncidents(state, pinned)
   return (
     <Panel title={say("st_incidentsTitle")}>
       <Stale state={state} name="incidents" say={say} />
       <IncidentCoverage body={body} say={say} />
-      {body.incidents.length === 0
+      {rows.length === 0
         ? <p className="adm-fine">{off ? say("inc_noneDisabled") : say("inc_none")}</p>
-        : <IncidentTable rows={body.incidents} say={say} nav={nav} caption={say("st_incidentsTitle")} />}
+        : <IncidentTable rows={rows} say={say} nav={nav} caption={say("st_incidentsTitle")} />}
+      {state.incOlder.length > 0 || older !== "none" ? <p className="adm-fine">{say(state.incCursor === null ? "inc_heldAll" : "inc_held", { n: rows.length, pages: 1 + state.incOlder.length })}</p> : null}
+      {older === "yes" ? (
+        <button type="button" className="adm-btn adm-btn-small" onClick={loadOlder} disabled={state.incBusy} aria-busy={state.incBusy}>
+          {state.incBusy ? say("inc_loadingOlder") : say("inc_loadOlder")}
+        </button>
+      ) : older === "live" ? <p className="adm-fine">{say("inc_pauseToPage")}</p> : older === "bound" ? <p className="adm-fine">{say("inc_pageBound", { n: HEALTH_UI_LIMITS.incidentPages * HEALTH_UI_LIMITS.incidentRows })}</p> : null}
+      {state.incFailure ? <p className="adm-stale" role="status">{say("inc_olderFailed", { reason: say(`st_fail_${state.incFailure}` as HealthWord) })}</p> : null}
       <p className="adm-fine">{say("inc_closedNote")}</p>
     </Panel>
   )
@@ -376,7 +387,7 @@ function IncidentDetail({ state, route, say, nav, actions }: { state: StoredStat
 export function M05({ state, route, say, nav, actions }: { state: StoredState; route: HealthRoute; say: HealthSay; nav: StoredNav; actions: IncidentActions }) {
   const incident = route.screen === "M05" ? route.incident : null
   if (incident !== null) return <IncidentDetail state={state} route={route} say={say} nav={nav} actions={actions} />
-  return <div className="adh-screen"><IncidentList state={state} say={say} nav={nav} /></div>
+  return <div className="adh-screen"><IncidentList state={state} say={say} nav={nav} pinned={route.scope.until !== null} loadOlder={actions.loadOlderIncidents} /></div>
 }
 
 /** Open incidents on the page held (active, recovering, awaiting review): never "healthy" when none. */

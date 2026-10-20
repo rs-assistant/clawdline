@@ -785,6 +785,11 @@
     "Note": true
   },
   {
+    "Name": "console.health_ui_incident_pages",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.health_ui_incident_rows",
     "Known": true,
     "Note": true
@@ -816,6 +821,16 @@
   },
   {
     "Name": "console.health_ui_request_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_trend_lanes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_trend_signals",
     "Known": true,
     "Note": true
   },

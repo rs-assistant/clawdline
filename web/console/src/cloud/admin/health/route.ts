@@ -17,18 +17,28 @@ const SOURCE_ID = /^hs_[0-9a-f]{32}$/
 /** Producers the Cloud's events read narrows to (contract §3 `source`). */
 export const SOURCE_FILTERS = ["daemon", "cloud_api", "relay", "viewer", "collector"] as const
 export type SourceFilter = (typeof SOURCE_FILTERS)[number]
+/** Trend ranges (aggregates.ts TREND_RANGES); repeated here so this module imports nothing at run time. */
+export const TREND_RANGE_WORDS = ["6h", "24h", "7d", "30d"] as const
+export type TrendRangeWord = (typeof TREND_RANGE_WORDS)[number]
+/** The screens with a trend view: the approved M01, M03 and M06. */
+export type TrendView = {
+  /** The open trend range; absent or null is the raw 24 h evidence view. */
+  trend?: TrendRangeWord | null
+  /** The Cloud's `machine_id` filter on the aggregates read, carried from a series row. */
+  trendMachine?: string | null
+}
 /** Revisions the Cloud keeps per incident (contract §11.5). */
 export const MAX_REVISION = 16
 
 export type HealthScreen =
-  | { screen: "M01" }
+  | ({ screen: "M01" } & TrendView)
   | { screen: "M02"; machine: string | null }
   /** The Cloud-side events filter; absent is every source. */
-  | { screen: "M03"; source?: SourceFilter | null; sourceId?: string | null }
+  | ({ screen: "M03"; source?: SourceFilter | null; sourceId?: string | null } & TrendView)
   | { screen: "M04"; trace: string }
   /** `revision` absent or null is the latest; a number is that immutable revision. */
   | { screen: "M05"; incident: string | null; revision?: number | null }
-  | { screen: "M06" }
+  | ({ screen: "M06" } & TrendView)
   | { screen: "evidence"; trace: string | null }
 
 /** The time scope. `until` null is live (the window ends at each load); a value pins it. */
@@ -85,14 +95,23 @@ export function healthScope(search: string, now: number = Date.now()): HealthSco
 function screenQuery(screen: HealthScreen, search: string): HealthScreen {
   const q = new URLSearchParams(search)
   // Only values present are written, so an address without them reads back as the bare screen.
+  const trend = (out: HealthScreen & TrendView): HealthScreen => {
+    const range = q.get("trend")
+    if (range === null || !(TREND_RANGE_WORDS as readonly string[]).includes(range)) return out
+    out.trend = range as TrendRangeWord
+    const machine = q.get("machine_id")
+    if (machine !== null && STORED_ID.test(machine)) out.trendMachine = machine
+    return out
+  }
   if (screen.screen === "M03") {
     const source = q.get("source")
     const sourceId = q.get("source_id")
     const out: HealthScreen = { screen: "M03" }
     if (source !== null && (SOURCE_FILTERS as readonly string[]).includes(source)) out.source = source as SourceFilter
     if (sourceId !== null && SOURCE_ID.test(sourceId)) out.sourceId = sourceId
-    return out
+    return trend(out)
   }
+  if (screen.screen === "M01" || screen.screen === "M06") return trend({ screen: screen.screen })
   if (screen.screen === "M05" && screen.incident !== null) {
     const raw = q.get("revision")
     const n = raw !== null && /^[0-9]{1,2}$/.test(raw) ? Number(raw) : NaN
@@ -126,6 +145,10 @@ export function healthHref(screen: HealthScreen, scope: HealthScope): string {
   if (screen.screen === "M03" && screen.source) q.set("source", screen.source)
   if (screen.screen === "M03" && screen.sourceId) q.set("source_id", screen.sourceId)
   if (screen.screen === "M05" && screen.incident !== null && screen.revision) q.set("revision", String(screen.revision))
+  if ((screen.screen === "M01" || screen.screen === "M03" || screen.screen === "M06") && screen.trend) {
+    q.set("trend", screen.trend)
+    if (screen.trendMachine) q.set("machine_id", screen.trendMachine)
+  }
   const s = q.toString()
   return s ? `${path}?${s}` : path
 }
@@ -138,8 +161,10 @@ export function windowBounds(scope: HealthScope, now: number): { from: string; t
 
 /** Two routes ask for the same evidence when screen, ids and scope agree. */
 export function routeKey(r: HealthRoute): string {
-  const id = r.screen === "M02" ? r.machine
-    : r.screen === "M03" ? `${r.source ?? ""}/${r.sourceId ?? ""}`
+  const trend = r.screen === "M01" || r.screen === "M03" || r.screen === "M06" ? `${r.trend ?? ""}/${r.trend ? (r.trendMachine ?? "") : ""}` : ""
+  const id = r.screen === "M01" || r.screen === "M06" ? trend
+    : r.screen === "M02" ? r.machine
+    : r.screen === "M03" ? `${r.source ?? ""}/${r.sourceId ?? ""}/${trend}`
     : r.screen === "M04" ? r.trace
     : r.screen === "M05" ? `${r.incident ?? ""}/${r.revision ?? ""}`
     : r.screen === "evidence" ? r.trace : null
