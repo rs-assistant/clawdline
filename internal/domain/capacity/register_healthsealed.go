@@ -131,5 +131,19 @@ func healthSealedBounds() []Entry {
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 			Sources: []string{"internal/transport/cloud.IdentityPairingLifetimeLimit"},
 		},
+		{
+			// Frames of the stalled goroutine in one /2 owner snapshot; the
+			// writer trims further to fit the snapshot bytes and says so.
+			Name: "cloud.health_sealed_snapshot_frames", Class: Buffer, Unit: Rows,
+			Limit: 24, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/healthsealed.MaxSnapshotFrames"},
+		},
+		{
+			Name: "cloud.health_sealed_snapshot_sources", Class: Buffer, Unit: Rows,
+			Limit: 8, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/healthsealed.MaxSnapshotSources"},
+		},
 	}
 }
