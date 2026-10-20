@@ -45,6 +45,7 @@ import {
 } from "./bridge.js"
 import { Block, Chip, Head, MemoField, Mono, Note, PopUp, Row, Slider, Switch, TabStrip } from "./controls.js"
 import { PairingQr, expiredFailure } from "./PairingQr.js"
+import { IdentityHandoverBlock } from "../../../cloud/health-owner/IdentityHandoverBlock.js"
 import { settingsFailureSentence } from "./failure.js"
 import { COMPACT_MAX, COMPACT_MIN, compactWindowText, compactWindowValue } from "./compact.js"
 import { gateModeOptions, gateModeText } from "./gate-mode.js"
@@ -1121,6 +1122,7 @@ export function SettingsWindow({ embedded = false, pane, hideNavigation = false 
           </div>
           {codeSaid ? <Note dot="warn">{codeSaid}</Note> : null}
         </Block>
+        <IdentityHandoverBlock />
       </>
     )
   }

@@ -115,5 +115,21 @@ func healthSealedBounds() []Entry {
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 			Sources: []string{"internal/adapters/cloud.MaxIdentityPollAttempts"},
 		},
+		{
+			// The local decision body (a pairing id and a bool); a larger
+			// body is refused 400 before it is decoded.
+			Name: "cloud.identity_pairing_decision_bytes", Class: Buffer, Unit: Bytes,
+			Limit: 1 << 10, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/http.maxIdentityDecisionBody"},
+		},
+		{
+			// One identity-pairing run on this machine; past it the run is
+			// cancelled and the local page reads failed/expired.
+			Name: "cloud.identity_pairing_run_seconds", Class: Buffer, Unit: Seconds,
+			Limit: 660, AtLimit: Disconnect,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/transport/cloud.IdentityPairingLifetimeLimit"},
+		},
 	}
 }

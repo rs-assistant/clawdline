@@ -88,6 +88,16 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/cloud/pairing/identity",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
+      "pattern": "/v1/cloud/pairing/identity/decision",
+      "guide": "cloud"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/cloud/pairing/offer",
       "guide": "cloud"
     },

@@ -244,11 +244,12 @@ type Link struct {
 	file     *nextconfig.File
 	settings adaptercloud.Settings
 
-	identity adaptercloud.Identity
-	keys     *cloudkeys.Files
-	deviceID string
-	pinned   *adaptercloud.PinnedStore
-	pairing  *Pairing
+	identity        adaptercloud.Identity
+	keys            *cloudkeys.Files
+	deviceID        string
+	pinned          *adaptercloud.PinnedStore
+	pairing         *Pairing
+	identityPairing *IdentityPairing
 
 	transport *adaptercloud.Transport
 	relay     *Relay
@@ -663,6 +664,18 @@ func Open(opts LinkOptions) (*Link, error) {
 		OnRevoke: link.revokeTerminalViewer,
 		Now:      opts.Now,
 		Log:      opts.Log,
+	}
+	// The identity pairing hands the master secret over with a recorded
+	// content-key epoch; its epoch record sits beside the key files.
+	link.identityPairing = &IdentityPairing{
+		AccountID: identity.AccountID,
+		AppOrigin: settings.AppOrigin,
+		Client: &adaptercloud.IdentityClient{BaseURL: settings.APIBase,
+			Credential: func(context.Context) (string, error) { return identity.MachineCredential, nil }},
+		Keys:   link.pairingKeys,
+		Epochs: adaptercloud.ContentEpochStore{Dir: keys.Dir()},
+		Now:    opts.Now,
+		Log:    opts.Log,
 	}
 	if err := link.wire(); err != nil {
 		link.fail(err)
@@ -1313,6 +1326,9 @@ func (l *Link) publicKeyFor(sender string) (ed25519.PublicKey, bool) {
 
 // Pairing is the handover this link drives, for the routes that start one.
 func (l *Link) Pairing() *Pairing { return l.pairing }
+
+// IdentityPairing is the content-key handover, nil before the identity loads.
+func (l *Link) IdentityPairing() *IdentityPairing { return l.identityPairing }
 
 // pairingKeys reads the two keys a handover carries, from the store, now.
 func (l *Link) pairingKeys() (domaincloud.DeviceKey, domaincloud.ContentKey, error) {
