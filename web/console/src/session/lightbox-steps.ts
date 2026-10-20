@@ -56,13 +56,32 @@ export function swipeStep(dx: number, dy: number): -1 | 0 | 1 {
   return dx < 0 ? 1 : -1
 }
 
-/** Start the platform's file sheet in the click itself; a completed fetch cannot borrow its activation. */
+interface ImageSavePlatform extends Pick<Navigator, "userAgent" | "maxTouchPoints">, Partial<Pick<Navigator, "share" | "canShare">> {
+  showSaveFilePicker?: (options: { suggestedName: string }) => Promise<{
+    createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }>
+  }>
+}
+
+/** Start saving inside the click so the browser retains the person's activation. */
 export function saveImageFromClick(
   file: File,
-  platform: Pick<Navigator, "share" | "canShare">,
+  platform: ImageSavePlatform,
   fallback: () => void,
-): "native" | "download" {
-  if (typeof platform.share === "function" && platform.canShare?.({ files: [file] })) {
+): "native" | "download" | "picker" {
+  const mobile = /Android|iPhone|iPad|iPod/i.test(platform.userAgent)
+    || (/Macintosh/i.test(platform.userAgent) && platform.maxTouchPoints > 1)
+  if (!mobile && platform.showSaveFilePicker) {
+    void platform.showSaveFilePicker({ suggestedName: file.name }).then(async (handle) => {
+      const writable = await handle.createWritable()
+      await writable.write(file)
+      await writable.close()
+    }).catch((error: unknown) => {
+      // Cancelling a save must not start a second, unexpected download.
+      if (!(error instanceof Error && error.name === "AbortError")) fallback()
+    })
+    return "picker"
+  }
+  if (mobile && typeof platform.share === "function" && platform.canShare?.({ files: [file] })) {
     void platform.share({ files: [file] }).catch(() => {
       // The person may dismiss the sheet. Keep the preview available for another press.
     })
@@ -123,8 +142,15 @@ export function attachLightboxSteps(
   }
   download.addEventListener("click", () => {
     if (!file) return
-    saveImageFromClick(file, navigator, () => {
-      // Browsers without file sharing keep the ordinary download path.
+    saveImageFromClick(file, {
+      userAgent: navigator.userAgent,
+      maxTouchPoints: navigator.maxTouchPoints,
+      share: navigator.share?.bind(navigator),
+      canShare: navigator.canShare?.bind(navigator),
+      showSaveFilePicker: (doc.defaultView as (Window & Pick<ImageSavePlatform, "showSaveFilePicker">) | null)
+        ?.showSaveFilePicker?.bind(doc.defaultView),
+    }, () => {
+      // Other desktop browsers use their configured download destination.
       const link = doc.createElement("a")
       link.href = imageURL
       link.download = imageName
