@@ -752,6 +752,7 @@ func (l *Link) wire() error {
 		Replay:               domaincloud.NewReplayWindow(0),
 		Inbound:              l.relay.Deliver,
 		DirectInbound:        l.relay.DeliverDirect,
+		InboundTraced:        l.relay.DeliverTraced,
 		PeerInbound:          l.enqueuePeer,
 		PeerAck:              l.enqueuePeerAck,
 		PeerTaskStartInbound: l.enqueuePeer,
@@ -1114,7 +1115,7 @@ func (l *Link) runService(ctx context.Context) error {
 				// It waits for the publisher's next re-statement, up to one
 				// SnapshotInterval. The publisher bounds how many may wait
 				// (SessionSnapshotWaitersLimit) and answers the rest at once.
-				h := l.lanePhase(connectionhealth.ClassStatus, connectionhealth.LocSessionsLane)
+				h := l.lanePhase(request, connectionhealth.ClassStatus, connectionhealth.LocSessionsLane)
 				answers.Add(1)
 				go func() {
 					defer answers.Done()
@@ -1125,7 +1126,7 @@ func (l *Link) runService(ctx context.Context) error {
 					l.refuseBusy(ctx, service, request, "read lane", CloudReadConcurrencyLimit)
 					continue
 				}
-				h := l.lanePhase(connectionhealth.ClassRead, connectionhealth.LocReadLane)
+				h := l.lanePhase(request, connectionhealth.ClassRead, connectionhealth.LocReadLane)
 				answers.Add(1)
 				go func() {
 					defer answers.Done()
@@ -1135,7 +1136,7 @@ func (l *Link) runService(ctx context.Context) error {
 			default:
 				// The phase begins before the send, so a command waiting
 				// behind a stuck one shows lane_queued with its own age.
-				h := l.lanePhase(connectionhealth.ClassControl, connectionhealth.LocCommandLane)
+				h := l.lanePhase(request, connectionhealth.ClassControl, connectionhealth.LocCommandLane)
 				select {
 				case commands <- pending{service: service, request: request, health: h}:
 				default:
@@ -1206,9 +1207,18 @@ func (l *Link) refuseBusy(ctx context.Context, service Service, request Inbound,
 // lanePhase begins the finite phase of one request as it is put on a lane.
 // The correlation is minted here: the request's own sender, sequence and
 // channel are never used as one.
-func (l *Link) lanePhase(class connectionhealth.Class, location string) connectionhealth.Handle {
+//
+// It continues the correlation the transport's frame phase handed over on
+// the request, so one logical operation reads frame_read → lane_queued →
+// handler under one id; only a request that carries none (monitoring was
+// off when it arrived, or a caller outside the transport) gets a new one.
+func (l *Link) lanePhase(request Inbound, class connectionhealth.Class, location string) connectionhealth.Handle {
 	t := l.opts.Health
-	return t.Start(connectionhealth.DaemonSpec(connectionhealth.StageLaneQueued, class, location, t.NewCorrelation()))
+	correlation := request.Correlation
+	if !connectionhealth.ValidID(correlation) {
+		correlation = t.NewCorrelation()
+	}
+	return t.Start(connectionhealth.DaemonSpec(connectionhealth.StageLaneQueued, class, location, correlation))
 }
 
 // answerTraced is answer, moving h to the handler as it starts and ending

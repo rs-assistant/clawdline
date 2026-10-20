@@ -136,10 +136,18 @@ type Handle struct {
 	t    *Tracker
 	slot int
 	id   uint64
+	// corr is the phase's logical correlation, kept even when no slot was
+	// free so the next boundary continues the same operation.
+	corr string
 }
 
 // Recorded reports whether the phase holds a slot.
 func (h Handle) Recorded() bool { return h.t != nil }
+
+// Correlation is the logical operation this phase belongs to, for the next
+// boundary to continue rather than mint a new one. It is "" only when the
+// phase was started without one or with no tracker.
+func (h Handle) Correlation() string { return h.corr }
 
 // Begin publishes a phase before the caller enters the dependency it covers.
 // When no slot is free it counts the overflow and returns slots_exhausted
@@ -162,10 +170,10 @@ func (t *Tracker) Begin(s Spec) (Handle, error) {
 		now := t.clock.Now()
 		p := &Phase{ID: t.ids.Add(1), Slot: idx, Spec: s, Started: now, LastProgress: now}
 		t.slots[idx].phase.Store(p)
-		return Handle{t: t, slot: idx, id: p.ID}, nil
+		return Handle{t: t, slot: idx, id: p.ID, corr: s.Correlation}, nil
 	}
 	t.countOverflow(s)
-	return Handle{}, &Error{Code: CodeSlotsExhausted}
+	return Handle{corr: s.Correlation}, &Error{Code: CodeSlotsExhausted}
 }
 
 func (t *Tracker) countOverflow(s Spec) {
