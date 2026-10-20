@@ -1,7 +1,8 @@
 # Connection health: panel design
 
 Status: design proposal with a standalone prototype
-([`admin-connection-health-preview.html`](admin-connection-health-preview.html)). Nothing here is
+([`admin-connection-health-preview.html`](admin-connection-health-preview.html)) that draws all six
+screens, M01–M06. Nothing here is
 shipped console behaviour. Every threshold below is a **proposal, not a measurement**; every number
 in the prototype is an illustrative fixture.
 
@@ -25,7 +26,7 @@ slowness, an error, an offline machine or an unknown stretch draws the eye.
 
 | Piece | Where | What this design takes from it |
 |---|---|---|
-| Admin shell: sidebar on desktop, drawer on phone | `web/console/src/cloud/admin/admin.css:82-184`, `AdminGate.tsx:303`, `:379-403` | The page is a fifth admin route in the same shell. |
+| Admin shell: sidebar on desktop, drawer on phone | `web/console/src/cloud/admin/admin.css:82-184`, `AdminGate.tsx:303`, `:379-403` The existing admin has five routes (overview, survey, accounts, usage, promotions); connection health is a separate group of screens added after them in the same shell. |
 | Palette and its reason for being dark only | `web/console/src/legacy/tokens.css:1-29` | Same tokens; no light theme (see §11). |
 | Text-contrast rule | `admin.css:1-5` | `--faint` and `--bad` never colour words, only bars and outlines. |
 | Tiles, panels, tables, phone card tables | `admin.css:343-413`, `:480-496`; `AdminDashboard.tsx:312` (`Tile`) | Tiles row, panels, table → card-per-row below 560 px. |
@@ -48,15 +49,19 @@ Stable screen IDs, used in review and future feedback:
 | ID | Screen | In the prototype |
 |---|---|---|
 | M01 | Connection health | `#overview` — verdict, tiles, freshness, timeline, incidents, segment table. |
-| M02 | Machine connections | Approximated by the *Your machine* scope of M01. Not drawn separately (see §12). |
-| M03 | Cloud services | Approximated by the *Cloud service* scope of M01. Not drawn separately. |
+| M02 | Machine connections | `#machines` — presence, boot/build/platform, presence and carrier timeline, viewers and carriers, replacement chain, oldest holders by stage, freshness, correlated incidents. |
+| M03 | Cloud services | `#services` — components with build/instance/outcome/quality/impact, component timeline, relay stages, dependency waits, saturation, correlated incidents. |
 | M04 | Request trace | `#trace/<incident>` — waterfall or table of one correlated request. |
 | M05 | Incident investigation | `#incident/<incident>` — facts / suspected / missing, waterfall, code locations. |
 | M06 | Monitoring status | `#monitoring` — per-source freshness, gaps, drops, retention, read-only probe. |
 | — | Agent evidence | `#evidence/<incident>` — structured JSON with copy and download. |
 
-Navigation: M01 verdict → *Open incident* → M05 → *Request trace* (M04) → *Agent evidence*. A
-breadcrumb on every inner page returns to M01. The verdict links to M06.
+Navigation: the sidebar keeps the five existing admin routes and adds a *Connection health* group
+with M01, M02, M03 and M06. M01 verdict → *Open incident* → M05 → *Request trace* (M04) → *Agent
+evidence*. The verdict links to M02, M03 and M06; the segment table's machine rows link to M02 and
+its relay and collector rows to M03. M02 and M03 each end in a correlated-incidents panel that
+routes to M05, M04, the evidence and M06. M05 links back to the screen of its segment. A
+breadcrumb on every inner page returns to M01.
 
 ### Desktop (≥ 900 px)
 
@@ -103,7 +108,9 @@ ago)*, and *Open incident*. A blocked verdict has an accent frame; unknown has a
 old verdict, dated, with the stale notice (`AdminGate.tsx:208-211`). First-load failure: no verdict
 at all, the typed failure code — never a green guess.
 
-**Tiles.** Latest active incident; machine inbound queue (rows used of the registered 64, meter,
+**Tiles.** A line under the tiles and the segment table states that these figures are a fixed
+60-minute fixture window with its end time; the time-window control changes timelines and event
+lists, not them. Latest active incident; machine inbound queue (rows used of the registered 64, meter,
 oldest waiting age, and its as-of time when the machine is offline); error rate with its
 denominator; latency p50 with p95, p99 and sample count. Below 20 samples p99 is replaced by "too
 few samples (n)". Empty latency is "Unknown", never 0 ms. In a scope that cannot read owner data
@@ -136,16 +143,25 @@ unknown). A facts list (id, start, end or ongoing, segment, trace, build). Three
 declaration or "inference"), **missing evidence**. A suspected cause built only from ordering says
 so in its own words. Then the waterfall and code locations.
 
-**Waterfall / request trace (M04).** Seven stages, each a separate receipt: accepted, queued,
-executed, published, relay delivered, viewer observed, acknowledged. A stage with no receipt is a
+**Waterfall / request trace (M04).** Eight stages, each a separate receipt: accepted, queued,
+executed, published, relay delivered, viewer received, **UI adopted** (the viewer applied the state
+to the screen) and **explicitly acknowledged** (a person's own action, only for operations that ask
+for it; otherwise "Not requested by this operation"). UI adoption is never called acknowledgement.
+An executed stage with no completion receipt but an independent active-phase span reads "active
+handler span … open for …" instead of "No receipt"; a stage recorded by a source the scope cannot
+read reads "Not visible in this scope" with no time. A stage with no receipt is a
 dashed empty bar reading "No receipt" — it is never assumed to have happened. A late stage is warn
 coloured **and** carries ▲. The axis is logarithmic so a 40 ms queue and a 61 s receipt are both
 visible; times are printed, so the scale never has to be read. Table alternative: stage, offset,
 delta from previous, recorder, receipt age.
 
-**Code locations.** Repository path with line, symbol, and one line on why it is relevant, at the
-build revision that emitted the evidence. Public repository paths only; a private service is named
-by role ("private Cloud service relay"), never by path.
+**Example responsibility points.** Each entry is a stage location code, optionally a repository
+path, line and symbol, and one line saying what that code does today. The panel says plainly that
+these are hypothetical instrumentation points, not the exact build of a real incident, and that the
+stable stage-to-source map is not implemented; a location code without a path names no line. A
+listed line is never presented as the root cause: in INC-S1 `(*Relay).start` is shown only as the
+place that creates the bounded inbound channel. Public repository paths only; a private service is
+a location code with no path.
 
 **Monitoring status (M06).** Per-source table: freshness, age, gaps in window, dropped records,
 schema version, retention. Then the **read-only probe** panel: a synthetic read issued from this
@@ -153,10 +169,36 @@ viewer, every 60 s, at most one outstanding. It lists each edge it exercised and
 lists *command execution* as "Not exercised: unverified". It is excluded from user success/error
 denominators and "proves this viewer's viewpoint only".
 
+**Machine connections (M02).** Facts: fictional machine id, presence (renewed N ago, or expired N
+ago), presence contract (proposal), boot id and time, build, platform, last status snapshot age.
+A timeline with four rows — authenticated presence, relay socket, this viewer's direct path, status
+snapshots — that follows the window and has the table alternative. *Viewers and carriers*: one row
+per viewer (fictional ids) with the read carrier, the command/status carrier, state, connection
+generation, last seen, replaced and refused counts; a direct close leaves only the direct carrier
+unavailable. *Replacement attempts and refusals*: events inside the window, newest six, each with
+its generation change and close or refusal reason, or "not reported by this build". *Oldest active
+holder, by stage*: handler, inbound queue, publish, send, with holder, age, the proposed 5 s / 15 s
+deadline and last progress; an offline or silent machine shows them as of the last snapshot.
+Then the freshness strip and correlated incidents.
+
+**Cloud services (M03).** Components (Cloud API, relay Worker edge, account execution, telemetry
+ingest, telemetry query) with outcome, evidence quality, fictional build and instance, source age
+and impact. A component timeline. *Relay path, stage by stage*: admission → account entry → handler
+return → edge completion, each with p50, p95, samples, pending and oldest pending. A standing
+notice: a completed socket write proves only that bytes left Cloud, never that a viewer observed
+them. *Dependency waits* (account storage, API database, service fetch, socket write) and
+*saturation* (admission slots, an illustrative bound, and oldest pending). Then correlated incidents
+and a route to M06.
+
 **Agent evidence.** Pretty-printed JSON and two real local actions: *Copy JSON*
 (`navigator.clipboard`; on refusal the text is selected and the person is told to press ⌘C/Ctrl+C)
 and *Download .json* (a Blob generated in the page). Both status messages say the content is
-generated from the fixture; there is no "captured diagnostics" message anywhere.
+generated from the fixture; there is no "captured diagnostics" message anywhere. The record gives
+`stage_progress` as `last_proven_stage` (end of the contiguous run of receipts), `active_stage`
+(only from an independent active-phase span, otherwise null) and `next_unobserved_stage`, plus
+`visibility_limit_at` when the scope hides the next stage. It obeys the scope like the page: an
+item the scope cannot read stays as `{source, forbidden: true}` with no text. A fixture's injection
+manifest is exported separately as `fixture_ground_truth` with `observed: false`.
 
 ## 5. Health truth table
 
@@ -183,11 +225,17 @@ unverified.
 
 A source is **fresh** while its last receipt is within twice its expected cadence (proposal), then
 **stale**. A source that never reported in the window is **no receipt**. Wording on screen:
-"Last receipt 12 s ago · expected every 15 s" and "Kept for 24 h". Proposed retention, to be set
-by the integration plan's budget: viewer 24 h of hourly counts (as `direct-history.ts` keeps
-today), relay metrics 24 h, machine detail the newest 50 commands (`docs/diagnostics.md:193-197`),
-collector 6 h. Beyond retention the timeline says **Not retained**, which is not unknown and not
-healthy.
+"Last receipt 12 s ago · expected every 15 s" and "Kept for 24 h".
+
+Cadences and retention follow the root technical plan's proposed defaults, all pending pressure
+tests: active-source snapshots (machine status, relay metrics) every 30 s; collector upload flush
+at most 15 s; dashboard polling every 15 s; probe every 60 s with one outstanding. Retention: Cloud
+routine detail 24 h, incident evidence 7 d, minute aggregates 30 d; machine local detail 7 d or
+100 MiB, whichever comes first; the viewer's own record 24 h of hourly counts (as
+`direct-history.ts` keeps today). When a byte cap is reached first the page shows the actual floor
+(the reconnect-storm fixture: 4 h). Beyond retention the timeline says **Not retained**, which is
+not unknown and not healthy, and a selected window that reaches past retention has evidence
+quality **partial**, never complete.
 
 ## 7. Permission boundaries
 
@@ -203,12 +251,24 @@ separately; linking from Devices never grants superuser rights. A lane the scope
 An offline machine still shows every Cloud-side observation (presence expiry, refusals,
 `machine_offline` counts) and its last snapshot with an as-of time.
 
+The scope is applied to every item by the source that recorded it, not only to timeline lanes:
+incident facts, suspected causes, missing evidence, trace stages, code locations, the M02 viewer
+table and replacement chain, the M03 builds, waits and saturation, and the evidence export. A hidden
+item leaves a "Not visible in this scope" marker with a count and no body. Presence is visible in
+every scope; an inference is shown only in the scope that reads all of its inputs; the fixture
+ground truth names owner internals and is shown only in the owner-inclusive scope.
+
 ## 8. Critical journeys (each is a fixture in the prototype)
 
 1. **Handler stalled, socket open.** Verdict *blocked*, queue 64/64, oldest waiting 18 min. Relay
    lane is slow (forwarded, no reply) while its socket is open; machine process lane is the tall
-   accent bar. M05: cause **confirmed** because the fixture declares an injected fault; waterfall
-   stops after *queued*.
+   accent bar. M05: the observed conclusion is that the handler does not return — a queued receipt,
+   an active handler span (synthetic, with an injection id) past its deadline and no execute
+   receipt — and its certainty stays **suspected** because nothing shows *why*. The fixture's
+   injection manifest (lease held, never returns) is a separate, labelled *ground truth* panel the
+   conclusion does not rely on. M02 shows the presence and socket healthy while the handler holder
+   is 18 min old; M03 shows account execution returning in milliseconds while edge completion
+   times out.
 2. **Relay receipt delayed.** Verdict *slow*, quality *partial* (a 6-minute relay gap). Execution
    and publish succeeded in 0.3 s; *relay delivered* is late (▲, 61 s). Cause **suspected** and
    the page says the suspicion rests on ordering only; three items of missing evidence are listed.
@@ -259,14 +319,19 @@ drawer animation.
   A light admin would be a product-wide change, not this page's.
 - **New lane tokens** (`--lane-ok`, `--lane-unknown`) in the admin palette. Cost: two tokens in
   `admin.css`; no other screen is affected.
-- **Making M02 and M03 full screens** rather than scopes of M01. Cost: two more routes and their
-  own layouts (presence chain, viewer/carrier table; relay admission and saturation).
+- **A stable stage-to-source map.** Until it exists, code locations stay location codes with
+  hypothetical paths. Cost: a registered table of stage codes owned beside the instrumentation.
 
 ## 12. Not verified
 
-- No browser was opened by this task. The prototype was syntax-checked and every view was rendered
-  in a DOM stub for each scenario × scope × window × live/paused × chart/table × language (2,376
-  renders, no `undefined`, `NaN` or missing string). Visual QA at desktop and 360 px, focus order
-  and screen-reader output are left to the root.
-- M02 and M03 are not drawn as their own screens.
-- All thresholds, cadences and retention periods are proposals; none were measured.
+- No browser was opened by the tasks that drew this prototype. The prototype was syntax-checked and
+  every route (M01–M06 and evidence) was rendered in a DOM stub for each scenario × scope × window ×
+  live/paused × chart/table × language (2,808 renders, no `undefined`, `NaN`, raw key or unfilled
+  placeholder; no forbidden item carrying text in a Cloud or viewer-scope export). Visual QA at
+  desktop and 360 px, focus order and screen-reader output are left to the root.
+- Overview tiles, segment figures and M03 stage statistics are a fixed 60-minute fixture window;
+  they say so on screen and do not follow the window control. Timelines, incident lists and the M02
+  replacement chain do.
+- All thresholds, cadences, retention periods and bounds (including M03's 128 admission slots) are
+  proposals or illustrations; none were measured. All machine, viewer, build and instance
+  identifiers are fictional.
