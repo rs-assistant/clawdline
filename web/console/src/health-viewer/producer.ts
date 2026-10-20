@@ -338,6 +338,7 @@ export class ViewerHealthProducer {
         } catch { /* a refusal without a readable body is still its status */ }
       }
     } catch {
+      // refusal-ok: a network failure or deadline is status 0, retried with the same bytes and counted; its exception text is never kept (the Cloud refuses raw errors).
       status = 0
     } finally {
       this.disarm(deadline)

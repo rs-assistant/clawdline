@@ -51,43 +51,43 @@ func (s *Server) consoleCapacityMeasures() map[string]func() capacity.Reading {
 		// The browser connection-health producer's bounds live in each signed-in page that turned
 		// it on; the page counts its own drops (ViewerHealthProducer.status), the daemon sees none.
 		capacity.ConsoleViewerHealthBodyBytes: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthBatchRows: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthBufferRows: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthSendEverySeconds: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthCoalesceSeconds: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthHourlyRequests: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthHourlyBytes: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthAttempts: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthBackoffSeconds: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthRetryAfterSeconds: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthRequestSeconds: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthElapsedSeconds: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleViewerHealthCountRows: func() capacity.Reading {
-			return capacity.Reading{Known: false, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
+			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
 		capacity.ConsoleExecutionRecoveryAttempts: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console opening recovery guard; daemon cannot measure another device's recovery attempts"}

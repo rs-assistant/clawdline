@@ -283,7 +283,7 @@ test("a record the Cloud would refuse is dropped here, never sent", async () => 
   const { p, clock } = producer(cloud)
   p.record({ event: "viewer_stage_failed", stage: "viewer_connect" })
   p.record({ event: "viewer_stage_completed", stage: "viewer_connect", error: "timeout" })
-  p.record({ event: "viewer_stage_started", stage: "viewer_somewhere" })
+  p.record({ event: "viewer_stage_started", stage: "viewer_somewhere" as any })
   p.record({ event: "viewer_stage_started", stage: "viewer_connect", correlation: "https://relay/x" })
   p.record({ event: "viewer_stage_completed", stage: "viewer_connect", elapsedMs: 9e9, outcome: "ok" })
   await clock.advance(5_000)
