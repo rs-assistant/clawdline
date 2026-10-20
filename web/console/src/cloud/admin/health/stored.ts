@@ -1,7 +1,7 @@
 /* The Cloud's stored connection-health reads, `schema_version: 1`, read field by field.
  *
  * This is the explicit adapter between the private Cloud contract
- * (clawdline-cloud docs/connection-health-contract.md §3, §3a) and the screens.
+ * (the Cloud repository's docs/connection-health-contract.md §3, §3a, §10) and the screens.
  * It keeps the API's own words: the overall outcome is always `unknown` with
  * `no_presence_contract`, per-group states are only what `cloud-derive/1`
  * derived, `null` is unknown and never zero, and coverage gaps are kept as the
