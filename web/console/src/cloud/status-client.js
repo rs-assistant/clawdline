@@ -3,6 +3,7 @@
 import { CatalogCloudClient } from "./refusal-client.js"
 import { SESSION_INVENTORY_ID, SESSION_INVENTORY_LIMIT, channelSegment, decodedChannelSegment } from "../legacy/js/net/client.js"
 import { base64Bytes, bytesBase64, envelopeSigningBytes, importMasterSecret, openEnvelope, sealEnvelope, validateEnvelope } from "../legacy/js/net/cloud-crypto.js"
+import { classifyViewerError, viewerHealthBegin, viewerHealthFailed } from "../legacy/js/net/viewer-health-hook.js"
 
 const decoder = new TextDecoder()
 const STATUS = /^ss\/([^/]+)\/([^/]+)$/u
@@ -658,6 +659,11 @@ export class StatusCloudClient extends CatalogCloudClient {
       this._applySnapshot(channel, payload, envelope, false)
     } catch (error) {
       this._recordReceiveFailure(error, envelope, false, probe)
+      // The same words the relay's receive path records (`cloud-client.js` `_receiveEnvelope`): an
+      // envelope that arrived on the carrier and did not open or apply is this page's failure,
+      // whatever the relay socket is doing.
+      viewerHealthFailed("viewer_decrypt_apply", error && error.code === "replay" ? "replay_rejected"
+        : probe.stage === "apply" ? "apply_failed" : "decrypt_failed", { class: "read" })
       // This channel delivered something this page cannot use, and it will deliver the next
       // answer the same way. Nothing has failed from the read's point of view — the carrier is
       // open and its request was written to it — so it is this that has to end the channel, and
@@ -697,7 +703,11 @@ export class StatusCloudClient extends CatalogCloudClient {
       }
       const waiters = { waiting: [waiter], timer: null, ref: null, machine: identity.machine, type,
         request: extra && typeof extra.request === "string" ? extra.request : null,
-        action: false, channel: null, retireUncertain: !!(readOptions && readOptions.retireUncertain) }
+        action: false, channel: null, retireUncertain: !!(readOptions && readOptions.retireUncertain),
+        // The read's connection-health trace, as a relay read's (`_read`): issued now, settled by
+        // `_settleRead` under the same correlation, so a read the carrier holds and never answers
+        // is a timed-out read, not a silence behind an open relay socket.
+        health: viewerHealthBegin("viewer_request_issued", "read") }
       self.readWaiters.set(key, waiters)
       self._watchReadAbort(key, waiters, waiter)
       if (self.readWaiters.get(key) !== waiters) return
@@ -737,6 +747,12 @@ export class StatusCloudClient extends CatalogCloudClient {
     this.carrierReads.delete(key)
     const waiters = flight.waiters
     if (this.readWaiters.get(key) !== waiters) return
+    // The read's carrier gave up and the relay takes it over: recorded under the read's own
+    // correlation, before the answer the relay brings settles it.
+    if (waiters.health) {
+      waiters.health.mark("viewer_carrier_replace", "viewer_stage_failed",
+        { error: cause ? classifyViewerError(cause, "read") : "carrier_closed", outcome: "error" })
+    }
     // The sequence the carrier was given is spent. Nothing on the relay will ever
     // acknowledge it, so stop waiting for an ACK under that number before the
     // resend pins a new one.

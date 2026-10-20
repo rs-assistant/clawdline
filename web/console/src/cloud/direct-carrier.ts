@@ -22,6 +22,7 @@ import type { SharedCarrier, TerminalEnvelope } from "./terminal-transport.js"
 import { base64Bytes, bytesBase64 } from "../legacy/js/net/cloud-crypto.js"
 // @ts-expect-error -- a `.ts` path, so Node's strip-types runner can load this file in its suite.
 import { recordDirectAttempt } from "./direct-history.ts"
+import { classifyViewerError, viewerHealthBegin, viewerHealthFailed } from "../legacy/js/net/viewer-health-hook.js"
 
 const enc = new TextEncoder()
 const dec = new TextDecoder("utf-8", { fatal: true })
@@ -108,6 +109,26 @@ export type DirectTry =
   | { kind: "busy" }
   | { kind: "no_answer"; code: string }
   | { kind: "not_connected"; code: string }
+
+/**
+ * The connection-health error word for a carrier that could not open or stopped carrying
+ * (docs/admin-connection-health-contract.md §11.2). The link's own codes are named here; anything
+ * else goes through the relay's table, so a word is never guessed.
+ */
+export function directCarrierHealthError(code: string): string {
+  switch (code) {
+    // ICE found no path between the two networks within the negotiation bound.
+    case "terminal_direct_ice_failed": return "network_unreachable"
+    case "terminal_direct_chunk_timeout": return "timeout"
+    case "terminal_direct_closed": case "carrier_not_open": case "carrier_failed": return "carrier_closed"
+    // The machine's sealed answer, or an envelope it delivered, would not open here.
+    case "carrier_bad_answer": case "carrier_unusable": return "decrypt_failed"
+    default: return classifyViewerError({ code }, "read")
+  }
+}
+
+/** Closes this page made on purpose: nothing failed, so nothing is recorded. */
+const DELIBERATE_CLOSE = new Set(["carrier_client_retired", "carrier_client_stopped", "carrier_replaced"])
 
 /** Compare only UDP server-reflexive public IPv4 addresses already in the
  * encrypted negotiation. Equal NAT exits suggest a LAN; they do not prove it.
@@ -257,12 +278,16 @@ export class DirectCarrier implements SharedCarrier {
   private async negotiate(): Promise<DirectTry> {
     const started = Date.now()
     let answered = false
+    let opening = false
     let suggestSameNetwork = false
     this.sameNetworkSuggestion = false
     const connection = random22()
     const keyID = "rk-" + random22()
     const key = crypto.getRandomValues(new Uint8Array(32))
     const request = crypto.randomUUID()
+    // This page's connection health: the carrier taking reads over from the relay is a carrier
+    // replacement, recorded under its own random correlation and never the connection id.
+    const health = viewerHealthBegin("viewer_carrier_replace", "transport")
     const record = directAttemptRecorder(this.client, this.machine)
     const link: DirectLink = new DirectLink(this.peers!, (envelope) => this.deliver(link, envelope),
       (code) => this.lost(link, code), record ? { attempt: connection, kind: "carrier", report: record } : null)
@@ -270,12 +295,15 @@ export class DirectCarrier implements SharedCarrier {
       const sdp = await link.offer()
       const answer = await this.client.publishCarrierOffer(this.machine, { request, connection, keyID, key, sdp })
       answered = true
+      opening = true
       const answerSDP = await openCarrierAnswer(key, connection, answer.sdpSealed)
+      opening = false
       suggestSameNetwork = answer.directLocalNetwork === false && samePublicIPv4(sdp, answerSDP)
       await link.answer(answerSDP)
       if (!link.open) throw fail("carrier_not_open")
       this.install(link, answer.directReceipts)
       recordDirectAttempt(this.machine, true)
+      health.complete("ok")
       return { kind: "open", ms: Date.now() - started }
     } catch (error) {
       link.close("carrier_failed")
@@ -284,7 +312,13 @@ export class DirectCarrier implements SharedCarrier {
       const code = (error as { code?: string })?.code ?? "carrier_failed"
       this.retryAt = Date.now() + (code === "terminal_busy" ? DIRECT_BUSY_RETRY_MS : DIRECT_RETRY_MS)
       // "Not now" from the machine is not a failure of this network, so it is not counted.
-      if (code === "terminal_busy") return { kind: "busy" }
+      if (code === "terminal_busy") {
+        health.complete("aborted")
+        return { kind: "busy" }
+      }
+      // WebCrypto and base64 failures carry a numeric DOMException code: an answer that would not
+      // open is the machine's sealed answer failing here, whatever number the platform chose.
+      health.fail(directCarrierHealthError(typeof code === "string" && !opening ? code : opening ? "carrier_bad_answer" : "carrier_failed"))
       this.sameNetworkSuggestion = answered && suggestSameNetwork
       recordDirectAttempt(this.machine, false)
       return answered ? { kind: "not_connected", code } : { kind: "no_answer", code }
@@ -360,6 +394,12 @@ export class DirectCarrier implements SharedCarrier {
   }
 
   private lost(link: DirectLink, code: string): void {
+    // An open carrier that stopped carrying is a failure of this path even while the relay socket
+    // is fine; a negotiation's own failure was recorded by `negotiate`, and a deliberate close
+    // (renewal, stop, replacement) is not a failure at all.
+    if (this.link === link && !DELIBERATE_CLOSE.has(code)) {
+      viewerHealthFailed("viewer_carrier_replace", directCarrierHealthError(code), { class: "transport" })
+    }
     if (this.link === link) this.link = null
     this.receipts = false
     // A carrier this page lets go is closed, never only forgotten. The machine
