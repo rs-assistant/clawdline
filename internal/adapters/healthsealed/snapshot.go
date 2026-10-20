@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -11,6 +12,13 @@ import (
 // the paired owner's reader (web/console/src/cloud/health-owner) decodes
 // the same whitelist.
 const SnapshotSchema = "clawdline.health-owner-diagnostics/1"
+
+// SnapshotSchemaV2 is SnapshotSchema plus the sanitized stall capture and
+// the stall's recovery. A writer uses it only for a revision that carries
+// either, so a reader that knows only /1 still opens every stall revision
+// and refuses, rather than half-reads, the richer ones. A /1 snapshot that
+// carries a capture or recovery field is refused.
+const SnapshotSchemaV2 = "clawdline.health-owner-diagnostics/2"
 
 // Bounds, registered in internal/domain/capacity.
 const (
@@ -21,7 +29,51 @@ const (
 	MaxSnapshotFieldChars = 512
 	// MaxSnapshotCoverage is how many coverage entries one snapshot names.
 	MaxSnapshotCoverage = 32
+	// MaxSnapshotFrames is the frames of the stalled goroutine one /2
+	// snapshot carries; the writer trims further to fit MaxSnapshotBytes.
+	MaxSnapshotFrames = 24
+	// MaxSnapshotSources is the exact source lines one join names.
+	MaxSnapshotSources = 8
 )
+
+// CaptureFrame is one sanitized frame: an allowlisted function and a
+// source relative to its module or the Go root.
+type CaptureFrame struct {
+	Function   string `json:"function"`
+	Source     string `json:"source,omitempty"`
+	SourceKind string `json:"source_kind"`
+}
+
+// CaptureExcerpt is the owner's part of a local stall capture: the
+// location's join to this build, the stalled goroutine's frames, and
+// every count that says what is missing. It is never the raw dump.
+type CaptureExcerpt struct {
+	Seq        Int64 `json:"seq"`
+	DurationNS Int64 `json:"duration_ns"`
+	OverBudget bool  `json:"over_budget"`
+	// Function is the location map's Go function for the location; Mapped
+	// false means this build has no entry and Sources says nothing.
+	Function          string         `json:"function,omitempty"`
+	Mapped            bool           `json:"mapped"`
+	MatchedGoroutines Int64          `json:"matched_goroutines"`
+	Sources           []string       `json:"sources,omitempty"`
+	State             string         `json:"state,omitempty"`
+	Frames            []CaptureFrame `json:"frames,omitempty"`
+	FramesOmitted     Int64          `json:"frames_omitted"`
+	GoroutinesTotal   Int64          `json:"goroutines_total"`
+	RawTruncated      bool           `json:"raw_truncated"`
+	Truncated         bool           `json:"truncated"`
+	Redacted          Int64          `json:"functions_redacted"`
+	SourceUnavailable Int64          `json:"source_unavailable"`
+}
+
+// Recovery is how the stalled phase ended, as the journal recorded it,
+// independent of any capture.
+type Recovery struct {
+	// State is recovered or released_outcome_unknown.
+	State      string `json:"state"`
+	RecoveryNS Int64  `json:"recovery_ns"`
+}
 
 // Int64 is an int64 that travels as a decimal string, because a JavaScript
 // reader cannot hold a nanosecond count above 2^53 exactly. It also reads a
@@ -86,11 +138,29 @@ type Snapshot struct {
 	// bounds; Lost counts evidence the source itself had already lost.
 	Truncated bool  `json:"truncated,omitempty"`
 	Lost      Int64 `json:"lost"`
+	// Capture and Recovery exist only in SnapshotSchemaV2.
+	Capture  *CaptureExcerpt `json:"capture,omitempty"`
+	Recovery *Recovery       `json:"recovery,omitempty"`
 }
 
 // Validate refuses a snapshot outside the whitelist's bounds.
 func (s Snapshot) Validate() error {
-	if s.Schema != SnapshotSchema {
+	switch s.Schema {
+	case SnapshotSchema:
+		if s.Capture != nil || s.Recovery != nil {
+			return fail(CodeBadInput)
+		}
+	case SnapshotSchemaV2:
+		if s.Capture == nil && s.Recovery == nil {
+			return fail(CodeBadInput)
+		}
+	default:
+		return fail(CodeBadInput)
+	}
+	if err := s.Capture.validate(); err != nil {
+		return err
+	}
+	if s.Recovery != nil && s.Recovery.State != "recovered" && s.Recovery.State != "released_outcome_unknown" {
 		return fail(CodeBadInput)
 	}
 	for _, f := range []string{s.Location, s.Build, s.Stage, s.CorrelationID} {
@@ -150,4 +220,75 @@ func DecodeSnapshot(b []byte) (Snapshot, error) {
 
 func boundedText(s string) bool {
 	return utf8.ValidString(s) && utf8.RuneCountInString(s) <= MaxSnapshotFieldChars
+}
+
+func (c *CaptureExcerpt) validate() error {
+	if c == nil {
+		return nil
+	}
+	if len(c.Frames) > MaxSnapshotFrames || len(c.Sources) > MaxSnapshotSources {
+		return fail(CodeTooLarge)
+	}
+	if (c.Function != "" && !safeFunction(c.Function)) || !boundedText(c.State) {
+		return fail(CodeBadInput)
+	}
+	for _, src := range c.Sources {
+		if !safeSource(src) {
+			return fail(CodeBadInput)
+		}
+	}
+	for _, f := range c.Frames {
+		if !safeFunction(f.Function) || (f.Source != "" && !safeSource(f.Source)) {
+			return fail(CodeBadInput)
+		}
+		switch f.SourceKind {
+		case "module", "std", "dependency", "unavailable":
+		default:
+			return fail(CodeBadInput)
+		}
+	}
+	return nil
+}
+
+// safeSource is a relative "file:line": never absolute, never climbing.
+func safeSource(s string) bool {
+	if s == "" || len(s) > 200 || strings.HasPrefix(s, "/") || strings.Contains(s, "..") {
+		return false
+	}
+	i := strings.LastIndexByte(s, ':')
+	if i <= 0 || i == len(s)-1 {
+		return false
+	}
+	for _, r := range s[i+1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	for _, r := range s[:i] {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', strings.ContainsRune("_./@!+-", r):
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// safeFunction is an allowlisted Go symbol, or the sanitizer's redaction
+// mark: no argument list, address or free text.
+func safeFunction(s string) bool {
+	if s == "<redacted>" {
+		return true
+	}
+	if s == "" || len(s) > 200 {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', strings.ContainsRune("_./*()[]{},-", r):
+		default:
+			return false
+		}
+	}
+	return true
 }

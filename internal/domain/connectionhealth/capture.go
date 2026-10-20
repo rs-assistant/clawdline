@@ -199,6 +199,10 @@ type Capturer struct {
 	// workers counts worker loops ever started: one, by construction.
 	workers atomic.Int32
 
+	// published is called on the worker's goroutine with each capture it
+	// publishes; it must not wait (OnPublish).
+	published atomic.Pointer[func(*Capture)]
+
 	window      atomic.Int64 // start of the current rate window, mono ns
 	windowCount atomic.Int32
 
@@ -331,6 +335,9 @@ func (c *Capturer) take(t CaptureTrigger) {
 	if got.validate() == nil {
 		c.latest.Store(&got)
 		c.completed.Add(1)
+		if fn := c.published.Load(); fn != nil {
+			(*fn)(&got)
+		}
 	} else {
 		c.rejected.Add(1)
 	}
@@ -348,6 +355,15 @@ func (c *Capturer) joinFor(location string) CaptureJoin {
 		}
 	}
 	return j
+}
+
+// OnPublish makes fn the receiver of each published capture, called on the
+// worker's goroutine after the capture is visible to Latest. fn must not
+// wait: anything it holds holds only the next capture, never a scan.
+func (c *Capturer) OnPublish(fn func(*Capture)) {
+	if c != nil && fn != nil {
+		c.published.Store(&fn)
+	}
 }
 
 // Latest is the newest published capture.
