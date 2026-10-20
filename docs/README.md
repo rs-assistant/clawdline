@@ -87,6 +87,7 @@ Start with the [task-based user index](user/README.md). It leads to a first Sess
 | [squad-packages.md](squad-packages.md) | Public design note | English | Offline squad ZIP format, contribution example, validation, preview, adoption and private export boundaries |
 | [cross-platform.md](cross-platform.md) | Public design note | English | Every feature on macOS, Linux and Windows, and what a platform shows when it cannot do something |
 | [localization.md](localization.md) | Public design note | English | Shipped languages, separate language preferences, catalog fallback and delivery checks |
+| [console-loading.md](console-loading.md) | Internal UI inventory | English | Stable screen IDs, existing skeletons and proposed first-read improvements |
 
 ## How it got here
 
