@@ -637,6 +637,11 @@ func (o *ownerIncidents) captured(c *connectionhealth.Capture) (healthsealed.Job
 				Build: c.Build, Stage: string(t.Stage), CorrelationID: t.Correlation, ObservedAtMS: at}}}
 	}
 	row.capture = ex
+	if row.job.Snapshot.Build == "" {
+		// Journal records carry the build only on the boot record; the
+		// capture names the build its source lines are exact for.
+		row.job.Snapshot.Build = c.Build
+	}
 	return row.revision()
 }
 

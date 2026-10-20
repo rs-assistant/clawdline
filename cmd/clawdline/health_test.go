@@ -870,7 +870,8 @@ func TestAStallsCaptureAndRecoveryReviseItsOwnerAttachment(t *testing.T) {
 	waitFor(t, "the opt-in to be read", w.Enabled)
 	o := newOwnerIncidents()
 	stall := stallRecord(7)
-	stall.MonoNS = 20_000_000_000
+	// A real stall record carries no build (only the boot record does).
+	stall.MonoNS, stall.Build = 20_000_000_000, ""
 	job, ok := sealedJob(stall, 0)
 	if !ok {
 		t.Fatal("no stall job")
@@ -896,7 +897,7 @@ func TestAStallsCaptureAndRecoveryReviseItsOwnerAttachment(t *testing.T) {
 	rv := recovered.Snapshot
 	if rv.Capture == nil || rv.Capture.Function != fn || len(rv.Capture.Frames) != 3 || rv.Capture.Sources[0] != "internal/adapters/cloud/websocket.go:200" ||
 		rv.Recovery == nil || rv.Recovery.State != "recovered" || rv.Recovery.RecoveryNS.Value != 3_500_000_000 ||
-		rv.Location != "cloud.link.read_handler" || rv.CorrelationID != "op-1" {
+		rv.Location != "cloud.link.read_handler" || rv.CorrelationID != "op-1" || rv.Build != "c9fe745db066" {
 		t.Fatalf("the recovery revision does not join stall, capture and recovery: %+v", rv)
 	}
 	plain, err := rv.Encode()
@@ -976,5 +977,58 @@ func TestAnOwnerCaptureIsTrimmedToTheSnapshotBound(t *testing.T) {
 	c := j.Snapshot.Capture
 	if !c.Truncated || len(c.Frames) == 0 || int64(len(c.Frames))+c.FramesOmitted.Value != 64 {
 		t.Fatalf("frames %d omitted %d truncated %v", len(c.Frames), c.FramesOmitted.Value, c.Truncated)
+	}
+}
+
+// TestWriteSyntheticOwnerSnapshot turns the synthetic bundle's local
+// export (internal/domain/connectionhealth TestWriteSyntheticBundle) into
+// the /2 owner snapshot the daemon would seal for it. It runs only with
+// HEALTH_SYNTHETIC_BUNDLE_DIR set (the package clears CLAWDLINE_* variables).
+func TestWriteSyntheticOwnerSnapshot(t *testing.T) {
+	dir := os.Getenv("HEALTH_SYNTHETIC_BUNDLE_DIR")
+	if dir == "" {
+		t.Skip("set HEALTH_SYNTHETIC_BUNDLE_DIR to write the owner snapshot")
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "export.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ev connectionhealth.Evidence
+	if err := json.Unmarshal(raw, &ev); err != nil {
+		t.Fatal(err)
+	}
+	if ev.StallCapture == nil || ev.StallCapture.Latest == nil {
+		t.Fatal("the export has no capture")
+	}
+	c := ev.StallCapture.Latest
+	var stall connectionhealth.Record
+	for _, r := range ev.Journal.Records {
+		if r.Event == connectionhealth.EventStallDetected && r.PhaseID == c.Trigger.PhaseID {
+			stall = r
+		}
+	}
+	if stall.PhaseID == 0 {
+		t.Fatal("the export's journal has no stall for the capture")
+	}
+	o := newOwnerIncidents()
+	job, ok := sealedJob(stall, ev.Watchdog.TransitionsLost)
+	if !ok {
+		t.Fatal("no stall job")
+	}
+	o.remember(stall, job)
+	rev, ok := o.captured(c)
+	if !ok {
+		t.Fatal("no capture revision")
+	}
+	plain, err := rev.Snapshot.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, plain, "", "  "); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "owner-snapshot-v2.json"), append(pretty.Bytes(), '\n'), 0o444); err != nil {
+		t.Fatal(err)
 	}
 }
