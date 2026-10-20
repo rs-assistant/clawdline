@@ -148,6 +148,11 @@ CREATE TABLE IF NOT EXISTS session_direct_todos (
   version      INTEGER NOT NULL DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS session_direct_todos_owner ON session_direct_todos(session_id, completed_at, created_at, id);
+-- One first-send reservation per existing to-do; cascade shares its lifecycle.
+CREATE TABLE IF NOT EXISTS session_direct_todo_first_sends (
+  todo_id TEXT PRIMARY KEY REFERENCES session_direct_todos(id) ON DELETE CASCADE,
+  submitted INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS session_direct_todo_images (
   id         TEXT PRIMARY KEY,
   todo_id    TEXT NOT NULL REFERENCES session_direct_todos(id) ON DELETE CASCADE,
@@ -2496,4 +2501,65 @@ func (s *Store) WorkV2DoneSince(ctx context.Context, since time.Time, limit int)
 		return items[:limit], true, err
 	}
 	return items, false, err
+}
+
+// HasPendingDirectTodos avoids terminal scans on ordinary, already-bound queues.
+func (s *Store) HasPendingDirectTodos(ctx context.Context) (bool, error) {
+	var found bool
+	err := s.rd.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM session_direct_todos WHERE session_id LIKE 'pending:%')`).Scan(&found)
+	return found, err
+}
+
+// BindDirectTodos moves the existing rows, including their image references and
+// first-send reservations. A terminal identity is never a permanent Session id.
+func (t *WorkV2Tx) BindDirectTodos(from, to string) error {
+	var source, target int
+	if err := t.tx.QueryRowContext(t.ctx, `SELECT COUNT(*) FROM session_direct_todos WHERE session_id=? AND completed_at IS NULL`, from).Scan(&source); err != nil {
+		return err
+	}
+	if source > 0 {
+		if err := t.tx.QueryRowContext(t.ctx, `SELECT COUNT(*) FROM session_direct_todos WHERE session_id=? AND completed_at IS NULL`, to).Scan(&target); err != nil {
+			return err
+		}
+		if source+target > DirectTodoV2Limit {
+			return ErrDirectTodoFull
+		}
+	}
+	res, err := t.tx.ExecContext(t.ctx, `UPDATE session_direct_todos SET session_id=? WHERE session_id=?`, to, from)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	t.wrote += n
+	return err
+}
+
+// FirstTodoSend returns whether an irreversible first-send attempt exists and
+// whether the terminal confirmed submission. A crash leaves an honest unknown.
+func (t *WorkV2Tx) FirstTodoSend(id string) (exists, submitted bool, err error) {
+	err = t.tx.QueryRowContext(t.ctx, `SELECT submitted FROM session_direct_todo_first_sends WHERE todo_id=?`, id).Scan(&submitted)
+	if err == sql.ErrNoRows {
+		return false, false, nil
+	}
+	return err == nil, submitted, err
+}
+
+func (t *WorkV2Tx) ReserveFirstTodoSend(id string) error {
+	_, err := t.tx.ExecContext(t.ctx, `INSERT INTO session_direct_todo_first_sends(todo_id) VALUES (?)`, id)
+	if err == nil {
+		t.wrote++
+	}
+	return err
+}
+
+func (t *WorkV2Tx) FinishFirstTodoSend(id string, unsent bool) error {
+	query := `UPDATE session_direct_todo_first_sends SET submitted=1 WHERE todo_id=?`
+	if unsent {
+		query = `DELETE FROM session_direct_todo_first_sends WHERE todo_id=?`
+	}
+	_, err := t.tx.ExecContext(t.ctx, query, id)
+	if err == nil {
+		t.wrote++
+	}
+	return err
 }

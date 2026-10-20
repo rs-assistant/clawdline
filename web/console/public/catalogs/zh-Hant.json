@@ -7074,5 +7074,6 @@
   "next.doorAskWhy": "為什麼要在機器上看數字",
   "next.doorAskWhyBody": "數字只顯示在機器上，不會傳給這一頁，所以只有人在機器旁才能完成配對。",
   "next.doorWrongCodeTries": "這組數字不對，還可以試 {n} 次。",
-  "next.doorCodeExpired": "這組數字已過期。按「要求配對」拿一組新的。"
+  "next.doorCodeExpired": "這組數字已過期。按「要求配對」拿一組新的。",
+  "http.2f4c75feb4744884": "第一次送出可能已經到達這個 Session。請先查看終端畫面，再決定是否傳送其他指令。"
 }

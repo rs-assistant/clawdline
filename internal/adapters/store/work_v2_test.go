@@ -1081,3 +1081,77 @@ func TestPendingAcceptanceNamesTheNewestAndCountsTheRest(t *testing.T) {
 		t.Fatalf("legacy item raised %+v, %v", got, err)
 	}
 }
+
+func TestFirstTodoReservationAndBindingSurviveStoreReopen(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const owner = "pending:codex:tmux:%4:42:1000"
+	td := work.DirectTodoV2{ID: "first-todo", SessionID: owner, Text: "First instruction", CreatedBy: "device:phone", CreatedAt: time.Now(), Version: 1}
+	err = s.WriteWorkV2(ctx, func(tx *WorkV2Tx) error {
+		if err := tx.CreateDirectTodo(td); err != nil {
+			return err
+		}
+		return tx.ReserveFirstTodoSend(td.ID)
+	})
+	if err != nil {
+		s.Close()
+		t.Fatal(err)
+	}
+	s.Close()
+	s, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	pending, err := s.HasPendingDirectTodos(ctx)
+	if err != nil || !pending {
+		t.Fatalf("pending after reopen: %v %v", pending, err)
+	}
+	err = s.WriteWorkV2(ctx, func(tx *WorkV2Tx) error {
+		exists, submitted, err := tx.FirstTodoSend(td.ID)
+		if err != nil {
+			return err
+		}
+		if !exists || submitted {
+			t.Fatalf("reservation after reopen: exists=%v submitted=%v", exists, submitted)
+		}
+		return tx.BindDirectTodos(owner, "real-conversation")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, _, err := s.DirectTodosV2(ctx, "real-conversation", true, false, DirectTodoV2Limit)
+	if err != nil || len(rows) != 1 || rows[0].ID != td.ID || rows[0].Version != td.Version {
+		t.Fatalf("bound rows: %+v %v", rows, err)
+	}
+	if err = s.WriteWorkV2(ctx, func(tx *WorkV2Tx) error {
+		exists, submitted, err := tx.FirstTodoSend(td.ID)
+		if err != nil {
+			return err
+		}
+		if !exists || submitted {
+			t.Fatal("binding lost unresolved reservation")
+		}
+		_, err = tx.DeleteDirectTodo(td.ID, "real-conversation")
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err = s.WriteWorkV2(ctx, func(tx *WorkV2Tx) error {
+		exists, _, err := tx.FirstTodoSend(td.ID)
+		if exists {
+			t.Fatal("delete retained first-send reservation")
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pending, err = s.HasPendingDirectTodos(ctx)
+	if err != nil || pending {
+		t.Fatalf("pending after bind/delete: %v %v", pending, err)
+	}
+}

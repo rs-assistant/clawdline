@@ -28,7 +28,9 @@ import (
 // because each has a precondition that is not the terminal's to check. The
 // terminal will happily close a session that still owes somebody a landing.
 type Actions struct {
-	Inventory Inventory
+	// PendingTodoOwner pins the first to-do send to its recorded process.
+	PendingTodoOwner string
+	Inventory        Inventory
 	// Reading is the machine's one reading, when the daemon wiring this holds
 	// one. Find asks it for a reading taken now, because what Find answers
 	// refuses a person's action by saying their session is not there; nil
@@ -289,6 +291,9 @@ func (a Actions) SendIfIdle(ctx context.Context, id, text string) (session.Sessi
 }
 
 func (a Actions) send(ctx context.Context, s session.Session, text string) (session.Session, error) {
+	if err := a.checkTodoProcess(s); err != nil {
+		return s, err
+	}
 	ctx = ports.Asked(ctx)
 	h, err := a.host(ctx, s)
 	if err != nil {
@@ -302,6 +307,19 @@ func (a Actions) send(ctx context.Context, s session.Session, text string) (sess
 		return s, err
 	}
 	defer release()
+	if a.PendingTodoOwner != "" {
+		live, err := a.Find(ctx, s.ID)
+		if err != nil {
+			return s, beforeTheFirstByte(err)
+		}
+		if err := a.checkTodoProcess(live); err != nil {
+			return live, err
+		}
+		if err := questionOnScreen(live); err != nil {
+			return live, err
+		}
+		s = live
+	}
 	// Whatever the message did to the screen is read live for a moment
 	// (HeldScreens.Pressed), as after a key.
 	defer a.Inventory.Held.Pressed(s.ID)
@@ -478,6 +496,9 @@ func (a Actions) SendWithPictures(ctx context.Context, id, text string, images [
 	s, err := a.Find(ctx, id)
 	if err != nil {
 		return session.Session{}, err
+	}
+	if err := a.checkTodoProcess(s); err != nil {
+		return s, err
 	}
 	h, err := a.host(ctx, s)
 	if err != nil {
@@ -893,4 +914,24 @@ func (a Actions) record(ctx context.Context, kind, subject string, payload map[s
 		raw, _ = json.Marshal(payload)
 	}
 	_ = a.Store.Append(ctx, store.Event{Kind: kind, Subject: subject, Payload: raw})
+}
+
+// PendingTodoOwner pins an unrecorded Session to the kernel process, never
+// merely to a reusable terminal id. Missing process evidence cannot bind work.
+func PendingTodoOwner(s session.Session) string {
+	return TodoProcessOwner(s, ownrecords.ProcessStart(s.PID))
+}
+
+func TodoProcessOwner(s session.Session, started time.Time) string {
+	if !s.IsAssistant() || s.PID <= 0 || started.IsZero() || s.ID == "" {
+		return ""
+	}
+	return fmt.Sprintf("pending:%s:%s:%s:%d:%d", s.Assistant, s.Backend, s.ID, s.PID, started.Unix())
+}
+
+func (a Actions) checkTodoProcess(s session.Session) error {
+	if a.PendingTodoOwner != "" && PendingTodoOwner(s) != a.PendingTodoOwner {
+		return beforeTheFirstByte(Refusal{Code: "session_unavailable", Detail: "The Session is unavailable or has no conversation id."})
+	}
+	return nil
 }
