@@ -1,6 +1,6 @@
 import { catalogFormat } from "../catalog.js"
 import { catalogWord } from "../catalog.js"
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react"
 import type { SessionRow } from "@clawdline/contract"
 import { asMachineNeedsUpdate, type MachineNeedsUpdate } from "@clawdline/core"
 import { NeedsUpdate } from "../machine/NeedsUpdate.js"
@@ -55,6 +55,14 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
   const busyRef = useRef(false)
   const actionSerial = useRef(0)
   const [expanded, setExpanded] = useState(false)
+  const panel = useRef<HTMLElement>(null)
+  useLayoutEffect(() => {
+    if (expanded) return
+    // These details used to unmount on close; keep their reset semantics.
+    for (const details of panel.current?.querySelectorAll("details[open]") ?? []) {
+      (details as HTMLDetailsElement).open = false
+    }
+  }, [expanded])
 
   const load = useCallback((target: InterventionTarget): Promise<void> => {
     const targetKey = JSON.stringify(target)
@@ -141,7 +149,7 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
     if (collapseTimer.current) clearTimeout(collapseTimer.current)
     receiptTimer.current = null
     collapseTimer.current = null
-    setCollapsing(false)
+    // A completed handoff already ran its exit; the next open resets it.
     setExpanded(false)
     document.querySelector<HTMLElement>(".human-interventions-head")?.focus({ preventScroll: true })
   }
@@ -319,7 +327,9 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
     <span className="human-interventions-live" role="status" aria-live="polite" aria-atomic="true">{unresolved !== null || readError ? countWords : ""}</span>
     {actionError && <span className="human-interventions-live" role="alert">{catalogWord("inline", "9aaa26b21b0c")}</span>}
   </>
-  const body = expanded && <section className={`human-interventions${collapsing ? " is-collapsing" : ""}`} aria-labelledby="human-interventions-title">
+  const body = <section ref={panel} className={`human-interventions${collapsing ? " is-collapsing" : ""}`} aria-labelledby="human-interventions-title"
+    hidden={!expanded} inert={!expanded} data-motion-id="AN-004">
+    <div className="human-interventions-content">
     <div className="human-interventions-panelbar"><h2 id="human-interventions-title">{catalogWord("inline", "0999edae13a4")}</h2><button type="button" onClick={closeWithFocus}><WorkIcon name="close" />{catalogWord("inline", "1fa4945f108c")}</button></div>
     <div className="human-interventions-body" id="human-interventions-body">
       {readUpdate ? <NeedsUpdate update={readUpdate} className="human-interventions-error" /> : readError && <p className="human-interventions-error" role="alert">{shown ? catalogWord("literal", "5789b797c9ef") : catalogWord("literal", "24fe20ab6d4d")} {readError} <button type="button" onClick={() => { void load(destination) }}>{catalogWord("inline", "7e59d0f16293")}</button></p>}
@@ -327,11 +337,14 @@ export function useInterventions(row: SessionRow | null, onReplySent?: () => voi
       {actionStatus && <p className="human-interventions-status" role="status">{actionStatus}</p>}
       {!shown && !readError && <p className="human-interventions-empty human-interventions-loading" role="status"><span className="human-interventions-spinner" aria-hidden="true" />{catalogWord("inline", "656c48dad32b")}</p>}
       {shown && active.length === 0 && <p className="human-interventions-empty">{catalogWord("inline", "e43b3c54e4b6")}</p>}
-      {active.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} secretReceived={!!note.secret_received || secretReceipt?.id === note.id && secretReceipt.phase === "received"} onReplace={() => { if (receiptTimer.current) clearTimeout(receiptTimer.current); if (collapseTimer.current) clearTimeout(collapseTimer.current); receiptTimer.current = null; collapseTimer.current = null; setCollapsing(false) }} onAction={run} onReply={reply} onCompose={compose} onHandoff={handoff} />)}
+      {/* Closing still unmounts secret fields immediately; only ordinary Note
+          content remains mounted for the non-interactive exit picture. */}
+      {active.filter((note) => expanded || note.kind !== "secret").map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} secretReceived={!!note.secret_received || secretReceipt?.id === note.id && secretReceipt.phase === "received"} onReplace={() => { if (receiptTimer.current) clearTimeout(receiptTimer.current); if (collapseTimer.current) clearTimeout(collapseTimer.current); receiptTimer.current = null; collapseTimer.current = null; setCollapsing(false) }} onAction={run} onReply={reply} onCompose={compose} onHandoff={handoff} />)}
       {recent.length > 0 && <details className="human-interventions-recent"><summary>{catalogFormat("count", "recentInterventions", [recent.length])}</summary>
         {recent.map((note) => <InterventionCard key={note.id} note={note} disabled={!!busy || !!readError} sending={busy === note.id} secretReceived={false} onReplace={() => {}} onAction={run} onReply={reply} onCompose={compose} onHandoff={handoff} />)}
       </details>}
       {!!shown?.pruned_resolved && <p className="human-interventions-retention">{catalogFormat("count", "prunedInterventions", [shown.pruned_resolved])}</p>}
+    </div>
     </div>
     <button className="human-interventions-backdrop" type="button" tabIndex={-1} aria-label={catalogWord("inline", "de6c2fb83e07")}
       onClick={closeWithFocus} />
