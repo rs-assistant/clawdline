@@ -182,10 +182,18 @@ and what it cannot record (`viewer_sse_gap`, the direct carrier) is in
   screen takes the link and keeps only its `clawdline.health-handover:` record; no device key or
   another account runs nothing and keeps the link; denial, sign-out during the comparison, and an
   account change during the write keep nothing; reload, a new content-key epoch, and revocation.
-- `web/console/src/cloud/health-owner/retention.test.ts`: the opt-in's status lines (§8).
+- `web/console/src/cloud/health-owner/retention.test.ts`: the opt-in's status lines (§8), and
+  the poller under a hung settings read, an unreachable network, overlapping ticks, unmount with a
+  late answer, a read outstanding while the switch is written, and a failed write.
+- `internal/domain/capacity` `TestOwnerRetentionBoundsMatchTheBlock`: the two registered rows
+  equal `OWNER_RETENTION_LIMITS`.
+- `web/console/src/health-viewer/terminal-direct-health.test.ts`: a terminal's own direct
+  negotiation (§9).
 
 Not proven here: a real browser's IndexedDB, `CloudGate`'s wiring of the pairing screen in a
-rendered page, and the visual review of both sheets and the Settings block.
+rendered page, the visual review of both sheets and the Settings block, the rendered
+`OwnerRetentionBlock` itself (its poller is tested; the React wiring is not), and a real
+`RTCPeerConnection` on the terminal path.
 
 ## 7. A browser that never took the legacy pairing
 
@@ -211,7 +219,25 @@ Settings → Remote, under the diagnostics-key block: one switch for `cloud_heal
 evidence and never touches `cloud_health_upload`. The daemon re-reads the file before every seal
 and send, so writing `false` cancels the next one. The lines under it come from
 `GET /v1/connection-health/status` → `upload.status.owner_diagnostics` (`senderReading`,
-`retentionLines`), re-read every 5 s while shown with a 5 s timeout:
+`retentionLines`).
+
+Both reads run through `createRetentionPoller` (`retention.ts`), with the bounds in
+`OWNER_RETENTION_LIMITS`, registered as `console.owner_retention_poll_seconds` (5 s) and
+`console.owner_retention_request_seconds` (5 s):
+
+- one refresh at a time, both reads together. A 5 s tick that finds the last refresh still out is
+  skipped, not queued; an explicit re-read (after a write) waits for the slot and coalesces;
+- the whole refresh has a 5 s deadline. Past it both reads are aborted (`readSettings` takes the
+  `AbortSignal`, and its own 10 s deadline now covers the body too) and whatever had not answered
+  is shown as unknown (`timeout`). A read that ignores its abort keeps the slot until it settles,
+  so a hung daemon costs one outstanding request, not one per tick;
+- a settings read that fails makes the switch unknown (`ownerRetentionSettingUnknown`, the switch
+  disabled), never the last value kept as if current;
+- a switch write aborts the read in flight and makes it obsolete; no tick reads until the write
+  answers, so a read from before the write cannot overwrite the written value. A failed write is
+  unknown (`write_unconfirmed`) until the next read. Writes are not aborted on unmount; their late
+  answer is not shown;
+- unmount aborts the read in flight and shows nothing that answers later.
 
 | Status | Shown |
 | --- | --- |
@@ -227,3 +253,33 @@ and send, so writing `false` cancels the next one. The lines under it come from
 There is no account-level Cloud setting for this or for the browser producer: the browser
 producer stays behind the explicit `VITE_VIEWER_HEALTH=on` build flag, and an account toggle would
 need a Cloud setting this repository does not own.
+
+## 9. A terminal's own direct negotiation
+
+A terminal that opens the direct path itself (`TerminalChannelTransport.prepareDirect`, then
+terminal-session's `direct_offer`) records the same stage a Session read's negotiation does in
+`direct-carrier.ts`: one `viewer_carrier_replace`, class `transport`, under its own random
+correlation, with the words of `directCarrierHealthError` (`health-viewer/direct-words.ts`, shared
+by both):
+
+| What happened | Recorded |
+| --- | --- |
+| the machine's answer applied and the channel opened | completed `ok` |
+| ICE found no path, or the channel never opened | failed `network_unreachable` / `carrier_closed` |
+| the offer could not be made or sealed | failed, the link's or the error's word |
+| the offer was released before an answer was applied (`direct_offer` refused, timed out or stale) | completed `aborted`: the transport cannot tell which, so it does not guess a failure word |
+| a channel the terminal still holds stops carrying after it opened | failed, its own correlation |
+| a channel adopted by the page's carrier stops carrying | failed once, by the carrier's `lost` |
+| released, replaced by the terminal's next negotiation, or borrowed from an open carrier | nothing |
+
+No connection id, key id, SDP or sealed offer reaches a record; recording is synchronous and never
+awaited, and an observer that throws is caught by `viewer-health-hook.js`. The relay request that
+carries `direct_offer` is not given a stage here.
+
+What this does not give: the Cloud's §14 health wire has no carrier dimension, so a terminal's
+negotiation and a Session read's arrive as the same stage and class and cannot be told apart in
+Cloud analytics, and neither is marked as direct rather than relay. Carrier-split analytics are unsupported until Cloud's
+§14 parser accepts a carrier field; nothing in this repository claims them.
+`docs/admin-connection-health-contract.md` §11 still says a terminal's `direct_offer` is not
+recorded as a negotiation; that line predates this section and is outside this change.
+

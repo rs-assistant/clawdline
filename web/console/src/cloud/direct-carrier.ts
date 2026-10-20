@@ -22,7 +22,9 @@ import type { SharedCarrier, TerminalEnvelope } from "./terminal-transport.js"
 import { base64Bytes, bytesBase64 } from "../legacy/js/net/cloud-crypto.js"
 // @ts-expect-error -- a `.ts` path, so Node's strip-types runner can load this file in its suite.
 import { recordDirectAttempt } from "./direct-history.ts"
-import { classifyViewerError, viewerHealthBegin, viewerHealthFailed } from "../legacy/js/net/viewer-health-hook.js"
+import { viewerHealthBegin, viewerHealthFailed } from "../legacy/js/net/viewer-health-hook.js"
+// @ts-expect-error -- a `.ts` path, so Node's strip-types runner can load this file in its suite.
+import { directCarrierHealthError } from "../health-viewer/direct-words.ts"
 
 const enc = new TextEncoder()
 const dec = new TextDecoder("utf-8", { fatal: true })
@@ -110,22 +112,8 @@ export type DirectTry =
   | { kind: "no_answer"; code: string }
   | { kind: "not_connected"; code: string }
 
-/**
- * The connection-health error word for a carrier that could not open or stopped carrying
- * (docs/admin-connection-health-contract.md §11.2). The link's own codes are named here; anything
- * else goes through the relay's table, so a word is never guessed.
- */
-export function directCarrierHealthError(code: string): string {
-  switch (code) {
-    // ICE found no path between the two networks within the negotiation bound.
-    case "terminal_direct_ice_failed": return "network_unreachable"
-    case "terminal_direct_chunk_timeout": return "timeout"
-    case "terminal_direct_closed": case "carrier_not_open": case "carrier_failed": return "carrier_closed"
-    // The machine's sealed answer, or an envelope it delivered, would not open here.
-    case "carrier_bad_answer": case "carrier_unusable": return "decrypt_failed"
-    default: return classifyViewerError({ code }, "read")
-  }
-}
+/** The connection-health error word for a carrier; shared with a terminal's own negotiation. */
+export { directCarrierHealthError }
 
 /** Closes this page made on purpose: nothing failed, so nothing is recorded. */
 const DELIBERATE_CLOSE = new Set(["carrier_client_retired", "carrier_client_stopped", "carrier_replaced"])
