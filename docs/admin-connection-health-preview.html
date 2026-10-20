@@ -503,7 +503,7 @@ Object.assign(WORDS.en, {
   cmpTl: "Components over time",
   relayStages: "Relay path, stage by stage", rs_admission: "Admission", rs_entry: "Account entry", rs_return: "Handler return", rs_edge: "Edge completion",
   pending: "Pending", oldestPending: "Oldest pending",
-  relayNote: "A completed socket write proves only that the bytes left Cloud. It never proves that a viewer observed them; that needs the viewer's own receipt.",
+  relayNote: "A successful socket send proves only that the local socket accepted the bytes. It never proves that a viewer observed them; that needs the viewer's own receipt.",
   waits: "Dependency waits", dep: "Dependency", dep_storage: "Account storage", dep_mongo: "Database (API)", dep_fetch: "Service fetch (API)", dep_write: "Socket write",
   saturation: "Saturation", inflight: "{used} of {limit} admission slots in use (illustrative bound) · oldest pending {age}",
   ownerCloudNote: "Your-machine scope shows outcomes for your own account only. Builds, instances, waits and saturation are operator data.",
@@ -543,7 +543,7 @@ Object.assign(WORDS["zh-TW"], {
   cmpTl: "元件的時間線",
   relayStages: "Relay 路徑，逐段來看", rs_admission: "接納", rs_entry: "進入帳號", rs_return: "處理程序回傳", rs_edge: "邊緣完成",
   pending: "等待中", oldestPending: "最久等待",
-  relayNote: "socket 寫完只證明位元組離開了 Cloud，絕不代表瀏覽器已收到；那要靠瀏覽器自己的回執。",
+  relayNote: "socket 送出呼叫成功只證明本端 socket 接受了位元組，絕不代表瀏覽器已收到；那要靠瀏覽器自己的回執。",
   waits: "依賴等待", dep: "依賴", dep_storage: "帳號儲存", dep_mongo: "資料庫（API）", dep_fetch: "服務呼叫（API）", dep_write: "Socket 寫入",
   saturation: "飽和度", inflight: "{limit} 個接納名額用了 {used} 個（示意上限）· 最久等待 {age}",
   ownerCloudNote: "「你的機器」範圍只顯示你自己帳號的結果。版本、執行個體、等待與飽和度是營運者的資料。",
@@ -623,11 +623,11 @@ const SCENARIOS = {
       holders: [["hs_handler", "op-example-0412 · span sp-synthetic-41", 1080, "blocked", true], ["hs_queue", "row 64 of 64", 1080, "blocked", true], ["hs_publish", "—", 0, "idle"], ["hs_send", "—", 0, "idle"]],
     }),
     c: withC({
-      comps: { api: ["healthy", "complete", NONE], edge: ["degraded", "complete", W("1 account: 188 commands timed out waiting for the machine's reply", "1 個帳號：188 筆指令等機器回覆而逾時")],
+      comps: { api: ["healthy", "complete", NONE], edge: ["healthy", "complete", W("Relay admission and forwarding are healthy; 188 downstream machine replies timed out, tracked as operation impact separately", "Relay 接納與轉送正常；188 筆下游機器回覆逾時另列為操作影響")],
         acct: ["healthy", "complete", W("Handler returns in milliseconds; it forwards and is not where the stall is", "處理程序幾毫秒內就回傳；它只轉送，卡住的不是這裡")], ingest: ["healthy", "complete", NONE], query: ["healthy", "complete", NONE] },
-      lanes: { api: [ok()], edge: [ok(-360, -18), seg(-18, 0, "degraded")], acct: [ok()], ingest: [ok()], query: [ok()] },
-      stages: [[3, 10, 731, 0, 0.1], [5, 15, 731, 0, 0.1], [17, 44, 731, 0, 0.1], [220, 30000, 731, 41, 30]],
-      sat: { used: 44, limit: 128, oldest: 30 },
+      lanes: { api: [ok()], edge: [ok()], acct: [ok()], ingest: [ok()], query: [ok()] },
+      stages: [[3, 10, 731, 0, 0.1], [5, 15, 731, 0, 0.1], [17, 44, 731, 0, 0.1], [20, 46, 731, 0, 0.2]],
+      sat: { used: 3, limit: 128, oldest: 0.2 },
     }),
     incidents: [{
       id: "INC-S1", start: -18, end: 0, sev: "blocked", lane: "proc", cert: "suspected",
@@ -1523,7 +1523,7 @@ const drawer = (open) => { shell.classList.toggle("drawer-open", open); menuBtn.
 menuBtn.onclick = () => drawer(true)
 document.getElementById("scrim").onclick = () => drawer(false)
 document.addEventListener("keydown", (e) => { if (e.key === "Escape" && shell.classList.contains("drawer-open")) drawer(false) })
-window.addEventListener("hashchange", () => { state.notice = null; shell.classList.remove("drawer-open"); render(true) })
+window.addEventListener("hashchange", () => { state.notice = null; shell.classList.remove("drawer-open"); menuBtn.setAttribute("aria-expanded", "false"); render(true) })
 
 // Live mode redraws only the parts that age, without moving focus or the scroll position.
 setInterval(() => {
