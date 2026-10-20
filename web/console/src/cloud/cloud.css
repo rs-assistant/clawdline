@@ -229,7 +229,9 @@
 @media (prefers-reduced-motion: reduce) {
     .cloud-all-refresh[aria-busy="true"] svg { animation: none; opacity: .5; }
 }
-.cloud-all-group-heading { margin: 0; }
+.cloud-all-group-heading { margin: 0; display: flex; align-items: center; gap: 8px; }
+.cloud-all-group-heading .cloud-all-connection { flex: 1; min-width: 0; }
+.cloud-all-group-heading .cloud-all-collapse { flex: 0 0 44px; width: 44px; justify-content: center; }
 .cloud-all-group-heading button { display: flex; align-items: center; justify-content: space-between; gap: 8px;
     box-sizing: border-box; width: 100%; min-height: 44px; padding: 0; appearance: none;
     border: 0; background: transparent; color: var(--dim); font: inherit; text-align: left; cursor: pointer; }

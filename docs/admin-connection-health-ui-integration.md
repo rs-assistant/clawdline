@@ -41,6 +41,8 @@ or a scope change does not.
 | `health/cloud.ts` | The loader: `planFor` (fixed reads per screen), `runReads` (concurrency 2, per-read deadline, overall budget, typed failures, refusal cancels everything), `storedReducer` (stale-per-read, refusal clears), cursor paging with a frozen window. `HEALTH_UI_LIMITS`. |
 | `health/route.ts` | Addresses and scope. |
 | `health/stored-screens.tsx` | The screens. |
+| `health/timeline.ts` | Pure mapping from stored reads to charts: the window axis and its bands, per-boot lanes of receipt marks, sequence coverage, source freshness, service source × stage, one operation's ordered stages, the weakest-quality summary and the problem list. Tested by `health/timeline.test.ts`. |
+| `health/timeline-view.tsx` | The charts that draw those shapes, each with a chart/table switch, the problem summary and quality strip every screen opens with, and one "requested, not collected yet" panel per screen. |
 | `health/stored-export.ts` | The evidence record: listed fields only, ≤ 512 KiB, `not_an_incident_bundle: true`. |
 | `health/useStored.ts` | One load at a time; 15 s live refresh; cancelled on route or scope change. |
 | `health/ConnectionHealth.tsx` | Page controls and whole-page states. Loaded lazily by `AdminGate.tsx`. |
@@ -75,6 +77,42 @@ registered as `console.health_ui_*` (`internal/domain/capacity/register_connecti
 - The stage note now reads: a completed socket write means only that the local socket
   implementation accepted the bytes; it does not prove delivery or viewer receipt.
 
+## What the charts draw, and what they refuse to
+
+Every screen opens with **What to look at first** (loss, stall, slow and released groups, stale
+sources, missing sequence records and failed reads, worst first, with the newest one's machine,
+stage and evidence age) and the **weakest evidence** strip: the overall quality is the weakest of
+the reads the screen relies on, a failed or stale read or a partial group caps it at partial, and
+each read's own quality is listed. It never says more than "only what these reads returned".
+
+- **Time lanes** (M01/M02/M04/M05 groups, M02 machine and M04 records, M03 service records): one
+  lane per source and boot, ordered by the Cloud's boot generation (unknown last). Each record or
+  group is a glyph at its server receive time. The track between marks is drawn "not observed",
+  never healthy. Records outside the query window are counted at the edge ("n earlier/later"), not
+  drawn. Bands mark time before the retention floor, time after the read's `as_of`, rows older
+  than the oldest held row of a list with more pages ("not loaded"), and listed sequence gaps
+  placed between the receipts of their nearest held neighbours (otherwise counted "cannot be
+  placed in time"). A record received after a higher sequence of the same boot is marked late;
+  a producer monotonic or wall clock that goes backwards against its own sequence is counted per
+  boot. Producer clocks are never compared with receive time or across hosts. Clock uncertainty
+  is shown, or "unknown".
+- **Sources** (M02, M06): each source's newest receipt on the window (fresh or stale glyph, age,
+  declared cadence) and each boot from its first to its last receipt as a dotted bracket that
+  says not every moment between was observed.
+- **Sequence coverage** (M01, M06): received ranges and listed gaps in producer-sequence space,
+  per source and boot, with retention floor and drop counters beside it.
+- **Service stages** (M03): record/2 rows on the loaded page as source × stage in contract order,
+  a bar for each stage's own largest `elapsed_ms` (downstream waits striped, socket handoff
+  dotted; never summed, never end-to-end), outcome counts, and one bottleneck: a still-pending
+  stage, else a failed one, else the largest own time, with its evidence age from `as_of`. The
+  source selector narrows **the loaded page only** and says how many of its rows it kept; no
+  `source` parameter is sent until the Cloud API commits one.
+- **One operation** (M04): stored records per source and boot in producer order, with sequence
+  holes as steps and late arrivals marked. Separate sources are not merged into one order and no
+  waterfall or end-to-end time is drawn.
+- Unsupported parts (incidents, latency, presence, relay/viewer stages, spans, probes) share one
+  "requested, not collected yet" panel per screen with their exact limitation.
+
 ## Bounds (`HEALTH_UI_LIMITS`, registered)
 
 Per read 6 s; per load 12 s; 2 reads in flight (the Cloud's per-principal admission); 3 reads per
@@ -108,6 +146,12 @@ only on `/admin/health`.
 
 ## Not verified, and what the root still owes
 
+- **The charts were not rendered in a browser by the task that drew them.** Owed by
+  the root: `VITE_ADMIN_HEALTH_FIXTURE=normal|partial|errors|empty|service` (command above), each
+  of `/admin/health`, `/machines`, `/machines/fixture_mac_b` (two boots, a late record, clocks
+  stepping back), `/services` (stage bars, bottleneck, source selector), `/trace/fixture-trace-1`,
+  `/monitoring`, at desktop and 390 px; Tab through the chart/table switches and the source
+  selector. The admin shell is dark-only (`legacy/tokens.css`), so there is no light theme to check.
 - **No browser rendered these screens in this task.** Owed: desktop and 390 px, light and dark,
   keyboard-only pass (open M01 → a group → its trace → evidence → copy), screen-reader names,
   focus after route changes, for each fixture scenario, then against a deployed Cloud.

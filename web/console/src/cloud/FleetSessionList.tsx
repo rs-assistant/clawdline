@@ -29,7 +29,7 @@ type Reading = { phase: "loading" } | { phase: "settled"; value: MachineSessionP
 
 /** Only the fleet list is new; the conversation and composer belong to SessionsPage. */
 export function FleetSessionList({ machines, source, target, filter, onFilter, onOpen,
-  carrierOf, onMachineAction, onCloseRequest, onArchiveRequest, onPresentations, onProjection, titleRevision, confirmedTitles }: {
+  carrierOf, onConnection, onMachineAction, onCloseRequest, onArchiveRequest, onPresentations, onProjection, titleRevision, confirmedTitles }: {
   machines: readonly FleetMachine[]
   source: SessionProjectionSource | null
   titleRevision?: number
@@ -43,6 +43,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   onPresentations?: (machineID: string, rows: readonly (SessionListPresentation & {
     destination: SessionDestination; projection?: ProjectedSession })[]) => void
   onProjection?: (machineID: string, reading: MachineSessionProjection) => void
+  onConnection: (machineID: string) => void
   onMachineAction?: (machineID: string, action: MachineToolbarAction) => void
   onCloseRequest: (target: SessionDestination, title: string) => void
   onArchiveRequest: (target: SessionDestination, title: string) => void
@@ -403,18 +404,18 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
           return <section key={machine.id} className="cloud-all-group"
           aria-label={`${machine.name} ${machine.id}` + (carrier ? ` · ${nextWord(carrier.word, { machine: machine.name })}` : "")}>
           <h2 className="cloud-all-group-heading">
-            <button type="button" aria-expanded={!isCollapsed}
-              aria-label={nextWord(isCollapsed ? "cloudAllExpandMachine" : "cloudAllCollapseMachine", { machine: machine.name })}
-              onClick={() => setCollapsed((before) => ({ ...before, [machine.id]: !isCollapsed }))}>
-              {/* The dot leads the machine's name, so every machine's light
-                  lines up in one column down the list. Inside the button it can
-                  only be seen, because the button states its own label; the
-                  section's name below says it for a reader. */}
+            <button type="button" className="cloud-all-connection"
+              aria-label={`${machine.name} · ${nextWord("msTabConnection")}`}
+              aria-haspopup="dialog" onClick={() => onConnection(machine.id)}>
               <span className="cloud-all-group-name">{carrier && <CarrierDot reading={carrier} machine={machine.name} />}
                 {machine.name} <small>{machine.platform}</small>
                 {rows.length > 0 && <span className="cloud-all-group-count"
                   aria-label={nextWord("cloudAllSessionCount", { count: rows.length })}>{rows.length}</span>}
               </span>
+            </button>
+            <button type="button" className="cloud-all-collapse" aria-expanded={!isCollapsed}
+              aria-label={nextWord(isCollapsed ? "cloudAllExpandMachine" : "cloudAllCollapseMachine", { machine: machine.name })}
+              onClick={() => setCollapsed((before) => ({ ...before, [machine.id]: !isCollapsed }))}>
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
             </button></h2>
           <div className="cloud-all-group-body" data-open={!isCollapsed}

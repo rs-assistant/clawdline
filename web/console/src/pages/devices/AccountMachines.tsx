@@ -179,7 +179,7 @@ export function AccountMachines({ shown, onStart }: { shown: boolean; onStart: (
 
 type Tab = "connection" | "access"
 
-function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
+export function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
   machine: Row
   manager: MachineManager
   onClose: () => void
@@ -188,6 +188,13 @@ function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
 }) {
   const [tab, setTab] = useState<Tab>("connection")
   const [forgetting, setForgetting] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const afterClose = useRef<(() => void) | null>(null)
+  const close = (after = onClose) => {
+    if (afterClose.current) return
+    afterClose.current = after
+    setClosing(true)
+  }
   const box = useRef<HTMLDivElement>(null)
   const name = nameOf(machine)
 
@@ -200,13 +207,16 @@ function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
   }, [])
 
   const onKey = (event: React.KeyboardEvent) => {
-    if (event.key === "Escape") { event.preventDefault(); if (forgetting) setForgetting(false); else onClose() }
+    if (event.key === "Escape") { event.preventDefault(); if (forgetting) setForgetting(false); else close() }
   }
 
   return (
-    <div className="am-layer" onKeyDown={onKey}>
-      <div className="am-scrim" onClick={onClose} aria-hidden="true" />
-      <div className="am-sheet" role="dialog" aria-modal="true" aria-labelledby="am-sheet-title" ref={box} tabIndex={-1}>
+    <div className="am-layer" data-closing={closing} onKeyDown={onKey}>
+      <div className="am-scrim" onClick={() => close()} aria-hidden="true" />
+      <div className="am-sheet" role="dialog" aria-modal="true" aria-labelledby="am-sheet-title" ref={box} tabIndex={-1}
+        inert={closing} onAnimationEnd={(event) => {
+          if (event.target === event.currentTarget && event.animationName === "am-sheet-out") afterClose.current?.()
+        }}>
         <div className="am-grab" aria-hidden="true" />
         <div className="am-sheet-head">
           <span className="am-icon"><MachinePlatformIcon platform={machine.kind ?? ""} /></span>
@@ -218,12 +228,12 @@ function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
               {" · "}{machineSeenWord(machine.observedAt)}
             </p>
           </div>
-          <button type="button" className="am-close" aria-label={nextWord("msClose")} onClick={onClose}>
+          <button type="button" className="am-close" aria-label={nextWord("msClose")} onClick={() => close()}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
         {forgetting ? (
-          <ForgetPanel machine={machine} manager={manager} onCancel={() => setForgetting(false)} onForgotten={onForgotten} />
+          <ForgetPanel machine={machine} manager={manager} onCancel={() => setForgetting(false)} onForgotten={(word) => close(() => onForgotten(word))} />
         ) : (
           <>
             <div className="am-tabs" role="tablist">
@@ -234,7 +244,7 @@ function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
             </div>
             <div className="am-panel" id="am-panel" role="tabpanel" aria-labelledby={tab === "connection" ? "am-tab-connection" : "am-tab-access"}>
               {tab === "connection"
-                ? <ConnectionTab machine={machine} manager={manager} onStart={onStart} />
+                ? <ConnectionTab machine={machine} manager={manager} onStart={() => close(onStart)} />
                 : <AccessTab machine={machine} manager={manager} onForget={() => setForgetting(true)} />}
             </div>
           </>

@@ -54,18 +54,47 @@ function events(now: number, scenario: FixtureScenario): Row[] {
       count: 1, rule: stall ? "watchdog/1" : null, received_at: new Date(at).toISOString(), retain_until: new Date(at + 86_400_000).toISOString(),
     })
   }
-  if (scenario === "service" || scenario === "normal") {
-    for (const [i, stage, outcome, elapsed] of [[1, "account_dispatch_started", "pending", 8_400], [2, "outer_settled", "ok", 35], [3, "fanout_sent", "zero_target", 0]] as const) {
-      const at = now - (40 - i) * 1_000
+  // Machine B: an earlier boot, then a new one whose seq 7 arrives after seq 8 and whose clocks step back at seq 10.
+  if (scenario === "normal" || scenario === "partial") {
+    for (const [boot, seq, ago, mono, wallAgo, event] of [
+      ["fixture-boot-b0", 1, 3_300_000, 1, 3_300_500, "boot"], ["fixture-boot-b0", 2, 3_240_000, 60, 3_240_500, "scheduling_gap"],
+      [BOOT_B, 1, 2_400_000, 1, 2_400_500, "boot"], [BOOT_B, 6, 2_100_000, 300, 2_100_500, "slow_detected"],
+      [BOOT_B, 8, 1_980_000, 420, 1_980_500, "scheduling_gap"], [BOOT_B, 7, 1_950_000, 400, 1_950_500, "scheduling_gap"],
+      [BOOT_B, 10, 1_860_000, 380, 1_990_000, "scheduling_gap"], [BOOT_B, 12, 1_800_000, 600, 1_800_500, "scheduling_gap"],
+    ] as const) {
+      const at = now - ago
       rows.push({
-        id: `he_fixture_relay_${i}`, account: "svc:relay", machine_id: "svc_relay", source_id: SRC_RELAY, producer_instance: "relay-worker",
-        schema: "clawdline.connection-health.record/2", producer_seq: i, event_id: `fixture-relay-boot-${i}`, boot_id: "fixture-relay-boot",
-        batch_id: "fixture-relay-boot-b1", build_commit: null, event: outcome === "pending" ? "stall_detected" : "stage_completed",
-        wall: new Date(at).toISOString(), mono_ns: i * 1_000_000, source: "relay", stage, class: null, kind: null, phase_id: null,
-        correlation: outcome === "pending" ? "fixture-relay-op" : null, count: outcome === "pending" ? 1 : 12, rule: null,
-        outcome, elapsed_ms: elapsed, received_at: new Date(at).toISOString(), retain_until: new Date(at + 86_400_000).toISOString(),
+        id: `he_fixture_b_${boot}_${seq}`, account: ACCOUNT, machine_id: MAC_B, source_id: SRC_B, producer_instance: "daemon",
+        schema: "clawdline.connection-health.record/1", producer_seq: seq, event_id: `${boot}-${seq}`, boot_id: boot, batch_id: null, build_commit: null,
+        event, wall: new Date(now - wallAgo).toISOString(), mono_ns: mono * 1_000_000_000, source: "daemon", stage: null, class: null, kind: null,
+        phase_id: null, correlation: null, count: 1, rule: null, received_at: new Date(at).toISOString(), retain_until: new Date(at + 86_400_000).toISOString(),
       })
     }
+  }
+  if (scenario === "service" || scenario === "normal") {
+    const stages = [
+      ["relay", "relay-worker", SRC_RELAY, 1, "worker_admitted", "ok", 2, 12, null],
+      ["relay", "relay-worker", SRC_RELAY, 2, "account_dispatch_started", "pending", 8_400, 1, "fixture-relay-op"],
+      ["relay", "relay-worker", SRC_RELAY, 3, "account_dispatch_returned", "ok", 120, 11, null],
+      ["relay", "relay-worker", SRC_RELAY, 4, "outer_settled", "ok", 35, 12, null],
+      ["relay", "relay-do", "hs_fixture_relay_do", 1, "do_entered", "ok", 1, 11, null],
+      ["relay", "relay-do", "hs_fixture_relay_do", 2, "storage_started", "ok", 260, 11, null],
+      ["relay", "relay-do", "hs_fixture_relay_do", 3, "fanout_sent", "zero_target", 0, 11, null],
+      ["cloud_api", "api", "hs_fixture_api", 1, "api_admitted", "ok", 1, 40, null],
+      ["cloud_api", "api", "hs_fixture_api", 2, "api_dependency_started", "ok", 640, 40, null],
+      ["cloud_api", "api", "hs_fixture_api", 3, "api_response_completed", "error", 700, 2, "fixture-api-op"],
+    ] as const
+    stages.forEach(([source, instance, sourceId, i, stage, outcome, elapsed, count, correlation], n) => {
+      const at = now - (60 - n * 2) * 1_000
+      const boot = `fixture-${instance}-boot`
+      rows.push({
+        id: `he_fixture_${instance}_${i}`, account: source === "relay" ? "svc:relay" : "svc:api", machine_id: source === "relay" ? "svc_relay" : "svc_api", source_id: sourceId, producer_instance: instance,
+        schema: "clawdline.connection-health.record/2", producer_seq: i, event_id: `${boot}-${i}`, boot_id: boot,
+        batch_id: `${boot}-b1`, build_commit: null, event: outcome === "pending" ? "stall_detected" : "stage_completed",
+        wall: new Date(at).toISOString(), mono_ns: i * 1_000_000, source, stage, class: null, kind: null, phase_id: null,
+        correlation, count, rule: null, outcome, elapsed_ms: elapsed, received_at: new Date(at).toISOString(), retain_until: new Date(at + 86_400_000).toISOString(),
+      })
+    })
   }
   return rows.sort((a, b) => String(b.received_at).localeCompare(String(a.received_at)))
 }

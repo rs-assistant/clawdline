@@ -16,6 +16,7 @@ export interface LightboxStepWords {
   previous: string
   next: string
   download: string
+  share: string
   position: (index: number, count: number) => string
 }
 
@@ -56,20 +57,38 @@ export function swipeStep(dx: number, dy: number): -1 | 0 | 1 {
   return dx < 0 ? 1 : -1
 }
 
-/** Start the platform's file sheet in the click itself; a completed fetch cannot borrow its activation. */
+interface ImageSavePlatform {
+  showSaveFilePicker?: (options: { suggestedName: string }) => Promise<{
+    createWritable(): Promise<{ write(data: Blob): Promise<void>; close(): Promise<void> }>
+  }>
+}
+
+/** Start saving inside the click so the browser retains the person's activation. */
 export function saveImageFromClick(
   file: File,
-  platform: Pick<Navigator, "share" | "canShare">,
+  platform: ImageSavePlatform,
   fallback: () => void,
-): "native" | "download" {
-  if (typeof platform.share === "function" && platform.canShare?.({ files: [file] })) {
-    void platform.share({ files: [file] }).catch(() => {
-      // The person may dismiss the sheet. Keep the preview available for another press.
+): "download" | "picker" {
+  if (platform.showSaveFilePicker) {
+    void platform.showSaveFilePicker({ suggestedName: file.name }).then(async (handle) => {
+      const writable = await handle.createWritable()
+      await writable.write(file)
+      await writable.close()
+    }).catch((error: unknown) => {
+      // Cancelling a save must not start a second, unexpected download.
+      if (!(error instanceof Error && error.name === "AbortError")) fallback()
     })
-    return "native"
+    return "picker"
   }
   fallback()
   return "download"
+}
+
+/** Sharing is an explicit action, separate from downloading an image. */
+export function shareImageFromClick(file: File, platform: Pick<Navigator, "share">): void {
+  void platform.share({ files: [file] }).catch(() => {
+    // Dismissing the sheet does not start a download or close the preview.
+  })
 }
 
 /**
@@ -123,8 +142,11 @@ export function attachLightboxSteps(
   }
   download.addEventListener("click", () => {
     if (!file) return
-    saveImageFromClick(file, navigator, () => {
-      // Browsers without file sharing keep the ordinary download path.
+    saveImageFromClick(file, {
+      showSaveFilePicker: (doc.defaultView as (Window & Pick<ImageSavePlatform, "showSaveFilePicker">) | null)
+        ?.showSaveFilePicker?.bind(doc.defaultView),
+    }, () => {
+      // Other desktop browsers use their configured download destination.
       const link = doc.createElement("a")
       link.href = imageURL
       link.download = imageName
@@ -132,6 +154,20 @@ export function attachLightboxSteps(
     })
   })
   frame.appendChild(download)
+  const share = doc.createElement("button")
+  share.type = "button"
+  share.className = "image-lightbox-share"
+  share.setAttribute("aria-label", words.share)
+  share.title = words.share
+  share.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M8 10H5v11h14V10h-3"/></svg>'
+  share.hidden = true
+  for (const kind of ["touchstart", "touchend", "pointerdown"]) {
+    share.addEventListener(kind, (event) => event.stopPropagation())
+  }
+  share.addEventListener("click", () => {
+    if (file) shareImageFromClick(file, navigator)
+  })
+  frame.appendChild(share)
   const count = doc.createElement("span")
   count.className = "image-lightbox-count"
   count.hidden = true
@@ -195,6 +231,7 @@ export function attachLightboxSteps(
       imageURL = (image as HTMLImageElement).src
       imageName = name
       file = null
+      share.hidden = true
       download.hidden = false
       download.disabled = true
       // Cloud already holds a blob URL; the local console fetches its same-origin image. Do this
@@ -206,6 +243,7 @@ export function attachLightboxSteps(
         if (revision !== imageRevision || !blob.size) return
         file = new File([blob], name, { type: blob.type || (name.endsWith(".jpg") ? "image/jpeg" : "image/png") })
         download.disabled = false
+        share.hidden = !(typeof navigator.share === "function" && navigator.canShare?.({ files: [file] }))
       }).catch(() => {
         if (revision === imageRevision) download.hidden = true
       })
