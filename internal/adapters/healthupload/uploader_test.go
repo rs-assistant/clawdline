@@ -563,3 +563,29 @@ func TestARefusedBatchIsCountedWithItsCodeAndNotResent(t *testing.T) {
 		t.Fatal("Cloud's message is echoed")
 	}
 }
+
+func TestABatchRebuiltAfterALostProgressFileReplaysItsReceipt(t *testing.T) {
+	dir := t.TempDir()
+	f := newFixture(t, dir, "boot-l")
+	f.add(3)
+	c := newCloud()
+	c.answer = func(n int, w http.ResponseWriter, r *http.Request, body []byte) bool {
+		if n != 1 {
+			return false
+		}
+		c.ingest(httptest.NewRecorder(), body)
+		panic(http.ErrAbortHandler)
+	}
+	h := newHarness(t, f, c, filepath.Join(dir, "upload"))
+	h.step(t)
+	if err := os.Remove(filepath.Join(dir, "upload", stateFile)); err != nil {
+		t.Fatal(err)
+	}
+	h.now = h.now.Add(time.Hour)
+	h.u = h.make()
+	h.step(t)
+	st := h.u.Status()
+	if c.count() != 2 || st.LastReceipt == nil || !st.LastReceipt.Replay || st.Totals.RefusedBatches != 0 {
+		t.Fatalf("the rebuilt batch must replay, not conflict: %+v", st)
+	}
+}
