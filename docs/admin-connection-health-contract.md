@@ -11,7 +11,7 @@ code reads or writes them. Product scope stays as `docs/admin-connection-health.
 | Part | State | Where |
 | --- | --- | --- |
 | Active-phase table (128 slots, 8 reserved) | implemented | `internal/domain/connectionhealth/active.go` |
-| Watchdog (reads atomics and its own clock only) | implemented | `watchdog.go` |
+| Watchdog (reads atomics and its own clock only; queues transitions to one journal writer) | implemented | `watchdog.go` |
 | In-memory journal ring and query page | implemented | `journal.go` |
 | Segment truth table, stage progress, local export | implemented | `evidence.go` |
 | Capacity rows `cloud.health_*` | registered; measured as a known zero | `internal/domain/capacity/register_connection_health.go`, `internal/transport/http/capacity_measures_connection_health.go` |
@@ -29,7 +29,14 @@ the foundation for the pipeline.
 
 All strings the package exports are enums, location codes or opaque ids. There is no free-text
 field. Validation is at the door (`Tracker.Begin`, `Journal.Append`, `NewJournal`) and a refusal
-names the field, never its value.
+names the field, never its value. `Journal.Append` checks each field against its own rule —
+`event`, `kind`, `rule`, `source`, `stage` and `class` against their allowlists, `location` and the
+ids against their patterns — rather than one pattern over all text. The stamps are the journal's:
+a record that arrives with its own `schema`, `producer_seq`, `event_id`, `boot_id`, `wall` or
+`mono_ns` is refused (`invalid_field` naming `schema`, `producer_seq`, `event_id`, `boot_id` or
+`time`), not silently overwritten. `boot` and `transitions_lost` are written only by the journal
+itself, `build_commit` only on `boot`, and `rule` is only `watchdog/1`. A refused record takes no
+sequence number, so a hole in `producer_seq` is always an eviction.
 
 | Identifier | Rule | Examples |
 | --- | --- | --- |
@@ -59,7 +66,8 @@ itself not scheduled; called blocked only if the next scan agrees).
 **Journal events** (`event`): `boot`, `slow_detected`, `stall_detected`, `recovered` (new
 progress after slow/blocked — silence is not recovery), `released_after_stall` (slot released;
 the watchdog cannot see the outcome, so this is not success), `overflow`, `scheduling_gap`,
-`clock_anomaly`.
+`clock_anomaly`, `transitions_lost` (`count` watchdog transitions were dropped just before this
+record because the queue to the journal was full; the page holding it reads `partial`).
 
 **Outcome** and **quality** are design §5's: outcomes `healthy`, `slow`, `blocked`, `error`,
 `offline`, `unknown`, `no_requests`; qualities `complete`, `partial`, `stale`, `not_collected`,
@@ -128,7 +136,11 @@ display and may jump.
       "total": 0,
       "critical": 0
     },
-    "trace_coverage": "complete"
+    "trace_coverage": "complete",
+    "scan_seq": 16,
+    "transitions": "complete",
+    "transitions_lost_total": 0,
+    "transitions_pending": 2
   },
   "journal": {
     "schema": "clawdline.connection-health.page/1",
@@ -221,7 +233,7 @@ display and may jump.
 
 | Field | Meaning |
 | --- | --- |
-| `coverage.quality` | `complete`, or `partial` when records the query covers were evicted |
+| `coverage.quality` | `complete`, or `partial` when records the query covers were evicted or the page holds a `transitions_lost` record |
 | `first_retained_seq`, `last_seq` | the ring's retained range when read |
 | `gap_from_seq`, `gap_to_seq` | the exact sequence numbers asked for and already evicted |
 | `evicted_total`, `refused_total` | lifetime counts of evicted and refused records |
@@ -231,6 +243,9 @@ display and may jump.
 | `watchdog.trace_coverage` | `partial` once any `Begin` was refused for want of a slot |
 | `watchdog.overflow` | refused `Begin`s: total, critical, `by_class`, first and last monotonic offset |
 | `watchdog.gap_ns`, `clock_backwards_ns` | the watchdog itself was late, or the clock went backwards |
+| `watchdog.scan_seq` | scans so far; it advances even while the journal is held |
+| `watchdog.transitions` | `complete`, `partial` once any transition was dropped before the journal, `not_collected` without a journal |
+| `watchdog.transitions_lost_total`, `transitions_pending` | dropped transitions, and the queue's depth when the report was made (the example shows 2 because it reports before `Flush`) |
 
 ## 5. Typed failures
 
@@ -250,7 +265,7 @@ display and may jump.
 
 All are proposals from the plan, registered in `internal/domain/capacity` and lowerable by
 `CLAWDLINE_NEXT_CAPACITY`. `TestEveryBoundIsRegistered` was red on all seven constants before the
-rows were added.
+rows were added, and on `MaxPendingTransitions` and its channel before the eighth.
 
 | Row | Limit | At the limit |
 | --- | --- | --- |
@@ -259,6 +274,7 @@ rows were added.
 | `cloud.health_journal_rows` | 4,096 records | evict oldest, count, name the gap |
 | `cloud.health_journal_bytes` | 4 MiB | evict oldest, count, name the gap |
 | `cloud.health_record_bytes` | 1 KiB per record | refuse, count |
+| `cloud.health_pending_transitions` | 256 transitions queued for the journal writer | drop the transition, count it, report `transitions: partial`, journal `transitions_lost` |
 | `cloud.health_query_rows` | 200 per page | stop, `truncated`, cursor |
 | `cloud.health_query_bytes` | 1 MiB per page | stop, `truncated`, cursor |
 
@@ -268,26 +284,38 @@ Parameters, not capacities: watchdog cadence `DefaultCadence` 1 s; finite deadli
 
 ### Measured cost
 
-`go test -bench . -benchtime 2s ./internal/domain/connectionhealth` on an Apple M4 Pro, 14
-threads, 2026-10-20:
+`go test -run '^$' -bench . -benchtime 2s -benchmem ./internal/domain/connectionhealth` on an
+Apple M4 Pro, 14 threads, 2026-10-20, rerun after the queued journal writer and the `End` retry:
 
 | Benchmark | Result |
 | --- | --- |
-| `Begin` + `Progress` + `End`, parallel | 298.6 ns/op, 416 B/op, 2 allocs/op |
-| One `Scan` of 120 active phases, journal attached | 22.4 µs/op, 102.6 KB/op, 22 allocs/op |
+| `Begin` + `Progress` + `End`, parallel | 298.3 ns/op, 416 B/op, 2 allocs/op (before: 298.6 ns/op) |
+| One `Scan` of 120 active phases, journal attached, no transitions | 26.9 µs/op, 121.3 KB/op, 24 allocs/op (before: 22.4 µs/op, 102.6 KB/op, 22 allocs/op; the difference is the copy of the findings published for `Latest`) |
 
 Nothing else was measured: not daemon CPU or latency with instrumentation enabled, not a 1 s scan
-under load, not memory of a full ring.
+under load, not a scan that queues transitions, not memory of a full ring.
 
 ## 7. Concurrency
 
 - `Tracker`: each slot is an `atomic.Bool` claim and an `atomic.Pointer[Phase]` to an immutable
   snapshot. `Progress` swaps in a copy with CAS; `End` clears it only if it still holds its own
-  phase, so a second `End` is harmless. Nothing blocks.
+  phase, retrying when a concurrent `Progress` replaced the snapshot, so it never leaves a slot
+  claimed; a second `End`, or a stale handle after the slot was reused, finds another phase or
+  none and does nothing. Nothing blocks. (`TestEndThatRacesProgressStillReleasesTheSlot` puts a
+  `Progress` between `End`'s read and its swap; it failed on the single-CAS `End`.)
 - `Watchdog.Scan` is called from one goroutine (`Run`, whose lifetime is its context). It reads
-  only the tracker's atomics and its clock; its only side effect is `Journal.Append`.
-- `Journal` has its own mutex, held for a copy and one `json.Marshal` of a ≤ 1 KiB record. No
-  business code holds it, and it does no I/O.
+  only the tracker's atomics and its clock, and takes no lock: each transition goes into a
+  256-row queue with a non-blocking send, a full queue drops and counts it, and the report is
+  published with an atomic store for `Latest`. `Run` accepts no caller callback.
+- One journal writer goroutine, started and joined by `Run`, is the only code that waits on the
+  journal. It appends each transition with the scan's own instant and writes `transitions_lost`
+  exactly where drops happened. A journal held forever stops the writer and delays `Run`'s
+  return until it is released, never a scan (`TestAScanNeverWaitsForAHeldJournal`,
+  `TestRunAdvancesWhileTheJournalIsHeldAndLeavesNothingRunning`; both failed with the old
+  synchronous append). `Flush` drains the queue on the caller's goroutine for a caller without
+  `Run`.
+- `Journal` has its own mutex, held for a copy and one `json.Marshal` of a ≤ 1 KiB record, or for
+  one page read. No business code holds it, and it does no I/O.
 - `Export` takes the watchdog's latest report rather than calling `Scan` itself, so the watchdog
   stays single-owner.
 
@@ -408,7 +436,7 @@ never an empty success; a `null` duration is never drawn as zero.
 ## 10. Remaining wiring, in order
 
 1. Construct one `Tracker`, `Journal` and `Watchdog` per daemon boot, run `Watchdog.Run` under the
-   daemon context, and replace the known-zero capacity measures with `Snapshot` and coverage.
+   daemon context, export from `Watchdog.Latest`, and replace the known-zero capacity measures with `Snapshot` and coverage.
 2. Instrument the call sites named in the plan (frame read, sender verify, inbound callback,
    admission, handler, spool, writer-lock acquisition, socket write, receipts), each with a stable
    location code; reserve critical slots for reader, writer, drain and keepalive loops.

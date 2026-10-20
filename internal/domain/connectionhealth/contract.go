@@ -12,11 +12,12 @@
 //   - Unknown is not zero. A reading that could not be taken says so with a
 //     typed quality, never with an empty list or a 0.
 //   - Instrumentation never waits. The active-phase table is lock-free; the
-//     watchdog reads only that table and its own clock; the journal has its
-//     own small lock that no business code holds.
+//     watchdog reads only that table and its own clock and hands transitions
+//     to the journal through a bounded queue it never waits on; the journal
+//     has its own small lock that no business code holds.
 //
-// The package keeps no goroutine of its own except Watchdog.Run, whose
-// lifetime is its caller's context.
+// The package keeps no goroutine of its own except Watchdog.Run and the one
+// journal writer it starts and joins, whose lifetime is the caller's context.
 package connectionhealth
 
 import (
