@@ -157,6 +157,7 @@ function imageLightbox(): Lightbox {
     previous: nextWord("imagePreviewPrevious"),
     next: nextWord("imagePreviewNext"),
     download: nextWord("imagePreviewDownload"),
+    share: nextWord("imagePreviewShare"),
     position: (index, count) => nextWord("imagePreviewPosition", { index, count }),
   })
   lightbox = {

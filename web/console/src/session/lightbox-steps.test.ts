@@ -2,7 +2,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error -- a `.ts` path, for node; see `session/order.test.ts`.
-import { saveImageFromClick, stepFrom, swipeStep } from "./lightbox-steps.ts"
+import { shareImageFromClick, saveImageFromClick, stepFrom, swipeStep } from "./lightbox-steps.ts"
 
 test("a step goes to the neighbour and stops at either end", () => {
   const list = ["a", "b", "c"]
@@ -30,17 +30,14 @@ test("a scroll or a wobble is not a swipe", () => {
   assert.equal(swipeStep(-30, 0), 0)
 })
 
-test("a phone save press gives the native sheet the original image file immediately", () => {
+test("a share press gives the native sheet the original image file immediately", () => {
   const file = new File([new Uint8Array([137, 80, 78, 71])], "clawdline-image.png", { type: "image/png" })
   const calls: unknown[] = []
   const platform = {
-    userAgent: "iPhone", maxTouchPoints: 5,
-    canShare(data: ShareData) { calls.push(["canShare", data.files]); return true },
     share(data: ShareData) { calls.push(["share", data.files]); return Promise.resolve() },
   }
-  const fallback = () => calls.push(["download"])
-  assert.equal(saveImageFromClick(file, platform, fallback), "native")
-  assert.deepEqual(calls, [["canShare", [file]], ["share", [file]]])
+  shareImageFromClick(file, platform)
+  assert.deepEqual(calls, [["share", [file]]])
   assert.equal(file.type, "image/png")
   assert.equal(file.size, 4)
 })
@@ -48,19 +45,18 @@ test("a phone save press gives the native sheet the original image file immediat
 test("a browser without file sharing keeps its download action", () => {
   const file = new File(["png"], "clawdline-image.png", { type: "image/png" })
   let downloads = 0
-  const platform = { userAgent: "Desktop", maxTouchPoints: 0, canShare: () => false, share: () => Promise.resolve() }
+  const platform = {}
   assert.equal(saveImageFromClick(file, platform, () => { downloads++ }), "download")
   assert.equal(downloads, 1)
 })
-
 
 test("a desktop with file sharing saves directly instead of opening the share sheet", () => {
   const file = new File(["png"], "picture.png", { type: "image/png" })
   let downloads = 0
   const platform = {
-    userAgent: "Macintosh", maxTouchPoints: 0,
+    showSaveFilePicker: undefined,
+    share: () => { assert.fail("download must not share"); return Promise.resolve() },
     canShare: () => true,
-    share: () => { assert.fail("desktop download must not share"); return Promise.resolve() },
   }
   assert.equal(saveImageFromClick(file, platform, () => { downloads++ }), "download")
   assert.equal(downloads, 1)
@@ -70,9 +66,6 @@ test("a desktop save picker receives the filename and writes the original bytes"
   const file = new File(["original bytes"], "picture.png", { type: "image/png" })
   const calls: unknown[] = []
   const platform = {
-    userAgent: "Windows", maxTouchPoints: 10,
-    share: () => { assert.fail("desktop download must not share"); return Promise.resolve() },
-    canShare: () => true,
     showSaveFilePicker: async (options: { suggestedName: string }) => {
       calls.push(options)
       return { createWritable: async () => ({
@@ -91,12 +84,28 @@ test("cancelling the save picker does not download; an unavailable picker falls 
   for (const name of ["AbortError", "SecurityError"]) {
     let downloads = 0
     const platform = {
-      userAgent: "Desktop", maxTouchPoints: 0,
-      share: undefined, canShare: undefined,
       showSaveFilePicker: () => Promise.reject(new DOMException("unavailable", name)),
     }
     saveImageFromClick(file, platform, () => { downloads++ })
     await new Promise(resolve => setImmediate(resolve))
     assert.equal(downloads, name === "AbortError" ? 0 : 1)
   }
+})
+
+test("an iPhone download does not open the share sheet", () => {
+  const file = new File(["image"], "picture.png", { type: "image/png" })
+  let downloads = 0
+  const platform = {
+    showSaveFilePicker: undefined,
+    share: () => { assert.fail("download must not share"); return Promise.resolve() },
+    canShare: () => true,
+  }
+  assert.equal(saveImageFromClick(file, platform, () => { downloads++ }), "download")
+  assert.equal(downloads, 1)
+})
+
+test("cancelling sharing is handled without starting a download", async () => {
+  const file = new File(["image"], "picture.png")
+  shareImageFromClick(file, { share: () => Promise.reject(new DOMException("cancelled", "AbortError")) })
+  await new Promise(resolve => setImmediate(resolve))
 })
