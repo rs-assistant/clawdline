@@ -398,3 +398,12 @@ func nonNegative(d time.Duration) int64 {
 	}
 	return int64(d)
 }
+
+// Pending is the transition queue's depth now and the transitions dropped
+// at its bound since the watchdog was made. Both are atomic reads.
+func (w *Watchdog) Pending() (depth int, lost uint64) {
+	if w.journal == nil {
+		return 0, 0
+	}
+	return len(w.pending), w.lost.Load()
+}

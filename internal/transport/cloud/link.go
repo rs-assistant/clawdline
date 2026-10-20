@@ -48,6 +48,7 @@ import (
 	"github.com/sainteye/clawdline/internal/app/terminals"
 	peercontract "github.com/sainteye/clawdline/internal/domain/agenthandoff"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
 	"github.com/sainteye/clawdline/internal/domain/schedulewebhook"
 	"github.com/sainteye/clawdline/internal/domain/terminal"
@@ -232,6 +233,9 @@ type LinkOptions struct {
 	// lower a bound, as it may for the two above.
 	SpoolChannelBytes int
 	SpoolReceipts     int
+	// Health is the daemon's connection-health tracker, handed to the
+	// transport and used by the lanes. Nil records nothing.
+	Health *connectionhealth.Tracker
 }
 
 // Link is one machine's Cloud line.
@@ -765,6 +769,7 @@ func (l *Link) wire() error {
 		ContentKey:           secret,
 		Log:                  func(line string) { l.logf("%s", line) },
 		Now:                  opts.Now,
+		Health:               opts.Health,
 	})
 	if err != nil {
 		return err
@@ -1109,26 +1114,32 @@ func (l *Link) runService(ctx context.Context) error {
 				// It waits for the publisher's next re-statement, up to one
 				// SnapshotInterval. The publisher bounds how many may wait
 				// (SessionSnapshotWaitersLimit) and answers the rest at once.
+				h := l.lanePhase(connectionhealth.ClassStatus, connectionhealth.LocSessionsLane)
 				answers.Add(1)
 				go func() {
 					defer answers.Done()
-					l.answer(ctx, service, request)
+					l.answerTraced(ctx, service, request, h, connectionhealth.LocSessionsHandler)
 				}()
 			case cloudops.IsRead(request.Plaintext):
 				if !l.takeReadSlot() {
 					l.refuseBusy(ctx, service, request, "read lane", CloudReadConcurrencyLimit)
 					continue
 				}
+				h := l.lanePhase(connectionhealth.ClassRead, connectionhealth.LocReadLane)
 				answers.Add(1)
 				go func() {
 					defer answers.Done()
 					defer l.releaseReadSlot()
-					l.answer(ctx, service, request)
+					l.answerTraced(ctx, service, request, h, connectionhealth.LocReadHandler)
 				}()
 			default:
+				// The phase begins before the send, so a command waiting
+				// behind a stuck one shows lane_queued with its own age.
+				h := l.lanePhase(connectionhealth.ClassControl, connectionhealth.LocCommandLane)
 				select {
-				case commands <- pending{service: service, request: request}:
+				case commands <- pending{service: service, request: request, health: h}:
 				default:
+					h.End(false)
 					l.refuseBusy(ctx, service, request, "command lane", depth)
 				}
 			}
@@ -1141,6 +1152,7 @@ func (l *Link) runService(ctx context.Context) error {
 type pending struct {
 	service Service
 	request Inbound
+	health  connectionhealth.Handle
 }
 
 // runCommands answers commands one at a time until the lane is closed. A
@@ -1149,9 +1161,10 @@ type pending struct {
 func (l *Link) runCommands(ctx context.Context, commands <-chan pending) {
 	for next := range commands {
 		if ctx.Err() != nil {
+			next.health.End(false)
 			continue
 		}
-		l.answer(ctx, next.service, next.request)
+		l.answerTraced(ctx, next.service, next.request, next.health, connectionhealth.LocCommandHandler)
 	}
 }
 
@@ -1190,8 +1203,28 @@ func (l *Link) refuseBusy(ctx context.Context, service Service, request Inbound,
 		lane, limit, request.Sender, request.Sequence)
 }
 
-// answer handles one request, counting what it answered.
-func (l *Link) answer(ctx context.Context, service Service, request Inbound) {
+// lanePhase begins the finite phase of one request as it is put on a lane.
+// The correlation is minted here: the request's own sender, sequence and
+// channel are never used as one.
+func (l *Link) lanePhase(class connectionhealth.Class, location string) connectionhealth.Handle {
+	t := l.opts.Health
+	return t.Start(connectionhealth.DaemonSpec(connectionhealth.StageLaneQueued, class, location, t.NewCorrelation()))
+}
+
+// answerTraced is answer, moving h to the handler as it starts and ending
+// it with the answer's outcome. The answer's own sealing and spooling happen
+// inside Service.Answer and are not separate stages yet.
+func (l *Link) answerTraced(ctx context.Context, service Service, request Inbound, h connectionhealth.Handle, location string) {
+	_ = h.Step(connectionhealth.StageHandlerStarted, location)
+	ok := false
+	defer func() { h.End(ok) }()
+	ok = l.answer(ctx, service, request)
+	_ = h.Progress(connectionhealth.StageHandlerCompleted)
+}
+
+// answer handles one request, counting what it answered, and reports
+// whether the answer was OK.
+func (l *Link) answer(ctx context.Context, service Service, request Inbound) bool {
 	answer := service.Answer(ctx, request)
 	l.mu.Lock()
 	l.answered++
@@ -1199,6 +1232,7 @@ func (l *Link) answer(ctx context.Context, service Service, request Inbound) {
 		l.refused++
 	}
 	l.mu.Unlock()
+	return answer.OK()
 }
 
 // allowCommands reads the write switch from the file, now.

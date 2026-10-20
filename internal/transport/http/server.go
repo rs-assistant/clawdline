@@ -41,6 +41,7 @@ import (
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/contract"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	"github.com/sainteye/clawdline/internal/domain/icon"
 	"github.com/sainteye/clawdline/internal/domain/projectsync"
 	"github.com/sainteye/clawdline/internal/domain/session"
@@ -62,6 +63,9 @@ type Server struct {
 	cloudReload  func() error
 	cloudLoginMu sync.Mutex
 	cloudLogin   cloudLoginAttempt
+	// connectionHealth is the daemon's per-boot connection-health runtime
+	// (connection_health.go); nil when monitoring is off.
+	connectionHealth *connectionhealth.Runtime
 	// version is this build as `clawdline version` prints it, for /v1/health
 	// (SetVersion). Empty leaves `version` out of the answer.
 	version        string
@@ -420,6 +424,9 @@ func (s *Server) routeTable() []route {
 		{Route{"*", "/v1/health"}, s.health},
 		{Route{"*", "/v1/diagnostics"}, s.diagnostics},
 		{Route{"*", "/v1/capacity"}, s.capacityRoute},
+		// What the connection-health watchdog sees now and its journal
+		// (connection_health.go). This machine's own token, never via Cloud.
+		{Route{"*", "/v1/connection-health/"}, s.connectionHealthRoute},
 		// The dashboard behind the session counts: this machine's CPU and memory and
 		// each session's share (machine_usage.go). Any paired device, as /v1/capacity.
 		{Route{"*", "/v1/machine/usage"}, s.machineUsageRoute},

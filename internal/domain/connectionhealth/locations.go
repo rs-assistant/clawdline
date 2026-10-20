@@ -75,12 +75,12 @@ func Locations() []LocationEntry {
 		{LocDrainSend, adapterPkg + ".(*Transport).drainPass", []Stage{StageSpoolQueued}, Finite, false},
 		{LocWriterLock, adapterPkg + ".(*Conn).writeFrame", []Stage{StageWriterLockWaiting}, Finite, false},
 		{LocSocketWrite, adapterPkg + ".(*Conn).writeFrame", []Stage{StageSocketWriteStarted, StageSocketWriteEnded}, Finite, false},
-		{LocReadLane, linkPkg + ".(*Link).runService", []Stage{StageLaneQueued}, Finite, false},
-		{LocCommandLane, linkPkg + ".(*Link).runService", []Stage{StageLaneQueued}, Finite, false},
-		{LocSessionsLane, linkPkg + ".(*Link).runService", []Stage{StageLaneQueued}, Finite, false},
-		{LocReadHandler, linkPkg + ".(*Link).answer", []Stage{StageHandlerStarted, StageHandlerCompleted}, Finite, false},
-		{LocCommandHandler, linkPkg + ".(*Link).answer", []Stage{StageHandlerStarted, StageHandlerCompleted}, Finite, false},
-		{LocSessionsHandler, linkPkg + ".(*Link).answer", []Stage{StageHandlerStarted, StageHandlerCompleted}, Finite, false},
+		{LocReadLane, linkPkg + ".(*Link).lanePhase", []Stage{StageLaneQueued}, Finite, false},
+		{LocCommandLane, linkPkg + ".(*Link).lanePhase", []Stage{StageLaneQueued}, Finite, false},
+		{LocSessionsLane, linkPkg + ".(*Link).lanePhase", []Stage{StageLaneQueued}, Finite, false},
+		{LocReadHandler, linkPkg + ".(*Link).answerTraced", []Stage{StageHandlerStarted, StageHandlerCompleted}, Finite, false},
+		{LocCommandHandler, linkPkg + ".(*Link).answerTraced", []Stage{StageHandlerStarted, StageHandlerCompleted}, Finite, false},
+		{LocSessionsHandler, linkPkg + ".(*Link).answerTraced", []Stage{StageHandlerStarted, StageHandlerCompleted}, Finite, false},
 	}
 }
 

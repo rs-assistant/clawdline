@@ -176,7 +176,7 @@ func (s *Server) cloudCapacityMeasures() map[string]func() capacity.Reading {
 		},
 		capacity.CloudSpoolRefusals: func() capacity.Reading { return s.spoolRefusalReading() },
 	}
-	for name, m := range connectionHealthCapacityMeasures() {
+	for name, m := range s.connectionHealthCapacityMeasures() {
 		out[name] = m
 	}
 	return out

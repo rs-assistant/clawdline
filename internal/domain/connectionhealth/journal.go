@@ -366,3 +366,22 @@ func (j *Journal) Read(q Query) (Page, error) {
 	p.Coverage = c
 	return p, nil
 }
+
+// JournalStats is the ring's occupancy for the capacity register.
+type JournalStats struct {
+	Rows, Bytes, LargestRecord int
+	Evicted, Refused           uint64
+}
+
+// Stats reads the ring's occupancy under its own short lock.
+func (j *Journal) Stats() JournalStats {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	st := JournalStats{Rows: j.n, Bytes: j.bytes, Evicted: j.evicted, Refused: j.refused}
+	for k := 0; k < j.n; k++ {
+		if b := j.sizes[(j.head+k)%j.limit]; b > st.LargestRecord {
+			st.LargestRecord = b
+		}
+	}
+	return st
+}

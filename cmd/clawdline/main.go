@@ -214,6 +214,10 @@ func main() {
 		// Run a commit of this checkout in place of the installed release,
 		// to test it (dev.go, docs/updates.md).
 		devCommand(os.Args[2:])
+	case "health":
+		// The connection-health watchdog and journal, read from the local
+		// daemon with this machine's token (health.go).
+		healthCommand(os.Args[2:])
 	case "update":
 		// Whether this machine trails the cloud's latest build, and on Linux
 		// deploying it (update.go, docs/updates.md).
@@ -274,6 +278,9 @@ func serve() {
 		refuseToServe(1, err.Error())
 	}
 	srv.SetVersion(version)
+	// One connection-health runtime per boot, before anything it instruments
+	// starts and whether or not Cloud is on (health.go).
+	srv.SetConnectionHealth(startConnectionHealth(context.Background()))
 	// A device file that cannot be read stops the daemon here, rather than
 	// letting it listen and refuse everybody.
 	if err := srv.AuthReady(); err != nil {
@@ -357,6 +364,9 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		SpoolBytes:        int(httptransport.CapacityLimit(capacity.CloudSpoolBytes)),
 		SpoolChannelBytes: int(httptransport.CapacityLimit(capacity.CloudSpoolChannelBytes)),
 		SpoolReceipts:     int(httptransport.CapacityLimit(capacity.CloudSpoolReceipts)),
+		// The lanes and the transport record their phases here; nil when
+		// connection-health monitoring is off.
+		Health: srv.ConnectionHealth().Probe(),
 	}
 	var mu sync.Mutex
 	var stop context.CancelFunc
