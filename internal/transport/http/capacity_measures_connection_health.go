@@ -29,6 +29,9 @@ func (s *Server) connectionHealthCapacityMeasures() map[string]func() capacity.R
 	for name, f := range s.connectionHealthUploadMeasures(rt != nil) {
 		out[name] = f
 	}
+	for name, f := range connectionHealthSealedMeasures() {
+		out[name] = f
+	}
 	if rt == nil {
 		for _, name := range names {
 			out[name] = func() capacity.Reading {
@@ -218,4 +221,35 @@ func uploadReading(name string, st healthupload.Status, now time.Time) capacity.
 		r.Note = "a bound per request or per cycle; nothing is held between them (" + string(st.State) + ")"
 	}
 	return r
+}
+
+// connectionHealthSealedMeasures reads the cloud.health_sealed_* rows the
+// owner-sealed uploader would hold (internal/adapters/healthsealed). This
+// daemon does not construct that uploader yet: there is no content-key epoch
+// to seal against (docs/admin-connection-health-contract.md §9b), so each row
+// is a known zero that says why rather than an idle-looking 0.
+func connectionHealthSealedMeasures() map[string]func() capacity.Reading {
+	names := []string{
+		"cloud.health_sealed_ciphertext_bytes", "cloud.health_sealed_request_bytes",
+		"cloud.health_sealed_life_seconds", "cloud.health_sealed_attempts",
+		"cloud.health_sealed_attempt_seconds", "cloud.health_sealed_response_bytes",
+		"cloud.health_sealed_queued_jobs", "cloud.health_sealed_revisions",
+		"cloud.health_sealed_snapshot_bytes", "cloud.health_sealed_snapshot_field_chars",
+		"cloud.health_sealed_snapshot_coverage", "cloud.health_sealed_store_attachments",
+		"cloud.health_sealed_store_bytes",
+	}
+	out := map[string]func() capacity.Reading{}
+	for _, name := range names {
+		out[name] = func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "the owner-sealed diagnostic uploader is not started in this daemon; nothing is held"}
+		}
+	}
+	// Identity pairing (internal/adapters/cloud/health_pairing.go) has no
+	// route in this daemon yet, so nothing polls and no epoch record is read.
+	for _, name := range []string{"cloud.content_key_epoch_record_bytes", "cloud.identity_pairing_poll_attempts"} {
+		out[name] = func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "identity pairing is not started by this daemon; nothing is held"}
+		}
+	}
+	return out
 }

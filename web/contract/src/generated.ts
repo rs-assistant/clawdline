@@ -7291,6 +7291,14 @@ export interface SettingsRequest {
   claude_default_model: string | null
 
   /**
+   * Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+   * as ciphertext only paired owner devices can open. Separate from
+   * cloud_health_upload, which never permits it. Absent or false means off, and off
+   * makes no request. Only the local token may change it.
+   */
+  cloud_health_owner_retention: boolean | null
+
+  /**
    * Whether this daemon uploads its connection-health records to Cloud. Absent or
    * false means off, and off makes no request. Only the local token may change it.
    * Owner diagnostics (location, age, deadline) are never sent.
@@ -7584,6 +7592,14 @@ export interface SettingsSnapshot {
    * one. Empty leaves the choice to Claude Code.
    */
   claude_default_model: string | null
+
+  /**
+   * Whether this daemon keeps owner diagnostics (location, age, deadline) in Cloud
+   * as ciphertext only paired owner devices can open. Separate from
+   * cloud_health_upload, which never permits it. Absent or false means off, and off
+   * makes no request. Only the local token may change it.
+   */
+  cloud_health_owner_retention: boolean | null
 
   /**
    * Whether this daemon uploads its connection-health records to Cloud. Absent or
