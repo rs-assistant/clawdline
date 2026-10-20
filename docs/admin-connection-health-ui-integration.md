@@ -185,9 +185,11 @@ carries `fixture: true`. The other admin pages say they need a real session.
 
 ## Bundle
 
-Production build, hosted declaration: `AdminGate` JS 112.53 kB → 117.32 kB (gzip 33.26 → 35.09);
-the lazily loaded `ConnectionHealth` chunk is 90.50 kB (gzip 28.27) JS and 9.80 kB CSS, fetched
-only on `/admin/health`.
+Production build, hosted declaration, measured on 2026-10-20 before and after the incident
+screens: the lazily loaded `ConnectionHealth` chunk 130.61 kB → 182.92 kB JS (gzip 38.89 →
+53.86) and 15.79 → 16.09 kB CSS; `AdminGate` 117.32 → 118.12 kB (gzip 35.08 → 35.36). About half
+of the growth is the English and Chinese copy tables in `words.ts`. A production build with
+`VITE_ADMIN_HEALTH_FIXTURE=normal` contains none of `fixture_mac_a`, `hi_f1000000`, `hs_f1000000`.
 
 ## Not verified, and what the root still owes
 
