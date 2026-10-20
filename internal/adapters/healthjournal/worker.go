@@ -125,7 +125,7 @@ func (s *Store) writeFrames(frames []pendingFrame, refused uint64) {
 				return
 			}
 		}
-		room := int64(MaxSegmentBytes) - s.active.valid.Load()
+		room := s.segmentBytes - s.active.valid.Load()
 		var chunk []byte
 		k := 0
 		for k < len(frames) && int64(len(chunk)+len(frames[k].b)+sealReserve) <= room {
@@ -134,6 +134,7 @@ func (s *Store) writeFrames(frames []pendingFrame, refused uint64) {
 		}
 		if k == 0 {
 			s.closeActive(true)
+			s.prune(false) // a sealed segment may put the store over its bytes
 			continue
 		}
 		before := s.active.valid.Load()
@@ -380,7 +381,7 @@ func (s *Store) prune(shed bool) bool {
 		switch {
 		case shed && !deleted:
 			reason = &s.st.prunedBytes
-		case total > MaxStoreBytes:
+		case total > s.storeBytes:
 			reason = &s.st.prunedBytes
 		case len(segs) > MaxSegments:
 			reason = &s.st.prunedCount

@@ -51,6 +51,9 @@ const (
 	GapPruned  = "pruned"
 	GapMissing = "missing_segment"
 	GapCorrupt = "corrupt_frames"
+	// GapTorn is the unreadable end of a segment found at recovery: a
+	// crash's half-written frame, or everything after a corrupt one.
+	GapTorn = "unreadable_tail"
 )
 
 // Gap says entries between two cursors are not available.
@@ -153,7 +156,7 @@ func (s *Store) Read(q Query) (Page, error) {
 	}
 	c := Coverage{
 		Quality: connectionhealth.QualityComplete, Durability: DurabilityDisk,
-		TargetSeconds: MaxStoreAgeSeconds, TargetBytes: MaxStoreBytes,
+		TargetSeconds: MaxStoreAgeSeconds, TargetBytes: s.storeBytes,
 		PrunedRecords: s.st.prunedRecords.Load(),
 		PrunedEarly:   s.st.prunedBytes.Load() + s.st.prunedCount.Load(),
 		LostRecords:   s.st.lost.Load(), Refused: s.st.refused.Load(),
@@ -302,6 +305,9 @@ func (s *Store) readSegment(g *segment, off int64, rows, budget int, p *Page) se
 	for {
 		typ, payload, n, err := readFrame(br)
 		if err == io.EOF {
+			if g.torn > 0 {
+				res.err = GapTorn
+			}
 			return res
 		}
 		if err != nil {

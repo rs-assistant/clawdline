@@ -172,9 +172,12 @@ type Options struct {
 	// (stall detection) come from; nil is the system clock.
 	Clock connectionhealth.Clock
 
-	// Test seams: how a segment is created and a file removed.
-	openSegment func(path string) (segmentFile, error)
-	remove      func(path string) error
+	// Test seams: how a segment is created and a file removed, and lower
+	// byte bounds so retention can be driven without writing 100 MiB.
+	openSegment  func(path string) (segmentFile, error)
+	remove       func(path string) error
+	storeBytes   int64
+	segmentBytes int64
 }
 
 // segmentFile is the active segment as the worker writes it.
@@ -239,6 +242,8 @@ type Store struct {
 	remove             func(string) error
 	lock               io.Closer
 	recovery           Recovery
+	storeBytes         int64
+	segmentBytes       int64
 
 	// Admission: the only lock a producer takes.
 	qmu        sync.Mutex
@@ -312,6 +317,12 @@ func Open(o Options) (*Store, error) {
 	if o.remove == nil {
 		o.remove = os.Remove
 	}
+	if o.storeBytes <= 0 || o.storeBytes > MaxStoreBytes {
+		o.storeBytes = MaxStoreBytes
+	}
+	if o.segmentBytes <= 0 || o.segmentBytes > MaxSegmentBytes {
+		o.segmentBytes = MaxSegmentBytes
+	}
 	if err := ensureDir(o.Dir); err != nil {
 		return nil, err
 	}
@@ -328,6 +339,7 @@ func Open(o Options) (*Store, error) {
 	s := &Store{
 		dir: o.Dir, bootID: o.BootID, build: o.Build, clock: o.Clock,
 		openSeg: o.openSegment, remove: o.remove, lock: lock, recovery: rec,
+		storeBytes: o.storeBytes, segmentBytes: o.segmentBytes,
 		wake: make(chan struct{}, 1), quit: make(chan struct{}),
 		flushReq: make(chan chan flushResult), done: make(chan struct{}),
 		readers: make(chan struct{}, MaxConcurrentReads),
@@ -335,6 +347,10 @@ func Open(o Options) (*Store, error) {
 		lastSync: now.Mono, lastPrune: now.Mono,
 	}
 	s.health.Store(&health{state: StateOK, at: now.Wall})
+	// Retention is enforced before Open returns, so a boot after a long
+	// absence never serves, or reports, what it is about to delete. The
+	// worker is not running yet; nothing else touches the segments.
+	s.prune(false)
 	go s.run()
 	return s, nil
 }
