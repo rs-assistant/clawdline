@@ -10,6 +10,15 @@ import (
 // (capacity.AreaOf), one reading per row.
 func (s *Server) artifactsCapacityMeasures() map[string]func() capacity.Reading {
 	return map[string]func() capacity.Reading{
+		"artifacts.report_total_image_pixels": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-report cumulative decoded pixel guard; later images beyond the budget are omitted"}
+		},
+		"artifacts.report_image_side": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-image decoded side guard; invalid report images are omitted"}
+		},
+		"artifacts.report_image_pixels": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-image decoded pixel guard; invalid report images are omitted"}
+		},
 		"icons.saved": func() capacity.Reading {
 			if s.icons == nil {
 				return capacity.Reading{Known: true, Note: "no icon registry attached"}
