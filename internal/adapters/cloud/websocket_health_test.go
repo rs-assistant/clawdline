@@ -181,3 +181,33 @@ func BenchmarkHandleFrame(b *testing.B) {
 	b.Run("off", func(b *testing.B) { benchHandle(b, nil) })
 	b.Run("on", func(b *testing.B) { benchHandle(b, connectionhealth.NewTracker(connectionhealth.NewSystemClock())) })
 }
+
+// A traced write's phase carries the operation it belongs to from the lock
+// wait on; a value that is not an opaque id is dropped rather than recorded,
+// and the untraced WriteText still names none.
+func TestATracedWriteCarriesItsCorrelationThroughTheLockWait(t *testing.T) {
+	for _, tc := range []struct{ given, want string }{{"op-9", "op-9"}, {"t/mac/session 1", ""}, {"", ""}} {
+		tr := connectionhealth.NewTracker(connectionhealth.NewSystemClock())
+		conn, peer := pipeConn(tr)
+		go func() { _, _ = io.Copy(io.Discard, peer) }()
+		conn.writeMu.Lock()
+		done := make(chan error)
+		go func() {
+			if tc.given == "" {
+				done <- conn.WriteText([]byte(`{}`), time.Now().Add(time.Minute))
+				return
+			}
+			done <- conn.WriteTextTraced([]byte(`{}`), time.Now().Add(time.Minute), tc.given)
+		}()
+		waitPhase(t, tr, connectionhealth.StageWriterLockWaiting)
+		phases, _ := tr.Snapshot()
+		if len(phases) != 1 || phases[0].Spec.Correlation != tc.want {
+			t.Fatalf("%q: %+v", tc.given, phases)
+		}
+		conn.writeMu.Unlock()
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+		_ = peer.Close()
+	}
+}

@@ -19,7 +19,7 @@ client. The query shapes in §9 remain a proposal; Cloud's implemented API is it
 | Segment truth table, stage progress, local export | implemented | `evidence.go` |
 | One runtime per daemon boot (fresh random `boot_id`, build from the binary's commit), watchdog run for the daemon's lifetime, Cloud on or off | implemented; `CLAWDLINE_CONNECTION_HEALTH=off` turns it off | `runtime.go`, `cmd/clawdline/health.go` `startConnectionHealth` |
 | Capacity rows `cloud.health_*` | measured from the tracker snapshot, journal occupancy and transition queue; unmeasured with a reason when monitoring is off | `internal/transport/http/capacity_measures_connection_health.go` |
-| Daemon call sites | **partial**: see §4.1 for the exact list. One correlation now crosses the relay queue from the transport's frame phase to the link's lane and handler (`Inbound.Correlation`). Response sealing and the spool enqueue inside `internal/transport/cloud/relay.go` are **not wired**, and the answer's seal, spool and socket write still start their own phases | `internal/adapters/cloud/transport.go`, `websocket.go`, `internal/transport/cloud/link.go` |
+| Daemon call sites | **partial**: see §4.1 for the exact list. One correlation now runs from the transport's frame phase through the relay queue (`Inbound.Correlation`), the lane and handler, the answer's reservation, seal and spool enqueue (the handler's context, `connectionhealth.WithCorrelation`), the spool row (`SpoolRow.Correlation`, local only) and every drain write and reconnect re-send of that row. Answers published outside a handler (status snapshots, terminal frames, carrier answers) are still uncorrelated | `internal/adapters/cloud/transport.go`, `websocket.go`, `spool.go`, `internal/transport/cloud/link.go`, `relay.go` |
 | Local route `GET /v1/connection-health/{status,events,trace,export}` and `clawdline health` | implemented, this machine's own token only, refused through Cloud | `internal/transport/http/connection_health.go`, `cmd/clawdline/health.go` |
 | Per-build location map | **partial**: every wired location code names its Go function (checked by `runtime.FuncForPC` in the owning package's tests); no file lines | `locations.go` |
 | Durable segmented store, boot markers on disk | implemented and opened by the daemon off the startup path; the watchdog's journal writer offers each stamped record (`Watchdog.Attach`); history route and CLI read it. The ring itself is still memory only and says so | `internal/adapters/healthjournal`, `docs/admin-connection-health-storage.md` |
@@ -279,6 +279,22 @@ sender, session or document; `phase_id` is the attempt, the correlation the logi
 | `cloud.websocket.writer_lock` → `socket_write` | `writer_lock_waiting` → `socket_write_started` → `socket_write_ended` | `(*Conn).writeFrame` | finite, one per frame written |
 | `cloud.link.read_lane`, `command_lane`, `sessions_lane` | `lane_queued` | `(*Link).lanePhase` | finite, one per request |
 | `cloud.link.read_handler`, `command_handler`, `sessions_handler` | `handler_started` → `handler_completed` | `(*Link).answerTraced` | same phase, stepped |
+| `cloud.relay.reserve` → `seal` → `spool_seal` | `handler_completed` → `handler_completed` → `response_sealed` → `spool_queued` | `(*Relay).PublishTracked` | finite, one per answer, class `transport`, under the handler's correlation |
+| `cloud.relay.direct_write` | `handler_completed` | `(*Relay).PublishTracked` | finite, one per direct answer; ends at the carrier's write and claims no spool or relay stage |
+
+**One answer, one correlation.** `answerTraced` puts the handler's correlation on the context it
+hands `Service.Answer` (`connectionhealth.WithCorrelation`; a nil tracker or no correlation leaves
+the context untouched and allocates nothing). `Relay.PublishTracked` begins the answer's own phase
+before the spool's lock (`cloud.relay.reserve`), steps it to `cloud.relay.seal` before sealing and to
+`cloud.relay.spool_seal` (`response_sealed`) before taking the lock again to queue the bytes, and
+ends it at `spool_queued`. The handler's own phase still ends only when `Answer` returns. The spool
+keeps the correlation on the row (`Spool.SealCorrelated`), bounded by the row caps and dropped with
+the row's bytes when it is acknowledged, refused, burned or coalesced, and gone when the row is
+collected; it is never in the sealed envelope, the frame, or any wire field. The drain writes the
+row with `Conn.WriteTextTraced`, and a reconnect re-send (`Spool.ResendCorrelated`) does the same:
+each write is its own `writer_lock` → `socket_write` phase, with its own `phase_id`, under the one
+correlation. Pings, closes, subscribes and untraced `WriteText` callers keep an uncorrelated phase.
+The drain pass phase (`cloud.transport.drain_send`) covers many rows and stays uncorrelated.
 
 Nothing here changes a deadline, a return value, an error or a retry; a nil tracker (monitoring
 off, or a test or old caller that passes none) records nothing. A full table means a phase is not
@@ -592,10 +608,10 @@ storage loss and `state_after_loss`; heartbeat/presence; uploading on a schedule
 ## 10. Remaining wiring, in order
 
 1. Done: one runtime per boot, real capacity measures (§1).
-2. Partly done (§4.1). The transport's correlation now reaches the lane and handler through
-   `Inbound.Correlation`. Still to wire: response sealing and spool enqueue in
-   `internal/transport/cloud/relay.go`, and carrying the same correlation on `Outbound` to the
-   seal, spool and socket write.
+2. Done for a handler's answer (§4.1): one correlation from the frame through the lane, handler,
+   reservation, seal, spool row and each socket write and re-send. Still uncorrelated: answers
+   published outside a handler (status snapshots, terminal frames, carrier answers) and refusals
+   sent by `refuseBusy`.
 3. Done: local route and CLI (§4.1).
 4. Done: durable store opened and fed (`docs/admin-connection-health-storage.md`), and flushed and
    closed at daemon shutdown.
