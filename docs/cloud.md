@@ -161,6 +161,13 @@ The browser's Cloud line reconnects in the background after a temporary failure.
 
 ## Which machine the hosted console is on
 
+The header machine menu opens and closes around its top-right origin in 200 ms. Fleet machine
+groups expand and collapse their intrinsic content height in 220 ms, keeping Session text at its
+normal size. Both transitions reverse on repeated presses and become immediate under reduced
+motion. Closed content is inert and hidden from accessibility immediately; menu focus returns to
+the trigger when it was inside the menu. Collapsed groups stay current but do not register their
+spinner canvases with the drawing clock.
+
 An account with more than one readable machine opens on **all of them**: the fleet list is the
 way in, and the machine list — which is where pairing, renaming and forgetting live — is one press
 away under the header's name. A tab that has chosen a single machine keeps it, because the choice

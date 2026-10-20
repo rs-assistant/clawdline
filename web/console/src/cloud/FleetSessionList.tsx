@@ -116,7 +116,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
   // The original Session list hands all its canvases to one page clock after
   // every render. Fleet rows use the same clock, including after status updates.
   useEffect(() => {
-    L.registerSpinners([...(listScroll.current?.querySelectorAll<HTMLCanvasElement>("canvas.spin") ?? [])])
+    L.registerSpinners([...(listScroll.current?.querySelectorAll<HTMLCanvasElement>('.cloud-all-group-body[data-open="true"] canvas.spin') ?? [])])
   })
 
   useEffect(() => {
@@ -416,7 +416,9 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               </span>
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
             </button></h2>
-          {!isCollapsed && <>
+          <div className="cloud-all-group-body" data-open={!isCollapsed}
+            inert={isCollapsed} aria-hidden={isCollapsed}>
+          <div className="cloud-all-group-content">
           {/* A verified Session reading can settle before the roster's machine
               freshness changes. Its own completeness and row freshness are the
               authority here; an unrelated roster state must not leave a
@@ -468,7 +470,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
           </>}
           {reading?.phase === "settled" && !!reading.value.unknownTargets &&
             <p role="status">{nextWord("cloudAllUnknownTargets", { count: reading.value.unknownTargets })}</p>}
-          </>}
+          </div></div>
         </section>
         })}
       </div>

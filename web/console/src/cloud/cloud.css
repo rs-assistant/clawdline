@@ -117,6 +117,14 @@
     box-sizing: border-box; width: min(300px, calc(100vw - 24px)); padding: 8px;
     border: 1px solid var(--line); border-radius: 12px;
     background: #141418; box-shadow: 0 16px 44px rgba(0, 0, 0, 0.42);
+    transform-origin: top right;
+    opacity: 0; transform: translateY(-6px) scale(.97);
+    visibility: hidden; pointer-events: none;
+    transition: opacity 200ms var(--ease), transform 200ms var(--ease), visibility 0s 200ms;
+}
+.cloud-switch-menu[data-open="true"] {
+    opacity: 1; transform: none; visibility: visible; pointer-events: auto;
+    transition-delay: 0s;
 }
 /* The line's state in words, so it does not rest on the dot's colour alone,
    and the retry the connection light's press used to be. */
@@ -507,3 +515,20 @@
 }
 .cloud-detail-act:hover { border-color: var(--accent-ed); }
 .cloud-detail-act:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Keep the intrinsic height live as Session snapshots change. CSS reverses an
+   interrupted transition; no delayed callback can close a reopened group. */
+.cloud-all-group-body {
+    display: grid; grid-template-rows: 0fr; visibility: hidden;
+    transition: grid-template-rows 220ms var(--ease), visibility 0s 220ms;
+}
+.cloud-all-group-body[data-open="true"] {
+    grid-template-rows: 1fr; visibility: visible; transition-delay: 0s;
+}
+.cloud-all-group-content { min-height: 0; overflow: hidden; }
+.cloud-all-group-body[aria-hidden="true"] { pointer-events: none; }
+.cloud-all-group-heading svg { transition: transform 220ms var(--ease); }
+@media (prefers-reduced-motion: reduce) {
+    .cloud-switch-menu, .cloud-switch-chevron, .cloud-all-group-body,
+    .cloud-all-group-heading svg { transition: none; }
+}
