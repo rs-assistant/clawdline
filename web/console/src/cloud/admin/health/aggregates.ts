@@ -299,16 +299,18 @@ const FAILED_OUTCOME = new Set(["error", "timeout", "refused", "threw", "aborted
 function signalsOf(p: AggPoint): { signals: SlotSignal[]; failed: number; ops: { n: number; floor: boolean } | null } {
   const s = new Set<SlotSignal>()
   let failed = 0
-  let ops: { n: number; floor: boolean } | null = null
+  let opsN = 0
+  let opsFloor = false
+  let opsSeen = false
   for (const c of p.cells) {
     if (c.event === "stall_detected") s.add("stall")
     if (c.event === "slow_detected") s.add("slow")
     if (c.event === "transitions_lost" || c.event === "overflow") s.add("loss")
     if (FAILED_EVENT.has(c.event) || (c.outcome !== null && FAILED_OUTCOME.has(c.outcome))) { s.add("failed"); failed += c.records }
-    if (STAGE_END.has(c.event)) ops = { n: (ops?.n ?? 0) + c.count_total, floor: (ops?.floor ?? false) || c.count_is_floor }
+    if (STAGE_END.has(c.event)) { opsSeen = true; opsN += c.count_total; opsFloor ||= c.count_is_floor }
   }
   if (p.loss_reported > 0) s.add("loss")
-  return { signals: [...s], failed, ops }
+  return { signals: [...s], failed, ops: opsSeen ? { n: opsN, floor: opsFloor } : null }
 }
 
 /** One lane per series, one slot per bucket of the window; unknown buckets keep their reason. */
@@ -325,7 +327,9 @@ export function trendLanes(body: AggregatesBody): TrendLane[] {
     let prevBoots: string | null = null
     let records = 0
     let failedTotal = 0
-    let ops: { n: number; floor: boolean } | null = null
+    let opsN = 0
+    let opsFloor = false
+    let opsSeen = false
     let held = 0
     for (let start = from; start < to; start += ms) {
       const end = start + ms
@@ -343,7 +347,7 @@ export function trendLanes(body: AggregatesBody): TrendLane[] {
       held++
       records += p.records
       failedTotal += sig.failed
-      if (sig.ops) ops = { n: (ops?.n ?? 0) + sig.ops.n, floor: (ops?.floor ?? false) || sig.ops.floor }
+      if (sig.ops) { opsSeen = true; opsN += sig.ops.n; opsFloor ||= sig.ops.floor }
       slots.push({
         ...base, gap: null, records: p.records, operations: sig.ops, failed: sig.failed, signals: sig.signals, restart, incomplete: start < covered, boots: p.boots,
         wallSkew: p.producer_wall_behind + p.producer_wall_ahead, duplicates: p.duplicates_refused, loss: p.loss_reported, cellsDropped: p.cells_dropped,
@@ -352,7 +356,7 @@ export function trendLanes(body: AggregatesBody): TrendLane[] {
     const max = Math.max(1, ...slots.map((s) => s.records ?? 0))
     return {
       key: `${series.account ?? ""}|${series.source_id}`, series, slots, max,
-      totals: { records, failed: failedTotal, operations: series.denominator === "unknown" ? null : ops, heldBuckets: held, unknownBuckets: slots.length - held },
+      totals: { records, failed: failedTotal, operations: series.denominator === "unknown" || !opsSeen ? null : { n: opsN, floor: opsFloor }, heldBuckets: held, unknownBuckets: slots.length - held },
     }
   })
 }

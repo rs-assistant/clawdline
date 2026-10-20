@@ -42,6 +42,7 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
   const setScope = (next: Partial<HealthScope>) => go(healthHref(route, { ...scope, ...next }))
   const trendable = route.screen === "M01" || route.screen === "M03" || route.screen === "M06"
   const trend = trendable ? route.trend ?? null : null
+  const trendMachine = trendable ? route.trendMachine ?? null : null
   // The trend range is part of the address: a change is a new query, chart and history entry.
   const setTrend = (next: TrendRangeWord | null) => go(healthHref({ ...route, trend: next, ...(next === null ? { trendMachine: null } : {}) } as HealthScreen, scope))
 
@@ -111,8 +112,8 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
         </div>
       </div>
       <p className="adm-fine">{say("scopeNote_cloud_operator")}</p>
-      {trend !== null && route.trendMachine ? (
-        <p className="adm-fine">{say("tr_machineFilter", { machine: route.trendMachine })} <a className="adh-link" href={healthHref({ ...route, trendMachine: null } as HealthScreen, scope)} onClick={(e) => { e.preventDefault(); go(healthHref({ ...route, trendMachine: null } as HealthScreen, scope)) }}>{say("st_clearFilter")}</a></p>
+      {trend !== null && trendMachine ? (
+        <p className="adm-fine">{say("tr_machineFilter", { machine: trendMachine })} <a className="adh-link" href={healthHref({ ...route, trendMachine: null } as HealthScreen, scope)} onClick={(e) => { e.preventDefault(); go(healthHref({ ...route, trendMachine: null } as HealthScreen, scope)) }}>{say("st_clearFilter")}</a></p>
       ) : null}
       {scope.account !== null ? (
         <p className="adm-fine">{say("st_accountFilter", { account: scope.account })} <a className="adh-link" href={healthHref(route, { ...scope, account: null })} onClick={(e) => { e.preventDefault(); setScope({ account: null }) }}>{say("st_clearFilter")}</a></p>
