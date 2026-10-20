@@ -11,7 +11,7 @@ import type { HealthScreen } from "./route"
 import { healthClock, healthDuration, healthMs, type HealthSay, type HealthWord } from "./words"
 import { linkClick, Panel } from "./parts"
 import {
-  bottleneck, filterLoaded, problems, qualitySummary, stageMatrix, traceLanes, windowBands,
+  bottleneck, problems, qualitySummary, stageMatrix, traceLanes, windowBands,
   type Axis, type Band, type Lane, type MarkKind, type PanelQuality, type Problem, type SeqLane, type SourceMark, type StageRow, type TraceLane,
 } from "./timeline"
 
@@ -116,10 +116,24 @@ export function ProblemSummary({ state, say, nav, staleCount = null }: { state: 
   const coverage = (partBody(state, "overview") ?? partBody(state, "outcomes"))?.coverage ?? null
   const failed = panelQualities(state).filter((p) => p.quality === "failed").length
   const list = problems(groups, sources, coverage, failed, staleCount)
+  // Durable incidents come first: each is a record Cloud keeps, so the line links to its evidence.
+  const incidents = partBody(state, "incidents")?.incidents.filter((r) => r.state !== null && r.state !== "closed") ?? []
+  const RANK = { active: 0, recovering: 1, recovered_awaiting_review: 2, closed: 3 } as const
+  const worst = [...incidents].sort((a, b) => RANK[a.state!] - RANK[b.state!])[0]
   return (
     <section className="adm-panel adh-problems" aria-label={say("tl_problemsTitle")}>
       <h2 className="adm-h3">{say("tl_problemsTitle")}</h2>
-      {list.length === 0 ? <p className="adm-fine">{say("tl_problemNone")}</p> : (
+      {worst ? (
+        <p className="adh-problem adh-problem-first">
+          <span aria-hidden="true" className="adh-glyph">■</span>{" "}
+          <span>{say("inc_problemLine", { n: incidents.length })}{" "}
+            <a className="adh-link" href={nav.href({ screen: "M05", incident: worst.id })} onClick={(e) => linkClick(e, () => nav.go({ screen: "M05", incident: worst.id }))}>
+              {say("inc_problemWorst", { state: say(`inc_state_${worst.state}` as HealthWord), machine: worst.machine_id })}
+            </a>
+          </span>
+        </p>
+      ) : null}
+      {list.length === 0 ? (worst ? null : <p className="adm-fine">{say("tl_problemNone")}</p>) : (
         <ol className="adh-problem-list">
           {list.map((p, i) => (
             <li key={p.kind} className={i === 0 ? "adh-problem adh-problem-first" : "adh-problem"}>
@@ -342,24 +356,14 @@ function outcomeLine(say: HealthSay, c: StageRow["cells"][number]): string {
 
 /** Source × stage on the loaded page, with each stage's own elapsed time as a bar. */
 export function StageChart({ events, say, nav, asOf, more }: { events: StoredEvent[]; say: HealthSay; nav: ChartNav; asOf: string; more: boolean }) {
-  const [only, setOnly] = useState<string | null>(null)
-  const service = events.filter((e) => e.source === "relay" || e.source === "cloud_api")
-  const { rows: filtered, of } = filterLoaded(service, only)
+  // The source filter is the Cloud's own (M03's control); this draws what that read returned.
+  const filtered = events.filter((e) => e.source === "relay" || e.source === "cloud_api")
+  const of = filtered.length
   const rows = stageMatrix(filtered)
   const max = Math.max(1, ...rows.flatMap((r) => r.cells.map((c) => c.maxElapsedMs ?? 0)))
   const b = bottleneck(rows, asOf)
   return (
     <div className="adh-stages">
-      <div className="adh-controls">
-        <label className="adh-control">
-          <span>{say("tl_filterLabel")}</span>
-          <select value={only ?? ""} onChange={(e) => setOnly(e.target.value === "" ? null : e.target.value)}>
-            <option value="">{say("tl_filterAll")}</option>
-            <option value="relay">{say("tl_filter_relay")}</option>
-            <option value="cloud_api">{say("tl_filter_cloud_api")}</option>
-          </select>
-        </label>
-      </div>
       <p className="adm-fine">{say(more ? "tl_stagesLocalMore" : "tl_stagesLocal", { n: filtered.length, of })}</p>
       {b ? (
         <p className="adh-bneck" role="status">

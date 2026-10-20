@@ -3,7 +3,7 @@ package capacity
 // The admin connection-health page's own bounds
 // (web/console/src/cloud/admin/health/cloud.ts HEALTH_UI_LIMITS, stored.ts
 // STORED_BOUNDS and STORED_ID_MAX_CHARS, stored-export.ts
-// STORED_EVIDENCE_MAX_BYTES). They live in each open operator tab; the Cloud's
+// STORED_EVIDENCE_MAX_BYTES, incident-export.ts through HEALTH_UI_LIMITS). They live in each open operator tab; the Cloud's
 // own read bounds are the Cloud's, in its connection-health contract §4.
 const (
 	ConsoleHealthUIRequestSeconds = "console.health_ui_request_seconds"
@@ -16,6 +16,11 @@ const (
 	ConsoleHealthUIEventPages     = "console.health_ui_event_pages"
 	ConsoleHealthUIExportBytes    = "console.health_ui_export_bytes"
 	ConsoleHealthUIIDCharacters   = "console.health_ui_id_characters"
+	// Incident reads and the audited export (HEALTH_UI_LIMITS incidentRows,
+	// incidentExportBytes, incidentWindowMs).
+	ConsoleHealthUIIncidentRows          = "console.health_ui_incident_rows"
+	ConsoleHealthUIIncidentExportBytes   = "console.health_ui_incident_export_bytes"
+	ConsoleHealthUIIncidentWindowSeconds = "console.health_ui_incident_window_seconds"
 )
 
 // connectionHealthUIBounds is every console.health_ui_* row.
@@ -91,6 +96,29 @@ func connectionHealthUIBounds() []Entry {
 			// Cloud's opaque-id rule). A longer one names no screen.
 			Name: ConsoleHealthUIIDCharacters, Class: Buffer, Unit: Characters,
 			Limit: 64, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// Incidents asked for per list read (incidentRows, the Cloud's
+			// default page). More are named as "more opened in this window",
+			// never as none.
+			Name: ConsoleHealthUIIncidentRows, Class: Buffer, Unit: Rows,
+			Limit: 50, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// One incident export held for download or copy
+			// (incidentExportBytes, the Cloud's own 1 MiB export bound). Past
+			// it reading stops and nothing is kept or offered.
+			Name: ConsoleHealthUIIncidentExportBytes, Class: Buffer, Unit: Bytes,
+			Limit: 1024 * 1024, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// The incident list's window over opened_at (incidentWindowMs,
+			// the Cloud's own 7-day maximum). Older incidents are not listed.
+			Name: ConsoleHealthUIIncidentWindowSeconds, Class: Cache, Unit: Seconds,
+			Limit: 7 * 24 * 3600, AtLimit: Expire,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
 	}

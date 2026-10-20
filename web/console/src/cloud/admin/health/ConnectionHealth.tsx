@@ -33,7 +33,8 @@ export type ConnectionHealthProps = {
 
 export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused, locale, arrivedByMove = false }: ConnectionHealthProps) {
   const say = useMemo(() => healthWords(locale), [locale])
-  const { state, refresh, loadOlder } = useStored(get, apiOrigin, route)
+  const { state, refresh, loadOlder, refuse } = useStored(get, apiOrigin, route)
+  const actions = useMemo(() => ({ get, apiOrigin, refresh, refuse }), [get, apiOrigin, refresh, refuse])
   const heading = useRef<HTMLHeadingElement>(null)
   const scope = route.scope
   const nav: StoredNav = useMemo(() => ({ href: (s: HealthScreen) => healthHref(s, scope), go: (s: HealthScreen) => go(healthHref(s, scope)) }), [go, scope])
@@ -45,7 +46,8 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
 
   // A move between screens puts the focus on this page's heading; a refresh or a scope change does not.
   const first = useRef(!arrivedByMove)
-  const screenKey = route.screen === "M02" ? `M02|${route.machine ?? ""}` : route.screen === "M04" ? `M04|${route.trace}` : route.screen
+  // An incident's revisions are one screen: moving between them keeps the focus where it is.
+  const screenKey = route.screen === "M02" ? `M02|${route.machine ?? ""}` : route.screen === "M04" ? `M04|${route.trace}` : route.screen === "M05" ? `M05|${route.incident ?? ""}` : route.screen
   useEffect(() => {
     if (first.current) { first.current = false; return }
     heading.current?.focus({ preventScroll: true })
@@ -117,7 +119,7 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
           </div>
         </div>
       ) : (
-        <StoredScreen state={state} route={route} say={say} nav={nav} fixture={fixture} loadOlder={loadOlder} />
+        <StoredScreen state={state} route={route} say={say} nav={nav} fixture={fixture} loadOlder={loadOlder} actions={actions} />
       )}
     </div>
   )

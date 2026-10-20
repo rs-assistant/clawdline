@@ -25,7 +25,7 @@ const NOW = Date.parse("2026-10-20T12:00:00.000Z")
 const API = "https://api.example.invalid"
 
 async function fixtureBody(path: string, scenario: FixtureScenario = "normal"): Promise<unknown> {
-  return (await fixtureAnswer(scenario, `${API}/su/v1/health/${path}?from=2026-10-20T11:00:00.000Z&to=2026-10-20T12:00:00.000Z`, NOW).json())
+  return (await (await fixtureAnswer(scenario, `${API}/su/v1/health/${path}?from=2026-10-20T11:00:00.000Z&to=2026-10-20T12:00:00.000Z`, NOW)).json())
 }
 
 const route = (path: string, search = ""): HealthRoute => healthRoute(path, search, NOW)!
@@ -101,7 +101,7 @@ test("only listed fields are kept: an owner-private or unknown field never reach
 /* ---- reads and the loader --------------------------------------------------- */
 
 test("each screen asks for a fixed, bounded set of reads, never one per row", () => {
-  for (const path of ["/admin/health", "/admin/health/machines", "/admin/health/machines/fixture_mac_a", "/admin/health/services", "/admin/health/trace/fixture-trace-1", "/admin/health/incidents", "/admin/health/incidents/inc-1", "/admin/health/monitoring", "/admin/health/evidence", "/admin/health/evidence/fixture-trace-1"]) {
+  for (const path of ["/admin/health", "/admin/health/machines", "/admin/health/machines/fixture_mac_a", "/admin/health/services", "/admin/health/trace/fixture-trace-1", "/admin/health/incidents", "/admin/health/incidents/hi_f1000000000000000000000000000a03", "/admin/health/monitoring", "/admin/health/evidence", "/admin/health/evidence/fixture-trace-1"]) {
     const plan = planFor(route(path), NOW)
     assert.ok(plan.reads.length >= 1 && plan.reads.length <= HEALTH_UI_LIMITS.readsPerLoad, path)
     for (const r of plan.reads) assert.ok(!readURL(API, r).includes("cursor="), path)
@@ -224,7 +224,7 @@ test("older pages use the first page's frozen window and cursor, and stop at the
 
 test("an address round-trips its screen and scope, and drops what it cannot vouch for", () => {
   const scope: HealthScope = { window_s: 21600, until: "2026-10-20T11:00:00.000Z", account: "acct_1" }
-  for (const screen of [{ screen: "M01" }, { screen: "M02", machine: null }, { screen: "M02", machine: "mac_x" }, { screen: "M03" }, { screen: "M04", trace: "tr-1" }, { screen: "M05", incident: null }, { screen: "M05", incident: "inc-1" }, { screen: "M06" }, { screen: "evidence", trace: null }, { screen: "evidence", trace: "tr-1" }] as const) {
+  for (const screen of [{ screen: "M01" }, { screen: "M02", machine: null }, { screen: "M02", machine: "mac_x" }, { screen: "M03" }, { screen: "M04", trace: "tr-1" }, { screen: "M05", incident: null }, { screen: "M05", incident: "hi_f1000000000000000000000000000a03" }, { screen: "M05", incident: "hi_f1000000000000000000000000000a03", revision: 1 }, { screen: "M03", source: "relay", sourceId: "hs_f100000000000000000000000000000c" }, { screen: "M06" }, { screen: "evidence", trace: null }, { screen: "evidence", trace: "tr-1" }] as const) {
     const href = healthHref(screen, scope)
     const u = new URL(href, "https://x.invalid")
     assert.deepEqual(healthRoute(u.pathname, u.search, NOW), { ...screen, scope }, href)
@@ -248,7 +248,7 @@ test("the evidence record holds only what was read, says what is unsupported, an
   const j = JSON.parse(rec.json)
   assert.equal(j.fixture, true)
   assert.equal(j.not_an_incident_bundle, true)
-  assert.equal(j.unsupported.incident_export, "unsupported_capability")
+  assert.equal(j.incident_bundles, "not_included_use_incident_export")
   assert.ok(j.outcomes.groups.every((g: { correlation: string }) => g.correlation === "fixture-trace-1"))
   for (const word of ["location", "age_ns", "deadline_ns", "payload"]) assert.equal(rec.json.includes(`"${word}"`), false, word)
   assert.ok(rec.bytes <= STORED_EVIDENCE_MAX_BYTES)

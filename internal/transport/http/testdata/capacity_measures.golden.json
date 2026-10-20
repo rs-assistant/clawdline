@@ -655,6 +655,21 @@
     "Note": true
   },
   {
+    "Name": "console.health_ui_incident_export_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_incident_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_incident_window_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.health_ui_page_rows",
     "Known": true,
     "Note": true

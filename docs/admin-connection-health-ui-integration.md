@@ -2,12 +2,14 @@
 
 Status: 2026-10-20. `/admin/health` is a page of the hosted admin shell. It reads the Cloud's
 stored operator evidence (`GET {api}/su/v1/health/…`, private contract
-`docs/connection-health-contract.md` in the Cloud repository, §3, §3a and §10) through an explicit
-adapter, and draws M01–M06 and the evidence view from what those reads return. It is **not** the
-complete monitor of [admin-connection-health.md](admin-connection-health.md): the Cloud has no
-presence contract, no durable incidents, no viewer producer and no owner-sealed diagnostics yet,
-and every screen says so where it would otherwise have shown them. The Cloud API that serves these
-reads (tasks 2a4ecc78 and 8de84319) is committed, not deployed; nothing here has called production.
+`docs/connection-health-contract.md` in the Cloud repository, §3, §3a, §10, §11 and §12) through an
+explicit adapter, and draws M01–M06 and the evidence view from what those reads return. It is
+**not** the complete monitor of [admin-connection-health.md](admin-connection-health.md): the Cloud
+has no presence contract, no viewer producer, no probes and no owner-sealed diagnostics yet, and
+every screen says so where it would otherwise have shown them. Durable incidents, their immutable
+revisions, the audited export and the operator acknowledgement (Cloud commit `fac588c`) are
+read and drawn. The Cloud API that serves these reads is committed, not deployed; nothing here has
+called production.
 The design is [admin-connection-health-design.md](admin-connection-health-design.md).
 
 ## Addresses
@@ -18,12 +20,13 @@ overview does not hide this page; a refused health read does not break the busin
 
 | Address | Screen | Reads (at most two in flight) |
 | --- | --- | --- |
-| `/admin/health` | M01 overview | `overview`, `outcomes`, `incidents` |
+| `/admin/health` | M01 overview | `overview`, `outcomes`, `incidents` (open ones link to M05) |
 | `/admin/health/machines` | M02 machines | `sources`, `outcomes` |
 | `/admin/health/machines/<machine_id>` | M02 one machine | `sources?machine_id`, `outcomes?machine_id`, `events?machine_id` |
-| `/admin/health/services` | M03 Cloud services | `overview`, `sources`, `events` |
-| `/admin/health/trace/<correlation>` | M04 trace | `trace/<correlation>`, `outcomes` |
-| `/admin/health/incidents[/<id>]` | M05 incidents | `incidents` or `incidents/<id>` (501), `outcomes` |
+| `/admin/health/services[?source=…&source_id=hs_…]` | M03 Cloud services | `overview`, `sources`, `events?source&source_id` |
+| `/admin/health/trace/<correlation>` | M04 trace | `trace/<correlation>`, `outcomes`, `incidents` |
+| `/admin/health/incidents` | M05 incident list | `incidents` (7 days by `opened_at`, 50 rows), `outcomes` |
+| `/admin/health/incidents/<hi_…>[?revision=n]` | M05 one revision | `incidents/<id>?revision=n`; export and acknowledge on demand |
 | `/admin/health/monitoring` | M06 monitoring | `overview`, `sources`, `outcomes` |
 | `/admin/health/evidence[/<correlation>]` | evidence record | `outcomes`, `events` or `trace/<correlation>`, `sources` |
 
@@ -37,13 +40,15 @@ or a scope change does not.
 
 | File | What it is |
 | --- | --- |
-| `health/stored.ts` | The adapter: v1 envelope, overview, events (record/1 and record/2), sources, outcomes and incidents, read field by field. Refuses `schema_version ≠ 1`, an overall `outcome` other than `unknown`, and any list past the Cloud's own bound. `stageRole` names service stages that wait on downstream. |
+| `health/stored.ts` | The adapter: v1 envelope, overview, events (record/1 and record/2, with `state` only on `state_after_loss`), sources, outcomes, the incident list, one incident revision and its bundle, read field by field. Refuses `schema_version ≠ 1`, an overall `outcome` other than `unknown`, any list past the Cloud's own bound, a `root_cause` other than `not_derived`, any hypothesis, and a revision chain that is not 1..n. `stageRole` names service stages that wait on downstream. |
+| `health/incident-export.ts` | The audited export: read under 1 MiB (reading stops past it), checked against the incident and revision asked for, its bundle re-hashed with WebCrypto over the Cloud's key-sorted JSON; and the acknowledgement POST. |
+| `health/incident-screens.tsx` | M05 list and revision view, the export panel and the two-step acknowledgement. |
 | `health/cloud.ts` | The loader: `planFor` (fixed reads per screen), `runReads` (concurrency 2, per-read deadline, overall budget, typed failures, refusal cancels everything), `storedReducer` (stale-per-read, refusal clears), cursor paging with a frozen window. `HEALTH_UI_LIMITS`. |
 | `health/route.ts` | Addresses and scope. |
 | `health/stored-screens.tsx` | The screens. |
 | `health/timeline.ts` | Pure mapping from stored reads to charts: the window axis and its bands, per-boot lanes of receipt marks, sequence coverage, source freshness, service source × stage, one operation's ordered stages, the weakest-quality summary and the problem list. Tested by `health/timeline.test.ts`. |
 | `health/timeline-view.tsx` | The charts that draw those shapes, each with a chart/table switch, the problem summary and quality strip every screen opens with, and one "requested, not collected yet" panel per screen. |
-| `health/stored-export.ts` | The evidence record: listed fields only, ≤ 512 KiB, `not_an_incident_bundle: true`. |
+| `health/stored-export.ts` | The evidence record: listed fields only, ≤ 512 KiB, `not_an_incident_bundle: true`, `incident_bundles: not_included_use_incident_export`. |
 | `health/useStored.ts` | One load at a time; 15 s live refresh; cancelled on route or scope change. |
 | `health/ConnectionHealth.tsx` | Page controls and whole-page states. Loaded lazily by `AdminGate.tsx`. |
 | `health/fixture.ts` | Development-only example answers (see below). |
@@ -72,8 +77,38 @@ registered as `console.health_ui_*` (`internal/domain/capacity/register_connecti
   Service `elapsed_ms` is shown as the service's own per-stage time, with stages that wait on
   downstream (`account_dispatch_started`, `storage_started`, `api_dependency_started`) labelled so,
   and `fanout_sent` labelled "handed to socket only". `build_commit` is labelled producer-declared.
-- Incidents, incident export, owner diagnostics, relay/viewer account-scoped stages, end-to-end
-  latency, queues and probes are labelled unsupported with the reason.
+- Owner diagnostics, relay/viewer account-scoped stages, end-to-end latency, queues, minute
+  aggregates and probes are labelled unsupported with the reason.
+
+## Incidents (M05, and links from M01 and M04)
+
+- The list is the Cloud's, by `opened_at` over the 7 days ending where the page's window ends. An
+  expired row shows its id and expiry and no state; `facts: null` is unknown. With incidents
+  turned off (`source_coverage.incidents: disabled`) the page says none are being opened, never
+  "no incidents". Refusal counters are shown, because an absent incident may be a refused one.
+- A revision view separates **what the records prove** (frozen facts, last proven stage, the
+  stage still active), **what is missing** (sequence gaps, producer loss counts, facts refused by
+  the bound, owner-private fields never collected), **cause** (always "not derived", no
+  hypotheses) and **context**. Recovery evidence and human review are two panels: `closed` reads
+  "closed by review" with its closure, never healthy, and states never move with time.
+- Hash, size, written time, retention of the bundle and of the raw rows, the previous revision
+  with its hash, and late evidence are shown. Revisions are links (`?revision=n`, Back/Forward
+  restore them); an older one says it is not the latest. `410 incident_expired` shows its
+  expiry and nothing from before; `404 revision_not_found` offers the latest.
+- **Export** fetches `…/incidents/<id>/export?revision=n`, reads at most 1 MiB, refuses any key
+  beyond `schema_version`/`export`/`bundle`, checks the incident id and revision, parses the
+  bundle, and recomputes `content_hash` as sha256 over the key-sorted JSON of `bundle` with
+  WebCrypto. Only then are the exact received bytes offered for download (`<id>.r<n>.json`) or
+  copy. `503 audit_unavailable`, a mismatch or an oversized body keeps nothing. The bytes live in
+  the panel of that incident, revision and account; changing any of them unmounts it.
+- **Acknowledge** is a button, then a confirmation that says what revision it writes and that it
+  does not mean recovery; one `POST …/acknowledge` with the page's cookie, the browser supplying
+  the console's `Origin` (`403 bad_origin` is shown as such). No read ever acknowledges.
+- 401 and the operator surface's 404 from an export or acknowledgement clear the page as a read's
+  would. Owner diagnostics stay unsupported; nothing here grants owner scope.
+- M01's incident tile and panel list the open incidents on the first page (active, recovering,
+  awaiting review), linking to each. M04 lists the incidents whose group names its correlation
+  (first page only, said so) and the producer-declared builds per source and boot in its records.
 - The stage note now reads: a completed socket write means only that the local socket
   implementation accepted the bytes; it does not prove delivery or viewer receipt.
 
@@ -105,12 +140,14 @@ each read's own quality is listed. It never says more than "only what these read
   a bar for each stage's own largest `elapsed_ms` (downstream waits striped, socket handoff
   dotted; never summed, never end-to-end), outcome counts, and one bottleneck: a still-pending
   stage, else a failed one, else the largest own time, with its evidence age from `as_of`. The
-  source selector narrows **the loaded page only** and says how many of its rows it kept; no
-  `source` parameter is sent until the Cloud API commits one.
+  source and source-id selectors are the Cloud's own `source`/`source_id` filter: a change is a
+  new address, so held pages are dropped and paging restarts under a cursor bound to that filter.
+  The line under them says whether every record of the filtered window is loaded or how many of
+  how many pages are held.
 - **One operation** (M04): stored records per source and boot in producer order, with sequence
   holes as steps and late arrivals marked. Separate sources are not merged into one order and no
   waterfall or end-to-end time is drawn.
-- Unsupported parts (incidents, latency, presence, relay/viewer stages, spans, probes) share one
+- Unsupported parts (latency, presence, relay/viewer stages, spans, probes) share one
   "requested, not collected yet" panel per screen with their exact limitation.
 
 ## Bounds (`HEALTH_UI_LIMITS`, registered)
@@ -118,7 +155,8 @@ each read's own quality is listed. It never says more than "only what these read
 Per read 6 s; per load 12 s; 2 reads in flight (the Cloud's per-principal admission); 3 reads per
 load; 1.5 MiB per body (refused unread above); 200 rows per page; 5 pages held (older paging only
 while paused, because the Cloud's cursor hashes the window); 512 KiB evidence record; 64-character
-ids. These are this page's choices against the Cloud's documented bounds, not measurements of
+ids; 50 incidents per list over 7 days; 1 MiB incident export. Revisions (16), facts (200) and
+context (20) per revision are the Cloud's bounds, refused past them as `contract_bound`. These are this page's choices against the Cloud's documented bounds, not measurements of
 production.
 
 ## Development harness
@@ -134,15 +172,24 @@ VITE_ADMIN_HEALTH_FIXTURE=normal npx vite --host 127.0.0.1 --port 5274 --strictP
 ```
 
 Scenarios: `normal`, `partial`, `errors` (outcomes 503, events 429), `empty`, `slow` (every read
-times out), `signed_out`, `forbidden`, `service`. The harness skips the session, answers in memory
+times out), `signed_out`, `forbidden`, `service`, `incidents_disabled`, `audit_fail` (every export
+503 `audit_unavailable`), `tampered` (an export whose bundle no longer matches its hash). `normal`
+holds one incident per state with real canonical hashes: `…a01` active (relay), `…a02` loss
+(active), `…a06` recovering (failed stage), `…a03` recovery observed awaiting review (two
+revisions), `…a04` closed by review without observed recovery (three revisions; r2 recovering),
+`…a05` expired (410). Ids are `hi_f1000000000000000000000000000a0N`. Acknowledging in the harness
+writes a closing revision for that tab only. The events read honours `source`/`source_id` and
+refuses a cursor from another filter. The harness skips the session, answers in memory
 (no request leaves the browser), and shows a fixture banner on every view; the evidence record
 carries `fixture: true`. The other admin pages say they need a real session.
 
 ## Bundle
 
-Production build, hosted declaration: `AdminGate` JS 112.53 kB → 117.32 kB (gzip 33.26 → 35.09);
-the lazily loaded `ConnectionHealth` chunk is 90.50 kB (gzip 28.27) JS and 9.80 kB CSS, fetched
-only on `/admin/health`.
+Production build, hosted declaration, measured on 2026-10-20 before and after the incident
+screens: the lazily loaded `ConnectionHealth` chunk 130.61 kB → 182.92 kB JS (gzip 38.89 →
+53.86) and 15.79 → 16.09 kB CSS; `AdminGate` 117.32 → 118.12 kB (gzip 35.08 → 35.36). About half
+of the growth is the English and Chinese copy tables in `words.ts`. A production build with
+`VITE_ADMIN_HEALTH_FIXTURE=normal` contains none of `fixture_mac_a`, `hi_f1000000`, `hs_f1000000`.
 
 ## Not verified, and what the root still owes
 
@@ -155,9 +202,25 @@ only on `/admin/health`.
 - **No browser rendered these screens in this task.** Owed: desktop and 390 px, light and dark,
   keyboard-only pass (open M01 → a group → its trace → evidence → copy), screen-reader names,
   focus after route changes, for each fixture scenario, then against a deployed Cloud.
+- **The incident screens were not rendered in a browser by the task that built them.** Owed by
+  the root, with `VITE_ADMIN_HEALTH_FIXTURE=normal` unless named: `/admin/health` (incident tile
+  and open-incident panel), `/admin/health/incidents`, each of
+  `/admin/health/incidents/hi_f1000000000000000000000000000a0N` for N = 1, 2, 3, 4, 6, and
+  `…a04?revision=1`/`?revision=2` with Back/Forward between them, `…a05` (expired 410),
+  `…a03?revision=9` (missing revision), export then download/copy on `…a03`, acknowledge on
+  `…a01` (confirm, then the closing revision appears), `audit_fail` and `tampered` exports on
+  `…a03`, `incidents_disabled` on `/admin/health/incidents` and `/admin/health`,
+  `/admin/health/trace/fixture-trace-1` (incident link and builds),
+  `/admin/health/services?source=relay&until=<a past instant>` and `…?source=daemon&source_id=hs_f100000000000000000000000000000a&until=…`
+  (load older until "all records … loaded"), `signed_out`/`forbidden` on an incident. Desktop and
+  390 px; keyboard only through the revision links, export, download, copy, acknowledge and cancel.
 - No production read: the Cloud reads are not deployed. Field names follow the committed Cloud
-  branches (2a4ecc78 `4a40b35`, 8de84319 `1414a55`); a later Cloud change needs the adapter updated.
-- Service evidence on the newest events page only: there is no `source` filter on `events`, so M03
-  shows Relay/API records among the page it holds.
-- Not built anywhere yet: durable incidents and bundles, owner encryption, presence contract,
-  viewer producer, external probe, account-attributed service evidence, daemon uploader.
+  branches (2a4ecc78 `4a40b35`, 8de84319 `1414a55`, 35ba675a `fac588c`); a later Cloud change needs
+  the adapter updated.
+- The incident list shows its first page (50); a later page is named, not loaded. M04's incident
+  links come from that page only.
+- The fixture's acknowledgement is per tab and in memory; the real route's `Origin` check was not
+  exercised against a Cloud.
+- Not built anywhere yet: owner encryption and owner-sealed attachments, presence contract,
+  viewer producer, external probe, minute aggregates, clock uncertainty, account-attributed service
+  evidence.
