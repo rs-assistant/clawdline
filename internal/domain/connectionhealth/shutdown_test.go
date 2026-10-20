@@ -38,7 +38,7 @@ func TestACanceledRunJournalsTheQueuedStallAndRecovery(t *testing.T) {
 }
 
 // A durable sink that never returns holds only the writer: Run's scans have
-// already stopped, Unwritten says what is still queued, and the writer
+// already stopped, Pending says what is still queued, and the writer
 // finishes once the sink lets go, without a second goroutine.
 func TestAHeldSinkHoldsOnlyTheWriterAndReportsWhatIsQueued(t *testing.T) {
 	c, tr, _, w := fixture(t)
@@ -65,7 +65,7 @@ func TestAHeldSinkHoldsOnlyTheWriterAndReportsWhatIsQueued(t *testing.T) {
 		t.Fatal("Run returned while its writer was still holding a transition")
 	case <-time.After(50 * time.Millisecond):
 	}
-	if n := w.Unwritten(); n < 1 {
+	if n, _ := w.Pending(); n < 1 {
 		t.Fatalf("the recovery behind the held stall is not reported as unwritten: %d", n)
 	}
 	close(release)
@@ -74,7 +74,7 @@ func TestAHeldSinkHoldsOnlyTheWriterAndReportsWhatIsQueued(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Run did not return after the sink let go")
 	}
-	if n := w.Unwritten(); n != 0 {
+	if n, _ := w.Pending(); n != 0 {
 		t.Fatalf("%d transitions left after the writer drained", n)
 	}
 }

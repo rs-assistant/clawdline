@@ -143,7 +143,7 @@ func NewWatchdog(tracker *Tracker, journal *Journal, clock Clock, cadence time.D
 // they queued (at most MaxPendingTransitions, then the drops after them) and
 // Run returns once it has. A journal or durable sink held forever holds
 // Run's return, never a scan: the caller bounds its wait (the daemon's stop
-// deadline) and reads Unwritten for what was left.
+// deadline) and reads Pending for what was left.
 func (w *Watchdog) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
@@ -196,10 +196,6 @@ func (w *Watchdog) write(stop <-chan struct{}) {
 		}
 	}
 }
-
-// Unwritten is how many observed transitions are still queued for the
-// journal writer: what a stop that gave up waiting leaves unjournaled.
-func (w *Watchdog) Unwritten() int { return len(w.pending) }
 
 // Flush appends every queued transition on the caller's goroutine, for a
 // caller that scans without Run (tests, a one-shot export). It never blocks

@@ -157,7 +157,8 @@ func (h *connectionHealthLife) Stop(ctx context.Context) error {
 		case <-w.done:
 		case <-ctx.Done():
 			if w.done == h.runDone {
-				late = append(late, fmt.Sprintf("watchdog (writer held; %d observed transitions not journaled)", h.rt.Watchdog.Unwritten()))
+				queued, _ := h.rt.Watchdog.Pending()
+				late = append(late, fmt.Sprintf("watchdog (writer held; %d observed transitions not journaled)", queued))
 				continue
 			}
 			late = append(late, w.name)
