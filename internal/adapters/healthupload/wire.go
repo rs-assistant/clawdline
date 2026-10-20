@@ -22,9 +22,11 @@ const (
 
 // wireEvent is the allowlist: every field the Cloud record/1 parser accepts
 // as content-free metadata, and nothing else. Location, age_ns, deadline_ns
-// (owner diagnostics), the state of a state_after_loss record, and anything
-// a future Record field adds stay on this machine because they have no field
-// here; there is no map, no embedding and no copy of the whole Record.
+// (owner diagnostics) and anything a future Record field adds stay on this
+// machine because they have no field here; there is no map, no embedding and
+// no copy of the whole Record. State is the watchdog enum and is set only on
+// a state_after_loss record, where Cloud requires it and refuses it anywhere
+// else (Cloud contract §12).
 type wireEvent struct {
 	Schema      string `json:"schema"`
 	Seq         uint64 `json:"producer_seq"`
@@ -42,6 +44,7 @@ type wireEvent struct {
 	Correlation string `json:"correlation,omitempty"`
 	Count       uint64 `json:"count,omitempty"`
 	Rule        string `json:"rule,omitempty"`
+	State       string `json:"state,omitempty"`
 }
 
 // wireBatch is the envelope. sent_at is deliberately absent: it is optional
@@ -61,9 +64,9 @@ type wireBatch struct {
 // Exclusion reasons: a stored record this uploader will not send, counted by
 // reason so its absence on Cloud is explained here rather than silent.
 const (
-	// ExcludedStateAfterLoss: Cloud record/1 has no state_after_loss event
-	// and no `state` field. Reported to the Cloud side as a wire gap.
-	ExcludedStateAfterLoss = "state_after_loss_unsupported_by_cloud"
+	// ExcludedState: a state_after_loss record whose state is not one of
+	// Cloud's watchdog states (slow, blocked, unverified_after_gap).
+	ExcludedState = "state_unsupported_by_cloud"
 	// ExcludedEvent: an event Cloud record/1 does not list.
 	ExcludedEvent = "event_unsupported_by_cloud"
 	// ExcludedStage: a stage Cloud record/1 does not list.
@@ -89,12 +92,17 @@ var cloudEvents = map[connectionhealth.Event]bool{
 	connectionhealth.EventStallDetected: true, connectionhealth.EventRecovered: true,
 	connectionhealth.EventReleasedStalled: true, connectionhealth.EventOverflow: true,
 	connectionhealth.EventSchedulingGap: true, connectionhealth.EventClockAnomaly: true,
-	connectionhealth.EventTransitionsLost: true,
+	connectionhealth.EventTransitionsLost: true, connectionhealth.EventStateAfterLoss: true,
 }
 
 // excludedEvents are Go events deliberately not uploaded, with the reason.
-var excludedEvents = map[connectionhealth.Event]string{
-	connectionhealth.EventStateAfterLoss: ExcludedStateAfterLoss,
+// None today; a Go event Cloud refuses goes here rather than being renamed.
+var excludedEvents = map[connectionhealth.Event]string{}
+
+// cloudStates is Cloud's HEALTH_WATCHDOG_STATES: the only values a
+// state_after_loss record may carry.
+var cloudStates = map[connectionhealth.State]bool{
+	connectionhealth.StateSlow: true, connectionhealth.StateBlocked: true, connectionhealth.StateUnverified: true,
 }
 
 var cloudStages = func() map[connectionhealth.Stage]bool {
@@ -131,6 +139,8 @@ func toWire(r connectionhealth.Record) (wireEvent, string) {
 		return wireEvent{}, ExcludedStage
 	case r.Source != "" && r.Source != connectionhealth.SourceDaemon:
 		return wireEvent{}, ExcludedSource
+	case r.Event == connectionhealth.EventStateAfterLoss && !cloudStates[r.State]:
+		return wireEvent{}, ExcludedState
 	case r.MonoNS < 0 || r.MonoNS > jsSafeInteger || r.Seq > jsSafeInteger ||
 		r.PhaseID > jsSafeInteger || r.Count > jsSafeInteger:
 		return wireEvent{}, ExcludedUnsafeInteger
@@ -140,12 +150,16 @@ func toWire(r connectionhealth.Record) (wireEvent, string) {
 		r.Rule != "" && !cloudRule.MatchString(r.Rule):
 		return wireEvent{}, ExcludedPattern
 	}
-	return wireEvent{
+	w := wireEvent{
 		Schema: connectionhealth.RecordSchema, Seq: r.Seq, EventID: r.EventID, BootID: r.BootID,
 		Event: string(r.Event), Wall: r.Wall.UTC().Format(time.RFC3339Nano), MonoNS: r.MonoNS,
 		Build: r.Build, Source: string(r.Source), Stage: string(r.Stage), Class: string(r.Class),
 		Kind: string(r.Kind), PhaseID: r.PhaseID, Correlation: r.Correlation, Count: r.Count, Rule: r.Rule,
-	}, ""
+	}
+	if r.Event == connectionhealth.EventStateAfterLoss {
+		w.State = string(r.State)
+	}
+	return w, ""
 }
 
 // encode is the exact body sent, and resent byte for byte on a retry.

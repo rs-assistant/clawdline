@@ -525,21 +525,27 @@ never does. Off states make no request at all: `not_opted_in`, `cloud_off`, `no_
 `s<first_seq>-<last_seq>`, `producer_instance: "daemon"`, `boot_id`, `build_commit` from the
 store's boot header, `events[]` of record/1. Each event is copied through a fixed struct
 (`wireEvent`) with exactly Cloud's keys: `schema, producer_seq, event_id, boot_id, event, wall
-(UTC), mono_ns, build_commit, source, stage, class, kind, phase_id, correlation, count, rule`.
-`location`, `age_ns`, `deadline_ns` and `state` have no field there, so they cannot leave.
+(UTC), mono_ns, build_commit, source, stage, class, kind, phase_id, correlation, count, rule,
+state`. `location`, `age_ns` and `deadline_ns` have no field there, so they cannot leave. `state`
+is set only on `state_after_loss`, the one event where Cloud requires it (`slow`, `blocked` or
+`unverified_after_gap`) and refuses it everywhere else. The location codes `sender_lookup`,
+`signature_check`, `replay_claim` and `open_envelope` are locations, not stages, and are never
+sent in any field.
 `sent_at` is omitted on purpose: it is part of Cloud's batch digest, and a batch rebuilt from the
 same records after a lost progress file must replay (200), not conflict (409). Cloud therefore
 reports `clock_offset_ms: null` for this producer. The bearer is the machine credential in the
 `Authorization` header only; redirects are not followed and there is no cookie jar.
 
-**Not sent, counted instead** (`totals.excluded` by reason): `state_after_loss` (Cloud record/1
-has no such event and no `state` key: `state_after_loss_unsupported_by_cloud`), an event or stage
-Cloud does not list, a source other than `daemon`, `mono_ns` or any integer above 2^53−1, an id
+**Not sent, counted instead** (`totals.excluded` by reason): a `state_after_loss` whose state is
+not one of Cloud's three (`state_unsupported_by_cloud`), an event or stage Cloud does not list, a source other than `daemon`, `mono_ns` or any integer above 2^53−1, an id
 or rule that fails Cloud's pattern, and a single record that alone would exceed the body bound.
 Durable-store loss markers (`loss` entries) have no producer sequence and cannot be record/1
 events; they are counted as `storage_loss_records`, and store gaps by reason as `store_gaps`. Both
 stay visible locally only — **wire gap for Cloud**: Cloud has no field for producer-side storage
-loss or for `state_after_loss` yet.
+loss yet. A batch-envelope `local_loss` counter is a proposal awaiting its own receiver; until it is
+built the uploader sends none and invents no record to carry the counts, so Cloud reports such a
+gap as unexplained. A progress file written before this change may still hold the retired reason
+`state_after_loss_unsupported_by_cloud` in its cumulative totals.
 
 **Delivery and retries.** One batch in flight. Its exact body is written to
 `<state>/connection-health/upload/upload-state.json` (atomic replace, fsync) before the first

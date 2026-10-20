@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -324,11 +325,34 @@ func TestOwnerPrivateFieldsNeverLeaveTheMachine(t *testing.T) {
 	}
 }
 
-func TestAStateAfterLossRecordIsCountedNotSent(t *testing.T) {
+// Cloud record/1 accepts state_after_loss with its watchdog state (Cloud
+// contract §12); the owner-private fields still stay here, and no other
+// event carries a state.
+func TestAStateAfterLossRecordIsSentWithItsStateOnly(t *testing.T) {
 	r := connectionhealth.Record{Schema: connectionhealth.RecordSchema, Seq: 4, EventID: "b-4", BootID: "b",
-		Event: connectionhealth.EventStateAfterLoss, Wall: t0, State: connectionhealth.StateBlocked}
-	if _, reason := toWire(r); reason != ExcludedStateAfterLoss {
-		t.Fatalf("state_after_loss: %q", reason)
+		Event: connectionhealth.EventStateAfterLoss, Wall: t0, State: connectionhealth.StateBlocked,
+		Source: connectionhealth.SourceDaemon, Stage: connectionhealth.StageHandlerStarted,
+		Location: "cloud.link.read_handler", AgeNS: 9_000_000_000, DeadlineNS: 7_000_000_000, Rule: connectionhealth.RuleVersion}
+	for _, st := range []connectionhealth.State{connectionhealth.StateSlow, connectionhealth.StateBlocked, connectionhealth.StateUnverified} {
+		r.State = st
+		w, reason := toWire(r)
+		if reason != "" || w.State != string(st) {
+			t.Fatalf("state_after_loss %s: reason %q, wire state %q", st, reason, w.State)
+		}
+		body, _ := json.Marshal(w)
+		for _, private := range []string{"location", "age_ns", "deadline_ns", "read_handler"} {
+			if strings.Contains(string(body), private) {
+				t.Fatalf("%s left the machine: %s", private, body)
+			}
+		}
+	}
+	r.State = connectionhealth.StateProgressing
+	if _, reason := toWire(r); reason != ExcludedState {
+		t.Fatalf("a state Cloud does not list must be excluded and counted: %q", reason)
+	}
+	r.Event, r.State = connectionhealth.EventStallDetected, connectionhealth.StateBlocked
+	if w, _ := toWire(r); w.State != "" {
+		t.Fatalf("state on %s: Cloud refuses it there", r.Event)
 	}
 	r.Event, r.MonoNS = connectionhealth.EventStallDetected, jsSafeInteger+1
 	if _, reason := toWire(r); reason != ExcludedUnsafeInteger {
@@ -608,6 +632,30 @@ func TestWriteABodyForTheCloudParser(t *testing.T) {
 		t.Fatal("no request")
 	}
 	if err := os.WriteFile(out, c.bodies[0], 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// A second body: one state_after_loss per Cloud watchdog state, as the
+	// uploader projects it, for the same parser.
+	var events []wireEvent
+	for i, st := range []connectionhealth.State{connectionhealth.StateSlow, connectionhealth.StateBlocked, connectionhealth.StateUnverified} {
+		w, reason := toWire(connectionhealth.Record{Schema: connectionhealth.RecordSchema, Seq: uint64(i + 1),
+			EventID: fmt.Sprintf("boot-7f3a-%d", i+1), BootID: "boot-7f3a", Build: "c9fe745db066",
+			Event: connectionhealth.EventStateAfterLoss, Wall: t0, MonoNS: int64(i + 1),
+			Source: connectionhealth.SourceDaemon, Stage: connectionhealth.StageHandlerStarted,
+			Class: connectionhealth.ClassRead, Kind: connectionhealth.Finite, PhaseID: 3, Correlation: "tr-1",
+			Location: "cloud.link.read_handler", AgeNS: 9_000_000_000, DeadlineNS: 7_000_000_000,
+			Rule: connectionhealth.RuleVersion, State: st})
+		if reason != "" {
+			t.Fatal(reason)
+		}
+		events = append(events, w)
+	}
+	body, err := encode(wireBatch{SchemaVersion: WireSchemaVersion, BatchID: "batch-state-1", ProducerInstance: ProducerInstance,
+		BootID: "boot-7f3a", BuildCommit: "c9fe745db066", Events: events})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(out+".state", body, 0o600); err != nil {
 		t.Fatal(err)
 	}
 }
