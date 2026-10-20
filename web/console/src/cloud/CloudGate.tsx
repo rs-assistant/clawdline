@@ -1998,6 +1998,8 @@ function GateCard(props: {
   const card = useRef<HTMLDivElement>(null)
   const cancel = useRef<HTMLButtonElement>(null)
   const go = useRef<HTMLButtonElement>(null)
+  // Which machine row has its details and rare actions (rename, remove) open.
+  const [moreFor, setMoreFor] = useState<string | null>(null)
   useLayoutEffect(() => {
     L.paintIcon(mark.current, BRAND_MARK, 3)
   }, [])
@@ -2084,18 +2086,22 @@ function GateCard(props: {
           ;(event.shiftKey ? ends[ends.length - 1] : ends[0]).focus({ preventScroll: true })
         }}
       >
-        <p className="lede">{nextWord("cloudForgetTitle", { machine: name })}</p>
-        <p className="say" id="cloud-forget-say">
-          {nextWord("cloudForgetAsk", { machine: name })}
-          {"\n"}
-          {machine.freshness === "current"
-            ? nextWord("cloudForgetAskCurrent")
-            : machine.freshness === "stale"
-              ? nextWord("cloudForgetAskStale")
-              : nextWord("cloudForgetAskUnknown")}
-          {"\n"}
-          {nextWord("cloudForgetHonest")}
-        </p>
+        <p className="lede">{nextWord("cloudForgetTitleShort", { machine: name })}</p>
+        <p className="say" id="cloud-forget-say">{nextWord("cloudForgetAskShort")}</p>
+        <details className="cloud-detail">
+          <summary>{nextWord("cloudForgetDetails")}</summary>
+          <p>
+            {nextWord("cloudForgetAsk", { machine: name })}
+            {"\n"}
+            {machine.freshness === "current"
+              ? nextWord("cloudForgetAskCurrent")
+              : machine.freshness === "stale"
+                ? nextWord("cloudForgetAskStale")
+                : nextWord("cloudForgetAskUnknown")}
+            {"\n"}
+            {nextWord("cloudForgetHonest")}
+          </p>
+        </details>
         <div className="buttons">
           <button
             className="chip"
@@ -2115,7 +2121,7 @@ function GateCard(props: {
             disabled={forgetting}
             onClick={() => onForget(machine)}
           >
-            {forgetting ? nextWord("cloudForgetting", { machine: name }) : nextWord("cloudForget")}
+            {forgetting ? nextWord("cloudForgetting", { machine: name }) : nextWord("cloudForgetGoShort")}
           </button>
         </div>
       </div>
@@ -2242,19 +2248,23 @@ function GateCard(props: {
     const outcome = told.outcome
     if (outcome.kind === "forgotten") {
       return (
-        <p className="say" id="cloud-forget-told" data-forget-outcome="forgotten">
-          {nextWord("cloudForgotten", { machine })}
-          {"\n"}
-          {/* Our own sentence while the route still answers the two words it
-              was written against; the route's own note when it answered
-              something else; and, when the answer to a revoke that did happen
-              could not be read at all, neither. */}
-          {honestyIsOurs(outcome)
-            ? nextWord("cloudForgetHonest")
-            : outcome.note
-              ? nextWord("cloudForgetSaid", { note: outcome.note })
-              : nextWord("cloudForgetHonestUnread")}
-        </p>
+        <div className="cloud-forget-told" data-forget-outcome="forgotten">
+          <p className="say calm" id="cloud-forget-told" role="status">{nextWord("cloudForgottenShort", { machine })}</p>
+          <details className="cloud-detail">
+            <summary>{nextWord("cloudForgetDetails")}</summary>
+            {/* Our own sentence while the route still answers the two words it
+                was written against; the route's own note when it answered
+                something else; and, when the answer to a revoke that did happen
+                could not be read at all, neither. */}
+            <p>
+              {honestyIsOurs(outcome)
+                ? nextWord("cloudForgetHonest")
+                : outcome.note
+                  ? nextWord("cloudForgetSaid", { note: outcome.note })
+                  : nextWord("cloudForgetHonestUnread")}
+            </p>
+          </details>
+        </div>
       )
     }
     const word =
@@ -2282,8 +2292,25 @@ function GateCard(props: {
       case "install":
         return (
           <>
-            <p className="lede">{nextWord("cloudInstallLede")}</p>
-            <p className="fine">{nextWord("cloudInstallFine")}</p>
+            <p className="lede">{nextWord("cloudInstallTitle")}</p>
+            <p className="fine">{nextWord("cloudInstallBenefit")}</p>
+            <ol className="cloud-home-steps">
+              <li>
+                <b aria-hidden="true">1</b>
+                <span>{nextWord("cloudInstallStep1")}</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12M8 7l4-4 4 4" /><rect x="5" y="10" width="14" height="11" rx="2" /></svg>
+              </li>
+              <li>
+                <b aria-hidden="true">2</b>
+                <span>{nextWord("cloudInstallStep2")}</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M12 8v8M8 12h8" /></svg>
+              </li>
+              <li><b aria-hidden="true">3</b><span>{nextWord("cloudInstallStep3")}</span></li>
+            </ol>
+            <details className="cloud-detail">
+              <summary>{nextWord("cloudInstallWhy")}</summary>
+              <p>{nextWord("cloudInstallWhyBody")}</p>
+            </details>
           </>
         )
       case "sign_in":
@@ -2308,11 +2335,12 @@ function GateCard(props: {
       case "pairing":
         return (
           <>
-            <p className="lede">{nextWord("cloudPairingLede")}</p>
-            <p className="fine">{nextWord("cloudPairingFine", { account: screen.account })}</p>
+            <p className="lede">{nextWord("cloudConnectLede")}</p>
+            <p className="fine">{nextWord("cloudConnectFine")}</p>
             <button className="go" type="button" id="cloud-pair-start" onClick={() => onPair(null)}>
               {nextWord("cloudPairStart")}
             </button>
+            <p className="fine cloud-account-line">{nextWord("cloudMachinesAccount", { account: screen.account })}</p>
           </>
         )
       case "device_limit":
@@ -2327,21 +2355,38 @@ function GateCard(props: {
         )
       case "retrying":
         return (
-          <p className="say calm">
-            {screen.reason.kind === "named"
-              ? nextWord("cloudRetrying", { code: screen.reason.code, seconds: screen.seconds })
-              : screen.reason.kind === "browser_offline"
+          <>
+            <p className="lede cloud-retrying-lede">
+              <span className="cloud-opening-ring" aria-hidden="true" />
+              {nextWord("cloudRetryingPlain")}
+            </p>
+            <p className="say calm" role="status">
+              {screen.reason.kind === "browser_offline"
                 ? nextWord("cloudRetryingBrowserOffline", { seconds: screen.seconds })
-                : nextWord("cloudRetryingUnknown", { seconds: screen.seconds })}
-          </p>
+                : nextWord("cloudRetryingIn", { seconds: screen.seconds })}
+            </p>
+            <button className="chip cloud-retry-now" type="button" onClick={onRetry}>
+              {nextWord("cloudRetryNow")}
+            </button>
+            {screen.reason.kind === "named" && (
+              <details className="cloud-detail">
+                <summary>{nextWord("cloudErrorDetails")}</summary>
+                <span className="cloud-detail-code">{screen.reason.code}</span>
+              </details>
+            )}
+          </>
         )
       case "failed":
         return (
           <>
-            <p className="say">{nextWord("cloudFailed", { code: screen.code })}</p>
+            <p className="say">{nextWord("cloudFailedPlain")}</p>
             <button className="go" type="button" onClick={onRetry}>
               {nextWord("cloudRetry")}
             </button>
+            <details className="cloud-detail">
+              <summary>{nextWord("cloudErrorDetails")}</summary>
+              <span className="cloud-detail-code">{screen.code}</span>
+            </details>
           </>
         )
       case "roster_failed":
@@ -2361,8 +2406,9 @@ function GateCard(props: {
         const machines = machineList.phase === "ready" ? machineList.machines : null
         return (
           <>
-            <p className="lede">{nextWord("cloudMachinesLede")}</p>
-            {who && <p className="fine">{nextWord("cloudMachinesFine", { account: who.account, device: who.device })}</p>}
+            <p className="lede">{nextWord(machineList.phase === "empty_authoritative" ? "cloudConnectLede" : "cloudMachinesLede")}</p>
+            {who && machineList.phase !== "empty_authoritative" &&
+              <p className="fine">{nextWord("cloudMachinesAccount", { account: who.account })}</p>}
             {machines ? (
               <ul className="cloud-machines" id="cloud-machines">
                 {machines.map((m) => {
@@ -2370,21 +2416,76 @@ function GateCard(props: {
                   const name = m.name || m.label || m.id
                   const identity = machineIdentityFacts(m)
                   const pairable = m.pairing !== "paired"
+                  const open = moreFor === m.id
+                  // One word for where the machine stands; the evidence behind it
+                  // (platform, id, each access fact, version) is under "⋯".
+                  const status = m.pairing === "not_paired"
+                    ? { kind: "pair", text: nextWord("cloudMachineNeedsPair") }
+                    : m.freshness === "current"
+                      ? { kind: "online", text: typeof count === "object"
+                        ? nextWord("cloudMachineOnlineSessions", { count: count.count })
+                        : nextWord("cloudMachineOnline") }
+                      : m.freshness === "stale"
+                        ? { kind: "offline", text: nextWord("cloudMachineOffline", { seen: machineSeenWord(identity.seenAt) }) }
+                        : { kind: "unknown", text: T.webCoordUnknown }
                   return (
                     <li
                       key={m.id}
                       data-pairable={pairable ? "true" : undefined}
+                      data-more={open ? "open" : undefined}
                     >
-                      <button
-                        type="button"
-                        data-machine={m.id}
-                        disabled={!m.selectable}
-                        onClick={() => onChoose(m)}
-                      >
-                        <span className="cloud-machine-heading">
+                      <div className="cloud-machine-row">
+                        <button
+                          className="cloud-machine-open"
+                          type="button"
+                          data-machine={m.id}
+                          disabled={!m.selectable}
+                          onClick={() => onChoose(m)}
+                        >
                           <MachinePlatformIcon platform={platformWord(identity.platform)} />
-                          <span className="cloud-machine-name">{name}</span>
-                        </span>
+                          <span className="cloud-machine-text">
+                            <span className="cloud-machine-name">{name}</span>
+                            <span className="cloud-machine-status" data-status={status.kind}>{status.text}</span>
+                          </span>
+                          {m.selectable && <svg className="cloud-machine-chevron" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6" /></svg>}
+                        </button>
+                        {/* The row and its controls are siblings: nesting buttons
+                           would be invalid, while a disabled unpaired row must
+                           leave Pair and the details in the focus order. */}
+                        <div
+                          className="cloud-machine-actions"
+                          role="group"
+                          aria-label={nextWord("cloudMachineActions", { machine: name })}
+                        >
+                          {pairable && (
+                            <button
+                              className="cloud-pair"
+                              type="button"
+                              data-pair={m.id}
+                              disabled={forgetting || renaming}
+                              title={nextWord("cloudPairOne", { machine: name })}
+                              aria-label={nextWord("cloudPairOne", { machine: name })}
+                              onClick={() => onPair({ id: m.id, name })}
+                            >
+                              {nextWord("cloudPair")}
+                            </button>
+                          )}
+                          <button
+                            className="cloud-more"
+                            type="button"
+                            aria-expanded={open}
+                            aria-controls={"cloud-more-" + m.id}
+                            title={nextWord("cloudMachineMore", { machine: name })}
+                            aria-label={nextWord("cloudMachineMore", { machine: name })}
+                            onClick={() => setMoreFor(open ? null : m.id)}
+                          >
+                            <span aria-hidden="true">⋯</span>
+                          </button>
+                        </div>
+                      </div>
+                      {/* Kept mounted while folded, so the version row keeps reading. */}
+                      <div className="cloud-machine-more" id={"cloud-more-" + m.id} hidden={!open}>
+                        <p className="cloud-machine-more-title">{nextWord("cloudMachineInfo")}</p>
                         <span className="cloud-machine-identity">
                           {platformWord(identity.platform)}
                           {" · "}
@@ -2398,12 +2499,6 @@ function GateCard(props: {
                             : count === "unread"
                               ? nextWord("cloudMachineSessionsUnread")
                               : nextWord("cloudMachineSessionsUnknown")}
-                          {" · "}
-                          {m.pairing === "not_paired"
-                            ? T.webDeviceNotPaired
-                            : m.freshness === "current"
-                              ? T.webDeviceOnline
-                              : m.freshness === "stale" ? T.webStartMachineStale : T.webCoordUnknown}
                         </span>
                         <span className="cloud-machine-access">{machineAccessFacts(m).join(" · ")}</span>
                         <FleetUpdateRow
@@ -2411,51 +2506,30 @@ function GateCard(props: {
                           machine={m}
                           appVersion={updateClient ? machineApp(updateClient, m.id).version : undefined}
                         />
-                      </button>
-                      {/* The row and its controls are siblings: nesting buttons
-                         would be invalid, while a disabled unpaired row must
-                         leave Pair, Rename and Forget in the focus order. */}
-                      <div
-                        className="cloud-machine-actions"
-                        role="group"
-                        aria-label={nextWord("cloudMachineActions", { machine: name })}
-                      >
-                        {pairable && (
+                        <div className="cloud-machine-more-actions">
                           <button
-                            className="cloud-pair"
+                            className="cloud-rename"
                             type="button"
-                            data-pair={m.id}
+                            data-rename={m.id}
                             disabled={forgetting || renaming}
-                            title={nextWord("cloudPairOne", { machine: name })}
-                            aria-label={nextWord("cloudPairOne", { machine: name })}
-                            onClick={() => onPair({ id: m.id, name })}
+                            title={nextWord("cloudRenameOne", { machine: name })}
+                            aria-label={nextWord("cloudRenameOne", { machine: name })}
+                            onClick={() => { setMoreFor(null); onName(m) }}
                           >
-                            {nextWord("cloudPair")}
+                            {nextWord("cloudRename")}
                           </button>
-                        )}
-                        <button
-                          className="cloud-rename"
-                          type="button"
-                          data-rename={m.id}
-                          disabled={forgetting || renaming}
-                          title={nextWord("cloudRenameOne", { machine: name })}
-                          aria-label={nextWord("cloudRenameOne", { machine: name })}
-                          onClick={() => onName(m)}
-                        >
-                          <span aria-hidden="true">✎</span>
-                          <span>{nextWord("cloudRename")}</span>
-                        </button>
-                        <button
-                          className="cloud-forget"
-                          type="button"
-                          data-forget={m.id}
-                          disabled={forgetting}
-                          title={nextWord("cloudForgetOne", { machine: name })}
-                          aria-label={nextWord("cloudForgetOne", { machine: name })}
-                          onClick={() => onAsk(m)}
-                        >
-                          <span aria-hidden="true">×</span>
-                        </button>
+                          <button
+                            className="cloud-forget"
+                            type="button"
+                            data-forget={m.id}
+                            disabled={forgetting}
+                            title={nextWord("cloudForgetOne", { machine: name })}
+                            aria-label={nextWord("cloudForgetOne", { machine: name })}
+                            onClick={() => { setMoreFor(null); onAsk(m) }}
+                          >
+                            {nextWord("cloudMachineForgetShort")}
+                          </button>
+                        </div>
                       </div>
                     </li>
                   )
@@ -2465,26 +2539,27 @@ function GateCard(props: {
               <p className="say calm" data-machine-list-state={machineList.phase}>
                 {machineList.phase === "loading"
                   ? nextWord("cloudMachinesWaiting")
-                  : machineList.phase === "empty_authoritative"
-                    ? nextWord("cloudMachinesNone")
-                    : machineList.phase === "refused"
-                      ? nextWord(
-                          machineList.next === "sign_in"
-                            ? "cloudMachinesRefusedSignIn"
-                            : machineList.next === "pair"
-                              ? "cloudMachinesRefusedPair"
-                              : "cloudMachinesRefusedRetry",
-                          { code: machineList.code },
-                        )
-                      : null}
+                  : machineList.phase === "refused"
+                    ? nextWord(
+                        machineList.next === "sign_in"
+                          ? "cloudMachinesRefusedSignInPlain"
+                          : machineList.next === "pair"
+                            ? "cloudMachinesRefusedPairPlain"
+                            : "cloudMachinesRefusedRetryPlain",
+                      )
+                    : null}
               </p>
             )}
             {machineList.phase === "empty_authoritative" && (
               <>
-                <p className="fine">{nextWord("cloudMachinesNoneNext")}</p>
+                <p className="fine">{nextWord("cloudConnectFine")}</p>
                 <button className="go" type="button" id="cloud-machines-pair" onClick={() => onPair(null)}>
                   {nextWord("cloudPairStart")}
                 </button>
+                <a className="cloud-install-link" href="https://clawdline.com" target="_blank" rel="noreferrer">
+                  {nextWord("cloudConnectInstall")}
+                </a>
+                {who && <p className="fine cloud-account-line">{nextWord("cloudMachinesAccount", { account: who.account })}</p>}
               </>
             )}
             {machineList.phase === "refused" && (
@@ -2503,6 +2578,12 @@ function GateCard(props: {
                   {nextWord("cloudRetry")}
                 </button>
               </div>
+            )}
+            {machineList.phase === "refused" && (
+              <details className="cloud-detail">
+                <summary>{nextWord("cloudErrorDetails")}</summary>
+                <span className="cloud-detail-code">{machineList.code}</span>
+              </details>
             )}
             {forgetOutcome()}
             {renameOutcome()}
