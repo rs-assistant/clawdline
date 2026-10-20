@@ -214,6 +214,10 @@ func main() {
 		// Run a commit of this checkout in place of the installed release,
 		// to test it (dev.go, docs/updates.md).
 		devCommand(os.Args[2:])
+	case "health":
+		// The connection-health watchdog and journal, read from the local
+		// daemon with this machine's token (health.go).
+		healthCommand(os.Args[2:])
 	case "update":
 		// Whether this machine trails the cloud's latest build, and on Linux
 		// deploying it (update.go, docs/updates.md).
@@ -274,6 +278,11 @@ func serve() {
 		refuseToServe(1, err.Error())
 	}
 	srv.SetVersion(version)
+	// One connection-health runtime per boot, before anything it instruments
+	// starts and whether or not Cloud is on (health.go).
+	// A stopping daemon stops it first, so the durable store is flushed and
+	// closed rather than abandoned mid-write.
+	go stopConnectionHealthOnSignal(startConnectionHealth(cfg.Dir, srv))
 	// A device file that cannot be read stops the daemon here, rather than
 	// letting it listen and refuse everybody.
 	if err := srv.AuthReady(); err != nil {
@@ -357,6 +366,9 @@ func startCloudLine(ctx context.Context, cfg config.Config, srv *httptransport.S
 		SpoolBytes:        int(httptransport.CapacityLimit(capacity.CloudSpoolBytes)),
 		SpoolChannelBytes: int(httptransport.CapacityLimit(capacity.CloudSpoolChannelBytes)),
 		SpoolReceipts:     int(httptransport.CapacityLimit(capacity.CloudSpoolReceipts)),
+		// The lanes and the transport record their phases here; nil when
+		// connection-health monitoring is off.
+		Health: srv.ConnectionHealth().Probe(),
 	}
 	var mu sync.Mutex
 	var stop context.CancelFunc
@@ -531,6 +543,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_open_print_sign_a_browser_in", "  open [--print]   sign a browser in with permission to read and send"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_pair_watch_show_the_code_when", "  pair [--watch]            show the code when a device asks to pair"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_devices_revoke_id_the_browsers_and", "  devices [revoke <id>]     the browsers and devices signed in to this machine directly; revoke one"))
+	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_health_status_events_trace_export_history", "  health <status|events|trace|export|history>   this machine's connection-health watchdog, journal, saved history and Cloud upload; local only"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_cloud_status_on_off_login_connect", "  cloud <status|on|off|login|connect>   the line to app.clawdline.com; off by default"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_remote_agent_tasks", "  remote <machines|dispatch|show|send|finish|ack|retry>   work with a paired Agent on another machine"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_board_tracks_rows_json_the_old", "  board tracks [--rows] [--json]   the old cards on the three tracks, read-only"))

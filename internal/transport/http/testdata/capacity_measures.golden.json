@@ -159,6 +159,156 @@
     "Note": true
   },
   {
+    "Name": "cloud.health_active_slots",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_journal_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_journal_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_pending_transitions",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_query_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_query_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_record_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_reserved_slots",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_dir_entries",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_frame_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_lost_ranges",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_queue_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_queue_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_readers",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_segment_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_store_segments",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_attempt_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_batch_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_batch_events",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_hourly_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_hourly_requests",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_receipts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_response_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_retry_after_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_retry_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_state_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_upload_step_pages",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.peer_body_bytes",
     "Known": true,
     "Note": true
@@ -476,6 +626,56 @@
   },
   {
     "Name": "console.health_live_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_budget_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_event_pages",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_export_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_id_characters",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_page_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_parallel_reads",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_reads_per_load",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_refresh_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_request_seconds",
     "Known": true,
     "Note": true
   },
