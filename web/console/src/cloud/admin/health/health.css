@@ -341,3 +341,18 @@
 .adh-tr-stage-name { overflow-wrap: anywhere; }
 .adh-tr-stage-bar { display: block; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
 .adh-tr-stage-bar > span { display: block; height: 100%; background: var(--accent); }
+
+/* ---- independent probes (probe-view.tsx): every state has its own word, glyph and border ---- */
+.adh-pr { gap: 6px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.adh-pr-sub { display: block; margin-top: 2px; }
+.adh-pr-scope { padding: 10px 12px; border: 1px dashed var(--line); border-radius: 9px; }
+.adh-pr-list { margin: 0 0 8px; padding-left: 18px; display: grid; gap: 4px; }
+.adh-pr-host-fresh .adh-glyph, .adh-pr-ev-current .adh-glyph { color: var(--ink); }
+.adh-pr-host-stale, .adh-pr-ev-stale { border-style: dashed; }
+.adh-pr-host-missing { border-style: dotted; }
+.adh-pr-ev-delayed, .adh-pr-ev-clock_ahead, .adh-pr-shared, .adh-pr-loss { color: var(--warn); border-color: rgba(176, 138, 74, .45); }
+.adh-pr-ev-clock_ahead { border-style: dotted; }
+.adh-pr-shared, .adh-pr-loss { border-width: 2px; }
+.adh-pr-failed .adh-glyph { color: var(--accent); }
+.adh-pr-unknown { font-weight: 500; color: var(--dim); }
+.adh-pr-off, .adh-pr-silent { border-style: dashed; }
