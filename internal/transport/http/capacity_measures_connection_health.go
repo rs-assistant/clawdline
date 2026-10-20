@@ -244,5 +244,12 @@ func connectionHealthSealedMeasures() map[string]func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "the owner-sealed diagnostic uploader is not started in this daemon; nothing is held"}
 		}
 	}
+	// Identity pairing (internal/adapters/cloud/health_pairing.go) has no
+	// route in this daemon yet, so nothing polls and no epoch record is read.
+	for _, name := range []string{"cloud.content_key_epoch_record_bytes", "cloud.identity_pairing_poll_attempts"} {
+		out[name] = func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "identity pairing is not started by this daemon; nothing is held"}
+		}
+	}
 	return out
 }

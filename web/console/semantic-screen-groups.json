@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 7804,
-  "riskKeys": 3482,
-  "nonRiskCount": 4322,
+  "englishContentKeys": 7808,
+  "riskKeys": 3485,
+  "nonRiskCount": 4323,
   "groups": [
     {
       "name": "admin / other",
@@ -275,7 +275,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 202,
+      "count": 203,
       "sources": [
         null
       ],
@@ -288,6 +288,7 @@
         "capacityRow.cache.session_activity.what",
         "capacityRow.cache.session_skills.what",
         "capacityRow.callback.per_machine.what",
+        "capacityRow.cloud.content_key_epoch_record_bytes.what",
         "capacityRow.cloud.header_read_diagnostic_seconds.what",
         "capacityRow.cloud.health_journal_bytes.what",
         "capacityRow.cloud.health_journal_rows.what",

@@ -35,6 +35,7 @@
 | `callback.per_machine` | 16 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `callback.per_root` | 8 | `rows` | `refuse` | `diagnostics, sender` | — |
 | `callback.tail_bytes` | 8192 | `bytes` | `evict_oldest` | `diagnostics` | — |
+| `cloud.content_key_epoch_record_bytes` | 4096 | `bytes` | `refuse` | `diagnostics` | — |
 | `cloud.header_read_diagnostic_rows` | 24 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cloud.header_read_diagnostic_seconds` | 3600 | `seconds` | `expire` | `diagnostics` | — |
 | `cloud.health_active_slots` | 128 | `rows` | `refuse` | `diagnostics` | — |
@@ -80,6 +81,7 @@
 | `cloud.health_upload_retry_seconds` | 3600 | `seconds` | `expire` | `diagnostics` | — |
 | `cloud.health_upload_state_bytes` | 65536 | `bytes` | `refuse` | `diagnostics` | — |
 | `cloud.health_upload_step_pages` | 8 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.identity_pairing_poll_attempts` | 600 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.peer_body_bytes` | 524288 | `bytes` | `refuse` | `diagnostics, notice, sender` | — |
 | `cloud.peer_discovery_reply` | 1 | `rows` | `refuse` | `sender, diagnostics` | — |
 | `cloud.peer_frame_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics, log, sender` | — |
