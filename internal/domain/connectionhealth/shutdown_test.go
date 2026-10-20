@@ -105,3 +105,29 @@ func stallThenRecover(t *testing.T, c *fakeClock, tr *Tracker, w *Watchdog) {
 	c.advance(time.Second)
 	w.Scan()
 }
+
+// The cost a stop adds: draining a full transition queue
+// (MaxPendingTransitions) into the journal and a sink that keeps nothing.
+func BenchmarkStopDrainsAFullQueue(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		b.StopTimer()
+		c := newFakeClock()
+		tr := NewTracker(c)
+		j, err := NewJournal(c, "boot-a", "abc123")
+		if err != nil {
+			b.Fatal(err)
+		}
+		w := NewWatchdog(tr, j, c, time.Second)
+		w.Attach(func(Record) {})
+		w.at = c.Now()
+		for k := 0; k < MaxPendingTransitions; k++ {
+			w.record(Record{Event: EventStallDetected, Source: SourceDaemon, Stage: StageHandlerStarted,
+				Class: ClassRead, Kind: Finite, Location: "cloud.link.read_handler", PhaseID: uint64(k + 1),
+				Rule: RuleVersion})
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		b.StartTimer()
+		w.Run(ctx)
+	}
+}
