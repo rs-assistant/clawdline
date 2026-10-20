@@ -149,6 +149,11 @@
     "Note": true
   },
   {
+    "Name": "cloud.content_key_epoch_record_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.header_read_diagnostic_rows",
     "Known": true,
     "Note": true
@@ -370,6 +375,11 @@
   },
   {
     "Name": "cloud.health_upload_step_pages",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.identity_pairing_poll_attempts",
     "Known": true,
     "Note": true
   },
