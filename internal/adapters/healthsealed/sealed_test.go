@@ -516,15 +516,24 @@ func TestRestartResendsIdenticalBody(t *testing.T) {
 	store2, _ := OpenStore(u.Store.dir)
 	u2 := *u
 	u2.Store = store2
-	if _, err := u2.Seal(ctx, "boot-1", SubjectEvidence, "ev-1", snap("y.go:2")); CodeOf(err) != CodeBusy {
-		t.Fatalf("a new revision was sealed over a pending one: %v", err)
+	// A new snapshot queues behind the pending revision without touching it.
+	if p2, err := u2.Seal(ctx, "boot-1", SubjectEvidence, "ev-1", snap("y.go:2")); err != nil || p2.Revision != 2 {
+		t.Fatalf("a snapshot behind a pending revision: %+v %v", p2, err)
+	}
+	if again, _, _ := store2.Load(p.AttachmentID); string(again.Revisions[0].Body) != string(before.Revisions[0].Body) {
+		t.Fatal("the pending revision's body changed")
 	}
 	rc, err := u2.Send(ctx, p.AttachmentID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rc.Status != "duplicate" {
-		t.Fatalf("resend was not byte-identical: %+v", rc)
+	// Revision 1 was resent byte-identical (a 409 would have refused it) and
+	// the queued revision 2 followed it.
+	if rc.Revision != 2 || rc.Status != "stored" {
+		t.Fatalf("receipt after the resend: %+v", rc)
+	}
+	if got := cloud.revs[p.AttachmentID][0]["body"].(string); got != string(before.Revisions[0].Body) {
+		t.Fatal("Cloud holds other bytes for revision 1")
 	}
 }
 

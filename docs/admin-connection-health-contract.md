@@ -710,7 +710,18 @@ The private Cloud contract §13 defines the wire. This repository holds both cli
   send, so a retry, including one after a restart, sends identical bytes; the receipt's
   `aad_sha256` must equal the client's own or the upload counts as failed. The worker takes
   snapshots through a non-blocking `Offer` (queue 8; full answers `busy`), and a full store
-  answers `store_full` at once. Every bound is in `capacity/register_healthsealed.go`.
+  answers `store_full` at once. A snapshot that arrives while an earlier revision of the same
+  attachment is still pending (held request, lost receipt, spent attempts) is sealed at once as
+  the next revision, chained to the pending one's fixed ciphertext digest, and queued behind it in
+  the same on-disk record; the pending bytes are never rewritten, so Cloud never sees a changed
+  body for a revision. `Send` delivers the queue in revision order after each receipt, and a
+  restart resumes it from disk. The queue is bounded by `MaxRevisions` (8) and the store bounds;
+  a snapshot past them is not written and is counted in `dropped` with its code
+  (`revisions_exhausted`, `store_full`, `too_large`, `sealed_expired`). A permanent refusal of
+  a pending revision refuses every revision chained after it (`predecessor_refused`) without
+  sending them; after a content-key rotation queued material is refused locally (`wrong_epoch`)
+  and never sent; with the opt-in off nothing is sent and the queue waits until the attachment
+  expires and is pruned. Every bound is in `capacity/register_healthsealed.go`.
 - PWA: `web/console/src/cloud/health-owner`. It lists `GET /v1/health/sealed`, signs a
   `clawdline.health-sealed-read/1` proof with the registered device key, posts it to
   `POST /v1/health/sealed/read`, and opens the revision only after the AAD, its digest, tenant,

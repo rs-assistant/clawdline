@@ -197,10 +197,11 @@ func (u *Uploader) Seal(ctx context.Context, bootID, kind, subjectID string, sna
 		case len(a.Revisions) >= MaxRevisions:
 			return Pending{}, fail(CodeRevisionsExhausted)
 		}
+		// A pending predecessor does not refuse the snapshot: it is sealed
+		// now, chained to the predecessor's fixed ciphertext digest, and
+		// queued behind it on disk (the outbox). The predecessor's bytes are
+		// never rewritten; Send delivers the queue in revision order.
 		last := a.Revisions[len(a.Revisions)-1]
-		if last.State == RevisionPending {
-			return Pending{}, fail(CodeBusy)
-		}
 		if last.State == RevisionRefused {
 			return Pending{}, &Error{Code: CodeRefused, Cloud: last.Refusal}
 		}
@@ -268,22 +269,45 @@ func (u *Uploader) Seal(ctx context.Context, bootID, kind, subjectID string, sna
 // Send sends the attachment's pending revision, exactly as stored, until a
 // receipt, a refusal or MaxAttempts. A revision that ran out of attempts
 // stays pending with the same bytes.
+//
+// Revisions sealed while an earlier one was pending wait behind it in the
+// same record; Send delivers them in revision order, each with its own
+// MaxAttempts, and stops at the first that is not stored. A permanent
+// refusal of one revision also refuses every revision chained after it
+// (CodePredecessorRefused): Cloud could never accept them.
 func (u *Uploader) Send(ctx context.Context, id string) (Receipt, error) {
+	var receipt Receipt
+	for sent := 0; sent < MaxRevisions; sent++ {
+		r, more, err := u.sendOne(ctx, id)
+		if err != nil {
+			return Receipt{}, err
+		}
+		receipt = r
+		if !more {
+			break
+		}
+	}
+	return receipt, nil
+}
+
+// sendOne sends the attachment's first pending revision. more says another
+// pending revision is queued behind it.
+func (u *Uploader) sendOne(ctx context.Context, id string) (Receipt, bool, error) {
 	if !u.enabled() {
-		return Receipt{}, fail(CodeDisabled)
+		return Receipt{}, false, fail(CodeDisabled)
 	}
 	keys, err := u.Keys.Keys(ctx)
 	if err != nil {
-		return Receipt{}, err
+		return Receipt{}, false, err
 	}
 	// A send needs the identity, never the secret.
 	clear(keys.MasterSecret)
 	a, ok, err := u.Store.Load(id)
 	if err != nil {
-		return Receipt{}, err
+		return Receipt{}, false, err
 	}
 	if !ok {
-		return Receipt{}, fail(CodeBadInput)
+		return Receipt{}, false, fail(CodeBadInput)
 	}
 	idx := -1
 	for i, r := range a.Revisions {
@@ -293,18 +317,23 @@ func (u *Uploader) Send(ctx context.Context, id string) (Receipt, error) {
 		}
 	}
 	if idx < 0 {
-		return Receipt{}, fail(CodeBadInput)
+		return Receipt{}, false, fail(CodeBadInput)
 	}
 	if a.Tenant != keys.Tenant || a.MachineID != keys.MachineID {
-		return Receipt{}, fail(CodeWrongAccount)
+		return Receipt{}, false, fail(CodeWrongAccount)
+	}
+	if a.ContentKeyEpoch != keys.ContentKeyEpoch {
+		// The content key rotated: material sealed under the old epoch is
+		// never sent under the new identity.
+		return Receipt{}, false, u.refuse(a, idx, &Error{Code: CodeWrongEpoch})
 	}
 	if a.IdentityEpoch != keys.IdentityEpoch {
-		return Receipt{}, u.refuse(a, idx, &Error{Code: CodeIdentityChanged})
+		return Receipt{}, false, u.refuse(a, idx, &Error{Code: CodeIdentityChanged})
 	}
 	rev := a.Revisions[idx]
 	target, err := u.target()
 	if err != nil {
-		return Receipt{}, err
+		return Receipt{}, false, err
 	}
 	backoff := firstBackoff
 	var last error
@@ -312,30 +341,31 @@ func (u *Uploader) Send(ctx context.Context, id string) (Receipt, error) {
 		receipt, retry, err := u.post(ctx, target, keys.Credential, rev.Body)
 		if err == nil {
 			if err := checkReceipt(receipt, a, rev); err != nil {
-				return Receipt{}, u.refuse(a, idx, err)
+				return Receipt{}, false, u.refuse(a, idx, err)
 			}
 			a.Revisions[idx].State = RevisionStored
 			if err := u.Store.Put(a); err != nil {
-				return receipt, err
+				return receipt, false, err
 			}
-			return receipt, nil
+			more := idx+1 < len(a.Revisions) && a.Revisions[idx+1].State == RevisionPending
+			return receipt, more, nil
 		}
 		last = err
 		if !retry {
 			if permanent(err) {
-				return Receipt{}, u.refuse(a, idx, err)
+				return Receipt{}, false, u.refuse(a, idx, err)
 			}
-			return Receipt{}, err
+			return Receipt{}, false, err
 		}
 		if attempt == MaxAttempts {
 			break
 		}
 		if err := u.sleep(ctx, backoff); err != nil {
-			return Receipt{}, fail(CodeUpstream)
+			return Receipt{}, false, fail(CodeUpstream)
 		}
 		backoff = min(backoff*2, backoffCeiling)
 	}
-	return Receipt{}, last
+	return Receipt{}, false, last
 }
 
 func (u *Uploader) refuse(a Attachment, idx int, err error) error {
@@ -349,6 +379,12 @@ func (u *Uploader) refuse(a Attachment, idx int, err error) error {
 	}
 	a.Revisions[idx].State = RevisionRefused
 	a.Revisions[idx].Refusal = cloud
+	for i := idx + 1; i < len(a.Revisions); i++ {
+		if a.Revisions[i].State == RevisionPending {
+			a.Revisions[i].State = RevisionRefused
+			a.Revisions[i].Refusal = string(CodePredecessorRefused)
+		}
+	}
 	if perr := u.Store.Put(a); perr != nil {
 		return perr
 	}
@@ -459,7 +495,7 @@ func (u *Uploader) post(ctx context.Context, target, credential string, body []b
 func permanent(err error) bool {
 	switch CodeOf(err) {
 	case CodeIdentityChanged, CodeEpochRegressed, CodeRevisionConflict, CodeNonceReused,
-		CodeDeleted, CodeExpired, CodeRefused, CodeReceiptMismatch:
+		CodeDeleted, CodeExpired, CodeRefused, CodeReceiptMismatch, CodeWrongEpoch, CodePredecessorRefused:
 		return true
 	}
 	return false
@@ -499,13 +535,15 @@ type Status struct {
 	Enabled bool `json:"enabled"`
 	// Ready is Uploader.Ready's code at the last refresh; empty when a
 	// seal could happen.
-	Ready    Code   `json:"ready_code,omitempty"`
-	Code     Code   `json:"code,omitempty"`
-	Cloud    string `json:"cloud_code,omitempty"`
-	Stored   int64  `json:"stored"`
-	Refused  int64  `json:"refused"`
-	Dropped  int64  `json:"dropped"`
-	LastAtMS int64  `json:"last_at_ms,omitempty"`
+	Ready   Code   `json:"ready_code,omitempty"`
+	Code    Code   `json:"code,omitempty"`
+	Cloud   string `json:"cloud_code,omitempty"`
+	Stored  int64  `json:"stored"`
+	Refused int64  `json:"refused"`
+	// Dropped is every snapshot that never became a revision: refused by a
+	// full hand-off queue, or by Seal at a bound.
+	Dropped  int64 `json:"dropped"`
+	LastAtMS int64 `json:"last_at_ms,omitempty"`
 	// Queued is the hand-off queue's depth now (MaxQueuedJobs).
 	Queued int `json:"queued"`
 	// Attachments and StoreBytes are the local records as last counted on
@@ -649,6 +687,14 @@ func (w *Worker) resume(ctx context.Context) {
 
 func (w *Worker) handle(ctx context.Context, j Job) {
 	p, err := w.u.Seal(ctx, j.BootID, j.SubjectKind, j.SubjectID, j.Snapshot)
+	if err != nil && CodeOf(err) != CodeDisabled && ctx.Err() == nil {
+		// The snapshot was never written: at a bound (revisions_exhausted,
+		// store_full, too_large, expired) or a refused chain it is lost,
+		// and counted as dropped with its code, never retried.
+		w.mu.Lock()
+		w.st.Dropped++
+		w.mu.Unlock()
+	}
 	if err == nil {
 		_, err = w.u.Send(ctx, p.AttachmentID)
 	}
