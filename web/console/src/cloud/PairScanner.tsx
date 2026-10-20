@@ -124,45 +124,57 @@ export function PairScanner({ onScanned, onUseCode, startRef }: {
     startRef.current?.focus({ preventScroll: true })
   }
 
+  const retry = () => { setIssue(null); void camera.current?.start() }
+  const useCode = () => {
+    camera.current?.stop()
+    onUseCode()
+  }
+  // A photo is the way past a live view that stays black; it is only offered
+  // once the camera was tried, so the first screen keeps one action.
+  const photoOption = (label: Parameters<typeof nextWord>[0], take: boolean) => (
+    <label className="chip cloud-pair-photo-option">
+      {nextWord(label)}
+      {take
+        ? <input type="file" accept="image/*" capture="environment" onClick={() => camera.current?.stop()} onChange={choosePhoto} />
+        : <input type="file" accept="image/*" onClick={() => camera.current?.stop()} onChange={choosePhoto} />}
+    </label>
+  )
+
   return (
-    <div className="cloud-pair-scanner">
-      <button
-        className="go cloud-pair-scan-start"
-        type="button"
-        id="cloud-pair-scan-start"
-        ref={startRef}
-        hidden={state !== "idle"}
-        onClick={() => { setIssue(null); void camera.current?.start() }}
-      >
-        {nextWord("cloudPairScanStart")}
-      </button>
+    <div className="cloud-pair-scanner" data-scan={issue ? "issue" : state}>
       <video ref={video} className="cloud-pair-scan-video" playsInline muted autoPlay hidden={state === "idle"} aria-label={nextWord("cloudPairScanVideo")} />
       <canvas ref={canvas} hidden aria-hidden="true" />
-      {state !== "idle" && (
-        <div className="cloud-pair-scan-controls">
-          <span role="status">{nextWord(state === "opening" ? "cloudPairScanOpening" : "cloudPairScanReady")}</span>
-          <button className="chip" type="button" id="cloud-pair-scan-cancel" ref={cancelRef} onClick={cancel}>{nextWord("cloudPairScanCancel")}</button>
-        </div>
-      )}
-      <p className="fine">{nextWord("cloudPairPhotoHint")}</p>
-      <div className="cloud-pair-photo-options">
-        <label className="chip cloud-pair-photo-option">
-          {nextWord("cloudPairPhotoTake")}
-          <input type="file" accept="image/*" capture="environment" onClick={() => camera.current?.stop()} onChange={choosePhoto} />
-        </label>
-        <label className="chip cloud-pair-photo-option">
-          {nextWord("cloudPairPhotoChoose")}
-          <input type="file" accept="image/*" onClick={() => camera.current?.stop()} onChange={choosePhoto} />
-        </label>
-      </div>
-      {issue && (
-        <div className="cloud-pair-scan-issue">
-          <p role="status">{nextWord(issueKey[issue])} {nextWord("cloudPairScanFallback")}</p>
-          <button className="chip" type="button" id="cloud-pair-scan-use-code" onClick={() => {
-            camera.current?.stop()
-            onUseCode()
-          }}>{nextWord("cloudPairGenerate")}</button>
-        </div>
+      {issue ? (
+        <>
+          <div className="cloud-pair-scan-issue" role="status">
+            <b>{nextWord("cloudPairScanIssueTitle")}</b>
+            <p>{nextWord(issueKey[issue])}</p>
+          </div>
+          <button className="go cloud-pair-primary" type="button" id="cloud-pair-scan-use-code" onClick={useCode}>
+            {nextWord("cloudPairUseCodeButton")}
+          </button>
+          <div className="cloud-pair-photo-options">
+            {photoOption("cloudPairPhotoChoose", false)}
+            <button className="chip" type="button" id="cloud-pair-scan-retry" onClick={retry}>{nextWord("cloudPairScanRetry")}</button>
+          </div>
+        </>
+      ) : state === "idle" ? (
+        <>
+          <button className="go cloud-pair-primary cloud-pair-scan-start" type="button" id="cloud-pair-scan-start" ref={startRef} onClick={retry}>
+            {nextWord("cloudPairScanStart")}
+          </button>
+          <button className="cloud-pair-link" type="button" id="cloud-pair-go" onClick={useCode}>
+            {nextWord("cloudPairUseCode")}
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="cloud-pair-scan-controls">
+            <span role="status">{nextWord(state === "opening" ? "cloudPairScanOpening" : "cloudPairScanReady")}</span>
+            <button className="chip" type="button" id="cloud-pair-scan-cancel" ref={cancelRef} onClick={cancel}>{nextWord("cloudPairScanCancel")}</button>
+          </div>
+          <div className="cloud-pair-photo-options">{photoOption("cloudPairPhotoInstead", true)}</div>
+        </>
       )}
     </div>
   )

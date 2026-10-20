@@ -161,16 +161,16 @@ test("a row always has a stable id fragment and says only the identity facts it 
   })
 })
 
-test("pairing is one action in the row's action group, and opens the two-path guide", () => {
+test("pairing is one action in the row's action group, and opens the one-action guide", () => {
   const here = dirname(fileURLToPath(import.meta.url))
   const gate = readFileSync(resolve(here, "CloudGate.tsx"), "utf8")
   const panel = readFileSync(resolve(here, "PairPanel.tsx"), "utf8")
   const css = readFileSync(resolve(here, "cloud.css"), "utf8")
   assert.match(gate, /className="cloud-machine-actions"/)
   assert.match(gate, /aria-label=\{nextWord\("cloudMachineActions"/)
-  assert.match(panel, /className="cloud-pair-ways"/)
-  assert.match(panel, /cloudPairFromMachineTitle/)
-  assert.match(panel, /cloudPairFromBrowserTitle/)
+  assert.match(panel, /className="cloud-pair-steps"/)
+  assert.match(panel, /nextWord\("cloudPairCompareTitle"\)/)
+  assert.match(panel, /nextWord\("cloudPairDifferent"\)/)
   assert.match(panel, /nextWord\("cloudPairAgentPrompt", \{ machine: target, command: line \}\)/)
   assert.match(panel, /id="cloud-pair-copy"/)
 })
