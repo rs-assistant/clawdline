@@ -11,14 +11,21 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
+	"github.com/sainteye/clawdline/internal/adapters/cloudkeys"
 	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
+	"github.com/sainteye/clawdline/internal/adapters/healthsealed"
 	"github.com/sainteye/clawdline/internal/adapters/healthupload"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
 	"github.com/sainteye/clawdline/internal/config"
+	domaincloud "github.com/sainteye/clawdline/internal/domain/cloud"
 	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	httptransport "github.com/sainteye/clawdline/internal/transport/http"
 )
@@ -125,7 +132,7 @@ func TestABrokenStoreDirectoryLeavesTheRuntimeRunning(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go rt.Run(ctx)
-	store, err := openConnectionHealthStore(rt, state)
+	store, err := openConnectionHealthStore(rt, state, nil)
 	if err == nil || store != nil || healthjournal.CodeOf(err) == "" {
 		t.Fatalf("a store under a file opened: %v", err)
 	}
@@ -436,5 +443,398 @@ func TestOwnerRetentionIsASeparateOptIn(t *testing.T) {
 	}
 	if code, _ := run("set", "cloud_health_owner_retention", "maybe"); code != 2 {
 		t.Fatalf("a word: %d", code)
+	}
+}
+
+// --- owner-sealed diagnostics ---
+
+// sealedCloud is a loopback Cloud for the sealed sender: GET /v1/machines
+// names this machine's identity epoch, and POST /v1/health/sealed/attachments
+// keeps revisions with §13.2's idempotency (same body replays as duplicate).
+type sealedCloud struct {
+	mu       sync.Mutex
+	identity int
+	machines atomic.Int64
+	posts    [][]byte
+	stored   map[string][]byte
+	// hold, when set, answers a POST only when it returns.
+	hold func(n int, w http.ResponseWriter, r *http.Request, body []byte) bool
+}
+
+func (c *sealedCloud) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Authorization") != "Bearer cred-test" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	switch {
+	case r.Method == http.MethodGet && r.URL.Path == "/v1/machines":
+		c.machines.Add(1)
+		c.mu.Lock()
+		epoch := c.identity
+		c.mu.Unlock()
+		_ = json.NewEncoder(w).Encode(map[string]any{"machines": []map[string]any{
+			{"id": "mac_other", "identity_epoch": 99}, {"id": "mac_test", "identity_epoch": epoch}}})
+	case r.Method == http.MethodPost && r.URL.Path == healthsealed.UploadPath:
+		raw, _ := io.ReadAll(r.Body)
+		c.mu.Lock()
+		c.posts = append(c.posts, raw)
+		n := len(c.posts)
+		hold := c.hold
+		c.mu.Unlock()
+		if hold != nil && hold(n, w, r, raw) {
+			return
+		}
+		c.ingest(w, raw)
+	default:
+		w.WriteHeader(http.StatusNotFound)
+	}
+}
+
+func (c *sealedCloud) ingest(w http.ResponseWriter, raw []byte) {
+	var b healthsealed.UploadBody
+	if json.Unmarshal(raw, &b) != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	id := healthsealed.AttachmentID("acct_test", "mac_test", b.BootID, b.SubjectKind, b.SubjectID)
+	aad := healthsealed.AAD{Alg: b.Alg, AttachmentID: id, BootID: b.BootID, ContentKeyEpoch: b.ContentKeyEpoch,
+		ExpiresAtMS: b.ExpiresAtMS, IdentityEpoch: b.IdentityEpoch, MachineID: "mac_test",
+		PreviousCiphertextSHA256: b.PreviousCiphertextSHA256, Revision: b.Revision, Schema: healthsealed.AADSchema,
+		SubjectID: b.SubjectID, SubjectKind: b.SubjectKind, Tenant: "acct_test"}
+	digest, _ := aad.Digest()
+	key := id + "/" + strconv.FormatInt(b.Revision, 10)
+	c.mu.Lock()
+	prior, seen := c.stored[key]
+	if !seen {
+		c.stored[key] = raw
+	}
+	c.mu.Unlock()
+	status, word := http.StatusCreated, "stored"
+	if seen {
+		if string(prior) != string(raw) {
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"error":{"code":"revision_conflict"}}`))
+			return
+		}
+		status, word = http.StatusOK, "duplicate"
+	}
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(healthsealed.Receipt{Schema: healthsealed.ReceiptSchema, Status: word, AttachmentID: id,
+		Revision: b.Revision, CiphertextSHA256: b.CiphertextSHA256, AADSHA256: digest, ContentKeyEpoch: b.ContentKeyEpoch,
+		IdentityEpoch: b.IdentityEpoch, MachineKeyEpoch: 1, ExpiresAtMS: b.ExpiresAtMS})
+}
+
+func (c *sealedCloud) sent() [][]byte {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([][]byte(nil), c.posts...)
+}
+
+// sealedMachine writes an isolated state directory: Cloud on against the
+// loopback server, the owner-retention opt-in, a machine identity and a
+// synthetic master secret. withEpoch records the content-key epoch for that
+// secret as a completed handover would.
+func sealedMachine(t *testing.T, base string, withEpoch int64) (string, []byte) {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "next")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := nextconfig.Open(dir).Set(map[string]any{adaptercloud.KeyEnabled: true, adaptercloud.KeyAPIBase: base,
+		healthsealed.SettingKey: true}); err != nil {
+		t.Fatal(err)
+	}
+	keyDir := filepath.Join(dir, cloudkeys.DirName)
+	if err := adaptercloud.NewIdentityStore(keyDir).Save(adaptercloud.Identity{AccountID: "acct_test", MachineID: "mac_test",
+		MachineCredential: "cred-test", APIBase: base}); err != nil {
+		t.Fatal(err)
+	}
+	raw := bytes.Repeat([]byte{7}, domaincloud.ContentKeyBytes)
+	key, err := domaincloud.ContentKeyFromBytes(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files, err := cloudkeys.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := files.SaveMasterSecret(key); err != nil {
+		t.Fatal(err)
+	}
+	if withEpoch > 0 {
+		recordEpoch(t, dir, raw, "acct_test", withEpoch)
+	}
+	return dir, raw
+}
+
+func recordEpoch(t *testing.T, dir string, master []byte, account string, epoch int64) {
+	t.Helper()
+	id, err := domaincloud.ContentKeyID(master)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (adaptercloud.ContentEpochStore{Dir: filepath.Join(dir, cloudkeys.DirName)}).Save(adaptercloud.ContentEpoch{
+		V: 1, ContentKeyEpoch: epoch, KeyID: id, AccountID: account, MachineID: "mac_test"}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func newSealedCloud(t *testing.T) (*sealedCloud, string) {
+	t.Helper()
+	c := &sealedCloud{stored: map[string][]byte{}, identity: 3}
+	srv := httptest.NewServer(c)
+	t.Cleanup(srv.Close)
+	return c, srv.URL
+}
+
+func stallRecord(phase uint64) connectionhealth.Record {
+	return connectionhealth.Record{EventID: "boot-s-1", BootID: "boot-s", Event: connectionhealth.EventStallDetected,
+		Wall: time.UnixMilli(1787745600000), Source: connectionhealth.SourceDaemon, Stage: connectionhealth.StageHandlerStarted,
+		Location: "cloud.link.read_handler", PhaseID: phase, Correlation: "op-1", AgeNS: 9_000_000_000,
+		DeadlineNS: 8_000_000_000, Build: "c9fe745db066"}
+}
+
+func runSealed(t *testing.T, w *healthsealed.Worker) context.CancelFunc {
+	t.Helper()
+	w.Interval = 20 * time.Millisecond
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); w.Run(ctx) }()
+	stop := func() { cancel(); <-done }
+	t.Cleanup(stop)
+	return stop
+}
+
+func waitFor(t *testing.T, what string, ok func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for !ok() {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestAnUnknownContentEpochIsRefusedBeforeAnyRequest(t *testing.T) {
+	c, base := newSealedCloud(t)
+	dir, master := sealedMachine(t, base, 0)
+	w, err := newSealedDiagnostics(dir, nil, sealedMachines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := ownerDiagnosticsStatus(w, nil)
+	runSealed(t, w)
+	waitFor(t, "the opt-in to be read", w.Enabled)
+	job, _ := sealedJob(stallRecord(1), 0)
+	_ = w.Offer(job)
+	waitFor(t, "the refusal", func() bool { return w.Status().Code != "" })
+	if got := w.Status().Code; got != healthsealed.CodeKeyHandoverRequired {
+		t.Fatalf("no recorded epoch must be key_handover_required, got %s", got)
+	}
+	if d := status(); d.Coverage != "failed" || d.Code != string(healthsealed.CodeKeyHandoverRequired) {
+		t.Fatalf("the status must name the coverage failure: %+v", d)
+	}
+	// A record naming another account, or a secret that has since been
+	// replaced, is not this secret's epoch: still no epoch is assumed.
+	keys := sealedKeys{stateDir: dir, machines: sealedMachines}
+	recordEpoch(t, dir, master, "acct_other", 4)
+	if err := keys.Ready(); healthsealed.CodeOf(err) != healthsealed.CodeKeyHandoverRequired {
+		t.Fatalf("an epoch of another account was accepted: %v", err)
+	}
+	recordEpoch(t, dir, bytes.Repeat([]byte{9}, len(master)), "acct_test", 4)
+	if _, err := keys.Keys(context.Background()); healthsealed.CodeOf(err) != healthsealed.CodeKeyHandoverRequired {
+		t.Fatalf("an epoch of another master secret was accepted: %v", err)
+	}
+	if n, posts := c.machines.Load(), len(c.sent()); n != 0 || posts != 0 {
+		t.Fatalf("an unknown epoch must refuse before any request: %d machine reads, %d uploads", n, posts)
+	}
+}
+
+func TestOwnerDiagnosticsAreSealedUnderTheRecordedEpochAndSentOnTheirOwnClient(t *testing.T) {
+	c, base := newSealedCloud(t)
+	dir, _ := sealedMachine(t, base, 2)
+	w, err := newSealedDiagnostics(dir, nil, sealedMachines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := ownerDiagnosticsStatus(w, nil)
+	runSealed(t, w)
+	waitFor(t, "the opt-in to be read", w.Enabled)
+	if d := status(); d.Coverage != "waiting" {
+		t.Fatalf("ready with nothing sealed yet is waiting: %+v", d)
+	}
+	job, ok := sealedJob(stallRecord(7), 3)
+	if !ok {
+		t.Fatal("a stall record must make a job")
+	}
+	if err := w.Offer(job); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the receipt", func() bool { return w.Status().Stored == 1 })
+	posts := c.sent()
+	if len(posts) != 1 {
+		t.Fatalf("one upload, got %d", len(posts))
+	}
+	var b healthsealed.UploadBody
+	if err := json.Unmarshal(posts[0], &b); err != nil {
+		t.Fatal(err)
+	}
+	if b.ContentKeyEpoch != 2 || b.IdentityEpoch != 3 || b.SubjectKind != healthsealed.SubjectIncident || b.SubjectID != "phase-7" {
+		t.Fatalf("the body must carry the recorded content epoch and Cloud's identity epoch: %+v", b)
+	}
+	for _, private := range []string{"cloud.link.read_handler", "op-1", "9000000000", "cred-test"} {
+		if strings.Contains(string(posts[0]), private) {
+			t.Fatalf("owner-private %q left the machine outside the ciphertext", private)
+		}
+	}
+	if d := status(); d.Coverage != "active" || d.Stored != 1 {
+		t.Fatalf("status: %+v", d)
+	}
+}
+
+func TestConsentWithdrawnBeforeTheSendMakesNoRequest(t *testing.T) {
+	c, base := newSealedCloud(t)
+	dir, _ := sealedMachine(t, base, 1)
+	w, err := newSealedDiagnostics(dir, nil, sealedMachines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Interval = time.Hour
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); w.Run(ctx) }()
+	defer func() { cancel(); <-done }()
+	waitFor(t, "the opt-in to be read", w.Enabled)
+	// The cached opt-in still says on; the file now says off.
+	if _, err := nextconfig.Open(dir).Set(map[string]any{healthsealed.SettingKey: false}); err != nil {
+		t.Fatal(err)
+	}
+	job, _ := sealedJob(stallRecord(2), 0)
+	if err := w.Offer(job); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the withdrawal to be read", func() bool { return !w.Enabled() })
+	if n, posts := c.machines.Load(), len(c.sent()); n != 0 || posts != 0 {
+		t.Fatalf("withdrawn consent must stop the seal and the send: %d machine reads, %d uploads", n, posts)
+	}
+}
+
+func TestARevisionPendingAtShutdownIsResentByteForByteAfterRestart(t *testing.T) {
+	c, base := newSealedCloud(t)
+	dir, _ := sealedMachine(t, base, 1)
+	inFlight := make(chan struct{})
+	release := make(chan struct{})
+	c.hold = func(n int, w http.ResponseWriter, r *http.Request, body []byte) bool {
+		if n != 1 {
+			return false
+		}
+		close(inFlight)
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+		panic(http.ErrAbortHandler)
+	}
+	defer close(release)
+	w, err := newSealedDiagnostics(dir, nil, sealedMachines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stop := runSealed(t, w)
+	waitFor(t, "the opt-in to be read", w.Enabled)
+	job, _ := sealedJob(stallRecord(5), 0)
+	if err := w.Offer(job); err != nil {
+		t.Fatal(err)
+	}
+	<-inFlight
+	stop() // the daemon stops with the upload in flight
+	w2, err := newSealedDiagnostics(dir, nil, sealedMachines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runSealed(t, w2)
+	waitFor(t, "the resend's receipt", func() bool {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		return len(c.stored) == 1
+	})
+	posts := c.sent()
+	if len(posts) < 2 || string(posts[0]) != string(posts[len(posts)-1]) {
+		t.Fatalf("the restart must resend the stored body, not reseal: %d posts", len(posts))
+	}
+}
+
+func TestALostReceiptIsReplayedAsADuplicateNotAConflict(t *testing.T) {
+	c, base := newSealedCloud(t)
+	dir, _ := sealedMachine(t, base, 1)
+	c.hold = func(n int, w http.ResponseWriter, r *http.Request, body []byte) bool {
+		if n != 1 {
+			return false
+		}
+		c.ingest(httptest.NewRecorder(), body) // Cloud stored it; the answer is lost.
+		panic(http.ErrAbortHandler)
+	}
+	w, err := newSealedDiagnostics(dir, nil, sealedMachines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runSealed(t, w)
+	waitFor(t, "the opt-in to be read", w.Enabled)
+	job, _ := sealedJob(stallRecord(6), 0)
+	if err := w.Offer(job); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the replayed receipt", func() bool { return w.Status().Stored == 1 })
+	posts := c.sent()
+	if len(posts) != 2 || string(posts[0]) != string(posts[1]) || w.Status().Refused != 0 {
+		t.Fatalf("the retry must be the same bytes and settle once: %d posts, %+v", len(posts), w.Status())
+	}
+}
+
+func TestARotatedIdentityEpochIsNotSentTheOldRevision(t *testing.T) {
+	c, base := newSealedCloud(t)
+	dir, _ := sealedMachine(t, base, 1)
+	var fail atomic.Bool
+	fail.Store(true)
+	c.hold = func(n int, w http.ResponseWriter, r *http.Request, body []byte) bool {
+		if fail.Load() {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":{"code":"health_sealed_deadline"}}`))
+			return true
+		}
+		return false
+	}
+	w, err := newSealedDiagnostics(dir, nil, sealedMachines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Interval = time.Hour
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() { defer close(done); w.Run(ctx) }()
+	waitFor(t, "the opt-in to be read", w.Enabled)
+	job, _ := sealedJob(stallRecord(8), 0)
+	if err := w.Offer(job); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "the bounded attempts", func() bool { return len(c.sent()) == healthsealed.MaxAttempts })
+	waitFor(t, "the attempts to settle", func() bool { return w.Status().Code == healthsealed.CodeUpstream })
+	cancel()
+	<-done
+	// Cloud rotates the account's identity epoch; the pending body names
+	// the old one and must never be sent again.
+	c.mu.Lock()
+	c.identity = 4
+	c.mu.Unlock()
+	fail.Store(false)
+	w2, err := newSealedDiagnostics(dir, nil, sealedMachines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runSealed(t, w2)
+	waitFor(t, "the local refusal", func() bool { return w2.Status().Code == healthsealed.CodeIdentityChanged })
+	if n := len(c.sent()); n != healthsealed.MaxAttempts {
+		t.Fatalf("the old revision was sent after the rotation: %d posts", n)
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,6 +24,7 @@ import (
 	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
 	"github.com/sainteye/clawdline/internal/adapters/cloudkeys"
 	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
+	"github.com/sainteye/clawdline/internal/adapters/healthsealed"
 	"github.com/sainteye/clawdline/internal/adapters/healthupload"
 	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
 	"github.com/sainteye/clawdline/internal/config"
@@ -76,7 +78,14 @@ func startConnectionHealth(stateDir string, srv *httptransport.Server) *connecti
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &connectionHealthLife{rt: rt, cancel: cancel,
-		runDone: make(chan struct{}), opened: make(chan struct{}), uploadDone: make(chan struct{})}
+		runDone: make(chan struct{}), opened: make(chan struct{}), uploadDone: make(chan struct{}),
+		sealedDone: make(chan struct{})}
+	sealed, sealedErr := newSealedDiagnostics(stateDir, foreignDirs(), sealedMachines)
+	if sealedErr != nil {
+		log.Printf("connection health: owner-sealed diagnostics are unavailable (%s)", healthsealed.CodeOf(sealedErr))
+	}
+	h.sealed = sealed
+	feed := sealedFeed(rt, sealed)
 	srv.SetConnectionHealth(rt)
 	srv.SetConnectionHealthStore(nil, nil, true)
 	go func() {
@@ -85,7 +94,7 @@ func startConnectionHealth(stateDir string, srv *httptransport.Server) *connecti
 	}()
 	go func() {
 		defer close(h.opened)
-		store, err := openConnectionHealthStore(rt, stateDir)
+		store, err := openConnectionHealthStore(rt, stateDir, feed)
 		if err == nil && ctx.Err() != nil {
 			// The daemon began stopping while the store was opening: close
 			// it here, or its lock and handles outlive the shutdown.
@@ -96,6 +105,11 @@ func startConnectionHealth(stateDir string, srv *httptransport.Server) *connecti
 		}
 		srv.SetConnectionHealthStore(store, err, false)
 		if err != nil {
+			// Owner diagnostics read the journal's own records, not the
+			// store, so they are fed even when the store cannot open.
+			if feed != nil {
+				rt.Watchdog.Attach(feed)
+			}
 			log.Printf("connection health: the durable store could not be opened (%s); this boot is memory only", healthjournal.CodeOf(err))
 			return
 		}
@@ -110,12 +124,20 @@ func startConnectionHealth(stateDir string, srv *httptransport.Server) *connecti
 			}
 			return nil
 		},
-		Log: func(format string, args ...any) { log.Printf(format, args...) },
+		Log:              func(format string, args ...any) { log.Printf(format, args...) },
+		BootID:           rt.BootID,
+		OwnerDiagnostics: ownerDiagnosticsStatus(sealed, sealedErr),
 	})
 	srv.SetConnectionHealthUpload(h.upload.Status)
 	go func() {
 		defer close(h.uploadDone)
 		h.upload.Run(ctx)
+	}()
+	go func() {
+		defer close(h.sealedDone)
+		if sealed != nil {
+			sealed.Run(ctx)
+		}
 	}()
 	return h
 }
@@ -129,16 +151,20 @@ const connectionHealthStopTimeout = 3 * time.Second
 type connectionHealthLife struct {
 	rt         *connectionhealth.Runtime
 	upload     *healthupload.Uploader
+	sealed     *healthsealed.Worker
 	cancel     context.CancelFunc
 	store      atomic.Pointer[healthjournal.Store]
 	runDone    chan struct{}
 	opened     chan struct{}
 	uploadDone chan struct{}
+	sealedDone chan struct{}
 }
 
 // Stop ends the producers first (the watchdog's scans, then its journal
 // writer, which drains every transition already observed into the journal
-// and the store's queue, and the uploader), then flushes and closes the
+// and the store's queue, the uploader and the sealed diagnostics worker,
+// whose revision in flight stays pending on disk with its exact body for
+// the next boot), then flushes and closes the
 // store, all within ctx. A part that does not finish in time is named in
 // the error and left behind — a held watchdog writer with how many observed
 // transitions it had not yet journaled — and the store is still flushed and
@@ -152,7 +178,7 @@ func (h *connectionHealthLife) Stop(ctx context.Context) error {
 	for _, w := range []struct {
 		name string
 		done <-chan struct{}
-	}{{"watchdog", h.runDone}, {"uploader", h.uploadDone}, {"store open", h.opened}} {
+	}{{"watchdog", h.runDone}, {"uploader", h.uploadDone}, {"sealed diagnostics", h.sealedDone}, {"store open", h.opened}} {
 		select {
 		case <-w.done:
 		case <-ctx.Done():
@@ -251,8 +277,9 @@ func healthUploadIdentity(stateDir string, foreign []string) healthupload.Identi
 }
 
 // openConnectionHealthStore opens the durable store for rt's boot and
-// attaches it to rt's journal writer.
-func openConnectionHealthStore(rt *connectionhealth.Runtime, stateDir string) (*healthjournal.Store, error) {
+// attaches it, and also when set, to rt's journal writer. also must not
+// block: it runs on the writer's goroutine.
+func openConnectionHealthStore(rt *connectionhealth.Runtime, stateDir string, also func(connectionhealth.Record)) (*healthjournal.Store, error) {
 	dir, err := filepath.Abs(connectionHealthStoreDir(stateDir))
 	if err != nil {
 		return nil, err
@@ -261,8 +288,262 @@ func openConnectionHealthStore(rt *connectionhealth.Runtime, stateDir string) (*
 	if err != nil {
 		return nil, err
 	}
-	rt.Watchdog.Attach(func(r connectionhealth.Record) { _, _ = store.Offer(r) })
+	rt.Watchdog.Attach(func(r connectionhealth.Record) {
+		_, _ = store.Offer(r)
+		if also != nil {
+			also(r)
+		}
+	})
 	return store, nil
+}
+
+// connectionHealthSealedDir holds the owner-sealed diagnostics' local
+// attachment records (internal/adapters/healthsealed.Store).
+func connectionHealthSealedDir(stateDir string) string {
+	return filepath.Join(stateDir, "connection-health", "sealed")
+}
+
+// sealedMachinesFunc lists the account's machines with this machine's
+// credential; tests replace it with a loopback server.
+type sealedMachinesFunc func(ctx context.Context, apiBase, credential string) ([]adaptercloud.MachineRecord, error)
+
+// sealedClient is the owner-sealed sender's own HTTPS client: its own
+// transport and connection, never the relay's line, so a stuck relay
+// socket, writer lock or spool cannot hold it. It follows no redirect,
+// because a redirect would carry the bearer somewhere else.
+func sealedClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ResponseHeaderTimeout: healthsealed.MaxAttemptSeconds * time.Second,
+			MaxConnsPerHost:       1,
+			MaxIdleConns:          1,
+			IdleConnTimeout:       90 * time.Second,
+			ForceAttemptHTTP2:     true,
+		},
+		Timeout:       healthsealed.MaxAttemptSeconds * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+}
+
+// sealedMachines is the production sealedMachinesFunc: one bounded GET
+// /v1/machines on the sealed sender's own client.
+func sealedMachines(ctx context.Context, apiBase, credential string) ([]adaptercloud.MachineRecord, error) {
+	ctx, cancel := context.WithTimeout(ctx, healthsealed.MaxAttemptSeconds*time.Second)
+	defer cancel()
+	c := &adaptercloud.AccountClient{BaseURL: strings.TrimRight(apiBase, "/"), HTTP: sealedClient()}
+	return c.Machines(ctx, credential)
+}
+
+// sealedKeys is the daemon's healthsealed.KeySource. It reads the master
+// secret once per seal and asks the content-key epoch record about that
+// very secret (its key id, ContentEpochFile), so a secret replaced between
+// two reads can never be sealed under the other's epoch. An epoch that is
+// unknown or names another key or account is CodeKeyHandoverRequired, and
+// it is checked before any request: no epoch is ever assumed. Only then is
+// the account's current identity epoch asked of Cloud, on the sealed
+// sender's own client.
+type sealedKeys struct {
+	stateDir string
+	foreign  []string
+	machines sealedMachinesFunc
+}
+
+// local reads, from local files only, the opt-in-independent half: Cloud's
+// switch, the identity, and that both name the same control plane.
+func (k sealedKeys) local() (adaptercloud.Identity, adaptercloud.Settings, error) {
+	settings, err := adaptercloud.ReadSettings(nextconfig.Open(k.stateDir, k.foreign...))
+	if err != nil || !settings.Enabled {
+		return adaptercloud.Identity{}, adaptercloud.Settings{}, &healthsealed.Error{Code: healthsealed.CodeDisabled}
+	}
+	identity, found, err := adaptercloud.NewIdentityStore(filepath.Join(k.stateDir, cloudkeys.DirName)).Load()
+	if err != nil || !found || !identity.Valid() || adaptercloud.CheckEnvironment(identity, settings) != nil {
+		return adaptercloud.Identity{}, adaptercloud.Settings{}, &healthsealed.Error{Code: healthsealed.CodeKeyUnavailable}
+	}
+	return identity, settings, nil
+}
+
+// master answers the master secret with its recorded content-key epoch,
+// or a typed error; the caller clears the secret.
+func (k sealedKeys) master(accountID string) ([]byte, int64, error) {
+	files, err := cloudkeys.Open(k.stateDir, k.foreign...)
+	if err != nil {
+		return nil, 0, &healthsealed.Error{Code: healthsealed.CodeKeyUnavailable}
+	}
+	key, found, err := files.MasterSecret()
+	if err != nil || !found {
+		return nil, 0, &healthsealed.Error{Code: healthsealed.CodeKeyUnavailable}
+	}
+	secret := key.Bytes()
+	epoch, known, err := adaptercloud.ContentEpochStore{Dir: filepath.Join(k.stateDir, cloudkeys.DirName)}.Load(accountID, secret)
+	if err != nil || !known || epoch < 1 {
+		clear(secret)
+		return nil, 0, &healthsealed.Error{Code: healthsealed.CodeKeyHandoverRequired}
+	}
+	return secret, epoch, nil
+}
+
+// Ready is the local-only half of Keys: no request is made.
+func (k sealedKeys) Ready() error {
+	identity, _, err := k.local()
+	if err != nil {
+		return err
+	}
+	secret, _, err := k.master(identity.AccountID)
+	clear(secret)
+	return err
+}
+
+func (k sealedKeys) Keys(ctx context.Context) (healthsealed.Keys, error) {
+	identity, settings, err := k.local()
+	if err != nil {
+		return healthsealed.Keys{}, err
+	}
+	secret, epoch, err := k.master(identity.AccountID)
+	if err != nil {
+		return healthsealed.Keys{}, err
+	}
+	machines, err := k.machines(ctx, settings.APIBase, identity.MachineCredential)
+	if err != nil {
+		clear(secret)
+		if errors.Is(err, adaptercloud.ErrUnauthorized) {
+			return healthsealed.Keys{}, &healthsealed.Error{Code: healthsealed.CodeAuthRefused}
+		}
+		return healthsealed.Keys{}, &healthsealed.Error{Code: healthsealed.CodeUpstream}
+	}
+	for _, m := range machines {
+		if m.ID != identity.MachineID {
+			continue
+		}
+		if m.RevokedAt != nil || m.IdentityEpoch < 0 {
+			break
+		}
+		return healthsealed.Keys{Tenant: identity.AccountID, MachineID: identity.MachineID,
+			Credential: identity.MachineCredential, MasterSecret: secret, ContentKeyEpoch: epoch,
+			IdentityEpoch: int64(m.IdentityEpoch)}, nil
+	}
+	clear(secret)
+	return healthsealed.Keys{}, &healthsealed.Error{Code: healthsealed.CodeKeyUnavailable}
+}
+
+// newSealedDiagnostics makes the owner-sealed diagnostics worker. It is off
+// unless the person opted in to owner retention (healthsealed.SettingKey,
+// off by default) and Cloud is on; both are re-read before every seal and
+// every send, so turning either off stops the next request.
+func newSealedDiagnostics(stateDir string, foreign []string, machines sealedMachinesFunc) (*healthsealed.Worker, error) {
+	store, err := healthsealed.OpenStore(connectionHealthSealedDir(stateDir))
+	if err != nil {
+		return nil, err
+	}
+	keys := sealedKeys{stateDir: stateDir, foreign: foreign, machines: machines}
+	u := &healthsealed.Uploader{
+		Client: sealedClient(),
+		Origin: func() (string, error) {
+			_, settings, err := keys.local()
+			return settings.APIBase, err
+		},
+		Ready: keys.Ready,
+		Enabled: func() bool {
+			file := nextconfig.Open(stateDir, foreign...)
+			values, err := file.Read()
+			if err != nil || !healthsealed.OptedIn(values.Raw) {
+				return false
+			}
+			settings, err := adaptercloud.ReadSettings(file)
+			return err == nil && settings.Enabled
+		},
+		Keys:  keys,
+		Store: store,
+	}
+	return healthsealed.NewWorker(u), nil
+}
+
+// sealedEvents are the records that say where the machine was stuck.
+var sealedEvents = map[connectionhealth.Event]bool{
+	connectionhealth.EventSlowDetected: true, connectionhealth.EventStallDetected: true,
+	connectionhealth.EventReleasedStalled: true, connectionhealth.EventStateAfterLoss: true,
+}
+
+// sealedJob turns one stamped journal record into a snapshot for the
+// owner, or ok=false for a record that says nothing about a stuck phase.
+// The snapshot is the healthsealed whitelist only; its coverage names how
+// many transitions the watchdog had dropped by then (lost), read from an
+// atomic counter.
+func sealedJob(r connectionhealth.Record, lost uint64) (healthsealed.Job, bool) {
+	if !sealedEvents[r.Event] {
+		return healthsealed.Job{}, false
+	}
+	if r.Event == connectionhealth.EventStateAfterLoss && r.State != connectionhealth.StateSlow && r.State != connectionhealth.StateBlocked {
+		return healthsealed.Job{}, false
+	}
+	subject := r.EventID
+	if r.PhaseID > 0 {
+		subject = "phase-" + strconv.FormatUint(r.PhaseID, 10)
+	}
+	at := healthsealed.Int64{Value: r.Wall.UnixMilli(), Set: !r.Wall.IsZero()}
+	snap := healthsealed.Snapshot{Schema: healthsealed.SnapshotSchema, Location: r.Location,
+		AgeNS: healthsealed.Int64{Value: r.AgeNS, Set: true}, DeadlineNS: healthsealed.Int64{Value: r.DeadlineNS, Set: r.DeadlineNS > 0},
+		Build: r.Build, Stage: string(r.Stage), CorrelationID: r.Correlation, ObservedAtMS: at,
+		Coverage: []healthsealed.Coverage{{Source: "watchdog.transitions", FromMS: at, ToMS: at,
+			Lost: healthsealed.Int64{Value: int64(min(lost, 1<<62)), Set: true}}},
+		Lost: healthsealed.Int64{Value: int64(min(lost, 1<<62)), Set: true}}
+	if snap.Validate() != nil {
+		return healthsealed.Job{}, false
+	}
+	return healthsealed.Job{BootID: r.BootID, SubjectKind: healthsealed.SubjectIncident, SubjectID: subject, Snapshot: snap}, true
+}
+
+// sealedFeed is what the journal writer offers each record to. It reads
+// only the worker's cached opt-in and an atomic counter, and Offer never
+// waits, so the writer is never held by the owner-sealed sender.
+func sealedFeed(rt *connectionhealth.Runtime, w *healthsealed.Worker) func(connectionhealth.Record) {
+	if w == nil {
+		return nil
+	}
+	return func(r connectionhealth.Record) {
+		if !w.Enabled() {
+			return
+		}
+		_, lost := rt.Watchdog.Pending()
+		if job, ok := sealedJob(r, lost); ok {
+			_ = w.Offer(job)
+		}
+	}
+}
+
+// ownerDiagnosticsStatus is the sealed sender as the health status shows
+// it, with a typed coverage: off, waiting (on, nothing to seal yet),
+// active, partial (jobs dropped or refused), or failed with its code.
+func ownerDiagnosticsStatus(w *healthsealed.Worker, openErr error) func() *healthupload.OwnerDiagnostics {
+	return func() *healthupload.OwnerDiagnostics {
+		if w == nil {
+			code := healthsealed.CodeOf(openErr)
+			if code == "" {
+				code = healthsealed.CodeStoreUnwritable
+			}
+			return &healthupload.OwnerDiagnostics{Coverage: "failed", Code: string(code)}
+		}
+		st := w.Status()
+		d := &healthupload.OwnerDiagnostics{Code: string(st.Code), Cloud: st.Cloud, Stored: st.Stored,
+			Refused: st.Refused, Dropped: st.Dropped, LastAtMS: st.LastAtMS}
+		switch {
+		case !st.Enabled:
+			d.Coverage = "off"
+		case st.Ready != "":
+			d.Coverage, d.Code = "failed", string(st.Ready)
+		case st.Code != "":
+			d.Coverage = "failed"
+		case st.Dropped > 0 || st.Refused > 0:
+			d.Coverage = "partial"
+		case st.Stored > 0:
+			d.Coverage = "active"
+		default:
+			d.Coverage = "waiting"
+		}
+		return d
+	}
 }
 
 // healthTimeout bounds one CLI read. The route reads memory only, so a
