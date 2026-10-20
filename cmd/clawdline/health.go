@@ -62,6 +62,12 @@ func connectionHealthStoreDir(stateDir string) string {
 // with its own HTTPS client. It makes no request unless the person opted in
 // (`cloud_health_upload: true`), Cloud is on and this machine has an
 // identity, and it reads only the durable store, never the Cloud line.
+//
+// The owner-sealed diagnostics worker (internal/adapters/healthsealed) runs
+// beside it on its own client: off unless the person opted in to owner
+// retention and Cloud is on, and refused before any request until the
+// identity pairing has recorded the master secret's content-key epoch
+// (docs/health-identity-handover.md).
 func startConnectionHealth(stateDir string, srv *httptransport.Server) *connectionHealthLife {
 	if strings.EqualFold(os.Getenv(connectionHealthOffEnv), "off") {
 		log.Printf("connection health: off (%s=off)", connectionHealthOffEnv)
