@@ -7291,6 +7291,13 @@ export interface SettingsRequest {
   claude_default_model: string | null
 
   /**
+   * Whether this daemon uploads its connection-health records to Cloud. Absent or
+   * false means off, and off makes no request. Only the local token may change it.
+   * Owner diagnostics (location, age, deadline) are never sent.
+   */
+  cloud_health_upload: boolean | null
+
+  /**
    * Only `false`: dismisses the retired Cloudflare tunnel notice by removing that
    * tunnel's old keys from the file. The old keys themselves are refused as
    * `retired_setting`.
@@ -7577,6 +7584,13 @@ export interface SettingsSnapshot {
    * one. Empty leaves the choice to Claude Code.
    */
   claude_default_model: string | null
+
+  /**
+   * Whether this daemon uploads its connection-health records to Cloud. Absent or
+   * false means off, and off makes no request. Only the local token may change it.
+   * Owner diagnostics (location, age, deadline) are never sent.
+   */
+  cloud_health_upload: boolean | null
 
   /**
    * True while the file still holds the built-in Cloudflare tunnel's settings

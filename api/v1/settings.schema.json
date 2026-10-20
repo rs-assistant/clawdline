@@ -198,6 +198,7 @@
         "push_on_app_release_success": { "description": "Notify after the app release is verified.", "nullable": true, "type": "boolean" },
         "push_on_cloud_release_success": { "description": "Notify after the Cloud release is verified.", "nullable": true, "type": "boolean" },
         "push_on_release_failure": { "description": "Notify when an App install or Cloud verification fails.", "nullable": true, "type": "boolean" },
+        "cloud_health_upload": { "description": "Whether this daemon uploads its connection-health records to Cloud. Absent or false means off, and off makes no request. Only the local token may change it. Owner diagnostics (location, age, deadline) are never sent.", "nullable": true, "type": "boolean" },
         "orchestrator_agent_notify": {
           "description": "Whether an agent may push a sentence of its own.",
           "nullable": true,
@@ -448,6 +449,7 @@
         "push_on_app_release_success": { "description": "Notify after the app release is verified.", "nullable": true, "type": "boolean" },
         "push_on_cloud_release_success": { "description": "Notify after the Cloud release is verified.", "nullable": true, "type": "boolean" },
         "push_on_release_failure": { "description": "Notify when an App install or Cloud verification fails.", "nullable": true, "type": "boolean" },
+        "cloud_health_upload": { "description": "Whether this daemon uploads its connection-health records to Cloud. Absent or false means off, and off makes no request. Only the local token may change it. Owner diagnostics (location, age, deadline) are never sent.", "nullable": true, "type": "boolean" },
         "orchestrator_agent_notify": {
           "description": "Whether an agent may push a sentence of its own.",
           "nullable": true,

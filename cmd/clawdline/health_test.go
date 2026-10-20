@@ -16,6 +16,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
 	"github.com/sainteye/clawdline/internal/adapters/healthupload"
+	"github.com/sainteye/clawdline/internal/adapters/nextconfig"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	httptransport "github.com/sainteye/clawdline/internal/transport/http"
@@ -363,4 +364,41 @@ func TestAHeldWatchdogWriterDoesNotHoldStopPastItsDeadline(t *testing.T) {
 		t.Fatal("the store was not closed while the writer was held")
 	}
 	readStoreEvents(t, dir, h.rt.BootID)
+}
+
+// The settings file takes the opt-in through the same writer the settings
+// route uses, and the uploader's identity reads it: absent and false are
+// not_opted_in (no request), true moves on to Cloud's own switch.
+func TestTheHealthUploadOptInIsASettingTheUploaderReads(t *testing.T) {
+	dir := t.TempDir()
+	identity := healthUploadIdentity(dir, nil)
+	code := func() healthupload.Code {
+		_, err := identity()
+		var e *healthupload.Error
+		if !errors.As(err, &e) {
+			t.Fatalf("identity answered %v", err)
+		}
+		return e.Code
+	}
+	if c := code(); c != healthupload.CodeNotOptedIn {
+		t.Fatalf("absent: %s", c)
+	}
+	// The settings route admits only a listed key: `clawdline setting` and
+	// the console write through it.
+	if k, ok := nextconfig.SettableByName(healthUploadKey); !ok || !k.Allows(true) || k.Allows("yes") {
+		t.Fatalf("%s is not a bool the settings route accepts", healthUploadKey)
+	}
+	file := nextconfig.Open(dir)
+	if _, err := file.Set(map[string]any{healthUploadKey: false}); err != nil {
+		t.Fatal(err)
+	}
+	if c := code(); c != healthupload.CodeNotOptedIn {
+		t.Fatalf("false: %s", c)
+	}
+	if _, err := file.Set(map[string]any{healthUploadKey: true}); err != nil {
+		t.Fatalf("the settings file refuses the opt-in: %v", err)
+	}
+	if c := code(); c == healthupload.CodeNotOptedIn {
+		t.Fatal("true still reads as not opted in")
+	}
 }

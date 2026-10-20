@@ -512,8 +512,10 @@ off stops the next request without a restart:
 { "cloud_enabled": true, "cloud_health_upload": true }
 ```
 
-`clawdline cloud on` sets `cloud_enabled`; `cloud_health_upload` is written into the same file by
-hand (`clawdline setting` does not accept it yet). It must be JSON `true`; anything else is off.
+`clawdline cloud on` sets `cloud_enabled`. The upload switch is
+`clawdline setting set cloud_health_upload on` (and `off`; `get` reads it, absent reads `off`),
+written through `/v1/settings` with this machine's local token only — a paired browser cannot
+change it. It must be JSON `true`; anything else is off, and nothing turns it on by default.
 The machine must also be enrolled. The identity is the machine's
 own (`machine-identity-v1.json`), and its `api_base` must equal the settings' `cloud_api_base`
 (`adaptercloud.CheckEnvironment`), else `origin_refused`. The base must be `https://`; plain

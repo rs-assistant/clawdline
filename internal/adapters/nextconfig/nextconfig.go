@@ -520,6 +520,9 @@ var Settables = []Settable{
 	{Name: "push_on_cloud_release_success", Kind: "bool"},
 	{Name: "push_on_release_failure", Kind: "bool"},
 	{Name: "orchestrator_agent_notify", Kind: "bool"},
+	// Opt-in for the connection-health uploader (cmd/clawdline/health.go);
+	// absent is off.
+	{Name: "cloud_health_upload", Kind: "bool"},
 	// Whether the daemon polls iTerm2 over Apple Events; absent is on
 	// (docs/interface.md "Turning iTerm2 scanning off").
 	{Name: "iterm_scan", Kind: "bool"},

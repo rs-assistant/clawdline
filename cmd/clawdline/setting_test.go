@@ -189,3 +189,35 @@ func TestUsageSaysTheWindowInWords(t *testing.T) {
 		}
 	}
 }
+
+// The connection-health upload switch: absent is off, and on/off reach the
+// route as a JSON bool.
+func TestSettingTurnsTheHealthUploadOnAndOff(t *testing.T) {
+	stored := map[string]any{}
+	call := func(method string, body any) (int, []byte, error) {
+		if method == http.MethodPost {
+			for key, value := range body.(map[string]any) {
+				stored[key] = value
+			}
+		}
+		data, _ := json.Marshal(stored)
+		return http.StatusOK, data, nil
+	}
+	run := func(args ...string) (int, string) {
+		var out, errs bytes.Buffer
+		code := runSetting(&out, &errs, args, call)
+		return code, out.String()
+	}
+	if code, out := run("get", "cloud_health_upload"); code != 0 || !strings.HasPrefix(out, "cloud_health_upload: off") {
+		t.Fatalf("absent must read off: %d %q", code, out)
+	}
+	if code, out := run("set", "cloud_health_upload", "on"); code != 0 || !strings.HasPrefix(out, "cloud_health_upload: on") || stored["cloud_health_upload"] != true {
+		t.Fatalf("on: %d %q %v", code, out, stored)
+	}
+	if code, out := run("set", "cloud_health_upload", "off"); code != 0 || !strings.HasPrefix(out, "cloud_health_upload: off") || stored["cloud_health_upload"] != false {
+		t.Fatalf("off: %d %q %v", code, out, stored)
+	}
+	if code, _ := run("set", "cloud_health_upload", "maybe"); code != 2 {
+		t.Fatalf("a word: %d", code)
+	}
+}

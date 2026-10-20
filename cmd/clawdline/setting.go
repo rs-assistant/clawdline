@@ -84,6 +84,24 @@ var settingKeys = map[string]struct {
 	"push_on_app_release_success":   {parse: parseSettingBool, show: showSettingBool, takes: "on/off or true/false"},
 	"push_on_cloud_release_success": {parse: parseSettingBool, show: showSettingBool, takes: "on/off or true/false"},
 	"push_on_release_failure":       {parse: parseSettingBool, show: showSettingBool, takes: "on/off or true/false"},
+	// The connection-health uploader's opt-in. Absent means off, and off
+	// makes no request; it takes effect on the uploader's next cycle.
+	"cloud_health_upload": {
+		parse: parseSettingBool,
+		show: func(raw json.RawMessage) string {
+			var on *bool
+			switch {
+			case len(raw) == 0 || string(raw) == "null":
+				return cliCopy("core", "setting.health_upload_off", "off (nothing is uploaded)")
+			case json.Unmarshal(raw, &on) != nil || on == nil:
+				return "unknown"
+			case *on:
+				return cliCopy("core", "setting.health_upload_on", "on (uploading connection-health records to Cloud)")
+			}
+			return cliCopy("core", "setting.health_upload_off", "off (nothing is uploaded)")
+		},
+		takes: "on uploads this machine's connection-health records to Cloud; off (the default) sends nothing",
+	},
 	"product_language": {
 		parse: func(s string) (any, bool) {
 			for _, language := range nextconfig.ProductLanguages {
@@ -174,6 +192,8 @@ func settingTakes(key, english string) string {
 		return cliCopy("core", "setting.takes_bool", english)
 	case "product_language":
 		return cliCopy("core", "setting.takes_language", english)
+	case "cloud_health_upload":
+		return cliCopy("core", "setting.takes_health_upload", english)
 	}
 	return english
 }

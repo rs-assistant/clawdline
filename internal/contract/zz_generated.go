@@ -6090,6 +6090,11 @@ type SettingsRequest struct {
 	// Empty, or a Claude Code model name used when a new Session does not name one.
 	ClaudeDefaultModel *string `json:"claude_default_model"`
 
+	// Whether this daemon uploads its connection-health records to Cloud. Absent or
+	// false means off, and off makes no request. Only the local token may change it.
+	// Owner diagnostics (location, age, deadline) are never sent.
+	CloudHealthUpload *bool `json:"cloud_health_upload"`
+
 	// Only `false`: dismisses the retired Cloudflare tunnel notice by removing that
 	// tunnel's old keys from the file. The old keys themselves are refused as
 	// `retired_setting`.
@@ -6269,6 +6274,11 @@ type SettingsSnapshot struct {
 	// The model used for a new Claude Code session when that launch does not name one.
 	// Empty leaves the choice to Claude Code.
 	ClaudeDefaultModel *string `json:"claude_default_model"`
+
+	// Whether this daemon uploads its connection-health records to Cloud. Absent or
+	// false means off, and off makes no request. Only the local token may change it.
+	// Owner diagnostics (location, age, deadline) are never sent.
+	CloudHealthUpload *bool `json:"cloud_health_upload"`
 
 	// True while the file still holds the built-in Cloudflare tunnel's settings
 	// (`remote_tunnel`, `remote_tunnel_name`, `remote_hostname`, `cloudflared_path`),
