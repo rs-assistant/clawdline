@@ -33,6 +33,10 @@ const (
 	LocReadHandler     = "cloud.link.read_handler"
 	LocCommandHandler  = "cloud.link.command_handler"
 	LocSessionsHandler = "cloud.link.sessions_handler"
+	LocRelayReserve    = "cloud.relay.reserve"
+	LocRelaySeal       = "cloud.relay.seal"
+	LocRelaySpoolSeal  = "cloud.relay.spool_seal"
+	LocRelayDirect     = "cloud.relay.direct_write"
 )
 
 // LocationEntry binds one location code to the function that holds it in
@@ -81,6 +85,10 @@ func Locations() []LocationEntry {
 		{LocReadHandler, linkPkg + ".(*Link).answerTraced", []Stage{StageHandlerStarted, StageHandlerCompleted}, Finite, false},
 		{LocCommandHandler, linkPkg + ".(*Link).answerTraced", []Stage{StageHandlerStarted, StageHandlerCompleted}, Finite, false},
 		{LocSessionsHandler, linkPkg + ".(*Link).answerTraced", []Stage{StageHandlerStarted, StageHandlerCompleted}, Finite, false},
+		{LocRelayReserve, linkPkg + ".(*Relay).PublishTracked", []Stage{StageHandlerCompleted}, Finite, false},
+		{LocRelaySeal, linkPkg + ".(*Relay).PublishTracked", []Stage{StageHandlerCompleted}, Finite, false},
+		{LocRelaySpoolSeal, linkPkg + ".(*Relay).PublishTracked", []Stage{StageResponseSealed, StageSpoolQueued}, Finite, false},
+		{LocRelayDirect, linkPkg + ".(*Relay).PublishTracked", []Stage{StageHandlerCompleted}, Finite, false},
 	}
 }
 

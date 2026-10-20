@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/domain/capacity"
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 )
 
 // SpoolChannel is the wire channel kind a row belongs to.
@@ -284,6 +285,12 @@ type SpoolRow struct {
 	// SealedAt is the authenticated `ts` inside Sealed, which is what
 	// staleness is measured from — not when this process queued it.
 	SealedAt time.Time
+	// Correlation is the connection-health correlation of the request this
+	// row answers, so each write and re-send of it is a phase of the same
+	// logical operation. It is local only: it is not in Sealed, never goes on
+	// the wire, and is dropped with Sealed once the row is terminal. It is an
+	// opaque tracker id (connectionhealth.ValidID) or "".
+	Correlation string
 
 	State      SpoolState
 	ReservedAt time.Time
@@ -614,6 +621,15 @@ func (s *Spool) admitLocked(channel SpoolChannel, recipient, logicalID string, c
 // sendable. sealedAt is the envelope's own `ts`, which is what staleness is
 // measured from.
 func (s *Spool) Seal(seq uint64, sealed []byte, sealedAt time.Time) error {
+	return s.SealCorrelated(seq, sealed, sealedAt, "")
+}
+
+// SealCorrelated is Seal that also keeps the row's connection-health
+// correlation. One that is not an opaque id is not kept.
+func (s *Spool) SealCorrelated(seq uint64, sealed []byte, sealedAt time.Time, correlation string) error {
+	if correlation != "" && !connectionhealth.ValidID(correlation) {
+		correlation = ""
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	row, ok := s.rows[seq]
@@ -628,6 +644,7 @@ func (s *Spool) Seal(seq uint64, sealed []byte, sealedAt time.Time) error {
 	}
 	row.Sealed = sealed
 	row.SealedAt = sealedAt
+	row.Correlation = correlation
 	row.State = SpoolReady
 	return nil
 }
@@ -693,16 +710,23 @@ func (s *Spool) SendNext() Disposition {
 // That is the whole point. A re-send with fresh bytes would be a second
 // identity for one command, and the relay's replay window would accept both.
 func (s *Spool) Resend(seq uint64) ([]byte, error) {
+	sealed, _, err := s.ResendCorrelated(seq)
+	return sealed, err
+}
+
+// ResendCorrelated is Resend with the row's connection-health correlation,
+// so the re-send is a new attempt of the same logical operation.
+func (s *Spool) ResendCorrelated(seq uint64) ([]byte, string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	row, ok := s.rows[seq]
 	if !ok {
-		return nil, fmt.Errorf("%w: %d", ErrSpoolRow, seq)
+		return nil, "", fmt.Errorf("%w: %d", ErrSpoolRow, seq)
 	}
 	if row.State != SpoolSent {
-		return nil, fmt.Errorf("%w: %d is %s", ErrSpoolSettle, seq, row.State)
+		return nil, "", fmt.Errorf("%w: %d is %s", ErrSpoolSettle, seq, row.State)
 	}
-	return row.Sealed, nil
+	return row.Sealed, row.Correlation, nil
 }
 
 // InFlight lists, in ascending sequence order, the rows that were written and
@@ -749,6 +773,7 @@ func (s *Spool) Settle(seq uint64, fullChannel string, kind SettleKind) (SettleR
 	// for a row that has been answered is 6.5 MB of nothing
 	// (`CloudOutboundSpool.swift:934-945`).
 	row.Sealed = nil
+	row.Correlation = ""
 	row.Tombstoned = s.now()
 	if kind == SettlePeerError || kind == SettleRateLimited {
 		row.State = SpoolRejected
@@ -776,6 +801,7 @@ func (s *Spool) BurnExpired() []uint64 {
 		row.BurnReason = BurnAttemptCapExpired
 		row.Outcome = AttemptTransportUncertain
 		row.Sealed = nil
+		row.Correlation = ""
 		row.Tombstoned = now
 		burned = append(burned, seq)
 	}
@@ -853,6 +879,7 @@ func (s *Spool) normalizeReadyLocked(now time.Time) {
 			s.rows[prior].State = SpoolBurned
 			s.rows[prior].BurnReason = BurnReplacedByCoalesce
 			s.rows[prior].Sealed = nil
+			s.rows[prior].Correlation = ""
 			s.rows[prior].Tombstoned = now
 			s.tally.coalesced++
 		}
@@ -870,6 +897,7 @@ func (s *Spool) normalizeReadyLocked(now time.Time) {
 			row.State = SpoolBurned
 			row.BurnReason = BurnStaleReadyAtSend
 			row.Sealed = nil
+			row.Correlation = ""
 			row.Tombstoned = now
 			s.tally.dropped++
 			s.tally.lastAt = now
