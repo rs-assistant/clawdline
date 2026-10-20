@@ -18,7 +18,9 @@ package healthupload
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -162,6 +164,30 @@ type Options struct {
 	// AttemptTimeout, when set below MaxAttemptSeconds, shortens one
 	// request's deadline (tests).
 	AttemptTimeout time.Duration
+	// BootID is this process's boot; a metadata-only local_loss batch is
+	// sent under it (contract §12.1). Empty sends no such batch.
+	BootID string
+	// Rand mints the counter epoch (tests); crypto/rand by default.
+	Rand io.Reader
+	// OwnerDiagnostics, when set, reports the sealed owner-diagnostics
+	// sender beside this one. It must not wait on I/O.
+	OwnerDiagnostics func() *OwnerDiagnostics
+}
+
+// OwnerDiagnostics is the owner-sealed diagnostics sender as the status
+// route shows it (internal/adapters/healthsealed runs it). Coverage is
+// `off` when the person has not opted in, `active` when the last seal and
+// send were receipted, and `failed` with Code otherwise: a snapshot that
+// could not be sealed or sent is a gap in what the owner can read, never
+// an empty success.
+type OwnerDiagnostics struct {
+	Coverage string `json:"coverage"`
+	Code     string `json:"code,omitempty"`
+	Cloud    string `json:"cloud_code,omitempty"`
+	Stored   int64  `json:"stored"`
+	Refused  int64  `json:"refused"`
+	Dropped  int64  `json:"dropped"`
+	LastAtMS int64  `json:"last_at_ms,omitempty"`
 }
 
 // Uploader is one daemon's health uploader.
@@ -246,6 +272,12 @@ type Status struct {
 	// StateBytes is the progress file's size as last read or written
 	// (bounded by MaxStateBytes); null before the uploader has read it.
 	StateBytes *int `json:"state_bytes"`
+	// CounterEpoch is the epoch the totals' local_loss reports name; empty
+	// before the progress file was first written.
+	CounterEpoch string `json:"counter_epoch,omitempty"`
+	// OwnerDiagnostics is the sealed sender; absent when the daemon runs
+	// none.
+	OwnerDiagnostics *OwnerDiagnostics `json:"owner_diagnostics,omitempty"`
 }
 
 // Refusal is a typed Cloud refusal.
@@ -280,9 +312,15 @@ type HourStatus struct {
 
 // Status is a copy; it never waits on I/O.
 func (u *Uploader) Status() Status {
+	var owner *OwnerDiagnostics
+	if u.o.OwnerDiagnostics != nil {
+		owner = u.o.OwnerDiagnostics()
+	}
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	s := u.status
+	s.OwnerDiagnostics = owner
+	s.CounterEpoch = u.st.CounterEpoch
 	s.Cursor = u.st.Cursor
 	s.Totals = u.st.Totals
 	s.Totals.Excluded = cloneMap(u.st.Totals.Excluded)
@@ -431,7 +469,7 @@ func (u *Uploader) build(now time.Time) (time.Duration, bool) {
 	}
 	if src == nil {
 		u.set(CodeSourceOpening)
-		return u.o.Wake, false
+		return u.lossOnly(now, CodeSourceOpening)
 	}
 	for round := 0; round < MaxStepPages; round++ {
 		u.mu.Lock()
@@ -451,18 +489,27 @@ func (u *Uploader) build(now time.Time) (time.Duration, bool) {
 				continue
 			}
 			u.set(CodeSourceFailed)
-			return u.o.Wake, false
+			return u.lossOnly(now, CodeSourceFailed)
 		}
 		b := assemble(page, cursor)
 		if b.next == cursor {
 			u.set(CodeIdle)
-			return u.o.Wake, false
+			return u.lossOnly(now, CodeIdle)
 		}
 		if len(b.events) == 0 {
 			if err := u.commitLocal(b.next, b.skipped); err != nil {
 				return stateRetry, false
 			}
 			continue
+		}
+		// An event batch never carries local_loss: its body must stay what
+		// the same records rebuild after a lost progress file, or the
+		// rebuilt batch would answer 409 idempotency_conflict instead of
+		// replaying its receipt. Totals travel in metadata-only batches
+		// whose batch_id names the counter epoch (lossOnly).
+		next := u.snapshot()
+		if err := u.mintEpoch(&next); err != nil {
+			return stateRetry, false
 		}
 		body, err := encode(wireBatch{SchemaVersion: WireSchemaVersion, BatchID: b.batchID(), ProducerInstance: ProducerInstance,
 			BootID: b.boot, BuildCommit: b.build, Events: b.events})
@@ -472,7 +519,6 @@ func (u *Uploader) build(now time.Time) (time.Duration, bool) {
 		}
 		p := &pendingBatch{BatchID: b.batchID(), BootID: b.boot, Body: body, NextCursor: b.next, Events: len(b.events),
 			FirstSeq: b.events[0].Seq, LastSeq: b.events[len(b.events)-1].Seq, Created: now.UTC(), Skipped: b.skipped}
-		next := u.snapshot()
 		next.Pending = p
 		if err := u.save(next); err != nil {
 			// Never send a batch whose bytes are not on disk: a restart
@@ -482,6 +528,66 @@ func (u *Uploader) build(now time.Time) (time.Duration, bool) {
 		return 0, true
 	}
 	return 0, false
+}
+
+// mintEpoch gives a progress state without a counter epoch its one epoch.
+// It is saved with the state it is minted into, never on its own.
+func (u *Uploader) mintEpoch(p *persisted) error {
+	if p.CounterEpoch != "" {
+		return nil
+	}
+	src := u.o.Rand
+	if src == nil {
+		src = rand.Reader
+	}
+	raw := make([]byte, 12)
+	if _, err := io.ReadFull(src, raw); err != nil {
+		u.set(CodeStateUnwritable)
+		return err
+	}
+	p.CounterEpoch = "ue-" + hex.EncodeToString(raw)
+	return nil
+}
+
+// lossOnly builds a metadata-only batch (no events, a local_loss block)
+// when the settled totals moved past the last such batch, once there is
+// nothing else to send: the store is idle, still opening or too broken to
+// read. Otherwise it answers the state's ordinary wait. A metadata-only
+// batch that is refused or abandoned still counts as reported, so it is
+// rebuilt only when the totals move again and never spends the hour's
+// requests in a loop; Cloud keeps the maximum, so the next report carries
+// the same totals anyway. Its batch_id names the epoch and a sequence
+// within it, so a new progress file never reuses one.
+func (u *Uploader) lossOnly(now time.Time, state Code) (time.Duration, bool) {
+	if !cloudOpaque.MatchString(u.o.BootID) {
+		return u.o.Wake, false
+	}
+	next := u.snapshot()
+	counters := next.Totals.counters(skipped{})
+	if next.LossReported.same(counters) || (next.LossReported == nil && counters.empty()) {
+		return u.o.Wake, false
+	}
+	if err := u.mintEpoch(&next); err != nil {
+		return stateRetry, false
+	}
+	loss := localLoss(next.CounterEpoch, now, counters)
+	if loss == nil {
+		return u.o.Wake, false
+	}
+	id := "ll-" + strings.TrimPrefix(next.CounterEpoch, "ue-") + "-" + strconv.FormatUint(next.LossBatches+1, 10)
+	body, err := encode(wireBatch{SchemaVersion: WireSchemaVersion, BatchID: id, ProducerInstance: ProducerInstance,
+		BootID: u.o.BootID, Events: []wireEvent{}, LocalLoss: loss})
+	if err != nil || len(body) > MaxBatchBytes {
+		return u.o.Wake, false
+	}
+	next.LossBatches++
+	next.Pending = &pendingBatch{BatchID: id, BootID: u.o.BootID, Body: body, NextCursor: next.Cursor, Created: now.UTC()}
+	next.LossReported = &counters
+	if err := u.save(next); err != nil {
+		return stateRetry, false
+	}
+	u.set(state)
+	return 0, true
 }
 
 func (u *Uploader) snapshot() persisted {

@@ -36,6 +36,56 @@ type persisted struct {
 	Totals  Totals        `json:"totals"`
 	// Receipts are the newest durable receipts, newest last.
 	Receipts []Receipt `json:"receipts,omitempty"`
+	// CounterEpoch names the life of this progress file: the totals above
+	// count from its creation, so a new file (lost, or moved aside) mints
+	// a new epoch and Cloud never compares its totals with the old ones
+	// (contract §12.1). It is minted with the first save and never changed.
+	CounterEpoch string `json:"counter_epoch,omitempty"`
+	// LossReported is the totals the newest metadata-only batch carried;
+	// the next one is built only when the settled totals move past it.
+	LossReported *lossCounters `json:"loss_reported,omitempty"`
+	// LossBatches numbers metadata-only batches within this epoch, so each
+	// has its own stable batch_id.
+	LossBatches uint64 `json:"loss_batches,omitempty"`
+}
+
+// lossCounters are the §12.1 totals: storage loss, gaps and exclusions.
+type lossCounters struct {
+	StorageLost uint64            `json:"storage_lost_records"`
+	Gaps        map[string]uint64 `json:"store_gaps,omitempty"`
+	Excluded    map[string]uint64 `json:"excluded,omitempty"`
+}
+
+// counters are the totals plus extra.
+func (t Totals) counters(extra skipped) lossCounters {
+	c := lossCounters{StorageLost: t.StorageLoss + extra.StorageLoss, Gaps: cloneMap(t.Gaps), Excluded: cloneMap(t.Excluded)}
+	for k, v := range extra.Gaps {
+		if c.Gaps == nil {
+			c.Gaps = map[string]uint64{}
+		}
+		c.Gaps[k] += v
+	}
+	for k, v := range extra.Excluded {
+		if c.Excluded == nil {
+			c.Excluded = map[string]uint64{}
+		}
+		c.Excluded[k] += v
+	}
+	return c
+}
+
+func (c lossCounters) empty() bool {
+	return c.StorageLost == 0 && len(c.Gaps) == 0 && len(c.Excluded) == 0
+}
+
+// same reports whether two sets of totals are equal; nil is never equal.
+func (c *lossCounters) same(o lossCounters) bool {
+	if c == nil {
+		return false
+	}
+	a, _ := json.Marshal(c)
+	b, _ := json.Marshal(o)
+	return string(a) == string(b)
 }
 
 type pendingBatch struct {
