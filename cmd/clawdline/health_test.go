@@ -232,3 +232,135 @@ func TestStoppingWhileTheStoreOpensDoesNotLeakIt(t *testing.T) {
 	}
 	_ = next.Close(context.Background())
 }
+
+// waitHealthStore waits for the durable store to open.
+func waitHealthStore(t *testing.T, h *connectionHealthLife) *healthjournal.Store {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for h.store.Load() == nil {
+		if time.Now().After(deadline) {
+			t.Fatal("the store did not open")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return h.store.Load()
+}
+
+// waitStall starts a phase that is blocked within milliseconds and waits for
+// the daemon's own watchdog scan to report it.
+func waitStall(t *testing.T, h *connectionHealthLife) {
+	t.Helper()
+	h.rt.Tracker.Start(connectionhealth.Spec{
+		Source: connectionhealth.SourceDaemon, Stage: connectionhealth.StageHandlerStarted,
+		Class: connectionhealth.ClassRead, Kind: connectionhealth.Finite,
+		Location: "cloud.link.read_handler", Warn: time.Millisecond, Block: 2 * time.Millisecond,
+	})
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if r, ok := h.rt.Watchdog.Latest(); ok {
+			for _, f := range r.Findings {
+				if f.State == connectionhealth.StateBlocked {
+					return
+				}
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the watchdog never reported the stall")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func readStoreEvents(t *testing.T, dir, boot string) []connectionhealth.Event {
+	t.Helper()
+	next, err := healthjournal.Open(healthjournal.Options{Dir: connectionHealthStoreDir(dir), BootID: "boot-next", Build: "abc"})
+	if err != nil {
+		t.Fatalf("the next boot cannot open the store: %v", err)
+	}
+	defer func() { _ = next.Close(context.Background()) }()
+	page, err := next.Read(healthjournal.Query{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []connectionhealth.Event
+	for _, e := range page.Entries {
+		if e.BootID == boot && e.Record != nil {
+			out = append(out, e.Record.Event)
+		}
+	}
+	return out
+}
+
+// A stall the watchdog observed is on disk for the next boot after Stop.
+func TestAStallObservedBeforeStopIsOnDiskForTheNextBoot(t *testing.T) {
+	dir, srv := newHealthServer(t)
+	h := startConnectionHealth(dir, srv)
+	if h == nil {
+		t.Fatal("monitoring is off")
+	}
+	waitHealthStore(t, h)
+	waitStall(t, h)
+	ctx, cancel := context.WithTimeout(context.Background(), connectionHealthStopTimeout)
+	defer cancel()
+	if err := h.Stop(ctx); err != nil {
+		t.Fatal(err)
+	}
+	got := readStoreEvents(t, dir, h.rt.BootID)
+	for _, e := range got {
+		if e == connectionhealth.EventStallDetected {
+			return
+		}
+	}
+	t.Fatalf("the observed stall is not on disk: %v", got)
+}
+
+// A durable sink that never returns holds the watchdog's writer. Stop still
+// returns by its deadline, names the held writer, and flushes and closes the
+// store so the next boot can open it.
+func TestAHeldWatchdogWriterDoesNotHoldStopPastItsDeadline(t *testing.T) {
+	dir, srv := newHealthServer(t)
+	h := startConnectionHealth(dir, srv)
+	if h == nil {
+		t.Fatal("monitoring is off")
+	}
+	store := waitHealthStore(t, h)
+	release := make(chan struct{})
+	held := make(chan struct{}, 1)
+	h.rt.Watchdog.Attach(func(r connectionhealth.Record) {
+		if r.Event != connectionhealth.EventStallDetected {
+			_, _ = store.Offer(r)
+			return
+		}
+		select {
+		case held <- struct{}{}:
+		default:
+		}
+		<-release
+	})
+	defer func() {
+		close(release)
+		select {
+		case <-h.runDone:
+		case <-time.After(5 * time.Second):
+			t.Error("the watchdog did not finish after its sink let go")
+		}
+	}()
+	waitStall(t, h)
+	<-held
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	began := time.Now()
+	err := h.Stop(ctx)
+	if took := time.Since(began); took > time.Second {
+		t.Fatalf("Stop waited %v on a held writer", took)
+	}
+	if err == nil || !strings.Contains(err.Error(), "watchdog (writer held;") {
+		t.Fatalf("Stop must name the held watchdog writer: %v", err)
+	}
+	select {
+	case <-store.Done():
+	case <-time.After(time.Second):
+		t.Fatal("the store was not closed while the writer was held")
+	}
+	readStoreEvents(t, dir, h.rt.BootID)
+}

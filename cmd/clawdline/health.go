@@ -136,10 +136,13 @@ type connectionHealthLife struct {
 	uploadDone chan struct{}
 }
 
-// Stop ends the producers first (the watchdog and its journal writer, which
-// drains what it was handed into the store's queue, and the uploader), then
-// flushes and closes the store, all within ctx. A part that does not finish
-// in time is named in the error and left behind; Stop never waits past ctx.
+// Stop ends the producers first (the watchdog's scans, then its journal
+// writer, which drains every transition already observed into the journal
+// and the store's queue, and the uploader), then flushes and closes the
+// store, all within ctx. A part that does not finish in time is named in
+// the error and left behind — a held watchdog writer with how many observed
+// transitions it had not yet journaled — and the store is still flushed and
+// closed; Stop never waits past ctx and starts no goroutine of its own.
 func (h *connectionHealthLife) Stop(ctx context.Context) error {
 	if h == nil {
 		return nil
@@ -153,6 +156,10 @@ func (h *connectionHealthLife) Stop(ctx context.Context) error {
 		select {
 		case <-w.done:
 		case <-ctx.Done():
+			if w.done == h.runDone {
+				late = append(late, fmt.Sprintf("watchdog (writer held; %d observed transitions not journaled)", h.rt.Watchdog.Unwritten()))
+				continue
+			}
 			late = append(late, w.name)
 		}
 	}

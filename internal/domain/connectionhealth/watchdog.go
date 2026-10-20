@@ -138,16 +138,23 @@ func NewWatchdog(tracker *Tracker, journal *Journal, clock Clock, cadence time.D
 
 // Run scans every cadence until ctx ends, publishing each report for Latest,
 // and runs the one journal writer beside it. Nothing it calls is supplied by
-// the caller, so nothing outside the package can hold a scan. It returns once
-// both goroutines have stopped; the writer stops after the Append it may be
-// waiting in, so a journal lock held forever holds Run's return, never a scan.
+// the caller, so nothing outside the package can hold a scan. When ctx ends
+// the scans stop first; then the writer journals and hands on everything
+// they queued (at most MaxPendingTransitions, then the drops after them) and
+// Run returns once it has. A journal or durable sink held forever holds
+// Run's return, never a scan: the caller bounds its wait (the daemon's stop
+// deadline) and reads Unwritten for what was left.
 func (w *Watchdog) Run(ctx context.Context) {
 	var wg sync.WaitGroup
+	stop := make(chan struct{})
 	if w.journal != nil {
 		wg.Add(1)
-		go func() { defer wg.Done(); w.write(ctx) }()
+		go func() { defer wg.Done(); w.write(stop) }()
 	}
+	// Deferred calls run last first: no scan is running when stop closes,
+	// so the writer's last drain sees every transition there will be.
 	defer wg.Wait()
+	defer close(stop)
 	t := time.NewTicker(w.cadence)
 	defer t.Stop()
 	for {
@@ -169,10 +176,14 @@ func (w *Watchdog) Latest() (Report, bool) {
 }
 
 // write is the journal writer: the only goroutine that waits on the journal.
-func (w *Watchdog) write(ctx context.Context) {
+// Once stop closes it drains what is queued and returns.
+func (w *Watchdog) write(stop <-chan struct{}) {
 	for {
 		select {
-		case <-ctx.Done():
+		case <-stop:
+			w.writeMu.Lock()
+			w.drain()
+			w.writeMu.Unlock()
 			return
 		case q := <-w.pending:
 			w.writeMu.Lock()
@@ -185,6 +196,10 @@ func (w *Watchdog) write(ctx context.Context) {
 		}
 	}
 }
+
+// Unwritten is how many observed transitions are still queued for the
+// journal writer: what a stop that gave up waiting leaves unjournaled.
+func (w *Watchdog) Unwritten() int { return len(w.pending) }
 
 // Flush appends every queued transition on the caller's goroutine, for a
 // caller that scans without Run (tests, a one-shot export). It never blocks
