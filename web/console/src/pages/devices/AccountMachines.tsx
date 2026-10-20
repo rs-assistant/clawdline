@@ -179,7 +179,7 @@ export function AccountMachines({ shown, onStart }: { shown: boolean; onStart: (
 
 type Tab = "connection" | "access"
 
-function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
+export function MachineSheet({ machine, manager, onClose, onStart, onForgotten }: {
   machine: Row
   manager: MachineManager
   onClose: () => void
