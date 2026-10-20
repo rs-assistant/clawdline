@@ -132,6 +132,8 @@ export interface HandoverContext {
   indexedDB?: IDBFactory
   now?: () => number
   sleep?: (ms: number) => Promise<void>
+  /** The pairing run; tests replace it to drive the persistence seam without a machine. */
+  pair?: typeof pairThisViewer
 }
 
 export class HandoverController {
@@ -172,7 +174,7 @@ export class HandoverController {
     const now = ctx.now ?? (() => Date.now())
     this.set({ phase: "working" })
     try {
-      await pairThisViewer(fragment, {
+      await (ctx.pair ?? pairThisViewer)(fragment, {
         apiOrigin: ctx.apiOrigin, fetch: ctx.fetch, accountID: ctx.accountID, deviceID: ctx.deviceID,
         signingPublicKey: ctx.signingPublicKey, isCurrent, now,
         sleep: ctx.sleep ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms))),
