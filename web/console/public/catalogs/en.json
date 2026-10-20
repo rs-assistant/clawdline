@@ -100,6 +100,7 @@
   "next.ownerRetentionLocal": "Kept on this machine: {count} records, {bytes}.",
   "next.ownerRetentionLocalUnknown": "Records kept on this machine have not been counted yet.",
   "next.ownerRetentionSaveFailed": "The setting was not changed ({why}).",
+  "next.ownerRetentionSettingUnknown": "Whether this switch is on could not be read ({why}). It cannot be changed until a read answers.",
   "http.84cc28107e831259": "This machine must allow Cloud operations and direct connections to enable same-network connections.",
   "bar.hintFullscreen": "Full screen",
   "bar.hintKeys": "Keyboard shortcut",
@@ -8047,5 +8048,9 @@
   "capacityRow.console.viewer_health_elapsed_seconds.what": "The longest stage duration a connection-health record can state.",
   "capacityRow.console.viewer_health_elapsed_seconds.full": "A longer stage is recorded as this long.",
   "capacityRow.console.viewer_health_count_rows.what": "The largest count a connection-health record can state.",
-  "capacityRow.console.viewer_health_count_rows.full": "A larger count is recorded as this number."
+  "capacityRow.console.viewer_health_count_rows.full": "A larger count is recorded as this number.",
+  "capacityRow.console.owner_retention_poll_seconds.what": "How often an open Settings window reads the owner-diagnostics switch and its sender's status again.",
+  "capacityRow.console.owner_retention_poll_seconds.full": "A read still out when the next one is due is not doubled: that tick is skipped.",
+  "capacityRow.console.owner_retention_request_seconds.what": "How long one read of the owner-diagnostics switch and sender status may take.",
+  "capacityRow.console.owner_retention_request_seconds.full": "Past it the read is abandoned and the block says the status is unknown instead of repeating the last answer."
 }

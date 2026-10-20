@@ -795,6 +795,16 @@
     "Note": true
   },
   {
+    "Name": "console.owner_retention_poll_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.owner_retention_request_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.persona_retry_seconds",
     "Known": true,
     "Note": true

@@ -2,7 +2,7 @@ package capacity
 
 // consoleBounds is every registered row named console.*.
 func consoleBounds() []Entry {
-	return append(append(connectionHealthUIBounds(), viewerHealthBounds()...), []Entry{
+	return append(append(append(connectionHealthUIBounds(), viewerHealthBounds()...), ownerRetentionBounds()...), []Entry{
 		{
 			// Both opened-detail readers share one automatic recovery per
 			// user opening (SessionExecutionRecovery). At the limit the

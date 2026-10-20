@@ -89,6 +89,13 @@ func (s *Server) consoleCapacityMeasures() map[string]func() capacity.Reading {
 		capacity.ConsoleViewerHealthCountRows: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-browser connection-health producer bound; the daemon cannot read another device's page"}
 		},
+		// Settings → Remote's owner-diagnostics block reads on its own cadence in each open window.
+		capacity.ConsoleOwnerRetentionPollSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Settings window cadence; daemon cannot measure live browser timers"}
+		},
+		capacity.ConsoleOwnerRetentionRequestSeconds: func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "per-Settings window read deadline; daemon cannot measure another window's wait"}
+		},
 		capacity.ConsoleExecutionRecoveryAttempts: func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-Console opening recovery guard; daemon cannot measure another device's recovery attempts"}
 		},

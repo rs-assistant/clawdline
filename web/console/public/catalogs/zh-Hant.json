@@ -100,6 +100,7 @@
   "next.ownerRetentionLocal": "這台機器上保留：{count} 筆，{bytes}。",
   "next.ownerRetentionLocalUnknown": "還沒計算這台機器上保留的筆數。",
   "next.ownerRetentionSaveFailed": "設定沒有變更（{why}）。",
+  "next.ownerRetentionSettingUnknown": "讀不到這個開關目前的設定（{why}）。要等讀到之後才能切換。",
   "http.84cc28107e831259": "這台機器必須允許 Cloud 操作並開啟直連，才能啟用同網路直連。",
   "bar.hintFullscreen": "全螢幕",
   "bar.hintKeys": "快速鍵",
@@ -8047,5 +8048,9 @@
   "capacityRow.console.viewer_health_elapsed_seconds.what": "單筆連線健康紀錄能記載的最長階段耗時。",
   "capacityRow.console.viewer_health_elapsed_seconds.full": "更久的階段會記為這個上限。",
   "capacityRow.console.viewer_health_count_rows.what": "單筆連線健康紀錄能記載的最大計數。",
-  "capacityRow.console.viewer_health_count_rows.full": "更大的計數會記為這個上限。"
+  "capacityRow.console.viewer_health_count_rows.full": "更大的計數會記為這個上限。",
+  "capacityRow.console.owner_retention_poll_seconds.what": "開著的設定視窗多久重新讀一次擁有者診斷開關和傳送程序狀態。",
+  "capacityRow.console.owner_retention_poll_seconds.full": "上一次還沒讀完時不會再多開一次，那一輪會直接跳過。",
+  "capacityRow.console.owner_retention_request_seconds.what": "讀一次擁有者診斷開關和傳送程序狀態最多能花多久。",
+  "capacityRow.console.owner_retention_request_seconds.full": "超過就放棄這次讀取，畫面改說狀態不明，不會把上一次的結果當成現在的。"
 }

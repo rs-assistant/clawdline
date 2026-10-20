@@ -1846,6 +1846,7 @@ const words = {
     ownerRetentionLocal: "Kept on this machine: {count} records, {bytes}.",
     ownerRetentionLocalUnknown: "Records kept on this machine have not been counted yet.",
     ownerRetentionSaveFailed: "The setting was not changed ({why}).",
+    ownerRetentionSettingUnknown: "Whether this switch is on could not be read ({why}). It cannot be changed until a read answers.",
   },
   "zh-Hant": {
     startPastMore: "載入較早的 session",
@@ -3583,6 +3584,7 @@ const words = {
     ownerRetentionLocal: "這台機器上保留：{count} 筆，{bytes}。",
     ownerRetentionLocalUnknown: "還沒計算這台機器上保留的筆數。",
     ownerRetentionSaveFailed: "設定沒有變更（{why}）。",
+    ownerRetentionSettingUnknown: "讀不到這個開關目前的設定（{why}）。要等讀到之後才能切換。",
   },
 } as const
 
