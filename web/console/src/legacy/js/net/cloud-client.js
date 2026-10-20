@@ -16,6 +16,7 @@ import {
     sealEnvelope
 } from "./cloud-crypto.js";
 import { T } from "../core/i18n.js";
+import { classifyViewerError, viewerHealthBegin, viewerHealthFailed } from "./viewer-health-hook.js";
 import { machinePresentation, machinePresentationForFleet } from "../session/selection.js";
 import {
     CloudTrail, DIAGNOSTIC_REPORT_MAX_BYTES, RELAY_CTL_MAX_BYTES, asCloudFailure, cloudFailure,
@@ -661,6 +662,9 @@ export class CloudClient {
             ["clawdline.v1", "clawdline.token." + this.deviceToken]);
         this.socket = ws;
         if (this.resumedFrom) this.renewalProbe = this.resumedFrom._probeLiveness();
+        // A client that takes over from another tries to resume its stream: `_becameReady` says
+        // whether the relay's delivery continued or the rows have to be asked for again.
+        this.healthResume = this.resumedFrom ? viewerHealthBegin("viewer_sse_resume", "transport") : null;
         this.socketOpenedAt = this.now();
         this._forgetSocketSubscriptions();
         var self = this;
@@ -696,6 +700,10 @@ export class CloudClient {
             var dropped = relayCode
                 ? failureFromRelay(relayCode, { message: "the relay closed the connection" })
                 : cloudError("offline", "the cloud connection dropped");
+            if (ours && self.healthResume) {
+                self.healthResume.fail("carrier_closed");
+                self.healthResume = null;
+            }
             if (ours) {
                 self.closedFailure = dropped;
                 self.trail.closed(closeCode);
@@ -737,6 +745,10 @@ export class CloudClient {
     }
 
     _shutdown(failure, acknowledgementFailure) {
+        if (this.healthResume) {
+            this.healthResume.complete("aborted");
+            this.healthResume = null;
+        }
         var ws = this.socket;
         this.socket = null;
         this._forgetSocketSubscriptions();
@@ -875,9 +887,15 @@ export class CloudClient {
             // went to that socket. Take what it heard meanwhile. A socket left half-open by a network
             // change still reads `ready` and hears nothing, so its successor is not a renewal and
             // recovers the rows like any reconnection.
-            if (prior.ready && !prior.retired && prior.continuityUnproven !== true
-                && this.renewalProbe !== null && prior.framesHeard > this.renewalProbe) {
+            var continued = prior.ready && !prior.retired && prior.continuityUnproven !== true
+                && this.renewalProbe !== null && prior.framesHeard > this.renewalProbe;
+            if (continued) {
                 this._continueFrom(prior);
+            }
+            if (this.healthResume) {
+                if (continued) this.healthResume.complete("ok");
+                else this.healthResume.fail("sse_resume_refused");
+                this.healthResume = null;
             }
             prior._handOff(this);
         }
@@ -1194,6 +1212,10 @@ export class CloudClient {
             return await this._openEnvelopeFrame(envelope, realign, probe);
         } catch (error) {
             this._recordReceiveFailure(error, envelope, realign, probe);
+            // The answer this envelope may have carried never reached its read: replay, the apply
+            // step, or anything before the payload opened (lookup, signature, decryption).
+            viewerHealthFailed("viewer_decrypt_apply", error && error.code === "replay" ? "replay_rejected"
+                : probe.stage === "apply" ? "apply_failed" : "decrypt_failed", { class: "read" });
             throw error;
         }
     }
@@ -3512,7 +3534,10 @@ export class CloudClient {
                 machine: identity.machine, type: type, request: extra && typeof extra.request === "string"
                     ? extra.request : null,
                 action: /^action:/.test(answer), channel: null,
-                retireUncertain: !!(readOptions && readOptions.retireUncertain) };
+                retireUncertain: !!(readOptions && readOptions.retireUncertain),
+                // The read's connection-health trace: issued now, its response and decrypt-apply
+                // recorded under the same correlation when it settles (`_settleRead`).
+                health: viewerHealthBegin("viewer_request_issued", "read") };
             self.readWaiters.set(key, waiters);
             self._watchReadAbort(key, waiters, waiter);
             if (self.readWaiters.get(key) !== waiters) return;
@@ -3627,6 +3652,20 @@ export class CloudClient {
         }
         var ref = waiters.ref;
         if (ref) this.pendingBySequence.delete(ref.seq);
+        if (waiters.health) {
+            if (!error) {
+                // An answer reaches here only opened and applied, so both stages completed.
+                waiters.health.mark("viewer_response_received", "viewer_stage_completed", { outcome: "ok" });
+                waiters.health.mark("viewer_decrypt_apply", "viewer_stage_completed", { outcome: "ok" });
+            } else if (error.code === "cloud_read_abandoned") {
+                waiters.health.mark("viewer_response_received", "viewer_stage_failed",
+                    { error: "unclassified", outcome: "aborted" });
+            } else {
+                var healthError = classifyViewerError(error, "read");
+                waiters.health.mark("viewer_response_received", "viewer_stage_failed",
+                    { error: healthError, outcome: healthError === "timeout" ? "timeout" : "error" });
+            }
+        }
         if (error) {
             error = this._withRef(error, ref);
             this.trail.refused(error.ref, error);
