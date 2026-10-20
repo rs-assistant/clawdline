@@ -280,7 +280,9 @@ func serve() {
 	srv.SetVersion(version)
 	// One connection-health runtime per boot, before anything it instruments
 	// starts and whether or not Cloud is on (health.go).
-	startConnectionHealth(context.Background(), cfg.Dir, srv)
+	// A stopping daemon stops it first, so the durable store is flushed and
+	// closed rather than abandoned mid-write.
+	go stopConnectionHealthOnSignal(startConnectionHealth(cfg.Dir, srv))
 	// A device file that cannot be read stops the daemon here, rather than
 	// letting it listen and refuse everybody.
 	if err := srv.AuthReady(); err != nil {

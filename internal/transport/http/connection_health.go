@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
+	"github.com/sainteye/clawdline/internal/adapters/healthupload"
 	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	"github.com/sainteye/clawdline/internal/transport/cloud"
 )
@@ -66,6 +67,29 @@ func (s *Server) durableReport() durableReport {
 	return r
 }
 
+// SetConnectionHealthUpload hands the server the health uploader's status
+// reader. It is a copy under the uploader's own short lock; an unreachable
+// Cloud never makes it wait.
+func (s *Server) SetConnectionHealthUpload(status func() healthupload.Status) {
+	s.connectionHealthUpload.Store(&status)
+}
+
+// uploadReport is the uploader half of the status answer: `not_started`
+// when this daemon has no uploader, never an empty status.
+type uploadReport struct {
+	State  string               `json:"state"`
+	Status *healthupload.Status `json:"status,omitempty"`
+}
+
+func (s *Server) uploadReport() uploadReport {
+	f := s.connectionHealthUpload.Load()
+	if f == nil {
+		return uploadReport{State: "not_started"}
+	}
+	st := (*f)()
+	return uploadReport{State: string(st.State), Status: &st}
+}
+
 // SetConnectionHealth hands the server the daemon's per-boot connection-health
 // runtime. Nil is monitoring turned off: the route then answers
 // `unsupported`, never an empty healthy page. It is called once, before the
@@ -116,7 +140,8 @@ func (s *Server) connectionHealthRoute(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, struct {
 			connectionhealth.Status
 			Durable durableReport `json:"durable"`
-		}{st, s.durableReport()})
+			Upload  uploadReport  `json:"upload"`
+		}{st, s.durableReport(), s.uploadReport()})
 	case "history":
 		s.connectionHealthHistory(w, q.Get("cursor"), q.Get("limit"))
 	case "events":

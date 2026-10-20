@@ -20,6 +20,7 @@ import (
 
 	"github.com/sainteye/clawdline/internal/adapters/artifacts"
 	adaptercloud "github.com/sainteye/clawdline/internal/adapters/cloud"
+	"github.com/sainteye/clawdline/internal/adapters/healthupload"
 	"github.com/sainteye/clawdline/internal/adapters/logs"
 	"github.com/sainteye/clawdline/internal/adapters/machineusage"
 	"github.com/sainteye/clawdline/internal/adapters/planner"
@@ -69,6 +70,8 @@ type Server struct {
 	// connectionHealthStore is the durable copy of its journal, once opened
 	// off the startup path (connection_health.go); nil before.
 	connectionHealthStore atomic.Pointer[durableHealth]
+	// connectionHealthUpload reads the health uploader's status, once set.
+	connectionHealthUpload atomic.Pointer[func() healthupload.Status]
 	// version is this build as `clawdline version` prints it, for /v1/health
 	// (SetVersion). Empty leaves `version` out of the answer.
 	version        string
