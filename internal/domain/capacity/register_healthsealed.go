@@ -99,5 +99,21 @@ func healthSealedBounds() []Entry {
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 			Sources: []string{"internal/adapters/healthsealed.MaxQueuedJobs", "internal/adapters/healthsealed.NewWorker:chan(MaxQueuedJobs)"},
 		},
+		{
+			// The machine's content-key epoch record, read whole; a larger
+			// file is refused and the epoch stays unknown.
+			Name: "cloud.content_key_epoch_record_bytes", Class: Buffer, Unit: Bytes,
+			Limit: 4 << 10, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/cloud.maxEpochRecordBytes"},
+		},
+		{
+			// Polls of one identity-pairing phase; past it the run stops
+			// with ErrIdentityPollExhausted and hands nothing over.
+			Name: "cloud.identity_pairing_poll_attempts", Class: Buffer, Unit: Rows,
+			Limit: 600, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+			Sources: []string{"internal/adapters/cloud.MaxIdentityPollAttempts"},
+		},
 	}
 }

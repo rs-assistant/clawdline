@@ -84,7 +84,7 @@ async function poll(deps: IdentityViewerDeps, qr: any, phase: string): Promise<a
     await deps.sleep(IDENTITY_POLL_INTERVAL_MS)
     guard(deps)
   }
-  throw new IdentityPairingError("poll_exhausted", "the Mac did not answer before the pairing expired")
+  throw new IdentityPairingError("poll_exhausted", "the machine did not answer before the pairing expired")
 }
 
 /** Runs offer → (grant) → activate → (confirm) and persists only after confirm. */

@@ -30,9 +30,9 @@ import (
 const (
 	// IdentityPollInterval is the wait between two polls of one phase.
 	IdentityPollInterval = time.Second
-	// IdentityPollMaxAttempts bounds the polls for one phase; Cloud's pairing
+	// MaxIdentityPollAttempts bounds the polls for one phase; Cloud's pairing
 	// lives at most 600 s, so more would only poll an expired row.
-	IdentityPollMaxAttempts = 600
+	MaxIdentityPollAttempts = 600
 	// IdentityRequestTimeout is one request's deadline.
 	IdentityRequestTimeout = 15 * time.Second
 	// ContentEpochFile is the epoch record, beside the key files.
@@ -315,7 +315,7 @@ func (m *MachineIdentityPairing) random(n int) ([]byte, error) {
 }
 
 func (m *MachineIdentityPairing) poll(ctx context.Context, q cloud.IdentityPairingQR, phase string) (cloud.PairingWrapper, string, error) {
-	for attempt := 0; attempt < IdentityPollMaxAttempts; attempt++ {
+	for attempt := 0; attempt < MaxIdentityPollAttempts; attempt++ {
 		w, digest, ok, err := m.Client.PollPhase(ctx, q.PairingID, phase, q.ClaimNonce)
 		if err != nil {
 			return cloud.PairingWrapper{}, "", err

@@ -635,6 +635,25 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.content_key_epoch_record_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.maxEpochRecordBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.header_read_diagnostic_rows",
     "Class": "observation",
     "Unit": "rows",
@@ -1489,6 +1508,25 @@
     "QuietRecovery": false,
     "Sources": [
       "internal/adapters/healthupload.MaxStepPages"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.identity_pairing_poll_attempts",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 600,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/cloud.MaxIdentityPollAttempts"
     ]
   },
   {
