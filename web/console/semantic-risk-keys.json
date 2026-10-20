@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6978,
+  "englishKeys": 6984,
   "counts": {
-    "negation": 2085,
+    "negation": 2086,
     "state": 1145,
     "permission": 421,
     "deletion": 178,
     "uncertainty": 194
   },
-  "unionCount": 3159,
+  "unionCount": 3160,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -91,6 +91,7 @@
       "capacityRow.artifacts.image_bytes.full",
       "capacityRow.artifacts.image_bytes.what",
       "capacityRow.artifacts.images.full",
+      "capacityRow.artifacts.report_total_image_pixels.what",
       "capacityRow.audit.security.full",
       "capacityRow.audit.security.what",
       "capacityRow.board.receipts.full",
@@ -4170,6 +4171,7 @@
     "capacityRow.artifacts.image_bytes.what",
     "capacityRow.artifacts.images.full",
     "capacityRow.artifacts.images.what",
+    "capacityRow.artifacts.report_total_image_pixels.what",
     "capacityRow.audit.security.full",
     "capacityRow.audit.security.what",
     "capacityRow.board.receipts.full",

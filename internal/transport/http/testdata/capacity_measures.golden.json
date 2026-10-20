@@ -21,6 +21,21 @@
     "Note": true
   },
   {
+    "Name": "artifacts.report_image_pixels",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "artifacts.report_image_side",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "artifacts.report_total_image_pixels",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "audit.security",
     "Known": true
   },

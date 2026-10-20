@@ -13,12 +13,15 @@ import (
 )
 
 // The policy is constructed per read and never shared or mutated by callers.
-// URLs are absent, except SVG references to a fragment in this same document.
+// URLs are absent except validated inline screenshots and local SVG fragments.
 func staticHTMLPolicy() *bluemonday.Policy {
 	p := bluemonday.NewPolicy()
-	p.AllowElements(strings.Fields("html head body title main article section nav header footer aside div span p h1 h2 h3 h4 h5 h6 br hr pre code blockquote strong em b i u s small sub sup ul ol li dl dt dd figure figcaption table caption thead tbody tfoot tr th td colgroup col details summary a style svg g defs symbol use path rect circle ellipse line polyline polygon text tspan title desc lineargradient radialgradient stop clippath mask pattern")...)
+	p.AllowElements(strings.Fields("html head body title main article section nav header footer aside div span p h1 h2 h3 h4 h5 h6 br hr pre code blockquote strong em b i u s small sub sup ul ol li dl dt dd figure figcaption table caption thead tbody tfoot tr th td colgroup col details summary a style img svg g defs symbol use path rect circle ellipse line polyline polygon text tspan title desc lineargradient radialgradient stop clippath mask pattern")...)
 	p.AllowAttrs("class", "id", "title", "lang", "dir", "role", "aria-label", "aria-hidden", "style").Globally()
 	p.AllowAttrs("open").OnElements("details")
+	p.AllowAttrs("src").Matching(regexp.MustCompile(`^data:image/(?:png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$`)).OnElements("img")
+	p.AllowAttrs("alt", "width", "height").OnElements("img")
+	p.AllowURLSchemes("data")
 	p.AllowAttrs("colspan", "rowspan", "scope").OnElements("th", "td")
 	p.AllowAttrs("start", "reversed").OnElements("ol")
 	p.AllowAttrs("viewbox", "preserveaspectratio", "width", "height", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "r", "rx", "ry", "d", "points", "transform", "opacity", "fill-opacity", "stroke-opacity", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "text-anchor", "dominant-baseline", "font-size", "offset", "gradientunits", "gradienttransform", "patternunits", "patterntransform").OnElements(strings.Fields("svg g symbol use path rect circle ellipse line polyline polygon text tspan lineargradient radialgradient stop clippath mask pattern")...)
@@ -35,10 +38,15 @@ func staticHTMLPolicy() *bluemonday.Policy {
 // sanitizeHTML runs the mature HTML allowlist first, then rewrites CSS using a
 // parsed declaration allowlist. The final HTML pass protects serialization too.
 func sanitizeHTML(body []byte) []byte {
+	return sanitizeHTMLWithImageBudget(body, MaximumReportImagePixels)
+}
+
+func sanitizeHTMLWithImageBudget(body []byte, imageBudget int64) []byte {
 	p := staticHTMLPolicy()
 	z := html.NewTokenizer(bytes.NewReader(p.SanitizeBytes(body)))
 	var out bytes.Buffer
 	inStyle := false
+	var retainedImagePixels int64
 	for {
 		tt := z.Next()
 		if tt == html.ErrorToken {
@@ -50,6 +58,20 @@ func sanitizeHTML(body []byte) []byte {
 		t := z.Token()
 		switch tt {
 		case html.StartTagToken, html.SelfClosingTagToken:
+			if t.Data == "img" {
+				var pixels int64
+				var sources int
+				for _, a := range t.Attr {
+					if a.Key == "src" {
+						sources++
+						pixels = inlineImagePixels(a.Val, imageBudget-retainedImagePixels)
+					}
+				}
+				if pixels == 0 || sources != 1 {
+					continue
+				}
+				retainedImagePixels += pixels
+			}
 			inStyle = t.Data == "style"
 			attrs := t.Attr[:0]
 			for _, a := range t.Attr {
