@@ -529,7 +529,7 @@ func (t *Transport) handleFrame(conn *Conn, data []byte, h connectionhealth.Hand
 		t.handlePublishError(data)
 		return nil
 	case FrameEnvelope:
-		t.handleEnvelope(data, h)
+		t.handleEnvelopeTraced(data, h)
 		return nil
 	case "peer_envelope":
 		if t.opts.PeerInbound != nil {
@@ -667,7 +667,12 @@ func (t *Transport) handlePublishError(data []byte) {
 // signature, and **only then** the replay claim. Claiming first would let an
 // unauthenticated envelope spend a sequence number that the real sender then
 // could not use (`CloudTransport.swift:2371-2374`).
-func (t *Transport) handleEnvelope(data []byte, h connectionhealth.Handle) {
+func (t *Transport) handleEnvelope(data []byte) {
+	t.handleEnvelopeTraced(data, connectionhealth.Handle{})
+}
+
+// handleEnvelopeTraced is handleEnvelope carrying the frame's phase.
+func (t *Transport) handleEnvelopeTraced(data []byte, h connectionhealth.Handle) {
 	var frame EnvelopeFrame
 	if err := json.Unmarshal(data, &frame); err != nil || len(frame.Envelope) == 0 {
 		t.opts.Status.Dropped(DropMalformed)

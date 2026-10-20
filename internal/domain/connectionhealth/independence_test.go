@@ -83,8 +83,11 @@ func TestAScanNeverWaitsForAHeldJournal(t *testing.T) {
 	}
 	// The slow and stall transitions came while the queue was still full:
 	// they are in the count, not silently missing, and the report kept them.
-	if lostAt != len(all)-1 || all[lostAt].MonoNS != r.MonoNS {
-		t.Fatalf("the loss is not the journal's last word at the last scan's time: %+v", all[len(all)-1])
+	// The loss is followed only by the stall that still stands, re-stated
+	// at the same instant, so the journal cannot end on "loss, then quiet".
+	if lostAt != len(all)-2 || all[lostAt].MonoNS != r.MonoNS ||
+		all[lostAt+1].Event != EventStateAfterLoss || all[lostAt+1].State != StateBlocked {
+		t.Fatalf("the loss and the standing stall are not the journal's last words at the last scan's time: %+v", all[lostAt:])
 	}
 }
 

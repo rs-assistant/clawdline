@@ -157,8 +157,12 @@ func ExampleExport() {
 	//       "status": "implemented"
 	//     },
 	//     {
+	//       "part": "daemon_runtime_per_boot",
+	//       "status": "implemented"
+	//     },
+	//     {
 	//       "part": "daemon_instrumentation_call_sites",
-	//       "status": "unimplemented"
+	//       "status": "partial"
 	//     },
 	//     {
 	//       "part": "durable_segmented_journal",
@@ -170,7 +174,7 @@ func ExampleExport() {
 	//     },
 	//     {
 	//       "part": "local_health_cli_and_route",
-	//       "status": "unimplemented"
+	//       "status": "implemented"
 	//     },
 	//     {
 	//       "part": "cloud_ingest",
@@ -186,7 +190,7 @@ func ExampleExport() {
 	//     },
 	//     {
 	//       "part": "stage_location_map_per_build",
-	//       "status": "unimplemented"
+	//       "status": "partial"
 	//     }
 	//   ]
 	// }
