@@ -279,7 +279,10 @@ type fixedKeys struct {
 func (f *fixedKeys) Keys(context.Context) (Keys, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.keys, f.err
+	k := f.keys
+	// The caller clears the secret it is given; each call gets its own.
+	k.MasterSecret = append([]byte(nil), f.keys.MasterSecret...)
+	return k, f.err
 }
 
 func testKeys(t *testing.T) *fixedKeys {

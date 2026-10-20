@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -77,6 +78,8 @@ type Keys struct {
 // KeySource reads the machine's identity and master secret. It returns a
 // typed Error: CodeKeyHandoverRequired when the content-key epoch of the
 // master secret is not known, CodeKeyUnavailable when no secret is held.
+// Each call answers a MasterSecret of its own: the caller clears it as soon
+// as the key is derived, so it never outlives one seal.
 type KeySource interface {
 	Keys(ctx context.Context) (Keys, error)
 }
@@ -119,7 +122,14 @@ func (p ProviderSource) Keys(ctx context.Context) (Keys, error) {
 type Uploader struct {
 	// Endpoint is Cloud's API origin, https only (http for loopback tests).
 	Endpoint string
-	Client   *http.Client
+	// Origin, when set, is read instead of Endpoint for every send, so the
+	// origin the settings name now is the one used.
+	Origin func() (string, error)
+	// Ready, when set, is a local-only check (no request) of whether a seal
+	// could happen now; Worker.Refresh reports its code, so a missing key
+	// handover is visible before the first incident needs it.
+	Ready  func() error
+	Client *http.Client
 	// Enabled is the owner-diagnostic-retention opt-in. It is separate from
 	// the metadata upload switch and off by default; off means no seal and
 	// no request.
@@ -159,6 +169,7 @@ func (u *Uploader) Seal(ctx context.Context, bootID, kind, subjectID string, sna
 	if err != nil {
 		return Pending{}, err
 	}
+	defer clear(keys.MasterSecret)
 	plain, err := snap.Encode()
 	if err != nil {
 		return Pending{}, err
@@ -225,10 +236,12 @@ func (u *Uploader) Seal(ctx context.Context, bootID, kind, subjectID string, sna
 		}
 	}
 	key, err := DeriveKey(keys.MasterSecret)
+	clear(keys.MasterSecret)
 	if err != nil {
 		return Pending{}, err
 	}
 	ct, err := Seal(key, aad, nonce, plain)
+	clear(key)
 	if err != nil {
 		return Pending{}, err
 	}
@@ -263,6 +276,8 @@ func (u *Uploader) Send(ctx context.Context, id string) (Receipt, error) {
 	if err != nil {
 		return Receipt{}, err
 	}
+	// A send needs the identity, never the secret.
+	clear(keys.MasterSecret)
 	a, ok, err := u.Store.Load(id)
 	if err != nil {
 		return Receipt{}, err
@@ -355,7 +370,15 @@ func (u *Uploader) sleep(ctx context.Context, d time.Duration) error {
 }
 
 func (u *Uploader) target() (string, error) {
-	parsed, err := url.Parse(u.Endpoint)
+	endpoint := u.Endpoint
+	if u.Origin != nil {
+		e, err := u.Origin()
+		if err != nil {
+			return "", fail(CodeKeyUnavailable)
+		}
+		endpoint = e
+	}
+	parsed, err := url.Parse(endpoint)
 	if err != nil || parsed.Host == "" {
 		return "", fail(CodeBadInput)
 	}
@@ -473,13 +496,24 @@ type Job struct {
 
 // Status is the worker's last outcome, for the local status route.
 type Status struct {
-	Enabled  bool   `json:"enabled"`
+	Enabled bool `json:"enabled"`
+	// Ready is Uploader.Ready's code at the last refresh; empty when a
+	// seal could happen.
+	Ready    Code   `json:"ready_code,omitempty"`
 	Code     Code   `json:"code,omitempty"`
 	Cloud    string `json:"cloud_code,omitempty"`
 	Stored   int64  `json:"stored"`
 	Refused  int64  `json:"refused"`
 	Dropped  int64  `json:"dropped"`
 	LastAtMS int64  `json:"last_at_ms,omitempty"`
+	// Queued is the hand-off queue's depth now (MaxQueuedJobs).
+	Queued int `json:"queued"`
+	// Attachments and StoreBytes are the local records as last counted on
+	// the worker's goroutine; StoreMeasured is false until then, and
+	// after a count that failed.
+	Attachments   int   `json:"attachments"`
+	StoreBytes    int64 `json:"store_bytes"`
+	StoreMeasured bool  `json:"store_measured"`
 }
 
 // Worker runs seals and sends on its own goroutine, so a producer — the
@@ -487,20 +521,37 @@ type Status struct {
 type Worker struct {
 	u    *Uploader
 	jobs chan Job
-	mu   sync.Mutex
-	st   Status
+	// Interval is how often Run re-reads the opt-in, re-checks readiness
+	// and resends revisions left pending (by a restart, a shutdown or
+	// spent attempts).
+	Interval time.Duration
+	// on caches the opt-in as last read on the worker's goroutine, so the
+	// status route and Offer do no file I/O while it is on.
+	on atomic.Bool
+	mu sync.Mutex
+	st Status
 }
+
+// refreshInterval is Worker.Interval's default.
+const refreshInterval = time.Minute
 
 // NewWorker binds an uploader to a bounded hand-off queue.
 func NewWorker(u *Uploader) *Worker {
-	return &Worker{u: u, jobs: make(chan Job, MaxQueuedJobs)}
+	return &Worker{u: u, jobs: make(chan Job, MaxQueuedJobs), Interval: refreshInterval}
 }
 
+// Enabled is the opt-in as last read; it never reads a file.
+func (w *Worker) Enabled() bool { return w.on.Load() }
+
 // Offer hands a job to the worker without waiting. Off is CodeDisabled; a
-// full queue is CodeBusy and the job is counted as dropped.
+// full queue is CodeBusy and the job is counted as dropped. While the
+// cached opt-in is on it does no I/O; the seal and the send re-read it.
 func (w *Worker) Offer(j Job) error {
-	if !w.u.enabled() {
-		return fail(CodeDisabled)
+	if !w.on.Load() {
+		if !w.u.enabled() {
+			return fail(CodeDisabled)
+		}
+		w.on.Store(true)
 	}
 	select {
 	case w.jobs <- j:
@@ -513,15 +564,86 @@ func (w *Worker) Offer(j Job) error {
 	}
 }
 
-// Run serves jobs until ctx ends.
+// Run serves jobs until ctx ends. It first resends what an earlier run
+// left pending, then does so again every Interval. A job in flight when
+// ctx ends stays pending on disk with its exact body for the next run.
 func (w *Worker) Run(ctx context.Context) {
+	interval := w.Interval
+	if interval <= 0 {
+		interval = refreshInterval
+	}
+	w.Refresh()
+	w.resume(ctx)
+	t := time.NewTicker(interval)
+	defer t.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-t.C:
+			w.Refresh()
+			w.resume(ctx)
 		case j := <-w.jobs:
 			w.handle(ctx, j)
 		}
+	}
+}
+
+// Refresh re-reads the opt-in and, when on, the uploader's local readiness.
+func (w *Worker) Refresh() {
+	on := w.u.enabled()
+	w.on.Store(on)
+	var ready Code
+	if on && w.u.Ready != nil {
+		if err := w.u.Ready(); err != nil {
+			if ready = CodeOf(err); ready == "" {
+				ready = CodeKeyUnavailable
+			}
+		}
+	}
+	w.mu.Lock()
+	w.st.Ready = ready
+	w.mu.Unlock()
+	w.measure()
+}
+
+// measure counts the local records for the status; it runs only on the
+// worker's goroutine, so the status route never reads the disk.
+func (w *Worker) measure() {
+	if w.u.Store == nil {
+		return
+	}
+	n, total, err := w.u.Store.Usage()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.st.Attachments, w.st.StoreBytes, w.st.StoreMeasured = n, total, err == nil
+}
+
+// resume prunes expired records and sends every revision still pending,
+// at most MaxPendingAttachments of them, each within its own bounds.
+func (w *Worker) resume(ctx context.Context) {
+	if !w.on.Load() || w.u.Store == nil {
+		return
+	}
+	_ = w.u.Store.Prune(w.u.now().UnixMilli())
+	ids, err := w.u.Store.IDs()
+	if err != nil {
+		w.record(err)
+		return
+	}
+	for _, id := range ids {
+		if ctx.Err() != nil {
+			return
+		}
+		a, ok, err := w.u.Store.Load(id)
+		if err != nil || !ok || len(a.Revisions) == 0 || a.Revisions[len(a.Revisions)-1].State != RevisionPending {
+			continue
+		}
+		_, err = w.u.Send(ctx, id)
+		if ctx.Err() != nil {
+			return
+		}
+		w.record(err)
 	}
 }
 
@@ -529,6 +651,18 @@ func (w *Worker) handle(ctx context.Context, j Job) {
 	p, err := w.u.Seal(ctx, j.BootID, j.SubjectKind, j.SubjectID, j.Snapshot)
 	if err == nil {
 		_, err = w.u.Send(ctx, p.AttachmentID)
+	}
+	if ctx.Err() != nil {
+		// Stopping: the revision, if sealed, is pending on disk.
+		return
+	}
+	w.record(err)
+	w.measure()
+}
+
+func (w *Worker) record(err error) {
+	if CodeOf(err) == CodeDisabled {
+		w.on.Store(false)
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -554,6 +688,7 @@ func (w *Worker) Status() Status {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	s := w.st
-	s.Enabled = w.u.enabled()
+	s.Enabled = w.on.Load()
+	s.Queued = len(w.jobs)
 	return s
 }

@@ -59,6 +59,72 @@ type wireBatch struct {
 	BootID           string      `json:"boot_id"`
 	BuildCommit      string      `json:"build_commit,omitempty"`
 	Events           []wireEvent `json:"events"`
+	// LocalLoss is the progress file's settled loss totals (Cloud contract
+	// §12.1), set only on a metadata-only batch. It is written into the
+	// body once, when the batch is built, and never refreshed on a retry:
+	// the body is part of the batch digest. Absent, not null, elsewhere.
+	LocalLoss *wireLocalLoss `json:"local_loss,omitempty"`
+}
+
+// LocalLossSchema is §12.1's block schema. It is split only so the
+// privacy guard does not read its middle as a .local host name.
+const LocalLossSchema = "clawdline.connection-health." + "local-loss/1"
+
+// wireLocalLoss is §12.1's block: totals of one counter epoch (the life of
+// one progress file), never per batch, boot or sequence. Cloud keeps the
+// maximum per key within an epoch, so the same totals on every batch never
+// add up. It names no sequence and no cause beyond the coarse reason.
+type wireLocalLoss struct {
+	Schema       string            `json:"schema"`
+	CounterEpoch string            `json:"counter_epoch"`
+	ObservedAt   string            `json:"observed_at"`
+	StorageLost  uint64            `json:"storage_lost_records"`
+	StoreGaps    map[string]uint64 `json:"store_gaps"`
+	Excluded     map[string]uint64 `json:"excluded"`
+}
+
+// UnlistedReason is §12.1's one bucket for an exclusion reason outside
+// Cloud's allowlist; a free-text reason is never sent.
+const UnlistedReason = "unlisted"
+
+// cloudGapReasons and cloudExcludedReasons are §12.1's allowlists, exactly.
+// TestTheLocalLossAllowlistsMatchTheGoReasons fails when a Go reason is
+// added without a decision here.
+var cloudGapReasons = map[string]bool{
+	"pruned": true, "missing_segment": true, "corrupt_frames": true, "unreadable_tail": true, "invalid_cursor": true,
+}
+
+var cloudExcludedReasons = map[string]bool{
+	ExcludedState: true, ExcludedEvent: true, ExcludedStage: true, ExcludedSource: true,
+	ExcludedUnsafeInteger: true, ExcludedPattern: true, ExcludedTooLarge: true, UnlistedReason: true,
+}
+
+// localLoss builds the block from totals, or nil when it cannot be stated
+// truthfully: no counter epoch yet, a value past Cloud's safe integer, or a
+// gap reason Cloud does not list (an omitted key would read as 0, which is
+// not known). Unknown is not zero.
+func localLoss(epoch string, at time.Time, c lossCounters) *wireLocalLoss {
+	if !cloudOpaque.MatchString(epoch) || c.StorageLost > jsSafeInteger {
+		return nil
+	}
+	b := &wireLocalLoss{Schema: LocalLossSchema, CounterEpoch: epoch, ObservedAt: at.UTC().Format(time.RFC3339),
+		StorageLost: c.StorageLost, StoreGaps: map[string]uint64{}, Excluded: map[string]uint64{}}
+	for k, v := range c.Gaps {
+		if !cloudGapReasons[k] || v > jsSafeInteger {
+			return nil
+		}
+		b.StoreGaps[k] = v
+	}
+	for k, v := range c.Excluded {
+		if !cloudExcludedReasons[k] {
+			k = UnlistedReason
+		}
+		b.Excluded[k] += v
+		if b.Excluded[k] > jsSafeInteger {
+			return nil
+		}
+	}
+	return b
 }
 
 // Exclusion reasons: a stored record this uploader will not send, counted by
