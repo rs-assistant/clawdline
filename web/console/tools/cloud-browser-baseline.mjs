@@ -7,8 +7,8 @@ import { mkdirSync, mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync
 import { createHash } from 'node:crypto';
 import { spawnSync, spawn } from 'node:child_process';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
-const [action = 'help', outputArgument, buildArgument] = process.argv.slice(2);
-if (!['build', 'start', 'summarize'].includes(action) || !outputArgument) { console.log('tools/heavy.sh node web/console/tools/cloud-browser-baseline.mjs build|start|summarize <absolute task artifacts directory>\nSummarize also requires the exact build artifacts directory as its third argument. Build first. Start prints loopback URL and child PID. POST /stop with matching Origin to stop; no server survives this process.'); process.exit(action === 'help' ? 0 : 2); }
+const [action = 'help', outputArgument, buildArgument, measuredRevision] = process.argv.slice(2);
+if (!['build', 'start', 'summarize'].includes(action) || !outputArgument) { console.log('tools/heavy.sh node web/console/tools/cloud-browser-baseline.mjs build|start|summarize <absolute task artifacts directory>\nSummarize also requires the exact build artifacts directory as its third argument, and optionally the measured full Git commit as its fourth argument when validating historical evidence. Build first. Start prints loopback URL and child PID. POST /stop with matching Origin to stop; no server survives this process.'); process.exit(action === 'help' ? 0 : 2); }
 const output = resolve(outputArgument), bundle = resolve(output, 'entry.js'), binary = resolve(output, 'browser-fixture.test'); mkdirSync(output, { recursive: true });
 if (action === 'summarize') {
  const rounds = [1, 2, 3].map(n => JSON.parse(readFileSync(resolve(output, `round-${n}.json`), 'utf8')));
@@ -16,13 +16,20 @@ if (action === 'summarize') {
  const buildOutput = resolve(buildArgument);
  const identity = JSON.parse(readFileSync(resolve(buildOutput, 'hashes.json'), 'utf8'));
  const manifest = JSON.parse(readFileSync(resolve(buildOutput, 'source-manifest.json'), 'utf8'));
+ const measuredFile = path => {
+  if (!measuredRevision) return readFileSync(resolve(root,path));
+  if (!/^[a-f0-9]{40}$/.test(measuredRevision)) throw new Error('Measured revision must be a full Git commit');
+  const result = spawnSync('git',['show',`${measuredRevision}:${path}`],{cwd:root});
+  if (result.status !== 0) throw new Error(`Measured source is unavailable: ${path}`);
+  return result.stdout;
+ };
  const hash = bytes => createHash('sha256').update(bytes).digest('hex');
  const requireHash = value => { if (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value)) throw new Error('Missing artifact identity'); return value; };
  for (const [name, path] of [['binary', 'browser-fixture.test'], ['bundle', 'entry.js']]) if (hash(readFileSync(resolve(buildOutput, path))) !== requireHash(identity[name])) throw new Error('Build artifact identity differs');
  requireHash(identity.source);
  if (!manifest || Object.keys(manifest).length === 0) throw new Error('Missing source manifest');
- for (const [path, expected] of Object.entries(manifest)) if (hash(readFileSync(resolve(root, path))) !== requireHash(expected)) throw new Error(`Source manifest differs: ${path}`);
- if (sourceDigest() !== identity.source) throw new Error('Source aggregate differs');
+ for (const [path, expected] of Object.entries(manifest)) if (hash(measuredFile(path)) !== requireHash(expected)) throw new Error(`Source manifest differs: ${path}`);
+ if (sourceDigest(measuredFile) !== identity.source) throw new Error('Source aggregate differs');
  const nonnegative = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
  const integer = value => nonnegative(value) && Number.isSafeInteger(value);
  const counterKeys = new Set(['accepted_commands','acks','admission_refused','connections','direct_frames_delivered','direct_native_requests','direct_peer_drops','http_requests','injected_duplicates','logical_reads','machine_publications','native_direct_offers','relay_delivered','subscribe','terminal_frame_observed','terminal_relay_frames_delivered','terminal_requests','unsubscribe','viewer_publish_frames','ws_in_frames','ws_in_json_bytes','ws_out_frames','ws_out_json_bytes']);
@@ -48,6 +55,7 @@ if (action === 'summarize') {
    if (previous) monotonic(previous,row.fixture_before);
    previous = row.fixture_after;
   }
+  const contextBatches = new Map(), lastSequence = new Map();
   for (const viewers of [1,2,4]) for (const [prefix, [delivered, errors]] of Object.entries(shape)) {
    const row = rows.find(s => s.name === `${prefix}-${viewers}`), expected = delivered === 'viewers' ? viewers : delivered === 'twice' ? viewers * 2 : delivered;
    const reads = prefix === 'multi-session' ? viewers * 2 : ['active-one','socket-reconnect'].includes(prefix) ? viewers : 0;
@@ -56,15 +64,29 @@ if (action === 'summarize') {
    const actualReads = (row.fixture_after.counters.logical_reads ?? 0) - (row.fixture_before.counters.logical_reads ?? 0);
    if (actualReads !== reads) throw new Error('Logical read counter differs');
    const sequences = new Set();
+   const rowContexts = [...new Set(row.proofs.map(p => p.context))];
+   if (prefix === 'active-one') {
+    if (rowContexts.some(context => lastSequence.has(context))) throw new Error('Independent viewer batch reused a context');
+    contextBatches.set(viewers,rowContexts);
+   }
+   const batch = contextBatches.get(viewers);
+   if (expected && (!batch || rowContexts.length !== contexts || rowContexts.some(context => !batch.includes(context)) || (contexts === 1 && viewers > 1 && rowContexts[0] !== batch[0]))) throw new Error('Same-batch viewer context differs');
+   const expectedCanaries = prefix === 'multi-viewer' ? new Set(Array.from({length:viewers},(_,i) => `canary-round-${index+1}-viewers-${viewers}-${i}`)) : null;
    for (const proof of row.proofs) {
     if (typeof proof.context !== 'string' || !proof.context.startsWith('synthetic-') || !Number.isSafeInteger(proof.sequence) || proof.sequence <= 0 || sequences.has(proof.sequence)) throw new Error('Missing or duplicate proof sequence/context');
     sequences.add(proof.sequence);
+    if (proof.sequence <= (lastSequence.get(proof.context) ?? 0)) throw new Error('Viewer proof sequence did not advance');
+    lastSequence.set(proof.context,proof.sequence);
+    if (expectedCanaries && !expectedCanaries.delete(proof.canary)) throw new Error('Targeted publication canary differs');
+    if (prefix === 'receiver-pin-restored' && proof.canary !== `canary-pin-restored-${index+1}-${viewers}`) throw new Error('Restored pin canary differs');
+    if (prefix === 'fixture-restored' && proof.canary !== `canary-restored-${index+1}-${viewers}`) throw new Error('Restored fixture canary differs');
     const sessions = prefix === 'socket-reconnect' ? ['two'] : prefix === 'multi-session' ? ['one','two'] : ['one'];
     if (!sessions.includes(proof.session) || typeof proof.canary !== 'string' || !proof.canary.startsWith('canary-')) throw new Error('Missing proof content/session');
     if (reads && proof.canary !== `canary-screen-${proof.session}`) throw new Error('Read canary differs');
    }
+   if (expectedCanaries?.size) throw new Error('Targeted publication canary missing');
    if (expected && new Set(row.proofs.map(p => p.context)).size !== contexts) throw new Error('Independent context proof missing');
-   if (prefix === 'multi-session') for (const context of new Set(row.proofs.map(p => p.context))) if (['one','two'].some(session => row.proofs.filter(p => p.context === context && p.session === session).length !== 1)) throw new Error('Missing per-context session proof');
+   if (prefix === 'multi-session') for (const context of new Set(row.proofs.map(p => p.context))) if (row.proofs.filter(p => p.context === context).map(p => p.session).join(',') !== 'one,two') throw new Error('Missing per-context session proof');
   }
   const native = rows.find(s => s.name === 'native-direct-auto-fallback');
   if (!native?.pass || native.viewers !== 1 || native.reads !== 0 || native.errors !== 0 || native.native_rtc !== true || native.same_client_fallback !== true || native.direct_then_relay !== true || native.verified_checkpoints !== 2 || native.delivered < 2 || native.proofs.length !== 1 || typeof native.proofs[0].context !== 'string' || !native.proofs[0].context.startsWith('synthetic-') || native.proofs[0].session !== 'terminal' || native.proofs[0].canary !== 'canary-native-relay') throw new Error('Native same-session direct/fallback proof missing');
@@ -125,8 +147,8 @@ async function startupSmoke() {
  } finally { clearTimeout(timer); if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM'); await exited; writeFileSync(resolve(output, 'startup-smoke.log'), log + stderr); }
 }
 
-function sourceDigest() {
+function sourceDigest(read = path => readFileSync(resolve(root,path))) {
  const h = createHash('sha256');
- for (const path of ['internal/domain/persona/catalog/performance.md','internal/transport/cloud/browser_efficiency_fixture_test.go','web/console/tools/cloud-browser-baseline-entry.mjs','web/console/tools/cloud-browser-baseline.mjs','web/console/src/legacy/js/net/cloud-client.js','web/console/src/legacy/js/net/cloud-crypto.js']) { h.update(path); h.update(readFileSync(resolve(root,path))); }
+ for (const path of ['internal/domain/persona/catalog/performance.md','internal/transport/cloud/browser_efficiency_fixture_test.go','web/console/tools/cloud-browser-baseline-entry.mjs','web/console/tools/cloud-browser-baseline.mjs','web/console/src/legacy/js/net/cloud-client.js','web/console/src/legacy/js/net/cloud-crypto.js']) { h.update(path); h.update(read(path)); }
  return h.digest('hex');
 }
