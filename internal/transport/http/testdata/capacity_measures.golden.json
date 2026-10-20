@@ -855,6 +855,71 @@
     "Note": true
   },
   {
+    "Name": "console.viewer_health_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_backoff_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_batch_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_body_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_buffer_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_coalesce_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_count_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_elapsed_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_hourly_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_hourly_requests",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_request_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_retry_after_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.viewer_health_send_every_seconds",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "coordinator.aliases",
     "Known": true
   },
