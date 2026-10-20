@@ -112,6 +112,7 @@ export function viewerRecord(
   if (o.class !== undefined) record.class = o.class
   if (o.correlation !== undefined) record.correlation = o.correlation
   if (o.outcome !== undefined) record.outcome = o.outcome
+  if (o.error !== undefined) record.error = o.error
   if (o.elapsedMs !== undefined && Number.isFinite(o.elapsedMs)) {
     record.elapsed_ms = Math.min(limits.elapsedMaxMs, Math.max(0, Math.round(o.elapsedMs)))
   }
