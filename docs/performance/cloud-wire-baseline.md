@@ -104,3 +104,5 @@ An independent reviewer recomputed all 36 archived scenario rows (the original a
 ## Follow-up CPU attribution
 
 The [isolated-process CPU experiment](cloud-wire-cpu.md) separates machine transport, fixture relay, viewer and generator costs. It adds attribution, not a production optimization or a speedup comparison with the combined-process subject.
+
+The [Publisher-to-wire experiment](cloud-publisher-wire.md) now joins production Pass to this transport path. Its CPU remains combined and its inventory remains a fixture; it does not close the full-daemon gaps above.
