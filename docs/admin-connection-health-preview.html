@@ -59,6 +59,13 @@ h1:focus-visible { outline: 2px solid var(--accent); }
 .nav b { font-size: 14.5px; font-weight: 560; }
 .nav .on b { font-weight: 640; }
 .nav small { font-size: 12px; color: var(--dim); }
+.nav .off { min-height: 40px; }
+.nav-group { margin: 14px 10px 6px; font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.links { display: flex; flex-wrap: wrap; gap: 8px; }
+.marker { color: var(--dim); font-size: 12.5px; }
+.truth { padding: 14px; border-radius: 10px; border: 1px dashed var(--accent-ed); background: var(--bg); display: grid; gap: 6px; }
+.truth h3 { margin: 0; font-size: 14px; font-weight: 640; }
+.truth p { margin: 0; font-size: 13.5px; line-height: 1.5; }
 .side-foot { margin-top: auto; padding: 14px 6px 0; border-top: 1px solid var(--line); color: var(--dim); font-size: 12.5px; line-height: 1.5; }
 .top { display: none; }
 .content { min-width: 0; }
@@ -290,9 +297,17 @@ pre.json { margin: 0; padding: 14px; max-height: 70vh; overflow: auto; border-ra
     <nav class="nav" data-t-label="navLabel">
       <ul>
         <li><span class="off"><b data-t="navOverview"></b><small data-t="notInProto"></small></span></li>
+        <li><span class="off"><b data-t="navSurvey"></b><small data-t="notInProto"></small></span></li>
         <li><span class="off"><b data-t="navAccounts"></b><small data-t="notInProto"></small></span></li>
         <li><span class="off"><b data-t="navUsage"></b><small data-t="notInProto"></small></span></li>
-        <li><a href="#overview" class="on" aria-current="page"><b data-t="navHealth"></b><small data-t="navHealthHint"></small></a></li>
+        <li><span class="off"><b data-t="navPromotions"></b><small data-t="notInProto"></small></span></li>
+      </ul>
+      <p class="nav-group" data-t="navHealth"></p>
+      <ul>
+        <li><a href="#overview" data-route="overview"><b data-t="navM01"></b><small data-t="navHealthHint"></small></a></li>
+        <li><a href="#machines" data-route="machines"><b data-t="navM02"></b><small data-t="navM02Hint"></small></a></li>
+        <li><a href="#services" data-route="services"><b data-t="navM03"></b><small data-t="navM03Hint"></small></a></li>
+        <li><a href="#monitoring" data-route="monitoring"><b data-t="navM06"></b><small data-t="navM06Hint"></small></a></li>
       </ul>
     </nav>
     <p class="side-foot" data-t="sideFoot"></p>
@@ -309,7 +324,7 @@ const WORDS = {
   en: {
     proto: "Design prototype · illustrative data · not live monitoring",
     lang: "中文", menu: "Menu", ops: "Operations", navLabel: "Operations pages",
-    navOverview: "Overview", navAccounts: "Accounts", navUsage: "Usage", navHealth: "Connection health",
+    navOverview: "Overview", navSurvey: "Onboarding survey", navAccounts: "Accounts", navUsage: "Usage", navPromotions: "Promotions", navHealth: "Connection health",
     navHealthHint: "Blocks, slowness, errors", notInProto: "Not part of this prototype",
     sideFoot: "Read-only. This page never restarts, retries or changes anything.",
     title: "Connection health", lead: "Where requests are blocked, slow or failing, when it started, and the evidence to find the code.",
@@ -317,7 +332,7 @@ const WORDS = {
     scopeCloud: "Cloud service", scopeMachine: "Your machine", scopeViewer: "This viewer",
     w15: "15 min", w60: "1 hour", w360: "6 hours",
     live: "Live", paused: "Paused", pause: "Pause", resume: "Resume live",
-    liveNote: "Live: the window follows the clock and source ages keep counting. No new fixture events arrive; this is a prototype.",
+    liveNote: "Live: the window follows the clock and source ages keep counting; the page would poll every 15 s (proposed, pending load tests). No new fixture events arrive; this is a prototype.",
     pausedNote: "Paused at {time} UTC. The window and every age are frozen; {n} simulated receipts would have arrived since.",
     scenarioReset: "Scenario changed: the selection was reset to this scenario's newest active incident and the window to its default.",
     incidentGone: "That incident is not in the current scenario. Showing the overview instead.",
@@ -357,9 +372,9 @@ const WORDS = {
     startedAt: "Started", endedAt: "Ended", ongoing: "Ongoing", segment: "Segment", trace: "Trace", build: "Build",
     waterfall: "One correlated request, stage by stage", wfNote: "Each stage is a separate receipt. A stage without a receipt is not assumed to have happened.",
     stage: "Stage", at: "At", took: "After previous", by: "Recorded by", receiptAge: "Receipt age", noReceipt: "No receipt",
-    stg_accepted: "Accepted", stg_queued: "Queued", stg_executed: "Executed", stg_published: "Published", stg_delivered: "Relay delivered", stg_observed: "Viewer observed", stg_acked: "Acknowledged",
-    stg_accepted_s: "Cloud ledger", stg_queued_s: "machine inbound", stg_executed_s: "machine ledger", stg_published_s: "machine outbound", stg_delivered_s: "relay receipt", stg_observed_s: "viewer", stg_acked_s: "viewer, on screen",
-    code: "Where to look in the code", codeNote: "Locations are the stage owners named by the evidence, at the build that emitted it.",
+    stg_accepted: "Accepted", stg_queued: "Queued", stg_executed: "Executed", stg_published: "Published", stg_delivered: "Relay delivered", stg_observed: "Viewer received", stg_applied: "UI adopted", stg_acked: "Explicitly acknowledged",
+    stg_accepted_s: "Cloud ledger", stg_queued_s: "machine inbound", stg_executed_s: "machine ledger", stg_published_s: "machine outbound", stg_delivered_s: "relay receipt", stg_observed_s: "viewer", stg_applied_s: "viewer state applied to the screen", stg_acked_s: "a person's explicit action, only when asked",
+    code: "Example responsibility points", codeNote: "Hypothetical instrumentation for illustration, not the exact build of a real incident. The stable stage-to-source map is not implemented yet, so a location code without a path names no source line. A listed line is where that code lives today, not a root cause.",
     toEvidence: "Agent evidence", back: "Connection health",
     // evidence
     evidence: "Agent evidence", evidenceLead: "The structured record an agent reads to locate the code. Illustrative; generated from the fixture on this page.",
@@ -381,7 +396,7 @@ const WORDS = {
   "zh-TW": {
     proto: "設計原型 · 示意資料 · 非即時監控",
     lang: "English", menu: "選單", ops: "營運", navLabel: "營運頁面",
-    navOverview: "總覽", navAccounts: "帳號", navUsage: "用量", navHealth: "連線健康",
+    navOverview: "總覽", navSurvey: "新使用者問卷", navAccounts: "帳號", navUsage: "用量", navPromotions: "兌換管理", navHealth: "連線健康",
     navHealthHint: "阻塞、變慢、錯誤", notInProto: "不在這份原型裡",
     sideFoot: "唯讀。這一頁不會重新啟動、重試或更改任何東西。",
     title: "連線健康", lead: "哪裡的請求被擋住、變慢或失敗，從什麼時候開始，以及找到程式碼的證據。",
@@ -389,7 +404,7 @@ const WORDS = {
     scopeCloud: "Cloud 服務", scopeMachine: "你的機器", scopeViewer: "這個瀏覽器",
     w15: "15 分鐘", w60: "1 小時", w360: "6 小時",
     live: "即時", paused: "已暫停", pause: "暫停", resume: "回到即時",
-    liveNote: "即時：時間範圍跟著時鐘走，各來源的時間會繼續累加。不會有新的示意事件進來；這是原型。",
+    liveNote: "即時：時間範圍跟著時鐘走，各來源的時間會繼續累加；正式版預計每 15 秒查詢一次（提議值，待壓測）。不會有新的示意事件進來；這是原型。",
     pausedNote: "暫停於 UTC {time}。時間範圍與所有時間都凍結；暫停後本來會收到 {n} 筆模擬回執。",
     scenarioReset: "情境已切換：選取改回這個情境最新的進行中事件，時間範圍改回預設。",
     incidentGone: "目前的情境裡沒有這個事件，改為顯示總覽。",
@@ -422,9 +437,9 @@ const WORDS = {
     startedAt: "開始", endedAt: "結束", ongoing: "仍在進行", segment: "路段", trace: "追蹤", build: "版本",
     waterfall: "同一筆請求，逐段來看", wfNote: "每個階段都是各自的回執。沒有回執的階段，不會被假設已經發生。",
     stage: "階段", at: "時間", took: "距上一段", by: "記錄者", receiptAge: "回執時間", noReceipt: "沒有回執",
-    stg_accepted: "已接受", stg_queued: "已排隊", stg_executed: "已執行", stg_published: "已發出", stg_delivered: "Relay 已送達", stg_observed: "瀏覽器已收到", stg_acked: "已確認",
-    stg_accepted_s: "Cloud 帳本", stg_queued_s: "機器入站", stg_executed_s: "機器帳本", stg_published_s: "機器出站", stg_delivered_s: "relay 回執", stg_observed_s: "瀏覽器", stg_acked_s: "瀏覽器，已畫在畫面上",
-    code: "程式碼要看哪裡", codeNote: "位置是證據點名的階段負責者，版本是發出證據的那一版。",
+    stg_accepted: "已接受", stg_queued: "已排隊", stg_executed: "已執行", stg_published: "已發出", stg_delivered: "Relay 已送達", stg_observed: "瀏覽器已收到", stg_applied: "介面已採用", stg_acked: "使用者明確確認",
+    stg_accepted_s: "Cloud 帳本", stg_queued_s: "機器入站", stg_executed_s: "機器帳本", stg_published_s: "機器出站", stg_delivered_s: "relay 回執", stg_observed_s: "瀏覽器", stg_applied_s: "瀏覽器狀態已套用到畫面", stg_acked_s: "人的明確動作，只在操作要求時",
+    code: "示例責任點", codeNote: "這是示意用的假想插樁，不是真實事故的精確版本。穩定的階段→原始碼對照還沒實作，所以只有位置代碼、沒有路徑的項目不指任何原始碼行。列出的行只表示那段程式碼現在在哪裡，不是根因。",
     toEvidence: "給 agent 的證據", back: "連線健康",
     evidence: "給 agent 的證據", evidenceLead: "agent 用來找到程式碼的結構化紀錄。示意用，由這一頁的示意資料產生。",
     copy: "複製 JSON", download: "下載 .json", copied: "已把示意 JSON 複製到剪貼簿。",
@@ -452,65 +467,212 @@ function t(key, vars) {
 const L = (o) => (o && typeof o === "object" ? (locale === "zh-TW" ? o.zh : o.en) : o)
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]))
 
+Object.assign(WORDS.en, {
+  navM01: "M01 · Overview", navM02: "M02 · Machine connections", navM02Hint: "Presence, viewers, carriers",
+  navM03: "M03 · Cloud services", navM03Hint: "API, relay, telemetry", navM06: "M06 · Monitoring status", navM06Hint: "Sources, gaps, retention",
+  na: "Not requested by this operation", hiddenStage: "Not visible in this scope",
+  activeSpan: "No completion receipt · active handler span {span} open for {age} (synthetic; injection {inj})",
+  hiddenItems: "{n} item(s) recorded by {src} are not visible in this scope.",
+  truth: "Fixture ground truth (not observed)",
+  truthNote: "Declared by the fixture's injection manifest so reviewers can check the page against a known answer. The observed conclusion does not rely on it, and a real incident has no such manifest.",
+  statsFixed: "Figures are a fixed 60-minute fixture window ending {time} UTC. The time-window control changes the timelines and event lists, not these figures.",
+  floorNote: "actual floor {floor}: the 100 MiB cap was reached first",
+  noPath: "No source line named", opHiddenNote: "Operator data; this scope cannot read it.",
+  linkM02: "Machine connections (M02)", linkM03: "Cloud services (M03)", linkM05: "Incident (M05)", linkM04: "Request trace (M04)",
+  // M02
+  m02Title: "Machine connections", m02Lead: "Whether this machine is present, which viewers reach it over which carrier, and what is holding work right now.",
+  machine: "Machine", machineVal: "m-example-7Q (fictional)", presence: "Presence", presenceRenewed: "Renewed {age} ago", presenceExpired: "Expired {age} ago and not renewed",
+  contract: "Presence contract", contractVal: "renew within 90 s (proposal)", bootId: "Boot", booted: "Booted", platform: "Platform", lastReported: "Last status snapshot",
+  presenceTl: "Presence and carriers over time",
+  ln_presence: "Authenticated presence", ln_presence_s: "relay contract", ln_sock: "Relay socket", ln_sock_s: "Cloud", ln_direct: "Direct path", ln_direct_s: "this viewer",
+  ln_snap: "Status snapshots", ln_snap_s: "owner · every 30 s (proposed)",
+  viewers: "Viewers and carriers", viewer: "Viewer", readCarrier: "Reads", cmdCarrier: "Commands and status", generation: "Connection generation", lastSeen: "Last seen",
+  replaced: "Replaced", refused: "Refused", thisViewer: "this viewer",
+  c_direct: "Direct", c_relay: "Relay", c_none: "None (closed)",
+  carrierNote: "Reads may go direct; commands and status always travel through the relay. A direct close leaves only the direct carrier unavailable.",
+  replChain: "Replacement attempts and refusals", outcome_replaced: "Replaced", outcome_refused: "Refused", noReason: "Close reason not reported by this build",
+  replCount: "{n} in this window; the newest {k} are listed.", replNone: "No replacement or refusal in this window.",
+  holders: "Oldest active holder, by stage", holder: "Holder", heldFor: "Held for", deadline: "Deadline", lastProgress: "Last progress",
+  holdersNote: "Deadlines are the proposed 5 s warning / 15 s block heuristic, not measured limits. A holder past its deadline counts as blocked only when it has made no progress.",
+  asOf: "as of {age} ago", related: "Correlated incidents and evidence",
+  hs_handler: "Command handler", hs_queue: "Inbound queue (oldest row)", hs_publish: "Reply publish", hs_send: "Outbound send",
+  // M03
+  m03Title: "Cloud services", m03Lead: "Each Cloud component's own build, instance, stage timing, waits and saturation, and how much of it we can see.",
+  components: "Components", component: "Component", instance: "Instance", impact: "Impact",
+  cmp_api: "Cloud API", cmp_edge: "Relay Worker (edge)", cmp_acct: "Account execution", cmp_ingest: "Telemetry ingest", cmp_query: "Telemetry query",
+  cmpTl: "Components over time",
+  relayStages: "Relay path, stage by stage", rs_admission: "Admission", rs_entry: "Account entry", rs_return: "Handler return", rs_edge: "Edge completion",
+  pending: "Pending", oldestPending: "Oldest pending",
+  relayNote: "A completed socket write proves only that the bytes left Cloud. It never proves that a viewer observed them; that needs the viewer's own receipt.",
+  waits: "Dependency waits", dep: "Dependency", dep_storage: "Account storage", dep_mongo: "Database (API)", dep_fetch: "Service fetch (API)", dep_write: "Socket write",
+  saturation: "Saturation", inflight: "{used} of {limit} admission slots in use (illustrative bound) · oldest pending {age}",
+  ownerCloudNote: "Your-machine scope shows outcomes for your own account only. Builds, instances, waits and saturation are operator data.",
+  viewerCloudNote: "This-viewer scope cannot read Cloud components. This browser's own read-only probe is in Monitoring status.",
+})
+Object.assign(WORDS["zh-TW"], {
+  navM01: "M01 · 總覽", navM02: "M02 · 機器連線", navM02Hint: "Presence、瀏覽器、載體",
+  navM03: "M03 · Cloud 服務", navM03Hint: "API、relay、遙測", navM06: "M06 · 監控狀態", navM06Hint: "來源、空白、保留期",
+  na: "此操作不要求", hiddenStage: "此範圍看不到",
+  activeSpan: "沒有完成回執 · 進行中的處理程序 span {span} 已開 {age}（合成資料；注入 {inj}）",
+  hiddenItems: "有 {n} 項由{src}記錄，此範圍看不到。",
+  truth: "示意資料的標準答案（非觀察所得）",
+  truthNote: "由示意資料的注入清單宣告，讓審查的人能拿頁面對照已知答案。上面的觀察結論不依賴它；真實事故沒有這種清單。",
+  statsFixed: "數字是固定的 60 分鐘示意統計窗，截至 UTC {time}。切換時間範圍會改變時間線與事件清單，不會改變這些數字。",
+  floorNote: "實際只保留到 {floor}：100 MiB 上限先到",
+  noPath: "未指出原始碼行", opHiddenNote: "這是營運者的資料，此範圍讀不到。",
+  linkM02: "機器連線（M02）", linkM03: "Cloud 服務（M03）", linkM05: "事件（M05）", linkM04: "請求追蹤（M04）",
+  m02Title: "機器連線", m02Lead: "這台機器在不在、哪些瀏覽器透過哪種載體連到它，以及現在是什麼卡著工作。",
+  machine: "機器", machineVal: "m-example-7Q（虛構）", presence: "Presence", presenceRenewed: "{age}前更新", presenceExpired: "{age}前到期，之後沒有更新",
+  contract: "Presence 約定", contractVal: "90 秒內更新（提議值）", bootId: "啟動", booted: "啟動於", platform: "平台", lastReported: "最後一份狀態快照",
+  presenceTl: "Presence 與載體的時間線",
+  ln_presence: "經驗證的 presence", ln_presence_s: "relay 約定", ln_sock: "Relay socket", ln_sock_s: "Cloud", ln_direct: "直連路徑", ln_direct_s: "這個瀏覽器",
+  ln_snap: "狀態快照", ln_snap_s: "擁有者 · 每 30 秒（提議值）",
+  viewers: "瀏覽器與載體", viewer: "瀏覽器", readCarrier: "讀取", cmdCarrier: "指令與狀態", generation: "連線代數", lastSeen: "最後出現",
+  replaced: "被替換", refused: "被拒絕", thisViewer: "這個瀏覽器",
+  c_direct: "直連", c_relay: "Relay", c_none: "沒有（已關閉）",
+  carrierNote: "讀取可以走直連；指令與狀態一律經 relay。直連關閉只代表直連這個載體不能用。",
+  replChain: "替換嘗試與拒絕", outcome_replaced: "已替換", outcome_refused: "被拒絕", noReason: "此版本不回報關閉原因",
+  replCount: "這段時間 {n} 筆；列出最新 {k} 筆。", replNone: "這段時間沒有替換或拒絕。",
+  holders: "各階段最久的進行中持有者", holder: "持有者", heldFor: "已持有", deadline: "期限", lastProgress: "最後進度",
+  holdersNote: "期限是提議的 5 秒警告／15 秒阻塞經驗值，不是量測出來的上限。超過期限且沒有任何進度，才算阻塞。",
+  asOf: "{age}前的資料", related: "相關事件與證據",
+  hs_handler: "指令處理程序", hs_queue: "入站佇列（最舊一列）", hs_publish: "回覆發出", hs_send: "出站送出",
+  m03Title: "Cloud 服務", m03Lead: "每個 Cloud 元件自己的版本、執行個體、各階段時間、等待與飽和度，以及我們看得到多少。",
+  components: "元件", component: "元件", instance: "執行個體", impact: "影響",
+  cmp_api: "Cloud API", cmp_edge: "Relay Worker（邊緣）", cmp_acct: "帳號執行", cmp_ingest: "遙測收件", cmp_query: "遙測查詢",
+  cmpTl: "元件的時間線",
+  relayStages: "Relay 路徑，逐段來看", rs_admission: "接納", rs_entry: "進入帳號", rs_return: "處理程序回傳", rs_edge: "邊緣完成",
+  pending: "等待中", oldestPending: "最久等待",
+  relayNote: "socket 寫完只證明位元組離開了 Cloud，絕不代表瀏覽器已收到；那要靠瀏覽器自己的回執。",
+  waits: "依賴等待", dep: "依賴", dep_storage: "帳號儲存", dep_mongo: "資料庫（API）", dep_fetch: "服務呼叫（API）", dep_write: "Socket 寫入",
+  saturation: "飽和度", inflight: "{limit} 個接納名額用了 {used} 個（示意上限）· 最久等待 {age}",
+  ownerCloudNote: "「你的機器」範圍只顯示你自己帳號的結果。版本、執行個體、等待與飽和度是營運者的資料。",
+  viewerCloudNote: "「這個瀏覽器」範圍讀不到 Cloud 元件。這個瀏覽器自己的唯讀探測在監控狀態頁。",
+})
+
 /* ============================== fixtures ================================== */
 // Everything is relative to the moment a scenario is loaded: s/e are minutes before it (negative),
-// and e = 0 means the state continues to the present. All names, ids and builds are synthetic.
+// and e = 0 means the state continues to the present. All names, ids, builds and instances are
+// fictional; code locations are hypothetical instrumentation points (see codeNote).
+const W = (en, zh) => ({ en, zh })
 const LANES = ["browser", "relay", "recv", "proc", "send", "coll"]
 const LANE_SOURCE = { browser: "browser", relay: "relay", recv: "machine", proc: "machine", send: "machine", coll: "collector" }
-const RETENTION_MIN = { browser: 1440, relay: 1440, machine: 60, collector: 360 }
-const RETENTION_WORD = { browser: { en: "24 h, hourly counts", zh: "24 小時，逐時計數" }, relay: { en: "24 h", zh: "24 小時" },
-  machine: { en: "newest 50 commands (about 1 h here)", zh: "最新 50 筆指令（此處約 1 小時）" }, collector: { en: "6 h", zh: "6 小時" } }
+// Proposed defaults from the root plan's budget table, all pending pressure tests: Cloud routine
+// detail 24 h (incidents 7 d, aggregates 30 d); machine local detail 7 d or 100 MiB, whichever first.
+const RETENTION_MIN = { browser: 1440, relay: 1440, machine: 10080, collector: 1440 }
+const RETENTION_WORD = {
+  browser: W("24 h, hourly counts in this browser", "24 小時，這個瀏覽器的逐時計數"),
+  relay: W("24 h routine detail · 30 d minute aggregates (proposed)", "例行明細 24 小時 · 分鐘彙總 30 天（提議值）"),
+  machine: W("7 d or 100 MiB on the machine, whichever first (proposed)", "機器上 7 天或 100 MiB，先到者為準（提議值）"),
+  collector: W("24 h routine detail · incident evidence 7 d (proposed)", "例行明細 24 小時 · 事件證據 7 天（提議值）"),
+}
+// Proposed cadences: active-source snapshots every 30 s, upload flush at most 15 s, dashboard polling 15 s.
+const EVERY = { browser: 15, relay: 30, machine: 30, collector: 15 }
 const BUILD = "2.0.0-dev+synthetic.7f3a"
 const ok = (s = -360, e = 0) => ({ s, e, st: "healthy" })
-const W = (en, zh) => ({ en, zh })
+const seg = (s, e, st) => ({ s, e, st })
+const src = (age, extra) => ({ age, ...extra })
+const KIND_DESK = W("Desktop browser", "桌機瀏覽器"), KIND_PHONE = W("Phone browser", "手機瀏覽器")
+const V = (id, self, kind, read, cmd, gen, st, seen, repl, refused) => ({ id, self, kind, read, cmd, gen, st, seen, repl, refused })
+const CB = { api: ["api 2026.10.18-example", "api-i3"], edge: ["relay 2026.10.17-example", "edge-i7"], acct: ["relay 2026.10.17-example", "acct-shard-12"], ingest: ["telemetry 0.1-example", "ingest-i1"], query: ["telemetry 0.1-example", "query-i1"] }
+const COMPONENTS = ["api", "edge", "acct", "ingest", "query"]
+const COMP_SOURCE = { api: "relay", edge: "relay", acct: "relay", ingest: "collector", query: "collector" }
+const NONE = W("None", "沒有")
+const quietCloud = () => ({
+  comps: { api: ["healthy", "complete", NONE], edge: ["healthy", "complete", NONE], acct: ["healthy", "complete", NONE], ingest: ["healthy", "complete", NONE], query: ["healthy", "complete", NONE] },
+  lanes: { api: [ok()], edge: [ok()], acct: [ok()], ingest: [ok()], query: [ok()] },
+  stages: [[3, 9, 1842, 0, 0.1], [5, 14, 1842, 0, 0.1], [18, 41, 1842, 0, 0.2], [20, 46, 1842, 0, 0.2]],
+  waits: [[2, 6], [4, 11], [12, 30], [1, 3]], sat: { used: 3, limit: 128, oldest: 0.2 },
+})
+const quietMachine = () => ({
+  lanes: { presence: [ok()], sock: [ok()], direct: [seg(-360, -38, "idle"), ok(-38, 0)], snap: [ok()] },
+  renew: 11, boot: { id: "boot-synthetic-0003", at: -2900, platform: "macOS 15 · arm64 (example)" },
+  viewers: [V("v-a1", true, KIND_DESK, "direct", "relay", 211, "healthy", 3, 0, 0), V("v-b2", false, KIND_PHONE, "relay", "relay", 209, "idle", 240, 0, 0)],
+  events: [],
+  holders: [["hs_handler", "op-example-1101", 0.2, "healthy"], ["hs_queue", "row 2 of 64", 0.4, "healthy"], ["hs_publish", "op-example-1100", 0.05, "healthy"], ["hs_send", "—", 0, "idle"]],
+})
+const withM = (o) => Object.assign(quietMachine(), o)
+const withC = (o) => Object.assign(quietCloud(), o)
 
 const SCENARIOS = {
   healthy: {
     probe: { read: "healthy", readNote: W("Answered in 310 ms", "310 毫秒內回應") },
-    lanes: { browser: [{ s: -360, e: -38, st: "idle" }, ok(-38, 0)], relay: [ok()], recv: [ok(-60)], proc: [ok(-60)], send: [ok(-60)], coll: [ok()] },
+    lanes: { browser: [seg(-360, -38, "idle"), ok(-38, 0)], relay: [ok()], recv: [ok(-60)], proc: [ok(-60)], send: [ok(-60)], coll: [ok()] },
     marks: [],
-    sources: { browser: { age: 3, every: 5 }, relay: { age: 9, every: 15 }, machine: { age: 1, every: 2 }, collector: { age: 22, every: 30 } },
+    sources: { browser: src(3), relay: src(9), machine: src(12), collector: src(6) },
     queue: { used: 2, limit: 64, oldest: 0.4 },
     totals: { n: 1842, bad: 4, p50: 140, p95: 380, p99: 720 },
     segs: { browser: [62, 150, 260, 1842, 2], relay: [18, 41, 88, 1842, 1], recv: [3, 9, 21, 1840, 0], proc: [40, 160, 410, 1840, 1], send: [6, 14, 30, 1839, 0], coll: [null, null, null, 0, 0] },
+    m: quietMachine(), c: quietCloud(),
     incidents: [],
   },
   stalled: {
     probe: { read: "healthy", readNote: W("Answered in 290 ms: reads still work while commands are stuck", "290 毫秒內回應：指令卡住時讀取仍然可以") },
-    lanes: { browser: [{ s: -360, e: -50, st: "idle" }, ok(-50, -18), { s: -18, e: -9, st: "degraded" }, { s: -9, e: 0, st: "error" }],
-      relay: [ok(-360, -18), { s: -18, e: 0, st: "degraded" }], recv: [ok(-60, -9), { s: -9, e: 0, st: "error" }], proc: [ok(-60, -18), { s: -18, e: 0, st: "blocked" }],
-      send: [ok(-60, -18), { s: -18, e: 0, st: "idle" }], coll: [ok()] },
+    lanes: { browser: [seg(-360, -50, "idle"), ok(-50, -18), seg(-18, -9, "degraded"), seg(-9, 0, "error")],
+      relay: [ok(-360, -18), seg(-18, 0, "degraded")], recv: [ok(-60, -9), seg(-9, 0, "error")], proc: [ok(-60, -18), seg(-18, 0, "blocked")],
+      send: [ok(-60, -18), seg(-18, 0, "idle")], coll: [ok()] },
     marks: [{ lane: "recv", t: -9 }, { lane: "proc", t: -18 }],
-    sources: { browser: { age: 2, every: 5 }, relay: { age: 6, every: 15 }, machine: { age: 1, every: 2 }, collector: { age: 14, every: 30 } },
+    sources: { browser: src(2), relay: src(6), machine: src(14), collector: src(4) },
     queue: { used: 64, limit: 64, oldest: 1080 },
     totals: { n: 731, bad: 188, p50: 220, p95: 30000, p99: 60000 },
     segs: { browser: [210, 30000, 60000, 731, 188], relay: [17, 44, 91, 731, 214], recv: [3, 11, 25, 543, 188], proc: [null, null, null, 0, 0], send: [null, null, null, 0, 0], coll: [null, null, null, 0, 0] },
+    m: withM({
+      viewers: [V("v-a1", true, KIND_DESK, "direct", "relay", 211, "blocked", 2, 0, 41), V("v-b2", false, KIND_PHONE, "relay", "relay", 209, "error", 95, 0, 147)],
+      events: [{ t: -9, viewer: "v-a1", from: 211, to: 211, outcome: "refused", reason: W("Command refused: cloud_ingress_busy (inbound queue 64/64)", "指令被拒絕：cloud_ingress_busy（入站佇列 64/64）") },
+        { t: -8, viewer: "v-b2", from: 209, to: 209, outcome: "refused", reason: W("Command refused: cloud_ingress_busy (inbound queue 64/64)", "指令被拒絕：cloud_ingress_busy（入站佇列 64/64）") }],
+      holders: [["hs_handler", "op-example-0412 · span sp-synthetic-41", 1080, "blocked", true], ["hs_queue", "row 64 of 64", 1080, "blocked", true], ["hs_publish", "—", 0, "idle"], ["hs_send", "—", 0, "idle"]],
+    }),
+    c: withC({
+      comps: { api: ["healthy", "complete", NONE], edge: ["degraded", "complete", W("1 account: 188 commands timed out waiting for the machine's reply", "1 個帳號：188 筆指令等機器回覆而逾時")],
+        acct: ["healthy", "complete", W("Handler returns in milliseconds; it forwards and is not where the stall is", "處理程序幾毫秒內就回傳；它只轉送，卡住的不是這裡")], ingest: ["healthy", "complete", NONE], query: ["healthy", "complete", NONE] },
+      lanes: { api: [ok()], edge: [ok(-360, -18), seg(-18, 0, "degraded")], acct: [ok()], ingest: [ok()], query: [ok()] },
+      stages: [[3, 10, 731, 0, 0.1], [5, 15, 731, 0, 0.1], [17, 44, 731, 0, 0.1], [220, 30000, 731, 41, 30]],
+      sat: { used: 44, limit: 128, oldest: 30 },
+    }),
     incidents: [{
-      id: "INC-S1", start: -18, end: 0, sev: "blocked", lane: "proc", cert: "confirmed",
+      id: "INC-S1", start: -18, end: 0, sev: "blocked", lane: "proc", cert: "suspected",
       title: W("Commands are accepted but never executed", "指令被接受，卻一直沒有執行"),
       facts: [
         [W("Relay socket to the machine stayed open the whole time; heartbeats every 30 s were acknowledged. Socket-open proves only the transport.", "到機器的 relay socket 全程開著，每 30 秒的心跳都有回應。socket 開著只證明傳輸層。"), "relay"],
         [W("Since 08:27 UTC the relay forwarded 214 commands and saw no reply envelope for any of them.", "UTC 08:27 起 relay 轉送了 214 筆指令，沒有看到任何一筆的回覆信封。"), "relay"],
-        [W("The machine accepted 214 commands after the stall began and executed none of them.", "卡住之後機器接受了 214 筆指令，一筆都沒有執行。"), "machine"],
+        [W("The machine queued 214 commands after the stall began and produced no execute receipt for any of them.", "卡住之後機器把 214 筆指令排進佇列，沒有任何一筆產生執行回執。"), "machine"],
+        [W("An active handler span (sp-synthetic-41, injection inj-fixture-07) opened 18 min ago and has reported no progress; the proposed block rule is 15 s.", "一個進行中的處理程序 span（sp-synthetic-41，注入 inj-fixture-07）在 18 分鐘前開始，之後沒有任何進度；提議的阻塞規則是 15 秒。"), "machine"],
         [W("The inbound queue reached its limit of 64 rows; new commands were refused with cloud_ingress_busy.", "入站佇列到了 64 列的上限，新指令以 cloud_ingress_busy 拒絕。"), "machine"],
       ],
-      suspected: [[W("Confirmed for this fixture: a synthetic fault injected into the command handler holds its lease and never returns.", "這份示意資料已確認：注入到指令處理程序的合成故障，拿著租約不放、一直不回傳。"), "fixture"]],
-      missing: [[W("None needed for this cause. Viewer acknowledgement does not apply: nothing reached the viewer.", "這個原因不需要更多證據。瀏覽器確認不適用：沒有東西送到瀏覽器。"), ""]],
-      trace: "tr-9c41e2", stages: [["accepted", 0, "relay", 4], ["queued", 35, "machine", 2], ["executed", null], ["published", null], ["delivered", null], ["observed", null], ["acked", null]],
-      code: [["internal/transport/cloud/relay.go:123", "(*Relay).start", W("drains the inbound queue that filled", "負責清空塞滿的入站佇列")],
-        ["internal/domain/capacity/register_cloud.go:175", "CloudRelayQueue", W("the registered 64-row bound and its refusal", "登記的 64 列上限與拒絕方式")]],
+      suspected: [[W("The command handler is not returning: a queued receipt, an active handler span past its deadline, and no execute receipt. These receipts do not show why it does not return.", "指令處理程序沒有回傳：有排隊回執、有超過期限的進行中 span、沒有執行回執。這些回執看不出它為什麼不回傳。"), "machine"]],
+      missing: [[W("What the handler is waiting on: no lock, lease or stack evidence was captured.", "處理程序在等什麼：沒有擷取到鎖、租約或堆疊的證據。"), "machine"],
+        [W("Viewer stages do not apply: nothing reached the viewer.", "瀏覽器的階段不適用：沒有東西送到瀏覽器。"), ""]],
+      truth: { id: "inj-fixture-07", text: W("A synthetic fault makes the command handler hold its lease and never return.", "合成故障讓指令處理程序拿著租約不放、一直不回傳。") },
+      active: { stage: "executed", span: "sp-synthetic-41", inj: "inj-fixture-07", since: -18 },
+      trace: "tr-9c41e2", stages: [["accepted", 0, "relay", 4], ["queued", 35, "machine", 2], ["executed", null, "machine", null, "active"], ["published", null], ["delivered", null], ["observed", null], ["applied", null], ["acked", "na"]],
+      code: [{ loc: "machine.command.handle", src: "machine", why: W("Hypothetical stage location code for the handler. No source line is named: the stable stage-to-source map is not implemented.", "處理程序的假想階段位置代碼。沒有指出原始碼行：穩定的階段→原始碼對照還沒實作。") },
+        { loc: "machine.relay.inbound_queue", path: "internal/domain/capacity/register_cloud.go:175", sym: "CloudRelayQueue", src: "machine", why: W("The registered 64-row bound and its refusal.", "登記的 64 列上限與拒絕方式。") },
+        { loc: "machine.relay.inbound_queue", path: "internal/transport/cloud/relay.go:123", sym: "(*Relay).start", src: "machine", why: W("Only creates the bounded inbound channel. It does not drain it and is not the cause.", "只負責建立有上限的入站 channel，不負責清空它，也不是原因。") }],
     }],
   },
   receipt: {
     probe: { read: "degraded", readNote: W("Answered after 58 s", "58 秒後才回應") },
-    lanes: { browser: [{ s: -360, e: -55, st: "idle" }, ok(-55, -26), { s: -26, e: 0, st: "degraded" }],
-      relay: [ok(-360, -26), { s: -26, e: -17, st: "degraded" }, { s: -17, e: -11, st: "unknown" }, { s: -11, e: 0, st: "degraded" }],
+    lanes: { browser: [seg(-360, -55, "idle"), ok(-55, -26), seg(-26, 0, "degraded")],
+      relay: [ok(-360, -26), seg(-26, -17, "degraded"), seg(-17, -11, "unknown"), seg(-11, 0, "degraded")],
       recv: [ok(-60)], proc: [ok(-60)], send: [ok(-60)], coll: [ok()] },
     marks: [],
-    sources: { browser: { age: 4, every: 5 }, relay: { age: 11, every: 15 }, machine: { age: 1, every: 2 }, collector: { age: 18, every: 30 } },
+    sources: { browser: src(4), relay: src(11), machine: src(20), collector: src(8) },
     queue: { used: 5, limit: 64, oldest: 1.2 },
     totals: { n: 1206, bad: 31, p50: 380, p95: 61400, p99: 88000 },
     segs: { browser: [300, 61400, 88000, 1206, 31], relay: [21, 59800, 86100, 1206, 0], recv: [3, 9, 22, 1206, 0], proc: [55, 190, 420, 1206, 0], send: [6, 15, 33, 1206, 0], coll: [null, null, null, 0, 0] },
+    m: withM({
+      lanes: { presence: [ok()], sock: [ok(-360, -17), seg(-17, -11, "unknown"), ok(-11, 0)], direct: [seg(-360, -55, "idle"), ok(-55, -30), seg(-30, 0, "unknown")], snap: [ok()] },
+      viewers: [V("v-a1", true, KIND_DESK, "relay", "relay", 212, "degraded", 4, 1, 0), V("v-b2", false, KIND_PHONE, "relay", "relay", 209, "idle", 600, 0, 0)],
+      events: [{ t: -30, viewer: "v-a1", from: 211, to: 212, outcome: "replaced", reason: W("Direct carrier closed; reads moved to the relay", "直連載體關閉；讀取改走 relay") }],
+      holders: [["hs_handler", "op-example-2210", 0.2, "healthy"], ["hs_queue", "row 5 of 64", 1.2, "healthy"], ["hs_publish", "op-example-2207", 0.3, "healthy"], ["hs_send", "op-example-2207", 0.1, "healthy"]],
+    }),
+    c: withC({
+      comps: { api: ["healthy", "complete", NONE], edge: ["degraded", "partial", W("1 account: delivery receipts 40–90 s late; 6 minutes of relay metrics missing", "1 個帳號：送達回執晚 40–90 秒；relay 指標缺了 6 分鐘")],
+        acct: ["healthy", "partial", NONE], ingest: ["healthy", "complete", NONE], query: ["healthy", "complete", NONE] },
+      lanes: { api: [ok()], edge: [ok(-360, -26), seg(-26, -17, "degraded"), seg(-17, -11, "unknown"), seg(-11, 0, "degraded")], acct: [ok(-360, -17), seg(-17, -11, "unknown"), ok(-11, 0)], ingest: [ok()], query: [ok()] },
+      stages: [[3, 9, 1206, 0, 0.1], [5, 14, 1206, 0, 0.1], [21, 48, 1206, 0, 0.2], [380, 59800, 1206, 6, 61]],
+      waits: [[2, 7], [4, 12], [12, 31], [2, 57000]], sat: { used: 9, limit: 128, oldest: 61 },
+    }),
     incidents: [{
       id: "INC-R1", start: -26, end: 0, sev: "degraded", lane: "relay", cert: "suspected",
       title: W("Replies are published but delivery receipts arrive late", "回覆已發出，但送達回執很晚才到"),
@@ -522,49 +684,73 @@ const SCENARIOS = {
       suspected: [[W("Relay fan-out to this viewer is delayed. This rests on ordering only: the delay begins after publishing and before delivery, which does not by itself show where the time went.", "Relay 對這個瀏覽器的分送被延遲。這只依據先後順序：延遲發生在發出之後、送達之前，這本身還不能證明時間花在哪裡。"), "inference"]],
       missing: [
         [W("Relay per-connection queue depth for the delayed requests (not recorded by this build).", "延遲請求在 relay 端每條連線的佇列深度（此版本未記錄）。"), "relay"],
-        [W("Viewer observed times for 48 requests: the tab was in the background and its batch was not delivered.", "48 筆請求的瀏覽器收到時間：分頁在背景，批次沒有送出。"), "browser"],
+        [W("Viewer received times for 48 requests: the tab was in the background and its batch was not delivered.", "48 筆請求的瀏覽器收到時間：分頁在背景，批次沒有送出。"), "browser"],
         [W("Relay stage events during the 6-minute gap.", "6 分鐘空白期間的 relay 階段事件。"), "relay"],
       ],
-      trace: "tr-51b7d0", stages: [["accepted", 0, "relay", 3], ["queued", 40, "machine", 2], ["executed", 210, "machine", 2], ["published", 260, "machine", 2], ["delivered", 61400, "relay", 3, "late"], ["observed", 61600, "browser", 1], ["acked", 61700, "browser", 1]],
-      code: [["internal/transport/cloud/publish.go:572", "(*Publisher).open", W("where a published reply waits for the relay receipt", "發出的回覆在這裡等 relay 回執")],
-        ["web/console/src/cloud/direct-history.ts:64", "recordDirectAttempt", W("this browser's own record of direct attempts", "這個瀏覽器自己的直連嘗試紀錄")]],
+      trace: "tr-51b7d0", stages: [["accepted", 0, "relay", 3], ["queued", 40, "machine", 2], ["executed", 210, "machine", 2], ["published", 260, "machine", 2], ["delivered", 61400, "relay", 3, "late"], ["observed", 61600, "browser", 1], ["applied", 61700, "browser", 1], ["acked", "na"]],
+      code: [{ loc: "cloud.relay.fanout.deliver", src: "relay", why: W("Hypothetical location code in the private Cloud relay; no source line is named.", "私有 Cloud relay 裡的假想位置代碼；沒有指出原始碼行。") },
+        { loc: "viewer.direct.attempt", path: "web/console/src/cloud/direct-history.ts:64", sym: "recordDirectAttempt", src: "browser", why: W("Counts this browser's direct attempts per hour; it is where the viewer's own record lives today.", "以小時計算這個瀏覽器的直連嘗試；這是瀏覽器自己紀錄目前所在的位置。") }],
     }],
   },
   source: {
     probe: { read: "healthy", readNote: W("Answered in 330 ms", "330 毫秒內回應") },
-    lanes: { browser: [{ s: -360, e: -40, st: "idle" }, ok(-40, 0)], relay: [ok()],
-      recv: [ok(-60, -22), { s: -22, e: 0, st: "unknown" }], proc: [ok(-60, -22), { s: -22, e: 0, st: "unknown" }], send: [ok(-60, -22), { s: -22, e: 0, st: "unknown" }],
-      coll: [ok(-360, -22), { s: -22, e: 0, st: "unknown" }] },
+    lanes: { browser: [seg(-360, -40, "idle"), ok(-40, 0)], relay: [ok()],
+      recv: [ok(-60, -22), seg(-22, 0, "unknown")], proc: [ok(-60, -22), seg(-22, 0, "unknown")], send: [ok(-60, -22), seg(-22, 0, "unknown")],
+      coll: [ok(-360, -22), seg(-22, 0, "unknown")] },
     marks: [],
-    sources: { browser: { age: 3, every: 5 }, relay: { age: 8, every: 15 }, machine: { age: 1320, every: 2, stuck: true }, collector: { age: 1320, every: 30, stuck: true } },
+    sources: { browser: src(3), relay: src(8), machine: src(1320, { stuck: true }), collector: src(1320, { stuck: true }) },
     queue: null,
     totals: { n: 402, bad: 1, p50: 150, p95: 410, p99: null },
     segs: { browser: [70, 160, 280, 402, 1], relay: [19, 43, 90, 402, 0], recv: [null, null, null, null, null], proc: [null, null, null, null, null], send: [null, null, null, null, null], coll: [null, null, null, null, null] },
+    m: withM({
+      lanes: { presence: [ok()], sock: [ok()], direct: [seg(-360, -40, "idle"), ok(-40, 0)], snap: [ok(-360, -22), seg(-22, 0, "unknown")] },
+      holders: [["hs_handler", "op-example-3005", 0.2, "healthy", false, -22], ["hs_queue", "row 1 of 64", 0.3, "healthy", false, -22], ["hs_publish", "—", 0, "idle", false, -22], ["hs_send", "—", 0, "idle", false, -22]],
+    }),
+    c: withC({
+      comps: { api: ["healthy", "complete", NONE], edge: ["healthy", "complete", NONE], acct: ["healthy", "complete", NONE],
+        ingest: ["unknown", "partial", W("Nothing from this machine for 22 min; relay and viewer records still arrive", "這台機器 22 分鐘沒有送來任何東西；relay 與瀏覽器的紀錄仍在進來")], query: ["healthy", "complete", NONE] },
+      lanes: { api: [ok()], edge: [ok()], acct: [ok()], ingest: [ok(-360, -22), seg(-22, 0, "unknown")], query: [ok()] },
+      stages: [[3, 9, 402, 0, 0.1], [5, 14, 402, 0, 0.1], [19, 43, 402, 0, 0.1], [21, 47, 402, 0, 0.1]],
+    }),
     incidents: [{
       id: "INC-M1", start: -22, end: 0, sev: "unknown", lane: "coll", cert: "unknown",
       title: W("No machine or collector observations for 22 minutes", "22 分鐘沒有機器與收集器的觀測資料"),
       facts: [
-        [W("The collector's last receipt was 22 minutes ago; it is expected every 30 s.", "收集器最後一次回執在 22 分鐘前，原本應每 30 秒一次。"), "collector"],
+        [W("The collector's last receipt was 22 minutes ago; it is expected every 15 s.", "收集器最後一次回執在 22 分鐘前，原本應每 15 秒一次。"), "collector"],
         [W("The relay still reports the machine connected and forwarding traffic.", "Relay 仍回報機器已連線，也還在轉送流量。"), "relay"],
         [W("The browser's requests succeed (1 error in 402).", "瀏覽器的請求都成功（402 筆中 1 筆錯誤）。"), "browser"],
       ],
       suspected: [[W("Nothing is suspected about the connection. The monitoring path itself is unavailable, so machine-side health is unknown, not healthy.", "連線本身沒有疑點。是監控路徑無法取得，所以機器端的健康狀態是不明，不是正常。"), "inference"]],
       missing: [[W("Every machine-side stage since the gap began.", "空白開始後機器端的每一個階段。"), "machine"], [W("Why the collector stopped: it has not reported a reason.", "收集器為什麼停：它沒有回報原因。"), "collector"]],
       trace: null, stages: [],
-      code: [["internal/adapters/cloud/status.go:95", "(*StatusRecorder).Snapshot", W("the machine-side snapshot that stopped arriving", "不再送來的機器端快照")]],
+      code: [{ loc: "machine.status.snapshot", path: "internal/adapters/cloud/status.go:95", sym: "(*StatusRecorder).Snapshot", src: "machine", why: W("Answers a copy of the machine's Cloud status; a snapshot source would read it.", "回傳機器 Cloud 狀態的副本；快照來源會讀它。") }],
     }],
   },
   offline: {
-    lanes: { browser: [{ s: -360, e: -45, st: "idle" }, ok(-45, -14), { s: -14, e: 0, st: "error" }],
-      relay: [ok(-360, -14), { s: -14, e: 0, st: "error" }],
-      recv: [ok(-60, -14), { s: -14, e: 0, st: "offline" }], proc: [ok(-60, -14), { s: -14, e: 0, st: "offline" }], send: [ok(-60, -14), { s: -14, e: 0, st: "offline" }],
+    lanes: { browser: [seg(-360, -45, "idle"), ok(-45, -14), seg(-14, 0, "error")],
+      relay: [ok(-360, -14), seg(-14, 0, "error")],
+      recv: [ok(-60, -14), seg(-14, 0, "offline")], proc: [ok(-60, -14), seg(-14, 0, "offline")], send: [ok(-60, -14), seg(-14, 0, "offline")],
       coll: [ok()] },
     marks: [{ lane: "browser", t: -16 }, { lane: "relay", t: -14 }],
-    sources: { browser: { age: 2, every: 5 }, relay: { age: 7, every: 15 }, machine: { age: 840, every: 2, stuck: true, offline: true }, collector: { age: 12, every: 30 } },
+    sources: { browser: src(2), relay: src(7), machine: src(840, { stuck: true, offline: true }), collector: src(12) },
     probe: { read: "error", readNote: W("Refused: machine_offline", "拒絕：machine_offline") },
     queue: { used: 0, limit: 64, oldest: 0, asOf: -14 }, presence: "expired",
     totals: { n: 96, bad: 57, p50: 160, p95: 420, p99: null },
     segs: { browser: [80, 190, 300, 96, 57], relay: [12, 30, 60, 96, 57], recv: [null, null, null, null, null], proc: [null, null, null, null, null], send: [null, null, null, null, null], coll: [null, null, null, 0, 0] },
+    m: withM({
+      lanes: { presence: [ok(-360, -14), seg(-14, 0, "offline")], sock: [ok(-360, -14), seg(-14, 0, "offline")], direct: [seg(-360, -45, "idle"), ok(-45, -16), seg(-16, 0, "unknown")], snap: [ok(-360, -14), seg(-14, 0, "offline")] },
+      marks: [{ lane: "direct", t: -16 }, { lane: "presence", t: -14 }],
+      viewers: [V("v-a1", true, KIND_DESK, "none", "relay", 211, "offline", 2, 0, 57), V("v-b2", false, KIND_PHONE, "relay", "relay", 209, "idle", 1500, 0, 0)],
+      events: [{ t: -13, viewer: "v-a1", from: 211, to: null, outcome: "refused", reason: W("Direct reconnect refused: machine_offline", "直連重連被拒絕：machine_offline") }],
+      holders: [["hs_handler", "—", 0, "idle", false, -14], ["hs_queue", "row 0 of 64", 0, "idle", false, -14], ["hs_publish", "—", 0, "idle", false, -14], ["hs_send", "—", 0, "idle", false, -14]],
+    }),
+    c: withC({
+      comps: { api: ["healthy", "complete", NONE], edge: ["healthy", "complete", NONE],
+        acct: ["error", "complete", W("1 account: 57 commands refused machine_offline; the refusal is correct while presence is expired", "1 個帳號：57 筆指令以 machine_offline 拒絕；presence 到期時拒絕是正確的")],
+        ingest: ["healthy", "complete", NONE], query: ["healthy", "complete", NONE] },
+      lanes: { api: [ok()], edge: [ok()], acct: [ok(-360, -14), seg(-14, 0, "error")], ingest: [ok()], query: [ok()] },
+      stages: [[3, 9, 96, 0, 0.1], [5, 13, 96, 0, 0.1], [9, 22, 96, 0, 0.1], [12, 30, 96, 0, 0.1]],
+    }),
     incidents: [{
       id: "INC-O1", start: -14, end: 0, sev: "offline", lane: "relay", cert: "confirmed",
       title: W("Machine offline; commands are refused as machine_offline", "機器離線；指令以 machine_offline 拒絕"),
@@ -574,41 +760,59 @@ const SCENARIOS = {
         [W("57 commands from this viewer were refused with machine_offline.", "這個瀏覽器有 57 筆指令以 machine_offline 拒絕。"), "relay"],
         [W("The machine's last status snapshot is 14 minutes old; its queue was empty then.", "機器最後一份狀態快照是 14 分鐘前的，當時佇列是空的。"), "machine"],
       ],
-      suspected: [[W("The machine is offline. Why it went offline is not modelled or guessed here.", "機器離線。它為什麼離線，這裡不建模，也不猜。"), "relay"]],
+      suspected: [[W("The machine is offline: its presence expired. Why it went offline is not modelled or guessed here.", "機器離線：它的 presence 到期了。它為什麼離線，這裡不建模，也不猜。"), "relay"]],
       missing: [[W("Anything from the machine after it went offline.", "機器離線之後的任何資料。"), "machine"]],
-      trace: "tr-0e2a77", stages: [["accepted", 0, "relay", 2], ["queued", null], ["executed", null], ["published", null], ["delivered", null], ["observed", 90, "browser", 1], ["acked", 120, "browser", 1]],
-      code: [["web/console/src/pages/devices/AccountMachines.tsx:70", "roadOf", W("how the machine sheet names the offline road", "機器頁怎麼標示離線")]],
+      terminal: { code: "machine_offline", by: "relay" },
+      trace: "tr-0e2a77", stages: [["accepted", 0, "relay", 2], ["queued", null], ["executed", null], ["published", null], ["delivered", null], ["observed", 90, "browser", 1], ["applied", 120, "browser", 1], ["acked", "na"]],
+      code: [{ loc: "viewer.machine.road", path: "web/console/src/pages/devices/AccountMachines.tsx:70", sym: "roadOf", src: "browser", why: W("Chooses the road the machine sheet names, including offline.", "決定機器頁標示的連線路徑，包含離線。") }],
     }],
   },
   storm: {
     probe: { read: "degraded", readNote: W("2 of 9 probes failed during the storm", "風暴期間 9 次探測失敗 2 次") },
-    lanes: { browser: [{ s: -360, e: -48, st: "idle" }, ok(-48, -12), { s: -12, e: -3, st: "degraded" }, ok(-3, 0)],
-      relay: [ok(-360, -12), { s: -12, e: -3, st: "error" }, ok(-3, 0)],
-      recv: [ok(-60, -12), { s: -12, e: -3, st: "degraded" }, ok(-3, 0)], proc: [ok(-60)], send: [ok(-60, -12), { s: -12, e: -3, st: "unsupported" }, ok(-3, 0)], coll: [ok()] },
+    lanes: { browser: [seg(-360, -48, "idle"), ok(-48, -12), seg(-12, -3, "degraded"), ok(-3, 0)],
+      relay: [ok(-360, -12), seg(-12, -3, "error"), ok(-3, 0)],
+      recv: [ok(-360, -12), seg(-12, -3, "degraded"), ok(-3, 0)], proc: [ok(-360)], send: [ok(-360, -12), seg(-12, -3, "unsupported"), ok(-3, 0)], coll: [ok()] },
     marks: Array.from({ length: 12 }, (_, i) => ({ lane: "relay", t: -12 + i * 0.75 })),
-    sources: { browser: { age: 3, every: 5 }, relay: { age: 5, every: 15 }, machine: { age: 1, every: 2 }, collector: { age: 9, every: 30 } },
+    sources: { browser: src(3), relay: src(5), machine: src(9), collector: src(9) },
+    // The machine's local detail reached its byte cap before its time cap.
+    floor: { machine: 240 },
     queue: { used: 7, limit: 64, oldest: 2.5 },
     totals: { n: 988, bad: 74, p50: 190, p95: 4200, p99: 9100 },
     segs: { browser: [120, 4200, 9100, 988, 74], relay: [20, 900, 3100, 988, 74], recv: [3, 600, 2400, 914, 0], proc: [48, 170, 400, 914, 0], send: [null, null, null, null, null], coll: [null, null, null, 0, 0] },
+    m: withM({
+      lanes: { presence: [ok()], sock: [ok(-360, -12), seg(-12, -3, "error"), ok(-3, 0)], direct: [seg(-360, -48, "idle"), ok(-48, -12), seg(-12, -3, "degraded"), ok(-3, 0)], snap: [ok()] },
+      marks: Array.from({ length: 12 }, (_, i) => ({ lane: "sock", t: -12 + i * 0.75 })),
+      viewers: [V("v-a1", true, KIND_DESK, "direct", "relay", 258, "healthy", 3, 47, 0), V("v-b2", false, KIND_PHONE, "relay", "relay", 209, "idle", 900, 0, 0)],
+      events: Array.from({ length: 47 }, (_, i) => ({ t: -12 + (i * 9) / 47, viewer: "v-a1", from: 211 + i, to: 212 + i, outcome: "replaced", reason: i % 3 === 0 ? W("Predecessor closed by the replacing connection", "前一條被替換的連線關閉") : null })),
+      holders: [["hs_handler", "op-example-5120", 0.3, "healthy"], ["hs_queue", "row 7 of 64", 2.5, "healthy"], ["hs_publish", "op-example-5118", 0.1, "healthy"], ["hs_send", null, null, "unsupported"]],
+    }),
+    c: withC({
+      comps: { api: ["healthy", "complete", NONE], edge: ["healthy", "partial", W("74 requests failed during replacements; recovered 3 min ago with new completions", "替換期間 74 筆請求失敗；3 分鐘前有新的完成紀錄，已恢復")],
+        acct: ["healthy", "partial", NONE], ingest: ["healthy", "complete", NONE], query: ["healthy", "complete", NONE] },
+      lanes: { api: [ok()], edge: [ok(-360, -12), seg(-12, -3, "error"), ok(-3, 0)], acct: [ok(-360, -12), seg(-12, -3, "unsupported"), ok(-3, 0)], ingest: [ok()], query: [ok()] },
+      stages: [[3, 11, 988, 0, 0.1], [6, 40, 988, 0, 0.1], [20, 900, 988, 0, 0.2], [25, 4100, 988, 1, 2.5]],
+      sat: { used: 7, limit: 128, oldest: 2.5 },
+    }),
     incidents: [{
       id: "INC-C1", start: -12, end: -3, sev: "degraded", lane: "relay", cert: "suspected",
       title: W("The machine reconnected 47 times in 9 minutes", "機器在 9 分鐘內重新連線 47 次"),
       facts: [
         [W("Connection generation rose from 211 to 258; each connection lasted 6–14 s.", "連線代數從 211 升到 258；每條連線只撐 6–14 秒。"), "relay"],
         [W("74 requests failed while a connection was being replaced.", "74 筆請求在連線替換期間失敗。"), "relay"],
-        [W("It stopped on its own 3 minutes ago.", "它在 3 分鐘前自己停了。"), "relay"],
+        [W("It stopped on its own 3 minutes ago, and new completions have arrived since.", "它在 3 分鐘前自己停了，之後有新的完成紀錄。"), "relay"],
       ],
       suspected: [[W("A replacement connection may be closing its predecessor, which then reconnects. Closes happen in pairs, but pairing alone does not prove which side started it.", "可能是替代連線把前一條關掉，前一條又重連。關閉總是成對出現，但光是成對，不能證明是哪一邊先開始。"), "inference"]],
       missing: [
         [W("Close reasons for 31 of 47 closes: this build does not report them.", "47 次關閉中 31 次的關閉原因：此版本不回報。"), "relay"],
         [W("Machine send-side stage events during the storm (not reported by this build).", "風暴期間機器送出端的階段事件（此版本不回報）。"), "machine"],
       ],
-      trace: "tr-7d19a3", stages: [["accepted", 0, "relay", 4], ["queued", 30, "machine", 3], ["executed", 220, "machine", 3], ["published", 260, "machine", 3], ["delivered", 4100, "relay", 4, "late"], ["observed", 4200, "browser", 3], ["acked", 4260, "browser", 3]],
-      code: [["internal/transport/cloud/link.go:957", "(*Link).runOnce", W("one connection's lifetime and its replacement", "一條連線的生命週期與替換")]],
+      trace: "tr-7d19a3", stages: [["accepted", 0, "relay", 4], ["queued", 30, "machine", 3], ["executed", 220, "machine", 3], ["published", 260, "machine", 3], ["delivered", 4100, "relay", 4, "late"], ["observed", 4200, "browser", 3], ["applied", 4260, "browser", 3], ["acked", "na"]],
+      code: [{ loc: "machine.cloud.link", path: "internal/transport/cloud/link.go:957", sym: "(*Link).runOnce", src: "machine", why: W("Holds one relay socket up until its context is done; one connection generation lives here.", "撐住一條 relay socket 直到 context 結束；一個連線代數就活在這裡。") }],
     }],
   },
 }
 const SCENARIO_ORDER = ["healthy", "stalled", "receipt", "source", "offline", "storm"]
+const STAGE_SRC = { accepted: "relay", queued: "machine", executed: "machine", published: "machine", delivered: "relay", observed: "browser", applied: "browser", acked: "browser" }
 
 /* ============================== state ===================================== */
 const state = {
@@ -621,6 +825,7 @@ const FIXTURE_CLOCK = Date.UTC(2026, 9, 20, 8, 45, 0) // what the fixture calls 
 const clock = (ms) => FIXTURE_CLOCK + (ms - state.loadedAt)
 const hhmm = (ms, sec) => new Date(clock(ms)).toISOString().slice(11, sec ? 19 : 16)
 const minAgo = (m) => state.loadedAt + m * 60000
+const sinceSec = (m) => (now() - minAgo(m)) / 1000
 
 function ago(sec) {
   sec = Math.max(0, Math.round(sec))
@@ -639,31 +844,41 @@ function visible(lane) {
   if (state.scope === "viewer") return lane === "browser"
   return true
 }
-function sourceVisible(src) {
-  if (state.scope === "cloud") return src === "relay" || src === "collector"
-  if (state.scope === "viewer") return src === "browser"
+function sourceVisible(s) {
+  if (state.scope === "cloud") return s === "relay" || s === "collector"
+  if (state.scope === "viewer") return s === "browser"
   return true
 }
+/* Every recorded item carries its source; the scope filters by it everywhere, exports included.
+   Presence expiry is visible to every scope; an inference may lean on owner data, so only the
+   scope that reads everything sees it; a fixture declaration is labelled and carries no owner data. */
+function canSee(s) {
+  if (!s || s === "presence" || s === "fixture") return true
+  if (s === "inference") return state.scope === "machine"
+  return sourceVisible(s)
+}
+const srcName = (s) => (WORDS.en["src_" + s] ? t("src_" + s) : s === "inference" ? (locale === "zh-TW" ? "推論" : "inference") : s === "fixture" ? (locale === "zh-TW" ? "示意資料宣告" : "fixture declaration") : s)
 
 /* A source's receipt age now. A flowing source keeps receiving; a stuck one only ages. */
-function sourceAge(src) {
-  const f = sc().sources[src]
+function sourceAge(s) {
+  const f = sc().sources[s]
   const elapsed = (now() - state.loadedAt) / 1000
   if (f.stuck) return f.age + elapsed
-  return (f.age + elapsed) % f.every
+  return (f.age + elapsed) % EVERY[s]
 }
-function freshness(src) {
-  if (!sourceVisible(src)) return "hidden"
-  const f = sc().sources[src]
-  const age = sourceAge(src)
+function freshness(s) {
+  if (!sourceVisible(s)) return "hidden"
+  const f = sc().sources[s]
+  const age = sourceAge(s)
   if (f.stuck && f.offline) return "stale"
   if (f.stuck) return "unknown"
-  return age <= f.every * 2 ? "fresh" : "stale"
+  return age <= EVERY[s] * 2 ? "fresh" : "stale"
 }
+const retMin = (s) => (sc().floor && sc().floor[s]) || RETENTION_MIN[s]
+const retText = (s) => L(RETENTION_WORD[s]) + (sc().floor && sc().floor[s] ? " · " + t("floorNote", { floor: ago(sc().floor[s] * 60) }) : "")
 
 /* Truth table (see the design document): the worst visible state wins, but unknown is never
    hidden behind healthy, and offline is its own answer rather than an error. */
-const RANK = { blocked: 6, offline: 5, error: 4, degraded: 3, unknown: 2, unsupported: 1, idle: 0, healthy: 0, retention: 0, hidden: -1 }
 function laneNow(lane) {
   if (!visible(lane)) return "hidden"
   const segs = sc().lanes[lane]
@@ -682,19 +897,22 @@ function verdict() {
   if (["relay", "collector", "machine", "browser"].some((s) => sourceVisible(s) && freshness(s) !== "fresh" && freshness(s) !== "hidden")) return "unknown"
   return "healthy"
 }
-/* Evidence quality is the second dimension: how much of the window we could actually see. */
+/* Evidence quality is the second dimension: how much of the selected window we could actually
+   see. A stretch beyond retention is missing from the window, so it makes the window partial. */
 const Q_RANK = { complete: 0, no_requests: 0, partial: 1, unsupported: 2, not_collected: 3, stale: 4, forbidden: -1 }
-function laneQuality(lane) {
-  if (!visible(lane)) return "forbidden"
-  const segs = laneSegments(lane).filter((x) => x.st !== "retention")
-  const cur = segs[segs.length - 1]
-  if (LANE_SOURCE[lane] === "machine" && sc().sources.machine.stuck) return "stale"
+function segQuality(segs, s) {
+  if (segs.length === 1 && segs[0].st === "hidden") return "forbidden"
+  if (s === "machine" && sc().sources.machine.stuck) return "stale"
+  const kept = segs.filter((x) => x.st !== "retention")
+  const cur = kept[kept.length - 1]
+  if (!cur) return "partial"
   if (cur.st === "unknown") return "not_collected"
   if (cur.st === "unsupported") return "unsupported"
-  if (segs.some((x) => x.st === "unknown" || x.st === "unsupported")) return "partial"
-  if (segs.every((x) => x.st === "idle")) return "no_requests"
+  if (kept.length < segs.length || kept.some((x) => x.st === "unknown" || x.st === "unsupported")) return "partial"
+  if (kept.every((x) => x.st === "idle")) return "no_requests"
   return "complete"
 }
+const laneQuality = (lane) => segQuality(laneSegments(lane), LANE_SOURCE[lane])
 function overallQuality() {
   return LANES.map(laneQuality).filter((q) => q !== "forbidden").reduce((w, q) => (Q_RANK[q] > Q_RANK[w] ? q : w), "complete")
 }
@@ -704,12 +922,18 @@ const screenId = (id) => `<span class="certainty mono" style="margin-right:8px">
 
 const GLYPH = { healthy: "✓", idle: "–", degraded: "▲", error: "✕", blocked: "■", unknown: "?", offline: "○", hidden: "⊘", unsupported: "∅", retention: "…" }
 const sev = (st, label) => `<span class="sev s-${st}"><i aria-hidden="true">${GLYPH[st] || "?"}</i>${esc(label ?? t("st_" + st))}</span>`
+const hiddenMarker = (note) => `<p class="marker">${sev("hidden")} · ${esc(note || t("t_hiddenNote"))}</p>`
 
 function activeIncidents() { return sc().incidents.filter((i) => i.end === 0) }
 function windowStart() { return now() - state.windowMin * 60000 }
+function incidentsInWindow() {
+  const start = windowStart(), end = now()
+  return sc().incidents.filter((i) => minAgo(i.start) < end && (i.end === 0 || minAgo(i.end) > start))
+}
 
 /* ============================== rendering ================================= */
 const main = document.getElementById("main")
+const ROUTES = { overview: "M01", machines: "M02", services: "M03", trace: "M04", incident: "M05", monitoring: "M06" }
 
 function render(focus) {
   document.documentElement.lang = locale === "zh-TW" ? "zh-Hant-TW" : "en"
@@ -726,7 +950,14 @@ function render(focus) {
     return render(focus)
   }
   if (inc) state.selected = inc.id
-  const body = route === "incident" ? incidentView(inc) : route === "evidence" ? evidenceView(inc) : route === "trace" ? traceView(inc) : route === "monitoring" ? monitoringView() : overviewView()
+  const navRoute = ["machines", "services", "monitoring"].includes(route) ? route : "overview"
+  document.querySelectorAll(".nav a[data-route]").forEach((a) => {
+    const on = a.dataset.route === navRoute
+    a.classList.toggle("on", on)
+    if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current")
+  })
+  const body = route === "incident" ? incidentView(inc) : route === "evidence" ? evidenceView(inc) : route === "trace" ? traceView(inc)
+    : route === "monitoring" ? monitoringView() : route === "machines" ? machinesView() : route === "services" ? servicesView() : overviewView()
   main.innerHTML = controls() + body
   bind()
   if (focus) { const h = main.querySelector("h1"); if (h) h.focus() }
@@ -736,7 +967,7 @@ function controls() {
   const opt = SCENARIO_ORDER.map((k) => `<option value="${k}"${k === state.scenario ? " selected" : ""}>${esc(t("sc_" + k))}</option>`).join("")
   const radios = (name, items, cur) => items.map(([v, label]) =>
     `<label><input type="radio" name="${name}" value="${v}"${String(v) === String(cur) ? " checked" : ""}><span>${esc(label)}</span></label>`).join("")
-  const liveText = state.live ? t("liveNote") : t("pausedNote", { time: hhmm(state.pausedAt, true), n: Math.floor((Date.now() - state.pausedAt) / 5000) })
+  const liveText = state.live ? t("liveNote") : t("pausedNote", { time: hhmm(state.pausedAt, true), n: Math.floor((Date.now() - state.pausedAt) / 15000) })
   return `
   <section class="controls" aria-label="${esc(t("scenario"))}">
     <div class="controls-row">
@@ -750,12 +981,14 @@ function controls() {
   </section>`
 }
 
+const statsNote = () => `<p class="fine">${esc(t("statsFixed", { time: hhmm(state.loadedAt) }))}</p>`
+
 function overviewView() {
   const v = verdict()
   const act = activeIncidents()[0]
   const tot = sc().totals
   const vText = { healthy: t("v_healthy"), blocked: t("v_blocked"), degraded: t("v_degraded"), unknown: t("v_unknown"), offline: t("v_offline") }[v]
-  const since = act ? t("v_since", { time: hhmm(minAgo(act.start)), ago: t("agoWord", { t: ago((now() - minAgo(act.start)) / 1000) }) }) : t("v_none")
+  const since = act ? t("v_since", { time: hhmm(minAgo(act.start)), ago: t("agoWord", { t: ago(sinceSec(act.start)) }) }) : t("v_none")
   return `
   <div class="pagehead">
     <p class="sub">${screenId("M01")}</p>
@@ -763,10 +996,11 @@ function overviewView() {
     <p class="sub">${esc(t("lead"))}</p>
   </div>
   <section class="verdict verdict-${v}" aria-labelledby="vh">
-    <div class="glyph-big glyph-${v === "healthy" ? "healthy" : v}" aria-hidden="true">${GLYPH[v]}</div>
+    <div class="glyph-big glyph-${v}" aria-hidden="true">${GLYPH[v]}</div>
     <div><h2 id="vh">${esc(vText)}</h2><p>${act ? esc(L(act.title)) + " · " : ""}${esc(since)}</p>
-      <p>${esc(t("outcome"))}: ${sev(v === "healthy" ? "healthy" : v)} · ${esc(t("quality"))}: ${qual(overallQuality())}${LANES.some((l) => !visible(l)) ? " + " + qual("forbidden") : ""} · <a href="#monitoring">${esc(t("openMonitoring"))} (M06)</a></p>
-      <p>${esc(t("qualityNote"))}</p></div>
+      <p>${esc(t("outcome"))}: ${sev(v)} · ${esc(t("quality"))}: ${qual(overallQuality())}${LANES.some((l) => !visible(l)) ? " + " + qual("forbidden") : ""}</p>
+      <p>${esc(t("qualityNote"))}</p>
+      <p class="links"><a href="#machines">${esc(t("linkM02"))}</a> · <a href="#services">${esc(t("linkM03"))}</a> · <a href="#monitoring">${esc(t("openMonitoring"))} (M06)</a></p></div>
     ${act ? `<a class="btn" href="#incident/${act.id}">${esc(t("v_open"))} →</a>` : ""}
   </section>
   ${tiles(act, tot)}
@@ -785,7 +1019,7 @@ function tiles(act, tot) {
     : !q ? `<p class="tile-value">${sev("unknown")}</p><p class="tile-note">${esc(t("f_never"))}</p>`
     : `<p class="tile-value">${q.used}<small> / ${q.limit}</small></p>
        <span class="meter${qHot ? " meter-hot" : ""}" aria-hidden="true"><span style="width:${(q.used / q.limit) * 100}%"></span></span>
-       <p class="tile-note">${esc(t("t_queueNote", { used: q.used, limit: q.limit, age: ms(q.oldest * 1000) }))}${q.asOf ? " · " + esc(t("agoWord", { t: ago(-q.asOf * 60) })) : ""}</p>`
+       <p class="tile-note">${esc(t("t_queueNote", { used: q.used, limit: q.limit, age: ms(q.oldest * 1000) }))}${q.asOf ? " · " + esc(t("asOf", { age: ago(sinceSec(q.asOf)) })) : ""}</p>`
   const rate = tot.n ? ((tot.bad / tot.n) * 100).toFixed(tot.bad / tot.n < 0.1 ? 1 : 0) + "%" : "—"
   const lat = tot.n >= 20 ? t("t_latNote", { p95: ms(tot.p95), p99: tot.p99 ? ms(tot.p99) : "—", n: tot.n }) : t("t_fewSamples", { n: tot.n })
   return `
@@ -797,82 +1031,87 @@ function tiles(act, tot) {
       <div class="tile"><p class="tile-label">${esc(t("t_err"))}</p><p class="tile-value">${rate}</p><p class="tile-note">${esc(t("t_errNote", { bad: tot.bad, n: tot.n }))}</p></div>
       <div class="tile"><p class="tile-label">${esc(t("t_lat"))}</p><p class="tile-value">p50 ${ms(tot.p50)}</p><p class="tile-note">${esc(lat)}</p></div>
     </div>
+    ${statsNote()}
   </section>`
 }
 
 function freshnessStrip() {
-  const items = ["browser", "relay", "machine", "collector"].map((src) => {
-    const f = freshness(src)
-    const def = sc().sources[src]
+  const items = ["browser", "relay", "machine", "collector"].map((s) => {
+    const f = freshness(s)
     const st = { fresh: "healthy", stale: "degraded", unknown: "unknown", hidden: "hidden", unsupported: "unsupported" }[f]
-    const word = t("f_" + f)
-    const age = f === "hidden" ? t("t_hiddenNote") : t("f_age", { age: ago(sourceAge(src)), every: ago(def.every) })
-    return `<li class="source"><span class="source-name">${esc(t("src_" + src))}</span>${sev(st, word)}
-      <span class="source-age">${esc(age)}</span><span class="source-ret">${esc(t("f_ret", { ret: L(RETENTION_WORD[src]) }))}</span></li>`
+    const age = f === "hidden" ? t("t_hiddenNote") : t("f_age", { age: ago(sourceAge(s)), every: ago(EVERY[s]) })
+    return `<li class="source"><span class="source-name">${esc(t("src_" + s))}</span>${sev(st, t("f_" + f))}
+      <span class="source-age">${esc(age)}</span><span class="source-ret">${esc(t("f_ret", { ret: retText(s) }))}</span></li>`
   }).join("")
   return `<section class="section" aria-labelledby="fh"><h2 class="h2" id="fh">${esc(t("fresh"))}</h2><ul class="sources">${items}</ul></section>`
 }
 
-/* Segments of a lane clipped to the window, with retention and permission applied. */
-function laneSegments(lane) {
+/* Segments clipped to the window, with retention and permission applied. */
+function clipSegs(defs, s, vis) {
   const start = windowStart(), end = now()
-  if (!visible(lane)) return [{ a: start, b: end, st: "hidden" }]
-  const retFrom = end - RETENTION_MIN[LANE_SOURCE[lane]] * 60000
+  if (!vis) return [{ a: start, b: end, st: "hidden" }]
+  const retFrom = end - retMin(s) * 60000
   const out = []
   if (retFrom > start) out.push({ a: start, b: retFrom, st: "retention" })
   let cursor = Math.max(start, retFrom)
-  for (const s of sc().lanes[lane]) {
-    let a = minAgo(s.s), b = s.e === 0 ? end : minAgo(s.e)
+  for (const d of defs) {
+    let a = minAgo(d.s), b = d.e === 0 ? end : minAgo(d.e)
     a = Math.max(a, cursor); b = Math.min(b, end)
     if (b <= a) continue
     if (a > cursor) out.push({ a: cursor, b: a, st: "unknown" })
-    let st = s.st
-    if (LANE_SOURCE[lane] === "machine" && freshness("machine") === "unknown" && s.e === 0 && st !== "unknown") st = "unknown"
+    let st = d.st
+    if (s === "machine" && freshness("machine") === "unknown" && d.e === 0 && st !== "unknown") st = "unknown"
     out.push({ a, b, st }); cursor = b
   }
   if (cursor < end) out.push({ a: cursor, b: end, st: "unknown" })
   return out
 }
+const laneSegments = (lane) => clipSegs(sc().lanes[lane], LANE_SOURCE[lane], visible(lane))
 const pct = (x) => (((x - windowStart()) / (now() - windowStart())) * 100).toFixed(3)
 
-function timeline() {
+/* One track per row; the same rows feed the table alternative. */
+function trackRows(rows, incs, buttons) {
   const start = windowStart(), end = now()
+  const bands = incs.map((i) => {
+    const a = Math.max(minAgo(i.start), start), b = i.end === 0 ? end : Math.min(minAgo(i.end), end)
+    return `<div class="tl-band" style="left:${pct(a)}%;width:${(pct(b) - pct(a)).toFixed(3)}%"></div>`
+  }).join("")
+  return rows.map((r) => {
+    const segs = r.segs
+    const summary = segs.map((x) => `${t("st_" + x.st)} ${hhmm(x.a)}–${hhmm(x.b)}`).join("; ")
+    const inner = segs.map((x) => `<span class="tl-seg st-${x.st}" style="left:${pct(x.a)}%;width:${(pct(x.b) - pct(x.a)).toFixed(3)}%"></span>`).join("")
+    const hidden = segs.length === 1 && segs[0].st === "hidden" ? `<span class="tl-hidden-note">⊘ ${esc(t("st_hidden"))}</span>` : ""
+    const retSeg = segs.find((x) => x.st === "retention")
+    const ret = retSeg ? `<span class="tl-ret-note" style="width:${pct(retSeg.b)}%">${esc(t("st_retention"))}</span>` : ""
+    const marks = hidden ? "" : (r.marks || []).filter((m) => minAgo(m) >= start).map((m) => `<span class="tl-mark" style="left:${pct(minAgo(m))}%"></span>`).join("")
+    return `<div class="tl-lane"><div class="tl-name">${esc(r.name)}<small>${esc(r.sub)}</small></div>
+      <div class="tl-track" role="img" aria-label="${esc(t("tlSummary", { lane: r.name, list: summary }))}">${bands}${inner}${marks}${hidden}${ret}${state.live ? '<span class="tl-now"></span>' : ""}</div></div>`
+  }).join("")
+}
+
+function trackPanel(title, rows, incs, extra) {
+  const start = windowStart(), end = now()
+  const head = `<div class="panel-head"><h2 class="h3" id="tlh">${esc(title)}</h2>
+      <span class="dimtext" style="font-size:12.5px">${esc(t("tlRange", { from: hhmm(start), to: hhmm(end) }))} · ${esc(state.live ? t("live") : t("paused"))}</span></div>`
+  if (state.tableView) {
+    const body = rows.map((r) => `<tr><th scope="row">${esc(r.name)} <span class="dimtext">${esc(r.sub)}</span></th>
+      <td data-label="${esc(t("state"))}" class="wide">${r.segs.map((x) => `${sev(x.st)} <span class="dimtext">${hhmm(x.a)}–${hhmm(x.b)}</span>`).join("<br>")}</td></tr>`).join("")
+    return `<section class="section panel" aria-labelledby="tlh">${head}
+      <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("seg"))}</th><th scope="col">${esc(t("state"))}</th></tr></thead><tbody>${body}</tbody></table></div>
+      <div class="tl-foot"><p class="fine">${esc(t("gapNote"))}</p><button type="button" class="btn btn-small" id="viewBtn">${esc(t("chartView"))}</button></div></section>`
+  }
   const ticks = 4
   const axis = Array.from({ length: ticks + 1 }, (_, i) => {
     const x = start + ((end - start) * i) / ticks
     return `<span style="left:${(i / ticks) * 100}%">${i === ticks ? esc(t("tlNow")) : hhmm(x)}</span>`
   }).join("")
-  const sel = state.selected
-  const incs = sc().incidents.filter((i) => minAgo(i.start) < end && (i.end === 0 || minAgo(i.end) > start))
-  const bands = incs.map((i) => {
-    const a = Math.max(minAgo(i.start), start), b = i.end === 0 ? end : Math.min(minAgo(i.end), end)
-    return `<div class="tl-band" style="left:${pct(a)}%;width:${(pct(b) - pct(a)).toFixed(3)}%"></div>`
-  }).join("")
-  if (state.tableView) return timelineTable(start, end, incs)
-  const lanes = LANES.map((lane) => {
-    const segs = laneSegments(lane)
-    const summary = segs.map((s) => `${t("st_" + s.st)} ${hhmm(s.a)}–${hhmm(s.b)}`).join("; ")
-    const inner = segs.map((s) => `<span class="tl-seg st-${s.st}" style="left:${pct(s.a)}%;width:${(pct(s.b) - pct(s.a)).toFixed(3)}%"></span>`).join("")
-    const hidden = segs.length === 1 && segs[0].st === "hidden" ? `<span class="tl-hidden-note">⊘ ${esc(t("st_hidden"))}</span>` : ""
-    const ret = segs.find((s) => s.st === "retention") ? `<span class="tl-ret-note" style="width:${pct(segs.find((s) => s.st === "retention").b)}%">${esc(t("st_retention"))}</span>` : ""
-    const marks = visible(lane) ? sc().marks.filter((m) => m.lane === lane && minAgo(m.t) >= start).map((m) => `<span class="tl-mark" style="left:${pct(minAgo(m.t))}%"></span>`).join("") : ""
-    return `<div class="tl-lane"><div class="tl-name">${esc(t("lane_" + lane))}<small>${esc(t("lane_" + lane + "_s"))}</small></div>
-      <div class="tl-track" role="img" aria-label="${esc(t("tlSummary", { lane: t("lane_" + lane), list: summary }))}">${bands}${inner}${marks}${hidden}${ret}${state.live ? '<span class="tl-now"></span>' : ""}</div></div>`
-  }).join("")
-  const buttons = incs.map((i) => {
-    const x = Math.max(minAgo(i.start), start)
-    return `<button type="button" class="tl-inc" data-inc="${i.id}" style="left:${pct(x)}%" aria-current="${i.id === sel}" aria-label="${esc(L(i.title))}, ${esc(t("v_since", { time: hhmm(minAgo(i.start)), ago: ago((end - minAgo(i.start)) / 1000) }))}">${GLYPH[i.sev]} ${esc(i.id)}</button>`
-  }).join("")
   const legend = ["healthy", "idle", "degraded", "error", "blocked", "offline", "unknown", "retention"].map((st) =>
     `<span><span class="sw"><b class="st-${st}"></b></span>${esc(t("st_" + st))}</span>`).join("")
-  return `
-  <section class="section panel" aria-labelledby="tlh">
-    <div class="panel-head"><h2 class="h3" id="tlh">${esc(t("timeline"))}</h2>
-      <span class="dimtext" style="font-size:12.5px">${esc(t("tlRange", { from: hhmm(start), to: hhmm(end) }))} · ${esc(state.live ? t("live") : t("paused"))}</span></div>
+  return `<section class="section panel" aria-labelledby="tlh">${head}
     <div class="tl">
       <div class="tl-axis"><div class="tl-name"></div><div class="tl-axis-track" aria-hidden="true">${axis}</div></div>
-      ${lanes}
-      ${buttons ? `<div class="tl-axis"><div class="tl-name dimtext" style="font-size:12px">${esc(t("incidents"))}</div><div class="tl-incidents">${buttons}</div></div>` : ""}
+      ${trackRows(rows, incs)}
+      ${extra || ""}
     </div>
     <div class="legend" aria-label="${esc(t("tlLegend"))}">${legend}</div>
     <div class="tl-foot"><p class="fine">${esc(t("gapNote"))}</p>
@@ -880,24 +1119,21 @@ function timeline() {
   </section>`
 }
 
-function timelineTable(start, end, incs) {
-  const rows = LANES.map((lane) => {
-    const segs = laneSegments(lane)
-    return `<tr><th scope="row">${esc(t("lane_" + lane))} <span class="dimtext">${esc(t("lane_" + lane + "_s"))}</span></th>
-      <td data-label="${esc(t("state"))}" class="wide">${segs.map((s) => `${sev(s.st)} <span class="dimtext">${hhmm(s.a)}–${hhmm(s.b)}</span>`).join("<br>")}</td></tr>`
+function timeline() {
+  const start = windowStart()
+  const incs = incidentsInWindow()
+  const rows = LANES.map((lane) => ({ name: t("lane_" + lane), sub: t("lane_" + lane + "_s"), segs: laneSegments(lane),
+    marks: visible(lane) ? sc().marks.filter((m) => m.lane === lane).map((m) => m.t) : [] }))
+  const buttons = incs.map((i) => {
+    const x = Math.max(minAgo(i.start), start)
+    return `<button type="button" class="tl-inc" data-inc="${i.id}" style="left:${pct(x)}%" aria-current="${i.id === state.selected}" aria-label="${esc(L(i.title))}, ${esc(t("v_since", { time: hhmm(minAgo(i.start)), ago: ago(sinceSec(i.start)) }))}">${GLYPH[i.sev]} ${esc(i.id)}</button>`
   }).join("")
-  return `
-  <section class="section panel" aria-labelledby="tlh">
-    <div class="panel-head"><h2 class="h3" id="tlh">${esc(t("timeline"))}</h2>
-      <span class="dimtext" style="font-size:12.5px">${esc(t("tlRange", { from: hhmm(start), to: hhmm(end) }))}</span></div>
-    <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("seg"))}</th><th scope="col">${esc(t("state"))}</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="tl-foot"><p class="fine">${esc(t("gapNote"))}</p>
-      <button type="button" class="btn btn-small" id="viewBtn">${esc(t("chartView"))}</button></div>
-  </section>`
+  const extra = buttons ? `<div class="tl-axis"><div class="tl-name dimtext" style="font-size:12px">${esc(t("incidents"))}</div><div class="tl-incidents">${buttons}</div></div>` : ""
+  return trackPanel(t("timeline"), rows, incs, extra)
 }
 
 function incidentList() {
-  const list = sc().incidents
+  const list = incidentsInWindow()
   const rows = list.length ? list.map((i) => `
     <li class="inc-row"><div><p class="inc-title">${sev(i.sev, "")} ${esc(L(i.title))}</p>
       <p class="inc-meta">${esc(i.id)} · ${esc(i.end === 0 ? t("active") : t("resolved"))} · ${hhmm(minAgo(i.start))}${i.end === 0 ? "–" : "–" + hhmm(minAgo(i.end))} UTC · ${esc(t("cert_" + i.cert))}</p></div>
@@ -911,48 +1147,225 @@ function segmentTable() {
     const st = laneNow(lane)
     const v = sc().segs[lane]
     const vis = visible(lane)
-    const src = LANE_SOURCE[lane]
+    const s = LANE_SOURCE[lane]
     const cell = (x, f) => (!vis ? "—" : x === null || x === undefined ? `<span class="dimtext">${esc(t("st_unknown"))}</span>` : f(x))
     const few = vis && v[3] !== null && v[3] < 20
-    return `<tr><th scope="row">${esc(t("lane_" + lane))}</th>
+    const to = s === "machine" ? "#machines" : lane === "browser" ? null : "#services"
+    return `<tr><th scope="row">${to ? `<a href="${to}">${esc(t("lane_" + lane))}</a>` : esc(t("lane_" + lane))}</th>
       <td data-label="${esc(t("state"))}">${sev(st)}</td>
       <td data-label="${esc(t("quality"))}">${qual(laneQuality(lane))}</td>
       <td data-label="p50" class="num">${cell(v[0], ms)}</td><td data-label="p95" class="num">${cell(v[1], ms)}</td>
       <td data-label="p99" class="num">${few ? `<span class="dimtext">${esc(t("t_fewSamples", { n: v[3] }))}</span>` : cell(v[2], ms)}</td>
       <td data-label="${esc(t("samples"))}" class="num">${cell(v[3], (x) => x.toLocaleString())}</td>
       <td data-label="${esc(t("errors"))}" class="num">${cell(v[4], (x) => x.toLocaleString())}</td>
-      <td data-label="${esc(t("age"))}">${sourceVisible(src) ? esc(ago(sourceAge(src))) : "—"}</td></tr>`
+      <td data-label="${esc(t("age"))}">${sourceVisible(s) ? esc(ago(sourceAge(s))) : "—"}</td></tr>`
   }).join("")
   return `<section class="section panel" aria-labelledby="sh"><h2 class="h3" id="sh" style="margin-bottom:8px">${esc(t("segHealth"))}</h2>
-    <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("seg"))}</th><th scope="col">${esc(t("state"))}</th><th scope="col">${esc(t("quality"))}</th><th scope="col" class="num">p50</th><th scope="col" class="num">p95</th><th scope="col" class="num">p99</th><th scope="col" class="num">${esc(t("samples"))}</th><th scope="col" class="num">${esc(t("errors"))}</th><th scope="col">${esc(t("age"))}</th></tr></thead><tbody>${rows}</tbody></table></div></section>`
+    <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("seg"))}</th><th scope="col">${esc(t("state"))}</th><th scope="col">${esc(t("quality"))}</th><th scope="col" class="num">p50</th><th scope="col" class="num">p95</th><th scope="col" class="num">p99</th><th scope="col" class="num">${esc(t("samples"))}</th><th scope="col" class="num">${esc(t("errors"))}</th><th scope="col">${esc(t("age"))}</th></tr></thead><tbody>${rows}</tbody></table></div>${statsNote()}</section>`
 }
 
 function crumbs(extra) {
   return `<nav aria-label="breadcrumb"><ol class="crumbs"><li><a href="#overview">${esc(t("back"))}</a></li>${extra.map(([h, l]) => `<li aria-hidden="true">›</li><li>${h ? `<a href="${h}">${esc(l)}</a>` : `<span aria-current="page">${esc(l)}</span>`}</li>`).join("")}</ol></nav>`
 }
 
-function incidentView(i) {
-  const srcName = (s) => (s && WORDS.en["src_" + s] ? t("src_" + s) : s === "fixture" ? (locale === "zh-TW" ? "示意資料宣告" : "fixture declaration") : s === "inference" ? (locale === "zh-TW" ? "推論" : "inference") : "")
-  const li = (rows) => rows.map(([w, s]) => `<li>${esc(L(w))}${s ? `<br><span class="src">${esc(srcName(s))}</span>` : ""}</li>`).join("")
-  const maxT = Math.max(1, ...i.stages.filter((s) => s[1] !== null).map((s) => s[1]))
+/* Correlated incidents with routes out to M05, M04, evidence and M06. */
+function relatedPanel() {
+  const list = incidentsInWindow()
+  const rows = list.length ? `<ul class="inc-list">${list.map((i) => `
+    <li class="inc-row"><div><p class="inc-title">${sev(i.sev, "")} ${esc(L(i.title))}</p>
+      <p class="inc-meta">${esc(i.id)} · ${esc(i.end === 0 ? t("active") : t("resolved"))} · ${esc(t("cert_" + i.cert))}${i.trace ? " · " + esc(i.trace) : ""}</p></div>
+      <div class="links"><a class="btn btn-small" href="#incident/${i.id}">${esc(t("linkM05"))}</a>${i.trace ? `<a class="btn btn-small" href="#trace/${i.id}">${esc(t("linkM04"))}</a>` : ""}<a class="btn btn-small" href="#evidence/${i.id}">${esc(t("toEvidence"))}</a></div></li>`).join("")}</ul>`
+    : `<p class="fine">${esc(t("noIncidents"))}</p>`
+  return `<section class="panel section" aria-labelledby="rh"><h2 class="h3" id="rh">${esc(t("related"))}</h2>${rows}
+    <div class="links"><a class="btn btn-small" href="#monitoring">${esc(t("openMonitoring"))} (M06)</a></div></section>`
+}
+
+/* ---- M02 Machine connections ---- */
+function machinesView() {
+  const m = sc().m
+  const expired = sc().presence === "expired"
+  const presText = expired ? t("presenceExpired", { age: ago(sinceSec(-14)) }) : t("presenceRenewed", { age: ago(((now() - state.loadedAt) / 1000 + m.renew) % 30) })
+  const relayOk = canSee("relay"), machOk = canSee("machine")
+  const hid = `<span class="marker">${sev("hidden")}</span>`
+  const snapAge = machOk ? `${sev({ fresh: "healthy", stale: "degraded", unknown: "unknown" }[freshness("machine")], t("f_" + freshness("machine")))} · ${esc(t("agoWord", { t: ago(sourceAge("machine")) }))}` : hid
+  const facts = `<section class="panel"><dl class="facts">
+    <div><dt>${esc(t("machine"))}</dt><dd class="mono">${esc(t("machineVal"))}</dd></div>
+    <div><dt>${esc(t("presence"))}</dt><dd>${sev(expired ? "offline" : "healthy", presText)}</dd></div>
+    <div><dt>${esc(t("contract"))}</dt><dd>${esc(t("contractVal"))}</dd></div>
+    <div><dt>${esc(t("bootId"))}</dt><dd class="mono">${relayOk || machOk ? esc(m.boot.id) : hid}</dd></div>
+    <div><dt>${esc(t("booted"))}</dt><dd>${relayOk || machOk ? esc(hhmm(minAgo(m.boot.at)) + " UTC · " + t("agoWord", { t: ago(sinceSec(m.boot.at)) })) : hid}</dd></div>
+    <div><dt>${esc(t("build"))}</dt><dd class="mono">${relayOk || machOk ? esc(BUILD) : hid}</dd></div>
+    <div><dt>${esc(t("platform"))}</dt><dd>${relayOk || machOk ? esc(m.boot.platform) : hid}</dd></div>
+    <div><dt>${esc(t("lastReported"))}</dt><dd>${snapAge}</dd></div>
+  </dl></section>`
+  const marksOf = (k) => (m.marks || []).filter((x) => x.lane === k).map((x) => x.t)
+  const rows = [
+    { name: t("ln_presence"), sub: t("ln_presence_s"), segs: clipSegs(m.lanes.presence, "relay", canSee("presence")), marks: marksOf("presence") },
+    { name: t("ln_sock"), sub: t("ln_sock_s"), segs: clipSegs(m.lanes.sock, "relay", relayOk), marks: marksOf("sock") },
+    { name: t("ln_direct"), sub: t("ln_direct_s"), segs: clipSegs(m.lanes.direct, "browser", canSee("browser")), marks: marksOf("direct") },
+    { name: t("ln_snap"), sub: t("ln_snap_s"), segs: clipSegs(m.lanes.snap, "machine", machOk), marks: [] },
+  ]
+  const carrier = (c) => (c === "none" ? sev("unknown", t("c_none")) : esc(t("c_" + c)))
+  const vrows = m.viewers.filter((v) => relayOk || (v.self && canSee("browser")))
+  const hiddenViewers = m.viewers.length - vrows.length
+  const viewersTable = `<section class="panel section" aria-labelledby="vwh"><h2 class="h3" id="vwh">${esc(t("viewers"))}</h2><p class="fine">${esc(t("carrierNote"))}</p>
+    <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("viewer"))}</th><th scope="col">${esc(t("readCarrier"))}</th><th scope="col">${esc(t("cmdCarrier"))}</th><th scope="col">${esc(t("state"))}</th><th scope="col" class="num">${esc(t("generation"))}</th><th scope="col">${esc(t("lastSeen"))}</th><th scope="col" class="num">${esc(t("replaced"))}</th><th scope="col" class="num">${esc(t("refused"))}</th></tr></thead>
+    <tbody>${vrows.map((v) => `<tr><th scope="row"><span class="mono">${esc(v.id)}</span> <span class="dimtext">${esc(L(v.kind))}${v.self ? " · " + esc(t("thisViewer")) : ""}</span></th>
+      <td data-label="${esc(t("readCarrier"))}">${carrier(v.read)}</td><td data-label="${esc(t("cmdCarrier"))}">${carrier(v.cmd)}</td>
+      <td data-label="${esc(t("state"))}">${sev(v.st)}</td><td data-label="${esc(t("generation"))}" class="num">${v.gen}</td>
+      <td data-label="${esc(t("lastSeen"))}">${esc(t("agoWord", { t: ago(v.seen + (now() - state.loadedAt) / 1000 * (v.st === "idle" ? 1 : 0)) }))}</td>
+      <td data-label="${esc(t("replaced"))}" class="num">${v.repl}</td><td data-label="${esc(t("refused"))}" class="num">${v.refused}</td></tr>`).join("")}</tbody></table></div>
+    ${hiddenViewers ? hiddenMarker(t("hiddenItems", { n: hiddenViewers, src: srcName("relay") })) : ""}</section>`
+  const start = windowStart()
+  const evs = m.events.filter((e) => minAgo(e.t) >= start && (relayOk || (e.viewer === "v-a1" && canSee("browser"))))
+  const hiddenEvs = m.events.filter((e) => minAgo(e.t) >= start).length - evs.length
+  const shown = evs.slice(-6).reverse()
+  const chain = `<section class="panel section" aria-labelledby="rch"><h2 class="h3" id="rch">${esc(t("replChain"))}</h2>
+    ${evs.length ? `<p class="fine">${esc(t("replCount", { n: evs.length, k: shown.length }))}</p><ul class="inc-list">${shown.map((e) => `
+      <li class="inc-row"><div><p class="inc-title">${sev(e.outcome === "refused" ? "error" : "degraded", t("outcome_" + e.outcome))} <span class="mono">${esc(e.viewer)}</span> · ${e.to ? `${e.from} → ${e.to}` : e.from}</p>
+        <p class="inc-meta">${hhmm(minAgo(e.t), true)} UTC · ${esc(e.reason ? L(e.reason) : t("noReason"))}</p></div></li>`).join("")}</ul>` : `<p class="fine">${esc(t("replNone"))}</p>`}
+    ${hiddenEvs > 0 ? hiddenMarker(t("hiddenItems", { n: hiddenEvs, src: srcName("relay") })) : ""}</section>`
+  const holders = `<section class="panel section" aria-labelledby="hdh"><h2 class="h3" id="hdh">${esc(t("holders"))}</h2><p class="fine">${esc(t("holdersNote"))}</p>
+    ${machOk ? `<div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("stage"))}</th><th scope="col">${esc(t("holder"))}</th><th scope="col">${esc(t("state"))}</th><th scope="col">${esc(t("heldFor"))}</th><th scope="col">${esc(t("deadline"))}</th><th scope="col">${esc(t("lastProgress"))}</th></tr></thead>
+    <tbody>${m.holders.map(([k, h, age, st, grows, asOf]) => {
+      const held = age === null ? null : age + (grows ? (now() - state.loadedAt) / 1000 : 0)
+      return `<tr><th scope="row">${esc(t(k))}</th><td data-label="${esc(t("holder"))}" class="mono">${esc(h ?? "—")}</td>
+        <td data-label="${esc(t("state"))}">${st === "unsupported" ? sev("unsupported", t("stageNotReported")) : sev(st)}</td>
+        <td data-label="${esc(t("heldFor"))}">${held === null ? "—" : esc(held < 1 ? ms(Math.round(held * 1000)) : ago(held))}${asOf ? ` <span class="dimtext">(${esc(t("asOf", { age: ago(sinceSec(asOf)) }))})</span>` : ""}</td>
+        <td data-label="${esc(t("deadline"))}">${st === "idle" || st === "unsupported" ? "—" : "5 s / 15 s"}</td>
+        <td data-label="${esc(t("lastProgress"))}">${held === null || st === "idle" ? "—" : esc(t("agoWord", { t: ago(grows ? held : 0) }))}</td></tr>`
+    }).join("")}</tbody></table></div>` : hiddenMarker()}</section>`
+  return `
+  ${crumbs([[null, t("m02Title")]])}
+  <div class="pagehead"><p class="sub">${screenId("M02")}</p><h1 tabindex="-1">${esc(t("m02Title"))}</h1><p class="sub">${esc(t("m02Lead"))}</p></div>
+  ${facts}
+  ${trackPanel(t("presenceTl"), rows, incidentsInWindow())}
+  ${viewersTable}
+  ${chain}
+  ${holders}
+  ${freshnessStrip()}
+  ${relatedPanel()}`
+}
+
+/* ---- M03 Cloud services ---- */
+function servicesView() {
+  const c = sc().c
+  const op = state.scope === "cloud", owner = state.scope === "machine"
+  const note = owner ? `<p class="notice">${esc(t("ownerCloudNote"))}</p>` : state.scope === "viewer" ? `<p class="notice">${esc(t("viewerCloudNote"))} <a href="#monitoring">${esc(t("openMonitoring"))} (M06)</a></p>` : ""
+  const readable = op || owner
+  const hid = `<span class="marker">${sev("hidden")}</span>`
+  const comps = readable ? `<section class="panel section" aria-labelledby="cph"><h2 class="h3" id="cph">${esc(t("components"))}</h2>
+    <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("component"))}</th><th scope="col">${esc(t("outcome"))}</th><th scope="col">${esc(t("quality"))}</th><th scope="col">${esc(t("build"))}</th><th scope="col">${esc(t("instance"))}</th><th scope="col">${esc(t("age"))}</th><th scope="col">${esc(t("impact"))}</th></tr></thead>
+    <tbody>${COMPONENTS.map((k) => {
+      const [st, q, impact] = c.comps[k]
+      const s = COMP_SOURCE[k]
+      return `<tr><th scope="row">${esc(t("cmp_" + k))}</th><td data-label="${esc(t("outcome"))}">${sev(st)}</td><td data-label="${esc(t("quality"))}">${qual(q)}</td>
+        <td data-label="${esc(t("build"))}" class="mono">${op ? esc(CB[k][0]) : hid}</td><td data-label="${esc(t("instance"))}" class="mono">${op ? esc(CB[k][1]) : hid}</td>
+        <td data-label="${esc(t("age"))}">${esc(t("agoWord", { t: ago(sourceAge(s)) }))}</td>
+        <td data-label="${esc(t("impact"))}" class="wide">${esc(L(impact))}</td></tr>`
+    }).join("")}</tbody></table></div>${statsNote()}</section>` : ""
+  const rows = COMPONENTS.map((k) => ({ name: t("cmp_" + k), sub: srcName(COMP_SOURCE[k]), segs: clipSegs(c.lanes[k], COMP_SOURCE[k], readable), marks: [] }))
+  const stages = readable ? `<section class="panel section" aria-labelledby="rsh"><h2 class="h3" id="rsh">${esc(t("relayStages"))}</h2>
+    <p class="notice">${esc(t("relayNote"))}</p>
+    <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("stage"))}</th><th scope="col" class="num">p50</th><th scope="col" class="num">p95</th><th scope="col" class="num">${esc(t("samples"))}</th><th scope="col" class="num">${esc(t("pending"))}</th><th scope="col">${esc(t("oldestPending"))}</th></tr></thead>
+    <tbody>${["admission", "entry", "return", "edge"].map((k, i) => {
+      const [p50, p95, n, pend, oldest] = c.stages[i]
+      const late = p95 >= 15000
+      return `<tr><th scope="row">${esc(t("rs_" + k))}</th><td data-label="p50" class="num">${ms(p50)}</td><td data-label="p95" class="num">${ms(p95)}${late ? " ▲" : ""}</td>
+        <td data-label="${esc(t("samples"))}" class="num">${n.toLocaleString()}</td><td data-label="${esc(t("pending"))}" class="num">${pend}</td>
+        <td data-label="${esc(t("oldestPending"))}">${pend ? (oldest >= 15 ? sev("degraded", ago(oldest)) : esc(ago(oldest))) : "—"}</td></tr>`
+    }).join("")}</tbody></table></div>${statsNote()}</section>` : ""
+  const waits = op ? `<section class="panel section" aria-labelledby="dwh"><h2 class="h3" id="dwh">${esc(t("waits"))}</h2>
+    <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("dep"))}</th><th scope="col" class="num">p50</th><th scope="col" class="num">p95</th></tr></thead>
+    <tbody>${["storage", "mongo", "fetch", "write"].map((k, i) => `<tr><th scope="row">${esc(t("dep_" + k))}</th><td data-label="p50" class="num">${ms(c.waits[i][0])}</td><td data-label="p95" class="num">${ms(c.waits[i][1])}${c.waits[i][1] >= 15000 ? " ▲" : ""}</td></tr>`).join("")}</tbody></table></div>
+    <h3 class="h3">${esc(t("saturation"))}</h3>
+    <span class="meter${c.sat.used / c.sat.limit >= 0.75 ? " meter-hot" : ""}" aria-hidden="true"><span style="width:${(c.sat.used / c.sat.limit) * 100}%"></span></span>
+    <p class="fine">${esc(t("inflight", { used: c.sat.used, limit: c.sat.limit, age: ago(c.sat.oldest) }))}</p></section>`
+    : readable ? `<section class="panel section"><h2 class="h3">${esc(t("waits"))} · ${esc(t("saturation"))}</h2>${hiddenMarker(t("opHiddenNote"))}</section>` : ""
+  return `
+  ${crumbs([[null, t("m03Title")]])}
+  <div class="pagehead"><p class="sub">${screenId("M03")}</p><h1 tabindex="-1">${esc(t("m03Title"))}</h1><p class="sub">${esc(t("m03Lead"))}</p></div>
+  ${note}
+  ${comps}
+  ${trackPanel(t("cmpTl"), rows, incidentsInWindow())}
+  ${stages}
+  ${waits}
+  ${relatedPanel()}`
+}
+
+/* ---- M05 and M04: every item is filtered by the source that recorded it. ---- */
+function scopedItems(rows) {
+  const shown = rows.filter(([, s]) => canSee(s))
+  const hidden = {}
+  rows.filter(([, s]) => !canSee(s)).forEach(([, s]) => { hidden[s] = (hidden[s] || 0) + 1 })
+  return { shown, hidden }
+}
+function itemsList(rows) {
+  const { shown, hidden } = scopedItems(rows)
+  return shown.map(([w, s]) => `<li>${esc(L(w))}${s ? `<br><span class="src">${esc(srcName(s))}</span>` : ""}</li>`).join("")
+    + Object.entries(hidden).map(([s, n]) => `<li class="marker">⊘ ${esc(t("hiddenItems", { n, src: srcName(s) }))}</li>`).join("")
+}
+const stageSrc = (row) => row[2] || STAGE_SRC[row[0]]
+function stageProgress(i) {
+  let last = null, next = null, limit = null
+  for (const row of i.stages) {
+    const [k, at] = row
+    if (!canSee(stageSrc(row))) { limit = k; break }
+    if (at === "na") continue
+    if (at === null) { next = k; break }
+    last = k
+  }
+  const a = i.active
+  const active = a && canSee(STAGE_SRC[a.stage]) ? { stage: a.stage, basis: "independent active-phase span", span_id: a.span, injection_id: a.inj, open_for_s: Math.round(sinceSec(a.since)) } : null
+  return { last_proven_stage: last, active_stage: active, next_unobserved_stage: next, ...(limit ? { visibility_limit_at: limit } : {}) }
+}
+
+function waterfall(i) {
+  const nums = i.stages.filter((r) => typeof r[1] === "number" && canSee(stageSrc(r))).map((r) => r[1])
+  const maxT = Math.max(1, ...nums)
   const scale = (v) => (Math.log10(1 + v) / Math.log10(1 + maxT)) * 100
   let prev = 0
-  const wf = i.stages.length ? i.stages.map(([k, at, by, age, flag]) => {
+  const rows = i.stages.map((r) => {
+    const [k, at, , , flag] = r
     const name = `<div class="wf-name">${esc(t("stg_" + k))}<small>${esc(t("stg_" + k + "_s"))}</small></div>`
-    if (at === null) return `<div class="wf-row">${name}<div class="wf-track"><span class="wf-missing">${esc(t("noReceipt"))}</span></div><div class="wf-time dimtext">—</div></div>`
+    const empty = (text) => `<div class="wf-row" role="listitem">${name}<div class="wf-track"><span class="wf-missing">${esc(text)}</span></div><div class="wf-time dimtext">—</div></div>`
+    if (!canSee(stageSrc(r))) return empty("⊘ " + t("hiddenStage"))
+    if (at === "na") return empty(t("na"))
+    if (at === null && flag === "active" && i.active) return empty(t("activeSpan", { span: i.active.span, age: ago(sinceSec(i.active.since)), inj: i.active.inj }))
+    if (at === null) return empty(t("noReceipt"))
     const left = scale(prev), right = scale(at)
-    const cls = flag === "late" ? " wf-late" : ""
-    const row = `<div class="wf-row">${name}<div class="wf-track"><span class="wf-bar${cls}" style="left:${left}%;width:${Math.max(0.8, right - left)}%"></span></div><div class="wf-time">+${ms(at)}${flag === "late" ? " ▲" : ""}</div></div>`
     prev = at
-    return row
-  }).join("") : `<p class="fine">${esc(t("f_never"))}</p>`
-  prev = 0
-  const table = i.stages.map(([k, at, by, age]) => {
-    const d = at === null ? "—" : ms(at - prev); if (at !== null) prev = at
-    return `<tr><th scope="row">${esc(t("stg_" + k))}</th><td data-label="${esc(t("at"))}" class="num">${at === null ? `<span class="dimtext">${esc(t("noReceipt"))}</span>` : "+" + ms(at)}</td>
-      <td data-label="${esc(t("took"))}" class="num">${d}</td><td data-label="${esc(t("by"))}">${by ? esc(t("src_" + (by === "machine" ? "machine" : by))) : "—"}</td>
-      <td data-label="${esc(t("receiptAge"))}">${age ? esc(ago(age)) : "—"}</td></tr>`
+    return `<div class="wf-row" role="listitem">${name}<div class="wf-track"><span class="wf-bar${flag === "late" ? " wf-late" : ""}" style="left:${left}%;width:${Math.max(0.8, right - left)}%"></span></div><div class="wf-time">+${ms(at)}${flag === "late" ? " ▲" : ""}</div></div>`
   }).join("")
+  prev = 0
+  const table = i.stages.map((r) => {
+    const [k, at, by, age, flag] = r
+    const vis = canSee(stageSrc(r))
+    const word = !vis ? t("hiddenStage") : at === "na" ? t("na") : at === null && flag === "active" && i.active ? t("activeSpan", { span: i.active.span, age: ago(sinceSec(i.active.since)), inj: i.active.inj }) : at === null ? t("noReceipt") : null
+    const d = word ? "—" : ms(at - prev); if (!word) prev = at
+    return `<tr><th scope="row">${esc(t("stg_" + k))}</th><td data-label="${esc(t("at"))}" class="num">${word ? `<span class="dimtext">${esc(word)}</span>` : "+" + ms(at)}</td>
+      <td data-label="${esc(t("took"))}" class="num">${d}</td><td data-label="${esc(t("by"))}">${esc(srcName(stageSrc(r)))}</td>
+      <td data-label="${esc(t("receiptAge"))}">${!word && age ? esc(ago(age)) : "—"}</td></tr>`
+  }).join("")
+  return `<section class="panel section" aria-labelledby="wfh">
+    <div class="panel-head"><h2 class="h3" id="wfh">${esc(t("waterfall"))}</h2><span class="mono dimtext">${esc(i.trace ?? "")}</span></div>
+    <p class="fine">${esc(t("wfNote"))}</p>
+    ${!i.stages.length ? `<p class="fine">${esc(t("f_never"))}</p>` : state.tableView
+      ? `<div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("stage"))}</th><th scope="col" class="num">${esc(t("at"))}</th><th scope="col" class="num">${esc(t("took"))}</th><th scope="col">${esc(t("by"))}</th><th scope="col">${esc(t("receiptAge"))}</th></tr></thead><tbody>${table}</tbody></table></div>`
+      : `<div class="wf" role="list">${rows}</div>`}
+    <div class="view-toggle"><button type="button" class="btn btn-small" id="viewBtn">${esc(state.tableView ? t("chartView") : t("tableView"))}</button></div>
+  </section>`
+}
+
+function codePanel(i) {
+  const shown = i.code.filter((c) => canSee(c.src))
+  const hidden = i.code.length - shown.length
+  return `<section class="panel section" aria-labelledby="ch"><h2 class="h3" id="ch">${esc(t("code"))}</h2><p class="fine">${esc(t("codeNote"))} <span class="mono">${esc(BUILD)}</span></p>
+    <ul class="code" style="margin:0;padding-left:18px">${shown.map((c) => `<li><span class="mono">${esc(c.loc)}</span><span>${c.path ? `<span class="mono">${esc(c.path)} · ${esc(c.sym)}</span>` : `<span class="dimtext">${esc(t("noPath"))}</span>`} — ${esc(L(c.why))}</span></li>`).join("")}</ul>
+    ${hidden ? hiddenMarker(t("hiddenItems", { n: hidden, src: srcName("machine") })) : ""}</section>`
+}
+
+function incidentView(i) {
   const end = i.end === 0 ? t("ongoing") : hhmm(minAgo(i.end)) + " UTC"
   return `
   ${crumbs([[null, i.id]])}
@@ -967,54 +1380,47 @@ function incidentView(i) {
     <div><dt>${esc(t("build"))}</dt><dd class="mono">${esc(BUILD)}</dd></div>
   </dl></section>
   <section class="claims" aria-label="${esc(t("facts"))} / ${esc(t("suspected"))} / ${esc(t("missing"))}">
-    <div class="claim claim-fact"><h3><span aria-hidden="true">●</span>${esc(t("facts"))}</h3><ul>${li(i.facts)}</ul></div>
-    <div class="claim claim-suspect"><h3><span aria-hidden="true">◐</span>${esc(t("suspected"))} · ${esc(t("cert_" + i.cert))}</h3><ul>${li(i.suspected)}</ul></div>
-    <div class="claim claim-missing"><h3><span aria-hidden="true">○</span>${esc(t("missing"))}</h3><ul>${li(i.missing)}</ul></div>
+    <div class="claim claim-fact"><h3><span aria-hidden="true">●</span>${esc(t("facts"))}</h3><ul>${itemsList(i.facts)}</ul></div>
+    <div class="claim claim-suspect"><h3><span aria-hidden="true">◐</span>${esc(t("suspected"))} · ${esc(t("cert_" + i.cert))}</h3><ul>${itemsList(i.suspected)}</ul></div>
+    <div class="claim claim-missing"><h3><span aria-hidden="true">○</span>${esc(t("missing"))}</h3><ul>${itemsList(i.missing)}</ul></div>
   </section>
-  <section class="panel section" aria-labelledby="wfh">
-    <div class="panel-head"><h2 class="h3" id="wfh">${esc(t("waterfall"))}</h2><span class="mono dimtext">${esc(i.trace ?? "")}</span></div>
-    <p class="fine">${esc(t("wfNote"))}</p>
-    ${state.tableView
-      ? `<div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("stage"))}</th><th scope="col" class="num">${esc(t("at"))}</th><th scope="col" class="num">${esc(t("took"))}</th><th scope="col">${esc(t("by"))}</th><th scope="col">${esc(t("receiptAge"))}</th></tr></thead><tbody>${table}</tbody></table></div>`
-      : `<div class="wf" role="list">${wf}</div>`}
-    <div class="view-toggle"><button type="button" class="btn btn-small" id="viewBtn">${esc(state.tableView ? t("chartView") : t("tableView"))}</button></div>
-  </section>
-  <section class="panel section" aria-labelledby="ch"><h2 class="h3" id="ch">${esc(t("code"))}</h2><p class="fine">${esc(t("codeNote"))} <span class="mono">${esc(BUILD)}</span></p>
-    <ul class="code" style="margin:0;padding-left:18px">${i.code.map(([p, sym, w]) => `<li><span class="mono">${esc(p)}</span><span><span class="mono">${esc(sym)}</span> — ${esc(L(w))}</span></li>`).join("")}</ul></section>
-  <div class="actions">${i.trace ? `<a class="btn" href="#trace/${i.id}">${esc(t("openTrace"))} (M04) →</a>` : ""}<a class="btn" href="#evidence/${i.id}">${esc(t("toEvidence"))} →</a><a class="btn" href="#overview">← ${esc(t("back"))}</a></div>`
+  ${i.truth && canSee("machine") ? `<section class="truth" aria-labelledby="gth"><h3 id="gth">${esc(t("truth"))} · <span class="mono">${esc(i.truth.id)}</span></h3><p>${esc(L(i.truth.text))}</p><p class="fine">${esc(t("truthNote"))}</p></section>` : ""}
+  ${waterfall(i)}
+  ${codePanel(i)}
+  <div class="actions">${i.trace ? `<a class="btn" href="#trace/${i.id}">${esc(t("openTrace"))} (M04) →</a>` : ""}<a class="btn" href="#evidence/${i.id}">${esc(t("toEvidence"))} →</a>
+    <a class="btn" href="${["relay", "coll"].includes(i.lane) ? "#services" : "#machines"}">${esc(["relay", "coll"].includes(i.lane) ? t("linkM03") : t("linkM02"))}</a><a class="btn" href="#overview">← ${esc(t("back"))}</a></div>`
 }
 
 function traceView(i) {
-  const full = incidentView(i)
-  const wf = full.slice(full.indexOf('<section class="panel section" aria-labelledby="wfh">'), full.indexOf('<div class="actions">'))
   return `
   ${crumbs([["#incident/" + i.id, i.id], [null, t("openTrace")]])}
   <div class="pagehead"><p class="sub">${screenId("M04")}</p><h1 tabindex="-1">${esc(t("openTrace"))} · <span class="mono">${esc(i.trace ?? "—")}</span></h1><p class="sub">${esc(t("traceLead"))}</p></div>
-  ${wf}
+  ${waterfall(i)}
+  ${codePanel(i)}
   <div class="actions"><a class="btn" href="#evidence/${i.id}">${esc(t("toEvidence"))} →</a><a class="btn" href="#incident/${i.id}">← ${esc(i.id)}</a></div>`
 }
 
 function monitoringView() {
   const pr = sc().probe
-  const gapsOf = (src) => LANES.filter((l) => LANE_SOURCE[l] === src).flatMap(laneSegments).filter((x) => x.st === "unknown").length
-  const rows = ["browser", "relay", "machine", "collector"].map((src) => {
-    const f = freshness(src)
+  const gapsOf = (s) => LANES.filter((l) => LANE_SOURCE[l] === s).flatMap(laneSegments).filter((x) => x.st === "unknown" || x.st === "retention").length
+  const rows = ["browser", "relay", "machine", "collector"].map((s) => {
+    const f = freshness(s)
     const st = { fresh: "healthy", stale: "degraded", unknown: "unknown", hidden: "hidden" }[f]
-    const vis = sourceVisible(src)
-    return `<tr><th scope="row">${esc(t("src_" + src))}</th><td data-label="${esc(t("state"))}">${sev(st, t("f_" + f))}</td>
-      <td data-label="${esc(t("age"))}">${vis ? esc(ago(sourceAge(src))) : "—"}</td>
-      <td data-label="${esc(t("gaps"))}" class="num">${vis ? gapsOf(src) : "—"}</td>
-      <td data-label="${esc(t("dropped"))}" class="num">${vis ? (state.scenario === "storm" && src === "relay" ? 31 : 0) : "—"}</td>
+    const vis = sourceVisible(s)
+    return `<tr><th scope="row">${esc(t("src_" + s))}</th><td data-label="${esc(t("state"))}">${sev(st, t("f_" + f))}</td>
+      <td data-label="${esc(t("age"))}">${vis ? esc(ago(sourceAge(s))) : "—"}</td>
+      <td data-label="${esc(t("gaps"))}" class="num">${vis ? gapsOf(s) : "—"}</td>
+      <td data-label="${esc(t("dropped"))}" class="num">${vis ? (state.scenario === "storm" && s === "relay" ? 31 : 0) : "—"}</td>
       <td data-label="${esc(t("schema"))}" class="mono">${vis ? "0.1-draft" : "—"}</td>
-      <td data-label="${esc(t("f_ret", { ret: "" }).trim())}" class="wide">${esc(L(RETENTION_WORD[src]))}</td></tr>`
+      <td data-label="${esc(t("f_ret", { ret: "" }).trim())}" class="wide">${esc(retText(s))}</td></tr>`
   }).join("")
-  const probeRows = sourceVisible("browser") ? `
+  const probeRows = sourceVisible("browser") && pr ? `
     <ul class="inc-list">
       <li class="inc-row"><div><p class="inc-title">${sev(pr.read, t("probeRead"))}</p><p class="inc-meta">${esc(L(pr.readNote))}</p></div></li>
       <li class="inc-row"><div><p class="inc-title">${sev("unknown", t("probeControl"))}</p><p class="inc-meta">${esc(t("probeNot"))}</p></div></li>
     </ul>
     <p class="fine">${esc(t("probeLast", { age: ago(((now() - state.loadedAt) / 1000 + 41) % 60) }))} ${esc(t("probeView"))}</p>`
-    : `<p class="fine">${sev("hidden")} ${esc(t("t_hiddenNote"))}</p>`
+    : hiddenMarker()
   return `
   ${crumbs([[null, t("monitoring")]])}
   <div class="pagehead"><p class="sub">${screenId("M06")}</p><h1 tabindex="-1">${esc(t("monitoring"))}</h1><p class="sub">${esc(t("monitoringLead"))}</p></div>
@@ -1022,26 +1428,38 @@ function monitoringView() {
   <section class="panel section" aria-labelledby="mh"><h2 class="h3" id="mh">${esc(t("producer"))}</h2>
     <div class="table-wrap"><table class="cards"><thead><tr><th scope="col">${esc(t("producer"))}</th><th scope="col">${esc(t("state"))}</th><th scope="col">${esc(t("age"))}</th><th scope="col" class="num">${esc(t("gaps"))}</th><th scope="col" class="num">${esc(t("dropped"))}</th><th scope="col">${esc(t("schema"))}</th><th scope="col">${esc(t("f_ret", { ret: "" }).trim())}</th></tr></thead><tbody>${rows}</tbody></table></div></section>
   <section class="panel section" aria-labelledby="ph"><h2 class="h3" id="ph">${esc(t("probe"))}</h2><p class="fine">${esc(t("probeLead"))}</p>${probeRows}</section>
-  <div class="actions"><a class="btn" href="#overview">← ${esc(t("back"))}</a></div>`
+  <div class="actions"><a class="btn" href="#machines">${esc(t("linkM02"))}</a><a class="btn" href="#services">${esc(t("linkM03"))}</a><a class="btn" href="#overview">← ${esc(t("back"))}</a></div>`
 }
 
+/* The export obeys the same scope: a hidden item keeps a forbidden marker and no body. */
 function evidenceFor(i) {
   const srcs = ["browser", "relay", "machine", "collector"]
+  const item = (key) => ([w, s]) => (canSee(s) ? { text: w.en, [key]: s || null } : { [key]: s, forbidden: true })
   return {
     schema: "clawdline.connection-evidence/0.1-draft",
     illustrative: true,
     generated_by: "design prototype fixture; not captured from any system",
-    incident: { id: i.id, opened_at: new Date(clock(minAgo(i.start))).toISOString(), state: i.end === 0 ? "active" : "resolved", severity: i.sev, segment: i.lane, cause_certainty: i.cert },
-    trace: i.trace ? { trace_id: i.trace, stages: i.stages.map(([k, at, by, age, flag]) => at === null ? { stage: k, receipt: "missing" } : { stage: k, offset_ms: at, recorded_by: by, receipt_age_s: age, ...(flag ? { flag } : {}) }) } : null,
-    program_stage: i.stages.find((s) => s[1] === null)?.[0] ?? "complete",
-    build: { revision: BUILD, boot_id: "boot-synthetic-0003" },
-    sources: srcs.map((s) => ({ source: s, visible_in_scope: sourceVisible(s), freshness: freshness(s), receipt_age_s: Math.round(sourceAge(s)), expected_every_s: sc().sources[s].every, retention: L(RETENTION_WORD[s]) })),
-    provenance: { scope: state.scope, scope_authorization: state.scope === "machine" ? "operator superuser + owner device key (separately granted)" : state.scope === "cloud" ? "operator superuser only" : "this viewer only", window_minutes: state.windowMin, mode: state.live ? "live" : "paused" },
+    incident: { id: i.id, opened_at: new Date(clock(minAgo(i.start))).toISOString(), state: i.end === 0 ? "active" : "resolved", severity: i.sev, segment: i.lane, observed_cause_certainty: i.cert },
+    trace: i.trace ? { trace_id: i.trace, stages: i.stages.map((r) => {
+      const [k, at, by, age, flag] = r
+      if (!canSee(stageSrc(r))) return { stage: k, recorded_by: stageSrc(r), forbidden: true }
+      if (at === "na") return { stage: k, receipt: "not_requested" }
+      if (at === null) return { stage: k, receipt: "missing" }
+      return { stage: k, offset_ms: at, recorded_by: by, receipt_age_s: age, ...(flag ? { flag } : {}) }
+    }) } : null,
+    stage_progress: i.stages.length ? stageProgress(i) : null,
+    ...(i.terminal ? { terminal_outcome: { code: i.terminal.code, recorded_by: i.terminal.by } } : {}),
+    build: { revision: BUILD, boot_id: canSee("relay") || canSee("machine") ? "boot-synthetic-0003" : null },
+    sources: srcs.map((s) => (sourceVisible(s)
+      ? { source: s, freshness: freshness(s), receipt_age_s: Math.round(sourceAge(s)), expected_every_s: EVERY[s], retention: retText(s) }
+      : { source: s, forbidden: true })),
+    provenance: { scope: state.scope, scope_authorization: state.scope === "machine" ? "operator superuser + owner device key (separately granted)" : state.scope === "cloud" ? "operator superuser only" : "this viewer only", window_minutes: state.windowMin, statistics_window_minutes: 60, mode: state.live ? "live" : "paused" },
     sequence_coverage: i.trace ? { first_seq: 8120, last_seq: 8334, gaps: i.missing.length ? [[8201, 8216]] : [] } : { first_seq: null, last_seq: null, gaps: "unknown" },
-    facts: i.facts.map(([w, s]) => ({ text: w.en, source: s })),
-    suspected_cause: i.suspected.map(([w, s]) => ({ text: w.en, basis: s })),
-    missing_evidence: i.missing.map(([w, s]) => ({ text: w.en, source: s || null })),
-    code_locations: i.code.map(([p, sym]) => ({ path: p, symbol: sym })),
+    facts: i.facts.map(item("source")),
+    suspected_cause: i.suspected.map(item("basis")),
+    missing_evidence: i.missing.map(item("source")),
+    fixture_ground_truth: !i.truth ? null : !canSee("machine") ? { source: "machine", forbidden: true } : { injection_id: i.truth.id, text: i.truth.text.en, observed: false, note: "declared by the fixture's injection manifest; not evidence" },
+    code_locations: i.code.map((c) => (canSee(c.src) ? { location_code: c.loc, path: c.path || null, symbol: c.sym || null, hypothetical_instrumentation: true } : { source: c.src, forbidden: true })),
     redactions: ["account id → opaque", "machine id → opaque", "session id → omitted", "paths, prompts, titles, transcript → never collected"],
     truncation: { stage_events: { kept: 214, limit: 256, dropped: 0 }, whole: !i.missing.length },
   }
@@ -1109,7 +1527,7 @@ window.addEventListener("hashchange", () => { state.notice = null; shell.classLi
 
 // Live mode redraws only the parts that age, without moving focus or the scroll position.
 setInterval(() => {
-  if (!state.live) { const n = document.getElementById("liveNote"); if (n) n.innerHTML = `<strong>${esc(t("paused"))}</strong> · ${esc(t("pausedNote", { time: hhmm(state.pausedAt, true), n: Math.floor((Date.now() - state.pausedAt) / 5000) }))}`; return }
+  if (!state.live) { const n = document.getElementById("liveNote"); if (n) n.innerHTML = `<strong>${esc(t("paused"))}</strong> · ${esc(t("pausedNote", { time: hhmm(state.pausedAt, true), n: Math.floor((Date.now() - state.pausedAt) / 15000) }))}`; return }
   const active = document.activeElement, id = active && active.id, inc = active && active.dataset && active.dataset.inc
   const y = window.scrollY
   render()
