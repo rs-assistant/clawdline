@@ -200,16 +200,35 @@ func (h Handle) Progress(stage Stage) error {
 	}
 }
 
+// testHookEndLoaded runs inside End between reading the slot's phase and
+// clearing it, so a test can put a concurrent Progress exactly there. It is
+// nil outside tests.
+var testHookEndLoaded func()
+
 // End releases the slot and counts the outcome by class. Ending twice is
-// harmless: the second call finds another phase or none and does nothing.
+// harmless: the second call finds another phase or none and does nothing. A
+// Progress racing End only makes End retry; it never leaves the slot held.
 func (h Handle) End(ok bool) {
 	if h.t == nil {
 		return
 	}
 	s := &h.t.slots[h.slot]
-	old := s.phase.Load()
-	if old == nil || old.ID != h.id || !s.phase.CompareAndSwap(old, nil) {
-		return
+	var old *Phase
+	for {
+		old = s.phase.Load()
+		if testHookEndLoaded != nil {
+			testHookEndLoaded()
+		}
+		if old == nil || old.ID != h.id {
+			// Already ended, or the slot now holds a newer phase.
+			return
+		}
+		// A failed swap means a Progress replaced our own snapshot; the
+		// phase is still ours, so read it again rather than leave the slot
+		// claimed forever.
+		if s.phase.CompareAndSwap(old, nil) {
+			break
+		}
 	}
 	i := classIndex(old.Spec.Class)
 	if ok {
