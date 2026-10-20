@@ -1,6 +1,8 @@
 import { SurveyCoordinator } from "../onboarding/Survey.js"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { flushSync } from "react-dom"
+import { MachineSheet } from "../pages/devices/AccountMachines.js"
+import { machineManager } from "./machine-manager.js"
+import { createPortal, flushSync } from "react-dom"
 import type { SessionRow } from "@clawdline/contract"
 import App from "../App.js"
 import { CLOSE_EXECUTION_CHANGED } from "../overlays/events.js"
@@ -451,6 +453,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   // account revoked (`opening.ts`).
   const [rosterPending, setRosterPending] = useState(transport.kind === "cloud")
   const [rosterFailed, setRosterFailed] = useState(false)
+  const [connectionMachineID, setConnectionMachineID] = useState<string | null>(null)
   const [connectionVersion, setConnectionVersion] = useState(0)
   const pairingStore = useMemo(() => browserPendingPairings(), [])
 
@@ -1905,12 +1908,20 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
             filter={filter} onFilter={onFilter}
             onOpen={openFleetSession}
             carrierOf={carrierOf}
+            onConnection={setConnectionMachineID}
             onPresentations={noteFleetPresentations}
             onProjection={noteFleetProjection}
             onCloseRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title }) }}
             onArchiveRequest={(target, title) => { openFleetSession(target); setFleetCloseIntent({ target, title, kind: "archive" }) }}
             onMachineAction={runMachineTool}
           /></> : undefined} />
+          {connectionMachineID && machineManager() && (() => {
+            const machine = quickMachines.find((row) => row.id === connectionMachineID)
+            return machine ? createPortal(<MachineSheet key={machine.id} machine={{ ...machine }}
+              manager={machineManager()!} onClose={() => setConnectionMachineID(null)}
+              onStart={() => { setConnectionMachineID(null); runMachineTool(machine.id, "start") }}
+              onForgotten={() => setConnectionMachineID(null)} />, document.body) : null
+          })()}
           <CloudSessionSheets machineID={reading ?? chosen.id}
             machines={quickMachines.map((machine) => machine.id)}
             source={liveSessionSource}
