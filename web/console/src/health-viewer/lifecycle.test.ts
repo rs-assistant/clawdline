@@ -131,7 +131,7 @@ test("a write the relay acknowledges is issued then received, under one correlat
 
 test("a write the relay refuses is a failed response with the fixed word only", async () => {
   const { records, uninstall } = collect()
-  const client = await writer((pending) => pending.ack.settle(Object.assign(new Error("Mac offline: secret text"), { code: "offline" })))
+  const client = await writer((pending) => pending.ack.settle(Object.assign(new Error("machine offline: secret text"), { code: "offline" })))
   try {
     await assert.rejects(client._publishAcknowledged("mac-a", "answer", { session: "s", answer: "y" }, "ctl"))
     assert.deepEqual(trace(records).at(-1), ["viewer_response_received", "viewer_stage_failed", "error", "carrier_closed"])
