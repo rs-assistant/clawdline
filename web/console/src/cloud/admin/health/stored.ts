@@ -455,6 +455,9 @@ const STAGE_ROLES: Record<string, StageRole> = {
   api_response_completed: "final",
 }
 
+/** Service stages in the contract's order (§10.3): worker, then Durable Object, then API. */
+export const STAGE_ORDER: readonly string[] = Object.keys(STAGE_ROLES)
+
 export function stageRole(stage: string | null): StageRole | null {
   return stage !== null && Object.hasOwn(STAGE_ROLES, stage) ? STAGE_ROLES[stage] : null
 }
