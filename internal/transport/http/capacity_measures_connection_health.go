@@ -11,8 +11,8 @@ import (
 // and the watchdog's transition queue and its drops. Each read is atomics or
 // the journal's own short lock; none calls Scan.
 //
-// With monitoring off there is no runtime and each row is unmeasured with
-// that reason, not a zero that would read as an empty table.
+// With monitoring off there is no runtime, so nothing is held: each row is a
+// known zero that says why, which the note keeps apart from an idle table.
 func (s *Server) connectionHealthCapacityMeasures() map[string]func() capacity.Reading {
 	rt := s.connectionHealth
 	names := []string{
@@ -25,7 +25,7 @@ func (s *Server) connectionHealthCapacityMeasures() map[string]func() capacity.R
 	if rt == nil {
 		for _, name := range names {
 			out[name] = func() capacity.Reading {
-				return capacity.Unmeasured("connection-health monitoring is off in this daemon")
+				return capacity.Reading{Known: true, Note: "connection-health monitoring is off in this daemon; nothing is held"}
 			}
 		}
 		return out

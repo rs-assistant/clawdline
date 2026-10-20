@@ -172,11 +172,11 @@ func TestConnectionHealthShowsAStuckHandlerWithItsLocation(t *testing.T) {
 }
 
 // With a runtime the capacity rows are measured from it; without one they
-// are unmeasured with a reason, never a zero.
+// are a known zero whose note says monitoring is off.
 func TestConnectionHealthCapacityRowsAreMeasured(t *testing.T) {
 	off := (&Server{}).connectionHealthCapacityMeasures()
-	if r := off["cloud.health_active_slots"](); r.Known || r.Err == "" {
-		t.Fatalf("monitoring off reads as measured: %+v", r)
+	if r := off["cloud.health_active_slots"](); !r.Known || r.Used != 0 || !strings.Contains(r.Note, "off") {
+		t.Fatalf("monitoring off: %+v", r)
 	}
 	rt, err := connectionhealth.NewRuntime("b", time.Second)
 	if err != nil {

@@ -168,9 +168,11 @@ func (r *Runtime) Export(q Query) (Evidence, error) {
 	return ev, nil
 }
 
-// maxScanPages bounds how many journal pages one filtered read walks: the
-// whole ring, MaxJournalRecords / MaxQueryRecords pages, and one more.
-const maxScanPages = MaxJournalRecords/MaxQueryRecords + 2
+// scanPages is how many journal pages one filtered read may walk: the whole
+// ring in pages of MaxQueryRecords, and one more. It is not a bound of its
+// own but the two registered rows (cloud.health_journal_rows,
+// cloud.health_query_rows) divided, so it moves when either is lowered.
+func scanPages() int { return MaxJournalRecords/MaxQueryRecords + 2 }
 
 // Events is Journal.Read with a wall-clock window: only records whose wall
 // time is in [since, until] are returned (a zero bound is open). The cursor
@@ -197,7 +199,7 @@ func (r *Runtime) Events(q Query, since, until time.Time) (Page, error) {
 	first := true
 	cursor := q
 	cursor.Limit = MaxQueryRecords
-	for i := 0; i < maxScanPages; i++ {
+	for i := 0; i < scanPages(); i++ {
 		p, err := r.Journal.Read(cursor)
 		if err != nil {
 			return Page{}, err
@@ -273,7 +275,7 @@ func (r *Runtime) Trace(correlation string) (Trace, error) {
 		}
 	}
 	cursor := Query{Limit: MaxQueryRecords}
-	for i := 0; i < maxScanPages; i++ {
+	for i := 0; i < scanPages(); i++ {
 		p, err := r.Journal.Read(cursor)
 		if err != nil {
 			return Trace{}, err
