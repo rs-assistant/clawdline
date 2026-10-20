@@ -151,6 +151,8 @@ const (
 // callbacks, receipt settlement, the drain pass, writer-lock wait and socket
 // write, and the link's read, command and sessions lanes and handlers are
 // wired; response sealing and the spool enqueue inside the relay are not.
+// The durable store is opened by the daemon and fed by the journal writer;
+// the ring itself stays memory only, which its coverage still says.
 // The location map names functions, not lines.
 func Unwired() []Wiring {
 	return []Wiring{
@@ -159,7 +161,8 @@ func Unwired() []Wiring {
 		{"memory_journal", WiringImplemented},
 		{"daemon_runtime_per_boot", WiringImplemented},
 		{"daemon_instrumentation_call_sites", WiringPartial},
-		{"durable_segmented_journal", WiringUnimplemented},
+		{"durable_segmented_journal", WiringImplemented},
+		{"durable_history_route", WiringImplemented},
 		{"stack_capture_worker", WiringUnimplemented},
 		{"local_health_cli_and_route", WiringImplemented},
 		{"cloud_ingest", WiringUnimplemented},

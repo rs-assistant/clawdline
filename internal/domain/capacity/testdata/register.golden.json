@@ -824,6 +824,198 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.health_store_bytes",
+    "Class": "journal",
+    "Unit": "bytes",
+    "Limit": 104857600,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxStoreBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_dir_entries",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxDirEntries"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_frame_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxFrameBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_lost_ranges",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 64,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxLostRanges"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_queue_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 2097152,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxQueueBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_queue_rows",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxQueueRecords"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_readers",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 4,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxConcurrentReads",
+      "internal/adapters/healthjournal.Open:chan(MaxConcurrentReads)"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_seconds",
+    "Class": "journal",
+    "Unit": "seconds",
+    "Limit": 604800,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxStoreAgeSeconds"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_segment_bytes",
+    "Class": "journal",
+    "Unit": "bytes",
+    "Limit": 8388608,
+    "WarnAt": 0,
+    "AtLimit": "rotate",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxSegmentBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_store_segments",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 256,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/adapters/healthjournal.MaxSegments"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.peer_body_bytes",
     "Class": "buffer",
     "Unit": "bytes",

@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 7090,
-  "riskKeys": 3209,
-  "nonRiskCount": 3881,
+  "englishContentKeys": 7110,
+  "riskKeys": 3227,
+  "nonRiskCount": 3883,
   "groups": [
     {
       "name": "admin / other",
@@ -270,7 +270,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 159,
+      "count": 161,
       "sources": [
         null
       ],
@@ -292,6 +292,8 @@
         "capacityRow.cloud.health_query_rows.full",
         "capacityRow.cloud.health_query_rows.what",
         "capacityRow.cloud.health_record_bytes.what",
+        "capacityRow.cloud.health_store_dir_entries.what",
+        "capacityRow.cloud.health_store_lost_ranges.what",
         "capacityRow.cloud.peer_discovery_reply.full",
         "capacityRow.cloud.peer_discovery_reply.what",
         "capacityRow.cloud.peer_frame_bytes.what",

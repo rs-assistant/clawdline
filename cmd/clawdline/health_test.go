@@ -2,14 +2,20 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 )
 
 func healthRunAgainst(t *testing.T, handler http.HandlerFunc, args ...string) (int, string, string, *http.Request) {
@@ -97,5 +103,48 @@ func TestHealthStatusSummary(t *testing.T) {
 	if code != 0 || !strings.Contains(out, "quality complete") || !strings.Contains(out, "cloud.link.read_handler") ||
 		!strings.Contains(out, "16s") || strings.Contains(out, "read_loop") {
 		t.Fatalf("exit %d: %s %s", code, out, errOut)
+	}
+}
+
+// A store that cannot be opened — here its directory's parent is a file —
+// is a typed failure, and the runtime keeps scanning in memory.
+func TestABrokenStoreDirectoryLeavesTheRuntimeRunning(t *testing.T) {
+	state := t.TempDir()
+	if err := os.WriteFile(filepath.Join(state, "connection-health"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	rt, err := connectionhealth.NewRuntime("abc", 10*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go rt.Run(ctx)
+	store, err := openConnectionHealthStore(rt, state)
+	if err == nil || store != nil || healthjournal.CodeOf(err) == "" {
+		t.Fatalf("a store under a file opened: %v", err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if r, ok := rt.Watchdog.Latest(); ok && r.ScanSeq > 2 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the runtime stopped scanning after the store failed")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// history pages the durable store with its own cursor and bounded limit.
+func TestHealthHistoryAsksTheDurableStore(t *testing.T) {
+	ok := func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, `{"entries":[]}`) }
+	code, _, _, req := healthRunAgainst(t, ok, "history", "--cursor", "v1.3.120", "--limit", "50")
+	if code != 0 || req.URL.Path != "/v1/connection-health/history" || req.URL.Query().Get("cursor") != "v1.3.120" || req.URL.Query().Get("limit") != "50" {
+		t.Fatalf("exit %d, asked %s", code, req.URL)
+	}
+	never := func(w http.ResponseWriter, r *http.Request) { t.Errorf("asked %s", r.URL) }
+	if code, _, _, _ := healthRunAgainst(t, never, "history", "--limit", "500"); code != 2 {
+		t.Fatalf("an over-bound limit: exit %d", code)
 	}
 }

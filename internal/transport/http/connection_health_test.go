@@ -3,11 +3,14 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
 	"github.com/sainteye/clawdline/internal/app/cloudops"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
@@ -204,4 +207,103 @@ func TestConnectionHealthCapacityRowsAreMeasured(t *testing.T) {
 	}
 	loop.End(true)
 	op.End(true)
+}
+
+// The durable history route reads the store the journal writer fed: the
+// first boot's records are read back in the next boot, with that boot named
+// (that every writer transition is handed on is pinned in the foundation's
+// TestAttachHandsOnEveryStampedRecordOnce); a
+// store that is not open is unsupported with its state, never an empty page.
+func TestConnectionHealthHistoryOutlivesARestart(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "connection-health", "journal")
+	boot := func() (*connectionhealth.Runtime, *healthjournal.Store) {
+		rt, err := connectionhealth.NewRuntime("c9fe745db066", time.Second)
+		if err != nil {
+			t.Fatal(err)
+		}
+		st, err := healthjournal.Open(healthjournal.Options{Dir: dir, BootID: rt.BootID, Build: rt.Build})
+		if err != nil {
+			t.Fatal(err)
+		}
+		rt.Watchdog.Attach(func(r connectionhealth.Record) { _, _ = st.Offer(r) })
+		return rt, st
+	}
+	first, store := boot()
+	first.Watchdog.Scan()
+	if err := first.Journal.Append(connectionhealth.Record{Event: connectionhealth.EventOverflow, Count: 1, Rule: connectionhealth.RuleVersion}); err != nil {
+		t.Fatal(err)
+	}
+	// A record a caller appends directly is not offered (only the writer
+	// hands records on).
+	first.Probe().Start(connectionhealth.DaemonSpec(connectionhealth.StageHandlerStarted, connectionhealth.ClassRead, connectionhealth.LocReadHandler, "op-x"))
+	first.Watchdog.Flush()
+	if _, err := store.Flush(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	<-store.Done()
+
+	second, store2 := boot()
+	defer func() { _ = store2.Close(context.Background()) }()
+	f, h := connectionHealthFixture(t, second)
+	auth := map[string]string{"Authorization": "Bearer " + f.local}
+	rec := call{method: http.MethodGet, path: "/v1/connection-health/history", headers: auth}.do(h)
+	if rec.Code != http.StatusServiceUnavailable || refusalError(t, rec.Body.String()) != "unsupported" {
+		t.Fatalf("history before the store is set: %d %s", rec.Code, rec.Body)
+	}
+	srv := &Server{}
+	srv.SetConnectionHealth(second)
+	srv.SetConnectionHealthStore(nil, nil, true)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/connection-health/", srv.connectionHealthRoute)
+	h = f.g.wrap(mux)
+	rec = call{method: http.MethodGet, path: "/v1/connection-health/history", headers: auth}.do(h)
+	if rec.Code != http.StatusServiceUnavailable || !strings.Contains(rec.Body.String(), "opening") {
+		t.Fatalf("history while opening: %d %s", rec.Code, rec.Body)
+	}
+	srv.SetConnectionHealthStore(store2, nil, false)
+	rec = call{method: http.MethodGet, path: "/v1/connection-health/history?limit=200", headers: auth}.do(h)
+	var page healthjournal.Page
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("history: %d %s", rec.Code, rec.Body)
+	}
+	events := map[connectionhealth.Event]int{}
+	for _, e := range page.Entries {
+		if e.Record != nil && e.Record.BootID == first.BootID {
+			events[e.Record.Event]++
+		}
+	}
+	if events[connectionhealth.EventBoot] != 1 || events[connectionhealth.EventOverflow] != 0 {
+		t.Fatalf("the first boot's records read back: %+v (%s)", events, rec.Body)
+	}
+	named := false
+	for _, b := range page.Boots {
+		named = named || b.BootID == first.BootID
+	}
+	if !named {
+		t.Fatalf("the first boot is not named: %+v", page.Boots)
+	}
+	rec = call{method: http.MethodGet, path: "/v1/connection-health/history?cursor=v9.x", headers: auth}.do(h)
+	if rec.Code != http.StatusBadRequest || refusalError(t, rec.Body.String()) != "invalid_cursor" {
+		t.Fatalf("a forged cursor: %d %s", rec.Code, rec.Body)
+	}
+	rec = call{method: http.MethodGet, path: "/v1/connection-health/status", headers: auth}.do(h)
+	if !strings.Contains(rec.Body.String(), `"durable":{"state":"open","status":{`) {
+		t.Fatalf("status without the durable store: %s", rec.Body)
+	}
+	srv.SetConnectionHealthStore(nil, errors.New("x"), false)
+	m := srv.connectionHealthCapacityMeasures()
+	if r := m["cloud.health_store_bytes"](); r.Known || r.Err == "" {
+		t.Fatalf("a failed store reads as measured: %+v", r)
+	}
+	srv.SetConnectionHealthStore(store2, nil, false)
+	m = srv.connectionHealthCapacityMeasures()
+	if r := m["cloud.health_store_bytes"](); !r.Known || r.Used <= 0 {
+		t.Fatalf("store bytes: %+v", r)
+	}
+	if r := m["cloud.health_store_segments"](); !r.Known || r.Used < 1 {
+		t.Fatalf("store segments: %+v", r)
+	}
 }

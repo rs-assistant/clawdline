@@ -66,6 +66,9 @@ type Server struct {
 	// connectionHealth is the daemon's per-boot connection-health runtime
 	// (connection_health.go); nil when monitoring is off.
 	connectionHealth *connectionhealth.Runtime
+	// connectionHealthStore is the durable copy of its journal, once opened
+	// off the startup path (connection_health.go); nil before.
+	connectionHealthStore atomic.Pointer[durableHealth]
 	// version is this build as `clawdline version` prints it, for /v1/health
 	// (SetVersion). Empty leaves `version` out of the answer.
 	version        string

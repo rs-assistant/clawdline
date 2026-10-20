@@ -1,14 +1,70 @@
 package http
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
 	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 	"github.com/sainteye/clawdline/internal/transport/cloud"
 )
+
+// Durable store states as the local route reports them.
+const (
+	DurableOpening = "opening"
+	DurableOpen    = "open"
+	DurableFailed  = "failed"
+)
+
+// durableHealth is the durable store as the daemon opened it: immutable,
+// swapped whole, so a reader never sees a store without its state.
+type durableHealth struct {
+	store *healthjournal.Store
+	state string
+	code  string
+}
+
+// SetConnectionHealthStore records the outcome of opening the durable
+// store: opening (nil store, nil error, before the open returns), open, or
+// failed with its typed code. It never holds a lock a reader waits on.
+func (s *Server) SetConnectionHealthStore(st *healthjournal.Store, err error, opening bool) {
+	switch {
+	case opening:
+		s.connectionHealthStore.Store(&durableHealth{state: DurableOpening})
+	case err != nil:
+		code := string(healthjournal.CodeOf(err))
+		if code == "" {
+			code = "internal"
+		}
+		s.connectionHealthStore.Store(&durableHealth{state: DurableFailed, code: code})
+	default:
+		s.connectionHealthStore.Store(&durableHealth{store: st, state: DurableOpen})
+	}
+}
+
+// durableReport is the durable half of the status answer. A store that is
+// not open says which of opening, failed or absent it is; never zeros.
+type durableReport struct {
+	State  string                `json:"state"`
+	Code   string                `json:"code,omitempty"`
+	Status *healthjournal.Status `json:"status,omitempty"`
+}
+
+func (s *Server) durableReport() durableReport {
+	d := s.connectionHealthStore.Load()
+	if d == nil {
+		return durableReport{State: "not_opened"}
+	}
+	r := durableReport{State: d.state, Code: d.code}
+	if d.store != nil {
+		st := d.store.Status()
+		r.Status = &st
+	}
+	return r
+}
 
 // SetConnectionHealth hands the server the daemon's per-boot connection-health
 // runtime. Nil is monitoring turned off: the route then answers
@@ -57,7 +113,12 @@ func (s *Server) connectionHealthRoute(w http.ResponseWriter, r *http.Request) {
 			writeConnectionHealthError(w, err)
 			return
 		}
-		writeJSON(w, st)
+		writeJSON(w, struct {
+			connectionhealth.Status
+			Durable durableReport `json:"durable"`
+		}{st, s.durableReport()})
+	case "history":
+		s.connectionHealthHistory(w, q.Get("cursor"), q.Get("limit"))
 	case "events":
 		query, since, until, err := connectionHealthWindow(q)
 		if err != nil {
@@ -153,4 +214,48 @@ func writeConnectionHealthError(w http.ResponseWriter, err error) {
 		status, code = http.StatusInternalServerError, "internal"
 	}
 	writeRawRefusal(w, status, string(code), err.Error())
+}
+
+// connectionHealthHistory pages the durable store: this boot's records and
+// every earlier boot's still retained, with its own cursor and coverage. A
+// store that is not open is unsupported with the state it is in, never an
+// empty history.
+func (s *Server) connectionHealthHistory(w http.ResponseWriter, cursor, limit string) {
+	d := s.connectionHealthStore.Load()
+	if d == nil || d.store == nil {
+		state, code := "not_opened", ""
+		if d != nil {
+			state, code = d.state, d.code
+		}
+		detail := "The durable connection-health store is " + state
+		if code != "" {
+			detail += " (" + code + ")"
+		}
+		writeRawRefusal(w, http.StatusServiceUnavailable, string(connectionhealth.CodeUnsupported), detail+".")
+		return
+	}
+	n := 0
+	if limit != "" {
+		v, err := strconv.Atoi(limit)
+		if err != nil {
+			writeRawRefusal(w, http.StatusBadRequest, string(connectionhealth.CodeQueryBoundExceeded), "limit")
+			return
+		}
+		n = v
+	}
+	page, err := d.store.Read(healthjournal.Query{Cursor: cursor, Limit: n})
+	if err != nil {
+		code := healthjournal.CodeOf(err)
+		status := http.StatusBadRequest
+		switch code {
+		case healthjournal.CodeReadersBusy, healthjournal.CodeClosed:
+			status = http.StatusServiceUnavailable
+		case "":
+			status, code = http.StatusInternalServerError, "internal"
+		}
+		writeRawRefusal(w, status, string(code), err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(page)
 }

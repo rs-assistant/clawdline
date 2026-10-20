@@ -280,7 +280,7 @@ func serve() {
 	srv.SetVersion(version)
 	// One connection-health runtime per boot, before anything it instruments
 	// starts and whether or not Cloud is on (health.go).
-	srv.SetConnectionHealth(startConnectionHealth(context.Background()))
+	startConnectionHealth(context.Background(), cfg.Dir, srv)
 	// A device file that cannot be read stops the daemon here, rather than
 	// letting it listen and refuse everybody.
 	if err := srv.AuthReady(); err != nil {

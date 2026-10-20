@@ -12,12 +12,15 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
 	"github.com/sainteye/clawdline/internal/config"
 	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
+	httptransport "github.com/sainteye/clawdline/internal/transport/http"
 )
 
 // connectionHealthOffEnv turns the connection-health runtime off for a boot.
@@ -25,11 +28,26 @@ import (
 // nothing, and the local route answers `unsupported`.
 const connectionHealthOffEnv = "CLAWDLINE_CONNECTION_HEALTH"
 
-// startConnectionHealth makes the one runtime of this boot and runs its
-// watchdog for the daemon's lifetime. A runtime that cannot be made (no
-// random bytes for a boot id) leaves monitoring off and says so; it never
-// stops the daemon.
-func startConnectionHealth(ctx context.Context) *connectionhealth.Runtime {
+// connectionHealthStoreDir is the durable store's directory under the
+// daemon's state directory.
+func connectionHealthStoreDir(stateDir string) string {
+	return filepath.Join(stateDir, "connection-health", "journal")
+}
+
+// startConnectionHealth makes the one runtime of this boot, hands it to the
+// server, runs its watchdog for the daemon's lifetime, and opens the durable
+// store beside it. A runtime that cannot be made (no random bytes for a boot
+// id) leaves monitoring off and says so; it never stops the daemon.
+//
+// The store is opened on its own goroutine: Open scans every segment (0.57 s
+// on a full 96 MiB store, docs/admin-connection-health-storage.md §8) and a
+// broken disk may make it slow or fail, and neither may hold the port or
+// the first request. Until it opens the runtime is memory only and the
+// route says `opening`; a failed open is reported with its code and the
+// runtime stays memory only. Once open, the watchdog's one journal writer
+// offers each record it appended, as stamped, to the store's non-blocking
+// Offer (Watchdog.Attach).
+func startConnectionHealth(ctx context.Context, stateDir string, srv *httptransport.Server) *connectionhealth.Runtime {
 	if strings.EqualFold(os.Getenv(connectionHealthOffEnv), "off") {
 		log.Printf("connection health: off (%s=off)", connectionHealthOffEnv)
 		return nil
@@ -43,8 +61,32 @@ func startConnectionHealth(ctx context.Context) *connectionhealth.Runtime {
 		log.Printf("connection health: off, the runtime could not be made: %v", err)
 		return nil
 	}
+	srv.SetConnectionHealth(rt)
+	srv.SetConnectionHealthStore(nil, nil, true)
 	go rt.Run(ctx)
+	go func() {
+		store, err := openConnectionHealthStore(rt, stateDir)
+		srv.SetConnectionHealthStore(store, err, false)
+		if err != nil {
+			log.Printf("connection health: the durable store could not be opened (%s); this boot is memory only", healthjournal.CodeOf(err))
+		}
+	}()
 	return rt
+}
+
+// openConnectionHealthStore opens the durable store for rt's boot and
+// attaches it to rt's journal writer.
+func openConnectionHealthStore(rt *connectionhealth.Runtime, stateDir string) (*healthjournal.Store, error) {
+	dir, err := filepath.Abs(connectionHealthStoreDir(stateDir))
+	if err != nil {
+		return nil, err
+	}
+	store, err := healthjournal.Open(healthjournal.Options{Dir: filepath.Clean(dir), BootID: rt.BootID, Build: rt.Build})
+	if err != nil {
+		return nil, err
+	}
+	rt.Watchdog.Attach(func(r connectionhealth.Record) { _, _ = store.Offer(r) })
+	return store, nil
 }
 
 // healthTimeout bounds one CLI read. The route reads memory only, so a
@@ -80,8 +122,9 @@ func healthCommand(args []string) {
 	os.Exit(healthRun(os.Stdout, os.Stderr, args, time.Now(), newRequest, client.Do))
 }
 
-const healthUsage = "usage: clawdline health <status|events|trace|export> [--since T] [--until T] [--after-seq N] [--limit N] [--boot-id ID] [--correlation ID] [--json] [--port n]\n" +
-	"  T is RFC 3339 (2026-10-20T12:00:00Z) or a duration back from now (15m)"
+const healthUsage = "usage: clawdline health <status|events|trace|export|history> [--since T] [--until T] [--after-seq N] [--limit N] [--boot-id ID] [--correlation ID] [--cursor C] [--json] [--port n]\n" +
+	"  T is RFC 3339 (2026-10-20T12:00:00Z) or a duration back from now (15m)\n" +
+	"  events/export read this boot's memory; history reads the durable store across boots (--cursor v1.<segment>.<offset>)"
 
 // healthRun is the command without the process around it, for tests. It
 // returns the exit status: 0 answered, 1 refused or unreachable, 2 usage.
@@ -101,6 +144,7 @@ func healthRun(stdout, stderr io.Writer, args []string, now time.Time,
 	limit := fs.Int("limit", 0, "")
 	boot := fs.String("boot-id", "", "")
 	correlation := fs.String("correlation", "", "")
+	cursor := fs.String("cursor", "", "")
 	asJSON := fs.Bool("json", false, "")
 	_ = fs.Int("port", 0, "")
 	if err := fs.Parse(args[1:]); err != nil || fs.NArg() != 0 {
@@ -140,6 +184,17 @@ func healthRun(stdout, stderr io.Writer, args []string, now time.Time,
 		}
 		if *boot != "" {
 			q.Set("boot_id", *boot)
+		}
+	case "history":
+		if *limit < 0 || *limit > connectionhealth.MaxQueryRecords {
+			fmt.Fprintf(stderr, "clawdline health: --limit must be 0..%d (query_bound_exceeded)\n", connectionhealth.MaxQueryRecords)
+			return 2
+		}
+		if *limit > 0 {
+			q.Set("limit", strconv.Itoa(*limit))
+		}
+		if *cursor != "" {
+			q.Set("cursor", *cursor)
 		}
 	case "trace":
 		if !connectionhealth.ValidID(*correlation) {
@@ -211,11 +266,35 @@ func healthTime(v string, now time.Time) (time.Time, error) {
 // idle or progressing.
 func healthSummary(stdout, stderr io.Writer, body []byte) int {
 	var st connectionhealth.Status
+	var durable struct {
+		Durable *struct {
+			State  string `json:"state"`
+			Code   string `json:"code"`
+			Status *struct {
+				State   string `json:"state"`
+				Records uint64 `json:"records"`
+				Synced  uint64 `json:"synced_through"`
+				Lost    uint64 `json:"lost_records"`
+			} `json:"status"`
+		} `json:"durable"`
+	}
+	_ = json.Unmarshal(body, &durable)
 	if json.Unmarshal(body, &st) != nil || st.Schema != connectionhealth.StatusSchema {
 		fmt.Fprintln(stderr, "clawdline health: the daemon's answer is not a connection-health status; it is unknown")
 		return 1
 	}
 	fmt.Fprintf(stdout, "boot %s  build %s  quality %s  running %t\n", st.BootID, st.Build, st.Quality, st.Running)
+	switch d := durable.Durable; {
+	case d == nil:
+		fmt.Fprintln(stdout, "durable store: unknown (not in this daemon's answer)")
+	case d.Status != nil:
+		fmt.Fprintf(stdout, "durable store: %s  %s  records %d  synced through ticket %d  lost %d\n",
+			d.State, d.Status.State, d.Status.Records, d.Status.Synced, d.Status.Lost)
+	case d.Code != "":
+		fmt.Fprintf(stdout, "durable store: %s (%s); this boot is memory only\n", d.State, d.Code)
+	default:
+		fmt.Fprintf(stdout, "durable store: %s\n", d.State)
+	}
 	if st.Report == nil {
 		fmt.Fprintln(stdout, "watchdog: no scan yet (not_collected)")
 		return 0

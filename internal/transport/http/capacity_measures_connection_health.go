@@ -1,6 +1,9 @@
 package http
 
 import (
+	"time"
+
+	"github.com/sainteye/clawdline/internal/adapters/healthjournal"
 	"github.com/sainteye/clawdline/internal/domain/capacity"
 	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 )
@@ -21,7 +24,7 @@ func (s *Server) connectionHealthCapacityMeasures() map[string]func() capacity.R
 		"cloud.health_pending_transitions",
 		"cloud.health_query_rows", "cloud.health_query_bytes",
 	}
-	out := map[string]func() capacity.Reading{}
+	out := s.connectionHealthStoreMeasures(rt != nil)
 	if rt == nil {
 		for _, name := range names {
 			out[name] = func() capacity.Reading {
@@ -69,4 +72,71 @@ func (s *Server) connectionHealthCapacityMeasures() map[string]func() capacity.R
 		}
 	}
 	return out
+}
+
+// connectionHealthStoreMeasures reads the cloud.health_store_* rows from the
+// durable store's Status (atomics and a copy of its segment list). Before the
+// store is open, and with monitoring off, it holds nothing: a known zero
+// that says which. A store that failed to open leaves what is on disk
+// unknown, so its rows are unmeasured with the failure code. A per-item
+// bound (a frame, a segment, the lost-range memory) that Status does not
+// expose is unmeasured, not zero.
+func (s *Server) connectionHealthStoreMeasures(monitoring bool) map[string]func() capacity.Reading {
+	names := []string{
+		"cloud.health_store_bytes", "cloud.health_store_seconds", "cloud.health_store_segment_bytes",
+		"cloud.health_store_segments", "cloud.health_store_queue_rows", "cloud.health_store_queue_bytes",
+		"cloud.health_store_frame_bytes", "cloud.health_store_readers", "cloud.health_store_dir_entries",
+		"cloud.health_store_lost_ranges",
+	}
+	out := map[string]func() capacity.Reading{}
+	for _, name := range names {
+		name := name
+		out[name] = func() capacity.Reading {
+			d := s.connectionHealthStore.Load()
+			switch {
+			case !monitoring:
+				return capacity.Reading{Known: true, Note: "connection-health monitoring is off in this daemon; nothing is held"}
+			case d == nil || d.state == DurableOpening:
+				return capacity.Reading{Known: true, Note: "the durable connection-health store is not open yet; nothing is held by it"}
+			case d.store == nil:
+				return capacity.Unmeasured("the durable connection-health store could not be opened: " + d.code)
+			}
+			return storeReading(name, d.store.Status(), time.Now())
+		}
+	}
+	return out
+}
+
+func storeReading(name string, st healthjournal.Status, now time.Time) capacity.Reading {
+	pruned := int64(st.PrunedAge + st.PrunedBytes + st.PrunedCount)
+	r := capacity.Reading{Known: true, Failing: st.State != "ok" && st.State != "closed",
+		Counters: capacity.Counters{Evicted: pruned, Dropped: int64(st.Lost)}}
+	switch name {
+	case "cloud.health_store_bytes":
+		r.Used = st.Bytes
+		r.Note = st.CrashLoss
+	case "cloud.health_store_seconds":
+		if st.Floor == nil {
+			r.Note = "nothing is retained yet"
+			break
+		}
+		r.Used = int64(now.Sub(*st.Floor) / time.Second)
+		r.OldestAt = *st.Floor
+	case "cloud.health_store_segments":
+		r.Used = int64(st.Segments)
+	case "cloud.health_store_queue_rows":
+		r.Used = st.QueueRows
+		r.Counters.Refused = int64(st.Refused)
+	case "cloud.health_store_queue_bytes":
+		r.Used = st.QueueBytes
+		r.Counters.Refused = int64(st.Refused)
+	case "cloud.health_store_readers":
+		r.Used = int64(st.Readers)
+	case "cloud.health_store_frame_bytes":
+		r.Note = "a bound per frame; nothing is held between writes"
+		r.Counters.Refused = int64(st.TooLarge)
+	default:
+		return capacity.Unmeasured("the durable store's status does not report this row's occupancy")
+	}
+	return r
 }

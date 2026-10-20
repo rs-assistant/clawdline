@@ -194,33 +194,36 @@ func newJournalBounded(clock Clock, bootID, build string, rows, bytes, record in
 // keeps it, evicting the oldest records the bounds require. A record that is
 // invalid or larger than MaxRecordBytes is refused and counted, and takes no
 // sequence number, so a gap in the sequence is always an eviction.
-func (j *Journal) Append(r Record) error { return j.append(r, false, nil) }
+func (j *Journal) Append(r Record) error { _, err := j.append(r, false, nil); return err }
 
 // appendStamped is Append for the journal's own boot record.
-func (j *Journal) appendStamped(r Record) error { return j.append(r, true, nil) }
+func (j *Journal) appendStamped(r Record) error { _, err := j.append(r, true, nil); return err }
 
 // appendObserved is Append for a record observed at an earlier instant: the
 // watchdog's writer appends after the scan, and the record keeps the scan's
 // time rather than the moment the writer got the lock.
-func (j *Journal) appendObserved(r Record, at Instant) error { return j.append(r, false, &at) }
+func (j *Journal) appendObserved(r Record, at Instant) (Record, error) {
+	return j.append(r, false, &at)
+}
 
 // appendState journals a re-statement of one stuck phase after a loss.
-func (j *Journal) appendState(r Record, at Instant) error {
+func (j *Journal) appendState(r Record, at Instant) (Record, error) {
 	r.Event = EventStateAfterLoss
 	return j.append(r, true, &at)
 }
 
 // appendLost journals that n watchdog transitions were dropped before at.
-func (j *Journal) appendLost(n uint64, at Instant) error {
+func (j *Journal) appendLost(n uint64, at Instant) (Record, error) {
 	return j.append(Record{Event: EventTransitionsLost, Count: n, Rule: RuleVersion}, true, &at)
 }
 
-func (j *Journal) append(r Record, own bool, at *Instant) error {
+// append returns the record as stamped, for the writer to hand on.
+func (j *Journal) append(r Record, own bool, at *Instant) (Record, error) {
 	if err := r.validate(own); err != nil {
 		j.mu.Lock()
 		j.refused++
 		j.mu.Unlock()
-		return err
+		return Record{}, err
 	}
 	var now Instant
 	if at != nil {
@@ -237,7 +240,7 @@ func (j *Journal) append(r Record, own bool, at *Instant) error {
 	b, err := json.Marshal(r)
 	if err != nil || len(b) > j.maxRec {
 		j.refused++
-		return &Error{Code: CodeRecordTooLarge}
+		return Record{}, &Error{Code: CodeRecordTooLarge}
 	}
 	j.seq = seq
 	for j.n > 0 && (j.n == j.limit || j.bytes+len(b) > j.maxB) {
@@ -251,7 +254,7 @@ func (j *Journal) append(r Record, own bool, at *Instant) error {
 	j.recs[i], j.sizes[i] = r, len(b)
 	j.n++
 	j.bytes += len(b)
-	return nil
+	return r, nil
 }
 
 // Query asks for the records after a sequence number of a named boot.

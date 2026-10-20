@@ -45,6 +45,16 @@
 | `cloud.health_query_rows` | 200 | `rows` | `evict_oldest` | `diagnostics, sender` | — |
 | `cloud.health_record_bytes` | 1024 | `bytes` | `refuse` | `diagnostics` | — |
 | `cloud.health_reserved_slots` | 8 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_store_bytes` | 104857600 | `bytes` | `evict_oldest` | `diagnostics` | — |
+| `cloud.health_store_dir_entries` | 4096 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_store_frame_bytes` | 4096 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_store_lost_ranges` | 64 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `cloud.health_store_queue_bytes` | 2097152 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_store_queue_rows` | 1024 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_store_readers` | 4 | `rows` | `refuse` | `diagnostics, sender` | — |
+| `cloud.health_store_seconds` | 604800 | `seconds` | `evict_oldest` | `diagnostics` | — |
+| `cloud.health_store_segment_bytes` | 8388608 | `bytes` | `rotate` | `diagnostics` | — |
+| `cloud.health_store_segments` | 256 | `rows` | `evict_oldest` | `diagnostics` | — |
 | `cloud.peer_body_bytes` | 524288 | `bytes` | `refuse` | `diagnostics, notice, sender` | — |
 | `cloud.peer_discovery_reply` | 1 | `rows` | `refuse` | `sender, diagnostics` | — |
 | `cloud.peer_frame_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics, log, sender` | — |

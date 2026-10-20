@@ -166,7 +166,11 @@ func ExampleExport() {
 	//     },
 	//     {
 	//       "part": "durable_segmented_journal",
-	//       "status": "unimplemented"
+	//       "status": "implemented"
+	//     },
+	//     {
+	//       "part": "durable_history_route",
+	//       "status": "implemented"
 	//     },
 	//     {
 	//       "part": "stack_capture_worker",

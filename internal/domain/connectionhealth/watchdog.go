@@ -117,6 +117,9 @@ type Watchdog struct {
 
 	writeMu  sync.Mutex // the writer side only; a scan never takes it
 	lostSeen uint64     // lost already journaled, under writeMu
+	// durable receives each record the writer appended, as the journal
+	// stamped it, under writeMu (Attach). Nil is memory only.
+	durable func(Record)
 }
 
 // NewWatchdog watches tracker and queues transitions for journal (which may
@@ -212,7 +215,45 @@ func (w *Watchdog) drain() {
 // append journals the drops that came before q, then q. Under writeMu.
 func (w *Watchdog) append(q queued) {
 	w.noteLost(q.lostBefore, q.at)
-	_ = w.journal.appendObserved(q.rec, q.at)
+	w.handOn(w.journal.appendObserved(q.rec, q.at))
+}
+
+// handOn gives a record the journal kept to the durable sink. Under writeMu.
+func (w *Watchdog) handOn(r Record, err error) {
+	if err == nil && w.durable != nil {
+		w.durable(r)
+	}
+}
+
+// Attach makes offer the durable copy of this watchdog's journal: first
+// every record the ring still holds, oldest first, then each record the
+// writer appends, as stamped, on the writer's goroutine. It is the only
+// place the ring is re-read for the sink, once, under the writer's lock, so
+// nothing is offered twice or skipped. offer must not block (the durable
+// store's Offer answers queue_full at once); if it did, only the writer
+// would wait — never a scan or a call site, which never take writeMu.
+// Records a caller appends with Journal.Append directly are not offered.
+func (w *Watchdog) Attach(offer func(Record)) {
+	if w.journal == nil || offer == nil {
+		return
+	}
+	w.writeMu.Lock()
+	defer w.writeMu.Unlock()
+	q := Query{Limit: MaxQueryRecords}
+	for i := 0; i < scanPages(); i++ {
+		p, err := w.journal.Read(q)
+		if err != nil {
+			break
+		}
+		for _, r := range p.Records {
+			offer(r)
+		}
+		if !p.Coverage.Truncated {
+			break
+		}
+		q.AfterSeq = p.Coverage.NextAfterSeq
+	}
+	w.durable = offer
 }
 
 // noteLost journals the drops up to upTo not yet journaled. Under writeMu.
@@ -220,9 +261,11 @@ func (w *Watchdog) noteLost(upTo uint64, at Instant) {
 	if upTo <= w.lostSeen {
 		return
 	}
-	if w.journal.appendLost(upTo-w.lostSeen, at) != nil {
+	rec, err := w.journal.appendLost(upTo-w.lostSeen, at)
+	if err != nil {
 		return
 	}
+	w.handOn(rec, nil)
 	w.lostSeen = upTo
 	w.restate(at)
 }
@@ -243,12 +286,12 @@ func (w *Watchdog) restate(at Instant) {
 		default:
 			continue
 		}
-		_ = w.journal.appendState(Record{
+		w.handOn(w.journal.appendState(Record{
 			Source: f.Source, Stage: f.Stage, Class: f.Class, Kind: f.Kind,
 			Location: f.Location, PhaseID: f.PhaseID, Correlation: f.Correlation,
 			AgeNS: f.AgeNS, DeadlineNS: f.DeadlineNS, Count: f.Progress,
 			Rule: RuleVersion, State: f.State,
-		}, at)
+		}, at))
 	}
 }
 
