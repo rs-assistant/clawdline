@@ -148,6 +148,11 @@
     },
     {
       "method": "*",
+      "pattern": "/v1/connection-health/",
+      "guide": "connect"
+    },
+    {
+      "method": "*",
       "pattern": "/v1/diagnostics",
       "guide": "connect"
     },

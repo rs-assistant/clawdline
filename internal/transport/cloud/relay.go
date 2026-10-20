@@ -152,9 +152,20 @@ func (r *Relay) DeliverDirect(envelope domaincloud.Envelope, plaintext []byte, v
 	r.deliver(envelope, plaintext, verifiedKey, true)
 }
 
+// DeliverTraced is Deliver or DeliverDirect carrying the transport phase's
+// connection-health correlation (adaptercloud.Options.InboundTraced).
+func (r *Relay) DeliverTraced(envelope domaincloud.Envelope, plaintext []byte, verifiedKey ed25519.PublicKey, correlation string, direct bool) {
+	r.deliverCorrelated(envelope, plaintext, verifiedKey, direct, correlation)
+}
+
 func (r *Relay) deliver(envelope domaincloud.Envelope, plaintext []byte, verifiedKey ed25519.PublicKey, direct bool) {
+	r.deliverCorrelated(envelope, plaintext, verifiedKey, direct, "")
+}
+
+func (r *Relay) deliverCorrelated(envelope domaincloud.Envelope, plaintext []byte, verifiedKey ed25519.PublicKey, direct bool, correlation string) {
 	r.start()
 	in := Inbound{
+		Correlation: correlation,
 		Channel:     envelope.Ch,
 		Class:       string(envelope.Class),
 		Sender:      envelope.Sender,

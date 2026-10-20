@@ -31,6 +31,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 )
 
 // The WebSocket GUID from RFC 6455 §1.3. The server hashes it with the key we
@@ -107,6 +109,12 @@ type Conn struct {
 
 	writeMu sync.Mutex
 	closed  bool
+
+	// health records the wait for writeMu and the socket write as two
+	// stages of one phase, so a writer stuck behind the lock and a writer
+	// stuck in the kernel's send are told apart. Nil records nothing. It is
+	// set once by the transport before the socket is shared.
+	health *connectionhealth.Tracker
 
 	// readBuf accumulates a fragmented message across continuation frames.
 	readBuf []byte
@@ -289,12 +297,18 @@ func (c *Conn) WriteClose(code int, reason string, deadline time.Time) error {
 	return c.writeFrame(opClose, payload, deadline)
 }
 
-func (c *Conn) writeFrame(op byte, payload []byte, deadline time.Time) error {
+func (c *Conn) writeFrame(op byte, payload []byte, deadline time.Time) (err error) {
+	// The phase begins before the lock, so a write that never gets the lock
+	// is visible as writer_lock_waiting at cloud.websocket.writer_lock.
+	h := c.health.Start(connectionhealth.DaemonSpec(connectionhealth.StageWriterLockWaiting,
+		connectionhealth.ClassTransport, connectionhealth.LocWriterLock, ""))
+	defer func() { h.End(err == nil) }()
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	if c.closed {
 		return ErrConnClosed
 	}
+	_ = h.Step(connectionhealth.StageSocketWriteStarted, connectionhealth.LocSocketWrite)
 	if err := c.conn.SetWriteDeadline(deadline); err != nil {
 		return err
 	}
@@ -334,6 +348,7 @@ func (c *Conn) writeFrame(op byte, payload []byte, deadline time.Time) error {
 			return err
 		}
 	}
+	_ = h.Progress(connectionhealth.StageSocketWriteEnded)
 	return nil
 }
 
