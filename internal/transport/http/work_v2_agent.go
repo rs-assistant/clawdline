@@ -329,6 +329,10 @@ func (s *Server) workV2Agent(w http.ResponseWriter, r *http.Request, parts []str
 	}
 	if len(parts) >= 2 && parts[0] == "session-todos" {
 		sessionID := parts[1]
+		if err := s.bindFirstSessionTodos(r.Context(), sessionID); err != nil {
+			s.writeWorkV2Error(w, err)
+			return
+		}
 		if len(parts) == 2 && r.Method == http.MethodGet {
 			rows, truncated, err := s.workV2().DirectTodos(r.Context(), sessionID, false, true)
 			if err != nil {

@@ -7074,5 +7074,6 @@
   "next.doorAskWhy": "Why read the digits on the machine",
   "next.doorAskWhyBody": "The digits only appear on the machine and are never sent to this page, so only someone at the machine can finish pairing.",
   "next.doorWrongCodeTries": "Those digits aren't right. {n} tries left.",
-  "next.doorCodeExpired": "These digits have expired. Press Ask to pair to get new ones."
+  "next.doorCodeExpired": "These digits have expired. Press Ask to pair to get new ones.",
+  "http.2f4c75feb4744884": "The first delivery may already have reached this Session. Check its screen before sending another instruction."
 }
