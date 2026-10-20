@@ -4427,6 +4427,7 @@
   "next.imagePreviewPrevious": "Previous image",
   "next.imagePreviewNext": "Next image",
   "next.imagePreviewDownload": "Download image",
+  "next.imagePreviewShare": "Share image",
   "next.imagePreviewPosition": "{index} / {count}",
   "next.updateToVersion": "Update to {latest}",
   "next.updateRunningDev": "dev {commit}",

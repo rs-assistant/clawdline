@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 7083,
+  "englishContentKeys": 7084,
   "riskKeys": 3203,
-  "nonRiskCount": 3880,
+  "nonRiskCount": 3881,
   "groups": [
     {
       "name": "admin / other",
@@ -2385,7 +2385,7 @@
     },
     {
       "name": "next / image",
-      "count": 14,
+      "count": 15,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2403,7 +2403,8 @@
         "next.imagePreviewDownload",
         "next.imagePreviewNext",
         "next.imagePreviewPosition",
-        "next.imagePreviewPrevious"
+        "next.imagePreviewPrevious",
+        "next.imagePreviewShare"
       ]
     },
     {

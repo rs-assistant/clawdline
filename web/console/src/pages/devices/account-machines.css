@@ -171,3 +171,22 @@
 .am-danger { border: 1px solid color-mix(in srgb, var(--am-no-hi) 35%, transparent); background: transparent; color: var(--am-no-hi); }
 .am-danger-fill { border: none; background: #4a2018; color: #ffd2c4; font-weight: 700; }
 .am-sheet button:disabled { opacity: .5; cursor: default; }
+
+/* Keep the sheet mounted until its exit finishes, including action-driven exits. */
+.am-scrim { animation: am-scrim-in 240ms ease-out both; }
+.am-sheet { animation: am-sheet-in 300ms cubic-bezier(.22, 1, .36, 1) both; }
+.am-layer[data-closing="true"] .am-scrim { animation: am-scrim-out 180ms ease-in both; }
+.am-layer[data-closing="true"] .am-sheet { animation: am-sheet-out 200ms cubic-bezier(.4, 0, 1, 1) both; }
+@keyframes am-scrim-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes am-scrim-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes am-sheet-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes am-sheet-out { from { transform: translateY(0); } to { transform: translateY(100%); } }
+@media (min-width: 720px) {
+  @keyframes am-sheet-in { from { opacity: 0; transform: translateY(16px) scale(.98); } to { opacity: 1; transform: none; } }
+  @keyframes am-sheet-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(12px) scale(.98); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .am-layer .am-sheet, .am-layer .am-scrim { animation-duration: 1ms; }
+  @keyframes am-sheet-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes am-sheet-out { from { opacity: 1; } to { opacity: 0; } }
+}
