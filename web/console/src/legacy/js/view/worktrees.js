@@ -1,3 +1,4 @@
+import { loadingSkeletonHTML } from "../../../loading-skeleton.js"
 /* A Project's worktree lifecycle is a bounded read model produced by the Mac.
    This renderer never probes Git and deliberately has no cleanup transport. */
 
@@ -327,6 +328,8 @@ export function bindWorktreeLifecycle(elements, environment = {}) {
             return;
         }
         const ticket = ++state.loading;
+        if (!state.answer) elements["project-worktree-rows"].innerHTML =
+            loadingSkeletonHTML(words(language(), "Reading the last worktree observation…", "正在讀取最近一次工作樹觀測…"), "SK-17", "cards");
         elements["project-worktree-refresh"].disabled = true;
         elements["project-worktree-status"].textContent = refreshing
             ? words(language(), "Refreshing the Mac observation…", "正在重新觀測 Mac…")

@@ -1,3 +1,4 @@
+import "./loading-skeleton.css"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { DoorGate } from "./door/Door.js"

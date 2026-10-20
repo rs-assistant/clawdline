@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../LoadingSkeleton.js"
 import { useEffect, useRef, useState } from "react"
 import { focusModalContainer } from "../modal-focus.js"
 import type { Snippet, WorkflowSource } from "../legacy/snippets-bridge.js"
@@ -339,7 +340,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
         {selectedSkill ? <>
           <div className="workflow-skill-content">
             <p className="workflow-skill-description">{selectedSkill.description || W("skillNoDescription")}</p>
-            {skillBusy && <p role="status">{W("loading")}</p>}
+            {skillBusy && <LoadingSkeleton id="SK-30" kind="text" label={W("loading")} />}
             {skillError && <p role="alert" className="workflow-error">{skillError}</p>}
             {skillText && <pre>{skillText}</pre>}
           </div>
@@ -358,7 +359,7 @@ function WorkflowPage({ shown }: { shown: boolean }) {
       onPointerDown={(event) => { if (event.target === event.currentTarget) closeSource() }}>
       <div className="workflow-skill-dialog" ref={sourceDialog}><header><div><h2>{W("sourceDetail")}</h2><p>{sourcePreview.kind === "command" ? W("claudeCommand") : "Skill"} · {sourcePreview.name}</p></div>
         <button type="button" onClick={closeSource} aria-label={W("cancel")}>×</button></header>
-        <div className="workflow-skill-content">{sourceBusy && <p role="status">{W("loading")}</p>}
+        <div className="workflow-skill-content">{sourceBusy && <LoadingSkeleton id="SK-30" kind="text" label={W("loading")} />}
           {sourceError && <p role="alert" className="workflow-error">{sourceError}</p>}
           {sourceText && <>{sourceVersion !== sourcePreview.version && <p role="status">{W("sourceChanged")}</p>}<pre>{sourceText}</pre></>}</div>
       </div>

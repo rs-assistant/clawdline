@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../LoadingSkeleton.js"
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Verification, VerificationCriterionState, VerificationData } from "@clawdline/contract"
 import * as L from "../legacy/bridge.js"
@@ -171,7 +172,7 @@ function ListView({ list, now, showClosed, onToggleClosed, onOpen }: {
   onOpen: (id: string) => void
 }) {
   if (!list.read) {
-    return list.failure ? <p className="verify-failure" role="status">{list.failure}</p> : null
+    return list.failure ? <p className="verify-failure" role="status">{list.failure}</p> : <LoadingSkeleton id="SK-09" label={L.strings.webLoading} />
   }
   const { open, closed } = splitRows(list.rows)
   return (
@@ -263,7 +264,7 @@ function Detail({ state, now, onChanged, onReopen }: {
   if (!row) {
     return (
       <div className="verify-detail">
-        {state.failure ? <p className="verify-failure" role="status">{state.failure}</p> : <p>{L.strings.webLoading}</p>}
+        {state.failure ? <p className="verify-failure" role="status">{state.failure}</p> : <LoadingSkeleton id="SK-10" kind="detail" label={L.strings.webLoading} />}
       </div>
     )
   }

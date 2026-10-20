@@ -1,3 +1,4 @@
+import { loadingSkeletonHTML } from "../loading-skeleton.js"
 import { useEffect, useLayoutEffect, useRef } from "react"
 import * as L from "../legacy/bridge.js"
 import { nextWord, type NextWord } from "../next-strings.js"
@@ -285,7 +286,9 @@ function renderSchedules(
             esc(group.unanswered === "loading" ? machineWords(group.machine) + " · " + nextWord("schedulesLoading") :
               group.unanswered ? silentMachine(group.machine, group.unanswered) : machineWords(group.machine)) +
             "</li>" +
-            group.rows.map(row).join(""),
+            (group.unanswered === "loading" && group.rows.length === 0
+              ? '<li role="presentation">' + loadingSkeletonHTML(nextWord("schedulesLoading"), "SK-11") + '</li>'
+              : group.rows.map(row).join("")),
         )
         .join("")
     : list.map(row).join("")
@@ -337,6 +340,11 @@ const Schedules = (() => {
   const paintReadState = () => {
     const state = document.getElementById("schedules-state")
     if (!state) return
+    if (readState === "loading" && !lastAnswer) {
+      state.innerHTML = loadingSkeletonHTML(nextWord("schedulesLoading"), "SK-11")
+      state.hidden = false
+      return
+    }
     state.textContent = readState === "loading" ? nextWord("schedulesLoading") :
       readState === "failed" ? nextWord(lastAnswer ? "schedulesRefreshFailed" : "schedulesReadFailed") :
         lastAnswer?.schedules.length === 0 && lastAnswer.unanswered.length === 0 ? nextWord("schedulesEmpty") : ""
@@ -2160,7 +2168,9 @@ const ScheduleHistory = (() => {
         : ""
     el("schedule-history-meta").textContent = [path, next].filter(Boolean).join(" · ")
     el("schedule-history-runs-label").textContent = nextWord("scheduleRunsHeading")
-    el("schedule-run-rows").innerHTML = scheduleRunsHTML(runs, Date.now() / 1000, terminalIsOpen)
+    el("schedule-run-rows").innerHTML = loading && !record
+      ? '<li role="presentation">' + loadingSkeletonHTML(T().webLoading, "SK-12") + "</li>"
+      : scheduleRunsHTML(runs, Date.now() / 1000, terminalIsOpen)
     el("schedule-history-empty").textContent = nextWord("scheduleRunsEmpty")
     el("schedule-history-empty").hidden = loading || started || runs.length > 0 || !!el("schedule-history-said").textContent
     el("schedule-history-capped").textContent = T().webResumeCapped
@@ -2689,7 +2699,7 @@ export function ScheduleSection({ arrived, waitForFleet = false, onOpen, canOpen
           </svg>
         </button>
       </summary>
-      <p id="schedules-state" role="status">{nextWord("schedulesLoading")}</p>
+      <div id="schedules-state" role="status" />
       <ul className="schedule-rows" id="schedule-rows" aria-label={nextWord("schedulesListLabel")}></ul>
     </details>
   )

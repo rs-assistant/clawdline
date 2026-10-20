@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../LoadingSkeleton.js"
 import { useEffect, useRef, useState } from "react"
 import { nextWord } from "../next-strings.js"
 import { showModalWithoutChoice } from "../modal-focus.js"
@@ -425,7 +426,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               permanent "checking connection" banner above settled results. */}
           {offline && <p role="status" className="cloud-all-offline">{nextWord("cloudAllMachineOffline",
             { seen: machineSeenWord(machine.seenAt ?? null) })}</p>}
-          {!reading || reading.phase === "loading" ? !offline && <p role="status">{nextWord("cloudAllLoading")}</p> : <>
+          {!reading || reading.phase === "loading" ? !offline && <LoadingSkeleton id="SK-02" label={nextWord("cloudAllLoading")} /> : <>
             {/* // refusal-ok: Background verification keeps its reason and scheduled retry without announcing transient recovery above retained rows. */}
             {reading.value.kind === "unavailable" && !offline && (reading.value.reason === "unknown" ||
               reading.value.reason === "stale" || reading.value.reason === "event_gap"
@@ -433,7 +434,7 @@ export function FleetSessionList({ machines, source, target, filter, onFilter, o
               : <p role="status">{problemWord(reading.value.reason)}</p>)}
             {reading.value.kind === "ready" && !reading.value.complete && !offline &&
               <p role="status">{nextWord("cloudAllPartialMachine")}</p>}
-            {presentationLoading && <p role="status">{nextWord("cloudAllLoading")}</p>}
+            {presentationLoading && <LoadingSkeleton id="SK-02" label={nextWord("cloudAllLoading")} />}
             {presentationFailed && <p role="alert">{nextWord("cloudAllNameUnavailable")} <button type="button"
               onClick={() => { presentationPasses.current.delete(machine.id); presentationFailures.current.delete(machine.id)
                 refreshPresentation((revision) => revision + 1) }}>{nextWord("cloudAllTryAgain")}</button></p>}

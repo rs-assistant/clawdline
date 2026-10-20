@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../LoadingSkeleton.js"
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { createPortal } from "react-dom"
 import { nextWord } from "../../next-strings.js"
@@ -126,7 +127,7 @@ export function AccountMachines({ shown, onStart }: { shown: boolean; onStart: (
         </div>
       )}
       {rows === null ? (
-        <p className="am-quiet" role="status">{nextWord("msLoading")}</p>
+        <LoadingSkeleton id="SK-04" kind="cards" label={nextWord("msLoading")} />
       ) : rows.length === 0 ? (
         <p className="am-quiet">{nextWord("msEmpty")}</p>
       ) : (

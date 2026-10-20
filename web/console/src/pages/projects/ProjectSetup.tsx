@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../LoadingSkeleton.js"
 import { localizedLiteralMap } from "../../catalog.js"
 import { catalogFormat } from "../../catalog.js"
 import { catalogWord } from "../../catalog.js"
@@ -238,7 +239,7 @@ export function ProjectSetup({ shown, ref }: { shown: boolean; ref?: Ref<Project
           }}>{catalogWord("inline", "a11ac5efe91d")}</button>
         </div>}
         {view === "files" && projectPath && <>
-          {loading && <p role="status">{catalogWord("inline", "a33893db1b83")}</p>}
+          {loading && <LoadingSkeleton id="SK-14" kind="cards" label={catalogWord("inline", "a33893db1b83")} />}
           {!loading && error && <p role="alert">{error} <button type="button" onClick={() => void load()}>{catalogWord("inline", "7e59d0f16293")}</button></p>}
           {!loading && !error && !visiblePlaces[0] && <p role="status">{catalogWord("inline", "0b2d6de09d19")}</p>}
           {!loading && !error && visiblePlaces[0] && <ProjectExplorer key={visiblePlaces[0].id} place={visiblePlaces[0]} />}
@@ -248,7 +249,7 @@ export function ProjectSetup({ shown, ref }: { shown: boolean; ref?: Ref<Project
           <p>{catalogWord("inline", "9efc27432575")}</p>
           {!projectPath && !loading && places.length > 0 && <span className="project-setup-total">{complete}/{places.length}<small>{catalogWord("inline", "1f18df830a84")}</small></span>}
         </div>
-        {loading && <p className="project-setup-loading" role="status">{catalogWord("inline", "db8653492c3a")}</p>}
+        {loading && (places.length === 0 ? <LoadingSkeleton id="SK-14" kind="cards" label={catalogWord("inline", "db8653492c3a")} /> : <p className="project-setup-loading" role="status">{catalogWord("inline", "db8653492c3a")}</p>)}
         {!loading && !error && visiblePlaces.length > 0 && <ol className="project-readiness-list">
           {visiblePlaces.map(place => <ProjectReadiness key={place.id} place={place} select={select} openUnify={openUnify} />)}
         </ol>}

@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../LoadingSkeleton.js"
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { Terminal } from "@clawdline/contract"
 import { nextWord } from "../../next-strings.js"
@@ -124,7 +125,7 @@ export function TerminalProjectList({ project, label, shown, headingLevel = 2 }:
       {unavailable && <p className="terminal-note" role="note">{unavailable}</p>}
       {unavailable && detail && <p className="terminal-note terminal-detail">{detail}</p>}
       <p className="terminal-status-line" role="status" aria-live="polite">{openFailed}</p>
-      {listing.kind === "loading" && <p className="terminal-note">{nextWord("terminalListLoading")}</p>}
+      {listing.kind === "loading" && <LoadingSkeleton id="SK-19" label={nextWord("terminalListLoading")} />}
       {listing.kind === "failed" && (
         <p className="terminal-note" role="alert">{noAccess ? listing.why : nextWord("terminalListFailed", { why: listing.why })}</p>
       )}

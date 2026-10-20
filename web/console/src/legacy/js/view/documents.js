@@ -1,3 +1,4 @@
+import { loadingSkeletonHTML } from "../../../loading-skeleton.js"
 import {
     documentShareURL, normalizeDocumentIdentity, normalizeDocumentLocator, shareDocument
 } from "../net/document-links.js";
@@ -44,6 +45,7 @@ export function bindDocumentsPage(elements, services) {
     var ticket = 0;
     var retryTimer = null;
     var shareURL = null;
+    var listRead = false;
 
     function paintWords() {
         w = words(services.language ? services.language() : "en");
@@ -100,6 +102,7 @@ export function bindDocumentsPage(elements, services) {
         cancelRetry();
         held = false;
         identity = null;
+        listRead = false;
         clearDocument();
         elements.rows.replaceChildren();
         show(false);
@@ -119,6 +122,7 @@ export function bindDocumentsPage(elements, services) {
     }
 
     function renderList(rows) {
+        listRead = true;
         show(false);
         elements.rows.replaceChildren();
         rows.forEach(function (row) {
@@ -203,13 +207,17 @@ export function bindDocumentsPage(elements, services) {
         held = false;
         clearDocument();
         show(false);
-        say(w.loading, false);
+        if (!listRead) {
+            elements.rows.innerHTML = '<li role="presentation">' + loadingSkeletonHTML(w.loading, "SK-13") + "</li>";
+            say("", false);
+        } else say(w.loading, false);
         return Promise.resolve().then(function () { return services.list(identity); }).then(function (value) {
             if (mine !== ticket) return false;
             renderList(value.documents);
             return true;
         }).catch(function (error) {
             if (mine !== ticket) return false;
+            if (!listRead) elements.rows.replaceChildren();
             held = retryable(error);
             say(held ? w.connecting : typedError(error), !held);
             if (held) scheduleRetry();

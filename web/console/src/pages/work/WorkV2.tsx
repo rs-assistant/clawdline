@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../../LoadingSkeleton.js"
 import { ProjectPicker } from "../../ui/ProjectPicker.js"
 import { catalogFormat } from "../../catalog.js"
 import { focusModalContainer } from "../../modal-focus.js"
@@ -1246,7 +1247,7 @@ function SessionAssignmentPicker({ choices, onRetry, value, onChange, autoFocus 
         selected={session.id === value} onChoose={() => choose(session.id)} />)}
       {/* Only a complete answer says the Project has none; loading, failed and
           incomplete lists say so instead (session-assignment.ts). */}
-      {said && <p className={"work-project-empty" + (choices.phase === "loading" ? " work-session-loading" : "")}
+      {said && choices.phase === "loading" && sessions.length === 0 ? <LoadingSkeleton id="SK-22" label={said} /> : said && <p className={"work-project-empty" + (choices.phase === "loading" ? " work-session-loading" : "")}
         role={choices.phase === "failed" ? "alert" : "status"} aria-busy={choices.phase === "loading" || undefined}>
         {choices.phase === "loading" && <span className="work-assignment-spinner" aria-hidden="true" />}{said}</p>}
       {choices.phase === "failed" && <button className="chip work-session-retry" type="button" onClick={onRetry}>{workWord("assignSessionsRetry")}</button>}
@@ -1282,7 +1283,7 @@ function SessionAssignmentDetail({ session, reading }: { session: SessionRow; re
   return <section className="work-session-detail" aria-label={catalogFormat("template", "ecd25f9c83f5", [session.label || session.id])} aria-live="polite">
     <div className="work-session-detail-head"><strong>{catalogWord("inline", "3f44b79c30e6")}</strong><span>{sessionActivityName(session.state)} · {sessionWorkLabel(session)}</span></div>
     {(session.line || session.work_note) && <p>{session.line || session.work_note}</p>}
-    {reading?.loading && !page ? <p>{catalogWord("inline", "926adfdf9989")}</p> : reading?.update ? <NeedsUpdate update={reading.update} /> : reading?.error ? <p className="work-note" role="alert">{catalogLabel("inline", "e85c2c330c2e")}{reading.error}</p> : page ? <>
+    {reading?.loading && !page ? <LoadingSkeleton id="SK-23" label={catalogWord("inline", "926adfdf9989")} /> : reading?.update ? <NeedsUpdate update={reading.update} /> : reading?.error ? <p className="work-note" role="alert">{catalogLabel("inline", "e85c2c330c2e")}{reading.error}</p> : page ? <>
       <p>{catalogFormat("count", "unfinishedWork", [counts?.board ?? 0, counts?.todos ?? 0])}</p>
       <SessionWorkList title={catalogWord("inline", "7cd8f523be1c")} empty={catalogWord("literal", "4a085d55298e")} rows={page.assigned_items.map((item) => ({
         id: item.id, title: item.title, meta: `${item.project.label} · ${phaseName(item.phase)}${item.condition ? ` · ${conditionWords(item)}` : ""}`,

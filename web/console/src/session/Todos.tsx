@@ -1,3 +1,4 @@
+import { LoadingSkeleton } from "../LoadingSkeleton.js"
 import { catalogFormat } from "../catalog.js"
 import { catalogWord } from "../catalog.js"
 import { useDetailsMotion } from "../ui/use-details-motion.js"
@@ -184,9 +185,7 @@ export function Todos({ row, onReplySent, onCompose }: { row: SessionRow | null;
         </summary>
         <div className="session-todos-body" inert={!open}>
           {row.sessionId && <SessionUsage conversation={row.sessionId} />}
-          {open && readReady && !page && !readFailure && <p className="session-todos-loading" role="status">
-            <span className="work-assignment-spinner" aria-hidden="true" />{L.strings.webLoading}
-          </p>}
+          {open && readReady && !page && !readFailure && <LoadingSkeleton id="SK-24" label={L.strings.webLoading} />}
           {readReady && readFailure && (readFailure.update
             ? <NeedsUpdate update={readFailure.update} />
             : <p className="work-note" role="alert">{readFailure.words}</p>)}
