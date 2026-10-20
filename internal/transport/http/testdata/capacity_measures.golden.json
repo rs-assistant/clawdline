@@ -785,6 +785,11 @@
     "Note": true
   },
   {
+    "Name": "console.health_ui_incident_pages",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.health_ui_incident_rows",
     "Known": true,
     "Note": true

@@ -21,6 +21,8 @@ const (
 	ConsoleHealthUIIncidentRows          = "console.health_ui_incident_rows"
 	ConsoleHealthUIIncidentExportBytes   = "console.health_ui_incident_export_bytes"
 	ConsoleHealthUIIncidentWindowSeconds = "console.health_ui_incident_window_seconds"
+	// Incident-list pages held by "Load older" (HEALTH_UI_LIMITS incidentPages).
+	ConsoleHealthUIIncidentPages = "console.health_ui_incident_pages"
 	// The trend view over the Cloud's minute rollups (HEALTH_UI_LIMITS
 	// trendLanes, trendSignals).
 	ConsoleHealthUITrendLanes   = "console.health_ui_trend_lanes"
@@ -123,6 +125,14 @@ func connectionHealthUIBounds() []Entry {
 			// the Cloud's own 7-day maximum). Older incidents are not listed.
 			Name: ConsoleHealthUIIncidentWindowSeconds, Class: Cache, Unit: Seconds,
 			Limit: 7 * 24 * 3600, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// Incident-list pages held at once (incidentPages), the first
+			// included: 250 incidents at 50 a page. At the bound "Load older"
+			// is replaced by a note to pause at an earlier time.
+			Name: ConsoleHealthUIIncidentPages, Class: Buffer, Unit: Rows,
+			Limit: 5, AtLimit: Refuse,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
 		{

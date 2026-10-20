@@ -3117,6 +3117,23 @@
   },
   {
     "Register": "daemon",
+    "Name": "console.health_ui_incident_pages",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 5,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
     "Name": "console.health_ui_incident_rows",
     "Class": "buffer",
     "Unit": "rows",

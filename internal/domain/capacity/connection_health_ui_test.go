@@ -61,6 +61,7 @@ func TestConnectionHealthUIBoundsMatchThePage(t *testing.T) {
 		"incidentRows":        {ConsoleHealthUIIncidentRows, 1},
 		"incidentExportBytes": {ConsoleHealthUIIncidentExportBytes, 1},
 		"incidentWindowMs":    {ConsoleHealthUIIncidentWindowSeconds, 1000},
+		"incidentPages":       {ConsoleHealthUIIncidentPages, 1},
 		"trendLanes":          {ConsoleHealthUITrendLanes, 1},
 		"trendSignals":        {ConsoleHealthUITrendSignals, 1},
 	}

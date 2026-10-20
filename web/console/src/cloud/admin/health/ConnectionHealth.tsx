@@ -34,8 +34,8 @@ export type ConnectionHealthProps = {
 
 export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused, locale, arrivedByMove = false }: ConnectionHealthProps) {
   const say = useMemo(() => healthWords(locale), [locale])
-  const { state, refresh, loadOlder, refuse } = useStored(get, apiOrigin, route)
-  const actions = useMemo(() => ({ get, apiOrigin, refresh, refuse }), [get, apiOrigin, refresh, refuse])
+  const { state, refresh, loadOlder, loadOlderIncidents, refuse } = useStored(get, apiOrigin, route)
+  const actions = useMemo(() => ({ get, apiOrigin, refresh, refuse, loadOlderIncidents }), [get, apiOrigin, refresh, refuse, loadOlderIncidents])
   const heading = useRef<HTMLHeadingElement>(null)
   const scope = route.scope
   const nav: StoredNav = useMemo(() => ({ href: (s: HealthScreen) => healthHref(s, scope), go: (s: HealthScreen) => go(healthHref(s, scope)) }), [go, scope])

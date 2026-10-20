@@ -163,6 +163,7 @@
 | `console.health_ui_export_bytes` | 524288 | `bytes` | `refuse` | `diagnostics` | — |
 | `console.health_ui_id_characters` | 64 | `characters` | `refuse` | `diagnostics` | — |
 | `console.health_ui_incident_export_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics` | — |
+| `console.health_ui_incident_pages` | 5 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_incident_rows` | 50 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_incident_window_seconds` | 604800 | `seconds` | `expire` | `diagnostics` | — |
 | `console.health_ui_page_rows` | 200 | `rows` | `refuse` | `diagnostics` | — |

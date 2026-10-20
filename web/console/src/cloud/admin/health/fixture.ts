@@ -12,9 +12,11 @@
  * Trends (`aggregates`): `normal` holds a daemon with a restart, a stall day, loss and absent
  * buckets, a relay with stage times and a viewer with errors; `partial` is scan-capped with a
  * refused day and dropped cells; `errors` answers `503 health_store_unavailable`; `rollups_off`
- * is a Cloud with rollups turned off (`aggregates.minute: unsupported`). */
+ * is a Cloud with rollups turned off (`aggregates.minute: unsupported`). `many_incidents` adds 124
+ * closed list rows (ids `hi_f2…`, list only: opening one answers 404) so the incident list pages by
+ * the Cloud's cursor, which is bound to the window like the real one. */
 
-export const FIXTURE_SCENARIOS = ["normal", "partial", "errors", "empty", "slow", "signed_out", "forbidden", "service", "incidents_disabled", "audit_fail", "tampered", "rollups_off"] as const
+export const FIXTURE_SCENARIOS = ["normal", "partial", "errors", "empty", "slow", "signed_out", "forbidden", "service", "incidents_disabled", "audit_fail", "tampered", "rollups_off", "many_incidents"] as const
 export type FixtureScenario = (typeof FIXTURE_SCENARIOS)[number]
 
 const MAC_A = "fixture_mac_a"
@@ -488,8 +490,33 @@ async function incidentAnswer(scenario: FixtureScenario, path: string, q: URLSea
   if (path === "incidents") {
     const from = Date.parse(q.get("from") ?? "") || now - 7 * 86_400_000
     const to = Date.parse(q.get("to") ?? "") || now
-    const rows = await Promise.all(all.filter((x) => now - x.openedAgo >= from && now - x.openedAgo <= to).sort((a, b) => a.openedAgo - b.openedAgo).map((x) => incidentRow(x, now)))
+    let rows: Row[] = await Promise.all(all.filter((x) => now - x.openedAgo >= from && now - x.openedAgo <= to).sort((a, b) => a.openedAgo - b.openedAgo).map((x) => incidentRow(x, now)))
+    let nextCursor: string | null = null
+    if (scenario === "many_incidents" && rows.length > 0) {
+      // A closed, unexpired row is the template: an expired one carries no state or facts.
+      const base = rows.find((r) => r.state === "closed" && r.expired === false) ?? rows[0]
+      for (let i = 0; i < 124; i++) {
+        const opened = now - 6 * 3_600_000 - i * 1_200_000
+        if (opened < from || opened > to) continue
+        rows.push({ ...base, id: `hi_f2${String(i).padStart(30, "0")}`, state: "closed", expired: false, acknowledged: true, opened_at: new Date(opened).toISOString(), updated_at: new Date(opened + 60_000).toISOString() })
+      }
+      rows.sort((a, b) => Date.parse(String(b.opened_at)) - Date.parse(String(a.opened_at)))
+      // The Cloud's cursor binds the reader, filter and window; this one binds the window.
+      const bind = `${from}|${to}`
+      const limit = Math.min(200, Number(q.get("limit") ?? 50))
+      let offset = 0
+      const cursor = q.get("cursor")
+      if (cursor !== null) {
+        const [at, bound] = atob(cursor.replace(/-/g, "+").replace(/_/g, "/")).split("\n")
+        if (bound !== bind || !/^[0-9]+$/.test(at)) return refusal(400, "bad_cursor")
+        offset = Number(at)
+      }
+      const more = offset + limit < rows.length
+      nextCursor = more ? btoa(`${offset + limit}\n${bind}`).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "") : null
+      rows = rows.slice(offset, offset + limit)
+    }
     return json(200, incidentEnvelope(now, {
+      next_cursor: nextCursor,
       window: { from: new Date(from).toISOString(), to: new Date(to).toISOString(), basis: "opened_at" },
       evidence_quality: disabled ? "not_collected" : "complete",
       source_coverage: { incidents: disabled ? "disabled" : "collected", bundles: disabled ? "disabled" : "collected", exports: "supported" },
