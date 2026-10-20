@@ -506,6 +506,14 @@ type Status struct {
 	Refused  int64  `json:"refused"`
 	Dropped  int64  `json:"dropped"`
 	LastAtMS int64  `json:"last_at_ms,omitempty"`
+	// Queued is the hand-off queue's depth now (MaxQueuedJobs).
+	Queued int `json:"queued"`
+	// Attachments and StoreBytes are the local records as last counted on
+	// the worker's goroutine; StoreMeasured is false until then, and
+	// after a count that failed.
+	Attachments   int   `json:"attachments"`
+	StoreBytes    int64 `json:"store_bytes"`
+	StoreMeasured bool  `json:"store_measured"`
 }
 
 // Worker runs seals and sends on its own goroutine, so a producer — the
@@ -596,6 +604,19 @@ func (w *Worker) Refresh() {
 	w.mu.Lock()
 	w.st.Ready = ready
 	w.mu.Unlock()
+	w.measure()
+}
+
+// measure counts the local records for the status; it runs only on the
+// worker's goroutine, so the status route never reads the disk.
+func (w *Worker) measure() {
+	if w.u.Store == nil {
+		return
+	}
+	n, total, err := w.u.Store.Usage()
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.st.Attachments, w.st.StoreBytes, w.st.StoreMeasured = n, total, err == nil
 }
 
 // resume prunes expired records and sends every revision still pending,
@@ -636,6 +657,7 @@ func (w *Worker) handle(ctx context.Context, j Job) {
 		return
 	}
 	w.record(err)
+	w.measure()
 }
 
 func (w *Worker) record(err error) {
@@ -667,5 +689,6 @@ func (w *Worker) Status() Status {
 	defer w.mu.Unlock()
 	s := w.st
 	s.Enabled = w.on.Load()
+	s.Queued = len(w.jobs)
 	return s
 }

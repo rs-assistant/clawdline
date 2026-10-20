@@ -156,6 +156,22 @@ func (s *Store) Put(a Attachment) error {
 	return writeAtomically(s.path(a.ID), raw)
 }
 
+// Usage counts the records on disk and their bytes, against
+// MaxPendingAttachments and MaxStoreBytes.
+func (s *Store) Usage() (int, int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, sizes, err := s.scan()
+	if err != nil {
+		return 0, 0, err
+	}
+	var total int64
+	for _, n := range sizes {
+		total += n
+	}
+	return len(sizes), total, nil
+}
+
 // Prune removes records whose attachment has expired: Cloud no longer
 // accepts or serves them.
 func (s *Store) Prune(nowMS int64) error {

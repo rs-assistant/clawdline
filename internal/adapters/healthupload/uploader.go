@@ -188,6 +188,11 @@ type OwnerDiagnostics struct {
 	Refused  int64  `json:"refused"`
 	Dropped  int64  `json:"dropped"`
 	LastAtMS int64  `json:"last_at_ms,omitempty"`
+	// Queued is the sender's hand-off queue now; Attachments and
+	// StoreBytes its local records, null until counted (unknown, not 0).
+	Queued      int    `json:"queued"`
+	Attachments *int   `json:"attachments"`
+	StoreBytes  *int64 `json:"store_bytes"`
 }
 
 // Uploader is one daemon's health uploader.

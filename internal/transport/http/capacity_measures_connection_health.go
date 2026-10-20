@@ -29,7 +29,7 @@ func (s *Server) connectionHealthCapacityMeasures() map[string]func() capacity.R
 	for name, f := range s.connectionHealthUploadMeasures(rt != nil) {
 		out[name] = f
 	}
-	for name, f := range connectionHealthSealedMeasures() {
+	for name, f := range s.connectionHealthSealedMeasures(rt != nil) {
 		out[name] = f
 	}
 	if rt == nil {
@@ -223,12 +223,15 @@ func uploadReading(name string, st healthupload.Status, now time.Time) capacity.
 	return r
 }
 
-// connectionHealthSealedMeasures reads the cloud.health_sealed_* rows the
-// owner-sealed uploader would hold (internal/adapters/healthsealed). This
-// daemon does not construct that uploader yet: there is no content-key epoch
-// to seal against (docs/admin-connection-health-contract.md §9b), so each row
-// is a known zero that says why rather than an idle-looking 0.
-func connectionHealthSealedMeasures() map[string]func() capacity.Reading {
+// connectionHealthSealedMeasures reads the cloud.health_sealed_* rows from the
+// owner-sealed sender the daemon runs (internal/adapters/healthsealed, wired
+// in cmd/clawdline/health.go), through the uploader status it is reported
+// in. Its queue depth is read now; its local records as last counted on its
+// own goroutine (unmeasured until then); the per-request and per-seal rows
+// hold nothing between requests. A sender that cannot seal (no recorded
+// content-key epoch, no key, a store that cannot be written) is failing
+// with its code, never an idle-looking 0.
+func (s *Server) connectionHealthSealedMeasures(monitoring bool) map[string]func() capacity.Reading {
 	names := []string{
 		"cloud.health_sealed_ciphertext_bytes", "cloud.health_sealed_request_bytes",
 		"cloud.health_sealed_life_seconds", "cloud.health_sealed_attempts",
@@ -241,7 +244,18 @@ func connectionHealthSealedMeasures() map[string]func() capacity.Reading {
 	out := map[string]func() capacity.Reading{}
 	for _, name := range names {
 		out[name] = func() capacity.Reading {
-			return capacity.Reading{Known: true, Note: "the owner-sealed diagnostic uploader is not started in this daemon; nothing is held"}
+			f := s.connectionHealthUpload.Load()
+			switch {
+			case !monitoring:
+				return capacity.Reading{Known: true, Note: "connection-health monitoring is off in this daemon; nothing is held"}
+			case f == nil:
+				return capacity.Reading{Known: true, Note: "the owner-sealed diagnostic sender has not started; nothing is held"}
+			}
+			d := (*f)().OwnerDiagnostics
+			if d == nil {
+				return capacity.Reading{Known: true, Note: "the owner-sealed diagnostic sender has not started; nothing is held"}
+			}
+			return sealedReading(name, *d)
 		}
 	}
 	// Identity pairing (internal/adapters/cloud/health_pairing.go) has no
@@ -252,4 +266,30 @@ func connectionHealthSealedMeasures() map[string]func() capacity.Reading {
 		}
 	}
 	return out
+}
+
+func sealedReading(name string, d healthupload.OwnerDiagnostics) capacity.Reading {
+	note := d.Coverage
+	if d.Code != "" {
+		note += " (" + d.Code + ")"
+	}
+	r := capacity.Reading{Known: true, Failing: d.Coverage == "failed", Note: note,
+		Counters: capacity.Counters{Dropped: d.Dropped}}
+	switch name {
+	case "cloud.health_sealed_queued_jobs":
+		r.Used = int64(d.Queued)
+	case "cloud.health_sealed_store_attachments":
+		if d.Attachments == nil {
+			return capacity.Unmeasured("the sender has not counted its local records yet")
+		}
+		r.Used = int64(*d.Attachments)
+	case "cloud.health_sealed_store_bytes":
+		if d.StoreBytes == nil {
+			return capacity.Unmeasured("the sender has not counted its local records yet")
+		}
+		r.Used = *d.StoreBytes
+	default:
+		r.Note = "a bound per seal or per request; nothing is held between them (" + note + ")"
+	}
+	return r
 }

@@ -527,7 +527,11 @@ func ownerDiagnosticsStatus(w *healthsealed.Worker, openErr error) func() *healt
 		}
 		st := w.Status()
 		d := &healthupload.OwnerDiagnostics{Code: string(st.Code), Cloud: st.Cloud, Stored: st.Stored,
-			Refused: st.Refused, Dropped: st.Dropped, LastAtMS: st.LastAtMS}
+			Refused: st.Refused, Dropped: st.Dropped, LastAtMS: st.LastAtMS, Queued: st.Queued}
+		if st.StoreMeasured {
+			n, b := st.Attachments, st.StoreBytes
+			d.Attachments, d.StoreBytes = &n, &b
+		}
 		switch {
 		case !st.Enabled:
 			d.Coverage = "off"
