@@ -90,3 +90,37 @@ func TestConnectionHealthUIBoundsMatchThePage(t *testing.T) {
 		}
 	}
 }
+
+// Probe decoding rejects oversized remote lists; these bounds must be visible
+// beside the other health-page limits, even when no probe is enabled.
+func TestProbeReadBoundsAreRegistered(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join(moduleRoot(t), "web", "console", "src", "cloud", "admin", "health", "probes.ts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	values := map[string]int64{}
+	for _, m := range regexp.MustCompile(`(?m)^\s+(targets|hosts|claims): ([0-9]+),`).FindAllStringSubmatch(string(raw), -1) {
+		values[m[1]], err = strconv.ParseInt(m[2], 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	for key, name := range map[string]string{"targets": "console.health_ui_probe_targets", "hosts": "console.health_ui_probe_hosts", "claims": "console.health_ui_probe_claims"} {
+		if values[key] == 0 {
+			t.Errorf("PROBE_BOUNDS.%s is missing", key)
+			continue
+		}
+		found := false
+		for _, row := range Register() {
+			if row.Name == name {
+				found = true
+				if row.Limit != values[key] {
+					t.Errorf("%s is %d, decoder says %d", name, row.Limit, values[key])
+				}
+			}
+		}
+		if !found {
+			t.Errorf("PROBE_BOUNDS.%s = %d is not registered as %s", key, values[key], name)
+		}
+	}
+}

@@ -290,14 +290,23 @@ of the growth is the English and Chinese copy tables in `words.ts`. A production
 - The incident list loads older pages only while paused (the Cloud's cursor hashes the window);
   live, it says to pause. M01's open-incident tile and M04's incident links still come from the
   first page only.
-- **The trend view was not rendered in a browser by the task that built it.** Owed by the root:
-  the trend addresses above at desktop and 390 px, keyboard through the view switch, the range
-  radios, the chart/table switch and the investigate links, and against a deployed Cloud with
-  rollups migrated and enabled. The aggregates read has not been called against any Cloud; its
-  fields follow Cloud commit `13e7387`, and a later wire change needs `aggregates.ts` updated.
-- Probes stay "unsupported" here; a probe read (`/su/v1/health/probes`) is not consumed.
+- Root rendered the actual trend components at desktop and 390 px with explicit fixture data;
+  keyboard range changes, table switching and historical source links worked without horizontal
+  overflow. Independent local Mongo/Fastify reads from Cloud `cb153af` exercised the four windows
+  and viewer filters. The original all-source response containing `external_probe` failed the
+  parser; after the probe merge, both original captured all-source and probe-only responses pass.
+  Production reads and rollout acceptance remain pending.
+- M06's `view=probes` now consumes `/su/v1/health/probes` as one parameterless service-scope read.
+  It explicitly ignores historical/account filters; pause stops automatic refresh, while manual
+  refresh reads latest evidence. Root rendered missing, delayed, stale, clock-ahead and
+  same-fault-domain fixture evidence at desktop and 390 px. Parser/type and local module tests
+  passed. A local archived Cloud `cb153af` probe-route response (two hosts, two targets) also
+  passed the shipped parser; ten API probe tests passed. Production host enablement remains
+  unverified and disabled.
 - The fixture's acknowledgement is per tab and in memory; the real route's `Origin` check was not
   exercised against a Cloud.
-- Not built anywhere yet: owner encryption and owner-sealed attachments, presence contract,
-  external probe, clock uncertainty, account-attributed service evidence, sequence gaps over 30
-  days (the rollups hold counts only), distinct operations over 30 days.
+- Still unavailable: a machine presence contract, measured clock uncertainty, account-attributed
+  service evidence, sequence gaps over 30 days (rollups hold counts only), and distinct operations
+  over 30 days. Owner-encrypted diagnostics have a separate paired-owner flow; the operator page
+  does not gain access to that plaintext. The independent probe code is default off and no
+  production probe host has been enabled.

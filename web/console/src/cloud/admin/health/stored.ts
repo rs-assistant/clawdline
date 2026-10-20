@@ -768,8 +768,8 @@ export function stageRole(stage: string | null): StageRole | null {
 
 /** Service producers (contract §10.1): their rows are service scope, never an account's. */
 export function isServiceSource(source: string | null): boolean {
-  return source === "relay" || source === "cloud_api"
+  return source === "relay" || source === "cloud_api" || source === "external_probe"
 }
 
 /** The field readers, for the other adapters of this page (aggregates.ts): one strictness everywhere. */
-export const storedReaders = { shape, obj, str, id, idOrNull, instant, instantOrNull, nat, natOrNull, bool, oneOf, list } as const
+export const storedReaders = { shape, obj, str, id, idOrNull, instant, instantOrNull, int, nat, natOrNull, bool, oneOf, list } as const

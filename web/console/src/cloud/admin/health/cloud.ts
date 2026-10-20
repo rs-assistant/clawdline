@@ -15,6 +15,9 @@ import { windowBounds } from "./route.ts"
 import type { EventsBody, IncidentDetailBody, IncidentListBody, IncidentRow, OutcomesBody, OverviewBody, SourcesBody, StoredEvent } from "./stored.ts"
 // @ts-expect-error -- a `.ts` path, so node's strip-types tests can import this module.
 import { parseEvents, parseIncidentDetail, parseIncidentList, parseOutcomes, parseOverview, parseSources, StoredContractError, STORED_BOUNDS } from "./stored.ts"
+import type { ProbesBody } from "./probes.ts"
+// @ts-expect-error -- a `.ts` path, so node's strip-types tests can import this module.
+import { parseProbes } from "./probes.ts"
 import type { AggregatesBody, TrendRange } from "./aggregates.ts"
 // @ts-expect-error -- a `.ts` path, so node's strip-types tests can import this module.
 import { parseAggregates, trendWindow } from "./aggregates.ts"
@@ -51,8 +54,9 @@ export const HEALTH_UI_LIMITS = {
   trendSignals: 20,
 } as const
 
-export type PartName = "overview" | "outcomes" | "sources" | "events" | "trace" | "incidents" | "incident" | "aggregates"
+export type PartName = "overview" | "outcomes" | "sources" | "events" | "trace" | "incidents" | "incident" | "aggregates" | "probes"
 export type PartBody = {
+  probes: ProbesBody
   aggregates: AggregatesBody
   overview: OverviewBody
   outcomes: OutcomesBody
@@ -86,6 +90,11 @@ export function planFor(route: HealthRoute, now: number): { window: { from: stri
   // ends, so a pinned page lists the same incidents on every load.
   const incidentList: Read = { part: "incidents", path: "incidents", params: { from: new Date(Date.parse(window.to) - HEALTH_UI_LIMITS.incidentWindowMs).toISOString(), to: window.to, limit: String(HEALTH_UI_LIMITS.incidentRows) } }
   let reads: Read[]
+  if (route.screen === "M06" && route.probes) {
+    // One read with no parameters: the latest retained probe evidence, service scope. No window,
+    // pin or account is sent, because the Cloud would honour none of them.
+    return { window, reads: [{ part: "probes", path: "probes", params: {} }] }
+  }
   const trend = route.screen === "M01" || route.screen === "M03" || route.screen === "M06" ? route.trend ?? null : null
   if (trend !== null && (route.screen === "M01" || route.screen === "M03" || route.screen === "M06")) {
     // The trend view replaces the screen's raw reads instead of adding a fourth: the same
@@ -156,7 +165,7 @@ export function readURL(apiOrigin: string, read: Read): string {
 }
 
 const PARSERS: { [N in PartName]: (body: unknown) => PartBody[N] } = {
-  aggregates: parseAggregates, overview: parseOverview, outcomes: parseOutcomes, sources: parseSources, events: parseEvents, trace: parseEvents, incidents: parseIncidentList, incident: parseIncidentDetail,
+  aggregates: parseAggregates, probes: parseProbes, overview: parseOverview, outcomes: parseOutcomes, sources: parseSources, events: parseEvents, trace: parseEvents, incidents: parseIncidentList, incident: parseIncidentDetail,
 }
 
 /** The server's typed refusal codes this page explains; anything else is its HTTP class. */

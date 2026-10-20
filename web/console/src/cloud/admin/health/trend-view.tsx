@@ -75,7 +75,9 @@ function SignalRows({ body, lanes, route, say, go }: { body: AggregatesBody; lan
         {shown.map(({ lane, s }) => {
           const until = new Date(Math.min(s.end, asOf)).toISOString()
           const scope = { ...route.scope, until, window_s: rawWindow(body.window.bucket_ms) }
-          const raw: HealthScreen = { screen: "M03", source: lane.series.source, sourceId: lane.series.source_id }
+          const raw: HealthScreen = { screen: "M03", source: lane.series.source === "external_probe" ? null : lane.series.source, sourceId: lane.series.source_id }
+          // Probe rows are not readable by time: the probe view holds only the latest evidence.
+          const probe = lane.series.source === "external_probe"
           const rawKept = s.end > asOf - RAW_RETENTION_MS
           return (
             <li key={`${lane.key}|${s.start}`}>
@@ -83,7 +85,8 @@ function SignalRows({ body, lanes, route, say, go }: { body: AggregatesBody; lan
               <strong>{s.signals.map((g) => say(`tr_sig_${g}` as HealthWord)).join(" · ")}</strong>{" · "}
               <Id v={lane.series.machine_id} /> · {say(`tr_source_${lane.series.source}` as HealthWord)} · <time dateTime={new Date(s.start).toISOString()}>{exactUTC(new Date(s.start).toISOString())}</time>
               <span className="adm-fine">{" · "}
-                {rawKept ? <Go href={healthHref(raw, scope)} go={go}>{say("tr_openRaw")}</Go> : say("tr_rawExpired")}
+                {probe ? <Go href={healthHref({ screen: "M06", probes: true }, route.scope)} go={go}>{say("pr_openLatest")}</Go>
+                  : rawKept ? <Go href={healthHref(raw, scope)} go={go}>{say("tr_openRaw")}</Go> : say("tr_rawExpired")}
                 {" · "}<Go href={healthHref({ screen: "M05", incident: null }, scope)} go={go}>{say("tr_openIncidents")}</Go>
               </span>
             </li>

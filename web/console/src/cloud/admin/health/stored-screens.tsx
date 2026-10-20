@@ -655,7 +655,10 @@ function M06({ state, say, nav }: StoredProps) {
       <Panel title={say("st_boundsTitle")}>
         <p className="adm-fine">{say("st_boundsNote")}</p>
       </Panel>
-      <NotCollected say={say} items={[{ title: say("st_probesTitle"), reason: say("st_probesUnsupported") }]} />
+      <Panel title={say("st_probesTitle")}>
+        <p className="adm-fine">{say("st_probesUnsupported")}</p>
+        <p><Link to={{ screen: "M06", probes: true }} nav={nav} className="adm-btn adm-btn-small">{say("st_probesOpen")}</Link></p>
+      </Panel>
     </div>
   )
 }

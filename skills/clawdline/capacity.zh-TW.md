@@ -168,6 +168,9 @@
 | `console.health_ui_incident_window_seconds` | 604800 | `seconds` | `expire` | `diagnostics` | — |
 | `console.health_ui_page_rows` | 200 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_parallel_reads` | 2 | `rows` | `refuse` | `diagnostics` | — |
+| `console.health_ui_probe_claims` | 8 | `rows` | `refuse` | `diagnostics` | — |
+| `console.health_ui_probe_hosts` | 204 | `rows` | `refuse` | `diagnostics` | — |
+| `console.health_ui_probe_targets` | 64 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_reads_per_load` | 3 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_refresh_seconds` | 15 | `seconds` | `expire` | `diagnostics` | — |
 | `console.health_ui_request_seconds` | 6 | `seconds` | `expire` | `diagnostics` | — |

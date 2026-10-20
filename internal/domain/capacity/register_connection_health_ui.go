@@ -27,6 +27,9 @@ const (
 	// trendLanes, trendSignals).
 	ConsoleHealthUITrendLanes   = "console.health_ui_trend_lanes"
 	ConsoleHealthUITrendSignals = "console.health_ui_trend_signals"
+	ConsoleHealthUIProbeTargets = "console.health_ui_probe_targets"
+	ConsoleHealthUIProbeHosts   = "console.health_ui_probe_hosts"
+	ConsoleHealthUIProbeClaims  = "console.health_ui_probe_claims"
 )
 
 // connectionHealthUIBounds is every console.health_ui_* row.
@@ -149,6 +152,21 @@ func connectionHealthUIBounds() []Entry {
 			Name: ConsoleHealthUITrendSignals, Class: Buffer, Unit: Rows,
 			Limit: 20, AtLimit: Refuse,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// PROBE_BOUNDS decoder limit; an oversized remote list is refused.
+			Name: ConsoleHealthUIProbeTargets, Class: Buffer, Unit: Rows,
+			Limit: 64, AtLimit: Refuse, Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// PROBE_BOUNDS decoder limit; an oversized remote list is refused.
+			Name: ConsoleHealthUIProbeHosts, Class: Buffer, Unit: Rows,
+			Limit: 204, AtLimit: Refuse, Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// PROBE_BOUNDS decoder limit; an oversized remote list is refused.
+			Name: ConsoleHealthUIProbeClaims, Class: Buffer, Unit: Rows,
+			Limit: 8, AtLimit: Refuse, Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
 	}
 }
