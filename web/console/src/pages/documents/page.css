@@ -8,3 +8,158 @@
 .documents-page .documents-title { margin: 4px 0 0; font-size: clamp(24px, 5vw, 34px); }
 
 .document-html-preview { display: block; width: 100%; height: 75vh; height: 75dvh; min-height: 360px; border: 0; background: var(--bg, #151515); }
+
+/* Reading one document (`is-reading`, set by the controller). The page bar
+   and the page heading step aside — the heading stays as the keyboard's
+   landing, out of sight — and the document's own one-row heading carries the
+   way back, the title, Share and Full screen. The page stops scrolling; the
+   document fills what is left and scrolls inside itself, so an HTML frame is
+   never a scroller inside a scroller. `:not([hidden])` keeps the page's own
+   hidden rule (pages.css) the stronger one. */
+.documents-page.is-reading:not([hidden]) { display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+.documents-page.is-reading .documents-shell { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.documents-page.is-reading .documents-head { display: none; }
+.documents-page.is-reading .documents-title {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.documents-page.is-reading .document-viewer:not([hidden]) {
+    flex: 1; min-height: 0; display: flex; flex-direction: column;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.documents-page .document-heading {
+    display: flex; align-items: center; justify-content: flex-start; gap: 2px;
+    min-height: 56px; margin: -6px -8px 0;
+}
+.documents-page .document-heading-text { flex: 1; min-width: 0; padding: 0 4px; }
+.documents-page .document-heading h2 {
+    margin: 0; font-size: 16px; line-height: 1.35;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal;
+}
+.documents-page .document-heading .document-meta {
+    margin-top: 2px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal;
+}
+.documents-page .document-icon {
+    width: 44px; height: 44px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+    padding: 0; border: 0; border-radius: 12px; color: var(--ink); background: transparent; cursor: pointer;
+}
+.documents-page .document-icon[hidden] { display: none; }
+.documents-page .document-icon svg {
+    width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.documents-page .document-icon:hover:not(:disabled) { background: var(--card-hi); }
+.documents-page .document-icon:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.documents-page .document-icon:disabled { opacity: .4; cursor: default; }
+.documents-page #document-list-back { color: var(--accent); }
+.documents-page .document-fullscreen:not(:disabled) { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.documents-page .document-exit-icon { display: none; }
+
+.documents-page.is-reading .document-body { flex: 1; min-height: 0; margin-top: 8px; overflow: auto; }
+.documents-page .document-body[hidden] { display: none; }
+.documents-page .document-body:has(> .document-html-preview) { padding: 0; overflow: hidden; }
+.documents-page.is-reading .document-html-preview { height: 100%; min-height: 0; }
+
+/* A passing notice while reading — link copied, share sheet opened — floats
+   at the bottom instead of pushing the document down; it leaves by itself. */
+.documents-page.is-reading .documents-shell > .documents-status:empty { display: none; }
+.documents-page.is-reading .documents-shell > .documents-status:not(:empty) {
+    position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); z-index: 1001;
+    transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); margin: 0;
+    padding: 10px 16px; border: 1px solid var(--line); border-radius: 12px;
+    color: var(--ink); background: var(--card-hi); box-shadow: 0 8px 28px rgba(0, 0, 0, .3);
+}
+.documents-page.is-reading .documents-shell > .documents-status[data-state="error"]:not(:empty) {
+    border-color: var(--bad); color: #d9897d;
+}
+
+/* A document that is not ready yet: loading, waiting for the encrypted
+   connection, or refused. The card stands where the document will be; the
+   status sentence is moved into it by the controller. */
+.documents-page .document-state { flex: 1; display: flex; flex-direction: column; gap: 14px; padding-top: 14px; }
+.documents-page .document-state[hidden] { display: none; }
+.documents-page .document-state-sketch { display: grid; gap: 12px; }
+.documents-page .document-state-sketch span { display: block; height: 16px; border-radius: 6px; background: var(--card); }
+.documents-page .document-state-sketch span:nth-child(1) { width: 70%; height: 26px; }
+.documents-page .document-state-sketch span:nth-child(2) { width: 92%; }
+.documents-page .document-state-sketch span:nth-child(3) { width: 80%; }
+.documents-page .document-state-sketch span:nth-child(4) { height: 140px; border-radius: 12px; }
+.documents-page .document-state-card {
+    display: grid; grid-template-columns: auto 1fr; column-gap: 12px; row-gap: 4px; align-items: start;
+    padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--card);
+}
+.documents-page .document-state-icon {
+    display: none; width: 24px; height: 24px; margin-top: 1px;
+    fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
+}
+.documents-page .document-state-text, .documents-page .document-state-detail,
+.documents-page .document-state-actions { grid-column: 2; }
+.documents-page .document-state .documents-status {
+    min-height: 0; margin: 0; padding: 0; border: 0; background: none;
+    color: var(--ink); font-weight: 600; overflow-wrap: anywhere;
+}
+.documents-page .document-state-detail { display: none; margin: 0; color: var(--dim); font-size: 14px; line-height: 1.55; }
+.documents-page .document-state-actions { display: none; gap: 10px; margin-top: 14px; }
+.documents-page .document-state-actions button {
+    flex: 1; min-height: 48px; padding: 0 16px; border: 1px solid var(--line); border-radius: 12px;
+    color: var(--ink); background: transparent; font: inherit; cursor: pointer;
+}
+.documents-page .document-state-actions .document-state-primary { border-color: var(--accent); color: #1a120d; background: var(--accent); font-weight: 600; }
+.documents-page .document-state-actions button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.documents-page .document-viewer[data-state="connecting"] .document-state-wait { display: block; }
+.documents-page .document-viewer[data-state="connecting"] .document-state-detail { display: block; }
+
+/* Refused: no sketch, the sentence large, its code quiet under it, and the
+   two things a person can do. */
+.documents-page .document-viewer[data-state="error"] .document-state { justify-content: center; padding-bottom: 12vh; }
+.documents-page .document-viewer[data-state="error"] .document-state-sketch { display: none; }
+.documents-page .document-viewer[data-state="error"] .document-state-card {
+    grid-template-columns: 1fr; padding: 0 8px; border: 0; background: none;
+}
+.documents-page .document-viewer[data-state="error"] .document-state-text,
+.documents-page .document-viewer[data-state="error"] .document-state-actions { grid-column: 1; }
+.documents-page .document-viewer[data-state="error"] .document-state-fail { display: block; width: 40px; height: 40px; margin-bottom: 10px; }
+.documents-page .document-viewer[data-state="error"] .document-state-actions { display: flex; }
+.documents-page .document-state .failure-text { display: block; font-size: 20px; font-weight: 700; line-height: 1.4; }
+.documents-page .document-state .failure-tag { display: block; margin-top: 8px; color: var(--dim); font: 12px/1.5 var(--mono); font-weight: 400; }
+
+/* Full screen (fullscreen.ts): the viewer is a layer over the whole window,
+   the heading floats over the document until it folds into the corner button. */
+.documents-page .document-viewer.is-fullscreen:not([hidden]) {
+    position: fixed; inset: 0; z-index: 1000; margin: 0; padding: 0;
+    display: flex; flex-direction: column; background: var(--bg);
+}
+.documents-page .is-fullscreen .document-heading {
+    position: absolute; z-index: 2; margin: 0;
+    top: max(10px, env(safe-area-inset-top)); left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right));
+    padding: 2px 4px 2px 12px; border-radius: 16px;
+    background: color-mix(in srgb, var(--card) 94%, transparent); box-shadow: 0 6px 24px rgba(0, 0, 0, .28);
+    transition: opacity .2s ease, transform .2s ease, visibility 0s;
+}
+.documents-page .is-fullscreen #document-list-back { display: none; }
+.documents-page .is-fullscreen .document-enter-icon { display: none; }
+.documents-page .is-fullscreen .document-exit-icon { display: block; }
+.documents-page .is-fullscreen.chrome-folded .document-heading {
+    opacity: 0; transform: translateY(-12px); visibility: hidden; pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease, visibility 0s .2s;
+}
+.documents-page .document-reveal {
+    position: absolute; z-index: 2; width: 48px; height: 48px; border-radius: 24px;
+    top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right));
+    color: var(--ink); background: color-mix(in srgb, var(--card-hi) 92%, transparent);
+    border: 1px solid var(--line); box-shadow: 0 4px 16px rgba(0, 0, 0, .35);
+}
+.documents-page .document-reveal:hover:not(:disabled) { background: var(--card-hi); }
+.documents-page .is-fullscreen .document-body {
+    flex: 1; min-height: 0; margin: 0; border: 0; border-radius: 0; overflow: auto;
+    padding: calc(76px + env(safe-area-inset-top)) max(18px, calc((100% - 880px) / 2)) max(24px, env(safe-area-inset-bottom));
+}
+.documents-page .is-fullscreen .document-body:has(> .document-html-preview) { padding: 0; }
+.documents-page .is-fullscreen .document-html-preview { height: 100%; min-height: 0; }
+.documents-page .is-fullscreen .document-state { padding: calc(76px + env(safe-area-inset-top)) 18px 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .documents-page .is-fullscreen .document-heading,
+    .documents-page .is-fullscreen.chrome-folded .document-heading { transition: none; transform: none; }
+}

@@ -9,14 +9,19 @@ function words(language) {
     return zh ? {
         title: "文件", menu: "文件", back: "‹ 工作階段", loading: "正在讀取文件…",
         connecting: "正在等待加密連線…", empty: "這個工作階段沒有可讀的 Markdown、文字或 HTML 文件。",
-        project: "專案", task: "任務", share: "分享", copy: "複製連結", copied: "連結已複製。",
-        shared: "已開啟分享選單。", list: "‹ 文件", bytes: "位元組"
+        project: "專案", task: "任務", share: "分享", copied: "連結已複製。",
+        shared: "已開啟分享選單。", list: "回到文件", bytes: "位元組",
+        fullscreen: "全螢幕", exitFullscreen: "離開全螢幕", reveal: "顯示控制列",
+        retry: "再讀一次", others: "看其他文件", connectingDetail: "連上之後會自動打開，不用重新整理。"
     } : {
         title: "Documents", menu: "Documents", back: "‹ Sessions", loading: "Loading documents…",
         connecting: "Waiting for the encrypted connection…",
         empty: "This session has no readable Markdown, text or HTML documents.",
-        project: "Project", task: "Task", share: "Share", copy: "Copy link", copied: "Link copied.",
-        shared: "Share sheet opened.", list: "‹ Documents", bytes: "bytes"
+        project: "Project", task: "Task", share: "Share", copied: "Link copied.",
+        shared: "Share sheet opened.", list: "Back to documents", bytes: "bytes",
+        fullscreen: "Full screen", exitFullscreen: "Exit full screen", reveal: "Show controls",
+        retry: "Read again", others: "Other documents",
+        connectingDetail: "It opens by itself once connected; there is no need to reload."
     };
 }
 
@@ -44,15 +49,31 @@ export function bindDocumentsPage(elements, services) {
     var ticket = 0;
     var retryTimer = null;
     var shareURL = null;
+    var viewing = "idle";
+    var noticeTimer = null;
 
     function paintWords() {
         w = words(services.language ? services.language() : "en");
         elements.title.textContent = w.title;
         elements.back.textContent = w.back;
-        elements.listBack.textContent = w.list;
-        elements.share.textContent = w.share;
-        elements.copy.textContent = w.copy;
+        name(elements.listBack, w.list, true);
+        name(elements.share, w.share, false);
+        if (elements.fullscreen) name(elements.fullscreen, w.fullscreen, true);
+        if (elements.reveal) name(elements.reveal, w.reveal, true);
+        if (elements.retry) elements.retry.textContent = w.retry;
+        if (elements.others) elements.others.textContent = w.others;
+        if (elements.stateDetail) elements.stateDetail.textContent = w.connectingDetail;
         if (elements.menu) elements.menu.textContent = w.menu;
+    }
+
+    /**
+     * Icon buttons are named for assistive technology; `title` is the pointer's
+     * tooltip, except on Share, where it carries why sharing is unavailable.
+     */
+    function name(element, label, tooltip) {
+        if (!element) return;
+        element.setAttribute("aria-label", label);
+        if (tooltip) element.title = label;
     }
 
     function cancelRetry() {
@@ -70,8 +91,39 @@ export function bindDocumentsPage(elements, services) {
     }
 
     function say(message, error) {
+        if (noticeTimer !== null) (services.cancel || clearTimeout)(noticeTimer);
+        noticeTimer = null;
         elements.status.textContent = message || "";
         elements.status.dataset.state = error ? "error" : "status";
+    }
+
+    /** A passing notice (link copied, share sheet opened) leaves by itself. */
+    function notice(message) {
+        say(message, false);
+        noticeTimer = (services.schedule || setTimeout)(function () {
+            noticeTimer = null;
+            if (elements.status.dataset.state !== "error") say("", false);
+        }, 4000);
+    }
+
+    /**
+     * An open document is `loading`, `connecting`, `error` or `ready`. Until it
+     * is ready the viewer shows a state card in the document's place, and the
+     * status line moves into that card, so the one sentence that says what is
+     * happening sits where the document will appear rather than above it.
+     */
+    function view(state) {
+        viewing = state;
+        var card = !elements.viewer.hidden && (state === "loading" || state === "connecting" || state === "error");
+        elements.viewer.dataset.state = state;
+        if (!elements.state) return;
+        elements.state.hidden = !card;
+        elements.body.hidden = card;
+        var home = card ? elements.stateText : elements.listView.parentNode;
+        if (elements.status.parentNode !== home) {
+            if (card) home.appendChild(elements.status);
+            else home.insertBefore(elements.status, elements.listView);
+        }
     }
 
     function show(viewer) {
@@ -79,6 +131,13 @@ export function bindDocumentsPage(elements, services) {
         elements.viewer.hidden = !viewer;
         elements.listBack.hidden = !viewer;
         elements.back.hidden = viewer;
+        if (elements.page) elements.page.classList.toggle("is-reading", viewer);
+        view(viewer ? viewing : "idle");
+    }
+
+    function ready(on) {
+        elements.share.disabled = !on || !shareURL;
+        if (elements.fullscreen) elements.fullscreen.disabled = !on;
     }
 
     function clearDocument() {
@@ -89,10 +148,9 @@ export function bindDocumentsPage(elements, services) {
         elements.documentTitle.textContent = "";
         elements.meta.textContent = "";
         elements.body.textContent = "";
-        elements.share.disabled = true;
-        elements.copy.disabled = true;
+        ready(false);
         elements.share.title = "";
-        elements.copy.title = "";
+        view("idle");
     }
 
     function reset(deactivate) {
@@ -152,10 +210,9 @@ export function bindDocumentsPage(elements, services) {
             shareURL = documentShareURL(services.shareOrigin ? services.shareOrigin(value) : null,
                 locatorOnly(value));
         } catch (error) { shareFailure = error; }
-        elements.share.disabled = !shareURL;
-        elements.copy.disabled = !shareURL;
+        ready(true);
         elements.share.title = shareFailure ? typedError(shareFailure) : "";
-        elements.copy.title = shareFailure ? typedError(shareFailure) : "";
+        view("ready");
         say("", false);
     }
 
@@ -180,8 +237,8 @@ export function bindDocumentsPage(elements, services) {
         elements.documentTitle.textContent = locator.path;
         elements.meta.textContent = "";
         elements.body.textContent = "";
-        elements.share.disabled = true;
-        elements.copy.disabled = true;
+        ready(false);
+        view("loading");
         say(w.loading, false);
         var mine = ++ticket;
         return Promise.resolve().then(function () { return services.read(locator); }).then(function (value) {
@@ -191,6 +248,7 @@ export function bindDocumentsPage(elements, services) {
         }).catch(function (error) {
             if (mine !== ticket) return false;
             held = retryable(error);
+            view(held ? "connecting" : "error");
             say(held ? w.connecting : typedError(error), !held);
             if (held) scheduleRetry();
             return false;
@@ -217,23 +275,6 @@ export function bindDocumentsPage(elements, services) {
         });
     }
 
-    function copy() {
-        if (!answer) return Promise.resolve(false);
-        return Promise.resolve().then(function () {
-            var url = documentShareURL(services.shareOrigin ? services.shareOrigin(answer) : null,
-                locatorOnly(answer));
-            var nav = services.navigator();
-            if (!nav || !nav.clipboard || typeof nav.clipboard.writeText !== "function") {
-                var unavailable = new Error("This browser cannot copy the document link.");
-                unavailable.code = "document_copy_unavailable";
-                throw unavailable;
-            }
-            return nav.clipboard.writeText(url);
-        }).then(function () {
-            say(w.copied, false); return true;
-        }).catch(function (error) { say(typedError(error), true); return false; });
-    }
-
     paintWords();
     elements.back.addEventListener("click", function () { services.navigate("sessions"); });
     elements.listBack.addEventListener("click", function () {
@@ -251,10 +292,14 @@ export function bindDocumentsPage(elements, services) {
                 navigator: services.navigator()
             });
         }).then(function (result) {
-            say(result === "copied" ? w.copied : w.shared, false);
+            notice(result === "copied" ? w.copied : w.shared);
         }).catch(function (error) { say(typedError(error), true); });
     });
-    elements.copy.addEventListener("click", copy);
+    if (elements.retry) elements.retry.addEventListener("click", function () {
+        if (locator) openDocument(locator);
+    });
+    // The same way back as the heading's, so the address steps back with it.
+    if (elements.others) elements.others.addEventListener("click", function () { elements.listBack.click(); });
 
     return {
         enter: function () {

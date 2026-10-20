@@ -39,7 +39,7 @@ let handoffDelay = 0
 let failHandoff = false
 let listWaiting = false
 let listAttentionCount = 1
-let documentMode: "ready" | "refused" | "keyed" = "ready"
+let documentMode: "ready" | "refused" | "keyed" | "starting" = "ready"
 let documentListMode: "ready" | "empty" | "starting" = "ready"
 let documentReadDelay = 0
 let questionTool = ""
@@ -53,8 +53,8 @@ const row = {
 }
 
 for (const [tag, width, title, projectMeta, listMeta, invalid] of [
-  ["ja", 390, "ドキュメント", "プロジェクト · demo.md · 47 バイト", "プロジェクト · 57 バイト", "ドキュメントのリンクが無効です。"],
-  ["es", 1280, "Documentos", "Proyecto · demo.md · 47 bytes", "Proyecto · 57 bytes", "El enlace del documento no es válido."],
+  ["ja", 390, "ドキュメント", "プロジェクト · 47 バイト", "プロジェクト · 57 バイト", "ドキュメントのリンクが無効です。"],
+  ["es", 1280, "Documentos", "Proyecto · 47 bytes", "Proyecto · 57 bytes", "El enlace del documento no es válido."],
 ] as const) {
   test(`Documents ${tag} at ${width}px translates states without changing document data`, async () => {
     const { targetId } = await browser.send("Target.createTarget", { url: "about:blank" })
@@ -87,6 +87,53 @@ for (const [tag, width, title, projectMeta, listMeta, invalid] of [
       assert.equal(await run(`document.getElementById("document-share")?.disabled`), true)
       assert.match(await run(`document.getElementById("document-share")?.getAttribute("title")`), /document_share_unavailable/)
       assert.equal(await run(`document.getElementById("document-share")?.getAttribute("title")?.includes(${JSON.stringify(tag === "ja" ? "文書のホスト識別情報を確認してください。" : "Comprueba la identidad del anfitrión de este documento.")})`), true)
+      assert.equal(await run(`document.getElementById("document-copy")`), null)
+
+      // Reading: one heading row, the page itself does not scroll, and the
+      // document reaches the bottom of the window.
+      assert.equal(await run(`document.getElementById("documents-page").classList.contains("is-reading")`), true)
+      assert.equal(await run(`getComputedStyle(document.querySelector(".documents-head")).display`), "none")
+      assert.equal(await run(`(() => { const p = document.getElementById("documents-page"); return p.scrollHeight <= p.clientHeight + 1 })()`), true)
+      assert.ok(await run(`innerHeight - document.getElementById("document-body").getBoundingClientRect().bottom`) < 40)
+      assert.ok(await run(`document.querySelector("#document-viewer .document-heading").getBoundingClientRect().height`) <= 60)
+      if (shots) { const { data } = await browser.send("Page.captureScreenshot", { format: "png" }, id); writeFileSync(join(shots, `document-reading-${tag}-${width}.png`), Buffer.from(data, "base64")) }
+
+      // Full screen: a layer over the whole window and a history step, whose
+      // controls fold into the corner button and come back from it.
+      assert.equal(await run(`document.getElementById("document-fullscreen").disabled`), false)
+      // The layer is what every browser gets; iPhone Safari, which this
+      // width stands for, has no element full screen to add to it.
+      if (width < 900) await run(`Element.prototype.requestFullscreen = undefined`)
+      await run(`document.getElementById("document-fullscreen").click()`)
+      assert.equal(await run(`document.getElementById("document-viewer").classList.contains("is-fullscreen")`), true)
+      assert.equal(await run(`history.state?.documentFullscreen`), true)
+      assert.deepEqual(await run(`(() => { const r = document.getElementById("document-viewer").getBoundingClientRect(); return [r.top, r.left, Math.round(r.width), Math.round(r.height)] })()`), [0, 0, width, 844])
+      assert.equal(await run(`document.elementFromPoint(${width / 2}, 400)?.closest("#document-viewer") !== null`), true)
+      assert.equal(await run(`document.getElementById("document-reveal").hidden`), true)
+      await run(`document.activeElement?.blur()`)
+      await until(`document.getElementById("document-viewer").classList.contains("chrome-folded")`)
+      assert.equal(await run(`document.getElementById("document-reveal").hidden`), false)
+      await until(`getComputedStyle(document.querySelector("#document-viewer .document-heading")).visibility === "hidden"`)
+      if (shots) { const { data } = await browser.send("Page.captureScreenshot", { format: "png" }, id); writeFileSync(join(shots, `document-fullscreen-${tag}-${width}.png`), Buffer.from(data, "base64")) }
+      await run(`document.getElementById("document-reveal").click()`)
+      assert.equal(await run(`document.getElementById("document-viewer").classList.contains("chrome-folded")`), false)
+      assert.equal(await run(`document.activeElement?.id`), "document-fullscreen")
+      // Back leaves full screen, not the document.
+      await run(`history.back()`)
+      await until(`!document.getElementById("document-viewer").classList.contains("is-fullscreen")`)
+      await until(`document.fullscreenElement === null`)
+      assert.equal(await run(`document.getElementById("document-viewer").hidden`), false)
+      assert.equal(await run(`document.getElementById("document-body")?.textContent?.includes("The document opened directly.")`), true)
+      // The same button leaves it too, and takes its history step with it:
+      // entering and leaving again does not pile up history entries.
+      const depth = await run(`history.length`)
+      await run(`document.getElementById("document-fullscreen").click()`)
+      assert.equal(await run(`document.getElementById("document-fullscreen").getAttribute("aria-label")`) !== await run(`document.getElementById("document-share").getAttribute("aria-label")`), true)
+      await run(`document.getElementById("document-fullscreen").click()`)
+      await until(`!document.getElementById("document-viewer").classList.contains("is-fullscreen") && !history.state?.documentFullscreen`)
+      await until(`document.fullscreenElement === null`)
+      assert.equal(await run(`history.length`), depth)
+
       await run(`document.getElementById("document-list-back").click()`)
       await until(`document.querySelectorAll("#documents-rows button").length === 5`)
       assert.equal(await run(`document.querySelector("#documents-rows button span")?.textContent`), listMeta)
@@ -101,13 +148,13 @@ for (const [tag, width, title, projectMeta, listMeta, invalid] of [
       if (shots) { const { data } = await browser.send("Page.captureScreenshot", { format: "png" }, id); writeFileSync(join(shots, `documents-${tag}-${width}.png`), Buffer.from(data, "base64")) }
       await run(`document.querySelectorAll("#documents-rows button")[1].click()`)
       await until(`document.getElementById("document-meta")?.textContent?.includes("notes/long-name.md")`)
-      assert.equal(await run(`document.getElementById("document-meta")?.textContent?.includes("1,200")`), tag === "ja")
+      assert.equal(await run(`document.getElementById("document-meta")?.textContent?.includes(${JSON.stringify(tag === "ja" ? "1.2 KB" : "1,2 kB")})`), true)
       assert.equal(await run(`document.getElementById("document-title")?.textContent`), "A very long user supplied task title that stays exactly as written")
       await run(`document.getElementById("document-list-back").click()`)
       await until(`document.querySelectorAll("#documents-rows button").length === 5`)
       await run(`document.querySelectorAll("#documents-rows button")[2].click()`)
-      await until(`document.getElementById("document-meta")?.textContent?.includes("empty.txt")`)
-      assert.equal(await run(`document.getElementById("document-meta")?.textContent`), tag === "ja" ? "プロジェクト · empty.txt · 0 バイト" : "Proyecto · empty.txt · 0 bytes")
+      await until(`document.getElementById("document-title")?.textContent === "empty.txt" && document.getElementById("document-viewer").dataset.state === "ready"`)
+      assert.equal(await run(`document.getElementById("document-meta")?.textContent`), tag === "ja" ? "プロジェクト · 0 バイト" : "Proyecto · 0 bytes")
       await run(`document.getElementById("document-list-back").click()`)
       await until(`document.querySelectorAll("#documents-rows button").length === 5`)
       await fetch(origin + "/__fixture/document-read-delay?ms=350")
@@ -137,6 +184,28 @@ for (const [tag, width, title, projectMeta, listMeta, invalid] of [
       assert.equal(await run(`document.getElementById("documents-status")?.querySelector("span[lang=en]")?.textContent`), "Raw document policy detail in English.")
       assert.equal(await run(`document.getElementById("documents-status")?.lang`), "")
       assert.equal(await run(`document.getElementById("documents-status")?.textContent?.includes("forbidden")`), true)
+      // A refused document is a card in the document's place: the sentence,
+      // its code on a line of its own, and the two ways on.
+      assert.equal(await run(`document.getElementById("document-viewer").dataset.state`), "error")
+      assert.equal(await run(`document.getElementById("documents-status").parentElement.id`), "document-state-text")
+      assert.equal(await run(`document.querySelector("#documents-status .failure-tag")?.textContent`), "forbidden")
+      assert.equal(await run(`document.getElementById("document-retry").getBoundingClientRect().height >= 44 && document.getElementById("document-others").getBoundingClientRect().height >= 44`), true)
+      assert.equal(await run(`document.getElementById("document-fullscreen").disabled`), true)
+      if (shots) { const { data } = await browser.send("Page.captureScreenshot", { format: "png" }, id); writeFileSync(join(shots, `document-refused-${tag}-${width}.png`), Buffer.from(data, "base64")) }
+      await run(`document.getElementById("document-others").click()`)
+      await until(`document.querySelectorAll("#documents-rows button").length === 5`)
+      assert.equal(await run(`document.getElementById("documents-status").parentElement.classList.contains("documents-shell")`), true)
+      // Waiting for the encrypted connection: the card says it will open by itself.
+      await fetch(origin + "/__fixture/document-mode?value=starting")
+      await run(`document.querySelector("#documents-rows button").click()`)
+      await until(`document.getElementById("document-viewer").dataset.state === "connecting"`)
+      assert.equal(await run(`getComputedStyle(document.getElementById("document-state-detail")).display`), "block")
+      assert.equal(await run(`getComputedStyle(document.querySelector(".document-state-actions")).display`), "none")
+      if (shots) { const { data } = await browser.send("Page.captureScreenshot", { format: "png" }, id); writeFileSync(join(shots, `document-connecting-${tag}-${width}.png`), Buffer.from(data, "base64")) }
+      await fetch(origin + "/__fixture/document-mode?value=ready")
+      await until(`document.getElementById("document-viewer").dataset.state === "ready"`)
+      assert.equal(await run(`document.getElementById("document-body")?.textContent?.includes("The document opened directly.")`), true)
+      await fetch(origin + "/__fixture/document-mode?value=refused")
       await fetch(origin + "/__fixture/document-mode?value=keyed")
       await browser.send("Page.navigate", { url: `${origin}/?ui=${tag}&fixture=keyed#document=1&machine=this-mac&session=${SESSION}&scope=project&path=demo.md` }, id)
       const translated = JSON.parse(readFileSync(join(dist, "catalogs", `${tag}.json`), "utf8"))["http.1e31c72f0db9eb5b"]
@@ -175,10 +244,10 @@ test("Documents all nine catalogs paint the active page before it is shown", asy
       }
       assert.equal(await run(`document.documentElement.lang`), tag)
       assert.equal(await run(`document.getElementById("documents-title")?.textContent`), catalog["documents.title"])
-      assert.equal(await run(`document.getElementById("document-share")?.textContent`), catalog["documents.share"])
-      assert.equal(await run(`document.getElementById("document-copy")?.textContent`), catalog["documents.copy"])
+      assert.equal(await run(`document.getElementById("document-share")?.getAttribute("aria-label")`), catalog["documents.share"])
+      assert.equal(await run(`document.getElementById("document-fullscreen")?.getAttribute("aria-label")`), catalog["documents.fullscreen"] ?? JSON.parse(readFileSync(join(dist, "catalogs", "en.json"), "utf8"))["documents.fullscreen"])
       assert.equal(await run(`document.getElementById("session-documents")?.textContent`), catalog["literal.6a2079c8124f"])
-      assert.equal(await run(`document.getElementById("document-meta")?.textContent`), catalog["documents.projectMeta"].replace("{arg0}", "demo.md").replace("{arg1}", "47"))
+      assert.equal(await run(`document.getElementById("document-meta")?.textContent`), catalog["documents.projectSize"].replace("{arg0}", catalog["documents.sizeBytes"].replace("{arg0}", "47")))
       assert.equal(await run(`document.getElementById("document-title")?.textContent`), "demo.md")
     }
   } finally { await browser.send("Target.closeTarget", { targetId }) }
@@ -302,7 +371,7 @@ function fixture(): Server {
     if (path === "/__fixture/reset") { withdrawn = false; questionTool = ""; readAt = null; resolvedAt = null; version = 1; failReads = false; failActions = false; readDelay = 0; noteReads = 0; todoReads = 0; noteCount = 1; showOptions = true; singleOption = false; secretMode = false; handoffValues = []; handoffDelay = 0; failHandoff = false; listWaiting = false; listAttentionCount = 1; documentMode = "ready"; documentListMode = "ready"; documentReadDelay = 0; sendRequests = 0; sentTexts = []; sentBeforeResolve = []; failSends = false; sendDelay = 0; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/handoff-delay") { handoffDelay = 400; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/handoff-fail") { failHandoff = true; return json(res, 200, { ok: true }) }
-    if (path === "/__fixture/document-mode") { const mode = new URL(req.url ?? "/", "http://fixture").searchParams.get("value"); documentMode = mode === "refused" || mode === "keyed" ? mode : "ready"; return json(res, 200, { ok: true }) }
+    if (path === "/__fixture/document-mode") { const mode = new URL(req.url ?? "/", "http://fixture").searchParams.get("value"); documentMode = mode === "refused" || mode === "keyed" || mode === "starting" ? mode : "ready"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/document-list-mode") { const value = new URL(req.url ?? "/", "http://fixture").searchParams.get("value"); documentListMode = value === "empty" || value === "starting" ? value : "ready"; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/document-read-delay") { documentReadDelay = Number(new URL(req.url ?? "/", "http://fixture").searchParams.get("ms")) || 0; return json(res, 200, { ok: true }) }
     if (path === "/__fixture/fail-sends") { failSends = new URL(req.url ?? "/", "http://fixture").searchParams.get("on") === "1"; return json(res, 200, { ok: true }) }
@@ -359,6 +428,7 @@ function fixture(): Server {
     }
     if (path === `/v1/sessions/${SESSION}/documents/project/demo.md`) {
       if (documentMode === "refused") return json(res, 403, { error: "forbidden", detail: "Raw document policy detail in English." })
+      if (documentMode === "starting") return json(res, 503, { error: "cloud_starting", detail: "The encrypted connection is starting." })
       if (documentMode === "keyed") return json(res, 404, { error: "not_found", detail: "No document named that.", detail_key: "http.1e31c72f0db9eb5b" })
       res.writeHead(200, { "content-type": "text/markdown; charset=utf-8" }); return res.end("# Demo document\n\nThe document opened directly.\n")
     }

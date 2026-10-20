@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6978,
+  "englishKeys": 6989,
   "counts": {
-    "negation": 2085,
+    "negation": 2086,
     "state": 1145,
     "permission": 421,
     "deletion": 178,
     "uncertainty": 194
   },
-  "unionCount": 3159,
+  "unionCount": 3160,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -490,6 +490,7 @@
       "count.skillFoldersSkipped",
       "count.unsyncedProjects",
       "dispatchPolicy.failed",
+      "documents.connectingDetail",
       "documents.copyUnavailableError",
       "documents.empty",
       "documents.readFailed",
@@ -4707,6 +4708,7 @@
     "dispatchPolicy.failed",
     "dispatchPolicy.saved",
     "documents.connecting",
+    "documents.connectingDetail",
     "documents.copyUnavailableError",
     "documents.empty",
     "documents.readFailed",
