@@ -6984,5 +6984,11 @@
   "capacityRow.artifacts.report_image_pixels.what": "HTML 報告內單張截圖解開後的像素總數。除了文件大小上限，另以此限制圖片占用的記憶體。",
   "capacityRow.artifacts.report_image_pixels.full": "超過上限的圖片不會顯示在報告中。請縮小圖片後再內嵌，報告其他內容仍可閱讀。",
   "capacityRow.artifacts.report_total_image_pixels.what": "一份 HTML 報告保留的所有截圖解開後的像素總數。重複的圖片也會計入，避免很小的檔案占用無上限的圖片記憶體。",
-  "capacityRow.artifacts.report_total_image_pixels.full": "超出報告剩餘額度的圖片不會顯示。請縮小或減少截圖後再發布；文字與先前有效的圖片仍可閱讀。"
+  "capacityRow.artifacts.report_total_image_pixels.full": "超出報告剩餘額度的圖片不會顯示。請縮小或減少截圖後再發布；文字與先前有效的圖片仍可閱讀。",
+  "next.scheduleInterval": "每隔 N 天",
+  "next.scheduleEveryDays": "間隔天數",
+  "next.scheduleStart": "起始日期",
+  "next.scheduleIntervalHelp": "從起始日期起，依指定時間每隔固定天數執行。手動執行不會改變後續日期。",
+  "next.scheduleIntervalSummary": "每 {days} 天 {at}",
+  "next.scheduleIntervalInvalid": "請輸入正整數天數，以及 1970 至 9999 年間的起始日期。"
 }

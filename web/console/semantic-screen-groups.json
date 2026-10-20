@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 6984,
-  "riskKeys": 3160,
-  "nonRiskCount": 3824,
+  "englishContentKeys": 6990,
+  "riskKeys": 3161,
+  "nonRiskCount": 3829,
   "groups": [
     {
       "name": "admin / other",
@@ -2738,12 +2738,16 @@
     },
     {
       "name": "next / schedule",
-      "count": 25,
+      "count": 30,
       "sources": [
         "src/next-strings.ts"
       ],
       "keys": [
         "next.scheduleEffortField",
+        "next.scheduleEveryDays",
+        "next.scheduleInterval",
+        "next.scheduleIntervalInvalid",
+        "next.scheduleIntervalSummary",
         "next.scheduleInvalid",
         "next.scheduleInvalidSchema",
         "next.scheduleInvalidStatus",
@@ -2760,6 +2764,7 @@
         "next.schedulePermissionEdits",
         "next.scheduleRunStartedTitle",
         "next.scheduleRunsHeading",
+        "next.scheduleStart",
         "next.scheduleTriggerOnlyNext",
         "next.scheduleUntitled",
         "next.scheduleWebhookCopied",

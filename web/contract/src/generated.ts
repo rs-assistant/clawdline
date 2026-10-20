@@ -5861,16 +5861,16 @@ export interface ScheduleRecord {
 /**
  * The body POST /v1/orchestrator/schedules and PATCH /v1/orchestrator/schedules/:id
  * take — the form's fields, flattened. `place_id` is an id from GET /v1/places,
- * never a path. Either `at` with exactly one of `days` and `on` (`days` is not
- * defaulted), or `trigger_only: true` with none of `at`, `days` and `on` — a
- * schedule the clock never fires, run only by hand or by webhook. schedule_id,
- * created_at, when_changed_at, fired_at and project_dir are the machine's and are
- * refused as unknown fields. Writes need an Idempotency-Key and either a device
- * that may send or, for a schedule that runs once, this machine's orchestrator
- * token. A session carrying a person's recent instruction may write a repeating
- * schedule by sending both `session_id` and `via.run`; the run must have been
- * issued for a message to that conversation. Those proof fields are audit evidence
- * and are not stored in the schedule.
+ * never a path. Either `at` with one of `days`, `on`, or the pair `every_days` and
+ * `start` (`days` is not defaulted), or `trigger_only: true` with none of `at`,
+ * `days`, `on`, `every_days` and `start` — a schedule the clock never fires, run
+ * only by hand or by webhook. schedule_id, created_at, when_changed_at, fired_at
+ * and project_dir are the machine's and are refused as unknown fields. Writes need
+ * an Idempotency-Key and either a device that may send or, for a schedule that runs
+ * once, this machine's orchestrator token. A session carrying a person's recent
+ * instruction may write a repeating schedule by sending both `session_id` and
+ * `via.run`; the run must have been issued for a message to that conversation.
+ * Those proof fields are audit evidence and are not stored in the schedule.
  */
 export interface ScheduleRequest {
   assistant: string
@@ -5879,6 +5879,12 @@ export interface ScheduleRequest {
   close_tab?: string
   days?: string[]
   enabled?: boolean
+
+  /**
+   * Positive calendar-day interval, paired with start and at; excludes days, on and
+   * trigger_only.
+   */
+  every_days?: number
   instructions: string
 
   /**
@@ -5909,6 +5915,11 @@ export interface ScheduleRequest {
    * session-authorized repeating write.
    */
   session_id?: string
+
+  /**
+   * Inclusive anchor date, YYYY-MM-DD, for every_days. Manual runs do not move it.
+   */
+  start?: string
   template?: ScheduleTemplate
 
   /**
@@ -5984,6 +5995,7 @@ export interface ScheduleRow {
    * never fires it, and it runs only by hand or by webhook. It never has next_fire.
    */
   trigger_only?: boolean
+  when?: ScheduleWhen
 }
 
 /**
@@ -6081,13 +6093,25 @@ export interface ScheduleUserAuthorization {
 /**
  * `when` in the file's own spelling: `at` (HH:MM, local time) and exactly one of
  * `days` (`daily`, or weekday names sun…sat) or `on` (YYYY-MM-DD, a schedule that
- * runs once) — or, alone, `trigger_only: true`, a schedule with no time that runs
- * only by hand or by webhook.
+ * runs once), or `every_days` with `start` (an anchored calendar-day interval) —
+ * or, alone, `trigger_only: true`, a schedule with no time that runs only by hand
+ * or by webhook.
  */
 export interface ScheduleWhen {
   at?: string
   days?: string[]
+
+  /**
+   * Positive calendar-day interval, paired with start and at; excludes days, on and
+   * trigger_only.
+   */
+  every_days?: number
   on?: string
+
+  /**
+   * Inclusive anchor date, YYYY-MM-DD, for every_days. Manual runs do not move it.
+   */
+  start?: string
   trigger_only?: boolean
 }
 

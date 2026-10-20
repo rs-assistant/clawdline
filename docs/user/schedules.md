@@ -27,7 +27,10 @@ running when a schedule is due; see [platforms.md](platforms.md) for keeping it 
    - **No time — runs only by webhook or by hand** — tick it
      for a task the clock never starts; the two fields below disappear.
    - **At** — the time of day.
-   - **On** — **Daily**, or the days of the week.
+   - **On** — **Daily**, the days of the week, or **Every N days**. For an interval, enter
+     **Every (days)** and **Starting on**. For example, every 3 days starting October 21 at
+     09:00 runs on October 21, 24, 27, 30, then November 2 in the schedule’s time zone.
+     **Run now** does not change those dates.
    - **Machine** — shown only when your Cloud account has more than one machine.
    - **Where** — the project the session opens in.
    - **With** — Claude Code or Codex.

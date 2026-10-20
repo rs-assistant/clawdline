@@ -6984,5 +6984,11 @@
   "capacityRow.artifacts.report_image_pixels.what": "The decoded pixel count of one screenshot embedded in an HTML report. This limits image memory independently of the document byte limit.",
   "capacityRow.artifacts.report_image_pixels.full": "An image beyond this limit is omitted from the report. Resize it before embedding it again; the rest of the report remains readable.",
   "capacityRow.artifacts.report_total_image_pixels.what": "The combined decoded pixel count of all screenshots retained in one HTML report. This also counts repeated images, so a small file cannot allocate unlimited image memory.",
-  "capacityRow.artifacts.report_total_image_pixels.full": "Images beyond the remaining report budget are omitted. Resize or reduce the screenshots before publishing again; text and earlier valid images remain readable."
+  "capacityRow.artifacts.report_total_image_pixels.full": "Images beyond the remaining report budget are omitted. Resize or reduce the screenshots before publishing again; text and earlier valid images remain readable.",
+  "next.scheduleInterval": "Every N days",
+  "next.scheduleEveryDays": "Every (days)",
+  "next.scheduleStart": "Starting on",
+  "next.scheduleIntervalHelp": "Repeats from this date at the selected time. Running by hand does not move the next date.",
+  "next.scheduleIntervalSummary": "Every {days} days at {at}",
+  "next.scheduleIntervalInvalid": "Enter a positive whole number of days and a start date from 1970 through 9999."
 }

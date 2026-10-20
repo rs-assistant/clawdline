@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 6984,
+  "englishKeys": 6990,
   "counts": {
-    "negation": 2086,
-    "state": 1145,
+    "negation": 2087,
+    "state": 1146,
     "permission": 421,
     "deletion": 178,
     "uncertainty": 194
   },
-  "unionCount": 3160,
+  "unionCount": 3161,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -1714,6 +1714,7 @@
       "next.restoreRefused",
       "next.restoreUnknownOutcome",
       "next.roleCreateFailed",
+      "next.scheduleIntervalHelp",
       "next.scheduleMachineReadFailed",
       "next.scheduleMoveCopyLeft",
       "next.scheduleMoveCreateFailedDisabled",
@@ -2985,6 +2986,7 @@
       "next.restoreFailedUnknown",
       "next.restoreSheetTitle",
       "next.scheduleForceRunConfirmation",
+      "next.scheduleIntervalHelp",
       "next.scheduleMoveCreateFailed",
       "next.scheduleMoveCreateFailedDisabled",
       "next.scheduleMoveHookStranded",
@@ -6553,6 +6555,7 @@
     "next.roleCreateFailed",
     "next.roleCreateIntro",
     "next.scheduleForceRunConfirmation",
+    "next.scheduleIntervalHelp",
     "next.scheduleMachineReadFailed",
     "next.scheduleMachineUnread",
     "next.scheduleMoveCopyLeft",
