@@ -423,12 +423,12 @@ func (k sealedKeys) Keys(ctx context.Context) (healthsealed.Keys, error) {
 		if m.ID != identity.MachineID {
 			continue
 		}
-		if m.RevokedAt != nil || m.IdentityEpoch < 0 {
+		if m.RevokedAt != nil || m.IdentityEpoch == nil || *m.IdentityEpoch < 0 {
 			break
 		}
 		return healthsealed.Keys{Tenant: identity.AccountID, MachineID: identity.MachineID,
 			Credential: identity.MachineCredential, MasterSecret: secret, ContentKeyEpoch: epoch,
-			IdentityEpoch: int64(m.IdentityEpoch)}, nil
+			IdentityEpoch: int64(*m.IdentityEpoch)}, nil
 	}
 	clear(secret)
 	return healthsealed.Keys{}, &healthsealed.Error{Code: healthsealed.CodeKeyUnavailable}
