@@ -486,21 +486,20 @@ func (p *Pairing) logf(format string, args ...any) {
 
 // Identity pairing phases, as the local route names them.
 const (
-	IdentityPairingIdle     = "idle"
-	IdentityPairingWaiting  = "waiting_viewer"
-	IdentityPairingConfirm  = "confirm_code"
-	IdentityPairingHanding  = "handing_over"
-	IdentityPairingPaired   = "paired"
-	IdentityPairingDenied   = "denied"
-	IdentityPairingFailed   = "failed"
-	IdentityPairingStopped  = "cancelled"
-	identityPairingLifetime = 11 * time.Minute
+	IdentityPairingIdle    = "idle"
+	IdentityPairingWaiting = "waiting_viewer"
+	IdentityPairingConfirm = "confirm_code"
+	IdentityPairingHanding = "handing_over"
+	IdentityPairingPaired  = "paired"
+	IdentityPairingDenied  = "denied"
+	IdentityPairingFailed  = "failed"
+	IdentityPairingStopped = "cancelled"
 )
 
-// IdentityPairingLifetime bounds one run: Cloud's pairing row lives at most
+// IdentityPairingLifetimeLimit bounds one run: Cloud's pairing row lives at most
 // 600 s, and the minute past it lets the last poll answer `expired` rather
 // than the context cutting it short.
-const IdentityPairingLifetime = identityPairingLifetime
+const IdentityPairingLifetimeLimit = 11 * time.Minute
 
 // IdentityPairingBeginTimeout bounds how long Begin waits for Cloud's start
 // answer before it reports the run as not started.
@@ -592,7 +591,7 @@ func (p *IdentityPairing) Begin(ctx context.Context) (IdentityPairingState, erro
 	}
 	p.gen++
 	gen := p.gen
-	run, cancel := context.WithTimeout(context.WithoutCancel(ctx), IdentityPairingLifetime)
+	run, cancel := context.WithTimeout(context.WithoutCancel(ctx), IdentityPairingLifetimeLimit)
 	p.cancel = cancel
 	decide := make(chan bool, 1)
 	p.decide = decide

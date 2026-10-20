@@ -379,7 +379,17 @@
     "Note": true
   },
   {
+    "Name": "cloud.identity_pairing_decision_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.identity_pairing_poll_attempts",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.identity_pairing_run_seconds",
     "Known": true,
     "Note": true
   },

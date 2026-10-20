@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8027,
-  "riskKeys": 3574,
-  "nonRiskCount": 4453,
+  "englishContentKeys": 8031,
+  "riskKeys": 3576,
+  "nonRiskCount": 4455,
   "groups": [
     {
       "name": "admin / other",
@@ -275,7 +275,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 226,
+      "count": 228,
       "sources": [
         null
       ],
@@ -328,6 +328,8 @@
         "capacityRow.cloud.health_upload_retry_seconds.what",
         "capacityRow.cloud.health_upload_state_bytes.what",
         "capacityRow.cloud.health_upload_step_pages.full",
+        "capacityRow.cloud.identity_pairing_decision_bytes.what",
+        "capacityRow.cloud.identity_pairing_run_seconds.what",
         "capacityRow.cloud.peer_discovery_reply.full",
         "capacityRow.cloud.peer_discovery_reply.what",
         "capacityRow.cloud.peer_frame_bytes.what",
