@@ -19,10 +19,12 @@ type Runtime struct {
 	Tracker  *Tracker
 	Journal  *Journal
 	Watchdog *Watchdog
-	BootID   string
-	Build    string
-	clock    Clock
-	running  atomic.Bool
+	// Capture is the one stall capture worker; off until enabled.
+	Capture *Capturer
+	BootID  string
+	Build   string
+	clock   Clock
+	running atomic.Bool
 }
 
 // NewRuntime makes the per-boot runtime. build is this binary's version or
@@ -44,8 +46,10 @@ func newRuntime(clock Clock, bootID, build string, cadence time.Duration) (*Runt
 		return nil, err
 	}
 	t := NewTracker(clock)
+	w := NewWatchdog(t, j, clock, cadence)
+	w.capture = NewCapturer(clock, bootID, build)
 	return &Runtime{
-		Tracker: t, Journal: j, Watchdog: NewWatchdog(t, j, clock, cadence),
+		Tracker: t, Journal: j, Watchdog: w, Capture: w.capture,
 		BootID: bootID, Build: build, clock: clock,
 	}, nil
 }
@@ -79,11 +83,14 @@ func (r *Runtime) Probe() *Tracker {
 }
 
 // Run runs the watchdog and its journal writer until ctx ends, and returns
-// once both have stopped.
+// once both have stopped. It also starts the one capture worker, which it
+// does not wait for: a capture stuck in the runtime must not hold a stopping
+// daemon, and the worker returns by itself once it is free.
 func (r *Runtime) Run(ctx context.Context) {
 	if r == nil {
 		return
 	}
+	go r.Capture.Run(ctx)
 	r.running.Store(true)
 	defer r.running.Store(false)
 	r.Watchdog.Run(ctx)
@@ -108,6 +115,8 @@ type Status struct {
 	ReportAgeNS  *int64   `json:"report_age_ns"`
 	InvalidSpecs uint64   `json:"invalid_specs"`
 	Wiring       []Wiring `json:"wiring"`
+	// Capture is the stall capture worker's status.
+	Capture CaptureStatus `json:"stall_capture"`
 }
 
 // StatusSchema names the local status answer.
@@ -126,7 +135,7 @@ func (r *Runtime) Status() (Status, error) {
 	s := Status{
 		Schema: StatusSchema, BootID: r.BootID, Build: r.Build, Running: r.Running(),
 		Quality: QualityNotCollected, Coverage: page.Coverage, InvalidSpecs: r.Tracker.InvalidSpecs(),
-		Wiring: Unwired(),
+		Wiring: Unwired(), Capture: r.Capture.Status(),
 	}
 	// The one-row page is only for the coverage numbers.
 	s.Coverage.Truncated, s.Coverage.NextAfterSeq = false, 0
@@ -165,7 +174,76 @@ func (r *Runtime) Export(q Query) (Evidence, error) {
 		return Evidence{}, err
 	}
 	ev.Locations = &LocationMap{Build: r.Build, Entries: Locations()}
+	ev.StallCapture = r.StallCapture(&rep)
 	return ev, nil
+}
+
+// StallCapture joins the latest capture to how its stalled phase ended. The
+// recovery is read from the journal and the latest report, never from the
+// capture, so a failed or hung capture leaves it intact.
+func (r *Runtime) StallCapture(rep *Report) *StallCapture {
+	if r == nil {
+		return nil
+	}
+	sc := &StallCapture{Status: r.Capture.Status()}
+	latest, ok := r.Capture.Latest()
+	if !ok {
+		return sc
+	}
+	sc.Latest = latest
+	sc.Recovery = r.recoveryOf(latest.Trigger, rep)
+	return sc
+}
+
+func (r *Runtime) recoveryOf(t CaptureTrigger, rep *Report) *CaptureRecovery {
+	rc := &CaptureRecovery{State: RecoveryUnknown, JournalQuality: QualityComplete}
+	cursor := Query{Limit: MaxQueryRecords}
+	stallSeen := false
+	for i := 0; i < scanPages(); i++ {
+		p, err := r.Journal.Read(cursor)
+		if err != nil {
+			rc.JournalQuality = QualityNotCollected
+			return rc
+		}
+		if p.Coverage.Quality == QualityPartial {
+			rc.JournalQuality = QualityPartial
+		}
+		for _, rec := range p.Records {
+			if rec.PhaseID != t.PhaseID || t.PhaseID == 0 {
+				continue
+			}
+			switch rec.Event {
+			case EventStallDetected:
+				stallSeen = true
+			case EventRecovered:
+				if rec.MonoNS >= t.RequestedMonoNS {
+					at, d := rec.Wall, rec.MonoNS-t.RequestedMonoNS
+					rc.State, rc.RecoveredAt, rc.RecoveryNS = RecoveryRecovered, &at, &d
+				}
+			case EventReleasedStalled:
+				if rc.State != RecoveryRecovered {
+					rc.State = RecoveryReleased
+				}
+			}
+		}
+		if !p.Coverage.Truncated {
+			break
+		}
+		cursor.AfterSeq = p.Coverage.NextAfterSeq
+	}
+	if rc.State == RecoveryUnknown && rep != nil {
+		for _, f := range rep.Findings {
+			if f.PhaseID == t.PhaseID && (f.State == StateBlocked || f.State == StateUnverified) {
+				rc.State = RecoveryStillBlocked
+			}
+		}
+	}
+	if !stallSeen && rc.JournalQuality == QualityComplete {
+		// The stall record itself is not in the journal (evicted, or
+		// lost at the queue): what is not there cannot be called absent.
+		rc.JournalQuality = QualityPartial
+	}
+	return rc
 }
 
 // scanPages is how many journal pages one filtered read may walk: the whole

@@ -120,6 +120,9 @@ type Watchdog struct {
 	// durable receives each record the writer appended, as the journal
 	// stamped it, under writeMu (Attach). Nil is memory only.
 	durable func(Record)
+	// capture is handed a trigger, without waiting, when a phase is first
+	// called blocked. Nil captures nothing.
+	capture *Capturer
 }
 
 // NewWatchdog watches tracker and queues transitions for journal (which may
@@ -330,6 +333,7 @@ func (w *Watchdog) Scan() Report {
 		}
 	}
 	w.started, w.last = true, now
+	w.capture.observe(now)
 
 	phases, overflow := w.tracker.Snapshot()
 	r.Overflow = overflow
@@ -428,6 +432,14 @@ func (w *Watchdog) transition(p Phase, f Finding, prev seen, had bool) {
 		return
 	}
 	w.record(rec)
+	if rec.Event == EventStallDetected {
+		// The stall record is queued first and stands whatever the
+		// capture does; Request only swaps an atomic and sends on an
+		// empty channel.
+		w.capture.Request(CaptureTrigger{PhaseID: p.ID, Location: p.Spec.Location, Stage: p.Spec.Stage,
+			Class: p.Spec.Class, Correlation: p.Spec.Correlation, AgeNS: f.AgeNS, DeadlineNS: f.DeadlineNS,
+			RequestedMonoNS: int64(w.at.Mono), RequestedWall: w.at.Wall})
+	}
 }
 
 // record queues r for the writer without waiting: a full queue drops it and

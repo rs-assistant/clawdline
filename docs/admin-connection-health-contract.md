@@ -231,7 +231,7 @@ display and may jump.
     { "part": "daemon_instrumentation_call_sites", "status": "partial" },
     { "part": "durable_segmented_journal", "status": "implemented" },
     { "part": "durable_history_route", "status": "implemented" },
-    { "part": "stack_capture_worker", "status": "unimplemented" },
+    { "part": "stack_capture_worker", "status": "implemented" },
     { "part": "local_health_cli_and_route", "status": "implemented" },
     { "part": "cloud_ingest", "status": "unimplemented" },
     { "part": "cloud_query", "status": "unimplemented" },
