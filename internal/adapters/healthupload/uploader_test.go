@@ -589,3 +589,25 @@ func TestABatchRebuiltAfterALostProgressFileReplaysItsReceipt(t *testing.T) {
 		t.Fatalf("the rebuilt batch must replay, not conflict: %+v", st)
 	}
 }
+
+// TestWriteABodyForTheCloudParser writes the body this uploader sends for
+// real stored records, so Cloud's own parser can be run on it
+// (HEALTHUPLOAD_BODY_OUT=<file>; skipped otherwise).
+func TestWriteABodyForTheCloudParser(t *testing.T) {
+	out := os.Getenv("HEALTHUPLOAD_BODY_OUT")
+	if out == "" {
+		t.Skip("HEALTHUPLOAD_BODY_OUT is not set")
+	}
+	dir := t.TempDir()
+	f := newFixture(t, dir, "boot-7f3a")
+	f.add(40)
+	c := newCloud()
+	h := newHarness(t, f, c, filepath.Join(dir, "upload"))
+	h.step(t)
+	if c.count() != 1 {
+		t.Fatal("no request")
+	}
+	if err := os.WriteFile(out, c.bodies[0], 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
