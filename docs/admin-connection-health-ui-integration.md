@@ -146,7 +146,7 @@ only on `/admin/health`.
 
 ## Not verified, and what the root still owes
 
-- **The charts (task 97be90e9) were not rendered in a browser by the task that drew them.** Owed by
+- **The charts were not rendered in a browser by the task that drew them.** Owed by
   the root: `VITE_ADMIN_HEALTH_FIXTURE=normal|partial|errors|empty|service` (command above), each
   of `/admin/health`, `/machines`, `/machines/fixture_mac_b` (two boots, a late record, clocks
   stepping back), `/services` (stage bars, bottleneck, source selector), `/trace/fixture-trace-1`,

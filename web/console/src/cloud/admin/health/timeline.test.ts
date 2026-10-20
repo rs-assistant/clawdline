@@ -4,6 +4,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import type { Coverage, StoredEvent, StoredGroup, StoredSource } from "./stored.ts"
+import type { PanelQuality } from "./timeline.ts"
 // @ts-expect-error -- a `.ts` path, for node.
 import { axisOf, bottleneck, eventLanes, filterLoaded, groupLanes, problems, qualitySummary, seqLanes, sourceMarks, stageMatrix, traceLanes, windowBands } from "./timeline.ts"
 
@@ -110,7 +111,7 @@ test("empty reads draw nothing and claim nothing", () => {
 })
 
 test("the overall quality is the weakest read's, and a failed or stale read caps it at partial", () => {
-  const q = (parts: { quality: string; stale?: boolean }[]) => qualitySummary(parts.map((p, i) => ({ part: `p${i}`, quality: p.quality, stale: p.stale ?? false, reason: null })), null).overall
+  const q = (parts: { quality: PanelQuality["quality"]; stale?: boolean }[]) => qualitySummary(parts.map((p, i) => ({ part: `p${i}`, quality: p.quality, stale: p.stale ?? false, reason: null })), null).overall
   assert.equal(q([{ quality: "complete" }, { quality: "complete" }]), "complete")
   assert.equal(q([{ quality: "complete" }, { quality: "partial" }]), "partial")
   assert.equal(q([{ quality: "complete" }, { quality: "failed" }]), "partial")
