@@ -158,7 +158,7 @@ each read's own quality is listed. It never says more than "only what these read
 
 ## Trends (M01, M03, M06): the Cloud's minute rollups
 
-Private contract §15 (Cloud commit `13e7387`, task 6c4160de), `GET {api}/su/v1/health/aggregates`.
+Private contract §15 (Cloud commit `13e7387`), `GET {api}/su/v1/health/aggregates`.
 "Raw records (24 h)" and "Trends (up to 30 days)" are two views of the same screen; the trend
 view **replaces** the screen's raw reads, so a load is still at most three reads, two in flight,
 under the same deadlines and budget — never a fourth read. Each range asks for the only bucket
