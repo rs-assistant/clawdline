@@ -38,7 +38,7 @@ import { setAccountMachines, setAccountRosterStatus, setMachineForgetting, setMa
 import { setMachineManager } from "./machine-manager.js"
 import { setOwnerDiagnosticsSource } from "./health-owner/source.js"
 import { ownerDiagnostics } from "./health-owner/client.js"
-import { dropPendingIdentityPairing, forgetHandovers, handover, heldMasterKeyFor, takeIdentityPairing } from "./health-owner/handover.js"
+import { forgetHandovers, handover, heldMasterKeyFor, watchIdentityPairing, type HandoverSession } from "./health-owner/handover.js"
 import { IdentityHandoverDialog } from "./health-owner/IdentityHandoverDialog.js"
 import { VIEWER_HEALTH_BUILD_FLAG, ViewerHealthLifecycle } from "../health-viewer/lifecycle.js"
 import { machinePaired } from "./pairing-completion.js"
@@ -314,6 +314,9 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         : { at: "checking" },
   )
   const [who, setWho] = useState<{ account: string; device: string } | null>(null)
+  // The account this page is signed in to, connected or still on the pairing screen; kept through
+  // a reconnect's "checking" so a handover in flight is not stopped by a redraw.
+  const [handoverAccount, setHandoverAccount] = useState<string | null>(null)
   const [managingMachines, setManagingMachines] = useState(false)
   const [machineList, setMachineList] = useState<MachineListState>({ phase: "loading" })
   const machines = machineList.phase === "ready" ? machineList.machines : null
@@ -550,31 +553,18 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     })
   }, [transport, who?.account, screen.at, chosen?.id])
   useEffect(() => () => viewerHealth.current?.stop(), [])
-  // A machine's `#pairid=` link runs the identity handover once this page is signed in; the link
-  // waits in this tab's session storage through a sign-in. Another account, or none, stops a run.
+  // A machine's `#pairid=` link runs the identity handover once this page is signed in — on the
+  // console or on the pairing screen, since signing in already registered this browser's device
+  // key. The link waits in this tab's session storage through a sign-in; another account, or
+  // none, stops a run. The handover gives a diagnostics key only, never relay access.
   useEffect(() => {
-    if (transport.kind !== "cloud" || !who?.account) return
-    const apiOrigin = transport.config.apiOrigin
-    const account = who.account
-    type Signer = { account?: string | null; deviceID?: string | null; devicePublicKey?: Uint8Array | null }
-    const take = () => {
-      const signer = session.current as unknown as Signer | null
-      if (!signer?.deviceID || !signer.devicePublicKey || signer.account !== account) return
-      const fragment = takeIdentityPairing(window)
-      if (!fragment) return
-      dropPendingIdentityPairing(window)
-      void handover.run(fragment, {
-        apiOrigin, fetch: (input, init) => fetch(input, init), accountID: account, deviceID: signer.deviceID,
-        signingPublicKey: signer.devicePublicKey, currentAccount: () => session.current?.account ?? null,
-      })
-    }
-    take()
-    window.addEventListener("hashchange", take)
-    return () => {
-      window.removeEventListener("hashchange", take)
-      handover.stop()
-    }
-  }, [transport, who?.account])
+    if (transport.kind !== "cloud" || !handoverAccount) return
+    return watchIdentityPairing(window, {
+      apiOrigin: transport.config.apiOrigin, account: handoverAccount,
+      session: () => session.current as unknown as HandoverSession | null,
+      fetch: (input, init) => fetch(input, init),
+    })
+  }, [transport, handoverAccount])
   const reader = useRef<RelayReader | null>(null)
   const unlisten = useRef<(() => void) | null>(null)
   const recheck = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1158,6 +1148,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           for (const listener of [...clientChanges.current]) listener()
           setClientEpoch((epoch) => epoch + 1)
           setWho({ account: next.account ?? "", device: next.deviceID ?? "" })
+          setHandoverAccount(next.account || null)
           // The Devices page reads the account's machines through this, and
           // says so under its heading. It is the client at the moment of the
           // call rather than this one, because a renewal replaces it
@@ -1230,11 +1221,13 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         }
         case "sign_in":
           handover.stop()
+          setHandoverAccount(null)
           ownerDiagnostics.clear("sign_out")
           setScreen({ at: "sign_in", url: update.url })
           return
         case "pairing_required":
           setScreen({ at: "pairing", account: update.accountID })
+          setHandoverAccount(update.accountID || null)
           if (transport.kind === "cloud") {
             readAccountRoster(transport.config.apiOrigin)
           }
@@ -1265,6 +1258,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
           // A revoked device keeps no diagnostics authority: the handover in flight stops, opened
           // plaintext is dropped, and this account's handover keys are deleted from this browser.
           handover.stop()
+          setHandoverAccount(null)
           viewerHealth.current?.stop("session_gone")
           ownerDiagnostics.clear("revoked")
           const revokedAccount = session.current?.account
@@ -1925,7 +1919,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [fleetScope, fleetTarget && destinationKey(fleetTarget), fleetProjectionRevision])
   return (
     <>
-      <IdentityHandoverDialog />
+      <IdentityHandoverDialog relay={screen.at === "pairing" ? "pairing_required" : "connected"} />
       {words && who && transport.kind === "cloud" ? <SurveyCoordinator key={who.account}
         account={{ id: who.account, apiOrigin: transport.config.apiOrigin }}
         eligible={!pairing && !asking && !naming && (screen.at === "machines" || screen.at === "console")}
@@ -2115,7 +2109,6 @@ function GateCard(props: {
   return (
     <div className="door" data-step="cloud" data-cloud-screen={open}
       data-pair-console={pairing && screen.at === "console" ? "true" : undefined}>
-      <IdentityHandoverDialog />
       <div
         className="door-card"
         ref={card}

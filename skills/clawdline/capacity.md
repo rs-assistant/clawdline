@@ -173,6 +173,8 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `console.machine_list_poll_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
 | `console.opened_row_quiet_seconds` | 8 | `seconds` | `expire` | `diagnostics` | — |
 | `console.opened_row_restate_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
+| `console.owner_retention_poll_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
+| `console.owner_retention_request_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
 | `console.persona_retry_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
 | `console.pinned_list_read_timeout_seconds` | 10 | `seconds` | `expire` | `diagnostics` | — |
 | `console.relay_feature_wait_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |

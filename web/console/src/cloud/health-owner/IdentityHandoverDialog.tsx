@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from "react"
 import { nextWord, type NextWord } from "../../next-strings.js"
-import { handover, type HandoverController } from "./handover.js"
+import { handover, handoverDoneWord, type HandoverController, type RelayAccess } from "./handover.js"
 import "../../pages/devices/account-machines.css"
 import "./handover.css"
 
@@ -26,7 +26,8 @@ function grouped(code: string): string {
   return code.length === 6 ? code.slice(0, 3) + " " + code.slice(3) : code
 }
 
-export function IdentityHandoverDialog({ controller = handover }: { controller?: HandoverController }) {
+export function IdentityHandoverDialog({ controller = handover, relay = "connected" }:
+  { controller?: HandoverController; relay?: RelayAccess }) {
   const state = useSyncExternalStore((l) => controller.watch(l), () => controller.state(), () => controller.state())
   const box = useRef<HTMLDivElement | null>(null)
   const open = state.phase !== "idle"
@@ -69,7 +70,7 @@ export function IdentityHandoverDialog({ controller = handover }: { controller?:
             </>
           ) : state.phase === "done" ? (
             <>
-              <p className="am-say" role="status">{nextWord("handoverDone", { epoch: state.contentKeyEpoch })}</p>
+              <p className="am-say" role="status">{nextWord(handoverDoneWord(relay), { epoch: state.contentKeyEpoch })}</p>
               <div className="am-pair-buttons">
                 <button type="button" className="am-primary" onClick={close}>{nextWord("handoverClose")}</button>
               </div>

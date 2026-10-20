@@ -112,6 +112,88 @@ export function dropPendingIdentityPairing(scope: Pick<FragmentScope, "sessionSt
   try { scope.sessionStorage.removeItem(PENDING_KEY) } catch { /* nothing kept */ }
 }
 
+// MARK: who may run it
+
+/** The little of the Cloud session a handover signs with. */
+export interface HandoverSession {
+  account?: string | null
+  deviceID?: string | null
+  devicePublicKey?: Uint8Array | null
+}
+
+/**
+ * Whether this browser can read the machine's Sessions over the relay, said apart from the
+ * diagnostics key: `connected` is a page past the pairing screen, `pairing_required` one that is
+ * signed in and registered as a device but holds no relay pairing. The handover never changes it.
+ */
+export type RelayAccess = "connected" | "pairing_required"
+
+/**
+ * The words a finished handover says. The diagnostics key and the relay pairing are two
+ * capabilities: a browser still on the pairing screen is told the key opens diagnostics only and
+ * what reading Sessions still needs, never that it is now paired.
+ */
+export function handoverDoneWord(relay: RelayAccess): "handoverDone" | "handoverDoneRelayNeeded" {
+  return relay === "pairing_required" ? "handoverDoneRelayNeeded" : "handoverDone"
+}
+
+/**
+ * The device a `#pairid=` run may sign as, or null. Signing in registers the device and its key
+ * before any relay pairing exists (`cloud-boot.js` `ensureSession`), so a browser that never took
+ * a `#pair=` link qualifies on the pairing screen too. The session must be the same account the
+ * page is signed in to; a different or missing one runs nothing.
+ */
+export function handoverSigner(session: HandoverSession | null, account: string | null):
+  { deviceID: string; signingPublicKey: Uint8Array } | null {
+  if (!account || !session || session.account !== account) return null
+  if (typeof session.deviceID !== "string" || !session.deviceID) return null
+  if (!(session.devicePublicKey instanceof Uint8Array) || session.devicePublicKey.length !== 32) return null
+  return { deviceID: session.deviceID, signingPublicKey: session.devicePublicKey }
+}
+
+interface WatchScope extends FragmentScope {
+  addEventListener(type: "hashchange", listener: () => void): void
+  removeEventListener(type: "hashchange", listener: () => void): void
+}
+
+export interface WatchContext {
+  apiOrigin: string
+  /** The account the page is signed in to, connected or on the pairing screen. */
+  account: string
+  session: () => HandoverSession | null
+  fetch: HandoverContext["fetch"]
+  controller?: HandoverController
+  indexedDB?: IDBFactory
+  pair?: HandoverContext["pair"]
+}
+
+/**
+ * Takes a `#pairid=` link from the address now and on every `hashchange`, and runs it as this
+ * page's signed-in device. The link stays in session storage until a signer exists, so it waits
+ * through a sign-in. The returned function stops a run in flight (sign-out, another account).
+ */
+export function watchIdentityPairing(scope: WatchScope, ctx: WatchContext): () => void {
+  const controller = ctx.controller ?? handover
+  const take = () => {
+    const signer = handoverSigner(ctx.session(), ctx.account)
+    if (!signer) return
+    const fragment = takeIdentityPairing(scope)
+    if (!fragment) return
+    dropPendingIdentityPairing(scope)
+    void controller.run(fragment, {
+      apiOrigin: ctx.apiOrigin, fetch: ctx.fetch, accountID: ctx.account, deviceID: signer.deviceID,
+      signingPublicKey: signer.signingPublicKey, currentAccount: () => ctx.session()?.account ?? null,
+      indexedDB: ctx.indexedDB, pair: ctx.pair,
+    })
+  }
+  take()
+  scope.addEventListener("hashchange", take)
+  return () => {
+    scope.removeEventListener("hashchange", take)
+    controller.stop()
+  }
+}
+
 // MARK: the run
 
 export type HandoverState =

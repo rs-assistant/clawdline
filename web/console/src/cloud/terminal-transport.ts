@@ -3,6 +3,9 @@ import type { TerminalFrame } from "@clawdline/contract"
 import type { TerminalObservation } from "./terminal-observation.js"
 // @ts-expect-error -- a `.ts` path, so Node's strip-types runner can load this file in its suite.
 import { DirectLink, browserDirectPeers, directAttemptRecorder, sealDirectOffer, type DirectPeerFactory } from "./terminal-direct.ts"
+import { viewerHealthBegin, viewerHealthFailed } from "../legacy/js/net/viewer-health-hook.js"
+// @ts-expect-error -- a `.ts` path, so Node's strip-types runner can load this file in its suite.
+import { TERMINAL_DELIBERATE_CLOSE, directCarrierHealthError } from "../health-viewer/direct-words.ts"
 
 export interface TerminalEnvelope {
   v: number; ch: string; seq: number; ts: number; class: string; key_id: string
@@ -293,35 +296,70 @@ export class TerminalChannelTransport {
       return carrier && carrier.current() === link ? carrier : null
     }
     const record = directAttemptRecorder(this.client, this.machine)
+    // This page's connection health: a terminal negotiating its own channel is the same carrier
+    // replacement a Session read's negotiation is (`cloud/direct-carrier.ts`), under its own
+    // random correlation and never the connection id, the SDP or the machine's answer. The span
+    // settles once; recording is synchronous and an observer that throws stays its own failure.
+    const health = viewerHealthBegin("viewer_carrier_replace", "transport")
+    let opened = false
+    // Once the page's carrier adopted the link its loss is that carrier's to record (`dropped`):
+    // by the time a closed link calls back, `current()` no longer names it.
+    let adopted = false
+    // The code the link itself closed with, which names a failed negotiation better than
+    // whatever the peer threw (a platform DOMException carries a number).
+    let downCode: string | null = null
     const link: DirectLink = new DirectLink(this.peers, (envelope) => {
       const carrier = held()
       if (carrier) carrier.receive(envelope)
       else this.receiveDirect(link, envelope)
     }, (code) => {
       const carrier = this.shared
+      downCode ??= code
       if (this.ownLink === link) this.ownLink = null
+      // A channel this transport still holds, which had opened and was not closed on purpose,
+      // stopped carrying: recorded here, since no carrier will.
+      if (opened && !adopted && !TERMINAL_DELIBERATE_CLOSE.has(code)) {
+        viewerHealthFailed("viewer_carrier_replace", directCarrierHealthError(code), { class: "transport" })
+      }
       if (carrier) carrier.dropped(link, code)
       this.observation?.record("direct_down", { connection, code })
       onDown(code)
     }, record ? { attempt: connection, kind: "terminal", report: record } : null)
     this.ownLink = link
+    const failed = (error: unknown) => {
+      const code = downCode ?? (error as { code?: unknown })?.code
+      health.fail(directCarrierHealthError(typeof code === "string" ? code : "carrier_failed"))
+    }
     try {
       const sealed = await sealDirectOffer(state.key, connection, await link.offer())
       return {
         sealed, get open() { return link.open },
         answer: async (sdp: string) => {
-          await link.answer(sdp)
+          try {
+            await link.answer(sdp)
+          } catch (error) {
+            failed(error)
+            throw error
+          }
+          if (!link.open) health.fail(directCarrierHealthError("carrier_not_open"))
+          else { opened = true; health.complete("ok") }
           // The channel this terminal just negotiated becomes the page's shared carrier, so a
           // Session read that follows takes it too. The machine's `direct_offer` answer always
           // offers receipts on it (`internal/transport/cloud/direct.go`).
-          if (link.open && shared) { shared.adopt(link, true); this.ownLink = null; this.listenShared(shared) }
+          if (link.open && shared) { adopted = true; shared.adopt(link, true); this.ownLink = null; this.listenShared(shared) }
         },
         // A terminal that handed this link to the page's carrier is no longer the
         // one that may close it: the reads are using it. Releasing the terminal
-        // only releases the terminal.
-        close: () => { if (!held()) link.close("terminal_direct_released") },
+        // only releases the terminal. Released before the machine's answer was applied — its
+        // `direct_offer` was refused, timed out or went stale — the negotiation is abandoned:
+        // this file cannot tell which, so it says aborted rather than guess a failure word.
+        close: () => {
+          health.complete("aborted")
+          if (!held()) link.close("terminal_direct_released")
+        },
       }
     } catch (error) {
+      failed(error)
       link.close("terminal_direct_failed")
       throw error
     }

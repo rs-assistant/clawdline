@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8074,
-  "riskKeys": 3592,
-  "nonRiskCount": 4482,
+  "englishContentKeys": 8095,
+  "riskKeys": 3609,
+  "nonRiskCount": 4486,
   "groups": [
     {
       "name": "admin / other",
@@ -275,7 +275,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 238,
+      "count": 239,
       "sources": [
         null
       ],
@@ -385,6 +385,7 @@
         "capacityRow.console.health_ui_request_seconds.what",
         "capacityRow.console.machine_list_poll_seconds.full",
         "capacityRow.console.opened_row_quiet_seconds.what",
+        "capacityRow.console.owner_retention_request_seconds.what",
         "capacityRow.console.persona_retry_seconds.full",
         "capacityRow.console.relay_transcript_expect_reask_seconds.what",
         "capacityRow.console.status_marker_recovery_wait_seconds.what",
@@ -2976,7 +2977,7 @@
     },
     {
       "name": "next / other",
-      "count": 346,
+      "count": 349,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3152,6 +3153,9 @@
         "next.ownerDiagStateLive",
         "next.ownerDiagTab",
         "next.ownerDiagYes",
+        "next.ownerRetentionHead",
+        "next.ownerRetentionLabel",
+        "next.ownerRetentionLocal",
         "next.proposalResolveEvidence",
         "next.proposalResolveSubmit",
         "next.providerWork",
