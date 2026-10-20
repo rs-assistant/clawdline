@@ -1222,10 +1222,13 @@ func (l *Link) lanePhase(request Inbound, class connectionhealth.Class, location
 }
 
 // answerTraced is answer, moving h to the handler as it starts and ending
-// it with the answer's outcome. The answer's own sealing and spooling happen
-// inside Service.Answer and are not separate stages yet.
+// it with the answer's outcome. The answer's sealing and spooling inside
+// Service.Answer are phases of their own (Relay.PublishTracked) under the
+// same correlation, which the context hands them; the handler's phase still
+// ends only when Answer returns.
 func (l *Link) answerTraced(ctx context.Context, service Service, request Inbound, h connectionhealth.Handle, location string) {
 	_ = h.Step(connectionhealth.StageHandlerStarted, location)
+	ctx = connectionhealth.WithCorrelation(ctx, l.opts.Health, h.Correlation())
 	ok := false
 	defer func() { h.End(ok) }()
 	ok = l.answer(ctx, service, request)

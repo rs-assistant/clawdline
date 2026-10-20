@@ -973,11 +973,11 @@ func (t *Transport) drain(conn *Conn, done <-chan struct{}, reconnect bool) {
 	if reconnect {
 		pass := t.drainPass()
 		for _, seq := range t.opts.Spool.InFlight() {
-			sealed, err := t.opts.Spool.Resend(seq)
+			sealed, correlation, err := t.opts.Spool.ResendCorrelated(seq)
 			if err != nil {
 				continue
 			}
-			if err := conn.WriteText(PublishFrame(sealed), t.opts.Now().Add(OpeningTimeout)); err != nil {
+			if err := conn.WriteTextTraced(PublishFrame(sealed), t.opts.Now().Add(OpeningTimeout), correlation); err != nil {
 				t.logf("cloud re-send failed seq=%d reason=%s", seq, FailureCode(err))
 				pass.End(false)
 				return
@@ -1022,7 +1022,7 @@ func (t *Transport) drainOnce(conn *Conn) bool {
 		if disposition.Row == nil {
 			break
 		}
-		if err := conn.WriteText(PublishFrame(disposition.Row.Sealed), t.opts.Now().Add(OpeningTimeout)); err != nil {
+		if err := conn.WriteTextTraced(PublishFrame(disposition.Row.Sealed), t.opts.Now().Add(OpeningTimeout), disposition.Row.Correlation); err != nil {
 			// The row stays `sent`. Whether those bytes reached the relay
 			// is unknown, and only the attempt window decides.
 			t.logf("cloud publish failed seq=%d reason=%s", disposition.Row.Seq, FailureCode(err))
