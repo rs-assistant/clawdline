@@ -737,6 +737,10 @@ export default function App({ aside, cloudSessions, cloudPeerAccess, fleetList, 
   useEffect(() => {
     const onPop = (event: PopStateEvent) => {
       if (!phone()) return
+      // A fragment navigation fires popstate before hashchange. The address
+      // already names the document while pageRef still names the Session;
+      // closing it here would replace that address with the Session list.
+      if (hasDocumentIntent(location.hash)) return
       // A document link from the attention card adds a browser history step.
       // Its back gesture returns to the still-open Session, not its list,
       // regardless of whether popstate or hashchange reaches us first.
