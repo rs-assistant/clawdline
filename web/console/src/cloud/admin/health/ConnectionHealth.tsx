@@ -10,7 +10,8 @@ import "./health.css"
 import { healthWords, type HealthLocale, type HealthWord } from "./words"
 import { HEALTH_UI_LIMITS, type Refusal } from "./cloud"
 import { useStored } from "./useStored"
-import { healthHref, STORED_WINDOWS_S, TREND_RANGE_WORDS, type HealthRoute, type HealthScope, type HealthScreen, type TrendRangeWord } from "./route"
+import { ProbeScreen } from "./probe-view"
+import { healthHref, isProbeView, STORED_WINDOWS_S, TREND_RANGE_WORDS, type HealthRoute, type HealthScope, type HealthScreen, type TrendRangeWord } from "./route"
 import { TrendScreen } from "./trend-view"
 import { exactUTC, StoredScreen, type StoredNav } from "./stored-screens"
 
@@ -40,7 +41,9 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
   const scope = route.scope
   const nav: StoredNav = useMemo(() => ({ href: (s: HealthScreen) => healthHref(s, scope), go: (s: HealthScreen) => go(healthHref(s, scope)) }), [go, scope])
   const setScope = (next: Partial<HealthScope>) => go(healthHref(route, { ...scope, ...next }))
-  const trendable = route.screen === "M01" || route.screen === "M03" || route.screen === "M06"
+  // The probe subview reads latest evidence only: no window, trend or account control applies.
+  const probes = isProbeView(route)
+  const trendable = !probes && (route.screen === "M01" || route.screen === "M03" || route.screen === "M06")
   const trend = trendable ? route.trend ?? null : null
   const trendMachine = trendable ? route.trendMachine ?? null : null
   // The trend range is part of the address: a change is a new query, chart and history entry.
@@ -71,12 +74,19 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
         <p className="adm-sub">{say(`lead_${route.screen}` as HealthWord)}</p>
       </header>
 
-      {trendable ? (
+      {trendable || probes ? (
         <nav className="adh-switch adh-view-switch" aria-label={say("tr_viewLabel")}>
-          <a className="adh-switch-btn" aria-current={trend === null ? "page" : undefined} href={healthHref({ ...route, trend: null, trendMachine: null } as HealthScreen, scope)}
-            onClick={(e) => { if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); setTrend(null) } }}>{say("tr_viewRaw")}</a>
-          <a className="adh-switch-btn" aria-current={trend !== null ? "page" : undefined} href={healthHref({ ...route, trend: trend ?? "30d" } as HealthScreen, scope)}
-            onClick={(e) => { if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); setTrend(trend ?? "30d") } }}>{say("tr_viewTrend")}</a>
+          {([
+            ["raw", !probes && trend === null, probes ? { screen: "M06" } : { ...route, trend: null, trendMachine: null }, "tr_viewRaw"],
+            ["trend", !probes && trend !== null, probes ? { screen: "M06", trend: "30d" } : { ...route, trend: trend ?? "30d" }, "tr_viewTrend"],
+            ...(route.screen === "M06" ? [["probes", probes, { screen: "M06", probes: true }, "pr_view"]] : []),
+          ] as [string, boolean, HealthScreen, HealthWord][]).map(([k, on, target, label]) => {
+            const href = healthHref(target, scope)
+            return (
+              <a key={k} className="adh-switch-btn" aria-current={on ? "page" : undefined} href={href}
+                onClick={(e) => { if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) { e.preventDefault(); go(href) } }}>{say(label)}</a>
+            )
+          })}
         </nav>
       ) : null}
       <div className="adh-controls">
@@ -90,7 +100,7 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
               </label>
             ))}
           </fieldset>
-        ) : (
+        ) : probes ? null : (
         <fieldset className="adh-control adh-windows">
           <legend>{say("windowLabel")}</legend>
           {STORED_WINDOWS_S.map((w) => (
@@ -118,10 +128,12 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
       {scope.account !== null ? (
         <p className="adm-fine">{say("st_accountFilter", { account: scope.account })} <a className="adh-link" href={healthHref(route, { ...scope, account: null })} onClick={(e) => { e.preventDefault(); setScope({ account: null }) }}>{say("st_clearFilter")}</a></p>
       ) : null}
-      <p className="adm-fine">
+      {probes ? (
+        <p className="adm-fine">{scope.until === null ? say("st_liveEvery", { s: HEALTH_UI_LIMITS.refreshMs / 1000 }) : null}</p>
+      ) : <p className="adm-fine">
         {state.window ? say("st_window", { from: exactUTC(state.window.from), to: exactUTC(state.window.to) }) : null}
         {" "}{scope.until === null ? say("st_liveEvery", { s: HEALTH_UI_LIMITS.refreshMs / 1000 }) : say("st_pinned")}
-      </p>
+      </p>}
 
       {state.status === "loading" ? (
         <div className="adm-skeleton" aria-busy="true">
@@ -148,7 +160,7 @@ export function ConnectionHealth({ route, go, apiOrigin, get, fixture, onRefused
           </div>
         </div>
       ) : (
-        trend !== null ? <TrendScreen state={state} route={route} say={say} go={go} /> : <StoredScreen state={state} route={route} say={say} nav={nav} fixture={fixture} loadOlder={loadOlder} actions={actions} />
+        probes ? <ProbeScreen state={state} route={route} say={say} /> : trend !== null ? <TrendScreen state={state} route={route} say={say} go={go} /> : <StoredScreen state={state} route={route} say={say} nav={nav} fixture={fixture} loadOlder={loadOlder} actions={actions} />
       )}
     </div>
   )

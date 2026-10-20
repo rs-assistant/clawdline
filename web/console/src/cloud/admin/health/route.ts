@@ -38,7 +38,8 @@ export type HealthScreen =
   | { screen: "M04"; trace: string }
   /** `revision` absent or null is the latest; a number is that immutable revision. */
   | { screen: "M05"; incident: string | null; revision?: number | null }
-  | ({ screen: "M06" } & TrendView)
+  /** `probes`: the independent-probe subview, which reads the latest retained probe evidence. */
+  | ({ screen: "M06"; probes?: boolean } & TrendView)
   | { screen: "evidence"; trace: string | null }
 
 /** The time scope. `until` null is live (the window ends at each load); a value pins it. */
@@ -111,6 +112,8 @@ function screenQuery(screen: HealthScreen, search: string): HealthScreen {
     if (sourceId !== null && SOURCE_ID.test(sourceId)) out.sourceId = sourceId
     return trend(out)
   }
+  // The probe read takes no parameters, so the subview carries no trend, window or account.
+  if (screen.screen === "M06" && q.get("view") === "probes") return { screen: "M06", probes: true }
   if (screen.screen === "M01" || screen.screen === "M06") return trend({ screen: screen.screen })
   if (screen.screen === "M05" && screen.incident !== null) {
     const raw = q.get("revision")
@@ -122,7 +125,16 @@ function screenQuery(screen: HealthScreen, search: string): HealthScreen {
 
 export function healthRoute(pathname: string, search: string, now?: number): HealthRoute | null {
   const screen = healthScreen(pathname)
-  return screen === null ? null : { ...screenQuery(screen, search), scope: healthScope(search, now) }
+  if (screen === null) return null
+  const s = screenQuery(screen, search)
+  const scope = healthScope(search, now)
+  // Only the pause survives into the probe subview: it stops refreshing, nothing more.
+  return isProbeView(s) ? { ...s, scope: { window_s: DEFAULT_WINDOW_S, until: scope.until, account: null } } : { ...s, scope }
+}
+
+/** The independent-probe subview of M06. */
+export function isProbeView(screen: HealthScreen): boolean {
+  return screen.screen === "M06" && screen.probes === true
 }
 
 /** The address for a screen in a scope. Only non-default scope values are written. */
@@ -139,6 +151,12 @@ export function healthHref(screen: HealthScreen, scope: HealthScope): string {
     case "evidence": path = screen.trace === null ? `${HEALTH_BASE}/evidence` : `${HEALTH_BASE}/evidence/${e(screen.trace)}`; break
   }
   const q = new URLSearchParams()
+  if (isProbeView(screen)) {
+    // The Cloud's probe read honours no window, pin or account; only the pause is kept.
+    q.set("view", "probes")
+    if (scope.until !== null) q.set("until", scope.until)
+    return `${path}?${q.toString()}`
+  }
   if (scope.window_s !== DEFAULT_WINDOW_S) q.set("window", String(scope.window_s))
   if (scope.until !== null) q.set("until", scope.until)
   if (scope.account !== null) q.set("account", scope.account)
@@ -162,7 +180,7 @@ export function windowBounds(scope: HealthScope, now: number): { from: string; t
 /** Two routes ask for the same evidence when screen, ids and scope agree. */
 export function routeKey(r: HealthRoute): string {
   const trend = r.screen === "M01" || r.screen === "M03" || r.screen === "M06" ? `${r.trend ?? ""}/${r.trend ? (r.trendMachine ?? "") : ""}` : ""
-  const id = r.screen === "M01" || r.screen === "M06" ? trend
+  const id = r.screen === "M06" && r.probes ? "probes" : r.screen === "M01" || r.screen === "M06" ? trend
     : r.screen === "M02" ? r.machine
     : r.screen === "M03" ? `${r.source ?? ""}/${r.sourceId ?? ""}/${trend}`
     : r.screen === "M04" ? r.trace

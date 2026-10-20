@@ -14,9 +14,15 @@
  * refused day and dropped cells; `errors` answers `503 health_store_unavailable`; `rollups_off`
  * is a Cloud with rollups turned off (`aggregates.minute: unsupported`). `many_incidents` adds 124
  * closed list rows (ids `hi_f2…`, list only: opening one answers 404) so the incident list pages by
- * the Cloud's cursor, which is bound to the window like the real one. */
+ * the Cloud's cursor, which is bound to the window like the real one.
+ * Independent probes (`probes`, Cloud cb153af contract §17.4): `normal` holds a declared-separate
+ * host with a current 2xx and a current timeout, a same-fault-domain host whose spool replayed an
+ * old observation and reported loss, a stale target, and a registered host that never reported;
+ * `partial` is scan-capped (counts are floors, loss unknown) with an observation dated after the
+ * read; `empty` is probing off (no host registered); `probes_silent` is a registered host that has
+ * sent nothing; `errors` answers `503 health_store_unavailable`. */
 
-export const FIXTURE_SCENARIOS = ["normal", "partial", "errors", "empty", "slow", "signed_out", "forbidden", "service", "incidents_disabled", "audit_fail", "tampered", "rollups_off", "many_incidents"] as const
+export const FIXTURE_SCENARIOS = ["normal", "partial", "errors", "empty", "slow", "signed_out", "forbidden", "service", "incidents_disabled", "audit_fail", "tampered", "rollups_off", "many_incidents", "probes_silent"] as const
 export type FixtureScenario = (typeof FIXTURE_SCENARIOS)[number]
 
 const MAC_A = "fixture_mac_a"
@@ -268,6 +274,73 @@ function aggregatesAnswer(scenario: FixtureScenario, q: URLSearchParams, now: nu
   })
 }
 
+/* ---- independent probes: the shape of `GET /su/v1/health/probes` (Cloud cb153af, §17.4) ---- */
+
+const PROBE_NOT_PROVEN = ["application_handler", "viewer_apply", "account_health", "dns_phase", "tls_phase"]
+const PROBE_FRESH_MS = 600_000
+
+function probeTarget(now: number, o: { host: string; target: string; stage: "probe_api_readiness" | "probe_relay_reachability"; viewpoint: string; independence: string; event: "probe_completed" | "probe_failed"; outcome: string; http: string | null; receivedAgo: number; observedAgo: number; results: number; failures: number; skipped: number; floor: boolean }): Row {
+  const fresh = o.receivedAgo <= PROBE_FRESH_MS && o.observedAgo >= 0 && o.observedAgo <= PROBE_FRESH_MS
+  return {
+    producer_instance: o.host, target_id: o.target, stage: o.stage, viewpoint: o.viewpoint, independence: o.independence,
+    independence_basis: "operator_declared_unverified",
+    latest_result: {
+      event: o.event, target_id: o.target, viewpoint: o.viewpoint, independence: o.independence, outcome: o.outcome, http_class: o.http,
+      elapsed_ms: o.outcome === "timeout" ? 5_000 : 48, dns_phase: "unknown", tls_phase: "unknown",
+      wall: new Date(now - o.observedAgo).toISOString(), received_at: new Date(now - o.receivedAgo).toISOString(),
+    },
+    evidence_age_ms: o.receivedAgo, observation_age_ms: o.observedAgo, observation_clock: "producer_wall_unverified",
+    freshness: fresh ? "fresh" : "stale",
+    status: !fresh ? "unknown" : o.event === "probe_completed" ? "answered_2xx" : o.outcome,
+    proves: o.stage === "probe_api_readiness" ? "api_readiness_route_answered_from_viewpoint" : "relay_health_route_answered_from_viewpoint",
+    does_not_prove: PROBE_NOT_PROVEN,
+    results_in_window: o.results, failures_in_window: o.failures, overlaps_skipped_in_window: o.skipped, counts_are_floor: o.floor,
+  }
+}
+
+function probeHost(now: number, instance: string, viewpoint: string, ago: number | null, loss: Row | null): Row {
+  return {
+    producer_instance: instance, registered: true, registered_viewpoint: viewpoint,
+    last_received_at: ago === null ? null : new Date(now - ago).toISOString(), last_receipt_age_ms: ago,
+    freshness: ago === null ? "missing" : ago <= PROBE_FRESH_MS ? "fresh" : "stale",
+    status: ago !== null && ago <= PROBE_FRESH_MS ? "reporting" : "unknown", producer_reported_loss: loss,
+  }
+}
+
+function probesAnswer(scenario: FixtureScenario, now: number): Response {
+  if (scenario === "errors") return refusal(503, "health_store_unavailable")
+  const off = scenario === "empty"
+  const silent = scenario === "probes_silent"
+  const capped = scenario === "partial"
+  const none = { spool_dropped: 0, spool_expired: 0, upload_rejected: 0 }
+  const hosts = off ? [] : silent ? [probeHost(now, "fixture_probe_a", "fixture_vp_separate", null, none)] : [
+    probeHost(now, "fixture_probe_a", "fixture_vp_separate", 40_000, capped ? null : none),
+    probeHost(now, "fixture_probe_b", "fixture_vp_shared", 90_000, capped ? null : { spool_dropped: 3, spool_expired: 0, upload_rejected: 1 }),
+    probeHost(now, "fixture_probe_c", "fixture_vp_spare", null, capped ? null : none),
+  ]
+  const A = { host: "fixture_probe_a", viewpoint: "fixture_vp_separate", independence: "declared_separate", floor: capped }
+  const B = { host: "fixture_probe_b", viewpoint: "fixture_vp_shared", independence: "same_fault_domain", floor: capped }
+  const targets = off || silent ? [] : [
+    probeTarget(now, { ...A, target: "fixture_api", stage: "probe_api_readiness", event: "probe_completed", outcome: "ok", http: "2xx", receivedAgo: 40_000, observedAgo: 41_000, results: 1_380, failures: 2, skipped: 1 }),
+    probeTarget(now, { ...A, target: "fixture_relay", stage: "probe_relay_reachability", event: "probe_failed", outcome: "timeout", http: null, receivedAgo: 40_000, observedAgo: 41_000, results: 1_380, failures: 17, skipped: 0 }),
+    probeTarget(now, { ...B, target: "fixture_api", stage: "probe_api_readiness", event: "probe_completed", outcome: "ok", http: "2xx", receivedAgo: 90_000, observedAgo: 2_400_000, results: 610, failures: 0, skipped: 4 }),
+    probeTarget(now, { ...B, target: "fixture_relay", stage: "probe_relay_reachability", event: "probe_failed", outcome: "http_error", http: "5xx", receivedAgo: 3_600_000, observedAgo: 3_601_000, results: 604, failures: 31, skipped: 0 }),
+    ...(capped ? [probeTarget(now, { ...A, target: "fixture_clock", stage: "probe_api_readiness", event: "probe_completed", outcome: "ok", http: "2xx", receivedAgo: 30_000, observedAgo: -120_000, results: 12, failures: 0, skipped: 0 })] : []),
+  ]
+  const coverage = off ? "unsupported" : "service_scope"
+  const quality = off ? "unsupported" : silent ? "not_collected" : "partial"
+  return json(200, {
+    ...envelope(now, quality, {
+      window: { from: new Date(now - 86_400_000).toISOString(), to: new Date(now).toISOString() },
+      partial_reason: off || silent ? null : capped ? "scan_cap" : "producer_reported_loss",
+      probe: { schema: "clawdline.external-probe.record/1", fresh_within_ms: PROBE_FRESH_MS, registered_hosts: hosts.length, unsupported: ["target_registry", "dns_tls_phases", "independence_verification", "account_attribution"] },
+      hosts, targets,
+    }, null),
+    coverage: { retention_floor: new Date(now - 86_400_000).toISOString(), truncated: capped, sequence: "not_computed", sequence_reason: null, seq_ranges: null, gaps: null, dropped: null },
+    source_coverage: { daemon: "not_collected", relay_worker: "service_scope", relay_do: "service_scope", api: "service_scope", viewer: "unsupported", external_probe: coverage },
+  })
+}
+
 /** Answers one URL from the fixture. Exported for the module tests. */
 export async function fixtureAnswer(scenario: FixtureScenario, url: string, now: number, method = "GET"): Promise<Response> {
   if (scenario === "signed_out") return refusal(401, "unauthorized")
@@ -277,6 +350,7 @@ export async function fixtureAnswer(scenario: FixtureScenario, url: string, now:
   const q = u.searchParams
   const empty = scenario === "empty"
   if (path === "aggregates") return aggregatesAnswer(scenario, q, now)
+  if (path === "probes") return probesAnswer(scenario, now)
   if (path === "overview") {
     const all = empty ? [] : events(now, scenario)
     const by: Record<string, number> = {}

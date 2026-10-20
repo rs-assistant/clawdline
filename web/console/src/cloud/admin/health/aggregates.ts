@@ -51,10 +51,12 @@ export const DEFAULT_TREND: TrendRange = "30d"
 
 const BUCKETS = ["1m", "5m", "1h", "1d"] as const
 const BUCKET_MS: Record<(typeof BUCKETS)[number], number> = { "1m": 60_000, "5m": 300_000, "1h": 3_600_000, "1d": 86_400_000 }
-const SOURCES = ["daemon", "cloud_api", "relay", "viewer", "collector"] as const
+/** `external_probe`: service-scope probe outcomes (Cloud cb153af); their denominator stays unknown. */
+const SOURCES = ["daemon", "cloud_api", "relay", "viewer", "collector", "external_probe"] as const
 export const DENOMINATORS = ["unknown", "service_reported_operations", "viewer_reported_stage_ends"] as const
 export type Denominator = (typeof DENOMINATORS)[number]
-const CELL_OUTCOMES = ["ok", "error", "timeout", "refused", "zero_target", "threw", "pending", "aborted"] as const
+/** Service, viewer and external-probe outcomes (`http_error`, `network_error`, `skipped`: contract §17.2). */
+const CELL_OUTCOMES = ["ok", "error", "timeout", "refused", "zero_target", "threw", "pending", "aborted", "http_error", "network_error", "skipped"] as const
 export const VIEWER_ERRORS = [
   "network_unreachable", "http_4xx", "http_5xx", "auth_refused", "auth_revoked", "timeout", "sse_gap", "sse_resume_refused",
   "carrier_closed", "decrypt_failed", "apply_failed", "replay_rejected", "unclassified",
@@ -294,7 +296,8 @@ export type TrendLane = { key: string; series: AggSeries; slots: Slot[]; max: nu
 
 const STAGE_END = new Set(["stage_completed", "stage_failed", "viewer_stage_completed", "viewer_stage_failed"])
 const FAILED_EVENT = new Set(["stage_failed", "viewer_stage_failed"])
-const FAILED_OUTCOME = new Set(["error", "timeout", "refused", "threw", "aborted"])
+// A skipped probe check is not a failure: it never ran (contract §17.4).
+const FAILED_OUTCOME = new Set(["error", "timeout", "refused", "threw", "aborted", "http_error", "network_error"])
 
 function signalsOf(p: AggPoint): { signals: SlotSignal[]; failed: number; ops: { n: number; floor: boolean } | null } {
   const s = new Set<SlotSignal>()
