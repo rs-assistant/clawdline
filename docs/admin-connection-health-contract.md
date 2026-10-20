@@ -1,7 +1,9 @@
 # Connection health: evidence contract v1
 
 Status: 2026-10-20. The local evidence foundation in `internal/domain/connectionhealth` is
-implemented and tested; nothing in the daemon constructs it yet. The Cloud upload, ingest and
+implemented and tested, and the daemon now runs one runtime of it per boot, instruments the relay
+transport, the WebSocket writer and the link's lanes, and answers it on a local route and the
+`clawdline health` CLI. Everything is still memory only. The Cloud upload, ingest and
 query shapes below are a **proposal** to be unified by the root with the Cloud API work; no Cloud
 code reads or writes them. Product scope stays as `docs/admin-connection-health.md` states it
 (P0–P3, M01–M06); this page is only the wire and evidence contract under it.
@@ -14,13 +16,14 @@ code reads or writes them. Product scope stays as `docs/admin-connection-health.
 | Watchdog (reads atomics and its own clock only; queues transitions to one journal writer) | implemented | `watchdog.go` |
 | In-memory journal ring and query page | implemented | `journal.go` |
 | Segment truth table, stage progress, local export | implemented | `evidence.go` |
-| Capacity rows `cloud.health_*` | registered; measured as a known zero | `internal/domain/capacity/register_connection_health.go`, `internal/transport/http/capacity_measures_connection_health.go` |
-| Daemon call sites (frame read, verify, callback, admission, handler, spool, writer lock, socket write) | **not wired** | — |
+| One runtime per daemon boot (fresh random `boot_id`, build from the binary's commit), watchdog run for the daemon's lifetime, Cloud on or off | implemented; `CLAWDLINE_CONNECTION_HEALTH=off` turns it off | `runtime.go`, `cmd/clawdline/health.go` `startConnectionHealth` |
+| Capacity rows `cloud.health_*` | measured from the tracker snapshot, journal occupancy and transition queue; unmeasured with a reason when monitoring is off | `internal/transport/http/capacity_measures_connection_health.go` |
+| Daemon call sites | **partial**: see §4.1 for the exact list. Response sealing and the spool enqueue inside `internal/transport/cloud/relay.go` are **not wired**, and the correlation does not cross the relay queue between the transport's callback and the link's lane | `internal/adapters/cloud/transport.go`, `websocket.go`, `internal/transport/cloud/link.go` |
+| Local route `GET /v1/connection-health/{status,events,trace,export}` and `clawdline health` | implemented, this machine's own token only, refused through Cloud | `internal/transport/http/connection_health.go`, `cmd/clawdline/health.go` |
+| Per-build location map | **partial**: every wired location code names its Go function (checked by `runtime.FuncForPC` in the owning package's tests); no file lines | `locations.go` |
 | Durable segmented on-disk journal, boot markers on disk | **not built**; the ring is memory only and says so (`durability: memory_only_lost_on_restart`) | — |
 | Stack capture worker | **not built** | — |
-| `clawdline health` CLI and local route | **not built** | — |
-| Cloud ingest, stored queries, relay and viewer producers | **not built here** (Cloud API work is separate) | — |
-| Per-build stage-to-source location map | **not built**; location codes are stable names only | — |
+| Cloud ingest, stored queries, relay and viewer producers, uploader, UI | **not built here** (separate tasks) | — |
 
 Every export carries the same list as `wiring[]` (`evidence.go` `Unwired`), so no reader can take
 the foundation for the pipeline.
@@ -67,7 +70,12 @@ itself not scheduled; called blocked only if the next scan agrees).
 progress after slow/blocked — silence is not recovery), `released_after_stall` (slot released;
 the watchdog cannot see the outcome, so this is not success), `overflow`, `scheduling_gap`,
 `clock_anomaly`, `transitions_lost` (`count` watchdog transitions were dropped just before this
-record because the queue to the journal was full; the page holding it reads `partial`).
+record because the queue to the journal was full; the page holding it reads `partial`),
+`state_after_loss` (written by the journal's writer right after each `transitions_lost`, once per
+phase the latest report holds as `slow`, `blocked` or `unverified_after_gap`, with that `state`:
+the dropped transition may have been the phase's `stall_detected`, and the watchdog never repeats a
+transition, so without it a journal could read "loss, then quiet" while a handler is still stuck).
+`state` appears on no other event, and no caller may append either of the writer's events.
 
 **Outcome** and **quality** are design §5's: outcomes `healthy`, `slow`, `blocked`, `error`,
 `offline`, `unknown`, `no_requests`; qualities `complete`, `partial`, `stale`, `not_collected`,
@@ -215,14 +223,15 @@ display and may jump.
     { "part": "active_phase_tracker", "status": "implemented" },
     { "part": "watchdog", "status": "implemented" },
     { "part": "memory_journal", "status": "implemented" },
-    { "part": "daemon_instrumentation_call_sites", "status": "unimplemented" },
+    { "part": "daemon_runtime_per_boot", "status": "implemented" },
+    { "part": "daemon_instrumentation_call_sites", "status": "partial" },
     { "part": "durable_segmented_journal", "status": "unimplemented" },
     { "part": "stack_capture_worker", "status": "unimplemented" },
-    { "part": "local_health_cli_and_route", "status": "unimplemented" },
+    { "part": "local_health_cli_and_route", "status": "implemented" },
     { "part": "cloud_ingest", "status": "unimplemented" },
     { "part": "cloud_query", "status": "unimplemented" },
     { "part": "relay_and_viewer_producers", "status": "unimplemented" },
-    { "part": "stage_location_map_per_build", "status": "unimplemented" }
+    { "part": "stage_location_map_per_build", "status": "partial" }
   ]
 }
 ```
@@ -247,6 +256,41 @@ display and may jump.
 | `watchdog.transitions` | `complete`, `partial` once any transition was dropped before the journal, `not_collected` without a journal |
 | `watchdog.transitions_lost_total`, `transitions_pending` | dropped transitions, and the queue's depth when the report was made (the example shows 2 because it reports before `Flush`) |
 
+### 4.1 Wired call sites and the local route
+
+Every daemon phase is `source: daemon` with the plan's 5 s / 15 s deadlines; each long-lived loop
+holds one of the 8 reserved slots for its socket's life, so three are used per connected line.
+Correlations are minted by the tracker (`op-<base36 counter>`), never taken from a frame, channel,
+sender, session or document; `phase_id` is the attempt, the correlation the logical operation.
+
+| Location | Stage(s) | Function | Kind |
+| --- | --- | --- | --- |
+| `cloud.transport.read_loop`, `keepalive_loop`, `drain_loop` | `idle` | `(*Transport).read`, `keepalive`, `drain` | long-lived, reserved |
+| `cloud.transport.handle_frame` | `frame_read` | `(*Transport).handle` (and `AcceptDirect`) | finite, one per frame |
+| `cloud.transport.settle_receipt` | `frame_read` | `(*Transport).handleFrame` (ack and publish-error settlement) | same phase, stepped |
+| `cloud.transport.sender_lookup`, `signature_check` | `frame_read` | `(*Transport).admitTraced` | same phase, stepped |
+| `cloud.transport.replay_claim`, `open_envelope` | `sender_verified` | `(*Transport).admitTraced` | same phase, stepped |
+| `cloud.transport.inbound_callback`, `peer_callback` | `lane_queued` | `admitTraced`, `handleFrame` | same phase, stepped |
+| `cloud.transport.drain_send` | `spool_queued` | `(*Transport).drainPass` (one per drain tick and per reconnect re-send) | finite |
+| `cloud.websocket.writer_lock` → `socket_write` | `writer_lock_waiting` → `socket_write_started` → `socket_write_ended` | `(*Conn).writeFrame` | finite, one per frame written |
+| `cloud.link.read_lane`, `command_lane`, `sessions_lane` | `lane_queued` | `(*Link).lanePhase` | finite, one per request |
+| `cloud.link.read_handler`, `command_handler`, `sessions_handler` | `handler_started` → `handler_completed` | `(*Link).answerTraced` | same phase, stepped |
+
+Nothing here changes a deadline, a return value, an error or a retry; a nil tracker (monitoring
+off, or a test or old caller that passes none) records nothing. A full table means a phase is not
+recorded and the overflow is counted; the business call proceeds.
+
+`GET /v1/connection-health/status` (latest report, journal coverage, wiring, report age; quality
+`not_collected` before the first scan and `stale` when the report is more than three scans old),
+`events?boot_id&after_seq&limit&since&until`, `trace?correlation=` (active findings and journal
+records naming it) and `export` (§4 plus `locations`, the map above bound to `build_commit`). Only
+this machine's own token reads them; a paired device or the machine token is refused, and a request
+the Cloud line dispatched in process is refused `forbidden` even though it carries this machine's
+token. The route reads atomics and the journal's lock; it never calls `Scan`, the relay, the
+spool or a status snapshot. `clawdline health status|events|trace|export` reads it with the local
+token (`--since/--until` as RFC 3339 or a duration back from now, `--after-seq`, `--limit`,
+`--boot-id`, `--correlation`, `--json`); a daemon it cannot ask is reported unknown, exit 1.
+
 ## 5. Typed failures
 
 `CodeOf(err)` returns one of these; no failure is turned into an empty page.
@@ -257,9 +301,11 @@ display and may jump.
 | `slots_exhausted` | no free slot | zero `Handle` (every call a no-op); the operation proceeds uninstrumented; counted |
 | `record_too_large` | an encoded record over 1 KiB | not kept; `refused_total` +1 |
 | `query_bound_exceeded` | `limit` < 0 or > 200 | no page |
-| `cursor_other_boot` | `boot_id` in the query is not this journal's boot | no page: the sequence numbers it names do not exist |
-| `unsupported` | export asked of a missing watchdog report or journal | no export — never a quiet-looking empty one |
-| `unsupported_schema`, `forbidden`, `idempotency_conflict` | reserved for the ingest and query routes below | — |
+| `cursor_other_boot` | `boot_id` in the query is not this journal's boot | no page: the sequence numbers it names do not exist (HTTP 409) |
+| `invalid_cursor` | `after_seq` past the newest sequence this boot assigned, or not a number that fits one (the largest `uint64` included) | no page; HTTP 400 |
+| `unsupported` | export asked of a missing watchdog report or journal; monitoring off | no export — never a quiet-looking empty one (HTTP 503 before the first scan, 501 when off) |
+| `forbidden` | the local route asked through the Cloud line | HTTP 403 |
+| `unsupported_schema`, `idempotency_conflict` | reserved for the ingest and query routes below | — |
 
 ## 6. Bounds
 
@@ -292,8 +338,20 @@ Apple M4 Pro, 14 threads, 2026-10-20, rerun after the queued journal writer and 
 | `Begin` + `Progress` + `End`, parallel | 298.3 ns/op, 416 B/op, 2 allocs/op (before: 298.6 ns/op) |
 | One `Scan` of 120 active phases, journal attached, no transitions | 26.9 µs/op, 121.3 KB/op, 24 allocs/op (before: 22.4 µs/op, 102.6 KB/op, 22 allocs/op; the difference is the copy of the findings published for `Latest`) |
 
-Nothing else was measured: not daemon CPU or latency with instrumentation enabled, not a 1 s scan
-under load, not a scan that queues transitions, not memory of a full ring.
+The call sites, on and off (nil tracker), `go test -run '^$' -bench 'WriteFrame|HandleFrame'
+-benchtime 2s -count 3 -benchmem ./internal/adapters/cloud` and `-bench IdleScan` in this package,
+same machine, 2026-10-20 (three runs each, middle value):
+
+| Benchmark | Off | On |
+| --- | --- | --- |
+| `WriteFrame`: one masked text write to a discarding socket | 106 ns/op, 96 B, 2 allocs | 1008 ns/op, 720 B, 5 allocs |
+| `HandleFrame`: one peer frame through `handle` to its callback | 204 ns/op, 16 B, 1 alloc | 1194 ns/op, 449 B, 5 allocs |
+| `IdleScan`: one scan of an idle line (three loops held), paid once a second | — | 956 ns/op, 3.5 KB, 11 allocs |
+
+So instrumentation adds about 0.9–1.0 µs and three to four allocations to each frame read or
+written, most of it clock reads and the immutable phase copy each step makes; the idle watchdog
+costs about 1 µs per second. Not measured: daemon CPU under real relay traffic, a scan under load
+or with queued transitions, memory of a full ring.
 
 ## 7. Concurrency
 
@@ -435,12 +493,11 @@ never an empty success; a `null` duration is never drawn as zero.
 
 ## 10. Remaining wiring, in order
 
-1. Construct one `Tracker`, `Journal` and `Watchdog` per daemon boot, run `Watchdog.Run` under the
-   daemon context, export from `Watchdog.Latest`, and replace the known-zero capacity measures with `Snapshot` and coverage.
-2. Instrument the call sites named in the plan (frame read, sender verify, inbound callback,
-   admission, handler, spool, writer-lock acquisition, socket write, receipts), each with a stable
-   location code; reserve critical slots for reader, writer, drain and keepalive loops.
-3. Local read route and `clawdline health` CLI over `Journal.Read` and `Export`.
+1. Done: one runtime per boot, real capacity measures (§1).
+2. Partly done (§4.1). Still to wire: response sealing and spool enqueue in
+   `internal/transport/cloud/relay.go`, and carrying one correlation from the transport's inbound
+   callback through the relay queue to the link's lane (it needs a field on `Inbound`).
+3. Done: local route and CLI (§4.1).
 4. Durable segmented journal with boot markers and a documented crash-loss window.
 5. Uploader over the proposed ingest, then the Cloud stored queries, relay/viewer producers,
    stage-to-source map per build, stack capture, and M01–M06 on real sources.
