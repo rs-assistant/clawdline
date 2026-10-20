@@ -81,6 +81,16 @@ func waitFor(t *testing.T, what string, ok func() bool) {
 	}
 }
 
+// recvWithin fails the test instead of hanging when a capture never starts.
+func recvWithin(t *testing.T, ch <-chan struct{}) {
+	t.Helper()
+	select {
+	case <-ch:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the capture never started")
+	}
+}
+
 func journaled(t *testing.T, rt *Runtime) map[Event]int {
 	t.Helper()
 	rt.Watchdog.Flush()
@@ -104,7 +114,7 @@ func TestCaptureJoinsARealBlockedWriterLockToItsExactSource(t *testing.T) {
 	mu.Lock()
 	entered := make(chan struct{})
 	go waitOnWriterLock(&mu, entered)
-	<-entered
+	recvWithin(t, entered)
 	waitFor(t, "the writer to block", func() bool {
 		buf := make([]byte, 1<<16)
 		return strings.Contains(string(buf[:runtime.Stack(buf, true)]), "waitOnWriterLock")
@@ -272,7 +282,7 @@ func TestHungCaptureNeverGetsAReplacementWorker(t *testing.T) {
 		return copy(b, "goroutine 1 [select]:\nmain.main()\n\t/nowhere/main.go:1 +0x1\n")
 	}
 	h := stall(t, c, rt, testWriterLock)
-	<-entered
+	recvWithin(t, entered)
 	if st := rt.Capture.Status(); st.State != CaptureRunning {
 		t.Fatalf("state = %s, want running", st.State)
 	}
@@ -318,7 +328,7 @@ func TestHungCaptureNeverGetsAReplacementWorker(t *testing.T) {
 		t.Fatalf("recovery while the capture hung: %+v", ev.StallCapture.Recovery)
 	}
 	stall(t, c, rt, LocDrainSend)
-	<-entered
+	recvWithin(t, entered)
 	if calls.Load() != 2 {
 		t.Fatalf("the worker did not take a trigger after finishing: %d", calls.Load())
 	}
