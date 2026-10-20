@@ -55,6 +55,18 @@
 | `cloud.health_store_seconds` | 604800 | `seconds` | `evict_oldest` | `diagnostics` | — |
 | `cloud.health_store_segment_bytes` | 8388608 | `bytes` | `rotate` | `diagnostics` | — |
 | `cloud.health_store_segments` | 256 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `cloud.health_upload_attempt_seconds` | 10 | `seconds` | `disconnect` | `diagnostics` | — |
+| `cloud.health_upload_attempts` | 6 | `rows` | `expire` | `diagnostics` | — |
+| `cloud.health_upload_batch_bytes` | 32768 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_upload_batch_events` | 100 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_upload_hourly_bytes` | 983040 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_upload_hourly_requests` | 120 | `rows` | `refuse` | `diagnostics` | — |
+| `cloud.health_upload_receipts` | 16 | `rows` | `evict_oldest` | `diagnostics` | — |
+| `cloud.health_upload_response_bytes` | 16384 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_upload_retry_after_seconds` | 3600 | `seconds` | `coalesce` | `diagnostics` | — |
+| `cloud.health_upload_retry_seconds` | 3600 | `seconds` | `expire` | `diagnostics` | — |
+| `cloud.health_upload_state_bytes` | 65536 | `bytes` | `refuse` | `diagnostics` | — |
+| `cloud.health_upload_step_pages` | 8 | `rows` | `refuse` | `diagnostics` | — |
 | `cloud.peer_body_bytes` | 524288 | `bytes` | `refuse` | `diagnostics, notice, sender` | — |
 | `cloud.peer_discovery_reply` | 1 | `rows` | `refuse` | `sender, diagnostics` | — |
 | `cloud.peer_frame_bytes` | 1048576 | `bytes` | `refuse` | `diagnostics, log, sender` | — |

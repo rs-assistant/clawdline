@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 7110,
-  "riskKeys": 3227,
-  "nonRiskCount": 3883,
+  "englishContentKeys": 7134,
+  "riskKeys": 3235,
+  "nonRiskCount": 3899,
   "groups": [
     {
       "name": "admin / other",
@@ -270,7 +270,7 @@
     },
     {
       "name": "capacityRow / other",
-      "count": 161,
+      "count": 177,
       "sources": [
         null
       ],
@@ -294,6 +294,22 @@
         "capacityRow.cloud.health_record_bytes.what",
         "capacityRow.cloud.health_store_dir_entries.what",
         "capacityRow.cloud.health_store_lost_ranges.what",
+        "capacityRow.cloud.health_upload_attempt_seconds.what",
+        "capacityRow.cloud.health_upload_attempts.what",
+        "capacityRow.cloud.health_upload_batch_bytes.what",
+        "capacityRow.cloud.health_upload_batch_events.full",
+        "capacityRow.cloud.health_upload_batch_events.what",
+        "capacityRow.cloud.health_upload_hourly_bytes.what",
+        "capacityRow.cloud.health_upload_hourly_requests.full",
+        "capacityRow.cloud.health_upload_hourly_requests.what",
+        "capacityRow.cloud.health_upload_receipts.what",
+        "capacityRow.cloud.health_upload_response_bytes.what",
+        "capacityRow.cloud.health_upload_retry_after_seconds.full",
+        "capacityRow.cloud.health_upload_retry_after_seconds.what",
+        "capacityRow.cloud.health_upload_retry_seconds.full",
+        "capacityRow.cloud.health_upload_retry_seconds.what",
+        "capacityRow.cloud.health_upload_state_bytes.what",
+        "capacityRow.cloud.health_upload_step_pages.full",
         "capacityRow.cloud.peer_discovery_reply.full",
         "capacityRow.cloud.peer_discovery_reply.what",
         "capacityRow.cloud.peer_frame_bytes.what",

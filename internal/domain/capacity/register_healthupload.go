@@ -4,7 +4,7 @@ package capacity
 // HTTPS uploader of connection-health evidence to Cloud's machine ingest
 // (internal/adapters/healthupload, docs/admin-connection-health-contract.md
 // §9). The batch and hourly rows mirror Cloud's ingest limits
-// (clawdline-cloud api/src/domain/healthBudget.ts) so the uploader stops
+// (Cloud's own budget table) so the uploader stops
 // itself before Cloud refuses it; the rest are this producer's proposals,
 // not measured budgets.
 func healthUploadBounds() []Entry {

@@ -8,7 +8,7 @@ import (
 	"github.com/sainteye/clawdline/internal/domain/connectionhealth"
 )
 
-// The Cloud ingest wire (clawdline-cloud docs/connection-health-contract.md
+// The Cloud ingest wire (Cloud's own ingest contract,
 // §2): one batch of `clawdline.connection-health.record/1` events of one
 // boot, sent to POST /v1/health/ingest with the machine's own credential.
 const (

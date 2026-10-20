@@ -1,5 +1,5 @@
 // Package healthupload sends the durable connection-health store's records to
-// Cloud's machine-authenticated ingest (clawdline-cloud
+// Cloud's machine-authenticated ingest (Cloud's
 // docs/connection-health-contract.md §2) over its own HTTPS client, so the
 // evidence of a stuck Cloud line can leave the machine while that line — its
 // relay socket, its writer lock, its spool — is the thing that is stuck.
