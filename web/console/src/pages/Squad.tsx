@@ -10,6 +10,7 @@ import type { PageModule } from "./types.js"
 import { squadApi, type PackPreview, type SkillSourceRow, type SquadAPI } from "./squad/api.js"
 import { ReceiptGate, sourceLabel, visiblePersonas, type SquadDraft, type SquadPersona, type SquadReadState, type SquadSkill, type SquadView } from "./squad/model.js"
 import { ACTIVE_SKILL_BYTES, activeSkillBytes, makeSkill, sameSkill, skillInputError, type SkillTransaction } from "./squad/skill-create.js"
+import { RoleIconUpdate } from "./squad/RoleIconEditor.js"
 import { PersonaCreator } from "./squad/PersonaCreator.js"
 import { forgetPersonas } from "../personas.js"
 import "../page-skeleton.css"
@@ -756,6 +757,7 @@ function SquadPageView({ shown, api = squadApi }: { shown: boolean; api?: SquadA
         <div className="squad-detail" ref={detailPanel} aria-labelledby="squad-detail-title">{persona ? <>
           <div className="page-bar squad-back-bar"><button className="squad-back" type="button" onClick={backToRoster}>{catalogWord("inline", "a614ac7abbc2")}</button></div>
           <div className="squad-profile"><IconCanvas icon={persona.icon} size={5} /><div><p>{catalogWord("inline", "863e4b25f68c")}</p><h2 id="squad-detail-title" ref={detailTitle} tabIndex={-1}>{persona.name}</h2><span>{persona.subtitle}</span></div></div>
+          {!persona.id.startsWith("clawdline.") && <RoleIconUpdate key={`${persona.id}:${persona.version}`} api={api} id={persona.id} icon={persona.icon} canWrite={canWrite} onSaved={async () => { forgetPersonas(); await load(scope) }} />}
           <div className="squad-meta"><span>{persona.teamIds.map((id) => data.teams.find((row) => row.id === id)?.name ?? id).join(" · ") || catalogWord("literal", "800a6095679f")}</span>
             <details className="squad-meta-detail"><summary>{catalogWord("inline", "230d9c9e189c")}</summary>
               <dl><div><dt>{catalogWord("inline", "c21db84c0653")}</dt><dd><LinkedText text={persona.source} /></dd></div>

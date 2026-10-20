@@ -42,5 +42,9 @@
   "squad.capability_not_file": "session capability is not a regular file",
   "squad.capability_unset": "%s is not set for this Session",
   "squad.invalid_args": "clawdline: invalid squad skill event arguments",
-  "squad.usage": "usage: clawdline squad skill-event --skill ID --version VERSION --status read|applied|failed [--event-id ID] [--failure-code CODE]"
+  "squad.usage": "usage: clawdline squad skill-event --skill ID --version VERSION --status read|applied|failed [--event-id ID] [--failure-code CODE]",
+  "squad.catalog_usage": "usage: clawdline squad <catalog|definition|scopes|settings|save|bind|icon> [--body-file FILE|-] [--key KEY] [--id ID] [--version VERSION] [--expected-version N] [--place-id ID|--scope-id ID] [--json] [--port N]; see clawdline guide squad",
+  "squad.file_help": "JSON request file, or - for stdin",
+  "squad.key_help": "stable Idempotency-Key for this write and its retries",
+  "squad.invalid_json": "clawdline squad: bad_request: supply one JSON request within the Squad request limit"
 }

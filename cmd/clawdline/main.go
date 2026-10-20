@@ -500,8 +500,9 @@ func terminalCommand(op string, args []string) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_usage_with_memory", "usage: clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|cloud|board|project|memory|task|webhook|setup|update|version>"))
+	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_usage_with_memory", "usage: clawdline <serve|doctor|guide|skill|report|session|coordinator|usage|heavy|verify|setting|dispatch|callback|handoff|todo|note|item|send|notify|landings|leases|sessions|assistants|type|interrupt|close|open|pair|devices|cloud|board|project|squad|memory|task|webhook|setup|update|version>"))
 	fmt.Fprintln(os.Stderr, "  "+cliCopy("core", "language_option", cliLanguageOptionEnglish))
+	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_squad_help", "  squad <catalog|definition|scopes|settings|save|bind|icon>   private roles, skills and pixel robots; guide squad has a complete example"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_guide_topic_guide_list_the_agent", "  guide [topic] | guide -list   the agent guide this build carries; no daemon needed"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_skill_dual_install", "  skill <install|uninstall>     put this build's skill stub in ~/.claude/skills/clawdline and ~/.agents/skills/clawdline, or put back what was there"))
 	fmt.Fprintln(os.Stderr, cliCopy("entry", "main_report_status_file_repo_dir_open", "  report --status <file> [--repo dir] [--open] <commit>…   a turn's status report as one local HTML file; prints its file:// address last"))

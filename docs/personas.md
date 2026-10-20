@@ -13,6 +13,16 @@ call it "Role".
 The [skill candidate decisions](persona-skill-decisions.md) review one bounded-task candidate for
 each built-in persona. They are research records, not installed or adopted skills.
 
+## Create your own roles and skills
+
+Run `clawdline guide squad` (alias `clawdline guide persona`) for the complete local Agent
+CLI/API contract, runnable private role and skill example, authentication, versioned updates,
+retry recovery, bindings and multicolor pixel icons. The same guide ships in Taiwan Traditional
+Chinese with `clawdline guide zh-Hant squad`. The published copies are
+[English](../skills/clawdline/squad.md) and [Traditional Chinese](../skills/clawdline/squad.zh-TW.md).
+The CLI uses the machine orchestrator credential on explicitly admitted Squad routes; it never
+borrows a browser credential. Catalog writes are handwritten and do not call a paid AI provider.
+
 ## The catalog
 
 The built-in catalog is closed and compiled into the daemon (`internal/domain/persona`). Each built-in persona is

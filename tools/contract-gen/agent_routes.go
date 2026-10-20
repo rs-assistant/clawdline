@@ -22,6 +22,7 @@ type agentRouteFile struct {
 }
 
 var agentRouteGoals = map[string]string{
+	"squad":   "docs/personas.md",
 	"connect": "docs/user/first-session.md", "send": "docs/user/sessions.md",
 	"note": "docs/user/sessions.md", "notify": "docs/user/notifications.md",
 	"cloud": "docs/user/cloud-first-look.md", "project": "docs/user/projects.md",

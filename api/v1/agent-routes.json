@@ -494,32 +494,32 @@
     {
       "method": "*",
       "pattern": "/v1/squad/",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/events",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/events/head",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/session-bindings",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/session-events",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",
       "pattern": "/v1/squad/session-snapshots/",
-      "guide": "dispatch"
+      "guide": "squad"
     },
     {
       "method": "*",

@@ -42,5 +42,9 @@
   "squad.capability_not_file": "Session 權限檔不是一般檔案",
   "squad.capability_unset": "尚未為此 Session 設定 %s",
   "squad.invalid_args": "clawdline：squad skill-event 參數無效",
-  "squad.usage": "用法：clawdline squad skill-event --skill ID --version VERSION --status read|applied|failed [--event-id ID] [--failure-code CODE]"
+  "squad.usage": "用法：clawdline squad skill-event --skill ID --version VERSION --status read|applied|failed [--event-id ID] [--failure-code CODE]",
+  "squad.catalog_usage": "用法：clawdline squad <catalog|definition|scopes|settings|save|bind|icon> [--body-file FILE|-] [--key KEY] [--id ID] [--version VERSION] [--expected-version N] [--place-id ID|--scope-id ID] [--json] [--port N]；完整說明：clawdline guide squad",
+  "squad.file_help": "JSON 請求檔案，或以 - 讀取標準輸入",
+  "squad.key_help": "此次寫入與重試共用的固定 Idempotency-Key",
+  "squad.invalid_json": "clawdline squad：bad_request：請提供未超過角色小隊請求上限的單一 JSON 請求"
 }

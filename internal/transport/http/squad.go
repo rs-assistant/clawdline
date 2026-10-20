@@ -141,7 +141,7 @@ func (s *Server) squadCandidateRead(w http.ResponseWriter, r *http.Request) {
 
 func squadWriteAllowed(r *http.Request) bool {
 	a := accessOf(r)
-	return a.verdict.Allowed && (a.verdict.Local || maySend(r))
+	return (a.machine && squadAgentPath(routePath(r))) || (a.verdict.Allowed && (a.verdict.Local || maySend(r)))
 }
 
 func squadWriteDoor(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -157,6 +157,9 @@ func squadWriteDoor(w http.ResponseWriter, r *http.Request) (string, bool) {
 	}
 	// The credential-derived principal separates two writers' retry keys.
 	principal := personPrincipal(r)
+	if accessOf(r).machine {
+		principal = "agent"
+	}
 	if accessOf(r).verdict.Local {
 		principal = "local"
 	}
@@ -913,4 +916,14 @@ func (s *Server) squadEntityWrite(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, contract.SquadEntityReply{
 		CatalogVersion: version, ID: row.ID, Version: row.Version, Digest: row.Digest})
+}
+
+// squadAgentPath is the explicit local Agent contract. It does not grant AI
+// drafting, package imports, Session telemetry, or paired-device permissions.
+func squadAgentPath(path string) bool {
+	switch path {
+	case "/v1/squad/catalog", "/v1/squad/settings", "/v1/squad/scopes":
+		return true
+	}
+	return strings.HasPrefix(path, "/v1/squad/definitions/")
 }

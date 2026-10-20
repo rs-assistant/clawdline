@@ -46,8 +46,7 @@ func readSquadCapability(path string) (string, error) {
 
 func squadCommand(args []string) {
 	if len(args) == 0 || args[0] != "skill-event" {
-		fmt.Fprintln(os.Stderr, cliCopy("core", "squad.usage", "usage: clawdline squad skill-event --skill ID --version VERSION --status read|applied|failed [--event-id ID] [--failure-code CODE]"))
-		os.Exit(2)
+		os.Exit(runSquadCatalog(os.Stdout, os.Stderr, args, nil))
 	}
 	fs := flag.NewFlagSet("squad skill-event", flag.ExitOnError)
 	skillID := fs.String("skill", "", "snapshot skill ID")

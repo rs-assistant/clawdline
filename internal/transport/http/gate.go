@@ -376,6 +376,9 @@ func openPath(p string) bool {
 // orchestrator's credential opens; the shadows of the board and the schedules
 // are gone (D07).
 func machineScoped(p string) bool {
+	if squadAgentPath(p) {
+		return true
+	}
 	if strings.HasPrefix(p, "/v1/orchestrator/") {
 		return true
 	}
@@ -548,6 +551,9 @@ func writePolicy(method, p string, machine bool, v auth.Verdict) (int, string, s
 			return http.StatusForbidden, "forbidden", "This device may not read squad packages."
 		}
 	case strings.HasPrefix(p, "/v1/squad-packages/") || strings.HasPrefix(p, "/v1/squad/"):
+		if machine && squadAgentPath(p) {
+			return 0, "", ""
+		}
 		if !(v.Allowed && (v.Local || v.Caps.Has(auth.Send))) {
 			return http.StatusForbidden, "forbidden", "This device may read the squad, and not change it."
 		}

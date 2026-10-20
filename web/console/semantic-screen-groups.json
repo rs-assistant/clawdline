@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 7075,
-  "riskKeys": 3201,
-  "nonRiskCount": 3874,
+  "englishContentKeys": 7083,
+  "riskKeys": 3203,
+  "nonRiskCount": 3880,
   "groups": [
     {
       "name": "admin / other",
@@ -2420,7 +2420,7 @@
     },
     {
       "name": "next / other",
-      "count": 285,
+      "count": 291,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -2562,6 +2562,12 @@
         "next.roleCreateSummary",
         "next.roleCreateTitle",
         "next.roleCreateUsage",
+        "next.roleIconColor",
+        "next.roleIconEdit",
+        "next.roleIconPixel",
+        "next.roleIconSave",
+        "next.roleIconTitle",
+        "next.roleIconVariant",
         "next.schedulesHeading",
         "next.schedulesListLabel",
         "next.schedulesLoading",

@@ -30,7 +30,7 @@ export interface NewSquadPersona {
   body: string
   icon: Icon
   teams: { id: string; version: string }[]
-  skills: []
+  skills: { id: string; version: string; enabled: boolean }[]
 }
 
 export interface RoleDraft { name: string; summary: string; body: string }
