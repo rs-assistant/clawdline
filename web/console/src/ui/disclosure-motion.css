@@ -1,0 +1,56 @@
+/* AN-001/002/003/004/009/014. Hidden/inert own interaction immediately;
+   discrete display transitions retain only the closing picture. Engines
+   without these features keep immediate, usable native controls. */
+.project-picker-menu[hidden], .human-interventions[hidden] { display: none; }
+.project-picker-chevron { transition: transform 180ms var(--ease); }
+.project-picker-trigger[aria-expanded="true"] .project-picker-chevron { transform: rotate(180deg); }
+
+@supports (transition-behavior: allow-discrete) {
+  .session-actions, .project-picker-menu, .composer .skill-menu {
+    display: block; opacity: 1; transform: none;
+    transform-origin: top right;
+    transition: display 200ms allow-discrete, opacity 200ms var(--ease), transform 200ms var(--ease);
+  }
+  .project-picker-menu { transform-origin: top left; }
+  .composer .skill-menu {
+    transform-origin: bottom left;
+    transition-duration: 140ms;
+  }
+  .session-actions[hidden], .project-picker-menu[hidden], .composer .skill-menu[hidden] {
+    display: none; opacity: 0; transform: translateY(-6px) scale(.98); pointer-events: none;
+  }
+  .composer .skill-menu[hidden] { transform: translateY(4px); }
+  @starting-style {
+    .session-actions:not([hidden]), .project-picker-menu:not([hidden]) {
+      opacity: 0; transform: translateY(-6px) scale(.98);
+    }
+    .composer .skill-menu:not([hidden]) { opacity: 0; transform: translateY(4px); }
+  }
+
+  .human-interventions {
+    display: grid; grid-template-rows: 1fr; opacity: 1;
+    transition: display 220ms allow-discrete, grid-template-rows 220ms var(--ease), opacity 220ms var(--ease);
+  }
+  .human-interventions[hidden] {
+    display: none; grid-template-rows: 0fr; opacity: 0; pointer-events: none;
+  }
+  .human-interventions-content { min-height: 0; overflow: hidden; }
+  @starting-style {
+    .human-interventions:not([hidden]) { grid-template-rows: 0fr; opacity: 0; }
+  }
+}
+
+/* Keep the existing secret completion exit independent from manual disclosure. */
+.human-interventions.is-collapsing[hidden] { transition: none; animation: none; }
+
+/* AN-003 measures only when explicitly toggled, never on a data refresh. */
+.session-todos .session-todos-body, .session-todos[open] .session-todos-body { animation: none; }
+.session-todos[open][data-expanded="false"]::after { opacity: 0; }
+.session-todos[open][data-expanded="false"] > summary::before { transform: none; }
+.session-todos[data-expanded="false"] > .session-todos-backdrop { pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .session-actions, .session-action-level, .session-action-level[data-place], .project-picker-menu, .project-picker-chevron,
+  .composer .skill-menu, .human-interventions, .session-todos::details-content,
+  .session-todos .session-todos-body { transition: none; }
+}
