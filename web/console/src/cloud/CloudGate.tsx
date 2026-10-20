@@ -36,6 +36,8 @@ import { afterForget, forgetMachine, honestyIsOurs, type ForgetOutcome } from ".
 import { NAME_MAX, renameMachine, type RenameOutcome } from "./rename.js"
 import { setAccountMachines, setAccountRosterStatus, setMachineForgetting, setMachinePairing } from "../legacy/devices-bridge.js"
 import { setMachineManager } from "./machine-manager.js"
+import { setOwnerDiagnosticsSource } from "./health-owner/source.js"
+import { ownerDiagnostics } from "./health-owner/client.js"
 import { machinePaired } from "./pairing-completion.js"
 import { setProjectSyncSeam, syncSeamFor, type SyncClient } from "./project-sync.js"
 import { machinePresentation } from "../legacy/js/session/selection.js"
@@ -529,6 +531,8 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     }
   }, [liveSessionSource])
   useEffect(() => clearTerminalCloseStates(), [who?.account])
+  // Opened diagnostics belong to one signed-in account; another account or none clears them.
+  useEffect(() => ownerDiagnostics.bind(who?.account || null, null), [who?.account])
   const reader = useRef<RelayReader | null>(null)
   const unlisten = useRef<(() => void) | null>(null)
   const recheck = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1067,7 +1071,33 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         openPairingRef.current({ id, name: named ? named.name || named.label || id : id })
       },
     })
-    return () => setMachineManager(null)
+    // The owner-diagnostics reader's authority. The client's pairing record holds the master
+    // secret as an AES-GCM key and no content-key epoch, so `heldMasterKey` reports exactly
+    // that and the reader answers key_handover_required; the device-key and identity epochs
+    // are not on the client either, so they are null (unknown), never guessed.
+    type Held = { devicePrivateKey?: CryptoKey | null
+      _machinePairing?: (machine: string, probe: Record<string, unknown>) => Promise<{ masterKey?: unknown } | null> }
+    setOwnerDiagnosticsSource({
+      apiOrigin: transport.config.apiOrigin,
+      accountID: () => client.current?.account ?? null,
+      deviceID: () => client.current?.deviceID ?? null,
+      proofIdentity: () => ({
+        signingKey: (client.current as unknown as Held | null)?.devicePrivateKey ?? null,
+        deviceKeyEpoch: null,
+        identityEpoch: null,
+      }),
+      heldMasterKey: async (machine) => {
+        const held = client.current as unknown as Held | null
+        const pairing = held?._machinePairing ? await held._machinePairing(machine, {}) : null
+        const key = typeof CryptoKey !== "undefined" && pairing?.masterKey instanceof CryptoKey ? pairing.masterKey : null
+        return { key, contentKeyEpoch: null }
+      },
+    })
+    return () => {
+      setMachineManager(null)
+      setOwnerDiagnosticsSource(null)
+      ownerDiagnostics.clear("source_removed")
+    }
   }, [transport, carrierOf])
 
   const askForget = useCallback((machine: CloudMachine | null) => {
