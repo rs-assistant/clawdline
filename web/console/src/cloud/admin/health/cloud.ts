@@ -43,6 +43,10 @@ export const HEALTH_UI_LIMITS = {
   incidentExportBytes: 1024 * 1024,
   /** The incident list's window over `opened_at` (the Cloud's own maximum, 7 days). */
   incidentWindowMs: 7 * 86_400_000,
+  /** Trend lanes drawn as charts (each up to 360 buckets); the rest stay in the table. */
+  trendLanes: 12,
+  /** Trend buckets listed to investigate, newest first; the rest are counted. */
+  trendSignals: 20,
 } as const
 
 export type PartName = "overview" | "outcomes" | "sources" | "events" | "trace" | "incidents" | "incident" | "aggregates"

@@ -820,6 +820,16 @@
     "Note": true
   },
   {
+    "Name": "console.health_ui_trend_lanes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "console.health_ui_trend_signals",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "console.machine_list_poll_seconds",
     "Known": true,
     "Note": true

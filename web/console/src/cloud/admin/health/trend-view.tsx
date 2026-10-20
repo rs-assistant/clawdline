@@ -3,7 +3,7 @@
  * unknown. It never fills a missing bucket, never divides by an unknown denominator, never adds
  * stage times into a latency, and never draws a line across a restart. */
 import type { ReactNode } from "react"
-import { partBody, type StoredState } from "./cloud"
+import { HEALTH_UI_LIMITS, partBody, type StoredState } from "./cloud"
 import { stageElapsed, trendLanes, viewerErrors, type AggregatesBody, type Slot, type TrendLane } from "./aggregates"
 import { healthHref, STORED_WINDOWS_S, type HealthRoute, type HealthScreen, type StoredWindow } from "./route"
 import { healthMs, type HealthSay, type HealthWord } from "./words"
@@ -12,10 +12,8 @@ import { ChartPanel, KnownStrip } from "./timeline-view"
 import { exactUTC, Id, PartFailed, Stale } from "./stored-screens"
 import { IncidentCoverage } from "./incident-screens"
 
-/** Lanes drawn as charts; the rest stay in the table. Registered as console.health_ui_trend_lanes. */
-export const TREND_LANES = 12
-/** Investigation rows listed under the chart, newest first. Registered as console.health_ui_trend_signals. */
-export const TREND_SIGNALS = 20
+const TREND_LANES = HEALTH_UI_LIMITS.trendLanes
+const TREND_SIGNALS = HEALTH_UI_LIMITS.trendSignals
 /** Raw records the Cloud keeps (contract §3): older buckets can only link to incidents. */
 const RAW_RETENTION_MS = 86_400_000
 

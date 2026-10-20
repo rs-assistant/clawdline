@@ -170,6 +170,8 @@ Generated directly from `internal/domain/capacity.Register()`; these are default
 | `console.health_ui_reads_per_load` | 3 | `rows` | `refuse` | `diagnostics` | — |
 | `console.health_ui_refresh_seconds` | 15 | `seconds` | `expire` | `diagnostics` | — |
 | `console.health_ui_request_seconds` | 6 | `seconds` | `expire` | `diagnostics` | — |
+| `console.health_ui_trend_lanes` | 12 | `rows` | `refuse` | `diagnostics` | — |
+| `console.health_ui_trend_signals` | 20 | `rows` | `refuse` | `diagnostics` | — |
 | `console.machine_list_poll_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |
 | `console.opened_row_quiet_seconds` | 8 | `seconds` | `expire` | `diagnostics` | — |
 | `console.opened_row_restate_seconds` | 5 | `seconds` | `expire` | `diagnostics` | — |

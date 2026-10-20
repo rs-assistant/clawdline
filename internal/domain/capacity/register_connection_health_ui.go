@@ -21,6 +21,10 @@ const (
 	ConsoleHealthUIIncidentRows          = "console.health_ui_incident_rows"
 	ConsoleHealthUIIncidentExportBytes   = "console.health_ui_incident_export_bytes"
 	ConsoleHealthUIIncidentWindowSeconds = "console.health_ui_incident_window_seconds"
+	// The trend view over the Cloud's minute rollups (HEALTH_UI_LIMITS
+	// trendLanes, trendSignals).
+	ConsoleHealthUITrendLanes   = "console.health_ui_trend_lanes"
+	ConsoleHealthUITrendSignals = "console.health_ui_trend_signals"
 )
 
 // connectionHealthUIBounds is every console.health_ui_* row.
@@ -119,6 +123,21 @@ func connectionHealthUIBounds() []Entry {
 			// the Cloud's own 7-day maximum). Older incidents are not listed.
 			Name: ConsoleHealthUIIncidentWindowSeconds, Class: Cache, Unit: Seconds,
 			Limit: 7 * 24 * 3600, AtLimit: Expire,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// Trend lanes drawn as charts (trendLanes), each up to the
+			// Cloud's 360 buckets. Past it the rest are listed in the table
+			// with "n of m drawn", never dropped.
+			Name: ConsoleHealthUITrendLanes, Class: Buffer, Unit: Rows,
+			Limit: 12, AtLimit: Refuse,
+			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
+		},
+		{
+			// Trend buckets listed to investigate (trendSignals), newest
+			// first. Past it the older ones are counted, not listed.
+			Name: ConsoleHealthUITrendSignals, Class: Buffer, Unit: Rows,
+			Limit: 20, AtLimit: Refuse,
 			Told: []Channel{Diagnostics}, EvictedBy: Daemon,
 		},
 	}

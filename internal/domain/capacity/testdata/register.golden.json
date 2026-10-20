@@ -3236,6 +3236,40 @@
   },
   {
     "Register": "daemon",
+    "Name": "console.health_ui_trend_lanes",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 12,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "console.health_ui_trend_signals",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 20,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
     "Name": "console.machine_list_poll_seconds",
     "Class": "cache",
     "Unit": "seconds",
