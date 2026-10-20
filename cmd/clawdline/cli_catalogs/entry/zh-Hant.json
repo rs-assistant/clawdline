@@ -4,6 +4,7 @@
   "main_callback_title_t_command_run_a": "  callback --title <t> -- <command…>   由 daemon 執行命令並結束本回合；命令結束時喚醒此 Session",
   "main_clawdline_no_backend_for": "clawdline: 沒有可用的後端：",
   "main_clawdline_type_needs_text": "clawdline type 需要文字",
+  "main_health_status_events_trace_export_history": "  health <status|events|trace|export|history>   這台機器的連線健康監看、紀錄、存下的歷史與 Cloud 上傳狀態；只在本機讀取",
   "main_cloud_status_on_off_login_connect": "  cloud <status|on|off|login|connect>   連接 app.clawdline.com 的通道；預設關閉",
   "main_remote_agent_tasks": "  remote <machines|dispatch|show|send|finish|ack|retry>   與另一台已配對機器的 Agent 協作",
   "main_coordinator_bind_conversation_id_register_this": "  coordinator bind [--conversation id]   註冊此機器工作區的 Session，或重新綁定離線角色",

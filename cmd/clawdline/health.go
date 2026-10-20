@@ -445,6 +445,10 @@ func healthSummary(stdout, stderr io.Writer, body []byte) int {
 				Lost    uint64 `json:"lost_records"`
 			} `json:"status"`
 		} `json:"durable"`
+		Upload *struct {
+			State  string               `json:"state"`
+			Status *healthupload.Status `json:"status"`
+		} `json:"upload"`
 	}
 	_ = json.Unmarshal(body, &durable)
 	if json.Unmarshal(body, &st) != nil || st.Schema != connectionhealth.StatusSchema {
@@ -462,6 +466,20 @@ func healthSummary(stdout, stderr io.Writer, body []byte) int {
 		fmt.Fprintf(stdout, "durable store: %s (%s); this boot is memory only\n", d.State, d.Code)
 	default:
 		fmt.Fprintf(stdout, "durable store: %s\n", d.State)
+	}
+	switch u := durable.Upload; {
+	case u == nil:
+		fmt.Fprintln(stdout, "cloud upload: unknown (not in this daemon's answer)")
+	case u.Status == nil:
+		fmt.Fprintf(stdout, "cloud upload: %s\n", u.State)
+	default:
+		t := u.Status.Totals
+		pending := "none"
+		if p := u.Status.Pending; p != nil {
+			pending = fmt.Sprintf("%s (%d events, %d attempts, persisted %s)", p.BatchID, p.Events, p.Attempts, p.Persisted)
+		}
+		fmt.Fprintf(stdout, "cloud upload: %s  receipted %d  pending %s  refused %d  abandoned %d  this hour %d B / %d requests\n",
+			u.Status.State, t.Receipted, pending, t.RefusedEvents, t.AbandonedEvents, u.Status.Hour.Bytes, u.Status.Hour.Requests)
 	}
 	if st.Report == nil {
 		fmt.Fprintln(stdout, "watchdog: no scan yet (not_collected)")
