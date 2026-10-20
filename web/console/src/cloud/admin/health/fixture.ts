@@ -284,6 +284,9 @@ function specs(): Spec[] {
   ]
 }
 
+/** Incident evidence is frozen: its times come from the first incident answer, not each refresh. */
+let incidentEpoch: number | null = null
+
 /** Acknowledgements made in this tab, so the harness shows the new closing revision. */
 const acknowledgedHere = new Set<string>()
 
@@ -371,7 +374,9 @@ function incidentEnvelope(now: number, extra: Row): Row {
   }
 }
 
-async function incidentAnswer(scenario: FixtureScenario, path: string, q: URLSearchParams, now: number, method: string): Promise<Response> {
+async function incidentAnswer(scenario: FixtureScenario, path: string, q: URLSearchParams, asked: number, method: string): Promise<Response> {
+  incidentEpoch ??= asked
+  const now = incidentEpoch
   const disabled = scenario === "incidents_disabled" || scenario === "empty"
   const all = disabled ? [] : specs().map(withAck)
   if (path === "incidents") {

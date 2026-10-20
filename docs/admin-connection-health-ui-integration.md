@@ -7,7 +7,7 @@ explicit adapter, and draws M01–M06 and the evidence view from what those read
 **not** the complete monitor of [admin-connection-health.md](admin-connection-health.md): the Cloud
 has no presence contract, no viewer producer, no probes and no owner-sealed diagnostics yet, and
 every screen says so where it would otherwise have shown them. Durable incidents, their immutable
-revisions, the audited export and the operator acknowledgement (Cloud task 35ba675a, `fac588c`) are
+revisions, the audited export and the operator acknowledgement (Cloud commit `fac588c`) are
 read and drawn. The Cloud API that serves these reads is committed, not deployed; nothing here has
 called production.
 The design is [admin-connection-health-design.md](admin-connection-health-design.md).

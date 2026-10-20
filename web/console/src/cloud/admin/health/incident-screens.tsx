@@ -180,7 +180,7 @@ function ExportPanel({ incidentId, revision, account, say, actions }: { incident
         {st.kind === "failed" ? (
           <p className="adm-stale">{say("inc_exportFailed", { reason: exportFailureWord(say, st.code) })}{st.code === "incident_expired" && st.expiredAt ? ` ${say("inc_expiredAt", { time: st.expiredAt })}` : ""} <span className="adm-code">({st.code})</span></p>
         ) : st.kind === "ready" ? (
-          <p>{say("inc_exportVerified", { hash: st.value.contentHash, kib: Math.ceil(st.value.bytes / 1024) })}</p>
+          <p className="adh-hash">{say("inc_exportVerified", { hash: st.value.contentHash, kib: Math.ceil(st.value.bytes / 1024) })}</p>
         ) : null}
       </div>
       {st.kind === "ready" ? (
