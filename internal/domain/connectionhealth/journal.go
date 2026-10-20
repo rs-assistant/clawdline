@@ -2,6 +2,7 @@ package connectionhealth
 
 import (
 	"encoding/json"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -36,8 +37,11 @@ const (
 // Record is one journal entry: content-free by construction, since every
 // string field is an enum, a location code or an opaque id.
 type Record struct {
-	Schema   string    `json:"schema"`
-	Seq      uint64    `json:"seq"`
+	Schema string `json:"schema"`
+	Seq    uint64 `json:"producer_seq"`
+	// EventID is "<boot_id>-<producer_seq>": unique per producer boot, so
+	// an uploader can retry a batch without minting new identities.
+	EventID  string    `json:"event_id"`
 	BootID   string    `json:"boot_id"`
 	Event    Event     `json:"event"`
 	Wall     time.Time `json:"wall"`
@@ -56,7 +60,7 @@ type Record struct {
 	DeadlineNS int64  `json:"deadline_ns,omitempty"`
 	Count      uint64 `json:"count,omitempty"`
 	Rule       string `json:"rule,omitempty"`
-	Build      string `json:"build,omitempty"`
+	Build      string `json:"build_commit,omitempty"`
 }
 
 func (r Record) validate() error {
@@ -131,6 +135,7 @@ func (j *Journal) Append(r Record) error {
 	defer j.mu.Unlock()
 	j.seq++
 	r.Schema, r.Seq, r.BootID = RecordSchema, j.seq, j.bootID
+	r.EventID = j.bootID + "-" + strconv.FormatUint(j.seq, 10)
 	r.Wall, r.MonoNS = now.Wall, int64(now.Mono)
 	b, err := json.Marshal(r)
 	if err != nil || len(b) > MaxRecordBytes {
@@ -188,7 +193,7 @@ type Page struct {
 	Schema      string    `json:"schema"`
 	GeneratedAt time.Time `json:"generated_at"`
 	BootID      string    `json:"boot_id"`
-	Build       string    `json:"build"`
+	Build       string    `json:"build_commit"`
 	Records     []Record  `json:"records"`
 	Coverage    Coverage  `json:"coverage"`
 	// NewestAgeNS is how long ago the newest retained record was written.

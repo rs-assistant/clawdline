@@ -159,6 +159,41 @@
     "Note": true
   },
   {
+    "Name": "cloud.health_active_slots",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_journal_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_journal_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_query_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_query_rows",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_record_bytes",
+    "Known": true,
+    "Note": true
+  },
+  {
+    "Name": "cloud.health_reserved_slots",
+    "Known": true,
+    "Note": true
+  },
+  {
     "Name": "cloud.peer_body_bytes",
     "Known": true,
     "Note": true

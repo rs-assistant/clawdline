@@ -9,7 +9,7 @@ import (
 // cloudCapacityMeasures measures every row of the register's "cloud" area
 // (capacity.AreaOf), one reading per row.
 func (s *Server) cloudCapacityMeasures() map[string]func() capacity.Reading {
-	return map[string]func() capacity.Reading{
+	out := map[string]func() capacity.Reading{
 		capacity.CloudTaskListReread: func() capacity.Reading {
 			line, ok := cloudLines.Load(s.cfg.Dir)
 			if !ok {
@@ -176,4 +176,8 @@ func (s *Server) cloudCapacityMeasures() map[string]func() capacity.Reading {
 		},
 		capacity.CloudSpoolRefusals: func() capacity.Reading { return s.spoolRefusalReading() },
 	}
+	for name, m := range connectionHealthCapacityMeasures() {
+		out[name] = m
+	}
+	return out
 }

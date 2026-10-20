@@ -242,6 +242,9 @@ func TestClockJumpsAndSchedulingGaps(t *testing.T) {
 	if r.ClockBackwardsNS != int64(500*time.Millisecond) {
 		t.Errorf("backwards clock not reported: %+v", r)
 	}
+	if f := finding(t, r, h.id); f.AgeNS != int64(time.Second) {
+		t.Errorf("age after a backwards clock is measured from the last good reading: %+v", f)
+	}
 	for _, f := range r.Findings {
 		if f.AgeNS < 0 || f.ActiveNS < 0 {
 			t.Errorf("negative age %+v", f)

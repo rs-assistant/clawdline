@@ -669,6 +669,141 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.health_active_slots",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 128,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxActiveSlots"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_journal_bytes",
+    "Class": "journal",
+    "Unit": "bytes",
+    "Limit": 4194304,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxJournalBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_journal_rows",
+    "Class": "journal",
+    "Unit": "rows",
+    "Limit": 4096,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxJournalRecords"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_query_bytes",
+    "Class": "observation",
+    "Unit": "bytes",
+    "Limit": 1048576,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxQueryBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_query_rows",
+    "Class": "observation",
+    "Unit": "rows",
+    "Limit": 200,
+    "WarnAt": 0,
+    "AtLimit": "evict_oldest",
+    "Deviation": "",
+    "Told": [
+      "diagnostics",
+      "sender"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxQueryRecords"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_record_bytes",
+    "Class": "buffer",
+    "Unit": "bytes",
+    "Limit": 1024,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxRecordBytes"
+    ]
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.health_reserved_slots",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 8,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": [
+      "internal/domain/connectionhealth.MaxReservedSlots"
+    ]
+  },
+  {
+    "Register": "daemon",
     "Name": "cloud.peer_body_bytes",
     "Class": "buffer",
     "Unit": "bytes",
