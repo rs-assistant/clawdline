@@ -4357,6 +4357,22 @@ export class CloudClient {
             });
         }
         var self = this;
+        // The write's connection-health trace (`viewer-health-hook.js`): issued now, and its
+        // relay answer recorded under the same correlation. A write that resolves because the
+        // ack timer ran out heard nothing, so it is recorded `pending`, never `ok`.
+        var health = viewerHealthBegin("viewer_request_issued", "control");
+        var healthSettled = false;
+        function healthAnswer(failure, heard) {
+            if (healthSettled) return;
+            healthSettled = true;
+            if (!failure) {
+                health.mark("viewer_response_received", "viewer_stage_completed", { outcome: heard ? "ok" : "pending" });
+                return;
+            }
+            var word = classifyViewerError(failure, "read");
+            health.mark("viewer_response_received", "viewer_stage_failed",
+                { error: word, outcome: word === "timeout" ? "timeout" : "error" });
+        }
         return new Promise(function (resolve, reject) {
             var pending = { ack: null };
             var envelope = null;
@@ -4365,24 +4381,25 @@ export class CloudClient {
             pending.ack = {
                 settle: function (failure) {
                     if (timer !== null) { self.clearTimeout(timer); timer = null; }
-                    if (failure) { reject(failure); return; }
+                    if (failure) { healthAnswer(failure, false); reject(failure); return; }
                     // The relay can answer inside the same turn the frame was written, before
                     // `_publishCommand` has handed the envelope back; resolve with it once it has.
                     relayed = true;
-                    if (envelope) resolve(envelope);
+                    if (envelope) { healthAnswer(null, true); resolve(envelope); }
                 }
             };
             self._publishCommand(machine, type, body, envelopeClass, pending).then(function (sealed) {
                 envelope = sealed;
-                if (relayed) { resolve(sealed); return; }
+                if (relayed) { healthAnswer(null, true); resolve(sealed); return; }
                 if (self.pendingBySequence.get(sealed.seq) !== pending.registered) return;   // refused already
                 timer = self.setTimeout(function () {
                     timer = null;
                     if (self.pendingBySequence.get(sealed.seq) !== pending.registered) return;
                     self.pendingBySequence.delete(sealed.seq);
+                    healthAnswer(null, false);
                     resolve(sealed);
                 }, self.ackTimeoutMs);
-            }, reject);
+            }, function (error) { healthAnswer(error, false); reject(error); });
         });
     }
 

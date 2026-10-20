@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8001,
-  "riskKeys": 3563,
-  "nonRiskCount": 4438,
+  "englishContentKeys": 8027,
+  "riskKeys": 3574,
+  "nonRiskCount": 4453,
   "groups": [
     {
       "name": "admin / other",
@@ -2964,7 +2964,7 @@
     },
     {
       "name": "next / other",
-      "count": 314,
+      "count": 329,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3003,6 +3003,21 @@
         "next.fontScaleReset",
         "next.fontScaleSmaller",
         "next.fontScaleTitle",
+        "next.handoverCancel",
+        "next.handoverClose",
+        "next.handoverCompare",
+        "next.handoverLead",
+        "next.handoverLocalAgain",
+        "next.handoverLocalCompare",
+        "next.handoverLocalDone",
+        "next.handoverLocalHead",
+        "next.handoverLocalHint",
+        "next.handoverLocalStart",
+        "next.handoverLocalViewerKey",
+        "next.handoverMachineKey",
+        "next.handoverMatch",
+        "next.handoverNoMatch",
+        "next.handoverTitle",
         "next.infoContext",
         "next.infoContextUsed",
         "next.infoReasoningEffort",

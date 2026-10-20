@@ -1,0 +1,5 @@
+/* The six digits a person compares with the machine's screen: large, tabular, the accent. */
+.am-handover-code {
+  margin: 4px 0; font-size: 40px; font-weight: 700; letter-spacing: .12em; text-align: center;
+  font-variant-numeric: tabular-nums; color: var(--accent);
+}

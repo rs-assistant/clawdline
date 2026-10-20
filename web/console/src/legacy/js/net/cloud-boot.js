@@ -290,6 +290,14 @@ function responseError(result, fallbackCode, fallbackMessage, terminal) {
  * Everything it touches — fetch, storage, IndexedDB, the clock, the socket — is injected, so
  * the same object runs under the tests with fakes and in the browser with the real thing.
  */
+/** `{ identity_epoch, key_epoch }` from a token mint, or null when either is not a whole number. */
+export function tokenIdentityOf(value) {
+    if (!value || typeof value !== "object") return null;
+    var identity = value.identity_epoch, key = value.key_epoch;
+    if (!Number.isSafeInteger(identity) || identity < 0 || !Number.isSafeInteger(key) || key < 1) return null;
+    return { identityEpoch: identity, deviceKeyEpoch: key };
+}
+
 export class CloudViewerSession {
     constructor(options) {
         options = options || {};
@@ -311,6 +319,7 @@ export class CloudViewerSession {
         this.deviceID = null;
         this.caps = [];
         this.devicePrivateKey = null;
+        this.tokenIdentity = null;
         this.devicePublicKey = null;
         this.client = null;
     }
@@ -472,6 +481,9 @@ export class CloudViewerSession {
         if (minted.status !== 200 || !minted.body || typeof minted.body.token !== "string") {
             throw bootError("token_failed", "the device token could not be minted");
         }
+        // The epochs the token was minted under: the owner-diagnostics read proof names them
+        // (`cloud/health-owner/proof.ts`). Absent or malformed reads as unknown, never as 0.
+        this.tokenIdentity = tokenIdentityOf(minted.body.identity);
         return {
             token: minted.body.token,
             expiresAt: Date.parse(minted.body.expires_at),

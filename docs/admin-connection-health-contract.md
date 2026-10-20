@@ -664,8 +664,9 @@ from a true one, so no attestation is sent. Until then a sealed read answers
 5. Done: the daemon uploader (§9a). Next: Cloud fields for storage loss and `state_after_loss`,
    owner sealing (clients in §9b; key source and daemon wiring still missing),
    stack capture, and M01–M06 on real sources.
-6. Done in code, not yet turned on: the browser viewer producer (§11). Next: the hosted page's
-   start/stop hookup (§11.4), then `viewer_sse_gap` and the write and direct-carrier paths (§11.3).
+6. Done, off by default: the browser viewer producer (§11), its hosted-page lifecycle behind the
+   `VITE_VIEWER_HEALTH=on` build flag (§11.4) and the relay write path. Not wired, by decision:
+   `viewer_sse_gap` and the WebRTC direct carrier (§11.3).
 
 ## 11. Browser viewer producer (implemented, off by default)
 
@@ -698,6 +699,8 @@ sent to cost the batch a 400. `elapsed_ms` and `count` are clamped to the Cloud'
 | `viewer_sse_resume` | `cloud-client.js` `start` → `_becameReady` of a client created with `resumeFrom` | completed `ok` when the predecessor's delivery provably continued (`_continueFrom` taken); failed `sse_resume_refused` when continuity was unproven and rows are asked for again; failed `carrier_closed` if the socket closed first |
 | `viewer_request_issued` | `cloud-client.js` `_read`, when the read's waiter is created | started |
 | `viewer_response_received` | `cloud-client.js` `_settleRead` | completed `ok`; failed `timeout`, `carrier_closed`, …; an abandoned read is failed `unclassified` with outcome `aborted` |
+| `viewer_request_issued` (class `control`) | `cloud-client.js` `_publishAcknowledged` (a write that resolves on the relay's ack: an answer to a Mac without `cloud_status.v >= 1`) | started |
+| `viewer_response_received` (class `control`) | the same write, when it settles | completed `ok` on the relay's ack; completed `pending` when the ack timer ran out and the write resolved having heard nothing; failed with the classified word on a relay refusal (`machine_offline`, `publish_error`) or a seal failure |
 | `viewer_decrypt_apply` | `_settleRead` success (an answer is only settled opened and applied), and `_receiveEnvelope`'s failure path | completed `ok` under the read's correlation; failed `replay_rejected`, `apply_failed` (probe stage `apply`) or `decrypt_failed` (anything before the payload opened), under its own correlation |
 
 "SSE" in the Cloud's stage names is mapped onto the relay WebSocket the hosted console actually
@@ -710,8 +713,14 @@ transport's own codes, anything else `unclassified`, never a guess.
 - `viewer_sse_gap`: the relay socket has no contiguous per-stream ids for the page to detect a
   skipped range (sequences are per sender across channels), so no record is ever sent. A Cloud
   reader showing no gap rows has **no** evidence that none happened.
-- Writes (`_publishAcknowledged`: send, answer, dispatch) and the WebRTC direct carrier
-  (`direct-carrier.ts`, `terminal-direct.ts`) record nothing.
+- The WebRTC direct carrier (`direct-carrier.ts`, `terminal-direct.ts`) records nothing. The
+  Cloud's eight stages describe the relay socket; `viewer_carrier_replace` means a successor relay
+  socket taking over from a ready one. Recording a peer-to-peer attempt under it, or under
+  `viewer_connect`, would mix a second carrier into the relay's rates, so it waits for a stage of
+  its own in the Cloud contract.
+- Writes that resolve from the Mac's own result (send, dispatch, and an answer to a Mac with
+  `cloud_status.v >= 1`) go through `_read` and are recorded as reads (class `read`), not as
+  `control`.
 - A decrypt or apply failure of an envelope cannot be tied to the read it answered (the read id is
   inside the ciphertext), so it carries its own correlation; the read then shows as a failed
   response (usually `timeout`) under the read's correlation.
@@ -720,15 +729,22 @@ transport's own codes, anything else `unclassified`, never a guess.
 
 ### 11.4 Turning it on
 
-`startViewerHealth({ enabled: true, apiOrigin, targetMachineId? })` (`install.ts`) starts the page's
-one producer and installs it into the hook; any other configuration answers `null` and records
-nothing. `handle.setTargetMachine(id)` names the owned machine later batches attribute to.
-`handle.stop()` / `stopViewerHealth()` clears the buffer and pending batch, aborts the request in
-flight, and uninstalls. **Not hooked up yet:** the hosted page's lifecycle lives in
-`CloudGate.tsx`, owned by a concurrent task. The root's hookup is: start it where the Cloud
-transport is configured and the session is signed in (behind the page's own explicit setting),
-`setTargetMachine` with the Cloud `machines` id of the reader's machine, and `stop()` in the
-`revoked`, `sign_in` and transport-leaves-Cloud branches of its `keepConnected` state handler.
+Two explicit conditions, both required; nothing is collected otherwise.
+
+1. **The build.** `VIEWER_HEALTH_BUILD_FLAG` (`lifecycle.ts`) is true only when the hosted console
+   was built with `VITE_VIEWER_HEALTH=on`. Unset, empty or any other value is off, so every
+   existing deployment records nothing until a build is made with the flag on purpose. There is no
+   runtime, account or URL switch that turns it on.
+2. **The page.** `ViewerHealthLifecycle.update({ apiOrigin, signedIn, account, targetMachineId })`
+   runs the page's one producer only while the transport is the Cloud and the page is signed in to
+   an account. `CloudGate.tsx` calls it as that state changes: another account stops the old
+   producer and starts a fresh one (no buffer crosses accounts); a change of `targetMachineId` (the
+   owned Cloud `machines` id the page is reading) calls `setTargetMachine` without a restart;
+   sign-out, revocation (`stop("session_gone")`), leaving the Cloud and unmounting call `stop()`,
+   which clears the buffer and pending batch, aborts the request in flight, and uninstalls.
+
+`startViewerHealth({ enabled: true, apiOrigin, targetMachineId? })` (`install.ts`) remains the one
+entry the lifecycle uses; any other configuration answers `null` and records nothing.
 
 ### 11.5 Bounds and failure behavior
 
