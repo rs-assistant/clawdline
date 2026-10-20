@@ -11,7 +11,7 @@
  * this runs throws `stale` and nothing is persisted.
  */
 import {
-  createIdentityOffer, decodeIdentityPairingQR, checkIdentityPairingQR, openIdentityGrant, openIdentityConfirm,
+  canonicalJSON, createIdentityOffer, decodeIdentityPairingQR, checkIdentityPairingQR, openIdentityGrant, openIdentityConfirm,
 } from "../../legacy/js/net/cloud-pairing.js"
 
 export const IDENTITY_POLL_INTERVAL_MS = 1_000
@@ -59,7 +59,7 @@ async function call(deps: IdentityViewerDeps, path: string, body: unknown): Prom
   try {
     response = await deps.fetch(deps.apiOrigin + path, {
       method: "POST", credentials: "include", cache: "no-store",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" }, body: canonicalJSON(body),
       signal: AbortSignal.timeout(IDENTITY_REQUEST_TIMEOUT_MS),
     })
   } catch {
