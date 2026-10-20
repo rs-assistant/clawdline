@@ -48,7 +48,7 @@ import {
   durablePairViewerFromInvitation,
   resumePendingPairing,
 } from "./pair-pending.js"
-import { PairPanel, type PairRequest } from "./PairPanel.js"
+import { PairPanel, type PairDevice, type PairRequest } from "./PairPanel.js"
 import { FleetUpdateRow } from "./FleetUpdateRow.js"
 import { FleetUpdateNotice } from "./FleetUpdateNotice.js"
 import type { PairAgentProgress, PairAgentReply } from "./pair-agent.js"
@@ -194,6 +194,17 @@ type Screen =
   | { at: "misdeclared"; reason: string }
 
 /** The machine a tab chose, so a reload reads the same one. Per account, per tab. */
+/**
+ * Which pairing way the card leads with. The Home Screen app and a phone
+ * browser scan the machine's QR inside the page; anything else is a computer,
+ * which copies a code to paste on the machine. An iPhone's Safari never gets
+ * here: it is sent to install the Home Screen app first.
+ */
+function pairDevice(): PairDevice {
+  if (cloudOnboardingMode(window) === "pwa") return "app"
+  return cloudViewerDeviceMetadata(window).kind === "android" ? "phone" : "desktop"
+}
+
 const CHOSEN = "clawdline.cloud.machine:"
 /**
  * A toolbar press that a reload used to be in the middle of.
@@ -1783,8 +1794,15 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
               failedReason: typeof answer.failed_reason === "string" ? answer.failed_reason : "",
             }
           },
-          canScan: cloudOnboardingMode(window) === "pwa",
+          device: pairDevice(),
           onScan: readInvitation,
+          onMismatch: (id: string) => {
+            // The machine that answered is not the one on the person's screen:
+            // put the forget question for it in front of them.
+            const answered = machinesRef.current?.find((m) => m.id === id) ?? null
+            closePairing()
+            if (answered) askForget(answered)
+          },
         }
       : null
   // Once drawn, the console stays: the copied modules bind to the document
