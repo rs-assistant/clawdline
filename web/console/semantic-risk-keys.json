@@ -1,14 +1,14 @@
 {
   "version": 1,
-  "englishKeys": 8784,
+  "englishKeys": 8790,
   "counts": {
-    "negation": 2556,
-    "state": 1440,
-    "permission": 484,
+    "negation": 2558,
+    "state": 1442,
+    "permission": 487,
     "deletion": 197,
     "uncertainty": 269
   },
-  "unionCount": 3899,
+  "unionCount": 3903,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -2555,6 +2555,8 @@
       "workflow.zeroReviewBody",
       "workflowSettings.dispatch_full_permissionOff",
       "workflowSettings.dispatch_full_permissionOn",
+      "workflowSettings.itermUpdateRequired",
+      "workflowSettings.iterm_integrationOff",
       "workflowSettings.readFailed",
       "workflowSettings.saveFailed",
       "workflowSettings.session_auto_discoveryOff",
@@ -4002,6 +4004,8 @@
       "workflow.sourceUnavailable",
       "workflow.workflowCount",
       "workflowSettings.dispatch_full_permissionScope",
+      "workflowSettings.iterm_integrationOn",
+      "workflowSettings.iterm_integrationScope",
       "workflowSettings.saved",
       "worktree.cleanupUnavailable",
       "worktree.failed",
@@ -4493,6 +4497,9 @@
       "workflowSettings.dispatch_full_permissionOff",
       "workflowSettings.dispatch_full_permissionOn",
       "workflowSettings.dispatch_full_permissionTitle",
+      "workflowSettings.itermUpdateRequired",
+      "workflowSettings.iterm_integrationOff",
+      "workflowSettings.iterm_integrationOn",
       "workflowSettings.session_auto_discoveryScope",
       "worktree.refreshed"
     ],
@@ -8844,6 +8851,10 @@
     "workflowSettings.dispatch_full_permissionOn",
     "workflowSettings.dispatch_full_permissionScope",
     "workflowSettings.dispatch_full_permissionTitle",
+    "workflowSettings.itermUpdateRequired",
+    "workflowSettings.iterm_integrationOff",
+    "workflowSettings.iterm_integrationOn",
+    "workflowSettings.iterm_integrationScope",
     "workflowSettings.readFailed",
     "workflowSettings.saveFailed",
     "workflowSettings.saved",

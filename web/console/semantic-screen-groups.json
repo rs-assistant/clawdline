@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8784,
-  "riskKeys": 3899,
-  "nonRiskCount": 4885,
+  "englishContentKeys": 8790,
+  "riskKeys": 3903,
+  "nonRiskCount": 4887,
   "groups": [
     {
       "name": "admin / other",
@@ -5665,13 +5665,15 @@
     },
     {
       "name": "workflowSettings / other",
-      "count": 11,
+      "count": 13,
       "sources": [
         null
       ],
       "keys": [
         "workflowSettings.explain",
         "workflowSettings.intro",
+        "workflowSettings.introWithITerm",
+        "workflowSettings.iterm_integrationTitle",
         "workflowSettings.loading",
         "workflowSettings.off",
         "workflowSettings.on",

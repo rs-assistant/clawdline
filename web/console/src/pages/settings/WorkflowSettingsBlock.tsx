@@ -41,11 +41,12 @@ export function WorkflowSettingsBlock({ shown }: { shown: boolean }) {
 
   return <div className="block settings-workflow" aria-busy={busy}>
     <b>{word("tab")}</b>
-    <p className="say">{word("intro")}</p>
-    {(["dispatch_full_permission", "session_auto_discovery"] as const).map(key => {
+    <p className="say">{word("introWithITerm")}</p>
+    {(["dispatch_full_permission", "session_auto_discovery", "iterm_integration"] as const).map(key => {
       const id = "workflow-" + key
       const title = word(key + "Title")
       const expanded = open === key
+      const unsupported = snapshot !== null && key === "iterm_integration" && typeof snapshot[key] !== "boolean"
       return <div className="workflow-setting" key={key}>
         <div className="workflow-setting-row">
           <div className="workflow-setting-label">
@@ -55,10 +56,10 @@ export function WorkflowSettingsBlock({ shown }: { shown: boolean }) {
               <span aria-hidden="true">ⓘ</span>
             </button>
           </div>
-          <Switch labelledBy={id + "-title"} describedBy={expanded ? id + "-help" : undefined}
+          {unsupported ? <span className="say" role="status">{word("itermUpdateRequired")}</span> : <Switch labelledBy={id + "-title"} describedBy={expanded ? id + "-help" : undefined}
             on={snapshot?.[key] === true} disabled={!snapshot || busy}
             stateText={snapshot ? word(snapshot[key] ? "on" : "off") : word("loading")}
-            onToggle={() => void toggle(key)} />
+            onToggle={() => void toggle(key)} />}
         </div>
         <div id={id + "-help"} className="workflow-setting-help" hidden={!expanded}>
           <p><strong>{word("whenOn")}</strong> {word(key + "On")}</p>

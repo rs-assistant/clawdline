@@ -269,8 +269,8 @@ consulted about a terminal again: move the hotkey wherever you like and the sess
 
 ## Turning iTerm2 scanning off
 
-**Settings → Enable iTerm2 integration** (`iterm_integration` in `config.json`)
-is off by default for both new and existing installations. Only an explicit
+**Website Settings → Workflow and control → Enable iTerm2 integration** (`iterm_integration` in `config.json`)
+is available in the Cloud and local browser console and is off by default for both new and existing installations. The macOS App settings surface is sunset; it is not the configuration entry point. Only an explicit
 `true` enables access. An old `iterm_scan` value, an iTerm2 terminal preference,
 and an existing macOS Automation grant do not count as consent. Unreadable
 settings leave integration off at startup.
@@ -292,7 +292,7 @@ Session, and does not block publishing complete enabled-source readings to Cloud
 
 A newer console connected to an older daemon shows an upgrade explanation instead
 of a misleading off switch: support is identified by the nullable
-`iterm_integration` snapshot key, which old daemons omit.
+`iterm_integration` snapshot key in the narrow workflow settings response, which old daemons omit.
 
 The switch explains that enabling allows listing tabs, reading screens, typing,
 and opening, showing or closing tabs. The first such operation may request macOS

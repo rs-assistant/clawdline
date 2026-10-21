@@ -2581,3 +2581,15 @@ test("a readonly viewer's refusal without a status of its own answers 403 viewer
     assert.equal(body.outcome, "not_done", code)
   }
 })
+
+
+test("the website workflow tab carries iTerm2 consent only to its selected machine", async () => {
+  const client = new FakeClient()
+  const { reader } = seam(client)
+  assert.equal((await reader.fetch("/v1/settings/workflow")).status, 200)
+  assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "workflow-settings", {}, "read"])
+  for (const on of [true, false]) {
+    assert.equal((await reader.fetch("/v1/settings/workflow", post({ iterm_integration: on }))).status, 200)
+    assert.deepEqual(client.calls.pop(), ["_machineRequest", "mac-a", "workflow-settings-update", { changes: { iterm_integration: on } }, "action"])
+  }
+})
