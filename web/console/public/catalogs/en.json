@@ -8763,5 +8763,9 @@
   "settings.settingsITermIntegrationUpgrade": "This daemon does not support the iTerm2 consent switch. Update Clawdline on this machine to control all iTerm2 access. Its current access cannot be inferred from this page.",
   "settings.settingsSessionTerminalConsentHint": "Automatic uses tmux while iTerm2 integration is off. With integration enabled, Automatic uses iTerm2 while it is open; with tmux installed, the Session runs in tmux and is shown in an iTerm2 tab. Explicit iTerm2 choices require enabled integration and a running iTerm2. iTerm2 (native tab) runs directly in its tab. tmux always uses tmux. The next Session follows this choice.",
   "capacityRow.cloud.envelope_key_id.what": "An encrypted envelope key identifier is limited to 128 bytes, including the epoch and full content-key hash.",
-  "capacityRow.cloud.envelope_key_id.full": "An oversized key identifier is refused before an envelope is sent or opened."
+  "capacityRow.cloud.envelope_key_id.full": "An oversized key identifier is refused before an envelope is sent or opened.",
+  "capacityRow.cloud.viewer_rekey_pending.what": "How many content-key exchanges one browser client may hold at once. Only an explicitly paired machine can answer; read-only browsers are eligible.",
+  "capacityRow.cloud.viewer_rekey_pending.full": "Further unknown-key envelopes retain no payload and start no extra operation. One exchange expires within 120 seconds; it is never automatically retried. This feature is disabled by default. The machine cannot measure live browser use.",
+  "capacityRow.cloud.viewer_rekey_cooldown.what": "The minimum seconds between content-key offers from one browser client, shared across its machines. This bounds retries caused by unknown-key traffic.",
+  "capacityRow.cloud.viewer_rekey_cooldown.full": "An earlier offer blocks another until the interval ends. New traffic may then request one fresh exchange; no timer retries it. Disconnect discards pending secrets. The machine cannot measure this browser interval."
 }

@@ -36,9 +36,9 @@ function validOffer(o: RekeyOffer, now: number) {
  if(o.type!=="content_key_offer" || o.v!==1 || !epoch(o.from_epoch) || !Number.isSafeInteger(now) || now<0 || !Number.isSafeInteger(o.expires_at_ms) || o.expires_at_ms<=now || o.expires_at_ms-now>REKEY_LIFETIME_MS_LIMIT || ![o.account_id,o.machine_id,o.viewer_device_id,o.operation_id,o.from_key_id].every(id)) fail()
  unb64(o.viewer_ephemeral_key,32); unb64(o.nonce,32)
 }
-async function verify(key: Uint8Array, sig: string, data: Uint8Array) {
- if(key.length!==32) fail()
- const k=await crypto.subtle.importKey("raw",raw(key),"Ed25519",false,["verify"])
+async function verify(key: Uint8Array | CryptoKey, sig: string, data: Uint8Array) {
+ if(key instanceof Uint8Array && key.length!==32) fail()
+ const k=key instanceof Uint8Array ? await crypto.subtle.importKey("raw",raw(key),"Ed25519",false,["verify"]) : key
  if(!await crypto.subtle.verify("Ed25519",k,raw(unb64(sig,64)),raw(data))) fail()
 }
 export async function signRekeyOffer(o: RekeyOffer, signing: CryptoKey, now: number): Promise<string> {
@@ -79,7 +79,7 @@ export async function sealRekeyAnswer(s: string,a: RekeyAuthority,state: {epoch:
  return rekeyCanonical(ans)
 }
 // Consume pending + persist state atomically in runtime. This has no replay cache.
-export async function openRekeyAnswer(s: string,pending: string,a: RekeyAuthority,privateKey: CryptoKey,machineKey: Uint8Array,storedEpoch: number,storedKeyID: string,now: number) {
+export async function openRekeyAnswer(s: string,pending: string,a: RekeyAuthority,privateKey: CryptoKey,machineKey: Uint8Array | CryptoKey,storedEpoch: number,storedKeyID: string,now: number) {
  const o=await verifyRekeyOffer(pending,a,now), ans=parse<RekeyAnswer>(s); fields(ans,answerFields)
  if(ans.type!=="content_key_answer" || ans.v!==1 || rekeyCanonical(ans.offer)!==pending || ans.offer_hash!==await hash(pending) || ans.sender_device_id!==a.machine_id || !epoch(ans.epoch) || ans.epoch<o.from_epoch || ans.epoch<storedEpoch || (ans.epoch===storedEpoch && ans.key_id!==storedKeyID) || (ans.epoch===o.from_epoch && ans.key_id!==o.from_key_id)) fail()
  await verify(machineKey,ans.signature,bytes("answer",omit(ans,"signature")))

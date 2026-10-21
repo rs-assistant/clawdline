@@ -10,6 +10,12 @@ import (
 // (capacity.AreaOf), one reading per row.
 func (s *Server) cloudCapacityMeasures() map[string]func() capacity.Reading {
 	out := map[string]func() capacity.Reading{
+		"cloud.viewer_rekey_pending": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "browser policy only; disabled by default; no daemon queue; live browser usage is not measured"}
+		},
+		"cloud.viewer_rekey_cooldown": func() capacity.Reading {
+			return capacity.Reading{Known: true, Note: "browser interval policy only; disabled by default; live browser activity is not measured"}
+		},
 		"cloud.envelope_key_id": func() capacity.Reading {
 			return capacity.Reading{Known: true, Note: "per-envelope key identifier parse guard; no retained buffer"}
 		},

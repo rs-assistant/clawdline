@@ -16,6 +16,7 @@ import {
     sealEnvelope
 } from "./cloud-crypto.js";
 import { T } from "../core/i18n.js";
+import { ViewerRekey } from "../../../cloud/viewer-rekey.ts";
 import { classifyViewerError, viewerHealthBegin, viewerHealthFailed } from "./viewer-health-hook.js";
 import { machinePresentation, machinePresentationForFleet } from "../session/selection.js";
 import {
@@ -635,6 +636,19 @@ export class CloudClient {
         this.BroadcastChannel = options.BroadcastChannel !== undefined
             ? options.BroadcastChannel : globalThis.BroadcastChannel;
         this.tabChannel = null;
+        this.viewerRekey = options.enableViewerRekey === true && options.persistMachineRekey
+            ? new ViewerRekey({ account: this.account, viewer: this.deviceID,
+                signing: this.devicePrivateKey, viewerKey: options.devicePublicKey,
+                now: this.now, setTimeout: this.setTimeout, clearTimeout: this.clearTimeout,
+                send: (raw) => {
+                    if (!this.ready || !this.socket || this.socket.readyState !== 1) {
+                        throw cloudError("offline", "the cloud connection is not ready");
+                    }
+                    this.socket.send(raw);
+                },
+                persist: options.persistMachineRekey,
+                adopted: (pairing) => this._resumeMachineAfterRekey(pairing)
+            }) : null;
     }
 
     events(listener) {
@@ -685,6 +699,7 @@ export class CloudClient {
             var ours = self.socket === ws;
             if (ours) {
                 self.socket = null;
+                if (self.viewerRekey) self.viewerRekey.cancel();
                 self._forgetSocketSubscriptions();
             }
             self.ready = false;
@@ -745,6 +760,7 @@ export class CloudClient {
     }
 
     _shutdown(failure, acknowledgementFailure) {
+        if (this.viewerRekey) this.viewerRekey.cancel();
         if (this.healthResume) {
             this.healthResume.complete("aborted");
             this.healthResume = null;
@@ -797,6 +813,7 @@ export class CloudClient {
             throw cloudError("bad_frame", "the relay frame is not an object");
         }
         this.framesHeard += 1;
+        if (frame.type === "content_key_answer" && this.viewerRekey) return this.viewerRekey.answer(raw);
         if (frame.type === "challenge") return this._answerChallenge(frame);
         if (frame.type === "ready") return this._becameReady(frame);
         if (frame.type === "envelope") return this._receiveEnvelope(frame.envelope, frame.realign === true);
@@ -838,6 +855,31 @@ export class CloudClient {
             throw refusal;
         }
         throw cloudError("bad_frame", "unknown relay frame type");
+    }
+
+    _resumeMachineAfterRekey(pairing) {
+        var machine = pairing.machineID;
+        this.machinePairings.set(machine, pairing);
+        if (!this.ready || this.retired) return;
+        // Re-request retained state, including on read-only sockets. No claim that the discarded
+        // first envelope was delivered: only the newly verified copy can advance replay state.
+        var channels = Array.from(this.pendingSubscriptions).filter(function (name) {
+            // Terminal channels also occupy this subscription set, though the content envelope
+            // parser deliberately does not parse their separate wire protocol.
+            var parts = name.split("/");
+            return parts[1] && decodedChannelSegment(parts[1]) === machine;
+        });
+        if (channels.length) {
+            this._sendSubscriptionFrame("unsubscribe", channels);
+            this._sendSubscriptionFrame("subscribe", channels);
+        }
+        // Only idempotent reads are replayed. Actions retain their original delivery uncertainty.
+        this.readWaiters.forEach(function (waiters) {
+            if (waiters.machine === machine && !waiters.action && waiters.rekeyRetry) waiters.rekeyRetry();
+        });
+        this.sessionRecoveryAsked.delete(machine);
+        this._recoverSessions(machine);
+        this._emit({ type: "content_key_updated", machine: machine });
     }
 
     async _answerChallenge(frame) {
@@ -1232,6 +1274,16 @@ export class CloudClient {
         probe.stage = "pairing_key_id";
         this._compareKeyID(envelope, routedMachine, pairing && pairing.keyID);
         if (pairing && pairing.keyID !== envelope.key_id) {
+            if (this.viewerRekey && pairing.legacy === false && envelope.sender === pairing.senderID) {
+                // Reserve no replay claim and retain no payload. Do not wait for an answer on
+                // messageChain: that very chain is how the raw answer reaches the operation.
+                await this.viewerRekey.request(pairing);
+                if (this.viewerRekey.isPending(routedMachine)) {
+                    // The existing transient code keeps automatic refresh out of the explicit
+                    // Pair a Browser repair door. This envelope still was not applied.
+                    throw cloudError("cloud_reconnecting", "the machine content key is being refreshed");
+                }
+            }
             throw cloudError("unknown_key",
                 "the envelope does not match the selected machine's pairing");
         }
@@ -3560,6 +3612,15 @@ export class CloudClient {
                 return;
             }
             if (full) { self._settleRead(key, null, full); return; }
+            waiters.rekeyRetry = function () {
+                if (self.readWaiters.get(key) !== waiters) return;
+                if (waiters.ref) self.pendingBySequence.delete(waiters.ref.seq);
+                return self._publishCommand(identity.machine, type,
+                    Object.assign({ session: identity.session }, extra), "ctl", { key: key, waiters: waiters })
+                    .catch(function (error) {
+                        if (self.readWaiters.get(key) === waiters) self._settleRead(key, null, error);
+                    });
+            };
             Promise.resolve()
                 .then(function () {
                     return self._publishCommand(identity.machine, type,
@@ -3567,6 +3628,8 @@ export class CloudClient {
                         { key: key, waiters: waiters });
                 })
                 .catch(function (error) {
+                    if (!waiters.action && self.viewerRekey && self.viewerRekey.isPending(identity.machine)
+                        && error.code === "cloud_reconnecting") return;
                     if (self.readWaiters.get(key) === waiters) self._settleRead(key, null, error);
                 });
         });
@@ -4543,10 +4606,16 @@ export class CloudClient {
         if (offline) throw offline;
         if (!this.ready) throw this.closedFailure || cloudError("offline", "the cloud connection is not ready");
         if (!this.devicePrivateKey || !this.deviceID) throw cloudError("missing_device_key", "the viewer device key is unavailable");
-        var machinePairing = await this._outboundMachinePairing(machine);
+        if (this.viewerRekey && this.viewerRekey.isPending(machine)) {
+            throw cloudError("cloud_reconnecting", "the machine content key is being refreshed");
+        }
         var sequence = await this.nextSequence(this.deviceID);
         if (!Number.isSafeInteger(sequence) || sequence < 0) {
             throw cloudError("bad_sequence", "nextSequence() did not return a non-negative safe integer");
+        }
+        var machinePairing = await this._outboundMachinePairing(machine);
+        if (this.viewerRekey && this.viewerRekey.isPending(machine)) {
+            throw cloudError("cloud_reconnecting", "the machine content key is being refreshed");
         }
         var envelope = await sealEnvelope({
             ch: "ctl/" + channelSegment(machine),

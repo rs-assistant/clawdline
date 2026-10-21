@@ -3082,6 +3082,40 @@
   },
   {
     "Register": "daemon",
+    "Name": "cloud.viewer_rekey_cooldown",
+    "Class": "cache",
+    "Unit": "seconds",
+    "Limit": 120,
+    "WarnAt": 0,
+    "AtLimit": "expire",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
+    "Name": "cloud.viewer_rekey_pending",
+    "Class": "buffer",
+    "Unit": "rows",
+    "Limit": 1,
+    "WarnAt": 0,
+    "AtLimit": "refuse",
+    "Deviation": "",
+    "Told": [
+      "diagnostics"
+    ],
+    "EvictedBy": "daemon",
+    "Projects": false,
+    "QuietRecovery": false,
+    "Sources": null
+  },
+  {
+    "Register": "daemon",
     "Name": "console.carrier_receive_bytes",
     "Class": "buffer",
     "Unit": "bytes",
