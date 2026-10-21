@@ -2,13 +2,13 @@
   "version": 1,
   "englishKeys": 8794,
   "counts": {
-    "negation": 2558,
+    "negation": 2559,
     "state": 1445,
     "permission": 487,
     "deletion": 197,
     "uncertainty": 269
   },
-  "unionCount": 3906,
+  "unionCount": 3907,
   "categories": {
     "negation": [
       "admin.accountsPrivacy",
@@ -669,6 +669,7 @@
       "health.iv_conc_unknown",
       "health.iv_destFailed",
       "health.iv_destIncomplete",
+      "health.iv_destNext_ready",
       "health.iv_destNext_unknown",
       "health.iv_destNone",
       "health.iv_destNoneReady",
@@ -5921,6 +5922,7 @@
     "health.iv_conc_verification_failed",
     "health.iv_destFailed",
     "health.iv_destIncomplete",
+    "health.iv_destNext_ready",
     "health.iv_destNext_setup_required",
     "health.iv_destNext_unknown",
     "health.iv_destNone",

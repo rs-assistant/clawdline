@@ -216,3 +216,5 @@ was produced with JavaScript's recursive key-sorted JSON serializer. The tests
 exercise frozen-scope/hash failures, report limits, authenticated collection,
 failed transport and persistence, and exact receipt replay after reopening the
 SQLite store. No live daemon or Cloud account is required.
+
+The destination label means that an investigation schedule is configured, not that its machine is currently connected. API heartbeat age does not prove relay disconnection. Starting queues the frozen incident; a delivery claim is the receipt that the machine received it.
