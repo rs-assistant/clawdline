@@ -955,7 +955,9 @@ the HTTP gate must not replace it with the in-process router's local bearer.
 
 Readonly pairing reserves the persistent ceiling before delivering the handover,
 so a failed post-delivery write cannot fall back to legacy operate authority.
-The reservation can survive a failed handover as a readonly pin. Grant writes
+The reservation can survive a failed handover as a readonly pin. It keeps an
+existing row's refusal, key and pairing time (`PinnedStore.ReserveReadOnly`), so
+a revoked browser stays revoked until the post-handover pin. Grant writes
 are atomic and failed writes restore the prior live state. A successful local
 downgrade persists before lease revalidation; read streams remain open. Account
 revocation freshness and future content-key rotation remain separate contracts.

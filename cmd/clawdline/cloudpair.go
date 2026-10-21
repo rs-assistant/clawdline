@@ -129,13 +129,20 @@ func cloudPairJSON(method, path string, body any, out any) error {
 	return json.NewDecoder(io.LimitReader(res.Body, 1<<20)).Decode(out)
 }
 
+// cloudPairFlags is the command's flag set, kept apart so its help can be read
+// without parsing (and exiting on) -h.
+func cloudPairFlags() (*flag.FlagSet, *string, *string, *time.Duration) {
+	fs := flag.NewFlagSet("cloud pair", flag.ExitOnError)
+	scope := fs.String("scope", "", cliCopy("cloud", "pair.scope_help", "viewer access: readonly or operate; when omitted, a browser this machine already paired keeps its scope and only a never-paired browser gets operate"))
+	offer := fs.String("offer", "", cliCopy("cloud", "pair.offer_help", "finish a pairing with the code the browser is showing"))
+	wait := fs.Duration("wait", 10*time.Minute, cliCopy("cloud", "pair.wait_help", "how long to wait for a browser"))
+	return fs, scope, offer, wait
+}
+
 // cloudPairCommand shows a pairing link and waits, or finishes a pairing from
 // a code the person carried from their browser.
 func cloudPairCommand(args []string) {
-	fs := flag.NewFlagSet("cloud pair", flag.ExitOnError)
-	scope := fs.String("scope", "", cliCopy("cloud", "pair.scope_help", "viewer access: readonly or operate (default operate for compatibility)"))
-	offer := fs.String("offer", "", cliCopy("cloud", "pair.offer_help", "finish a pairing with the code the browser is showing"))
-	wait := fs.Duration("wait", 10*time.Minute, cliCopy("cloud", "pair.wait_help", "how long to wait for a browser"))
+	fs, scope, offer, wait := cloudPairFlags()
 	_ = fs.Parse(args)
 	if *scope != "" && !adaptercloud.ValidViewerScope(*scope) {
 		fail(errors.New(cliCopy("cloud", "grant.invalid_scope", "scope must be readonly or operate")))
