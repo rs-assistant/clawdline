@@ -135,12 +135,13 @@ The "Today" column is clawdline-go on macOS (master `d40545e`).
 | Voice recording | Browser MediaRecorder → 16 kHz PCM | ✅ | ✅ needs a secure context | ✅ same | An http origin that is not localhost: the microphone button must say "this address cannot record" | S |
 | Speech to text | `whisper-cli` + `ggml-*.bin` | ✅ | ✅ search paths already written | ✅ search paths already written | Already right: `ErrNoBinary` and `ErrNoModel` are separate | S (what is missing is install guidance, §4.4) |
 
-Image previews keep **Download image** separate from **Share image**. Download uses the browser's
-save picker when available, otherwise its ordinary download behavior; cancelling the picker does
-not start another download. Share appears only when the browser can share the loaded image file.
-The preview permits the browser's native long-press image menu. On iPhone, saving to Photos still
-requires a system action: a web page cannot choose a Photos destination through the Web Share API.
-An ordinary download is not a promise that the image will appear in Photos.
+Image previews show one action in the bottom-right corner. When the browser can share the loaded
+image file, **Share image** opens the native share sheet and **Download image** is hidden. Otherwise,
+**Download image** uses the browser's save picker when available, or its ordinary download behavior;
+cancelling the picker does not start another download. Dismissing the share sheet also does not
+start a download. Both actions stay hidden until the image file is ready.
+The preview permits the browser's native long-press image menu. On iPhone, saving to Photos is
+chosen through the system share sheet.
 
 ### 3.3 Secrets, permissions, storage
 
