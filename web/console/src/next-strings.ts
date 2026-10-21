@@ -979,6 +979,23 @@ const words = {
       "Sign this browser out? Its key is revoked now; to come back, sign it in again with clawdline open or a pairing code.",
     signedInSignOutConfirm: "Sign out",
     signedInSignOutFailed: "This browser was not signed out: {why}",
+    signedInPermissionLegend: "What {name} may do",
+    signedInPermissionReadOnly: "Read only",
+    signedInPermissionOperate: "Read and operate",
+    signedInPermissionUnknown: "Permission not recognized: {caps}",
+    signedInPermissionHelp:
+      "Read only lets a device see Sessions, terminal screens, and the documents and images Clawdline shows. Read and operate also lets it send messages, type in terminals, and start or close Sessions, so an assistant can run programs on this machine for it. Only this machine can change either.",
+    signedInPermissionSaving: "Saving what {name} may do…",
+    signedInPermissionSaved: "{name}: {permission}.",
+    signedInPermissionMismatch: "The machine accepted the change, but {name} still shows {permission}.",
+    signedInPermissionFailed: "{name} was not changed: {why}",
+    signedInPermissionUnread: "{name} was changed, but the list could not be read again to show it: {why}",
+    signedInRevokeLimits:
+      "Revoking refuses a device's next request. What it has already seen or downloaded cannot be taken back.",
+    doorAskScope:
+      "A paired browser can read this machine's Sessions, terminal screens, and the documents and images Clawdline shows. If the machine lets it operate, it can also send messages and type in terminals, and the assistants it drives can run programs on the machine.",
+    doorAskControl:
+      "The machine chooses read only or read and operate for each device. Revoke it on the machine under Devices → Signed in to this machine, or with clawdline devices revoke.",
     cloudMisdeclared: "This console's Clawdline Cloud declaration cannot be used: {reason}",
     cloudNotCarried: "This cannot be done over Clawdline Cloud yet. Do it on the machine itself.",
     // The one-time schedule webhook URL. Only its host, path and last four characters are
@@ -2765,6 +2782,22 @@ const words = {
     signedInSignOutAsk: "要登出這個瀏覽器嗎？它的金鑰會立刻撤銷；要回來，得再用 clawdline open 或配對碼登入。",
     signedInSignOutConfirm: "確定登出",
     signedInSignOutFailed: "這個瀏覽器沒有登出：{why}",
+    signedInPermissionLegend: "{name} 可以做什麼",
+    signedInPermissionReadOnly: "只讀",
+    signedInPermissionOperate: "可讀可操作",
+    signedInPermissionUnknown: "無法辨識的權限：{caps}",
+    signedInPermissionHelp:
+      "只讀：可以看 Session、終端畫面，以及 Clawdline 顯示的文件和圖片。可讀可操作：還能傳送訊息、在終端打字、開始或關閉 Session，所以 assistant 可以替它在這台機器上執行程式。兩者都只能由這台機器更改。",
+    signedInPermissionSaving: "正在儲存 {name} 的權限…",
+    signedInPermissionSaved: "{name}：{permission}。",
+    signedInPermissionMismatch: "機器已接受變更，但 {name} 仍顯示為「{permission}」。",
+    signedInPermissionFailed: "{name} 沒有變更：{why}",
+    signedInPermissionUnread: "{name} 已變更，但無法重新讀取清單來確認：{why}",
+    signedInRevokeLimits: "撤銷後，裝置的下一個請求就會被拒絕；它已經看過或下載的內容無法收回。",
+    doorAskScope:
+      "配對後的瀏覽器可以讀取這台機器的 Session、終端畫面，以及 Clawdline 顯示的文件和圖片。如果機器允許它操作，它還能傳送訊息、在終端打字，它驅動的 assistant 也能在機器上執行程式。",
+    doorAskControl:
+      "每台裝置是只讀還是可讀可操作，由機器決定。要撤銷，請在機器上到「裝置」→「登入這台機器的裝置」，或執行 clawdline devices revoke。",
     cloudMisdeclared: "這個 console 的 Clawdline Cloud 宣告不能用：{reason}",
     cloudNotCarried: "這件事還不能經由 Clawdline Cloud 做，請直接在那台機器上操作。",
     scheduleWebhookUrlLabel: "Webhook 網址（部分隱藏）",

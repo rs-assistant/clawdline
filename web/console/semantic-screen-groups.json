@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8737,
-  "riskKeys": 3869,
-  "nonRiskCount": 4868,
+  "englishContentKeys": 8750,
+  "riskKeys": 3879,
+  "nonRiskCount": 4871,
   "groups": [
     {
       "name": "admin / other",
@@ -3704,7 +3704,7 @@
     },
     {
       "name": "next / signed",
-      "count": 9,
+      "count": 12,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3713,6 +3713,9 @@
         "next.signedInCapsRead",
         "next.signedInCapsSend",
         "next.signedInLastSeen",
+        "next.signedInPermissionLegend",
+        "next.signedInPermissionOperate",
+        "next.signedInPermissionSaving",
         "next.signedInSignOut",
         "next.signedInSignOutConfirm",
         "next.signedInSince",
