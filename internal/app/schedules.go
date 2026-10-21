@@ -107,6 +107,12 @@ type ScheduleBook struct {
 	// `401 no_machine_credential` for.
 	// expectedRevision is the revision the hook is at: 0 for a new one.
 	Activate func(ctx context.Context, hookID, requestID string, expectedRevision int64) (int64, error)
+	// ActivateInvestigation is Activate declaring that the hook is bound to an
+	// enabled, trigger-only `health_investigation` schedule, so Cloud lists it
+	// as an investigation destination before its first run. BindWebhook picks
+	// it from the schedule as stored, never from the request. Nil, with
+	// Activate set, refuses such a bind rather than activating it unmarked.
+	ActivateInvestigation func(ctx context.Context, hookID, requestID string, expectedRevision int64) (int64, error)
 	// Conversations matches a run to the conversation its child had, so a
 	// finished run can be resumed (schedule_resume.go). Zero answers none.
 	Conversations RunConversations
@@ -1324,11 +1330,16 @@ func (b *ScheduleBook) BindWebhook(ctx context.Context, requestID, hookID, sched
 		}
 		return finish(status, code, body)
 	}
-	if _, ok, err := b.named(ctx, scheduleID); err != nil {
+	bound, ok, err := b.named(ctx, scheduleID)
+	if err != nil {
 		return complete(failure(503, "binding_store_unavailable"))
 	} else if !ok {
 		return complete(failure(404, "schedule_not_found"))
 	}
+	// The declaration covers this activation only. A schedule changed after it
+	// is still refused before each run by InvestigationBound.
+	investigation := bound.s.Enabled && bound.s.When.TriggerOnly &&
+		bound.s.TaskString("kind") == schedulewebhook.InvestigationKind
 	if !hookPattern.MatchString(hookID) || (replaceHookID != nil && !hookPattern.MatchString(*replaceHookID)) ||
 		expected < 0 {
 		return complete(failure(503, "binding_store_unavailable"))
@@ -1346,8 +1357,22 @@ func (b *ScheduleBook) BindWebhook(ctx context.Context, requestID, hookID, sched
 	if b.Activate == nil {
 		return complete(failure(401, "no_machine_credential"))
 	}
-	revision, err := b.Activate(ctx, hookID, requestID, expected)
+	activate := b.Activate
+	if investigation {
+		if b.ActivateInvestigation == nil {
+			return finish(failure(503, "cloud_upgrade_required"))
+		}
+		activate = b.ActivateInvestigation
+	}
+	revision, err := activate(ctx, hookID, requestID, expected)
 	if err != nil {
+		// A Cloud that does not know the purpose is not asked again without
+		// it: the same key must keep its body, and an unmarked investigation
+		// hook is the miss this declaration exists to prevent. Not recorded,
+		// so the same request succeeds once Cloud is upgraded.
+		if errors.Is(err, adaptercloud.ErrCloudUpgradeRequired) {
+			return finish(failure(503, "cloud_upgrade_required"))
+		}
 		// Cloud's own refusal is said as itself — `stale_revision` once hid
 		// behind this 503 for every moved hook. What did not reach Cloud, or
 		// came back unreadable, stays temporarily unavailable.

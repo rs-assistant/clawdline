@@ -1,4 +1,4 @@
-/* Network wiring for agent investigations: the operator's own schedule webhooks, and the start.
+/* Network wiring for agent investigations: the machines one can run on, and the start.
  *
  * Starting one is an explicit POST with an Idempotency-Key the caller keeps until the outcome is
  * known: an answer that never arrived is retried with the same key and body, never a new key.
@@ -14,27 +14,63 @@ type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => v !== null && typeof v === "object" && !Array.isArray(v)
 const REF = /^[A-Za-z0-9_-]{1,128}$/
 const ref = (v: unknown): string | null => (typeof v === "string" && REF.test(v) ? v : null)
-const nat = (v: unknown): number | null => (typeof v === "number" && Number.isSafeInteger(v) && v >= 0 ? v : null)
 
-/* ---- the operator's own schedule webhooks ---------------------------------- */
+/* ---- where an investigation can run ----------------------------------------- */
 
-/** One hook as `GET /v1/schedule-webhooks` lists it; only what the picker shows. */
-export type HookChoice = { hook_id: string; machine_id: string; machine_name?: string; availability: string; generation: number | null; credential_fingerprint: string | null }
-export type HooksResult = { ok: true; hooks: HookChoice[]; more: boolean } | { ok: false; code: StoredFailure } | { refused: Refusal }
+/** `GET /su/v1/health/investigation-destinations`: one row per real machine, as Cloud resolves it. */
+export const DESTINATION_SCHEMA = "clawdline.health_investigation.destinations.v1"
+export const DESTINATION_STATES = ["ready", "setup_required", "ambiguous", "offline", "unknown"] as const
+export type DestinationState = (typeof DESTINATION_STATES)[number]
 
-/** The hooks a start may name: only `active` ones, because Cloud refuses every other (`hook_unavailable`).
- *  The list carries no field saying which hook is bound to an investigation schedule; the page says so. */
-export function parseHooks(body: unknown): { hooks: HookChoice[]; more: boolean } | null {
-  if (!isObj(body) || body.schema !== "clawdline.schedule_webhook.list.v1" || !Array.isArray(body.hooks)) return null
-  const hooks: HookChoice[] = []
-  for (const h of body.hooks) {
-    if (!isObj(h)) continue
-    const id = ref(h.hook_id)
-    const machine = ref(h.machine_id)
-    if (id === null || machine === null || h.state !== "active" || h.availability !== "active") continue
-    hooks.push({ ...(typeof h.machine_name === "string" && h.machine_name.trim() ? { machine_name: h.machine_name.trim() } : {}), hook_id: id, machine_id: machine, availability: "active", generation: nat(h.generation), credential_fingerprint: ref(h.credential_fingerprint) })
+/** A machine the operator may pick. `hook_id` is non-null only on a `ready` row; every other row is shown, never chosen.
+ *  `raw` keeps a state this page does not know, so it is said as unknown rather than dropped. */
+export type Destination = { machine_id: string; machine_name: string; state: DestinationState; raw: string | null; hook_id: string | null; reason: string }
+export type Destinations = { status: "ok"; complete: boolean; machines: Destination[] } | { status: "unavailable" }
+export type DestinationsResult = { ok: true; destinations: Destinations } | { ok: false; code: StoredFailure | "not_supported" } | { refused: Refusal }
+
+const NAME_MAX = 256
+const REASON_MAX = 128
+
+/** Null is an answer the page cannot trust: a wrong schema or status, a row without a machine or name, two rows for one
+ *  machine, or two machines claiming one hook. Each would make a list look complete when it is not, so all of it fails.
+ *  A state this page does not know, or a `ready` row without a hook, stays on screen as unknown and marks the list
+ *  incomplete. */
+export function parseDestinations(body: unknown): Destinations | null {
+  if (!isObj(body) || body.schema !== DESTINATION_SCHEMA || typeof body.complete !== "boolean") return null
+  if (body.status === "unavailable") return { status: "unavailable" }
+  if (body.status !== "ok" || !Array.isArray(body.machines)) return null
+  let complete = body.complete
+  const machines: Destination[] = []
+  const seenMachine = new Set<string>()
+  const seenHook = new Set<string>()
+  for (const m of body.machines) {
+    if (!isObj(m)) return null
+    const id = ref(m.machine_id)
+    const name = typeof m.machine_name === "string" ? m.machine_name.trim() : ""
+    if (id === null || name === "" || name.length > NAME_MAX || seenMachine.has(id)) return null
+    seenMachine.add(id)
+    if (m.hook_id !== null && ref(m.hook_id) === null) return null
+    const hook = m.hook_id === null ? null : (m.hook_id as string)
+    const reason = typeof m.reason === "string" && m.reason.length <= REASON_MAX ? m.reason : ""
+    const known = (DESTINATION_STATES as readonly unknown[]).includes(m.status)
+    let state: DestinationState = known ? m.status as DestinationState : "unknown"
+    let raw = known ? null : typeof m.status === "string" ? m.status.slice(0, 64) : "—"
+    if (state === "ready" && hook === null) { state = "unknown"; raw = "ready" }
+    if (!known || raw !== null) complete = false
+    if (state === "ready") {
+      if (seenHook.has(hook as string)) return null
+      seenHook.add(hook as string)
+    }
+    machines.push({ machine_id: id, machine_name: name, state, raw, hook_id: state === "ready" ? hook : null, reason })
   }
-  return { hooks, more: typeof body.next_cursor === "string" }
+  return { status: "ok", complete, machines }
+}
+
+/** The start body for the chosen machine: its own `ready` hook, or nothing when it cannot run one. */
+export function startRequestFor(d: Destinations, machineId: string, revision: number): StartRequest | null {
+  if (d.status !== "ok") return null
+  const m = d.machines.find((x) => x.machine_id === machineId)
+  return m && m.state === "ready" && m.hook_id !== null ? { hook_id: m.hook_id, expected_incident_revision: revision } : null
 }
 
 async function cappedText(res: Response): Promise<string | null> {
@@ -42,20 +78,24 @@ async function cappedText(res: Response): Promise<string | null> {
   return new TextEncoder().encode(text).length > HEALTH_UI_LIMITS.bodyBytes ? null : text
 }
 
-export async function fetchHooks(get: typeof fetch, apiOrigin: string, signal: AbortSignal): Promise<HooksResult> {
+/** The page is only open to an operator, so a 404 here is a Cloud without the route: said as such, with no
+ *  fallback to the webhook list, which cannot tell which hook runs an investigation. */
+export async function fetchDestinations(get: typeof fetch, apiOrigin: string, signal: AbortSignal): Promise<DestinationsResult> {
   let res: Response
   try {
-    res = await get(`${apiOrigin}/v1/schedule-webhooks`, { credentials: "include", cache: "no-store", headers: { accept: "application/json" }, signal })
+    res = await get(`${apiOrigin}/su/v1/health/investigation-destinations`, { credentials: "include", cache: "no-store", headers: { accept: "application/json" }, signal })
   } catch {
     return { ok: false, code: "network" }
   }
   const text = await cappedText(res).catch(() => null)
   if (res.status === 401) return { refused: "signed_out" }
+  if (res.status === 404) return { ok: false, code: "not_supported" }
+  if (res.status === 403) return { refused: "forbidden" }
   if (!res.ok) return { ok: false, code: res.status === 429 ? "rate_limited" : res.status >= 500 ? "unavailable" : "http_error" }
   if (text === null) return { ok: false, code: "body_too_large" }
   try {
-    const parsed = parseHooks(JSON.parse(text))
-    return parsed === null ? { ok: false, code: "contract_shape" } : { ok: true, ...parsed }
+    const parsed = parseDestinations(JSON.parse(text))
+    return parsed === null ? { ok: false, code: "contract_shape" } : { ok: true, destinations: parsed }
   } catch {
     return { ok: false, code: "contract_shape" }
   }
