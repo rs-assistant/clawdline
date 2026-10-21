@@ -2,7 +2,8 @@
 
 Design proposal, not implemented. The interactive comparison is
 `docs/design/session-state-filter.html` (self-contained, no external assets). This page is the
-engineering reading of it.
+engineering reading of it. A script-free Cloud reading copy is
+`docs/design/session-state-filter-preview.html`; it embeds actual captures of the three designs.
 
 ## What changes for the person
 
@@ -28,10 +29,13 @@ Semantic caveats the implementation must keep:
 
 1. **The categories overlap.** `attention` is orthogonal to `working`/`idle`: a Session can be
    both. Per-option counts therefore do not sum to the total; the modal says so.
-2. **Non-current rows belong to no category.** A row whose `freshness` is not `current` fails both
-   `working` and `idle` and is visible only under `all`. A multi-select where every box is ticked
-   would silently hide them. The designs add a fourth option, 狀態未更新 (freshness ≠ current),
-   so "all ticked" equals "all". This is a new category, not an existing one — awaiting approval.
+2. **The state filters do not partition every row.** Non-current rows fail `working` and
+   `idle`, but may still match `attention`, whose predicate does not require current freshness.
+   A current row with an unknown state and no attention signals can also match none of these
+   filters. The mock adds 狀態未更新 as a fourth option; that alone does not prove every real
+   row will be covered when every box is selected. Keep an explicit show-all mode, and decide
+   how unmatched rows should be represented during implementation. The additional category is
+   a proposal awaiting approval.
 3. **Local and fleet states are not the same vocabulary.** The local header counts
    `state === "waiting"`; the fleet `attention` reads `waitingForReply`/`needsAttention`. The
    design does not assume they are equivalent. Using the filter on the single-machine view needs
@@ -89,7 +93,8 @@ clears the filter. A zero-count option stays selectable; it is not disabled.
 
 1. Which direction: A, B, C, or a mix (e.g. A's checklist with B's refresh-in-panel).
 2. Multi-select with union semantics, with "show all" equal to clearing the selection — yes or no.
-3. Add the fourth option 狀態未更新 (freshness ≠ current) so that ticking everything equals all.
+3. Add the fourth option 狀態未更新 (freshness ≠ current), keeping show-all as an explicit mode
+   and separately handling any current rows that match none of the three existing filters.
 4. Should the single-machine view get the same filter now, and if so how is 需要注意 defined on
    local `SessionRow` data (`state === "waiting"` alone, or also the attention signals)?
 5. Should the selection persist across reloads, or reset to all each time the page opens?
