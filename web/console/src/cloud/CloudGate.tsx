@@ -1959,12 +1959,12 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
     <>
       <IdentityHandoverDialog relay={screen.at === "pairing" ? "pairing_required" : "connected"} />
       {problem && (screen.at === "console" || screen.at === "machines") && (
-        <CloudReadProblem message={nextWord(problem.code === "machine_pairing_required" ? "cloudReadPairingRequired" : "cloudReadUnknownFailure", {
-          machine: machinesRef.current?.find((row) => row.id === problem.machine)?.label ?? problem.machine,
-        })} code={problem.code} trace={problem.trace} pairLabel={nextWord("cloudPairStart")} retryLabel={nextWord("cloudRetry")}
-          onPair={problem.code === "machine_pairing_required" ? () => pairOffer({
-            id: problem.machine, name: machinesRef.current?.find((row) => row.id === problem.machine)?.label ?? problem.machine,
-          }) : undefined} onRetry={() => { line.current?.retry(); listMachines() }} />
+        <CloudReadProblem key={problem.machine + ":" + problem.code}
+          message={nextWord("cloudReadUnknownFailure", {
+            machine: machinesRef.current?.find((row) => row.id === problem.machine)?.label ?? problem.machine,
+          })} code={problem.code} trace={problem.trace} retryLabel={nextWord("cloudRetry")}
+          dismissLabel={nextWord("updateBannerDismiss")}
+          onRetry={() => { line.current?.retry(); listMachines() }} />
       )}
       {words && who && transport.kind === "cloud" ? <SurveyCoordinator key={who.account}
         account={{ id: who.account, apiOrigin: transport.config.apiOrigin }}

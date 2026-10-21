@@ -787,7 +787,10 @@ func (p *directPeer) sendWithinEpoch(data []byte) error {
 		if refused, err := p.l.pinned.Refused(p.viewer); err != nil || refused {
 			return domaincloud.ErrRekey
 		}
-		if _, ok, err := p.l.pinned.PublicKeyFor(p.viewer); err != nil || !ok {
+		// A legacy viewer already authenticated with the current content key
+		// may use the roster fallback, just as it does on the relay. Local
+		// revocations and unreadable pins still take precedence.
+		if _, ok := p.l.publicKeyFor(p.viewer); !ok {
 			return domaincloud.ErrRekey
 		}
 	}

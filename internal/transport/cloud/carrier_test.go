@@ -9,6 +9,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -425,5 +427,43 @@ func TestCarrierReportsMissingPairingWithoutDisclosingContent(t *testing.T) {
 				t.Fatal("browser received no outcome")
 			}
 		})
+	}
+}
+
+// A roster-backed viewer has the same read authority on either transport.
+func TestCarrierReadsForLegacyViewerAndStillRejectsRevocation(t *testing.T) {
+	f := newDirectFixture(t)
+	b, _, _ := f.carrier(t)
+	f.l.pinned = adaptercloud.NewPinnedStore(t.TempDir())
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"devices": []adaptercloud.RosterDevice{{ID: "viewer", PublicKey: base64.StdEncoding.EncodeToString(f.viewer.PublicKey()), Caps: []string{"read_transcript"}}}})
+	}))
+	defer server.Close()
+	f.l.roster = adaptercloud.NewRoster(server.URL, "synthetic", time.Now)
+	epoch, err := domaincloud.NewKeyEpoch(domaincloud.ContentKeyState{Epoch: 1, KeyID: "ms-1", Key: f.master})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.l.contentEpoch = epoch
+	if err := f.l.sendCarrierEnvelope("viewer", "t/machine/session", domaincloud.ClassStream, []byte(`{"read":"transcript","body":{"text":"synthetic"}}`)); err != nil {
+		t.Fatalf("legacy viewer's answer was dropped: %v", err)
+	}
+	_, body := f.openMaster(t, b.next(t))
+	if body["read"] != "transcript" {
+		t.Fatalf("unexpected answer: %v", body)
+	}
+	if err := f.l.pinned.Pin("account", adaptercloud.PinnedDevice{DeviceID: "viewer", PublicKey: base64.StdEncoding.EncodeToString(f.viewer.PublicKey())}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.l.pinned.Revoke("viewer", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.l.sendCarrierEnvelope("viewer", "t/machine/session", domaincloud.ClassStream, []byte(`{"private":"must not leave"}`)); !errors.Is(err, domaincloud.ErrRekey) {
+		t.Fatalf("revoked viewer admitted by roster fallback: %v", err)
+	}
+	select {
+	case frame := <-b.msgs:
+		t.Fatalf("revoked viewer received content: %s", frame)
+	default:
 	}
 }

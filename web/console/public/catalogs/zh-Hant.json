@@ -8800,5 +8800,5 @@
   "capacityRow.cloud.rekey_interval.what": "這台機器每兩秒最多接受一筆原始換鑰請求，所有檢視裝置共用此間隔。",
   "capacityRow.cloud.rekey_interval.full": "間隔內的請求會被拒絕，檢視裝置可在間隔結束後重試。",
   "next.cloudReadPairingRequired": "無法讀取 {machine}：這個瀏覽器需要重新確認配對。已顯示的內容可能不是最新狀態。",
-  "next.cloudReadUnknownFailure": "目前讀不到 {machine} 的最新回覆，原因尚未確認。已顯示的內容可能已過時，請重試。"
+  "next.cloudReadUnknownFailure": "讀取 {machine} 失敗，顯示的內容可能尚未更新。"
 }

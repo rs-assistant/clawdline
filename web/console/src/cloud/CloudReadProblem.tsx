@@ -1,12 +1,16 @@
-/** An error keeps the existing console mounted, including unsent drafts. */
+import { useState } from "react"
+
+/** A quiet status row never covers content or takes focus from a draft. */
 export function CloudReadProblem(props: {
-  message: string; code: string; trace?: string; pairLabel: string; retryLabel: string;
-  onPair?: () => void; onRetry: () => void;
+  message: string; code: string; trace?: string; retryLabel: string; dismissLabel: string;
+  onRetry: () => void;
 }) {
-  return <section role="alert" className="cloud-read-problem">
-    <p>{props.message}</p>
-    <p><code>{props.code}{props.trace ? ` · ${props.trace}` : ""}</code></p>
-    {props.onPair && <button className="chip" type="button" onClick={props.onPair}>{props.pairLabel}</button>}
-    <button className="chip" type="button" onClick={props.onRetry}>{props.retryLabel}</button>
+  const [dismissed, setDismissed] = useState(false)
+  if (dismissed) return null
+  return <section role="status" className="cloud-read-problem">
+    <span title={props.code + (props.trace ? ` · ${props.trace}` : "")}>{props.message}</span>
+    <button type="button" onClick={props.onRetry}>{props.retryLabel}</button>
+    <button type="button" aria-label={props.dismissLabel} title={props.dismissLabel}
+      onClick={() => setDismissed(true)}>×</button>
   </section>
 }

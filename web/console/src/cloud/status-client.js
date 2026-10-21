@@ -451,7 +451,7 @@ export class StatusCloudClient extends CatalogCloudClient {
 
   /** The carrier for this machine, or null when this page has none to offer. */
   _carrierFor(machine) {
-    if (!this.directCarriers || typeof machine !== "string" || !machine) return null
+    if (!this.directCarriers || typeof machine !== "string" || !machine || this.carrierPairingRefusals?.has(machine)) return null
     let carrier = null
     try { carrier = this.directCarriers.for(machine) } catch { return null }
     if (carrier && !this.carrierWatched.has(carrier)) {
@@ -823,17 +823,12 @@ export class StatusCloudClient extends CatalogCloudClient {
   /** The carrier went: every read it was holding is asked again on the relay. */
   _carrierDown(machine, code) {
     if (code === "machine_pairing_required") {
-      const error = refused(code, "This browser needs to confirm its pairing with this machine.")
-      error.detail = { machine }
-      for (const [key, flight] of [...this.carrierReads]) {
-        if (flight.identity.machine === machine) {
-          this.carrierReads.delete(key)
-          this._settleRead(key, null, error)
-        }
-      }
-      this.viewerEvents?.record?.("cloud.read.failed", { machine, code, stage: "carrier_refused" })
-      this._emit({ type: "error", machine, error })
-      return
+      // Older daemons require a strong local pin only on the direct path.
+      // A transport refusal does not prove the authenticated relay is unusable.
+      // Keep this client on the relay until pairing is refreshed or it renews.
+      this.carrierPairingRefusals ??= new Set()
+      this.carrierPairingRefusals.add(machine)
+      this.viewerEvents?.record?.("cloud.carrier.fallback", { machine, code, stage: "carrier_refused" })
     }
     for (const [key, flight] of [...this.carrierReads]) {
       if (flight.identity.machine === machine) this._relayAfterCarrier(key, null)

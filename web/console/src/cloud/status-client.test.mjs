@@ -1269,16 +1269,27 @@ test("thumbnails have a separate exact waiter and older machines keep their orig
 })
 
 
-test("pairing refusal settles only that machine's carrier reads without replaying on relay", () => {
+test("an older carrier's pin requirement falls back only its reads and stops new direct attempts", async () => {
   const c = Object.create(StatusCloudClient.prototype)
-  c.carrierReads = new Map([["one", {identity: {machine: "m"}}], ["two", {identity: {machine: "other"}}]])
-  const settled = [], events = []
-  c._settleRead = (key, body, error) => settled.push([key, error.code])
-  c._emit = (event) => events.push(event)
-  c._relayAfterCarrier = () => assert.fail("must not replay a confirmed pairing refusal")
+  const identity = {machine: "m", session: "s"}
+  const waiters = {waiting: [], ref: null}
+  c.carrierReads = new Map([["one", {identity, type: "transcript", extra: {}, waiters}], ["two", {identity: {machine: "other"}}]])
+  c.readWaiters = new Map([["one", waiters]])
+  c.subscriptionHolds = new Map()
+  c._subscriptionRoom = () => null
+  c.subscribe = () => {}
+  const published = [], settled = []
+  c._publishCommand = async (...args) => {published.push(args)}
+  c._settleRead = (key, body, error) => settled.push([key, error?.code])
+  c._emit = () => assert.fail("a carrier refusal is not a failed relay read")
+  c.directCarriers = { for() { assert.fail("must keep this client on relay") } }
   c._carrierDown("m", "machine_pairing_required")
-  assert.deepEqual(settled, [["one", "machine_pairing_required"]])
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(published.length, 1)
+  assert.equal(published[0][0], "m")
+  assert.equal(published[0][1], "transcript")
+  assert.equal(c.readWaiters.get("one"), waiters, "the original caller still awaits its relay answer")
   assert.equal(c.carrierReads.has("two"), true)
-  assert.equal(events[0].machine, "m")
-  assert.equal(events[0].error.code, "machine_pairing_required")
+  assert.equal(c._carrierFor("m"), null)
+  assert.deepEqual(settled, [])
 })

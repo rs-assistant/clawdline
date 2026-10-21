@@ -222,7 +222,8 @@ func (l *Link) sendCarrierAtEpoch(viewer, channel string, class domaincloud.Clas
 	if l.contentEpoch != nil {
 		refused, pinErr := l.pinned.Refused(viewer)
 		_, pinned, keyErr := l.pinned.PublicKeyFor(viewer)
-		if pinErr == nil && keyErr == nil && !refused && !pinned {
+		_, admitted := l.publicKeyFor(viewer)
+		if pinErr == nil && keyErr == nil && !refused && !pinned && !admitted {
 			dc := peer.dc
 			peer.mu.Unlock()
 			peer.sendMu.Lock()

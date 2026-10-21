@@ -272,8 +272,29 @@ When a complete frame is awaiting relay settlement, the machine defers a newer f
 
 ### Content-free read refusal on an authenticated carrier
 
-An open carrier can send exactly `{"t":"read_error","code":"machine_pairing_required"}` when the enabled content-key runtime finds no completed local public-key pin for that viewer. The signed offer/answer has already authenticated this DTLS peer; the control does not depend on the account content key that prevented the response. It contains no request body, keys or content, and never grants authority or installs a pairing. Revoked or unreadable pins are not classified as this repairable absence. A normal paired read remains a signed, encrypted envelope.
+An open carrier can send exactly `{"t":"read_error","code":"machine_pairing_required"}` when the enabled content-key runtime finds neither a completed local public-key pin nor an admitted legacy roster identity for that viewer. The signed offer/answer has already authenticated this DTLS peer; the control does not depend on the account content key that prevented the response. It contains no request body, keys or content, and never grants authority or installs a pairing. Revoked or unreadable pins are not classified as this repairable absence. A normal paired read remains a signed, encrypted envelope.
 
 The browser closes that carrier, settles its machine's pending reads with the typed refusal, and does not replay those reads onto relay. Other machines are unaffected. It records a content-free viewer diagnostic and shows a persistent error on both machine-list and console screens. Pairing starts only after the person's press through the existing confirmed handover. Retry renews the connection, preserving the console and drafts. A normal read deadline instead shows an unknown-cause error; silence never proves a pairing failure. Only a live successful read from the affected machine clears the message; a cached inventory or another machine answering does not.
 
 Older daemons cannot send this control. Their unchanged local read deadlines provide the unknown-cause fallback. This change does not enable automatic pairing, repair or deployment.
+
+
+### Legacy read compatibility and visible failures
+
+Carrier publication uses the same pin-first, roster-fallback identity rule as relay reads.
+A locally revoked viewer or unreadable pin store still fails closed; the content-key epoch
+fence still covers the final socket enqueue. Absence of a newer pin alone is not evidence that
+an already authenticated legacy viewer needs to pair again.
+
+For older daemons that send the pin-only control above, the viewer retries only reads on the
+relay, inside the original timeout, and stops offering that machine a carrier for this client.
+The relay still performs its normal pairing and authority checks; a successful fallback is
+not a read failure. Mutations are never replayed by this path.
+
+An unresolved read failure appears in a dismissible, polite inline status row. It never covers
+the console, changes focus, or asks the person to pair based only on a transport refusal.
+A current successful read from the same machine clears it; cached rows and other machines do not.
+
+Read handlers do not hold the mutation authority mutex while routes or roster reads run.
+Their existing authority checks and publication epoch fences remain in place. Mutations,
+pairing completion, and revocation retain their authority serialization.

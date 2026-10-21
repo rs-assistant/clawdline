@@ -1300,7 +1300,10 @@ func (l *Link) answerTraced(ctx context.Context, service Service, request Inboun
 // answer handles one request, counting what it answered, and reports
 // whether the answer was OK.
 func (l *Link) answer(ctx context.Context, service Service, request Inbound) bool {
-	if l.contentAuthority != nil {
+	// Read routes recheck authority before returning content; publication owns
+	// the epoch fence. Holding the mutation lock during a read serializes all
+	// eight read slots, including slow local routes and roster I/O.
+	if l.contentAuthority != nil && !cloudops.IsRead(request.Plaintext) && !cloudops.AsksForSessions(request.Plaintext) {
 		l.contentAuthority.mu.Lock()
 		defer l.contentAuthority.mu.Unlock()
 	}
