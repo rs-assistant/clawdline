@@ -1029,6 +1029,11 @@ envelope。
 clawdline image send /absolute/path.png [more.png …]
 ```
 
+所有旗標都必須放在第一個圖片路徑之前，例如
+`clawdline image send --port 7727 /absolute/path.png`；`--target` 與 `--from` 也一樣。
+第一個路徑後面的參數都會被當成其他圖片路徑；把 `--port 7727` 放在最後會被當成兩個不存在的檔案，
+整批回傳 `400 invalid_image_path`。
+
 它會把圖片存成「在你自己的 Session 裡顯示」，console 會把它們畫在**圖片存好之後、你的 Session 第一則寫進紀錄的
 回覆**底下——通常就是執行這個指令的那則訊息（Claude Code 在指令開始後才把它寫進紀錄），不然就是下一則。
 回覆裡不需要寫任何東西。它就是 `POST /v1/artifacts/images`，body 為

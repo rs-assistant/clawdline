@@ -1173,6 +1173,12 @@ screenshot", 「傳圖片給我」「給我看截圖」 — and whenever a scree
 clawdline image send /absolute/path.png [more.png …]
 ```
 
+Put every flag before the first picture path: for example,
+`clawdline image send --port 7727 /absolute/path.png`. This also applies to
+`--target` and `--from`. After the first path, arguments are treated as more image paths;
+a trailing `--port 7727` becomes two nonexistent files and the whole batch is refused with
+`400 invalid_image_path`.
+
 It stores the pictures as shown in your own Session, and the console draws them under **the first
 reply your Session writes into its record after they are stored** — usually the message that ran
 the command, since Claude Code records it after the command starts, otherwise the next one.
