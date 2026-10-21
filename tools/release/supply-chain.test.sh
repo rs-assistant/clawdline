@@ -210,7 +210,17 @@ fi
 
 if [ "$(uname -s)" = Darwin ]; then
   echo "== macOS release signature"
-  cp "$gobin" "$work/adhoc"
+  # The toolchain's own signature differs by installer (ad hoc from source,
+  # Developer ID on GitHub's runners), so the fixture is re-signed ad hoc and
+  # the precondition checked before the case relies on it.
+  cp "$gobin" "$work/adhoc"; chmod u+w "$work/adhoc"
+  codesign --force --sign - "$work/adhoc" 2>/dev/null
+  adhocsig=$(codesign -dvvv "$work/adhoc" 2>&1 || true)
+  if grep -q '^Signature=adhoc$' <<<"$adhocsig" && ! grep -q '^Authority=' <<<"$adhocsig"; then
+    ok "the ad hoc fixture carries an ad hoc signature and no authority"
+  else
+    bad "the ad hoc fixture is not ad hoc signed"; sed 's/^/    /' <<<"$adhocsig" >&2
+  fi
   expect_fail "an ad hoc signature is not a release signature" 'not signed by a Developer ID' \
     bash -c '. tools/release/codesign.sh; codesign_verify_release "$1"' _ "$work/adhoc"
   # Node's official macOS binary is a Developer ID signature from another
