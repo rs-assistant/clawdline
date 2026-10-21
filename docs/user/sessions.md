@@ -22,7 +22,8 @@ one to expand its On, Off, and scope explanation. These are settings of the sele
 including when changed from a paired Cloud browser with Send permission.
 
 - **Use full permission by default for dispatch**: off changes future dispatches that omit a
-  permission mode to Ask. An explicit task mode takes precedence; existing tasks keep their mode.
+  permission mode to the assistant’s own permission settings, without adding full-permission arguments.
+  An explicit task mode takes precedence; existing tasks keep their mode.
 - **Automatically discover other Sessions**: off keeps Sessions opened by Clawdline and stops
   adding externally opened conversations. It takes effect on the next inventory refresh, without
   closing conversations, deleting retained records, or changing pairing or Cloud command permission.
