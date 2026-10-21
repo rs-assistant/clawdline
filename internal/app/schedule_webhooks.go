@@ -245,8 +245,8 @@ func (r *ScheduleWebhookRuntime) advance(ctx context.Context, row store.Schedule
 		}
 		var reply ScheduleReply
 		if row.Investigation != nil {
-			if schedulewebhook.ValidateInvestigationBundle(row.InvestigationBundle, *row.Investigation, r.Identity) != nil {
-				return schedulewebhook.ErrInvestigationInvalid
+			if err := schedulewebhook.ValidateInvestigationBundle(row.InvestigationBundle, *row.Investigation, r.Identity); err != nil {
+				return err
 			}
 			reply = r.Book.RunInvestigationWebhook(ctx, row.ScheduleID, row.TaskID, *row.Investigation, row.InvestigationBundle)
 		} else {

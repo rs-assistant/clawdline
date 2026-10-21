@@ -2,7 +2,10 @@ package schedulewebhook
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -52,7 +55,7 @@ func TestInvestigationFrozenBundleWire(t *testing.T) {
 			case "investigation":
 				r.InvestigationID = "hiv_" + strings.Repeat("f", 32)
 			case "machine":
-				id.MachineID = "another_machine"
+				changed = bytes.Replace(changed, []byte(`"machine_id": "mac_fixture"`), []byte(`"machine_id": "svc_api"`), 1)
 			case "scope":
 				changed = bytes.Replace(changed, []byte(`"source_id": "fixture-source"`), []byte(`"source_id": "other-source"`), 1)
 			case "trailing":
@@ -127,5 +130,87 @@ func TestInvestigationCanonicalJSONUsesCloudEncoding(t *testing.T) {
 		if _, err := CanonicalInvestigationJSON([]byte(bad)); err == nil {
 			t.Fatal("accepted ambiguous canonical JSON")
 		}
+	}
+}
+
+// serviceSourcedBundle is the shape Cloud actually serves for a Cloud service
+// incident: the evidence comes from svc_api while the delivery is leased to,
+// and its digest binds, the executing machine.
+func serviceSourcedBundle(t *testing.T) ([]byte, InvestigationRef, Identity) {
+	t.Helper()
+	raw, ref, identity := investigationFixture(t)
+	raw = bytes.ReplaceAll(raw, []byte(`"machine_id": "mac_fixture"`), []byte(`"machine_id": "svc_api"`))
+	var b InvestigationBundle
+	if err := json.Unmarshal(raw, &b); err != nil {
+		t.Fatal(err)
+	}
+	canonical, err := CanonicalInvestigationJSON(b.Bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(canonical)
+	fresh := "sha256:" + hex.EncodeToString(sum[:])
+	raw = bytes.Replace(raw, []byte(ref.ContentHash), []byte(fresh), 1)
+	ref.ContentHash = fresh
+	return raw, ref, identity
+}
+
+func TestInvestigationServiceEvidenceRunsOnTheLeasedMachine(t *testing.T) {
+	raw, ref, identity := serviceSourcedBundle(t)
+	if identity.MachineID == "svc_api" {
+		t.Fatal("fixture identity must be the executing machine, not the evidence source")
+	}
+	if err := ValidateInvestigationBundle(raw, ref, identity); err != nil {
+		t.Fatalf("refused service-sourced evidence delivered to this machine: %v", err)
+	}
+}
+
+func TestInvestigationRefusalNamesStageAndFieldOnly(t *testing.T) {
+	raw, ref, identity := serviceSourcedBundle(t)
+	cases := []struct {
+		name, want string
+		edit       func([]byte, *InvestigationRef) []byte
+	}{
+		{"schema", "envelope.schema", func(b []byte, _ *InvestigationRef) []byte {
+			return bytes.Replace(b, []byte(`clawdline.health_investigation.bundle.v1`), []byte(`clawdline.health_investigation.bundle.v0`), 1)
+		}},
+		{"hash_basis", "envelope.hash_basis", func(b []byte, _ *InvestigationRef) []byte {
+			return bytes.Replace(b, []byte("sha256 over key-sorted JSON of `bundle`"), []byte("sha256 over bundle"), 1)
+		}},
+		{"ref", "envelope.investigation_id", func(b []byte, r *InvestigationRef) []byte {
+			r.InvestigationID = "hiv_" + strings.Repeat("f", 32)
+			return b
+		}},
+		{"source", "envelope.scope.machine_id", func(b []byte, _ *InvestigationRef) []byte {
+			return bytes.Replace(b, []byte(`"machine_id": "svc_api"`), []byte(`"machine_id": ""`), 1)
+		}},
+		{"manifest", "manifest.scope.source_id", func(b []byte, _ *InvestigationRef) []byte {
+			return bytes.Replace(b, []byte(`"source_id": "fixture-source"`), []byte(`"source_id": "other-source"`), 1)
+		}},
+		{"group", "manifest.scope.group", func(b []byte, _ *InvestigationRef) []byte {
+			return bytes.Replace(b, []byte(`"correlation": "fixture-operation"`), []byte(`"correlation": "other-operation"`), 1)
+		}},
+		{"hash", "bundle.content_hash", func(b []byte, r *InvestigationRef) []byte {
+			fake := "sha256:" + strings.Repeat("0", 64)
+			b = bytes.Replace(b, []byte(r.ContentHash), []byte(fake), 1)
+			r.ContentHash = fake
+			return b
+		}},
+		{"number", "json", func(b []byte, _ *InvestigationRef) []byte {
+			return bytes.ReplaceAll(b, []byte(`"revision": 3`), []byte(`"revision": 3.5`))
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r := ref
+			err := ValidateInvestigationBundle(c.edit(bytes.Clone(raw), &r), r, identity)
+			var refusal *InvestigationRefusal
+			if !errors.Is(err, ErrInvestigationInvalid) || !errors.As(err, &refusal) || refusal.Field != c.want {
+				t.Fatalf("got %v, want a refusal naming %s", err, c.want)
+			}
+			if strings.Contains(err.Error(), "svc_api") || strings.Contains(err.Error(), "fixture") || strings.Contains(err.Error(), ref.ContentHash) {
+				t.Fatalf("refusal leaked a value: %v", err)
+			}
+		})
 	}
 }
