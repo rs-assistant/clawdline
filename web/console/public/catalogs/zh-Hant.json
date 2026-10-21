@@ -133,6 +133,7 @@
   "next.ownerRetentionLocalUnknown": "還沒計算這台機器上保留的筆數。",
   "next.ownerRetentionSaveFailed": "設定沒有變更（{why}）。",
   "next.ownerRetentionSettingUnknown": "讀不到這個開關目前的設定（{why}）。要等讀到之後才能切換。",
+  "next.adminDashboardNav": "管理 Dashboard",
   "http.84cc28107e831259": "這台機器必須允許 Cloud 操作並開啟直連，才能啟用同網路直連。",
   "bar.hintFullscreen": "全螢幕",
   "bar.hintKeys": "快速鍵",

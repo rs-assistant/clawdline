@@ -299,3 +299,30 @@ test("a new browser is named by its browser and its system, never by its user ag
   )
   assert.deepEqual(named("", ""), { kind: "browser", name: "Web browser" }, "nothing to go on keeps the old name")
 })
+
+
+test("operations discovery requires a fresh explicit session grant and clears before failures", async () => {
+  let access: unknown = true
+  let unavailable = false
+  const seen: boolean[] = []
+  const viewer = new CloudViewerSession({ config: CONFIG, storage: memoryStorage(), indexedDB: keyStore(),
+    onOperationsAccess: (allowed: boolean) => seen.push(allowed),
+    fetch: async () => {
+      if (unavailable) throw new Error("offline")
+      return new Response(JSON.stringify({ account_id: "acct_test", device_id: "dev_test", operations_access: access }))
+    },
+  })
+  viewer.restoreDeviceKey = async () => true
+  viewer.readCapabilities = async () => []
+  await viewer.ensureSession()
+  assert.deepEqual(seen, [false, true])
+  access = false
+  await viewer.ensureSession()
+  assert.deepEqual(seen.slice(-2), [false, false])
+  access = "true"
+  await viewer.ensureSession()
+  assert.deepEqual(seen.slice(-2), [false, false])
+  unavailable = true
+  await assert.rejects(viewer.ensureSession(), /offline/)
+  assert.equal(seen.at(-1), false)
+})
