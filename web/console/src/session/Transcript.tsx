@@ -58,7 +58,7 @@ import "./lightbox-steps.css"
 import "./transcript-error.css"
 import { atNewest, jumpOffered } from "./jump.js"
 import { joinTranscript } from "./history.js"
-import { HistoryFill, HISTORY_FILL_PAGES, historyAdvanced } from "./history-fill.js"
+import { HistoryFill, historyAdvanced } from "./history-fill.js"
 import { recordSendDiagnostic } from "../cloud/install.js"
 import "./jump.css"
 import "./history.css"
@@ -126,23 +126,28 @@ interface EarlierPages {
   pages: TranscriptPage[]
 }
 
-export function Transcript({
-  id,
-  row,
-  agentId,
-  onAgent,
-}: {
+interface TranscriptProps {
   id: string
   row?: SessionRow
   agentId?: string
   onAgent?: (id: string) => void
-}) {
-  // Keyed, so a different session starts from nothing: no previous session's
-  // turns, error or opened folds are shown under the new name.
-  return <TranscriptOf key={`${id}:${agentId ?? ""}`} id={id} row={row} agentId={agentId} onAgent={onAgent} />
 }
 
-function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: SessionRow; agentId?: string; onAgent?: (id: string) => void }) {
+export function Transcript(props: TranscriptProps) {
+  return <TranscriptFrame key={`${props.id}:${props.agentId ?? ""}`} {...props} />
+}
+
+function TranscriptFrame(props: TranscriptProps) {
+  const [filling, setFilling] = useState(true)
+  return <div className="tx-history-wrap" aria-busy={filling}>
+    {filling && <div className="tx-history-loading"><Skeleton /></div>}
+    <div className="tx-history-body" style={{ visibility: filling ? "hidden" : undefined }} aria-hidden={filling || undefined}>
+      <TranscriptOf {...props} onFilling={setFilling} />
+    </div>
+  </div>
+}
+
+function TranscriptOf({ id, row, agentId, onAgent, onFilling }: TranscriptProps & { onFilling: (filling: boolean) => void }) {
   // The page last read, and whether the pane is on its fast pace: the read
   // asks only for what was appended to it unless this is the safety read of
   // the whole page (`transcript-follow.ts`).
@@ -273,6 +278,7 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
     if (!olderCursor || olderBusy.current || !data) return
     olderBusy.current = true
     historyFill.current.begin(automatic)
+    onFilling(true)
     setOlderLoading(true)
     setOlderError(null)
     const scroll = document.getElementById("tx-scroll")
@@ -295,22 +301,33 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
       olderBusy.current = false
       if (alive.current) setOlderLoading(false)
     }
-  }, [agentId, data, id, olderCursor])
+  }, [agentId, data, id, olderCursor, onFilling])
   // Empty raw-record windows and compact tool groups may leave no scrollbar.
   // Fill after layout without requiring a scroll gesture. The per-opening
   // budget survives polling and resizes; only the person can restart it.
   useEffect(() => {
     const scroll = document.getElementById("tx-scroll")
     const box = document.getElementById("tx")
-    if (!scroll || !box || !data || data.evidence !== "transcript") return
+    if (!scroll || !box || !data || data.evidence !== "transcript") {
+      onFilling(show === "loading")
+      return
+    }
+    if (skeleton) { onFilling(true); return }
     let frame = 0
     const fill = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
+        if (olderBusy.current) return
+        const body = box.querySelector(".tx-history-body")
+        const style = getComputedStyle(scroll)
+        const viewportHeight = scroll.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
         if (historyFill.current.needed({
-          cursor: olderCursor, contentHeight: scroll.scrollHeight, viewportHeight: scroll.clientHeight,
-          loading: olderBusy.current, failed: !!olderError || show === "failure",
-        })) void loadOlder(true)
+          cursor: olderCursor, contentHeight: body?.getBoundingClientRect().height ?? 0, viewportHeight,
+          loading: false, failed: !!olderError || show === "failure",
+        })) {
+          onFilling(true)
+          void loadOlder(true)
+        } else onFilling(false)
       })
     }
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fill)
@@ -318,7 +335,7 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
     observer?.observe(box)
     fill()
     return () => { observer?.disconnect(); cancelAnimationFrame(frame) }
-  }, [data, earlier, olderCursor, olderError, olderLoading, show, loadOlder])
+  }, [data, earlier, olderCursor, olderError, olderLoading, show, skeleton, loadOlder, onFilling])
   useLayoutEffect(() => {
     const anchor = olderAnchor.current
     if (!anchor) return
@@ -495,13 +512,9 @@ function TranscriptOf({ id, row, agentId, onAgent }: { id: string; row?: Session
   const olderControl = olderCursor ? (
     <div className="tx-older" key="tx-older" aria-live="polite">
       <button type="button" className="go" disabled={olderLoading} onClick={() => void loadOlder()}>
-        {olderLoading
-          ? nextWord("transcriptFillingEarlier", { count: historyFill.current.reads, limit: HISTORY_FILL_PAGES })
-          : nextWord(olderError ? "transcriptRetryEarlier" : "transcriptLoadEarlier")}
+        {nextWord(olderLoading ? "transcriptLoadingEarlier" : olderError ? "transcriptRetryEarlier" : "transcriptLoadEarlier")}
       </button>
       {olderError && <span role="alert">{olderError}</span>}
-      {!olderLoading && !olderError && historyFill.current.reads >= HISTORY_FILL_PAGES &&
-        <span>{nextWord("transcriptFillPaused", { count: HISTORY_FILL_PAGES })}</span>}
     </div>
   ) : null
   if (skeleton) return <Skeleton />
