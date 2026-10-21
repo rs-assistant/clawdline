@@ -12,6 +12,13 @@ for name in check-legacy-css.sh check-machine-words.sh check-shell-expansions.sh
   printf '#!/bin/sh\nprintf "%%s\\n" "%s" >> "$CALLS"\n' "$name" > "$scratch/repo/tools/$name"
   chmod +x "$scratch/repo/tools/$name"
 done
+cat > "$scratch/repo/tools/heavy.sh" <<'MOCK'
+#!/bin/bash
+printf 'heavy %s\n' "$*" >> "$CALLS"
+if [ "${1:-}" = --compile ]; then shift; fi
+exec "$@"
+MOCK
+chmod +x "$scratch/repo/tools/heavy.sh"
 mkdir -p "$scratch/repo/tools/release"
 printf '#!/bin/sh\nprintf "supply-chain\\n" >> "$CALLS"\n' > "$scratch/repo/tools/release/supply-chain.test.sh"
 cat > "$scratch/bin/go" <<'MOCK'
@@ -60,7 +67,7 @@ printf 'Documentation edit\n' >> docs/fixture.md
 bash tools/check.sh > "$scratch/docs.log"
 ! grep -Fxq 'go test ./...' "$CALLS"
 grep -Fxq 'go test -count=1 ./internal/config' "$CALLS"
-! grep -q '^go build\|^go vet\|^npm' "$CALLS"
+! grep -q '^heavy\|^go build\|^go vet\|^npm' "$CALLS"
 mkdir -p internal/example
 printf 'package example\n' > internal/example/example.go
 : > "$CALLS"
@@ -84,6 +91,8 @@ rmdir internal/example internal
 bash tools/check.sh --full > "$scratch/full.log"
 grep -Fxq 'go vet ./...' "$CALLS"
 grep -Fxq 'go build -o /dev/null ./cmd/clawdline' "$CALLS"
+grep -Fxq 'heavy go build ./...' "$CALLS"
+! grep -q '^heavy .*test\|^heavy .*vet' "$CALLS"
 grep -Fxq 'npm run build' "$CALLS"
 grep -Fxq 'supply-chain' "$CALLS"
 # The native shell's Swift tests run in every full check on a Mac, and only there.

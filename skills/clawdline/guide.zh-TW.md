@@ -68,7 +68,7 @@ Swift app 已於 2026-09-19 退役：它被停掉、取消了登入時啟動，p
 | `clawdline dispatch --title "…" --claims a,b < brief.md` | 派出一個 owned child（§4） |
 | `clawdline item show\|steps\|name\|phase\|step-add\|step-done\|doc\|acceptance <item id> …` | 讀取並推進你負責的看板項目（`clawdline guide zh-Hant feature-root`、§10） |
 | `clawdline todo add\|list\|done` | 這個 Session 自己的待辦，只在使用者要求時（§10） |
-| `clawdline heavy [--handoff] -- <command…>` | 在機器唯一的編譯槽裡跑 build 或測試；`--handoff` 會把排隊等待交給 callback（§11） |
+| `clawdline heavy [--handoff] -- <command…>` | 應用程式與原生編譯才排隊；一般指令直接執行；`--handoff` 會把排隊等待交給 callback（§11） |
 | `clawdline send --to <terminal> "…"` | 把一則訊息轉進另一個 session（§8） |
 | `clawdline notify --title "…" --body "…"` | 推播一則通知給使用者（§9） |
 | `clawdline note create --body-file <JSON> [--target <terminal>]` | 在 Session 上方留下需要人處理的便條（§9a） |
@@ -112,7 +112,7 @@ token 讀。帳本還沒讀到、或已經讀不到的 session 會回它的原�
 
 **收到完成通知後再續接。** 派出 child 後結束這個 turn：child 自己的完成通知會喚醒你，不必另設 callback
 監看它。排隊中的 `heavy`、CI、deploy、長時間編譯，或其他不需 Agent 即時判斷的指令，登記
-`clawdline callback`（或使用 `heavy --handoff`／`tools/check.sh`）後結束 turn。收到通知後，對該 id 執行一次
+`clawdline callback`（原生編譯也可使用 `heavy --handoff`）後結束 turn。收到通知後，對該 id 執行一次
 `clawdline task show <id>`；讀取會關掉通知。分別處理成功、失敗與逾時。失敗、逾時或結果不明時，先查明
 已執行的部分，再判斷重試是否安全；不要只因等待逾時就重啟同一工作。後續 turn 不要輪詢，包括用
 `clawdline leases`。一次 token 檢查在十個項目裡數到 520 個純等待 turn（7,220 萬 token），大多花在排隊
@@ -160,7 +160,7 @@ token 讀。帳本還沒讀到、或已經讀不到的 session 會回它的原�
   建置尚未執行；76 代表 `heavy --handoff` 已啟動 callback，應結束這個 turn 並等待通知。
 
 `clawdline heavy` 最多等 `--max-wait`（預設 30 分鐘），之後不執行指令、以 75 結束；要等的時間比你的工具
-允許的長，可用 `--handoff`：排隊時啟動 callback 並以 76 結束。`tools/check.sh` 預設啟用；child 不需要等待型 callback。callback 被拒絕時，讀取具體的拒絕原因並選擇受支援的路徑；拒絕代表指令尚未啟動。
+允許的長，可用 `--handoff`：排隊時啟動 callback 並以 76 結束。一般 `tools/check.sh` 不排隊；child 不需要等待型 callback。callback 被拒絕時，讀取具體的拒絕原因並選擇受支援的路徑；拒絕代表指令尚未啟動。
 
 **用 curl 呼叫 orchestrator 路由。** 從 `<state dir>/orchestrator-token` 讀取憑證，放進
 `X-Clawdline-Orchestrator` header。避免把憑證放在指令參數：使用
@@ -1698,9 +1698,9 @@ clawdline item assign <child id> (--terminal <terminal id> | --new [--assistant 
 
 取得 `daemon_restart` 前先完成建置。不要把 `clawdline dev install` 或其他會要求 `heavy_compile` 的指令包進此 wrapper：重新啟動租約會擋住編譯名額。安排好維護時段後直接執行 `clawdline dev install`；它會先建置再切換。`clawdline update --apply` 也直接執行，由更新程序自行下載、切換、檢查與回復。此 wrapper 只用於不會建置的獨立重新啟動指令。
 
-**編譯或跑測試套件時，用 `clawdline heavy -- <指令>` 包起來，不要直接跑。** 它會先排 `heavy_compile`，等機器有足夠的可用記憶體（機器的四分之一，最多 1 GB，且記憶體等待不超過 10%），再以較低優先權執行；在 Linux 上，記憶體真的不夠時，核心會先砍它而不是互動中的 session。執行期間續租，結束後釋放，並保留指令本身的 exit code。daemon 沒回應、或被它看不懂的理由拒絕時，它不會因此不編譯：照樣執行指令，並在 stderr 說明。等超過 `--max-wait`（預設 30 分鐘）還沒拿到編譯位置和記憶體時，它會放棄排隊、不執行指令，以 **75** 結束——這個代碼不會跟指令本身的失敗混在一起；晚點再跑一次。等待期間只在開始等時印一行、等完時印一行，中間什麼都不印：等它就一次等久一點（§2「等一個跑很久的指令」）。`heavy` 裡面再呼叫 `heavy` 會直接執行。`--min-available 1500M` 可要求更多記憶體，`--no-slot` 只檢查記憶體。repository 裡有 `tools/heavy.sh` 的話，用 `tools/heavy.sh <指令>` 就會自動找到執行檔。
+**只有應用程式建置與原生編譯才使用 `clawdline heavy -- <指令>`。** Go build/install、Swift build、Objective-C／C 編譯及 Xcode 建置會排隊。Python、一般測試（含 Go／Swift test）、前端建置與型別檢查直接執行，不依 CPU 用量判斷。無法辨識的指令也直接執行，不等待記憶體或建立 callback。只有包含應用程式／原生編譯的腳本才用 `--compile`（或 `tools/heavy.sh --compile`）明確標記，不可把整套檢查或測試標記為編譯。`--no-slot` 仍可明確要求只等待記憶體。原生編譯會先排 `heavy_compile`，等機器有足夠的可用記憶體（機器的四分之一，最多 1 GB，且記憶體等待不超過 10%），再以較低優先權執行；在 Linux 上，記憶體真的不夠時，核心會先砍它而不是互動中的 session。執行期間續租，結束後釋放，並保留指令本身的 exit code。daemon 沒回應、或被它看不懂的理由拒絕時，它不會因此不編譯：照樣執行指令，並在 stderr 說明。等超過 `--max-wait`（預設 30 分鐘）還沒拿到編譯位置和記憶體時，它會放棄排隊、不執行指令，以 **75** 結束——這個代碼不會跟指令本身的失敗混在一起；晚點再跑一次。等待期間只在開始等時印一行、等完時印一行，中間什麼都不印：等它就一次等久一點（§2「等一個跑很久的指令」）。`heavy` 裡面再呼叫 `heavy` 會直接執行。`--min-available 1500M` 可要求更多記憶體，`--no-slot` 只檢查記憶體。repository 裡有 `tools/heavy.sh` 的話，用 `tools/heavy.sh <指令>` 就會自動找到執行檔。
 
-Root 的 `heavy` 預設在需要等待時啟動 callback，並以 **76** 結束，印出 callback ID 與已知的排隊位置。這時結束這個 turn，等待通知。`tools/check.sh` 預設啟用；child、缺少 conversation ID、callback 被拒絕或 daemon 無法連線時，仍在原處等待。
+Root 的 `heavy` 預設在需要等待時啟動 callback，並以 **76** 結束，印出 callback ID 與已知的排隊位置。這時結束這個 turn，等待通知。一般 `tools/check.sh` 不排隊；child、缺少 conversation ID、callback 被拒絕或 daemon 無法連線時，仍在原處等待。
 
 **Session 暫停與喚醒。** 排列衝突工作前，先讀 `docs/session-resource-coordination.md`。`clawdline coordination status` 顯示持久化的暫停回執。`clawdline coordination pause --reason "…" --wake "lease:heavy_compile" <目標對話 ID>…` 接受指令並嘗試送達。收件 Session 完成重要命令後執行 `clawdline coordination observed <指令 ID>`，到安全停點再執行 `clawdline coordination safe <指令 ID>`，然後結束模型回合。只有最後一筆收件者回執代表已暫停。條件成立後執行 `wake <指令 ID>`；收件者執行 `resumed <指令 ID>`，且仍須先取得租約或確認等待已釋放，才能工作。`retry <指令 ID>` 可重試失敗或結果不明的送達。新的已註冊 Clawdfather 可以喚醒離線前任留下的 Session。候位期間不要讓模型回合定期輪詢。
 

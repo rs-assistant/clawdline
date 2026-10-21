@@ -16,7 +16,7 @@ tools/check.sh --quick ./internal/adapters/store
 Run the smallest relevant package/test while editing. `--run=` accepts Go's test
 name expression. Quick mode is explicitly a development check, not a commit or
 integration receipt. A package with slow tests may need a narrower expression to
-meet ten seconds. Use `tools/heavy.sh` for other ad hoc test commands too.
+meet ten seconds. Ordinary tests run directly without the compile queue. Only application/native builds use `tools/heavy.sh`; opaque native build scripts use `tools/heavy.sh --compile`.
 
 A result must not depend on the developer's machine. `cmd/clawdline` tests run
 under a `TestMain` (`cmd/clawdline/hermetic_test.go`) that clears every

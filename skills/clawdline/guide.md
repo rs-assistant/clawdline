@@ -74,7 +74,7 @@ the command instead.
 | `clawdline dispatch --title "…" --claims a,b < brief.md` | Dispatches an owned child (§4) |
 | `clawdline item show\|steps\|name\|phase\|step-add\|step-done\|doc\|acceptance <item id> …` | Reads and advances a Board item you own (`clawdline guide feature-root`, §10) |
 | `clawdline todo add\|list\|done` | This Session's own to-dos, only when the person asks (§10) |
-| `clawdline heavy [--handoff] -- <command…>` | Runs a build or test suite in the machine's one compile slot; `--handoff` gives a queued wait to a callback (§11) |
+| `clawdline heavy [--handoff] -- <command…>` | Queues application/native compilation; ordinary commands run directly; `--handoff` gives a queued wait to a callback (§11) |
 | `clawdline send --to <terminal> "…"` | Relays a message into another session (§8) |
 | `clawdline notify --title "…" --body "…"` | Pushes a notification to the person (§9) |
 | `clawdline note create --body-file <JSON> [--target <terminal>]` | Leaves one actionable note above a Session (§9a) |
@@ -123,7 +123,7 @@ ledger has not read, or can no longer read, answers `not_yet_read`, `transcript_
 **Continue on the completion notice.** After dispatching a child, end the turn: the child's own
 completion notice wakes you, so do not add a callback to watch it. For a queued `heavy`, CI, deploy,
 long build or other command that can run without Agent decisions, register `clawdline callback`
-(or use `heavy --handoff` / `tools/check.sh`) and end the turn. On its notice, run
+(or use `heavy --handoff` for native compilation) and end the turn. On its notice, run
 `clawdline task show <id>` once; the read closes the notice. Treat success, failure and timeout as
 different results. Inspect a failure, timeout or uncertain outcome before deciding whether a retry
 is safe; do not start the same work again just because a wait expired. Do not poll from later turns,
@@ -179,7 +179,7 @@ print nothing while running; for long commands use the callback path above.
   exit code: 75 means the compile-slot or memory wait expired before the build ran; 76 means `heavy --handoff` started a callback, so end your turn and wait for its notice.
 
 `clawdline heavy` waits at most `--max-wait` (default 30m) and then exits 75 without running the
-command. With `--handoff`, a queued wait starts a callback and exits 76; `tools/check.sh` requests this by default. A child needs no waiting callback. If a callback is refused, read the typed refusal and choose a supported path; a refusal has not started the command.
+command. With `--handoff`, a queued wait starts a callback and exits 76; Ordinary `tools/check.sh` runs do not queue. A child needs no waiting callback. If a callback is refused, read the typed refusal and choose a supported path; a refusal has not started the command.
 
 **Curl to an orchestrator route.** Read `<state dir>/orchestrator-token` and send it in the
 `X-Clawdline-Orchestrator` header. Keep the token out of command arguments: use
@@ -1983,7 +1983,7 @@ checkout), and `daemon_restart` (one machine-wide restart window).
 
 Build before taking `daemon_restart`. Never put `clawdline dev install` or another command that requests `heavy_compile` inside that wrapper: the restart lease blocks the compile slot. Run `clawdline dev install` directly after arranging the maintenance window; it builds before switching. Run `clawdline update --apply` directly too: it performs its own download, switch, health check and rollback. Use the wrapper only for a separate restart command that does not build.
 
-**Run a build or a test suite through `clawdline heavy -- <command>`**, not bare. It queues for
+**Only application builds and native compilation use `clawdline heavy -- <command>`.** Go build/install, Swift build, Objective-C/C compilation and Xcode builds queue. Python, ordinary tests (including Go/Swift tests), frontend bundles and type checks run directly, regardless of CPU use. Unknown commands also run directly without a memory wait or callback. Use `--compile` (or `tools/heavy.sh --compile`) only to declare an opaque application/native build script; never wrap an entire check/test script as compilation. `--no-slot` explicitly requests a memory-only wait. Native compilation queues for
 `heavy_compile`, waits until the machine has memory available (a quarter of it, at most 1 GB, and
 no memory stall above 10%), runs the command at a lower priority — on Linux also as the first
 thing the kernel kills if memory runs out — renews the lease while it runs and releases it after. It keeps the
@@ -1995,7 +1995,7 @@ prints one line when the wait starts and one when it ends, nothing in between: w
 long (§2, "Waiting on a long command"). A `heavy` inside a `heavy` runs directly. `--min-available 1500M` asks for more; `--no-slot` checks memory only. In a repository
 that has it, `tools/heavy.sh <command>` finds the binary for you.
 
-`heavy` starts a callback by default when a Root would wait; it then exits **76** with the callback id and queue position when known. End your turn and wait for the notice. `tools/check.sh` enables this by default; a child, missing conversation, refused callback, or unreachable daemon keeps waiting in place.
+`heavy` starts a callback by default when a Root would wait; it then exits **76** with the callback id and queue position when known. End your turn and wait for the notice. Ordinary `tools/check.sh` runs do not queue; a child, missing conversation, refused callback, or unreachable daemon keeps waiting in place.
 
 **Session pause and wake.** Read `docs/session-resource-coordination.md` before ordering conflicting work. `clawdline coordination status` shows durable pause receipts. `clawdline coordination pause --reason "…" --wake "lease:heavy_compile" <target conversation id>…` accepts a request and tries to deliver it. The receiver finishes important commands, runs `clawdline coordination observed <request id>`, then `clawdline coordination safe <request id>` at a safe turn boundary and ends its model turn. Only that final receiver receipt means paused. Use `wake <request id>` after the condition holds; the receiver runs `resumed <request id>` and still acquires its lease or confirms its wait release before working. `retry <request id>` reattempts failed or uncertain delivery. A new registered Clawdfather can wake its offline predecessor's parked Session. Do not poll from a waiting model turn.
 

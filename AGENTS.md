@@ -85,8 +85,10 @@ tools/heavy.sh bash tools/test-heavy-linux-cache.sh # Linux only: cache ownershi
 ( cd web && npm run check && ../tools/heavy.sh npm run build && ../tools/heavy.sh npm test )   # when anything under web/ changed
 ```
 
-- **Every compile, test suite or bundle build goes through `tools/heavy.sh`** (`clawdline heavy`).
-  Wrap the whole script once; wait for it with one long wait. If it exits 75 before acquiring the
+- **Only application builds and native compilation queue through `tools/heavy.sh`** (`clawdline heavy`).
+  Go/Swift tests, Python, frontend bundles, type checks and ordinary checks run directly; CPU usage
+  alone never requires a queue. For opaque native build scripts use `tools/heavy.sh --compile <command>`.
+  Do not wrap a whole check/test script as compilation. Wait for queued native builds with one long wait. If it exits 75 before acquiring the
   slot, run it later. A queued `tools/check.sh` hands itself to a callback and exits 76: a root
   ends its turn and waits for the notice; a child waits in place. See `docs/working-rules.md` for
   the incident and procedure.
