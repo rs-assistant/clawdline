@@ -15,6 +15,9 @@ import (
 )
 
 type Inventory struct {
+	// SquadRole resolves a process's immutable launch ID against its terminal.
+	// It is optional for inventories without a durable role store.
+	SquadRole func(context.Context, session.Session) string
 	// DiscoverExternal defaults to true; false keeps external terminal presence only.
 	DiscoverExternal func() bool
 	Process          ports.ProcessHost
@@ -201,6 +204,9 @@ func (in Inventory) Read(ctx context.Context) session.Inventory {
 			continue
 		}
 		row := in.enrich(ctx, byTTY[key])
+		if row.IsAssistant() && row.SquadLaunchID != "" && in.SquadRole != nil {
+			row.Persona = in.SquadRole(ctx, row)
+		}
 		if in.Agents != nil {
 			row = in.Agents.ForSession(row)
 		}
