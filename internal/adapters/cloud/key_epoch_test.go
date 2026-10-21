@@ -1,11 +1,14 @@
 package cloud
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sync/atomic"
 	"testing"
@@ -90,8 +93,26 @@ func TestACutoverWaitsForAnOldRowsWriteAndNothingOldIsWrittenAfter(t *testing.T)
 		}}}
 	conn, peer := pipeConn(nil)
 	gate := make(chan struct{})
-	var read atomic.Int64
-	go countingPeer(peer, gate, &read)
+	// Observe complete frames and join the reader before inspecting them.
+	// net.Pipe.Write can finish before the reader records the payload; a
+	// nonzero byte count may describe only the WebSocket header.
+	var frames [][]byte
+	var readErr error
+	readerDone := make(chan struct{})
+	go func() {
+		defer close(readerDone)
+		<-gate
+		reader := bufio.NewReader(peer)
+		for {
+			frame, err := readServerFrame(reader)
+			if err != nil {
+				readErr = err
+				return
+			}
+			frames = append(frames, frame)
+		}
+	}()
+	t.Cleanup(func() { _ = conn.Close(); _ = peer.Close() })
 
 	drained := make(chan bool)
 	go func() { drained <- transport.drainOnce(conn) }()
@@ -116,8 +137,6 @@ func TestACutoverWaitsForAnOldRowsWriteAndNothingOldIsWrittenAfter(t *testing.T)
 	if !<-drained {
 		t.Fatal("the drain failed")
 	}
-	waitFor(t, 5*time.Second, func() bool { return read.Load() > 0 })
-	oneFrame := read.Load()
 	for _, seq := range []uint64{blocked, behind} {
 		if row, _ := s.Row(seq); row.State != SpoolBurned || row.BurnReason != BurnKeyRetired {
 			t.Fatalf("seq %d after the cutover: %+v", seq, row)
@@ -133,9 +152,14 @@ func TestACutoverWaitsForAnOldRowsWriteAndNothingOldIsWrittenAfter(t *testing.T)
 	waitFor(t, 5*time.Second, func() bool { row, _ := s.Row(missed); return row.State == SpoolBurned })
 	close(stop)
 	<-finished
-	time.Sleep(20 * time.Millisecond)
-	if got := read.Load(); got != oneFrame {
-		t.Fatalf("%d more bytes went out after the cutover", got-oneFrame)
+	_ = conn.Close()
+	<-readerDone
+	if !errors.Is(readErr, io.EOF) {
+		t.Fatalf("reading the complete publication stream: %v", readErr)
+	}
+	want := PublishFrame([]byte(`{"frame":"t/m/blocked"}`))
+	if len(frames) != 1 || !bytes.Equal(frames[0], want) {
+		t.Fatalf("publications across cutover: %q, want only %q", frames, want)
 	}
 	if row, _ := s.Row(missed); row.BurnReason != BurnKeyRetired {
 		t.Fatalf("the missed row: %+v", row)
