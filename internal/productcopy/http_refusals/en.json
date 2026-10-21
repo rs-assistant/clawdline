@@ -1,4 +1,5 @@
 {
+  "http.7365b6e50a6dd149": "The Cloud connection is not available in this daemon.",
   "http.1c713ef2f5fafb46": "An image is read whole, or with size=thumb.",
   "http.44d0e689bf3adef3": "The image could not be drawn small.",
   "http.84cc28107e831259": "This machine must allow Cloud operations and direct connections to enable same-network connections.",

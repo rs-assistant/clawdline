@@ -40,7 +40,7 @@
 | `closeability_unknown` | `internal/transport/http/actions.go` |
 | `cloud_not_signed_in` | `internal/transport/http/cloud.go`, `internal/transport/http/cloud_identity_pairing.go`, `internal/transport/http/cloud_onboarding.go` |
 | `cloud_off` | `internal/transport/http/cloud.go`, `internal/transport/http/cloud_identity_pairing.go` |
-| `cloud_runtime_unavailable` | `internal/transport/http/cloud_onboarding.go` |
+| `cloud_runtime_unavailable` | `internal/transport/http/cloud.go`, `internal/transport/http/cloud_onboarding.go` |
 | `confirmation_mismatch` | `internal/transport/http/work_v2.go` |
 | `conversation_empty` | `internal/transport/http/session_smart_title.go` |
 | `conversation_id_malformed` | `internal/transport/http/human_interventions.go`, `internal/transport/http/work_v2_session_todos.go` |

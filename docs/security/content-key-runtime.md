@@ -7,6 +7,32 @@ Its remaining-obligations list is historical; the integration section at the end
 records the new wiring and the acceptance still outstanding. Neither section
 establishes deployed future-content revocation.
 
+## Update acceptance before Cloud activation
+
+The daemon defers the entire Cloud link (including `Open`, pairing, local
+revocation, viewer grants and signing-key rotation) while an installed update
+is pending or its state cannot be read. Local HTTP and console health routes
+remain available to the update supervisor. Initial activation and settings
+reload share the same admission check; the existing updater settle poll resumes
+Cloud in the same boot after acceptance. Cancellation prevents a deferred open.
+
+This is necessary even though the content-key producer remains disabled: the
+first supervisor upgrading from v2.0.0 runs **the old version's** `Finish`.
+Changing only the new supervisor cannot close that first rollback window.
+`Finish` removes pending before writing its healthy receipt, so disappearance
+alone is insufficient. Admission requires the accepted receipt for a witnessed
+candidate, matching candidate build stamp, and an installation whose current
+release still matches the process's captured executable/build identity. A
+rollback or a replaced service hard link cannot relabel a surviving candidate
+as the accepted old process. Unreadable pending quarantined by `Finish` remains
+closed through its failed receipt.
+
+Before admission, the device-management routes have no pairing object and
+return a typed refusal without touching pins, revocation journals or keys;
+there is no legacy-revocation fallback. This is an update compatibility guard,
+not an assertion of deployed future-content revocation, and it does not enable
+`LinkOptions.ContentKeyRuntime`.
+
 ## The problem it closes
 
 `Relay.PublishTracked` used to read `r.Secret` and `r.KeyID` as two fields, and
