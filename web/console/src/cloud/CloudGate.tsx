@@ -101,6 +101,7 @@ import {
   type RetryReason,
 } from "./state.js"
 import "./cloud.css"
+import { attentionWatch, type Attention } from "./admin/health/attention.js"
 
 /**
  * What stands in front of the console when the build says it is Clawdline
@@ -406,6 +407,15 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
   }, [])
   /** A console is on screen, for a machine this browser can read. */
   const [operationsAccess, setOperationsAccess] = useState(false)
+  // One attention reader for the whole gate, so a remounted console never adds a poller. It
+  // exists only for an administrator: nobody else ever sends the operator read.
+  const attentionOrigin = operationsAccess && transport.kind === "cloud" ? transport.config.apiOrigin : null
+  const attention = useMemo(() => attentionOrigin === null ? null : attentionWatch(attentionOrigin, (...a) => fetch(...a)), [attentionOrigin])
+  const [operationsAttention, setOperationsAttention] = useState<Attention | null>(null)
+  useEffect(() => {
+    setOperationsAttention(null)
+    return attention?.subscribe(setOperationsAttention)
+  }, [attention])
   const consoleUp = !!chosen && screen.at === "console"
   /**
    * The machine the console is reading.
@@ -1957,7 +1967,7 @@ export function CloudGate({ declared, sessionSource = null }: { declared: string
         productVersion={transport.config.build || "unknown"} /> : null}
       {chosen && who && transport.kind === "cloud" && screen.at === "console" && (
         <CloudAccountContext.Provider value={{ apiOrigin: transport.config.apiOrigin, deviceID: who.device }}>
-          <App cloudOperationsAccess={operationsAccess} key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
+          <App cloudOperationsAccess={operationsAccess} cloudOperationsAttention={operationsAttention} key={fleetScope ? "fleet" : reading ?? chosen.id} aside={aside} hideSessionCounts={fleetScope}
             onChooseDashboardMachine={fleetScope ? () => {
               switchOpener.current = document.getElementById("machine-dashboard-open")
               setDashboardPicker(true)

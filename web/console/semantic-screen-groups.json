@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "englishContentKeys": 8719,
-  "riskKeys": 3856,
-  "nonRiskCount": 4863,
+  "englishContentKeys": 8737,
+  "riskKeys": 3869,
+  "nonRiskCount": 4868,
   "groups": [
     {
       "name": "admin / other",
@@ -906,7 +906,7 @@
     },
     {
       "name": "health / other",
-      "count": 670,
+      "count": 674,
       "sources": [
         null
       ],
@@ -915,6 +915,10 @@
         "health.affected",
         "health.affectedLower",
         "health.asOf",
+        "health.at_action_investigate",
+        "health.at_action_review_fix",
+        "health.at_action_review_result",
+        "health.at_incident",
         "health.basis_source",
         "health.carriersTitle",
         "health.certainty_confirmed",
@@ -3207,7 +3211,7 @@
     },
     {
       "name": "next / other",
-      "count": 356,
+      "count": 357,
       "sources": [
         "src/next-strings.ts"
       ],
@@ -3442,6 +3446,7 @@
         "next.sessionWriteDisabled",
         "next.sessionsListWaitTitle",
         "next.sessionsMachineOfflineTitle",
+        "next.sidebarAdministrator",
         "next.sidebarAppStaged",
         "next.sidebarChooseMachineVersion",
         "next.sidebarHide",
