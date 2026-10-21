@@ -134,8 +134,8 @@ const okList = (body: unknown) => {
   return d
 }
 
-test("a Mac with three webhooks and a Linux machine with one are two machines, each listed once", () => {
-  // Cloud resolves the Mac's three hooks to its one investigation hook; the Linux machine has none bound.
+test("a machine with three webhooks and a Linux machine with one are two machines, each listed once", () => {
+  // Cloud resolves the first machine's three hooks to its one investigation hook; the Linux machine has none bound.
   const d = okList(listOf([row("mac_1", "Studio", "ready", MAC_HOOK), row("linux_1", "Build server", "setup_required")]))
   assert.equal(d.machines.length, 2)
   assert.deepEqual(d.machines.map((m) => [m.machine_name, m.state]), [["Studio", "ready"], ["Build server", "setup_required"]])
