@@ -477,6 +477,12 @@ export class StatusCloudClient extends CatalogCloudClient {
     return super._machineImplements(machine, type, options)
   }
 
+  /** Retry backoff expiring permits another request; only live evidence restores presence. */
+  _machineRows() {
+    return super._machineRows().map((row) => this.machineOffline?.has(row.id)
+      ? Object.freeze({ ...row, freshness: "stale", autoSelectable: false }) : row)
+  }
+
   _machinesFor(type) {
     let found = super._machinesFor(type)
     if (type !== "voice") return found
@@ -492,14 +498,16 @@ export class StatusCloudClient extends CatalogCloudClient {
     if (this.voiceUnavailable instanceof Set && this.voiceUnavailable.size) {
       found = { ...found, capable: found.capable.filter((row) => !this.voiceUnavailable.has(row.id)) }
     }
-    return found
+    // Capability is not availability. This also gates saved choices, sole
+    // candidates and the Session-owner path before any recording is sent.
+    return { ...found, capable: found.capable.filter((row) => row.freshness === "current") }
   }
 
   /** A saved choice wins; otherwise one current Mac is the fleet fallback. */
   _voiceHost() {
     const choice = this._voiceHostChoice()
-    if (choice) return super._voiceHost()
     const found = this._machinesFor("voice")
+    if (found.capable.some((row) => row.id === choice)) return super._voiceHost()
     const macs = found.capable.filter((row) => row.freshness === "current" &&
       ["darwin", "macos"].includes(String(this.machineDescriptor(row.id)?.machine?.platform || "").toLowerCase()))
     if (macs.length === 1) {

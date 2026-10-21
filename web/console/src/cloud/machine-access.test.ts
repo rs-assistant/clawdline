@@ -4,7 +4,7 @@ import assert from "node:assert/strict"
 import { machinesByCapability, reportsMachinePresence } from "./machine-access.ts"
 
 test("reports from either machine refresh presence while a single-machine reader is open", () => {
-  for (const type of ["sessions", "orchestrator", "session_status"]) {
+  for (const type of ["sessions", "orchestrator", "session_status", "machine_reachability"]) {
     assert.equal(reportsMachinePresence({ type }), true, type)
   }
   assert.equal(reportsMachinePresence({ type: "connection" }), false)
