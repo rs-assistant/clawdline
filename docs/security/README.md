@@ -13,7 +13,7 @@ Use this index to check Clawdline's data, permission, and installation boundarie
 | Where does Cloud encryption happen? | [Go daemon and browser architecture](../cloud.md), [envelope implementation](../../internal/domain/cloud), and [browser implementation](../../web/console/src/cloud) |
 | What does revocation check? | [Local revocation boundary tests](../../internal/domain/auth/revocation_boundary_test.go) and [Cloud content authority tests](../../internal/transport/cloud/content_authority_test.go) |
 | What authenticates an installation or update? | [Installation and first-install trust](../user/install.md), [release manifest and signing process](../releasing.md), [installer source](../../install.sh), and [update verification](../../internal/adapters/release/release.go) |
-| What do independent agents report about comparable tools? | [English reports and methodology](agent-reviews/README.md), [Traditional Chinese reports and methodology](agent-reviews/README.zh-TW.md) |
+| What do independent agents report about comparable tools? | [English comparison and full responses](https://clawdline.com/ai-review/), [Traditional Chinese comparison and reading guides](https://clawdline.com/zh-TW/ai-review/) |
 | What supply-chain evidence must a new release provide? | [Release evidence, verification commands, and pending acceptance](release-evidence.md) |
 | How are source changes checked? | [Check scope and release verification boundaries](../checks.md) |
 
